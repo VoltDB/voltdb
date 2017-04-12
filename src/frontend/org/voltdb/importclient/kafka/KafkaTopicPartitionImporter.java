@@ -536,13 +536,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     public boolean commitOffset() {
         final short version = 1;
         long safe = m_gapTracker.commit(-1L);
-        if (safe > m_lastCommittedOffset) {
+        long pausedOffset = m_pauseOffset.get();
+        if (safe > m_lastCommittedOffset || pausedOffset != -1) {
             long now = System.currentTimeMillis();
             OffsetCommitResponse offsetCommitResponse = null;
             try {
                 BlockingChannel channel = null;
                 int retries = 3;
-                long pausedOffset = m_pauseOffset.get();
                 if (pausedOffset != -1) {
                     info(null, "Using paused offset to commit: " + pausedOffset);
                 }
