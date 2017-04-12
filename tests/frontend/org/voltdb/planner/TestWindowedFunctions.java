@@ -515,7 +515,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         failToCompile("SELECT A, B, C FROM AAA WHERE RANK() OVER (PARTITION BY A ORDER BY B) < 3;",
                       "Windowed function call expressions can only appear in the selection list of a query or subquery.");
         failToCompile("SELECT COUNT((SELECT DISTINCT A FROM AAA)) OVER (PARTITION BY A) FROM AAA;",
-                      "Window Function with subquery expression is not allowed.");
+                      "Window Functions with subquery expressions are not allowed.");
 
         // Detect that PARTITION BY A is ambiguous when A names multiple columns.
         // Queries like this passed at one point in development, ignoring the subquery

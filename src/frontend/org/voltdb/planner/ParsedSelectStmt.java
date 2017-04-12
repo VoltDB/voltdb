@@ -602,7 +602,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(expr instanceof AggregateExpression);
             if (expr.hasSubquerySubexpression()) {
                 throw new PlanningErrorException(
-                        "SQL Aggregate with subquery expression is not allowed.");
+                        "SQL Aggregates with subquery expressions are not allowed.");
             }
 
             ParsedColInfo col = new ParsedColInfo();
@@ -943,7 +943,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
             }
             if (m_windowFunctionExpressions.get(0).hasSubqueryArgs()) {
-                throw new PlanningErrorException("Window Function with subquery expression is not allowed.");
+                throw new PlanningErrorException("Window functions with subquery expressions are not allowed.");
             }
             //
             // This could be an if statement, but I think it's better to
@@ -1101,7 +1101,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // guards against subquery inside of order by clause
         if (order_exp.hasSubquerySubexpression()) {
             throw new PlanningErrorException(
-                    "ORDER BY clause with subquery expression is not allowed.");
+                    "ORDER BY clauses with subquery expressions are not allowed.");
         }
 
         // Mark the order by column if it is in displayColumns. The ORDER BY
@@ -1144,7 +1144,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_having.hasSubquerySubexpression()) {
             m_aggregationList.clear();
             throw new PlanningErrorException(
-                    "SQL HAVING with subquery expression is not allowed.");
+                    "SQL HAVING clauses with subquery expressions are not allowed.");
         }
         if (isDistributed) {
             m_having = m_having.replaceAVG();
