@@ -31,6 +31,12 @@ try:
 except ImportError, e:
     ssl_available = False
     ssl_exception = e
+try:
+    import krbV
+    kerberos_available = True
+except  ImportError, e:
+    kerberos_available = False
+    kerberos_exception = e
 
 
 decimal.getcontext().prec = 38
@@ -147,8 +153,10 @@ class FastSerializer:
     else:
         DEFAULT_SSL_CONFIG = {}
 
-    def __init__(self, host = None, port = 21212, usessl = False, username = "",
-                 password = "", dump_file_path = None,
+    def __init__(self, host = None, port = 21212, usessl = False,
+                 username = "", password = "",
+                 kerberos = None,
+                 dump_file_path = None,
                  connect_timeout = 8,
                  procedure_timeout = None,
                  default_timeout = None,
@@ -160,6 +168,7 @@ class FastSerializer:
         :param usessl: switch for use ssl or not
         :param username: authentication user name for connection or None
         :param password: authentication password for connection or None
+        :param kerberos: use Kerberos authentication
         :param dump_file_path: path to optional dump file or None
         :param connect_timeout: timeout (secs) or None for authentication (default=8)
         :param procedure_timeout: timeout (secs) or None for procedure calls (default=None)
@@ -275,6 +284,11 @@ class FastSerializer:
             assert not self.socket is None
             self.socket.settimeout(connect_timeout)
             self.authenticate(username, password)
+        elif not kerberos is None:
+            assert not self.socket is None
+            self.socket.settimeout(connect_timeout)
+            kerberos_ticket = KerberosTicket(kerberos)
+            self.authenticate(username, kerberos_ticket)
 
         if self.socket:
             self.socket.settimeout(self.default_timeout)
@@ -417,6 +431,20 @@ class FastSerializer:
         self.readInt32()
         for x in range(self.readInt32()):
             self.readByte()
+
+    def has_ticket():
+        '''
+        Checks to see if the user has a valid ticket.
+        '''
+        ctx = krbV.default_context()
+        cc = ctx.default_ccache()
+        try:
+            princ = cc.principal()
+            retval = True
+        except krbV.Krb5Error:
+            retval = False
+
+        return retval
 
     def setInputByteOrder(self, bom):
         # assuming bom is high bit set?
