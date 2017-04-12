@@ -698,8 +698,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         VoltTable result;
 
         Client client = getClient();
-        loadSomeData(client, 0, 10);
-        assertCallbackSuccess(client);
 
         // check that no index was used by checking the plan itself
         callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
@@ -712,8 +710,10 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
 
-        // check the index for non-zero size
+        loadSomeData(client, 0, 10);
+        assertCallbackSuccess(client);
 
+        // check the index for non-zero size
         long tupleCount = -1;
         while (tupleCount <= 0) {
             tupleCount = indexEntryCountFromStats(client, "NEW_ORDER", "NEWEXPRESSINDEX");
