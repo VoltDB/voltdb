@@ -416,7 +416,6 @@ def test_irregular_verbs(reportout = None):
     for v in volt_irregular_verbs:
         for obj in objects:
             for pos in options:
-                print "+++ pos = " + str(pos)
                 if pos == "none":
                     clean_args = [obj.pyname]
                     expected_opts = [volt_verbs_mapping[v], obj.javaname,]
