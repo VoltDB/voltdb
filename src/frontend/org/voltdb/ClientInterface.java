@@ -1237,6 +1237,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                               1000 * 120,
                                                               cb,
                                                               true, // priority NT
+                                                              null, // back pressure predicate
                                                               invocation.getProcName(),
                                                               itm.getParameters());
                 }
