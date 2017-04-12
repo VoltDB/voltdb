@@ -96,18 +96,24 @@ def basicCheck(runner):
         if remote_cluster_id > largestClusterId:
             largestClusterId = remote_cluster_id
 
-#     # Check the existence of voltdb root path and new kit on all the existing nodes
-#     response = runner.call_proc('@CheckUpgradePlan',
-#                                 [VOLT.FastSerializer.VOLTTYPE_STRING],
-#                                 [runner.opts.newKit, runner.opts.newRoot])
-#     for tuple in response.table(0).tuples():
-#         if tuple != 'Success':
-#             error += tuple + "\n"
-#
-#     if error is not None:
-#         runner.abort(error)
+    # Check the existence of voltdb root path and new kit on all the existing nodes
+    response = runner.call_proc('@CheckUpgradePlanNT',
+                                [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
+                                [runner.opts.newKit, runner.opts.newRoot])
+    error = False
+    for tuple in response.table(0).tuples():
+        hostId = tuple[0]
+        result = tuple[1]
+        if result != 'Success':
+            error = True
+            host = hosts.hosts_by_id[hostId]
+            if host is None:
+                runner.abort('@CheckUpgradePlanNT returns a host id ' + hostId + " that doesn't belong to the cluster.")
+            print 'Check fails on Host ' + getHostnameOrIp(host) + " with the cause: " + result
 
-    print 'Pre-upgrade check is passed.'
+    if error:
+        runner.abort("Failed to pass pre-upgrade check. Abort. ")
+    print 'Pass pre-upgrade check.'
 
     return hosts, kfactor, largestClusterId
 
@@ -135,9 +141,9 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
     step += 1
     leadersString = generateStartNewClusterCommand(runner.opts, killSet, hostcount, files, newNodeF, step)
 
-    # 4 load catalog into the new cluster
+    # 4 load schema into the new cluster
     step += 1
-    writeCommands(files[getKey(killSet[0])], 'Step %d: load catalog' % step, '#note# load catalog into the new-version cluster')
+    writeCommands(files[getKey(killSet[0])], 'Step %d: load schema' % step, '#instruction# load schema into the new-version cluster')
 
     # 5 only for upgrading stand-alone cluster, set up XDCR replication between two clusters
     # update old cluster's deployment file
@@ -201,18 +207,25 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, largestClusterId,
         if hostInfo in killSet:
             writeCommands(file,
                           'Step %d: copy deployment file' % step,
-                          '#note# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
+                          '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
         if hostInfo in surviveSet:
-            writeCommands(file,
-                          'Step %d: copy deployment file' % step,
-                          '#note# copy %s and %s to %s' % (origin_cluster_deploy, new_cluster_deploy, runner.opts.newRoot))
+            if largestClusterId == -1:
+                # for stand-alone cluster
+                writeCommands(file,
+                              'Step %d: copy deployment file' % step,
+                              '#instruction# copy %s and %s to %s' % (origin_cluster_deploy, new_cluster_deploy, runner.opts.newRoot))
+            else:
+                # for multi-cluster
+                writeCommands(file,
+                              'Step %d: copy deployment file' % step,
+                              '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
     newNodeF = None
     if runner.opts.newNode is not None:
         newNodeF = open("upgradePlan-%s.txt" % (runner.opts.newNode), 'w+')
         writeHeader(newNodeF)
         writeCommands(newNodeF,
                       'Step %d: copy deployment file' % step,
-                      '#note# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
+                      '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
     return files, newNodeF
 
 def generateStopNodeCommand(hosts, surviveSet, killSet, files, step):
@@ -294,9 +307,9 @@ def generateInitOldClusterCommmand(opts, surviveSet, files, new_cluster_deploy, 
         initNodes += 1
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: initialize original cluster with new voltdb path' % step,
-                      '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'),
-                                                        opts.newRoot,
-                                                        os.path.join(opts.newRoot, new_cluster_deploy)))
+                      '%s init --dir=%s --config=%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                                                                opts.newRoot,
+                                                                os.path.join(opts.newRoot, new_cluster_deploy)))
         if initNodes == halfNodes:
             break
 
@@ -448,7 +461,7 @@ def createDeploymentForNewCluster(runner, xmlString, largestClusterId, drSource,
         else:
             connection.attrib['source'] = drSource
     else:
-        # for multisite cluster
+        # for multi-cluster
         if 'source' not in connection.attrib:
             # Connect to a random covering host
             response = checkstats.get_stats(runner, "DRCONSUMER")
