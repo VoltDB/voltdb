@@ -355,6 +355,12 @@ typedef struct {
     char log[0];
 }__attribute__((packed)) apply_binary_log;
 
+typedef struct {
+    struct ipc_command cmd;
+    int64_t timestamp;
+    int32_t isStreamChange;
+    char data[0];
+}__attribute__((packed)) update_catalog_cmd;
 
 using namespace voltdb;
 
@@ -565,19 +571,13 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
 
 int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
     assert(m_engine);
+    update_catalog_cmd *uc = (update_catalog_cmd*) cmd;
     if (!m_engine) {
         return kErrorCode_Error;
     }
 
-    struct updatecatalog {
-        struct ipc_command cmd;
-        int64_t timestamp;
-        bool isStreamChange;
-        char data[];
-    };
-    struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(ntohll(uc->timestamp), uc->isStreamChange, std::string(uc->data)) == true) {
+        if (m_engine->updateCatalog(ntohll(uc->timestamp), (uc->isStreamChange != 0), std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
     }
