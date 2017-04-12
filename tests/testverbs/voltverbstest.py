@@ -233,9 +233,9 @@ option_name_re = re.compile(option_name)
 # also skip 'blocking'
 option_ignore = ['version', 'help', 'verbose', 'background', 'ignore', 'blocking']
 
-# model data for the irregular (voltdb get) family
 # voltdb get and others use positional arguments so their
 # tests can't use the same pattern as "voltdb start|init|..."
+# model data for the irregular (voltdb get) family
 volt_irregular_verbs = { "get": 2,}
 get = Opt("get", "get", str, 2)
 irr_classes = Opt("classes", "classes", str, 2)
@@ -416,7 +416,9 @@ def test_irregular_verbs(reportout = None):
     for v in volt_irregular_verbs:
         for obj in objects:
             for pos in options:
+                print "+++ pos = " + str(pos)
                 if pos == "none":
+                    clean_args = [obj.pyname]
                     expected_opts = [volt_verbs_mapping[v], obj.javaname,]
                 else:
                     expected_opts = [volt_verbs_mapping[v], obj.javaname, pos.javaname]
