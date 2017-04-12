@@ -2526,11 +2526,14 @@ public class PlanAssembler {
                 }
             }
 
-            int outputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
             NodeSchema top_agg_schema = new NodeSchema();
 
-            for (ParsedColInfo col : m_parsedSelect.m_aggResultColumns) {
+
+            for ( int outputColumnIndex = 0;
+                    outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
+                    outputColumnIndex += 1) {
+                ParsedColInfo col = m_parsedSelect.m_aggResultColumns.get(outputColumnIndex);
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
@@ -2559,12 +2562,12 @@ public class PlanAssembler {
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
-                            tve);
+                            tve, outputColumnIndex);
                     top_schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
-                            tve);
+                            tve, outputColumnIndex);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -2653,7 +2656,8 @@ public class PlanAssembler {
                     schema_col = new SchemaColumn(
                             col.tableName, col.tableAlias,
                             col.columnName, col.alias,
-                            col.expression);
+                            col.expression,
+                            outputColumnIndex);
                     AbstractExpression topExpr = null;
                     if (col.groupBy) {
                         topExpr = m_parsedSelect.m_groupByExpressions.get(col.alias);
@@ -2663,12 +2667,12 @@ public class PlanAssembler {
                     }
                     top_schema_col = new SchemaColumn(
                             col.tableName, col.tableAlias,
-                            col.columnName, col.alias, topExpr);
+                            col.columnName, col.alias,
+                            topExpr, outputColumnIndex);
                 }
 
                 agg_schema.addColumn(schema_col);
                 top_agg_schema.addColumn(top_schema_col);
-                outputColumnIndex++;
             }// end for each ParsedColInfo in m_aggResultColumns
 
             for (ParsedColInfo col : m_parsedSelect.m_groupByColumns) {

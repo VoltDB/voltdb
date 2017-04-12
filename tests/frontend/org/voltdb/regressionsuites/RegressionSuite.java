@@ -145,6 +145,7 @@ public class RegressionSuite extends TestCase {
                     }
                 }
             }
+            client.drain();
         }
         for (final Client c : m_clients) {
             c.close();
