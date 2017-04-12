@@ -28,11 +28,11 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.utils.MiscUtils;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-
-import org.voltdb.utils.MiscUtils;
 
 /**
  * A subclass of TestSuite that multiplexes test methods across
@@ -56,7 +56,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @return A list of the names of each JUnit test method.
      */
     static List<String> getTestMethodNames(Class<? extends TestCase> testCls) {
-        ArrayList<String> retval = new ArrayList<String>();
+        ArrayList<String> retval = new ArrayList<>();
 
         for (Method m : testCls.getMethods()) {
             if (m.getReturnType() != void.class)
@@ -87,6 +87,10 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param config A Server Configuration to run this set of tests on.
      */
     public boolean addServerConfig(VoltServerConfig config) {
+        return addServerConfig(config, true);
+    }
+
+    public boolean addServerConfig(VoltServerConfig config, boolean reuseServer) {
 
         // near silent skip on k>0 and community edition
         if (!MiscUtils.isPro()) {
@@ -145,7 +149,8 @@ public class MultiConfigSuiteBuilder extends TestSuite {
 
         // add a test case instance for each method for the specified
         // server config
-        for (String mname : methods) {
+        for (int i = 0; i < methods.size(); i++) {
+            String mname = methods.get(i);
             RegressionSuite rs = null;
             try {
                 rs = (RegressionSuite) cons.newInstance(mname);
@@ -154,6 +159,9 @@ public class MultiConfigSuiteBuilder extends TestSuite {
                 return false;
             }
             rs.setConfig(config);
+            // The last test method for the current cluster configuration will need to
+            // shutdown the cluster completely after finishing the test.
+            rs.m_completeShutdown = ! reuseServer || (i == methods.size() - 1);
             super.addTest(rs);
         }
 

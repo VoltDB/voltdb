@@ -154,7 +154,8 @@ public class StatsAgent extends OpsAgent
             new ColumnInfo("MAX_PARAMETER_SET_SIZE", VoltType.INTEGER),
             new ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER),
             new ColumnInfo("ABORTS", VoltType.BIGINT),
-            new ColumnInfo("FAILURES", VoltType.BIGINT));
+            new ColumnInfo("FAILURES", VoltType.BIGINT),
+            new ColumnInfo("TRANSACTIONAL", VoltType.TINYINT));
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
             if (baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
@@ -177,7 +178,8 @@ public class StatsAgent extends OpsAgent
                     baseStats[0].getLong("MAX_PARAMETER_SET_SIZE"),
                     baseStats[0].getLong("AVG_PARAMETER_SET_SIZE"),
                     baseStats[0].getLong("ABORTS"),
-                    baseStats[0].getLong("FAILURES"));
+                    baseStats[0].getLong("FAILURES"),
+                    (byte) baseStats[0].getLong("TRANSACTIONAL"));
             }
         }
         return new VoltTable[] { result };
@@ -195,6 +197,14 @@ public class StatsAgent extends OpsAgent
         StatsProcProfTable timeTable = new StatsProcProfTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
+            // Skip non-transactional procedures for some of these rollups until
+            // we figure out how to make them less confusing.
+            // NB: They still show up in the raw PROCEDURE stata.
+            boolean transactional = baseStats[0].getLong("TRANSACTIONAL") == 1;
+            if (!transactional) {
+                continue;
+            }
+
             if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
                 continue;
             }
@@ -225,6 +235,14 @@ public class StatsAgent extends OpsAgent
         StatsProcInputTable timeTable = new StatsProcInputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
+            // Skip non-transactional procedures for some of these rollups until
+            // we figure out how to make them less confusing.
+            // NB: They still show up in the raw PROCEDURE stata.
+            boolean transactional = baseStats[0].getLong("TRANSACTIONAL") == 1;
+            if (!transactional) {
+                continue;
+            }
+
             if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
                 continue;
             }
@@ -255,6 +273,14 @@ public class StatsAgent extends OpsAgent
         StatsProcOutputTable timeTable = new StatsProcOutputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
+            // Skip non-transactional procedures for some of these rollups until
+            // we figure out how to make them less confusing.
+            // NB: They still show up in the raw PROCEDURE stata.
+            boolean transactional = baseStats[0].getLong("TRANSACTIONAL") == 1;
+            if (!transactional) {
+                continue;
+            }
+
             if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
                 continue;
             }
@@ -538,6 +564,9 @@ public class StatsAgent extends OpsAgent
             break;
         case DRROLE:
             stats = collectStats(StatsSelector.DRROLE, false);
+            break;
+        case GC:
+            stats = collectStats(StatsSelector.GC, interval);
             break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something

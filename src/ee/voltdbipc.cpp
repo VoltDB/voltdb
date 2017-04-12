@@ -572,11 +572,12 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
     struct updatecatalog {
         struct ipc_command cmd;
         int64_t timestamp;
+        bool isStreamChange;
         char data[];
     };
     struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
+        if (m_engine->updateCatalog(ntohll(uc->timestamp), uc->isStreamChange, std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
     }
@@ -638,9 +639,11 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_perFragmentStatsBuffer = new char[MAX_MSG_SZ];
         std::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
         m_exceptionBuffer = new char[MAX_MSG_SZ];
-        m_engine->setBuffers(NULL, 0, m_perFragmentStatsBuffer, MAX_MSG_SZ,
-                                      m_reusedResultBuffer, MAX_MSG_SZ,
-                                      m_exceptionBuffer, MAX_MSG_SZ);
+        m_engine->setBuffers(NULL, 0,
+                             m_perFragmentStatsBuffer, MAX_MSG_SZ,
+                             NULL, 0,
+                             m_reusedResultBuffer, MAX_MSG_SZ,
+                             m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
         m_tupleBufferSize = MAX_MSG_SZ;
         m_tupleBuffer = new char[m_tupleBufferSize];
@@ -790,7 +793,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     ReferenceSerializeInputBE serialize_in(offset, sz);
 
     // and reset to space for the results output
-    m_engine->resetReusedResultOutputBuffer(1); // 1 byte to add status code
+    m_engine->resetReusedResultOutputBuffer(1, 1); // 1 byte to add status code
     m_engine->resetPerFragmentStatsOutputBuffer(queryCommand->perFragmentTimingEnabled);
 
     try {
@@ -802,7 +805,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
                                                 ntohll(queryCommand->spHandle),
                                                 ntohll(queryCommand->lastCommittedSpHandle),
                                                 ntohll(queryCommand->uniqueId),
-                                                ntohll(queryCommand->undoToken));
+                                                ntohll(queryCommand->undoToken),
+                                                false);
     }
     catch (const FatalException &e) {
         crashVoltDB(e);
@@ -1577,7 +1581,7 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
         execute_task *task = (execute_task*)cmd;
         voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
         ReferenceSerializeInputBE input(task->task, MAX_MSG_SZ);
-        m_engine->resetReusedResultOutputBuffer(1);
+        m_engine->resetReusedResultOutputBuffer(1, 1);
         m_engine->executeTask(taskId, input);
         int32_t responseLength = m_engine->getResultsSize();
         char *resultsBuffer = m_engine->getReusedResultBuffer();
@@ -1591,7 +1595,7 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
 void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     try {
         apply_binary_log *params = (apply_binary_log*)cmd;
-        m_engine->resetReusedResultOutputBuffer(1);
+        m_engine->resetReusedResultOutputBuffer(1, 1);
         int64_t rows = m_engine->applyBinaryLog(ntohll(params->txnId),
                                         ntohll(params->spHandle),
                                         ntohll(params->lastCommittedSpHandle),

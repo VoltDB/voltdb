@@ -840,6 +840,8 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
             assertTrue(exc.toString().contains("The size 2050 of the value"));
             assertTrue(exc.toString().contains("exceeds the size of the VARCHAR(2048 BYTES) column"));
         }
+        // Delete the problem maker first, so that the automatic cleanup between tests won't fail.
+        client.callProcedure("R6.delete", 1);
     }
 
     private void mvUpdateR4() throws IOException, ProcCallException {
@@ -1507,20 +1509,27 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
         validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
                 new long[] {numSourceRows});
 
-        // With view size limits in place, it's actually not possible
-        // to delete all the rows from the source table
-        if (!isValgrind()) {
-            // we are truncating here, but in the back end, we actually delete row-by-row,
-            // hence this failure.
-            verifyStmtFails(client, "truncate table r6", "exceeds the size");
+        try {
+            // Depending on how the EE was built (with MEMCHECK defined or not)
+            // the following may fail.  Sometimes we run a release EE build in valgrind though,
+            // so it's difficult to know in the regressionsuite framework whether the
+            // following will succeed.
+            client.callProcedure("@AdHoc", "truncate table r6");
             validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
-                                       new long[] {numSourceRows});
+                    new long[] {0});
+
         }
-        else {
-            // In memcheck builds, table truncation is handled a little differently because
-            // there is one table block per row.
-            validateTableOfScalarLongs(client, "truncate table R6;", new long[] {numSourceRows});
+        catch (ProcCallException pce) {
+            // If the above does fail, it should be because the new aggregate
+            // MIN/MAX value doesn't fit into the view.
+            assertTrue(pce.getMessage().contains("exceeds the size"));
+            validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                    new long[] {numSourceRows});
+
         }
+
+        // Delete the problem maker first, so that the automatic cleanup between tests won't fail.
+        client.callProcedure("R6.delete", 1);
     }
 
     //

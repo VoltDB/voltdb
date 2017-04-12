@@ -86,7 +86,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     private int countHostsProvidingRows(VoltTable result, Map<String, String> columnTargets,
             boolean enforceUnique) {
         result.resetRowPosition();
-        Set<Long> hostsSeen = new HashSet<Long>();
+        Set<Long> hostsSeen = new HashSet<>();
         while (result.advanceRow()) {
             if (checkRowForMultipleTargets(result, columnTargets)) {
                 Long thisHostId = result.getLong("HOST_ID");
@@ -108,7 +108,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
         if (HOSTS != hostsSeen.size()) {
             m_recentAnalysis = new StringBuilder();
             m_recentAnalysis.append("Failure follows from these results:\n");
-            Set<Long> seenAgain = new HashSet<Long>();
+            Set<Long> seenAgain = new HashSet<>();
             result.resetRowPosition();
             while (result.advanceRow()) {
                 Long thisHostId = result.getLong("HOST_ID");
@@ -146,7 +146,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     protected boolean validateRowSeenAtAllSites(VoltTable result, String columnName, String targetValue,
             boolean enforceUnique) {
         result.resetRowPosition();
-        Set<Long> sitesSeen = new HashSet<Long>();
+        Set<Long> sitesSeen = new HashSet<>();
         while (result.advanceRow()) {
             String colValFromRow = result.getString(columnName);
             if (targetValue.equalsIgnoreCase(colValFromRow)) {
@@ -196,6 +196,10 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite(Class classzz, boolean isCommandLogTest, int replicationPort) throws IOException {
+        return suite(classzz, isCommandLogTest, replicationPort, true);
+    }
+
+    static public Test suite(Class classzz, boolean isCommandLogTest, int replicationPort, boolean reuseServer) throws IOException {
         VoltServerConfig config = null;
 
         MultiConfigSuiteBuilder builder
@@ -265,7 +269,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
 
         boolean success = config.compile(project);
         assertTrue(success);
-        builder.addServerConfig(config);
+        builder.addServerConfig(config, reuseServer);
 
         return builder;
     }

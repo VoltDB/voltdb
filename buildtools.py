@@ -697,8 +697,8 @@ class ValgrindError:
         return self.line
 
 class ValgrindErrorState:
-    def __init__(self, expectNoErrors, valgrindFile):
-        self.expectErrors = not expectNoErrors
+    def __init__(self, expectErrorsIn, valgrindFile):
+        self.expectErrors = expectErrorsIn
         self.foundErrors    = False
         self.valgrindFile = valgrindFile
         self.errorStrings = []
@@ -709,7 +709,7 @@ class ValgrindErrorState:
         root = tree.getroot()
         errs = root.findall(".//error")
         for err in errs:
-            foundErrors = True
+            self.foundErrors = True
             self.errorStrings += [self._toString(err)]
 
     def _toString(self, err):
@@ -846,6 +846,7 @@ def runTests(CTX):
                         break
             if CTX.PLATFORM == "Linux" and isValgrindTest:
                 print('Executing valgrind test %s' % targetpath)
+                sys.stdout.flush()
                 valgrindDir = os.path.join(bindirname, dirname)
                 valgrindFile = makeValgrindFile(valgrindDir, "%p")
                 if executing:
@@ -884,6 +885,7 @@ def runTests(CTX):
                     print('    Test %s was not run.' % os.path.join(dirname, test))
             else:
                 print('Executing non-valgrind test %s' % targetpath)
+                sys.stdout.flush()
                 if executing:
                     retval = os.system(targetpath)
                 else:

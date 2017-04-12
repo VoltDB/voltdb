@@ -90,7 +90,10 @@ public class SQLCommand
     private static List<String> RecallableSessionLines = new ArrayList<String>();
     private static boolean m_testFrontEndOnly;
     private static String m_testFrontEndResult;
-    private static String m_sslPropsFile;
+
+    // Special exception type to inform main to return m_exitCode and stop SQLCmd
+    @SuppressWarnings("serial")
+    private static class SQLCmdEarlyExitException extends RuntimeException {}
 
     private static String patchErrorMessageWithFile(String batchFileName, String message) {
 
@@ -170,7 +173,8 @@ public class SQLCommand
                 public void actionPerformed(ActionEvent e) {
                     CursorBuffer cursorBuffer = interactiveReader.getCursorBuffer();
                     if (cursorBuffer.length() == 0) {
-                        System.exit(m_exitCode);
+                        // tells caller to stop (basically a goto)
+                        throw new SQLCmdEarlyExitException();
                     } else {
                         try {
                             interactiveReader.delete();
@@ -586,6 +590,9 @@ public class SQLCommand
         try {
             executeScriptFromReader(fileInfo, reader);
         }
+        catch (SQLCmdEarlyExitException e) {
+            throw e;
+        }
         catch (Exception x) {
             stopOrContinue(x);
         }
@@ -859,7 +866,7 @@ public class SQLCommand
         }
     }
 
-    private static void stopOrContinue(Exception exc) {
+    private static int stopOrContinue(Exception exc) {
         System.err.println(exc.getMessage());
         if (m_debug) {
             exc.printStackTrace(System.err);
@@ -870,7 +877,7 @@ public class SQLCommand
         m_exitCode = -1;
         if (m_stopOnError) {
             if ( ! m_interactive ) {
-                System.exit(m_exitCode);
+                throw new SQLCmdEarlyExitException();
             }
             // Setting this member to drive a fast stack unwind from
             // recursive readScriptFile requires explicit checks in that code,
@@ -878,6 +885,7 @@ public class SQLCommand
             // would require additional exception handlers in the caller(s)
             m_returningToPromptAfterError = true;
         }
+        return 0;
     }
 
     // Output generation
@@ -989,6 +997,10 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@SwapTables",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
+        Procedures.put("@Trace",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>())
+                                                             .put( 1, Arrays.asList("varchar"))
+                                                             .put( 2, Arrays.asList("varchar", "varchar")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
@@ -1023,9 +1035,10 @@ public class SQLCommand
     {
         System.out.print(msg);
         System.out.println("\n");
-        printUsage(-1);
+        m_exitCode = -1;
+        printUsage();
     }
-    private static void printUsage(int exitCode)
+    private static void printUsage()
     {
         System.out.println(
         "Usage: sqlcmd --help\n"
@@ -1083,7 +1096,6 @@ public class SQLCommand
         + "  Read-only queries that take longer than this number of milliseconds will abort. Default: " + BatchTimeoutOverrideType.DEFAULT_TIMEOUT/1000.0 + " seconds.\n"
         + "\n"
         );
-        System.exit(exitCode);
     }
 
     // printHelp() can print readme either to a file or to the screen
@@ -1101,7 +1113,8 @@ public class SQLCommand
         }
         catch (Exception x) {
             System.err.println(x.getMessage());
-            System.exit(-1);
+            m_exitCode = -1;
+            return;
         }
     }
 
@@ -1257,14 +1270,16 @@ public class SQLCommand
         String[] splitStrings = arg.split("=", 2);
         if (splitStrings[1].isEmpty()) {
             printUsage("Missing input value for " + splitStrings[0]);
+            return null;
         }
         return splitStrings[1];
     }
 
-    // Application entry point
-    public static void main(String args[])
-    {
-        System.setProperty("voltdb_no_logging", "true");
+    /**
+     * Wraps the main routine. Is callable from other code without fear of it
+     * calling System.exit(..).
+     */
+    public static int mainWithReturnCode(String args[]) {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
         // Initialize parameter defaults
         String serverList = "localhost";
@@ -1273,7 +1288,7 @@ public class SQLCommand
         String password = "";
         String kerberos = "";
         List<String> queries = null;
-        String ddlFile = "";
+        String ddlFileText = "";
         String sslConfigFile = null;
         boolean enableSSL = false;
 
@@ -1282,18 +1297,24 @@ public class SQLCommand
             String arg = args[i];
             if (arg.startsWith("--servers=")) {
                 serverList = extractArgInput(arg);
+                if (serverList == null) return -1;
             }
             else if (arg.startsWith("--port=")) {
-                port = Integer.valueOf(extractArgInput(arg));
+                String portStr = extractArgInput(arg);
+                if (portStr == null) return -1;
+                port = Integer.valueOf(portStr);
             }
             else if (arg.startsWith("--user=")) {
                 user = extractArgInput(arg);
+                if (user == null) return -1;
             }
             else if (arg.startsWith("--password=")) {
                 password = extractArgInput(arg);
+                if (password == null) return -1;
             }
             else if (arg.startsWith("--kerberos=")) {
                 kerberos = extractArgInput(arg);
+                if (kerberos == null) return -1;
             }
             else if (arg.startsWith("--kerberos")) {
                 kerberos = "VoltDBClient";
@@ -1310,7 +1331,9 @@ public class SQLCommand
                 }
             }
             else if (arg.startsWith("--output-format=")) {
-                String formatName = extractArgInput(arg).toLowerCase();
+                String formatName = extractArgInput(arg);
+                if (formatName == null) return -1;
+                formatName = formatName.toLowerCase();
                 if (formatName.equals("fixed")) {
                     m_outputFormatter = new SQLCommandOutputFormatterDefault();
                 }
@@ -1322,10 +1345,13 @@ public class SQLCommand
                 }
                 else {
                     printUsage("Invalid value for --output-format");
+                    return -1;
                 }
             }
             else if (arg.startsWith("--stop-on-error=")) {
-                String optionName = extractArgInput(arg).toLowerCase();
+                String optionName = extractArgInput(arg);
+                if (optionName == null) return -1;
+                optionName = optionName.toLowerCase();
                 if (optionName.equals("true")) {
                     m_stopOnError = true;
                 }
@@ -1334,19 +1360,27 @@ public class SQLCommand
                 }
                 else {
                     printUsage("Invalid value for --stop-on-error");
+                    return -1;
                 }
             }
             else if (arg.startsWith("--ddl-file=")) {
                 String ddlFilePath = extractArgInput(arg);
+                if (ddlFilePath == null) return -1;
                 try {
-                    ddlFile = new Scanner(new File(ddlFilePath)).useDelimiter("\\Z").next();
+                    File ddlJavaFile = new File(ddlFilePath);
+                    Scanner scanner = new Scanner(ddlJavaFile);
+                    ddlFileText = scanner.useDelimiter("\\Z").next();
+                    scanner.close();
                 } catch (FileNotFoundException e) {
                     printUsage("DDL file not found at path:" + ddlFilePath);
+                    return -1;
                 }
             }
             else if (arg.startsWith("--query-timeout=")) {
                 m_hasBatchTimeout = true;
-                m_batchTimeout = Integer.valueOf(extractArgInput(arg));
+                String batchTimeoutStr = extractArgInput(arg);
+                if (batchTimeoutStr == null) return -1;
+                m_batchTimeout = Integer.valueOf(batchTimeoutStr);
             }
 
             // equals check starting here
@@ -1356,6 +1390,7 @@ public class SQLCommand
             else if (arg.startsWith("--ssl=")) {
                 enableSSL = true;
                 sslConfigFile = extractArgInput(arg);
+                if (sslConfigFile == null) return -1;
             }
             else if (arg.startsWith("--ssl")) {
                 enableSSL = true;
@@ -1367,16 +1402,19 @@ public class SQLCommand
             else if (arg.equals("--help")) {
                 printHelp(System.out); // Print readme to the screen
                 System.out.println("\n\n");
-                printUsage(0);
+                printUsage();
+                return -1;
             }
             else if (arg.equals("--no-version-check")) {
                 m_versionCheck = false; // Disable new version phone home check
             }
             else if ((arg.equals("--usage")) || (arg.equals("-?"))) {
-                printUsage(0);
+                printUsage();
+                return -1;
             }
             else {
                 printUsage("Invalid Parameter: " + arg);
+                return -1;
             }
         }
 
@@ -1413,15 +1451,15 @@ public class SQLCommand
             m_client = getClient(config, servers, port);
         } catch (Exception exc) {
             System.err.println(exc.getMessage());
-            System.exit(-1);
+            return -1;
         }
 
         try {
-            if (! ddlFile.equals("")) {
+            if (! ddlFileText.equals("")) {
                 // fast DDL Loader mode
                 // System.out.println("fast DDL Loader mode with DDL input:\n" + ddlFile);
-                m_client.callProcedure("@AdHoc", ddlFile);
-                System.exit(m_exitCode);
+                m_client.callProcedure("@AdHoc", ddlFileText);
+                return m_exitCode;
             }
 
             // Load system procedures
@@ -1466,8 +1504,11 @@ public class SQLCommand
                 interactWithTheUser();
             }
         }
+        catch (SQLCmdEarlyExitException e) {
+            return m_exitCode;
+        }
         catch (Exception x) {
-            stopOrContinue(x);
+            try { stopOrContinue(x); } catch (SQLCmdEarlyExitException e) { return m_exitCode; }
         }
         finally {
             try { m_client.close(); } catch (Exception x) { }
@@ -1477,7 +1518,15 @@ public class SQLCommand
         // This might be a little unconventional for an interactive session,
         // but it's also likely to be ignored in that case, so "no great harm done".
         //* enable to debug */ System.err.println("Exiting with code " + m_exitCode);
-        System.exit(m_exitCode);
+        return m_exitCode;
+    }
+
+    // Application entry point
+    public static void main(String args[])
+    {
+        System.setProperty("voltdb_no_logging", "true");
+        int exitCode = mainWithReturnCode(args);
+        System.exit(exitCode);
     }
 
     // The following two methods implement a "phone home" version check for VoltDB.

@@ -12,8 +12,6 @@
 	<classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant-testability-explorer.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/emma_ant.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/emma.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/japex.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/jcommon-1.0.16.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/jfreechart-1.0.13.jar"/>
@@ -41,7 +39,6 @@
 	<classpathentry kind="lib" path="third_party/java/jars/objenesis-2.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
-	<classpathentry kind="lib" path="lib/groovy-all-2.1.7-indy.jar"/>
 	<classpathentry kind="lib" path="lib/kafka-clients-0.8.2.2.jar"/>
 	<classpathentry kind="lib" path="lib/kafka_2.11-0.8.2.2.jar"/>
 	<classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>

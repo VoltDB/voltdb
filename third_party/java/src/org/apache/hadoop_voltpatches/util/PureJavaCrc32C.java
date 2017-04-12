@@ -30,7 +30,7 @@ import java.util.zip.Checksum;
 public class PureJavaCrc32C implements Checksum {
 
   /** the current CRC value, bit-flipped */
-  private int crc;
+  protected int crc;
 
   /** Create a new PureJavaCrc32 object. */
   public PureJavaCrc32C() {
@@ -86,7 +86,7 @@ public class PureJavaCrc32C implements Checksum {
   // java -cp build/test/classes/:build/classes/ \
   //   org.apache.hadoop.util.TestPureJavaCrc32\$Table 82F63B78
 
-  static final int[] T8_0 = new int[] {
+  protected static final int[] T8_0 = new int[] {
     0x00000000, 0xF26B8303, 0xE13B70F7, 0x1350F3F4,
     0xC79A971F, 0x35F1141C, 0x26A1E7E8, 0xD4CA64EB,
     0x8AD958CF, 0x78B2DBCC, 0x6BE22838, 0x9989AB3B,
@@ -152,7 +152,7 @@ public class PureJavaCrc32C implements Checksum {
     0x79B737BA, 0x8BDCB4B9, 0x988C474D, 0x6AE7C44E,
     0xBE2DA0A5, 0x4C4623A6, 0x5F16D052, 0xAD7D5351
   };
-  static final int[] T8_1 = new int[] {
+  protected static final int[] T8_1 = new int[] {
     0x00000000, 0x13A29877, 0x274530EE, 0x34E7A899,
     0x4E8A61DC, 0x5D28F9AB, 0x69CF5132, 0x7A6DC945,
     0x9D14C3B8, 0x8EB65BCF, 0xBA51F356, 0xA9F36B21,
@@ -218,7 +218,7 @@ public class PureJavaCrc32C implements Checksum {
     0xD98EEDC6, 0xCA2C75B1, 0xFECBDD28, 0xED69455F,
     0x97048C1A, 0x84A6146D, 0xB041BCF4, 0xA3E32483
   };
-  static final int[] T8_2 = new int[] {
+  protected static final int[] T8_2 = new int[] {
     0x00000000, 0xA541927E, 0x4F6F520D, 0xEA2EC073,
     0x9EDEA41A, 0x3B9F3664, 0xD1B1F617, 0x74F06469,
     0x38513EC5, 0x9D10ACBB, 0x773E6CC8, 0xD27FFEB6,
@@ -284,7 +284,7 @@ public class PureJavaCrc32C implements Checksum {
     0xE5F54FC1, 0x40B4DDBF, 0xAA9A1DCC, 0x0FDB8FB2,
     0x7B2BEBDB, 0xDE6A79A5, 0x3444B9D6, 0x91052BA8
   };
-  static final int[] T8_3 = new int[] {
+  protected static final int[] T8_3 = new int[] {
     0x00000000, 0xDD45AAB8, 0xBF672381, 0x62228939,
     0x7B2231F3, 0xA6679B4B, 0xC4451272, 0x1900B8CA,
     0xF64463E6, 0x2B01C95E, 0x49234067, 0x9466EADF,
@@ -350,7 +350,7 @@ public class PureJavaCrc32C implements Checksum {
     0x31035088, 0xEC46FA30, 0x8E647309, 0x5321D9B1,
     0x4A21617B, 0x9764CBC3, 0xF54642FA, 0x2803E842
   };
-  static final int[] T8_4 = new int[] {
+  protected static final int[] T8_4 = new int[] {
     0x00000000, 0x38116FAC, 0x7022DF58, 0x4833B0F4,
     0xE045BEB0, 0xD854D11C, 0x906761E8, 0xA8760E44,
     0xC5670B91, 0xFD76643D, 0xB545D4C9, 0x8D54BB65,
@@ -416,7 +416,7 @@ public class PureJavaCrc32C implements Checksum {
     0x081E60E7, 0x300F0F4B, 0x783CBFBF, 0x402DD013,
     0xE85BDE57, 0xD04AB1FB, 0x9879010F, 0xA0686EA3
   };
-  static final int[] T8_5 = new int[] {
+  protected static final int[] T8_5 = new int[] {
     0x00000000, 0xEF306B19, 0xDB8CA0C3, 0x34BCCBDA,
     0xB2F53777, 0x5DC55C6E, 0x697997B4, 0x8649FCAD,
     0x6006181F, 0x8F367306, 0xBB8AB8DC, 0x54BAD3C5,
@@ -482,7 +482,7 @@ public class PureJavaCrc32C implements Checksum {
     0x37F2D291, 0xD8C2B988, 0xEC7E7252, 0x034E194B,
     0x8507E5E6, 0x6A378EFF, 0x5E8B4525, 0xB1BB2E3C
   };
-  static final int[] T8_6 = new int[] {
+  protected static final int[] T8_6 = new int[] {
     0x00000000, 0x68032CC8, 0xD0065990, 0xB8057558,
     0xA5E0C5D1, 0xCDE3E919, 0x75E69C41, 0x1DE5B089,
     0x4E2DFD53, 0x262ED19B, 0x9E2BA4C3, 0xF628880B,
@@ -548,7 +548,7 @@ public class PureJavaCrc32C implements Checksum {
     0x60F48DC6, 0x08F7A10E, 0xB0F2D456, 0xD8F1F89E,
     0xC5144817, 0xAD1764DF, 0x15121187, 0x7D113D4F
   };
-  static final int[] T8_7 = new int[] {
+  protected static final int[] T8_7 = new int[] {
     0x00000000, 0x493C7D27, 0x9278FA4E, 0xDB448769,
     0x211D826D, 0x6821FF4A, 0xB3657823, 0xFA590504,
     0x423B04DA, 0x0B0779FD, 0xD043FE94, 0x997F83B3,

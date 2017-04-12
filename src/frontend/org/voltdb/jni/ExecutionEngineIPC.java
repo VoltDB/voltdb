@@ -31,6 +31,7 @@ import java.util.logging.Logger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
+import org.voltdb.HybridCrc32;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -41,6 +42,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
@@ -537,6 +539,47 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
         }
 
+        public ByteBuffer readResultsBuffer() throws IOException {
+            // check the dirty-ness of the batch
+            final ByteBuffer dirtyBytes = ByteBuffer.allocate(1);
+            while (dirtyBytes.hasRemaining()) {
+                int read = m_socketChannel.read(dirtyBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            dirtyBytes.flip();
+            // check if anything was changed
+            m_dirty |= dirtyBytes.get() > 0;
+
+            final ByteBuffer resultTablesLengthBytes = ByteBuffer.allocate(4);
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (resultTablesLengthBytes.hasRemaining()) {
+                int read = m_socketChannel.read(resultTablesLengthBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            resultTablesLengthBytes.flip();
+            final int resultTablesLength = resultTablesLengthBytes.getInt();
+
+            if (resultTablesLength <= 0)
+                return resultTablesLengthBytes;
+
+            final ByteBuffer resultTablesBuffer = ByteBuffer
+                    .allocate(resultTablesLength+4);
+            //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            resultTablesBuffer.putInt(resultTablesLength);
+            while (resultTablesBuffer.hasRemaining()) {
+                int read = m_socketChannel.read(resultTablesBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            resultTablesBuffer.flip();
+            return resultTablesBuffer;
+        }
+
         /**
          * Read and deserialize a long from the wire.
          */
@@ -811,7 +854,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void coreUpdateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(final long timestamp, final boolean isStreamUpdate, final String catalogDiffs) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -822,6 +865,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             m_data.putInt(Commands.UpdateCatalog.m_id);
             m_data.putLong(timestamp);
+            m_data.putInt(isStreamUpdate ? 1 : 0);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -881,6 +925,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
             final Object[] parameterSets,
+            boolean[] isWriteFrag,
+            HybridCrc32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -891,16 +937,19 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         final FastSerializer fser = new FastSerializer();
         try {
             for (int i = 0; i < numFragmentIds; ++i) {
+                Object params = parameterSets[i];
                 // pset can be ByteBuffer or ParameterSet instance
-                if (parameterSets[i] instanceof ByteBuffer) {
-                    fser.write((ByteBuffer) parameterSets[i]);
+                int paramStart = fser.getPosition();
+                if (params instanceof ByteBuffer) {
+                    ByteBuffer buf = (ByteBuffer) params;
+                    fser.write(buf);
                 }
                 else {
-                    ParameterSet pset = (ParameterSet) parameterSets[i];
-                    ByteBuffer buf = ByteBuffer.allocate(pset.getSerializedSize());
-                    pset.flattenToBuffer(buf);
-                    buf.flip();
-                    fser.write(buf);
+                    ParameterSet pset = (ParameterSet) params;
+                    fser.writeParameterSet(pset);
+                }
+                if (isWriteFrag[i]) {
+                    writeCRC.updateFromPosition(paramStart, fser.getContainerNoFlip().b());
                 }
             }
         } catch (final IOException exception) {
@@ -945,19 +994,22 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    protected VoltTable[] coreExecutePlanFragments(
+    protected FastDeserializer coreExecutePlanFragments(
+            final int bufferHint,
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            boolean[] isWriteFrag,
+            HybridCrc32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
-            final long undoToken) throws EEException {
+            final long undoToken, boolean traceOn) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
-                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, txnId,
-                spHandle, lastCommittedSpHandle, uniqueId, undoToken);
+                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, isWriteFrag, writeCRC,
+                txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
         if (m_perFragmentTimingEnabled) {
             m_executionTimes = new long[numFragmentIds];
@@ -966,6 +1018,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         while (true) {
             try {
                 result = m_connection.readStatusByte();
+                ByteBuffer resultTables = null;
 
                 if (result == ExecutionEngine.ERRORCODE_NEED_PLAN) {
                     long fragmentId = m_connection.readLong();
@@ -976,17 +1029,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     m_connection.write();
                 }
                 else if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-                    final VoltTable resultTables[] = new VoltTable[numFragmentIds];
-                    for (int ii = 0; ii < numFragmentIds; ii++) {
-                        resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
-                    }
                     try {
-                        m_connection.readResultTables(resultTables);
+                        resultTables = m_connection.readResultsBuffer();
                     } catch (final IOException e) {
                         throw new EEException(
                                 ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
                     }
-                    return resultTables;
+                    return new FastDeserializer(resultTables);
                 }
                 else {
                     // failure

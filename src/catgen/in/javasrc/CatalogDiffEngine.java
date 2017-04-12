@@ -129,6 +129,8 @@ public class CatalogDiffEngine {
     // true if table changes require the catalog change runs
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
+    // true if export needs new generation.
+    private boolean m_requiresNewExportGeneration = false;
 
     private final SortedMap<String, TablePopulationRequirements> m_tablesThatMustBeEmpty = new TreeMap<>();
 
@@ -214,6 +216,13 @@ public class CatalogDiffEngine {
      */
     public boolean requiresSnapshotIsolation() {
         return m_requiresSnapshotIsolation;
+    }
+
+    /**
+     * @return true if changes require export generation to be updated.
+     */
+    public boolean requiresNewExportGeneration() {
+        return m_requiresNewExportGeneration;
     }
 
     public String[][] tablesThatMustBeEmpty() {
@@ -417,23 +426,6 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * If it is not a new table make sure that the soon to be exported
-     * table is empty or has no tuple allocated memory associated with it
-     *
-     * @param tName table name
-     */
-    private void trackExportOfAlreadyExistingTables(String tName) {
-        if (tName == null || tName.trim().isEmpty()) return;
-        if (!m_newTablesForExport.contains(tName)) {
-            String errorMessage = String.format(
-                    "Unable to change table %s to an export table because the table is not empty",
-                    tName
-                    );
-            m_tablesThatMustBeEmpty.put(tName, new TablePopulationRequirements(tName, tName, errorMessage));
-        }
-    }
-
-    /**
      * Check if an addition or deletion can be safely completed
      * in any database state.
      *
@@ -472,6 +464,10 @@ public class CatalogDiffEngine {
 
         else if (suspect instanceof Table) {
             if (ChangeType.DELETION == changeType) {
+                Table tbl = (Table)suspect;
+                if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
+                    m_requiresNewExportGeneration = true;
+                }
                 // No special guard against dropping a table or view
                 // (although some procedures may fail to plan)
                 return null;
@@ -485,6 +481,7 @@ public class CatalogDiffEngine {
             if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
                 // Remember that it's a new export table.
                 m_newTablesForExport.add(tbl.getTypeName());
+                m_requiresNewExportGeneration = true;
             }
 
             String viewName = null;
@@ -519,22 +516,17 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof Connector) {
-            if (ChangeType.ADDITION == changeType) {
-                for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
-                    trackExportOfAlreadyExistingTables(cti.getTable().getTypeName());
-                }
-            }
+            m_requiresNewExportGeneration = true;
             return null;
         }
 
         else if (suspect instanceof ConnectorTableInfo) {
-            if (ChangeType.ADDITION == changeType) {
-                trackExportOfAlreadyExistingTables(((ConnectorTableInfo)suspect).getTable().getTypeName());
-            }
+            m_requiresNewExportGeneration = true;
             return null;
         }
 
         else if (suspect instanceof ConnectorProperty) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
 
@@ -1062,6 +1054,7 @@ public class CatalogDiffEngine {
             }
             // allow export connector property changes
             if (parent instanceof Connector && suspect instanceof ConnectorProperty) {
+                m_requiresNewExportGeneration = true;
                 return null;
             }
 
@@ -1256,24 +1249,22 @@ public class CatalogDiffEngine {
         if (responseList == null) {
             m_supported = false;
             m_errors.append(errorMessage + "\n");
+            return;
         }
         // otherwise, it's possible if a specific table is empty
         // collect the error message(s) and decide if it can be done inside @UAC
-        else {
-            for (TablePopulationRequirements response : responseList) {
-                String objectName = response.getObjectName();
-                List<String> tableNames = response.getTableNames();
-                String nonEmptyErrorMessage = response.getErrorMessage();
-                assert (nonEmptyErrorMessage != null);
+        for (TablePopulationRequirements response : responseList) {
+            String objectName = response.getObjectName();
+            String nonEmptyErrorMessage = response.getErrorMessage();
+            assert (nonEmptyErrorMessage != null);
 
-                TablePopulationRequirements popreq = m_tablesThatMustBeEmpty.get(objectName);
-                if (popreq == null) {
-                    popreq = response;
-                    m_tablesThatMustBeEmpty.put(objectName, popreq);
-                } else {
-                    String newErrorMessage = popreq.getErrorMessage() + "\n " + response.getErrorMessage();
-                    popreq.setErrorMessage(newErrorMessage);
-                }
+            TablePopulationRequirements popreq = m_tablesThatMustBeEmpty.get(objectName);
+            if (popreq == null) {
+                popreq = response;
+                m_tablesThatMustBeEmpty.put(objectName, popreq);
+            } else {
+                String newErrorMessage = popreq.getErrorMessage() + "\n " + response.getErrorMessage();
+                popreq.setErrorMessage(newErrorMessage);
             }
         }
     }
@@ -1623,24 +1614,11 @@ public class CatalogDiffEngine {
      * This currently handles just the basics, but much of the plumbing is
      * in place to give a lot more detail, with a bit more work.
      */
-    public String getDescriptionOfChanges() {
+    public String getDescriptionOfChanges(boolean updatedClass) {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Catalog Difference Report\n");
         sb.append("=========================\n");
-        if (supported()) {
-            sb.append("  This change can occur while the database is running.\n");
-            if (requiresSnapshotIsolation()) {
-                sb.append("  This change must occur when no snapshot is running.\n");
-                sb.append("  If a snapshot is in progress, the system will wait \n" +
-                          "  until the snapshot is complete to make the changes.\n");
-            }
-        }
-        else {
-            sb.append("  Making this change requires stopping and restarting the database.\n");
-        }
-        sb.append("\n");
-
         boolean wroteChanges = false;
 
         // DESCRIBE TABLE CHANGES
@@ -1657,13 +1635,13 @@ public class CatalogDiffEngine {
                 }
 
                 // check if export table
-                // this probably doesn't work due to the same kinds of problesm we have
+                // this probably doesn't work due to the same kinds of problems we have
                 // when identifying views. Tables just need a field that says if they
                 // are export tables or not... ugh. FIXME
                 for (Connector c : ((Database) table.getParent()).getConnectors()) {
                     for (ConnectorTableInfo cti : c.getTableinfo()) {
                         if (cti.getTable() == table) {
-                            return "Export Table " + type.getTypeName();
+                            return "Stream Table " + type.getTypeName();
                         }
                     }
                 }
@@ -1689,6 +1667,9 @@ public class CatalogDiffEngine {
 
         // DESCRIBE GROUP CHANGES
         wroteChanges |= basicMetaChangeDesc(sb, "GROUP CHANGES:", DiffClass.GROUP, null, null);
+
+        // DESCRIBE USER CHANGES
+        wroteChanges |= basicMetaChangeDesc(sb, "USER CHANGES:", DiffClass.USER, null, null);
 
         // DESCRIBE OTHER CHANGES
         CatalogChangeGroup group = m_changes.get(DiffClass.OTHER);
@@ -1717,7 +1698,11 @@ public class CatalogDiffEngine {
         }
 
         if (!wroteChanges) {
-            sb.append("  No changes detected.\n");
+            if (updatedClass) {
+                sb.append("  Changes have been made to user code (procedures, supporting classes, etc).\n");
+            } else {
+                sb.append("  No changes detected.\n");
+            }
         }
 
         // trim the last newline

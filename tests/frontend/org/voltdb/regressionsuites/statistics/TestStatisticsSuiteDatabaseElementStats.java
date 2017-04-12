@@ -29,6 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import junit.framework.Test;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -37,8 +39,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb.utils.MiscUtils;
-
-import junit.framework.Test;
 
 public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuiteBase {
 
@@ -180,7 +180,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         System.out.println("\n\nTESTING PROCEDURE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[19];
+        ColumnInfo[] expectedSchema = new ColumnInfo[20];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -200,6 +200,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         expectedSchema[16] = new ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER);
         expectedSchema[17] = new ColumnInfo("ABORTS", VoltType.BIGINT);
         expectedSchema[18] = new ColumnInfo("FAILURES", VoltType.BIGINT);
+        expectedSchema[19] = new ColumnInfo("TRANSACTIONAL", VoltType.TINYINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
@@ -211,6 +212,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         // this plus R/W replication should ensure that every site on every node runs this transaction
         // at least once
 
+        client.callProcedure("@Statistics", "proceduredetail", 1);
         results = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults();
         VoltTable keys = results[0];
         for (int k = 0;k < keys.getRowCount(); k++) {
@@ -235,7 +237,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         validateSchema(results[0], expectedTable);
         // For this table, where unique HSID isn't written to SITE_ID, these
         // two checks should ensure we get all the rows we expect?
-        Map<String, String> columnTargets = new HashMap<String, String>();
+        Map<String, String> columnTargets = new HashMap<>();
         columnTargets.put("PROCEDURE", "NEW_ORDER.insert");
         validateRowSeenAtAllHosts(results[0], columnTargets, false);
         validateRowSeenAtAllPartitions(results[0], "PROCEDURE", "NEW_ORDER.insert", false);
@@ -336,12 +338,12 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         validateSchema(results[0], expectedTable);
 
         // Validate the PROCEDUREPROFILE aggregation.
-        results = client.callProcedure("@Statistics", "procedureprofile", 0).getResults();
+        results = client.callProcedure("@Statistics", "procedureprofile", 1).getResults();
         System.out.println("\n\n\n" + results[0].toString() + "\n\n\n");
 
         // expect NEW_ORDER.insert, GoSleep
         // see TestStatsProcProfile.java for tests of the aggregation itself.
-        List<String> possibleProcs = new ArrayList<String>();
+        List<String> possibleProcs = new ArrayList<>();
         possibleProcs.add("org.voltdb_testprocs.regressionsuites.malicious.GoSleep");
         possibleProcs.add("NEW_ORDER.insert");
         if (MiscUtils.isPro()) {

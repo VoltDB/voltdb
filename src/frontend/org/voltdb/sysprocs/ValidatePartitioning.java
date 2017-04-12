@@ -93,13 +93,13 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             for (int ii = 0; ii < tableNames.size(); ii++) {
                 results.addRow(context.getHostId(), CoreUtils.getSiteIdFromHSId(context.getSiteId()), context.getPartitionId(), tableNames.get(ii), mispartitionedCounts[ii]);
             }
-            return new DependencyPair( DEP_validatePartitioning, results);
+            return new DependencyPair.TableDependencyPair( DEP_validatePartitioning, results);
 
         } else if (fragmentId == SysProcFragmentId.PF_validatePartitioningResults) {
 
             assert (dependencies.size() > 0);
             final VoltTable results = VoltTableUtil.unionTables(dependencies.get(DEP_validatePartitioning));
-            return new DependencyPair( DEP_validatePartitioningResults, results);
+            return new DependencyPair.TableDependencyPair( DEP_validatePartitioningResults, results);
 
         } else if (fragmentId == SysProcFragmentId.PF_matchesHashinator) {
 
@@ -119,13 +119,13 @@ public class ValidatePartitioning extends VoltSystemProcedure {
                     context.getPartitionId(),
                     givenConfigurationSignature == TheHashinator.getConfigurationSignature() ? (byte)1 : (byte)0);
 
-            return new DependencyPair(DEP_matchesHashinator, matchesHashinator);
+            return new DependencyPair.TableDependencyPair(DEP_matchesHashinator, matchesHashinator);
 
         } else if (fragmentId == SysProcFragmentId.PF_matchesHashinatorResults) {
 
             assert (dependencies.size() > 0);
             final VoltTable results = VoltTableUtil.unionTables(dependencies.get(DEP_matchesHashinator));
-            return new DependencyPair( DEP_matchesHashinatorResults, results);
+            return new DependencyPair.TableDependencyPair( DEP_matchesHashinatorResults, results);
 
         }
         assert (false);

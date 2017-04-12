@@ -38,9 +38,9 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 import junit.framework.TestCase;
-import org.voltdb.utils.VoltFile;
 
 public class TestCatalogDiffs extends TestCase {
     static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
@@ -84,7 +84,8 @@ public class TestCatalogDiffs extends TestCase {
 
     public static Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(
+                CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
@@ -95,20 +96,25 @@ public class TestCatalogDiffs extends TestCase {
             Catalog catOriginal,
             Catalog catUpdated)
     {
-        return verifyDiff(catOriginal, catUpdated, null, null);
+        //Default expect no generation roll.
+        return verifyDiff(catOriginal, catUpdated, null, null, false, true);
     }
 
     private String verifyDiff(
             Catalog catOriginal,
             Catalog catUpdated,
             Boolean expectSnapshotIsolation,
-            Boolean worksWithElastic)
+            Boolean worksWithElastic,
+            Boolean expectedNewGeneration, Boolean execute)
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
         String commands = diff.commands();
         System.out.println("DIFF COMMANDS:");
         System.out.println(commands);
-        catOriginal.execute(commands);
+        //If we want to just compare catalogs back and forth keep catalog intact.
+        if (execute) {
+            catOriginal.execute(commands);
+        }
         assertTrue(diff.supported());
         assertEquals(0, diff.tablesThatMustBeEmpty()[0].length);
         if (expectSnapshotIsolation != null) {
@@ -117,10 +123,15 @@ public class TestCatalogDiffs extends TestCase {
         if (worksWithElastic != null) {
             assertEquals((boolean)worksWithElastic, diff.worksWithElastic());
         }
-        String updatedOriginalSerialized = catOriginal.serialize();
-        assertEquals(updatedOriginalSerialized, catUpdated.serialize());
+        if (expectedNewGeneration != null) {
+            assertEquals((boolean)expectedNewGeneration, diff.requiresNewExportGeneration());
+        }
+        if (execute) {
+            String updatedOriginalSerialized = catOriginal.serialize();
+            assertEquals(updatedOriginalSerialized, catUpdated.serialize());
+        }
 
-        String desc = diff.getDescriptionOfChanges();
+        String desc = diff.getDescriptionOfChanges(false);
 
         System.out.println("========================");
         System.out.println(desc);
@@ -436,7 +447,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testaddtable2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testaddtable2.jar");
 
-        verifyDiff(catOriginal, catUpdated, false, null);
+        verifyDiff(catOriginal, catUpdated, false, null, false, true);
     }
 
     public void testDropTable() throws IOException {
@@ -455,7 +466,7 @@ public class TestCatalogDiffs extends TestCase {
         // Create a catalog with just table A
         Catalog catUpdated = getCatalogForTable("A", "droptable2");
 
-        verifyDiff(catOriginal, catUpdated, false, null);
+        verifyDiff(catOriginal, catUpdated, false, null, false, true);
     }
 
     public void testViewConversion() throws IOException {
@@ -496,7 +507,7 @@ public class TestCatalogDiffs extends TestCase {
     public void testAddTableColumn() throws IOException {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
-        verifyDiff(catOriginal, catUpdated, true, null);
+        verifyDiff(catOriginal, catUpdated, true, null, false, true);
 
         VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
@@ -508,7 +519,7 @@ public class TestCatalogDiffs extends TestCase {
     public void testRemoveTableColumn() throws IOException {
         Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumn2");
         Catalog catUpdated = getCatalogForTable("A", "removetablecolumn1");
-        verifyDiff(catOriginal, catUpdated, true, null);
+        verifyDiff(catOriginal, catUpdated, true, null, false, true);
 
         VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
@@ -523,14 +534,14 @@ public class TestCatalogDiffs extends TestCase {
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
         Catalog catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         Catalog catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiff(catOriginal, catUpdated, true, null);
+        verifyDiff(catOriginal, catUpdated, true, null, false, true);
 
         // even pass when crossing the inline/out-of-line boundary
         t1 = TableHelper.quickTable("(VARBINARY30)");
         t2 = TableHelper.quickTable("(VARBINARY70)");
         catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiff(catOriginal, catUpdated, true, null);
+        verifyDiff(catOriginal, catUpdated, true, null, false, true);
 
         // fail integer contraction if non-empty empty
         t1 = TableHelper.quickTable("(BIGINT)");
@@ -685,7 +696,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar");
 
-        verifyDiff(catOriginal, catUpdated, false, null);
+        verifyDiff(catOriginal, catUpdated, false, null, false, true);
     }
 
     public void testAddUniqueNonCoveringTableIndexRejectedIfNotEmpty() throws IOException {
@@ -828,36 +839,6 @@ public class TestCatalogDiffs extends TestCase {
         // remove the index
         Catalog catUpdated = get2ColumnCatalogForTable("A", "testRemoveNonUniqueIndex2");
         verifyDiff(catOriginal, catUpdated);
-    }
-
-    public void testExportRejectedIfNotEmpty() throws IOException {
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("A", "C1");
-        builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
-        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
-
-        builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2.jar");
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2.jar");
-        verifyDiffIfEmptyTable(catOriginal, catUpdated);
-
-        builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("B", "C1");
-        builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
-        catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
-
-        builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addLiteralSchema("\nCREATE TABLE B PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.compile(testDir + File.separator + "testAddTableConstraintRejected2.jar");
-        catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2.jar");
-        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testAddTableConstraintRejectedIfNotEmpty() throws IOException {
@@ -1246,7 +1227,7 @@ public class TestCatalogDiffs extends TestCase {
 
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
-        verifyDiff(catOriginal, catUpdated, null, true);
+        verifyDiff(catOriginal, catUpdated, null, true, false, true);
     }
 
     public void testChangeNotCompatibleWithElasticAddProcedure() throws IOException {
@@ -1260,7 +1241,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addStmtProcedure("another_procedure", "select * from A;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
-        verifyDiff(catOriginal, catUpdated, null, false);
+        verifyDiff(catOriginal, catUpdated, null, false, false, true);
     }
 
     public void testChangeNotCompatibleWithElasticAddTable() throws IOException {
@@ -1274,7 +1255,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE another_table (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
-        verifyDiff(catOriginal, catUpdated, null, false);
+        verifyDiff(catOriginal, catUpdated, null, false, false, true);
     }
 
     public void testEnableDROnEmptyTable() throws IOException {
@@ -1410,7 +1391,7 @@ public class TestCatalogDiffs extends TestCase {
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         final String ddl =
-                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
+                "CREATE STREAM export_data export to target default ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(ddl);
@@ -1503,9 +1484,64 @@ public class TestCatalogDiffs extends TestCase {
         msg = CatalogUtil.compileDeployment(modTypeCat, modTypeDepl, false);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
-        verifyDiff(origCat, newPropCat); // test add
-        verifyDiff(newPropCat, origCat); // test delete
-        verifyDiff(origCat, modPropCat); // test modification
-        verifyDiff(modPropCat, modTypeCat); // test modification
+        verifyDiff(newPropCat, origCat, null, null, true, false); // test delete
+        verifyDiff(origCat, newPropCat, null, null, true, false); // test add
+        verifyDiff(origCat, modPropCat, null, null, true, false); // test modification
+        verifyDiff(modPropCat, modTypeCat, null, null, true, false); // test modification
     }
+
+    public void testAddStreamRollGeneration() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE TABLE tableToDrop (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE STREAM B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp1.jar"));
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "exp1.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE TABLE tableToDrop (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp2.jar"));
+        Catalog catUpdatedWithDropStream = catalogForJar(testDir + File.separator + "exp2.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE TABLE tableToDrop (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE STREAM B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE TABLE foo (i integer);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp3.jar"));
+        Catalog catUpdatedWithNewTable = catalogForJar(testDir + File.separator + "exp3.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE STREAM B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp4.jar"));
+        Catalog catUpdatedWithDroppedTable = catalogForJar(testDir + File.separator + "exp4.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE TABLE tableToDrop (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE STREAM B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE STREAM C (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp5.jar"));
+        Catalog catUpdatedWithNewStream = catalogForJar(testDir + File.separator + "exp5.jar");
+
+        verifyDiff(catOriginal, catUpdatedWithNewStream, null, null, true, false); // add stream and roll
+        verifyDiff(catOriginal, catUpdatedWithDropStream, null, null, true, false); // drop stream and roll
+        verifyDiff(catOriginal, catUpdatedWithNewTable, null, null, false, false); // add table and dont roll
+        verifyDiff(catOriginal, catUpdatedWithDroppedTable, null, null, false, false); // drop table and dont roll
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE TABLE tableToDrop (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE STREAM B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
+                + "\nCREATE VIEW V_A (C1 , NUM_A) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp6.jar"));
+        Catalog catUpdatedWithStreamView = catalogForJar(testDir + File.separator + "exp6.jar");
+        verifyDiff(catOriginal, catUpdatedWithStreamView, null, null, false, false); // create view on stream and roll
+        verifyDiff(catUpdatedWithStreamView, catOriginal, null, null, false, false); // drop view on stream and roll
+
+    }
+
 }

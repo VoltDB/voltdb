@@ -850,6 +850,9 @@ public class CoreUtils {
     public static String hsIdToString(long hsId) {
         return Integer.toString((int)hsId) + ":" + Integer.toString((int)(hsId >> 32));
     }
+    public static void hsIdToString(long hsId, StringBuilder sb) {
+        sb.append((int)hsId).append(":").append((int)(hsId >> 32));
+    }
 
     public static String hsIdCollectionToString(Collection<Long> ids) {
         List<String> idstrings = new ArrayList<String>();

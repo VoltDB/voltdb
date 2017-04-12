@@ -54,7 +54,15 @@
 
 namespace voltdb {
 
-AbstractJoinPlanNode::AbstractJoinPlanNode() { }
+AbstractJoinPlanNode::AbstractJoinPlanNode()
+    : m_preJoinPredicate()
+    , m_joinPredicate()
+    , m_wherePredicate()
+    , m_joinType(JOIN_TYPE_INVALID)
+    , m_outputSchemaPreAgg()
+    , m_tupleSchemaPreAgg(NULL)
+{
+}
 
 AbstractJoinPlanNode::~AbstractJoinPlanNode()
 {
