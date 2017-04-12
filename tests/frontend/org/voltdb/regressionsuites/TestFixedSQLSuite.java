@@ -695,6 +695,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG9533();
         subTestENG9796();
         subTestENG11256();
+        subTestENG12116();
     }
 
     private void subTestENG11256() throws Exception {
@@ -2705,6 +2706,32 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, new String[] {"p1", "r1", "r2"});
     }
 
+    private void subTestENG12116() throws Exception {
+        Client client = getClient();
+        // This is essentially the case which was failing
+        // in ENG-12116.  Note that the select statement's
+        // expressions don't depend on the derived table it
+        // selects from.
+        String SQL = "SELECT SIN(0) FROM ( SELECT DISTINCT * FROM P1 AS O, R1 AS I) AS TTT;";
+        client.callProcedure("p1.Insert", 10, "foo", 20,  40.0);
+        client.callProcedure("r1.Insert", 11, "bar", 30,  99.0);
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", SQL).getResults()[0];
+        assertApproximateContentOfTable(new Object[][] {{ 0.0 }}, vt, 1.0e-7);
+        SQL = "SELECT * FROM ( SELECT DISTINCT * FROM P1 AS O, R1 AS I WHERE O.ID+1 = I.ID) AS TTT;";
+        client.callProcedure("p1.Insert", 20, "goo", 21,  41.0);
+        client.callProcedure("r1.Insert", 22, "gar", 31,  99.9);
+        vt = client.callProcedure("@AdHoc", SQL).getResults()[0];
+        // See if we are actually getting the columns
+        // right in the plan.  Before ENG-12116 was fixed we would
+        // sometimes choose the wrong columns in a subquery
+        // with select distinct when the column names were
+        // identical, as is the case here.  With this test
+        // we can see that the indexes are correct, since the
+        // values are different.
+        assertContentOfTable(new Object[][] {{ 10, "foo", 20, 40.0, 11, "bar", 30, 99.0 }}, vt);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -2754,12 +2781,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         builder.addServerConfig(config);
         // end of normally disabled section */
 
-        // CONFIG #2: HSQL
+        //* CONFIG #2: HSQL
         config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
+        // end of HSQDB config */
         return builder;
     }
 }
