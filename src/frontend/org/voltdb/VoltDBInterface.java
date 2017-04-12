@@ -162,7 +162,8 @@ public interface VoltDBInterface
             long currentTxnTimestamp,
             byte[] deploymentBytes,
             byte[] deploymentHash,
-            boolean hasSchemaChange);
+            boolean hasSchemaChange,
+            boolean requiresNewExportGeneration);
 
     /**
      * Updates the cluster setting of this VoltDB

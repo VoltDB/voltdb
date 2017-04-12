@@ -1224,7 +1224,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             TupleValueExpression tve = new TupleValueExpression(
                     col.tableName, col.tableAlias,
                     col.columnName, col.alias,
-                    col.index);
+                    col.index, col.differentiator);
+            tve.setTypeSizeAndInBytes(col.asSchemaColumn());
 
             ParsedColInfo pcol = new ParsedColInfo();
             pcol.tableName = col.tableName;

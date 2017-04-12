@@ -854,7 +854,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void coreUpdateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(final long timestamp, final boolean isStreamUpdate, final String catalogDiffs) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -865,6 +865,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             m_data.putInt(Commands.UpdateCatalog.m_id);
             m_data.putLong(timestamp);
+            m_data.putInt(isStreamUpdate ? 1 : 0);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
