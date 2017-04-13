@@ -186,7 +186,7 @@ public class HostCriteria {
         return m_terminusNonce;
     }
 
-    public UUID getStagedCatalogHash() {
+    public UUID getStartupCatalogHash() {
         return m_startupCatalogHash;
     }
 

@@ -320,6 +320,10 @@ public class MeshProber implements JoinAcceptor {
         return m_missingHostCount;
     }
 
+    public UUID getStartupCatalogHash() {
+        return m_startupCatalogHash;
+    }
+
     public HostCriteria asHostCriteria() {
         return new HostCriteria(
                 m_paused,
