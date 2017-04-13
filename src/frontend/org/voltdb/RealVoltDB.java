@@ -2211,7 +2211,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // this check cannot be part of managedPathsWithFiles(), since "voltdb start" can get translated into "voltdb create" after probing the mesh.
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists() && stagedCatalogFH.canRead()){
-            VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite them.");
+            VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
         }
         final boolean standalone = true;
         final boolean isXCDR = false;
@@ -3971,9 +3971,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (stagedCatalog.exists()) {
                 boolean success = stagedCatalog.delete();
                 if (success){
-                    hostLog.info("Deleted staged schema because durability is present.");
+                    hostLog.info("Deleted VoltDB's copy of the initialized schema because durability is present.");
                 } else {
-                    hostLog.warn("Could not delete staged schema.");
+                    hostLog.warn("Could not delete VoltDB's copy of the initialized schema.");
                 }
             }
         }

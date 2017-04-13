@@ -249,10 +249,9 @@ public class HostCriteria {
                     + m_terminusNonce + " vs. " + o.m_terminusNonce);
         }
         if ((m_startupCatalogHash == null) ^ (o.m_startupCatalogHash == null)) {
-            ilb.add("Staged schema and/or classes are missing on at least one node. "
-                    + "If any node has staged a schema, all must have staged identical schemas.");
+            ilb.add("A node has not initialized a schema. All nodes must initialize with identical schemas.");
         } else if ((m_startupCatalogHash != null) && !m_startupCatalogHash.equals(o.m_startupCatalogHash)) {
-            ilb.add("Nodes have staged different schemas.");
+            ilb.add("Nodes have been initialized with different schemas.");
         }
         return ilb.build();
     }

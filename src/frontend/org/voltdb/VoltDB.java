@@ -718,7 +718,7 @@ public class VoltDB {
                     // existence of previous staged catalog will be addressed later
                     break;
                 default:
-                    hostLog.warn("Staged schema and/or procedures are present, but they are being ignored and may be removed.");
+                    hostLog.warn("Initialized schema is present, but is being ignored and may be removed.");
                     break;
                 }
             }
