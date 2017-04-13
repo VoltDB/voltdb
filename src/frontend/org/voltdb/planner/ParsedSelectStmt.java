@@ -602,7 +602,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(expr instanceof AggregateExpression);
             if (expr.hasSubquerySubexpression()) {
                 throw new PlanningErrorException(
-                        "SQL Aggregates with subquery expressions are not allowed.");
+                        "SQL Aggregate function calls with subquery expression arguments are not allowed.");
             }
 
             ParsedColInfo col = new ParsedColInfo();
@@ -943,7 +943,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
             }
             if (m_windowFunctionExpressions.get(0).hasSubqueryArgs()) {
-                throw new PlanningErrorException("Window functions with subquery expressions are not allowed.");
+                throw new PlanningErrorException("Window function calls with subquery expression arguments are not allowed.");
             }
             //
             // This could be an if statement, but I think it's better to
