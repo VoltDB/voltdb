@@ -2211,13 +2211,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // this check cannot be part of managedPathsWithFiles(), since "voltdb start" can get translated into "voltdb create" after probing the mesh.
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists() && stagedCatalogFH.canRead()){
-            VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
+            VoltDB.crashLocalVoltDBNoArtifacts("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
         }
         final boolean standalone = true;
         final boolean isXCDR = false;
-        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
+        final boolean generateReports = false; // this will be overridden if debug mode is enabled
+        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR, generateReports);
         if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())){
-            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema, false, null);
+            VoltDB.crashLocalVoltDBNoArtifacts("Could not compile specified schema " + config.m_userSchema);
         }
     }
 
@@ -3969,8 +3970,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (((m_commandLog != null) && m_commandLog.isEnabled()) || (m_terminusNonce != null)) {
             File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(m_nodeSettings.getVoltDBRoot().getAbsolutePath()));
             if (stagedCatalog.exists()) {
-                boolean success = stagedCatalog.delete();
-                if (success){
+                if (stagedCatalog.delete()){
                     hostLog.info("Deleted VoltDB's copy of the initialized schema because durability is present.");
                 } else {
                     hostLog.warn("Could not delete VoltDB's copy of the initialized schema.");

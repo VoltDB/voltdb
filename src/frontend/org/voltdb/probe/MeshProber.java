@@ -690,8 +690,7 @@ public class MeshProber implements JoinAcceptor {
         try {
             appendTo(js);
         } catch (JSONException e) {
-            Throwables.throwIfUnchecked(e);
-            throw new RuntimeException(e);
+            Throwables.propagate(e);
         }
         return js.toString();
     }

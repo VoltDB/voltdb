@@ -1145,7 +1145,7 @@ public class VoltDB {
     }
 
     public static void crashLocalVoltDB(String errMsg) {
-        crashLocalVoltDB(errMsg, false, null);
+        crashLocalVoltDB(errMsg, false, null, true);
     }
 
     /**
@@ -1188,10 +1188,23 @@ public class VoltDB {
             log.warn("failed to issue a crash SNMP trap", t);
         }
     }
+
+    /**
+     * Exit the process with an error message, but no artifacts.
+     * Typical usage: user errors on start-up.
+     */
+    public static void crashLocalVoltDBNoArtifacts(String errMsg) {
+        crashLocalVoltDB(errMsg, false, null, false);
+    }
+
     /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        crashLocalVoltDB(errMsg, stackTrace, thrown, true);
+    }
+
+    private static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown, boolean allowArtifacts) {
         if (exitAfterMessage) {
             System.err.println(errMsg);
             VoltDB.exit(-1);
@@ -1238,6 +1251,10 @@ public class VoltDB {
                     VoltTrace.closeAllAndShutdown(new File(instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath(),
                                                   TimeUnit.SECONDS.toMillis(10));
                 } catch (IOException e) {}
+
+                if (!allowArtifacts){
+                    return; // this will jump to the finally block
+                }
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
