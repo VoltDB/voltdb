@@ -332,6 +332,9 @@ public class SchemaColumn {
             if (m_expression.getValueType() != null) {
                 str += "[" + m_expression.getValueType().toSQLString() + "] ";
             }
+            else {
+                str += "[!!! value type:NULL !!!] ";
+            }
 
             str += m_expression.explain(table) + ")";
 
