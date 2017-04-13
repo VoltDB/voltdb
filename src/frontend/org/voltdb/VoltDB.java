@@ -718,7 +718,7 @@ public class VoltDB {
                     // existence of previous staged catalog will be addressed later
                     break;
                 default:
-                    hostLog.warn("Staged catalog is present at " + stagedCatalogLocation.getAbsolutePath() + " but is being ignored by the " + m_startAction.toString() + " action.");
+                    hostLog.warn("Staged schema and/or procedures are present, but they are being ignored and may be removed.");
                     break;
                 }
             }

@@ -2690,6 +2690,6 @@ public abstract class CatalogUtil {
 
     public static final String CATALOG_FILE_NAME = "catalog.jar";
 
-    public static final String STAGED_CATALOG_RELATIVE_PATH = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
+    public static final String STAGED_CATALOG = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
 
 }

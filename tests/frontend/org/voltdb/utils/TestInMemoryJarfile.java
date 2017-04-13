@@ -31,6 +31,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.Arrays;
+import java.util.UUID;
 
 import junit.framework.TestCase;
 
@@ -141,6 +142,9 @@ public class TestInMemoryJarfile extends TestCase {
         byte[] sha1 = new InMemoryJarfile(m_jarPath).getSha1Hash();
         byte[] sha2 = new InMemoryJarfile("testout-dupe.jar").getSha1Hash();
         assertTrue(Arrays.equals(sha1, sha2));
+        UUID md51 = new InMemoryJarfile(m_jarPath).getMD5Checksum();
+        UUID md52 = new InMemoryJarfile("testout-dupe.jar").getMD5Checksum();
+        assertEquals(md51, md52);
     }
 
     public void testDifferentJarContentsDontMatchCRCs()
@@ -154,6 +158,9 @@ public class TestInMemoryJarfile extends TestCase {
         byte[] sha1 = new InMemoryJarfile(m_jarPath).getSha1Hash();
         byte[] sha2 = new InMemoryJarfile("testout-dupe.jar").getSha1Hash();
         assertFalse(Arrays.equals(sha1, sha2));
+        UUID md51 = new InMemoryJarfile(m_jarPath).getMD5Checksum();
+        UUID md52 = new InMemoryJarfile("testout-dupe.jar").getMD5Checksum();
+        assertNotSame(md51, md52);
     }
 
     public void testJarfileRemoveClassRemovesInnerClasses() throws Exception

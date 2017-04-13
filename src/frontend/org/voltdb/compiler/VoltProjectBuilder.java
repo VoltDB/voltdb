@@ -843,26 +843,6 @@ public class VoltProjectBuilder {
                        ppdEnabled, snapshotPath, ppdPrefix);
     }
 
-    private void validateVoltDbRoot(String voltRootPath){
-        if ((voltRootPath != null) && !voltRootPath.trim().isEmpty()){
-            java.io.File voltRootFile = new java.io.File(voltRootPath);
-            if (voltRootFile.exists()){
-                if (!voltRootFile.isDirectory()) {
-                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not a directory");
-                }
-                if (!voltRootFile.canRead()) {
-                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not readable");
-                }
-                if (!voltRootFile.canWrite()) {
-                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
-                }
-                if (!voltRootFile.canExecute()) {
-                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
-                }
-            }
-        }
-    }
-
     public boolean compile(final VoltCompiler compiler,
                            final String jarPath,
                            final String voltRoot,
@@ -886,7 +866,18 @@ public class VoltProjectBuilder {
                         throw new RuntimeException("Unable to create voltdbroot \"" + voltRootPath + "\" for test");
                     }
                 }
-                validateVoltDbRoot(voltRootPath);
+                if (!voltRootFile.isDirectory()) {
+                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not a directory");
+                }
+                if (!voltRootFile.canRead()) {
+                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not readable");
+                }
+                if (!voltRootFile.canWrite()) {
+                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
+                }
+                if (!voltRootFile.canExecute()) {
+                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
+                }
                 deploymentVoltRoot = voltRootPath;
             }
         }
@@ -947,7 +938,6 @@ public class VoltProjectBuilder {
 
     private String compileDeploymentOnly(String voltDbRoot, DeploymentInfo deployment)
     {
-        validateVoltDbRoot(voltDbRoot);
         try {
             m_pathToDeployment = writeDeploymentFile(voltDbRoot, deployment);
         } catch (Exception e) {

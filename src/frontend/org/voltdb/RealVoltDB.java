@@ -162,7 +162,6 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Digester;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
@@ -541,7 +540,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     public static String getStagedCatalogPath(String voltDbRoot){
-        return voltDbRoot + File.separator + CatalogUtil.STAGED_CATALOG_RELATIVE_PATH;
+        return voltDbRoot + File.separator + CatalogUtil.STAGED_CATALOG;
     }
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
@@ -985,17 +984,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_clusterSettings.set(clusterSettings, 1);
 
-            UUID startupCatalogHash = null;
-            if (m_pathToStartupCatalog != null){
-                try {
-                    // TODO - any way to keep it around so it need not be loaded twice?
-                    startupCatalogHash = new InMemoryJarfile(m_pathToStartupCatalog).getMD5Checksum();
-                } catch (IOException e){
-                    VoltDB.crashLocalVoltDB("Failed to load schema and classes from staging location " + m_pathToStartupCatalog, false, e);
-                }
-            }
-
-            MeshProber.Determination determination = buildClusterMesh(readDepl, startupCatalogHash);
+            MeshProber.Determination determination = buildClusterMesh(readDepl, m_pathToStartupCatalog);
             if (m_config.m_startAction == StartAction.PROBE) {
                 String action = "Starting a new database cluster";
                 if (determination.startAction.doesRejoin()) {
@@ -2767,7 +2756,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * rejoining, it will return when the node and agreement
      * site are synched to the existing cluster.
      */
-    MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl, UUID startupCatalogHash) {
+    MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl, String startupCatalogPath) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
                 || pathsWithRecoverableArtifacts(readDepl.deployment).isEmpty();
         setBare(bareAtStartup);
@@ -2778,6 +2767,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return m_clusterSettings.get().hostcount();
             }
         };
+
+        UUID startupCatalogHash = null;
+        if (m_pathToStartupCatalog != null){
+            try {
+                startupCatalogHash = new InMemoryJarfile(m_pathToStartupCatalog).getMD5Checksum();
+            } catch (IOException e){
+                VoltDB.crashLocalVoltDB("Failed to load schema and classes from staging location " + m_pathToStartupCatalog, false, e);
+            }
+        }
 
         ClusterType clusterType = readDepl.deployment.getCluster();
 
@@ -3680,6 +3678,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final long megabytes = m_executionSiteRecoveryTransferred / (1024 * 1024);
         final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);
 
+        deleteStagedCatalogIfNeeded();
+
         if (m_clientInterface != null) {
             m_clientInterface.mayActivateSnapshotDaemon();
             try {
@@ -3872,14 +3872,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         /*
          * Remove the terminus file if it is there, which is written on shutdown --save
          */
-        final File terminusMarker = new File(m_nodeSettings.getVoltDBRoot(), VoltDB.TERMINUS_MARKER);
-        final boolean terminusExists = terminusMarker.exists();
-        if (terminusExists){
-            boolean success = terminusMarker.delete();
-            if (!success){
-                hostLog.warn("Could not delete terminus marker");
-            }
-        }
+        new File(m_nodeSettings.getVoltDBRoot(), VoltDB.TERMINUS_MARKER).delete();
 
         /*
          * Command log is already initialized if this is a rejoin or a join
@@ -3916,17 +3909,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_leaderAppointer.onReplayCompletion();
         }
 
-        if ((m_commandLog != null) && (m_commandLog.isEnabled()) || terminusExists){
-            File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(m_nodeSettings.getVoltDBRoot().getAbsolutePath()));
-            if (stagedCatalog.exists()){
-                boolean success = stagedCatalog.delete();
-                if (success){
-                    hostLog.info("Deleted staged schema and classes because durability is present.");
-                } else {
-                    hostLog.warn("Could not delete staged schema and classes. They will be ignored during command log or terminus snapshot recovery.");
-                }
-            }
-        }
+        deleteStagedCatalogIfNeeded();
 
         if (m_startMode != null) {
             m_mode = m_startMode;
@@ -3979,6 +3962,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+    }
+
+    private void deleteStagedCatalogIfNeeded() {
+        if (((m_commandLog != null) && m_commandLog.isEnabled()) || (m_terminusNonce != null)){
+            assert((m_terminusNonce == null) || !m_terminusNonce.trim().isEmpty());
+            File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(m_nodeSettings.getVoltDBRoot().getAbsolutePath()));
+            if (stagedCatalog.exists()){
+                boolean success = stagedCatalog.delete();
+                if (success){
+                    hostLog.info("Deleted staged schema and classes because durability is present.");
+                } else {
+                    hostLog.warn("Could not delete staged schema and classes. They will be ignored during command log or terminus snapshot recovery.");
+                }
+            }
+        }
     }
 
     @Override

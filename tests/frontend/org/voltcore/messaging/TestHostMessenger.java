@@ -1578,4 +1578,13 @@ public class TestHostMessenger {
         // this should not trip partition detection
         assertFalse(HostMessenger.makePPDDecision(-1, previous, current, true));
     }
+
+    /** Staged catalog tests:
+     * 1a. Create with matching catalogs -> succeed.
+     * 1b. Create with non-matching catalogs -> fail.
+     * 1c. Create with missing catalog -> fail.
+     * 2.  Recover - same as create.
+     * Rejoin - should never have a staged catalog. This is tested at the system level.
+     * TODO add assertion into code.
+     */
 }
