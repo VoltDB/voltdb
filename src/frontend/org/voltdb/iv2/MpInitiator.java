@@ -201,10 +201,10 @@ public class MpInitiator extends BaseInitiator implements Promotable
      * be blocked running the EveryPartitionTask for the catalog update, this
      * is currently safe with no locking.  And yes, I'm a horrible person.
      */
-    public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp, boolean requiresNewExportGeneration)
     {
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
-        m_executionSite.updateCatalog(diffCmds, context, csp, false, true, Long.MIN_VALUE, Long.MIN_VALUE);
+        m_executionSite.updateCatalog(diffCmds, context, csp, false, true, Long.MIN_VALUE, Long.MIN_VALUE, requiresNewExportGeneration);
         MpScheduler sched = (MpScheduler)m_scheduler;
         sched.updateCatalog(diffCmds, context, csp);
     }

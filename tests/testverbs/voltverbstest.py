@@ -19,6 +19,11 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+
+# How are the tests generated for the Python unittest framework?
+#  See http://blog.kevinastone.com/generate-your-tests.html for
+#  a detailed walkthrough the process of dynamic unittest generation
+
 import os
 import random
 import re
@@ -38,14 +43,17 @@ volt_verbs = {'create': 1,
               'rejoin': 1,
               'add': 1,
               'init': 2,
-              'start': 2}
+              'start': 2,
+             }
 
 volt_verbs_mapping = {'create': 'create',
                       'recover': 'recover',
                       'rejoin': 'live rejoin',
                       'add': 'add',
                       'init': 'initialize',
-                      'start': 'probe'}
+                      'start': 'probe',
+                      'get': 'get',
+                      }
 
 
 # create all the options
@@ -76,7 +84,8 @@ pause = Opt('pause', 'paused', None, 1)
 missing = Opt('missing', 'missing', str, 1)
 # 'replica' should be immediately after verb
 replica = Opt('replica', 'replica', None, 1)
-# 'blocking' is only for rejoin, does not have corresponding java optional name, change verb 'live rejoin' to 'rejoin'
+# 'blocking' is only for rejoin, does not have corresponding java optional
+# name, change verb 'live rejoin' to 'rejoin'
 blocking = Opt('blocking', '', None, 1)
 
 # for newcli only
@@ -85,6 +94,10 @@ config = Opt('config', 'deployment', str, 2)
 voltdbroot = Opt('dir', 'voltdbroot', str, 2)
 hostcount = Opt('count', 'hostcount', int, 2)
 add = Opt('add', 'enableadd', None, 2)
+out = Opt('out', 'file', str, 2)
+verbose = Opt('verbose', 'verbose', None, 2)
+output = Opt('output', 'file', str, 2)
+# Ddir = Opt('
 schema = Opt('schema', 'schema', str, 2)
 classes = Opt('classes', 'classpath', str, 2)
 
@@ -173,7 +186,7 @@ volt_opts = {'create': [admin,
                        missing,
                        pause,
                        replica,
-                       add]
+                       add],
              }
 
 volt_opts_mandatory = {'create': [],
@@ -181,7 +194,7 @@ volt_opts_mandatory = {'create': [],
                        'rejoin': [host],
                        'add': [host],
                        'init': [],
-                       'start': []
+                       'start': [],
                        }
 
 volt_opts_negative = [unknown]
@@ -220,28 +233,45 @@ option_name_re = re.compile(option_name)
 # also skip 'blocking'
 option_ignore = ['version', 'help', 'verbose', 'background', 'ignore', 'blocking']
 
+# voltdb get and others use positional arguments so their
+# tests can't use the same pattern as "voltdb start|init|..."
+# model data for the irregular (voltdb get) family
+volt_irregular_verbs = { "get": 2,}
+get = Opt("get", "get", str, 2)
+irr_classes = Opt("classes", "classes", str, 2)
+voltdbrootdir = Opt("--dir somedir", "getvoltdbroot somedir", str, 2)
+otheroot = Opt("otheroot", "getvoltdbroot otheroot", str, 2)
+defaultroot = Opt("", "getvoltdbroot voltdbroot",  str, 2)
+# noverb = Opt("", "no verb: put some help text here", str, 2)
+# noobj = Opt("", "no obj: put some help text here", str, 2)
+# noparms = Opt("", "no parms", str, 2)
+# noout = Opt("", "file \"\"", str, 2)
+somefile = "somefile"
+out = Opt("--output "+somefile, "file"+" "+somefile, str, 2)
+verbs = [ get, ]
+objects = [ deployment, schema, irr_classes ]  # required
+options = [ voltdbrootdir, out, "none", ]
 
 class TestsContainer(unittest.TestCase):
     longMessage = True
 
 
-def make_test_function(haddiff, description):
+def make_test_function(haddiffs, description):
     def test(self):
-        self.assertFalse(haddiff, description)
-
+        self.assertFalse(haddiffs, description)
     return test
 
 
 def run_unit_test(verb, opts, expected_opts, reportout, expectedOut=None, expectedErr=None):
     stdout, stderr = run_voltcli(verb, opts, reportout)
-    haddiff, description = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout,
+    haddiffs, description = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout,
                                           expectedOut, expectedErr)
-    setattr(TestsContainer, 'test: {0}'.format(verb + " " + " ".join(opts)), make_test_function(haddiff, description))
-    return haddiff
+    setattr(TestsContainer, 'test: {0}'.format(verb + " " + " ".join(opts)), make_test_function(haddiffs, description))
+    return haddiffs
 
 
 # Execute the command.
-def run_voltcli(verb, opts, reportout=None, cmd=['../../bin/voltdb'], mode=['--dry-run'], environ=None, cwd=None):
+def run_voltcli(verb, opts, reportout=None, cmd=['voltdb'], mode=['--dry-run'], environ=None, cwd=None):
     command = cmd + [verb] + mode + opts
     if reportout:
         reportout.write("Test python cli:\n\t" + " ".join([verb] + opts) + "\n")
@@ -259,29 +289,30 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
     output_str = sanitize(stdout).strip()
     description = "Generate java command line:\n\t" + output_str + "\nTest Passed!\n\n"
     if expectedOut:
-        haddiff = False
+        haddiffs = False
         if expectedOut != stdout:
-            description = "Generate stdout:\n" + stdout + "\n" + "doest not match expected:\n" + expectedOut + + "\nTest Failed!\n\n"
-            haddiff = True
+            description = "Generate stdout:\n" + stdout + "\n" + "does not match expected:\n" + expectedOut + + "\nTest Failed!\n\n"
+            haddiffs = True
         else:
             description = "Generate expected stdout:\n" + stdout + "Test Passed!\n\n"
         reportout.write(description)
-        return haddiff, description
+        return haddiffs, description
 
     if expectedErr:
-        haddiff = False
+        haddiffs = False
         if stderr != expectedErr:
-            haddiff = True
+            haddiffs = True
             description = "Generate stderr:\n" + stderr + "\n" + "doest not match expected:\n" + expectedErr + "\nTest Failed!\n\n"
         else:
             description = "Generate expected stderr:\n" + stderr + "Test Passed!\n\n"
         reportout.write(description)
-        return haddiff, description
+        return haddiffs, description
 
 
 
     # match the verbs
-    if output_str.find(verb) != 0:
+    # if output_str.find(verb) == -1:
+    if output_str.find(verb) == -1:
         description = "Generate java command line:\n\t" + output_str + "\n" + "does not contain expected verb:\n" + verb + "\nTest Failed!\n\n"
         reportout.write(description)
         return True, description
@@ -300,8 +331,6 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
     if set(output_tokens) != set(expected_tokens):
         description = "Generated java command line:\n\t" + output_str + "\n" + "does not match expected options:\n" + " ".join(
             expected_tokens) + "\nTest Failed!\n\n"
-        reportout.write(description)
-        return True, description
 
     reportout.write(description)
     return False, description
@@ -380,6 +409,51 @@ def test_java_opts_override(verb = 'start', reportout = None):
             haddiffs = True
     return haddiffs
 
+# Test the irregular verbs -- the ones that have positional args
+def test_irregular_verbs(reportout = None):
+    haddiffs = False
+
+    for v in volt_irregular_verbs:
+        for obj in objects:
+            for pos in options:
+                if pos == "none":
+                    clean_args = [obj.pyname]
+                    expected_opts = [volt_verbs_mapping[v], obj.javaname,]
+                else:
+                    expected_opts = [volt_verbs_mapping[v], obj.javaname, pos.javaname]
+                    clean_args = []
+                    for a in [obj.pyname, pos.pyname]:
+                        if len(a) > 0:
+                            for b in str(a).split():
+                                clean_args.append(b)
+                stdout, stderr = run_voltcli(v, clean_args, reportout)
+
+                javaout = sanitize(stdout)
+                haddiffs, description = compare_irregular(javaout, expected_opts, reportout)
+
+                if pos == "none":
+                    setattr(TestsContainer, 'test: {0}'.format(v+ " " + " ".join([ obj.pyname, ])),
+                            make_test_function(haddiffs, description))
+                else:
+                    setattr(TestsContainer, 'test: {0}'.format(v+ " " + " ".join([ obj.pyname, pos.pyname, ])),
+                            make_test_function(haddiffs, description))
+
+def compare_irregular(actual, expected, reportout):
+    """
+        Follows the model already in place:
+        False means "no differences", aka match
+        True means "differences", aka doesn't match
+    """
+    description = "Generate java command line:\n\t" + actual
+    if actual.strip() == " ".join(expected).strip():
+        description += "\nTest Passed!\n\n"
+        haddiffs = False
+    else:
+        description += "\nTest Failed!\n\n"
+        haddiffs = True
+    reportout.write(description)
+    return haddiffs, description
+
 def do_main():
     parser = OptionParser()
     parser.add_option("-o", "--report_file", dest="report_file",
@@ -392,6 +466,8 @@ def do_main():
 
     # test override of environment
     haddiffs = test_java_opts_override(reportout=reportout)
+    # test irregulars...
+    haddiffs = test_irregular_verbs(reportout=reportout)
 
     try:
         for verb, version in volt_verbs.items():
@@ -413,6 +489,7 @@ def do_main():
             ## generate minimal config
             opts, expected_opts = gen_config(volt_opts_mandatory[verb], volt_opts[verb], 0,
                                              volt_opts_default[verb].copy())
+
             haddiffs = run_unit_test(verb, opts, expected_opts, reportout) or haddiffs
 
             ## generate config that contain a single opt

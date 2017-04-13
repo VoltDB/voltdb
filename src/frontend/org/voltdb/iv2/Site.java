@@ -395,10 +395,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation,
-                long uniqueId, long spHandle)
+                long uniqueId, long spHandle, boolean requiresNewExportGeneration)
         {
             return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation,
-                    false, uniqueId, spHandle);
+                    false, uniqueId, spHandle, requiresNewExportGeneration);
         }
 
         @Override
@@ -1474,7 +1474,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle, boolean requiresNewExportGeneration)
     {
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
@@ -1486,6 +1486,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
+        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
+
         diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
         if (diffCmds.length() == 0) {
             // empty diff cmds for the EE to apply, so skip the JNI call
@@ -1494,7 +1496,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         boolean DRCatalogChange = false;
-        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
         for (Table t : tables) {
             if (t.getIsdred()) {
                 DRCatalogChange |= diffCmds.contains("tables#" + t.getTypeName());
@@ -1522,7 +1523,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         m_ee.quiesce(m_lastCommittedSpHandle);
-        m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
+        m_ee.updateCatalog(m_context.m_uniqueId, requiresNewExportGeneration, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,

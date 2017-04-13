@@ -88,7 +88,7 @@ public class InternalConnectionHandler {
             String procName,
             Object...args)
     {
-        return callProcedure(user, isAdmin, timeout, cb, false, procName, args);
+        return callProcedure(user, isAdmin, timeout, cb, false, null, procName, args);
     }
 
     public boolean callProcedure(
@@ -97,6 +97,7 @@ public class InternalConnectionHandler {
             int timeout,
             ProcedureCallback cb,
             boolean ntPriority,
+            Function<Integer, Boolean> backPressurePredicate,
             String procName,
             Object...args)
     {
@@ -139,7 +140,7 @@ public class InternalConnectionHandler {
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
                 DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, adapter.connectionId());
 
-        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, ntPriority, null)) {
+        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, ntPriority, backPressurePredicate)) {
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -147,7 +148,7 @@ public class InternalConnectionHandler {
         return true;
     }
 
-    // Use backPressureTimeout value <= 0  for no back pressure timeout
+    // Use null backPressurePredicate for no back pressure
     public boolean callProcedure(InternalConnectionContext caller,
                                  Function<Integer, Boolean> backPressurePredicate,
                                  InternalConnectionStatsCollector statsCollector,

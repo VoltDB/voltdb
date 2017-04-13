@@ -572,11 +572,12 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
     struct updatecatalog {
         struct ipc_command cmd;
         int64_t timestamp;
+        bool isStreamChange;
         char data[];
     };
     struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
+        if (m_engine->updateCatalog(ntohll(uc->timestamp), uc->isStreamChange, std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
     }

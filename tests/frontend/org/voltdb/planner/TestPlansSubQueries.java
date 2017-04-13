@@ -2529,7 +2529,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
      */
 
     public void testENG8280() throws Exception {
-        // failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C ) * 2;","mumble");
+        failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C ) * 2;",
+                      "ORDER BY clause with subquery expression is not allowed.");
     }
 
     /**
