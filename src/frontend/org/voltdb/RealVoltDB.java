@@ -3687,9 +3687,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 createDRConsumerIfNeeded();
                 prepareReplication();
             }
-            if (m_rejoining) {
-                m_clientInterface.callBalanceSPI(m_myHostId);
-            }
         }
         startHealthMonitor();
 
@@ -3727,6 +3724,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else {
                 logRecoveryCompleted = true;
             }
+
+            if (m_clientInterface != null && m_rejoining) {
+                m_clientInterface.callBalanceSPI(m_myHostId);
+            }
+
             // Join creates a truncation snapshot as part of the join process,
             // so there is no need to wait for the truncation snapshot requested
             // above to finish.

@@ -36,10 +36,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -2128,78 +2130,61 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * migration spi after rejoining
      * @param hostId new host id
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
     public void callBalanceSPI(int hostId) {
 
-        Map<Integer, Integer> partitions = m_cartographer.calculatePartitionsForMigration(hostId);
-        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
-
-        if (hostLog.isDebugEnabled()) {
-            hostLog.debug("\n" + Cartographer.peekTopology(m_cartographer).toFormattedString());
-            hostLog.debug("\n" + partitionKeys.toFormattedString());
-            partitionKeys.resetRowPosition();
-        }
-
-        Map<Integer, Integer> keyMap = Maps.newHashMap();
-        while (partitionKeys.advanceRow()) {
-            keyMap.put((int)(partitionKeys.getLong(0)), ((int)partitionKeys.getLong(1)));
-        }
-        for (Map.Entry<Integer, Integer> entry: partitions.entrySet()) {
-            int partition = entry.getKey();
-            int hid = entry.getValue();
-            try {
-                ClientResponse resp = migrateSPI(keyMap.get(partition), partition, hid);
-                if (resp.getStatus() != ClientResponse.SUCCESS) {
-                    hostLog.error(String.format("Fail to move partition master for partition %d to host %d. %s", partition, hid, resp.getStatusString()));
-                }
-                if (m_cartographer.waitForPromotionAccepted(hostId, partition)) {
-                    hostLog.info(String.format("Partition master for partition %d has been moved to host %d.", partition, hid));
-                } else {
-                   hostLog.error(String.format("Fail to move partition master for partition %d to host %d.", partition, hid));
-                }
-
-            } catch (IOException | InterruptedException e) {
-                hostLog.error(String.format("Fail to move partition master for partition %d to host %d, %s", partition, hid, e.getMessage()));
-            }
-        }
-    }
-
-    /**
-     * Call @BalanceSPI to move SPI
-     * @param partitionKey  The partition key
-     * @param partition  The partition id
-     * @param newHostId  The new host
-     * @return
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    private ClientResponse migrateSPI(int partitionKey, int partition, int newHostId) throws IOException, InterruptedException {
-        if (hostLog.isDebugEnabled()) {
-            hostLog.debug(String.format("[callSPIMigration] partition key %d, partition id %d, host id %d", partitionKey, partition, newHostId));
-        }
-        SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
-        final String procedureName = "@BalanceSPI";
-        Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
-        Procedure proc = procedureConfig.asCatalogProcedure();
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setProcName(procedureName);
-        spi.setParams(partitionKey, partition, newHostId);
-        spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
-        if (spi.getSerializedParams() == null) {
-            spi = MiscUtils.roundTripForCL(spi);
-        }
-        synchronized (m_executeTaskAdpater) {
-            createTransaction(m_executeTaskAdpater.connectionId(),
-                              spi,
-                              proc.getReadonly(),
-                              proc.getSinglepartition(),
-                              proc.getEverysite(),
-                              partition,
-                              spi.getSerializedSize(),
-                              System.nanoTime());
-        }
-        final long timeoutMS = 2 * 60 * 1000;
-        return cb.getResponse(timeoutMS);
+       hostLog.info("Migrate SPI to host " + hostId);
+       final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(
+               CoreUtils.getThreadFactory("BalanceSPI"));
+       Map<Integer, Integer> partitions = m_cartographer.calculatePartitionsForMigration(hostId);
+       VoltTable vt = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+       Map<Integer, Integer> pIDKeyMap = Maps.newHashMap();
+       while (vt.advanceRow()) {
+           pIDKeyMap.put((int)(vt.getLong(0)), ((int)vt.getLong(1)));
+       }
+       int count = 0;
+       for (Map.Entry<Integer, Integer> entry: partitions.entrySet()) {
+           int pid = entry.getKey();
+           int hid = entry.getValue();
+           Runnable task = ( ) -> {
+               try {
+                   SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
+                   final String procedureName = "@BalanceSPI";
+                   Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
+                   Procedure proc = procedureConfig.asCatalogProcedure();
+                   StoredProcedureInvocation spi = new StoredProcedureInvocation();
+                   spi.setProcName(procedureName);
+                   spi.setParams(pIDKeyMap.get(pid), pid, hid);
+                   spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
+                   if (spi.getSerializedParams() == null) {
+                       spi = MiscUtils.roundTripForCL(spi);
+                   }
+                   synchronized (m_executeTaskAdpater) {
+                       createTransaction(m_executeTaskAdpater.connectionId(),
+                               spi,
+                               proc.getReadonly(),
+                               proc.getSinglepartition(),
+                               proc.getEverysite(),
+                               pid,
+                               spi.getSerializedSize(),
+                               System.nanoTime());
+                   }
+                   final long timeoutMS = 2 * 60 * 1000;
+                   ClientResponse resp= cb.getResponse(timeoutMS);
+                   if (resp.getStatus() == ClientResponse.SUCCESS) {
+                       hostLog.info(String.format("The mastership for partition %d has been moved to host %d.", pid, hid));
+                   } else {
+                       hostLog.error(String.format("The mastership for partition %d has not been successfully moved to host %d.", pid, hid));
+                   }
+               } catch (IOException | InterruptedException e) {
+                   hostLog.error(String.format("Fail to process mastership change. %s", e.getMessage()));
+               }
+           };
+           executor.schedule(task, 2 * count, TimeUnit.MINUTES);
+           count++;
+       }
     }
 
     void handleFailedHosts(Set<Integer> failedHosts) {

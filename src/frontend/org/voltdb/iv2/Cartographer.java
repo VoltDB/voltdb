@@ -237,16 +237,16 @@ public class Cartographer extends StatsSource
          * get partition candidates for migration on a host
          * @param partitions  the partitions on the new host. These partitions are replica but will assume leadership after
          *                    spi migration
-         * @param optimalLeadersOnHost  The optimal number of partition leaders
+         * @param maxLeaderCount  The optimal number of partition leaders
          * @param candidateCount  the number of partition candidates requested
          * @return  The partitions on this host to be migrated.
          */
-        public Set<Integer> getPartitionsForMigration(Set<Integer> partitions, int optimalLeadersOnHost, int candidateCount) {
+        public Set<Integer> getPartitionsForMigration(Set<Integer> partitions, int maxLeaderCount, int candidateCount) {
 
             Set<Integer> candidates = Sets.newHashSet();
             int count = m_partitions.size();
             for (Integer partition : m_partitions) {
-                if (partitions.contains(partition) && count > optimalLeadersOnHost && candidates.size() < candidateCount) {
+                if (partitions.contains(partition) && count > maxLeaderCount && candidates.size() < candidateCount) {
                     candidates.add(partition);
                     count--;
                 }
@@ -732,21 +732,21 @@ public class Cartographer extends StatsSource
     }
 
     /**
-     * Calculate the partitions whose leaders will be migrated to the new host.
-     * @param newHostId  newly rejoined host id
+     * Calculate the partitions whose leaders will be migrated to new host.
+     * @param hostId  newly rejoined host id
      * @return The IDs of partitions. Their leaders will be moved to the new host
      */
-    public Map<Integer, Integer> calculatePartitionsForMigration(int newHostId) {
+    public Map<Integer, Integer> calculatePartitionsForMigration(int hostId) {
 
         assert(m_hostCount > 0);
         Map<Integer, Integer> partitions = Maps.newHashMap();
 
         //partitions on the new host
         Set<Integer> partitionsOnNewHost = new HashSet<Integer>();
-        partitionsOnNewHost.addAll(getHostToPartitionMap().get(newHostId));
+        partitionsOnNewHost.addAll(getHostToPartitionMap().get(hostId));
 
         if (hostLog.isDebugEnabled()) {
-            hostLog.debug("[calculateSPIMigrationPartitions] partitions " + partitionsOnNewHost + " on host " + newHostId);
+            hostLog.debug("[calculateSPIMigrationPartitions] partitions " + partitionsOnNewHost + " on host " + hostId);
         }
 
         //current partition leaders by host
@@ -777,36 +777,14 @@ public class Cartographer extends StatsSource
                 hostLog.debug("[calculateSPIMigrationPartitions] host info: " + info + " candidates:" + candidates);
             }
             for (Integer candidate : candidates) {
-                partitions.put(candidate, newHostId);
+                partitions.put(candidate, hostId);
             }
         }
 
         if (hostLog.isDebugEnabled()) {
-            hostLog.debug("[calculateSPIMigrationPartitions] partition leaders " + partitions + " to be moved to host " + newHostId);
+            hostLog.debug("[calculateSPIMigrationPartitions] partition leaders " + partitions + " to be moved to host " + hostId);
         }
         return partitions;
-    }
-
-    //Wait for the spi migration to be processed
-    public boolean waitForPromotionAccepted(int hostId, int partition) {
-
-        final long maxSleep = 2 * 60 * 1000;
-        long sleep = 100;
-        while (true) {
-            Long hsid = m_iv2Masters.pointInTimeCache().get(partition);
-            if (hsid != null && hostId == CoreUtils.getHostIdFromHSId(hostId)) {
-                return true;
-            }
-            try {
-                Thread.sleep(sleep);
-            } catch (Exception ignored) {
-            }
-            if (sleep > maxSleep) {
-                break;
-            }
-            sleep = Math.min(sleep + sleep, maxSleep);
-        }
-        return false;
     }
 
     //Utility method to peek the topology
