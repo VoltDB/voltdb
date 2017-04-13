@@ -393,15 +393,17 @@ def buildThirdPartyTools(CTX, makefile):
 
     return None
 
-def generatedEETestFiles(generated_dir):
+def generatedEETestFiles(generated_dir, buildType):
     if not os.path.exists(generated_dir):
-        os.system("tools/generate-ee-unit-tests.sh")
+        print('Making generated files for %s in %s' % (buildType, generated_dir))
+        os.system("tools/generate-ee-unit-tests.sh --build %s" % buildType)
     answer = []
     for (dir, subdir, files) in os.walk(generated_dir):
         ldir = os.path.normpath(dir).split(os.sep)[-1]
         for file in files:
             if file[-4:] == '.cpp':
                 answer += [(ldir, file[:-4])]
+                print("Adding generated file %s/%s" % (ldir, file))
     return answer
 
 def buildMakefile(CTX):
@@ -451,7 +453,9 @@ def buildMakefile(CTX):
         test_names = CTX.TESTS[dir].split()
         tests += [os.path.join(TEST_PREFIX, dir, test) for test in test_names]
     # All generated tests.
-    all_gen_tests = generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated'))
+    all_gen_tests = generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated'),
+                                         CTX.LEVEL.lower())
+    print(all_gen_tests)
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
     makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
@@ -679,23 +683,6 @@ def buildIPC(CTX):
     retval = os.system("make --directory=%s prod/voltdbipc -j4" % (CTX.OUTPUT_PREFIX))
     return retval
 
-class MemLeakError:
-    def __init__(self, bytes, blocks, errType, line):
-        self.bytes = bytes
-        self.blocks = blocks
-        self.errType = errType
-        self.line = line
-    def message(self):
-        return self.errType + '\n    ' + self.line
-
-class ValgrindError:
-    def __init__(self, errorCount, contextCount, errType, line):
-        self.errorCount = errorCount
-        self.contextCount = contextCount
-        self.line = line
-    def message(self):
-        return self.line
-
 class ValgrindErrorState:
     def __init__(self, expectErrorsIn, valgrindFile):
         self.expectErrors = expectErrorsIn
@@ -773,14 +760,15 @@ class ValgrindErrorState:
     def isExpectedState(self):
         return (self.expectErrors == self.foundErrors)
 
-    def errorMessage(self):
+    def errorMessage(self, retval):
         if self.isExpectedState():
             exp = " (Expected)"
         else:
             exp = ""
-        return ("%s\n%d Valgrind Errors%s: \n" %
+        return ("%s\n%d Valgrind Errors, return value %d%s: \n" %
                 (":-----------------------------------------------------------:", \
                  len(self.errorStrings), \
+                 retval, \
                  exp) \
                 + "\n".join(self.errorStrings))
 
@@ -821,7 +809,8 @@ def runTests(CTX):
                        dirname,
                        testname) for testname in test_names]
     if TEST_GENERATED:
-        for dirname, testname in generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated')):
+        for dirname, testname in generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated'),
+                                                      CTX.LEVEL.lower()):
             tests += [(os.path.join(OUTPUT_PREFIX, 'generated', 'bin'),
                        dirname,
                        testname)]
@@ -829,7 +818,7 @@ def runTests(CTX):
     for bindirname, dirname, test in tests:
         # We expect valgrind failures in all tests in memleaktests
         # except for the test named no_losses.
-        expectNoMemLeaks = not (dirname == "memleaktests") or not ( test == "no_losses" )
+        expectErrors = (dirname == "memleaktests") and ( test != "no_losses" )
         srcpath = os.path.join("test", "ee", dirname, test)
         targetpath = os.path.join(bindirname, dirname, test)
         retval = 0
@@ -839,6 +828,7 @@ def runTests(CTX):
             retval = os.system("/usr/bin/env python " + targetpath + ".py")
         else:
             isValgrindTest = usingValgrind
+            errorState = None
             if usingValgrind:
                 for nvgtest in noValgrindTests:
                     if targetpath.find(nvgtest) != -1:
@@ -863,11 +853,12 @@ def runTests(CTX):
                     out_err = process.stderr.readlines()
                     retval = process.wait()
                     fileName = makeValgrindFile(valgrindDir, "%d" % process.pid)
-                    errorState = ValgrindErrorState(True, fileName)
                 else:
                     fileName = None
                     retval = exretval
-                    errorState = None
+                    print('    Test %s was not run.' % os.path.join(dirname, test))
+                if retval != 0:
+                    errorState = ValgrindErrorState(expectErrors, fileName)
                 # If there are as many errors as we expect,
                 # then delete the xml file.  Otherwise keep it.
                 # It may be useful.
@@ -878,11 +869,9 @@ def runTests(CTX):
                                 os.remove(fileName)
                             except ex:
                                 pass
-                        print(errorState.errorMessage())
+                        print(errorState.errorMessage(retval))
                         retval = -1
                         sys.stdout.flush()
-                else:
-                    print('    Test %s was not run.' % os.path.join(dirname, test))
             else:
                 print('Executing non-valgrind test %s' % targetpath)
                 sys.stdout.flush()

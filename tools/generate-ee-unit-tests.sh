@@ -30,6 +30,7 @@ while [ -n "$1" ]; do
         --build)
             shift
             BUILD="$1"
+            shift
             case "$BUILD" in
                 debug|release|memcheck)
                     ;;
@@ -38,7 +39,6 @@ while [ -n "$1" ]; do
                     exit 100
                     ;;
             esac
-            shift
             ;;
         --help)
             echo 'Usage: generate-ee-unit-tests [ options ]'
