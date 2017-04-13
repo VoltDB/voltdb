@@ -1043,7 +1043,7 @@ public class VoltProjectBuilder {
         // <paths>
         PathsType paths = factory.createPathsType();
         deployment.setPaths(paths);
-        if ((voltRoot != null) && !voltRoot.trim().isEmpty()){
+        if ((voltRoot != null) && !voltRoot.trim().isEmpty()) {
             Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
             paths.setVoltdbroot(voltdbroot);
             voltdbroot.setPath(voltRoot);

@@ -109,7 +109,7 @@ public class LocalCluster extends VoltServerConfig {
     int m_replicationPort = -1;
 
     Map<String, String> m_hostRoots = new HashMap<>();
-    public Map<String, String> getHostRoots(){
+    public Map<String, String> getHostRoots() {
         return m_hostRoots;
     }
 
@@ -293,7 +293,7 @@ public class LocalCluster extends VoltServerConfig {
                         boolean isRejoinTest,
                         Map<String, String> env)
     {
-        if (schemaToStage == null){
+        if (schemaToStage == null) {
             assert catalogJarFileName != null : "Catalog jar file name is null";
             setNewCli(isNewCli);
         } else {
@@ -333,7 +333,7 @@ public class LocalCluster extends VoltServerConfig {
         m_callingClassName = traces[i].getClassName().substring(dot + 1);
         m_callingMethodName = traces[i].getMethodName();
 
-        if (catalogJarFileName == null){
+        if (catalogJarFileName == null) {
             if (schemaToStage == null){
                 log.info("Instantiating empty LocalCluster with class.method: " +
                         m_callingClassName + "." + m_callingMethodName);
@@ -386,11 +386,11 @@ public class LocalCluster extends VoltServerConfig {
         }
 
         String classPath = System.getProperty("java.class.path");
-        if (m_jarFileName != null){
+        if (m_jarFileName != null) {
             classPath += ":" + buildDir + File.separator + m_jarFileName;
         }
         classPath += ":" + buildDir + File.separator + "prod";
-        if (m_jarFileName != null){
+        if (m_jarFileName != null) {
             // Remove the stored procedures from the classpath.  Out-of-process nodes will
             // only be able to find procedures and dependent classes in the catalog, as intended
             classPath = classPath.replace(buildDir + File.separator + "testprocs:", "");
@@ -2148,13 +2148,13 @@ public class LocalCluster extends VoltServerConfig {
      * @param relativePathFromVoltDBRoot
      * @return number of nodes who have that file
      */
-    public int countNodesWithFile(String relativePathFromVoltDBRoot){
+    public int countNodesWithFile(String relativePathFromVoltDBRoot) {
         final String pathWithinVoltDBRoot = File.separator + "voltdbroot" + File.separator + relativePathFromVoltDBRoot;
         int total = 0;
-        for (Map.Entry<String, String> entry : m_hostRoots.entrySet()){
+        for (Map.Entry<String, String> entry : m_hostRoots.entrySet()) {
             File testFile = new VoltFile(entry.getValue() + pathWithinVoltDBRoot);
             assert( !testFile.exists() || testFile.isFile() ) : testFile.getAbsolutePath() + " is not a file";
-            if (testFile.canRead() && (testFile.length() > 0)){
+            if (testFile.canRead() && (testFile.length() > 0)) {
                 total++;
             }
         }

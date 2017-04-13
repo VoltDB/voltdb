@@ -2211,7 +2211,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // this check cannot be part of managedPathsWithFiles(), since "voltdb start" can get translated into "voltdb create" after probing the mesh.
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists() && stagedCatalogFH.canRead()){
-            VoltDB.crashLocalVoltDB("A previous database \"init\" staged a schema and/or classes. You must init with --force to overwrite them.");
+            VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite them.");
         }
         final boolean standalone = true;
         final boolean isXCDR = false;
@@ -2769,11 +2769,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         };
 
         UUID startupCatalogHash = null;
-        if (m_pathToStartupCatalog != null){
+        if (m_pathToStartupCatalog != null) {
             try {
                 startupCatalogHash = new InMemoryJarfile(m_pathToStartupCatalog).getMD5Checksum();
             } catch (IOException e){
-                VoltDB.crashLocalVoltDB("Failed to load schema and classes from staging location " + m_pathToStartupCatalog, false, e);
+                VoltDB.crashLocalVoltDB("Failed to load schema from staging location within voltdbroot: " + e.getMessage(), false, e);
             }
         }
 
@@ -3966,15 +3966,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void deleteStagedCatalogIfNeeded() {
-        if (((m_commandLog != null) && m_commandLog.isEnabled()) || (m_terminusNonce != null)){
-            assert((m_terminusNonce == null) || !m_terminusNonce.trim().isEmpty());
+        if (((m_commandLog != null) && m_commandLog.isEnabled()) || (m_terminusNonce != null)) {
             File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(m_nodeSettings.getVoltDBRoot().getAbsolutePath()));
-            if (stagedCatalog.exists()){
+            if (stagedCatalog.exists()) {
                 boolean success = stagedCatalog.delete();
                 if (success){
-                    hostLog.info("Deleted staged schema and classes because durability is present.");
+                    hostLog.info("Deleted staged schema because durability is present.");
                 } else {
-                    hostLog.warn("Could not delete staged schema and classes. They will be ignored during command log or terminus snapshot recovery.");
+                    hostLog.warn("Could not delete staged schema.");
                 }
             }
         }

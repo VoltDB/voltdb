@@ -709,8 +709,8 @@ public class VoltDB {
             }
 
             final File stagedCatalogLocation = new VoltFile(RealVoltDB.getStagedCatalogPath(m_voltdbRoot.getAbsolutePath()));
-            if (stagedCatalogLocation.canRead()){
-                switch (m_startAction){
+            if (stagedCatalogLocation.canRead()) {
+                switch (m_startAction) {
                 case PROBE:
                     m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
                     break;
@@ -994,7 +994,7 @@ public class VoltDB {
         }
 
         public static String getPathToCatalogForTest(String jarname) {
-            if (jarname == null){
+            if (jarname == null) {
                 return null; // NewCLI tests that init with schema do not want a pre-compiled catalog
             }
 

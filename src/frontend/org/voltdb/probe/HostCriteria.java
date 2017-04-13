@@ -248,12 +248,11 @@ public class HostCriteria {
             ilb.add("Servers have different startup snapshots nonces: "
                     + m_terminusNonce + " vs. " + o.m_terminusNonce);
         }
-        if ((m_startupCatalogHash == null) ^ (o.m_startupCatalogHash == null)){
-            ilb.add("Staged schema and/or classes are missing on at least one server. "
-                    + "If any server has staged a schema or classes, all must have staged identical schemas and classes.");
-        } else if ((m_startupCatalogHash != null) && !m_startupCatalogHash.equals(o.m_startupCatalogHash)){
-            ilb.add("Servers have staged different schemas and/or classes. Hashes: "
-                    + m_startupCatalogHash + " vs. " + o.m_startupCatalogHash);
+        if ((m_startupCatalogHash == null) ^ (o.m_startupCatalogHash == null)) {
+            ilb.add("Staged schema and/or classes are missing on at least one node. "
+                    + "If any node has staged a schema, all must have staged identical schemas.");
+        } else if ((m_startupCatalogHash != null) && !m_startupCatalogHash.equals(o.m_startupCatalogHash)) {
+            ilb.add("Nodes have staged different schemas.");
         }
         return ilb.build();
     }
