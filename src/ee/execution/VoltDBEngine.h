@@ -308,6 +308,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void serializeException(SerializableEEException const& e);
 
         /**
+         * Retrieves the result buffer that could be either a buffer assigned through setBuffers() or
+         * the fallback buffer created dynamically for results larger than 10MB
+         */
+        const unsigned char* getResultsBuffer() const;
+
+        /**
          * Retrieves the size in bytes of the data that has been placed in the reused result buffer
          */
         int getResultsSize() const;
