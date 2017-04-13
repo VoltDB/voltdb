@@ -375,6 +375,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
             ENG12024TestHelper(ddlTemplateForColumnExpression, "a * b", false);
             ENG12024TestHelper(ddlTemplateForColumnExpression, "a / b", false);
             ENG12024TestHelper(ddlTemplateForColumnExpression, "c || c", false);
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "repeat(c, 100)", false);
 
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "NOT a > b", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a IS NULL", true);
