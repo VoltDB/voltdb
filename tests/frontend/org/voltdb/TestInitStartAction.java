@@ -31,6 +31,7 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -52,6 +53,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.regressionsuites.LocalCluster.FailureState;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -394,49 +396,6 @@ final public class TestInitStartAction {
         assertEquals(true, schemaFile.delete());
     }
 
-    /** Tests that a cluster can start with each node using an identical staged catalog.
-     * Since durability is off, the staged catalog will be kept around but not reflect any DDL changes.
-     * Restarting the database will reload the previous staged catalog.
-     *
-     * For more 'voltdb start' test cases see TestStagedCatalogWithDurability (in Pro) and TestHostMessenger.
-     * All nodes are out of process during this test.
+    /* For 'voltdb start' test coverage see TestStartWithSchema (in Pro) and TestHostMessenger.
      */
-    @Test
-    public void testStartWithStagedCatalogNoDurability() throws Exception {
-
-        final String schema =
-                "create table HELLOWORLD (greeting varchar(30), greeterid integer, PRIMARY KEY(greeting));\n" +
-                "create procedure from class org.voltdb.compiler.procedures.SelectStarHelloWorld;";
-        final int siteCount = 1;
-        final int hostCount = 3;
-        final int kfactor = 0;
-        LocalCluster cluster = LocalCluster.createLocalClusterViaStagedCatalog(schema, null, siteCount, hostCount, kfactor, null);
-
-        System.out.println("First start up is expected to succeed");
-        boolean clearLocalDataDirectories = false;
-        boolean skipInit = false;
-        cluster.startUp(clearLocalDataDirectories, skipInit);
-
-        for (int i = 0; i < hostCount; i++) {
-            System.out.printf("Local cluster node[%d] ports: internal=%d, admin=%d, client=%d\n",
-                              i, cluster.internalPort(i), cluster.adminPort(i), cluster.port(i));
-        }
-
-        System.out.println("Verifying schema and classes are present");
-        Client client = ClientFactory.createClient();
-        client.createConnection("localhost", cluster.port(0));
-        ClientResponse response;
-        response = client.callProcedure("@AdHoc", "INSERT INTO HELLOWORLD VALUES ('Hello, world!', 1);");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("SelectStarHelloWorld");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        assertEquals(1, response.getResults().length);
-        assertEquals(1, response.getResults()[0].getRowCount());
-
-        // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
-        // It's NOT a source of durability - DDL changes need not be reflected in the staged schema.
-        int nodesWithStagedCatalog = cluster.countNodesWithFile(CatalogUtil.STAGED_CATALOG);
-        assertEquals(hostCount, nodesWithStagedCatalog);
-        cluster.shutDown();
-    }
 }

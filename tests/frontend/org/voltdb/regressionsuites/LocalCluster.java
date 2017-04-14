@@ -169,8 +169,6 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.startCommand("create");
     };
 
-    private boolean m_usesStagedCatalog;
-
     private boolean isEnableSSL = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
     public boolean isEnableSSL() { return isEnableSSL; };
     public void setEnableSSL(boolean flag) {
@@ -299,7 +297,6 @@ public class LocalCluster extends VoltServerConfig {
         } else {
             assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
             setNewCli(true);
-            m_usesStagedCatalog = true;
             try {
                 templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
                 log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
@@ -1010,9 +1007,9 @@ public class LocalCluster extends VoltServerConfig {
         m_hostRoots.put(hostIdStr, cmdln.voltdbRoot().getPath());
     }
 
-    private void startOne(int hostId, boolean clearLocalDataDirectories,
-            StartAction startAction, boolean waitForReady, String placementGroup)
-    throws IOException {
+    public void startOne(int hostId, boolean clearLocalDataDirectories,
+            StartAction startAction, boolean waitForReady, String placementGroup) throws IOException
+    {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
@@ -2080,50 +2077,6 @@ public class LocalCluster extends VoltServerConfig {
         return lc;
     }
 
-    /** Creates a cluster on the local machine using NewCLI, staging the specified schema and procedures.
-     * This does not support DR use cases, because the tests that use it don't either.
-     * Catalog compilation is taken care of by VoltDB itself - no need to do so explicitly.
-     * @param schemaDDL
-     * @param proceduresJar
-     * @param siteCount
-     * @param hostCount
-     * @param kfactor
-     * @return a running VoltDB cluster
-     * @throws IOException
-     */
-    public static LocalCluster createLocalClusterViaStagedCatalog(
-            String schemaDDL,
-            String proceduresJar,
-            int siteCount,
-            int hostCount,
-            int kfactor,
-            VoltProjectBuilder projectBuilder) throws IOException {
-
-        if (projectBuilder == null){
-            projectBuilder = new VoltProjectBuilder();
-        }
-
-        final int clusterID = 0;
-        LocalCluster lc = new LocalCluster(
-                schemaDDL,
-                null,
-                siteCount,
-                hostCount,
-                kfactor,
-                clusterID,
-                BackendTarget.NATIVE_EE_JNI,
-                FailureState.ALL_RUNNING, false, false, null);
-
-        assert(proceduresJar == null) : "TODO: add ability to insert a procedures JAR into the classpath";
-        assert(!lc.m_compiled);
-
-        System.out.println("Starting local cluster.");
-        lc.setHasLocalServer(false);
-        lc.overrideAnyRequestForValgrind();
-        lc.compileDeploymentOnly(projectBuilder);
-        return lc;
-    }
-
     public void compileDeploymentOnly(VoltProjectBuilder voltProjectBuilder) {
         // NOTE: voltDbRoot must be set prior to calling this method if you care about it.
         // When this method was written no users cared about the deployment's voltdbroot path,
@@ -2142,6 +2095,19 @@ public class LocalCluster extends VoltServerConfig {
 
     public void setDeplayBetweenNodeStartup(long deplayBetweenNodeStartup) {
         m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
+    }
+
+    /** Obtains location of a file in a node's voltdbroot.
+     * @param relativePathFromVoltDBRoot
+     * @return absolute file path
+     */
+    public String getFileFromVoltDbRoot(String nodeID, String relativePathFromVoltDBRoot) {
+        String rootpath = m_hostRoots.get(nodeID);
+        if (rootpath == null) {
+            return null;
+        }
+        File testFile = new VoltFile(rootpath + File.separator + "voltdbroot" + File.separator + relativePathFromVoltDBRoot);
+        return testFile.getAbsolutePath();
     }
 
     /** Counts how many nodes contain a given file in their voltDbRoots
