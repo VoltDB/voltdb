@@ -18,6 +18,7 @@
 package org.voltdb.sysprocs;
 
 import org.voltdb.DependencyPair;
+import org.voltdb.DependencyPair.TableDependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -59,10 +60,10 @@ public class SwapTables extends AdHocBase {
             if (context.isLowestSiteId()) {
                 VoltDB.instance().swapTables((String) params.getParam(0), (String) params.getParam(1));
             }
-            return new DependencyPair(DEP_swapTables, dummy);
+            return new TableDependencyPair(DEP_swapTables, dummy);
         }
         else if (fragmentId == SysProcFragmentId.PF_swapTablesAggregate) {
-            return new DependencyPair(DEP_swapTablesAggregate,
+            return new TableDependencyPair(DEP_swapTablesAggregate,
                     VoltTableUtil.unionTables(dependencies.get(DEP_swapTables)));
         }
 
