@@ -109,7 +109,7 @@ def basicCheck(runner):
             host = hosts.hosts_by_id[hostId]
             if host is None:
                 runner.abort('@CheckUpgradePlanNT returns a host id ' + hostId + " that doesn't belong to the cluster.")
-            print 'Check fails on Host ' + getHostnameOrIp(host) + " with the cause: " + result
+            print 'Pre-upgrade check fails on host ' + getHostnameOrIp(host) + " with the cause: " + result
 
     if error:
         runner.abort("Failed to pass pre-upgrade check. Abort. ")

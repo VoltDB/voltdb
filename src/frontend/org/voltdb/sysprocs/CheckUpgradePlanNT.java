@@ -42,8 +42,6 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
         private final static int MINIMUM_MINOR_VERSION = 2;
 
         public VoltTable run(String newKitPath, String newRootPath) throws InterruptedException, ExecutionException {
-
-            System.out.println("Calling @CheckEveryWhere...");
             String ret = checkVoltDBKitExistence(newKitPath);
             String ret2 = checkVoltDBRootExistence(newRootPath);
             VoltTable vt = new VoltTable(
@@ -58,22 +56,22 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
             if (Files.exists(newKit) && Files.isDirectory(newKit)) {
                 try {
                     String version = new String(Files.readAllBytes(Paths.get(newKitPath, "version.txt")));
-                    String[] versionNumber = version.split(".");
+                    System.out.println("Check VoltDB Kit: version is " + version);
+                    String[] versionNumber = version.split("\\.");
                     if (versionNumber.length < 2) {
                         return "Illegal version string format found in " + newKitPath;
                     }
-                    Integer majorVersion = Integer.getInteger(versionNumber[0]);
-                    Integer minorVersion = Integer.getInteger(versionNumber[1]);
-                    if (majorVersion != null && minorVersion != null &&
-                            (majorVersion < MINIMUM_MAJOR_VERSION ||
-                                    (majorVersion == MINIMUM_MAJOR_VERSION && minorVersion < MINIMUM_MINOR_VERSION))) {
+                    int majorVersion = Integer.parseInt(versionNumber[0].trim());
+                    int minorVersion = Integer.parseInt(versionNumber[1].trim());
+                    if ( majorVersion < MINIMUM_MAJOR_VERSION ||
+                                    (majorVersion == MINIMUM_MAJOR_VERSION && minorVersion < MINIMUM_MINOR_VERSION)) {
                         return "Version of new VoltDB kit is lower than the minimum supported version (v" +
                                 MINIMUM_MAJOR_VERSION + "." + MINIMUM_MINOR_VERSION + ")";
                     } else {
                         return "Success";
                     }
-                } catch (IOException e) {
-                    return "Failed to read version string in the new VoltDB kit";
+                } catch (IOException | NumberFormatException e) {
+                    return "Failed to parse version string in the new VoltDB kit";
                 }
             } else {
                 return newKitPath + " doesn't exist.";
@@ -83,11 +81,7 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
         private static String checkVoltDBRootExistence(String newRootPath) {
             Path newRoot = Paths.get(newRootPath);
             if (!Files.exists(newRoot)) {
-                try {
-                    Files.createDirectories(newRoot);
-                } catch (IOException e) {
-                    return "Failed to create " + newRootPath + " for the new VoltDB root.";
-                }
+                return newRoot + " doesn't exist.";
             } else if (!Files.isDirectory(newRoot)) {
                 return newRoot + " does exist, but it doesn't look like a directory.";
             }
