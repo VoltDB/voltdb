@@ -467,7 +467,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(sn);
         assertNotNull(aggNode.getPostPredicate());
     }
-    public static String HavingErrorMsg = "SQL HAVING with subquery expression is not allowed.";
+    public static String HavingErrorMsg = "SQL HAVING clauses with subquery expressions are not allowed.";
 
     public void testInHaving() {
         String sql;
