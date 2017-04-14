@@ -199,70 +199,6 @@ public class Cartographer extends StatsSource
         }
     }
 
-    /**
-     * HostLeaderInfo is used to calculate the partition candidates for migration
-     */
-    private static class HostLeaderInfo implements Comparable<HostLeaderInfo> {
-        int m_hostId;
-        Set<Integer> m_partitions = Sets.newHashSet();
-
-        public HostLeaderInfo(int hostId) {
-            m_hostId = hostId;
-        }
-
-        @Override
-        public int compareTo(HostLeaderInfo other){
-            return (m_partitions.size() - other.m_partitions.size());
-        }
-
-        @Override
-        public int hashCode() {
-            return m_hostId;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj instanceof HostLeaderInfo) {
-                HostLeaderInfo info = (HostLeaderInfo)obj;
-                return m_hostId == info.m_hostId;
-            }
-            return false;
-        }
-
-        public void addPartition(int partition) {
-            m_partitions.add(partition);
-        }
-
-        /**
-         * get partition candidates for migration on a host
-         * @param partitions  the partitions on the new host. These partitions are replica but will assume leadership after
-         *                    spi migration
-         * @param maxLeaderCount  The optimal number of partition leaders
-         * @param candidateCount  the number of partition candidates requested
-         * @return  The partitions on this host to be migrated.
-         */
-        public Set<Integer> getPartitionsForMigration(Set<Integer> partitions, int maxLeaderCount, int candidateCount) {
-
-            Set<Integer> candidates = Sets.newHashSet();
-            int count = m_partitions.size();
-            for (Integer partition : m_partitions) {
-                if (partitions.contains(partition) && count > maxLeaderCount && candidates.size() < candidateCount) {
-                    candidates.add(partition);
-                    count--;
-                }
-            }
-            return candidates;
-        }
-
-        @Override
-        public String toString() {
-            StringBuilder builder = new StringBuilder();
-            builder.append("Host:" + m_hostId);
-            builder.append(", Partitions:" + m_partitions);
-            return builder.toString();
-        }
-    }
-
     public Cartographer(HostMessenger hostMessenger, int configuredReplicationFactor, boolean partitionDetectionEnabled) {
         super(false);
         m_hostMessenger = hostMessenger;
@@ -732,59 +668,129 @@ public class Cartographer extends StatsSource
     }
 
     /**
-     * Calculate the partitions whose leaders will be migrated to new host.
-     * @param hostId  newly rejoined host id
-     * @return The IDs of partitions. Their leaders will be moved to the new host
+     * used to calculate the partition candidate for migration
      */
-    public Map<Integer, Integer> calculatePartitionsForMigration(int hostId) {
+    private static class Host implements Comparable<Host> {
+        final int m_hostId;
+        final int m_maximalMasters;
+        List<Integer> m_masters = Lists.newArrayList();
+        List<Integer> m_replicas = Lists.newArrayList();
 
-        assert(m_hostCount > 0);
-        Map<Integer, Integer> partitions = Maps.newHashMap();
+        public Host(int hostId, int maximalMasters) {
+            m_hostId = hostId;
+            m_maximalMasters = maximalMasters;
+        }
 
-        //partitions on the new host
-        Set<Integer> partitionsOnNewHost = new HashSet<Integer>();
-        partitionsOnNewHost.addAll(getHostToPartitionMap().get(hostId));
+        @Override
+        public int compareTo(Host other){
+            return (other.m_masters.size() - m_masters.size());
+        }
+
+        @Override
+        public int hashCode() {
+            return m_hostId;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof Host) {
+                Host info = (Host)obj;
+                return m_hostId == info.m_hostId;
+            }
+            return false;
+        }
+
+        public void addPartition(Integer partitionId, boolean master) {
+            if (master) {
+                m_masters.add(partitionId);
+            } else {
+                m_replicas.add(partitionId);
+            }
+        }
+
+        public int findPartitionForMigration(Host targetHost) {
+            if ( m_maximalMasters < m_masters.size() && m_hostId != targetHost.m_hostId) {
+                for (Integer partition : m_masters) {
+                    if (targetHost.m_replicas.contains(partition)) {
+                        return partition;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder builder = new StringBuilder();
+            builder.append("Host:" + m_hostId);
+            builder.append(", master:" + m_masters);
+            builder.append(", replica:" + m_replicas);
+            builder.append(", max:" + m_maximalMasters);
+            return builder.toString();
+        }
+    }
+
+    /**
+     * find a partition and its new host
+     * @return
+     */
+    public Pair<Integer, Integer> getPartitionForMigration() {
+
+        int maximalNumberOfMasters = (int)Math.ceil((double)(getPartitionCount()) / m_hostCount);
+
+        //collect host and partition info
+        Map<Integer, Host> hostsMap = Maps.newHashMap();
+        Iterator<Object> i = getStatsRowKeyIterator(false);
+        while (i.hasNext()) {
+            Integer partitionId = new Integer(((Integer)i.next()).intValue());
+            if (partitionId.equals(MpInitiator.MP_INIT_PID)) {
+                continue;
+            }
+            int leaderHostId = CoreUtils.getHostIdFromHSId(m_iv2Masters.pointInTimeCache().get(partitionId));
+            Host leaderHost = hostsMap.get(leaderHostId);
+            if (leaderHost == null) {
+                leaderHost = new Host(leaderHostId, maximalNumberOfMasters);
+                hostsMap.put(leaderHostId, leaderHost);
+            }
+            List<Long> sites = getReplicasForPartition(partitionId);
+            for (long site : sites) {
+                int hostId = CoreUtils.getHostIdFromHSId(site);
+                Host host = hostsMap.get(hostId);
+                if ( host ==  null) {
+                    host = new Host(hostId, maximalNumberOfMasters);
+                    hostsMap.put(hostId, host);
+                }
+                host.addPartition(partitionId, (leaderHostId == hostId));
+            }
+        }
+
+        //sorted the hosts by master count, descending
+        List<Host> hostsListDesc = Lists.newLinkedList();
+        hostsListDesc.addAll(hostsMap.values());
+        Collections.sort(hostsListDesc);
+
+        //sorted the hosts by master count, ascending
+        List<Host> hostsListAsc = Lists.newLinkedList();
+        hostsListAsc.addAll(hostsMap.values());
+        Collections.sort(hostsListAsc);
+        Collections.reverse(hostsListAsc);
 
         if (hostLog.isDebugEnabled()) {
-            hostLog.debug("[calculateSPIMigrationPartitions] partitions " + partitionsOnNewHost + " on host " + hostId);
+            VoltTable vt = peekTopology(this);
+            hostLog.debug("[getPartitionForMigration]\n" + vt.toFormattedString());
         }
-
-        //current partition leaders by host
-        Map<Integer, HostLeaderInfo> leadersByHostMap = Maps.newHashMap();
-        HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>(m_iv2Masters.pointInTimeCache());
-        for (Map.Entry<Integer, Long> entry : cacheCopy.entrySet()) {
-            int leaderHostId = (int)(CoreUtils.getHostIdFromHSId(entry.getValue()));
-            HostLeaderInfo leaderInfo = leadersByHostMap.get(leaderHostId);
-            if (leaderInfo == null) {
-                leaderInfo = new HostLeaderInfo(leaderHostId);
-                leadersByHostMap.put(leaderHostId, leaderInfo);
-            }
-            leaderInfo.addPartition(entry.getKey());
-        }
-
-        List<HostLeaderInfo> leaders = Lists.newLinkedList();
-        leaders.addAll(leadersByHostMap.values());
-        Collections.sort(leaders);
-        double countTemp = (double)(getPartitionCount()) / m_hostCount;
-        int maxCount = (int)Math.ceil(countTemp);
-        for (HostLeaderInfo info : leaders) {
-            int remaining = maxCount - partitions.size();
-            if (remaining == 0) {
-                break;
-            }
-            Set<Integer> candidates = info.getPartitionsForMigration(partitionsOnNewHost, maxCount, remaining);
-            if (hostLog.isDebugEnabled()) {
-                hostLog.debug("[calculateSPIMigrationPartitions] host info: " + info + " candidates:" + candidates);
-            }
-            for (Integer candidate : candidates) {
-                partitions.put(candidate, hostId);
+        //move one master from a host with most masters to a host with least masters
+        for (Host srcHost : hostsListDesc) {
+            for (Host targetHost : hostsListAsc) {
+                int partitionCandidate = srcHost.findPartitionForMigration(targetHost);
+                if (partitionCandidate > -1) {
+                    Pair<Integer, Integer> pair = new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
+                    hostLog.info(String.format("Moving mastership of partition %d to host %d.", pair.getFirst(), pair.getSecond()));
+                    return pair;
+                }
             }
         }
-
-        if (hostLog.isDebugEnabled()) {
-            hostLog.debug("[calculateSPIMigrationPartitions] partition leaders " + partitions + " to be moved to host " + hostId);
-        }
-        return partitions;
+        return null;
     }
 
     //Utility method to peek the topology

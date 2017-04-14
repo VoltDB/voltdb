@@ -57,6 +57,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -2073,6 +2074,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }, 0, 6, TimeUnit.MINUTES));
 
+        final long interval = Integer.getInteger("SPI_BALANCE_INTERVAL", 120);
+        Runnable task = () -> {
+            TreeSet<Integer> hosts = (TreeSet<Integer>)(getHostMessenger().getLiveHostIds());
+            if (m_clientInterface != null && m_myHostId == hosts.pollLast()) {
+                m_clientInterface.balanceSPI(m_myHostId);
+            }
+        };
+        m_periodicWorks.add(scheduleWork(task, 10, interval, TimeUnit.SECONDS));
+
         // other enterprise setup
         EnterpriseMaintenance em = EnterpriseMaintenance.get();
         if (em != null) { em.setupMaintenaceTasks(); }
@@ -3725,10 +3735,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 logRecoveryCompleted = true;
             }
 
-            if (m_clientInterface != null && m_rejoining) {
-                m_clientInterface.callBalanceSPI(m_myHostId);
-            }
-
             // Join creates a truncation snapshot as part of the join process,
             // so there is no need to wait for the truncation snapshot requested
             // above to finish.
@@ -4455,4 +4461,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public Cartographer getCartograhper() {
         return m_cartographer;
     }
+
+//    private void startBalanceSPI() {
+//        Runnable task = () -> {
+//            final long interval = Integer.getInteger("SPI_BALANCE_RETRY_INTERVAL", 10);
+//            final int retrySalt = Integer.getInteger("SPI_BALANCE_RETRY_INTERVAL_SALT", 30);
+//            final Random salt = new Random();
+//            long sleep = interval;
+//            final int maxSleep = 300;
+//            while (true) {
+//                final int spiHost = CoreZK.createSPIMigrationIndicator(getHostMessenger().getZK(), m_myHostId);
+//                if (spiHost == -1) {
+//                    break;
+//                }
+//                //another node is working on SPI balance
+//                try {
+//                    Thread.sleep(TimeUnit.SECONDS.toMillis(sleep));
+//                } catch (InterruptedException ignoreIt) {
+//                }
+//                //exponential back off with a salt to avoid collision. Max is 5 minutes.
+//                sleep = Math.min(sleep * 2, maxSleep) + salt.nextInt(retrySalt);
+//                if (sleep > maxSleep) {
+//                    sleep = interval;
+//                }
+//            }
+//            m_clientInterface.callBalanceSPI(m_myHostId);
+//        };
+//        m_es.execute(task);
+//    }
 }

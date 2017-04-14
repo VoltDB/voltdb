@@ -25,6 +25,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.voltdb.VoltZK;
 
 /**
  * CoreZK provides constants for all voltcore-registered
@@ -53,6 +54,8 @@ public class CoreZK {
     // root for rejoin nodes
     public static final String rejoin_node_blocker = "/core/rejoin_nodes_blocker";
 
+    // root for spi migration nodes
+    public static final String spi_balance_blocker = "/core/spi_balance_blocker";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -174,6 +177,74 @@ public class CoreZK {
             if (e.code() == KeeperException.Code.NONODE ||
                     e.code() == KeeperException.Code.BADVERSION) {
                 // Okay if the join indicator for the given hostId is already gone.
+                return true;
+            }
+        } catch (InterruptedException e) {
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Creates a SPI migration blocker for the given rejoining host.
+     * This prevents other hosts from migrating SPI at the same time.
+     *
+     * @param zk        ZooKeeper client
+     * @param hostId    The rejoining host ID
+     * @return true if the blocker is created successfully, or the host ID
+     */
+    public static boolean createSPIBalanceIndicator(ZooKeeper zk, int hostId)
+    {
+        try {
+            if(zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null ||
+                    zk.exists(rejoin_node_blocker, false) != null) {
+                return false;
+            }
+        } catch (KeeperException | InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to check the existence of join or rejoin indicator", true, e);
+        }
+        try {
+            zk.create(spi_balance_blocker,
+                      ByteBuffer.allocate(4).putInt(hostId).array(),
+                      Ids.OPEN_ACL_UNSAFE,
+                      CreateMode.PERSISTENT);
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NODEEXISTS) {
+                try {
+                    int host = ByteBuffer.wrap(zk.getData(spi_balance_blocker, false, null)).getInt();
+                    if (host != hostId) {
+                        removeSPIBalanceIndicator(zk);
+                    }
+                } catch (KeeperException e1) {
+                    if (e1.code() != KeeperException.Code.NONODE) {
+                        org.voltdb.VoltDB.crashLocalVoltDB("Unable to get the current spi balance indicator");
+                    }
+                } catch (InterruptedException e1) {}
+                return false;
+            } else {
+                org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+            }
+        } catch (InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+        }
+
+        return true;
+    }
+
+    /**
+     * Removes the spi balance blocker if the current rejoin blocker contains the given host ID.
+     * @return true if the blocker is removed successfully, false otherwise.
+     */
+    public static boolean removeSPIBalanceIndicator(ZooKeeper zk)
+    {
+        try {
+            Stat stat = new Stat();
+            zk.getData(spi_balance_blocker, false, stat);
+            zk.delete(spi_balance_blocker, stat.getVersion());
+            return true;
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NONODE ||
+                e.code() == KeeperException.Code.BADVERSION) {
                 return true;
             }
         } catch (InterruptedException e) {
