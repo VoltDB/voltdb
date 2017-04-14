@@ -2115,9 +2115,10 @@ public class LocalCluster extends VoltServerConfig {
      * @return number of nodes who have that file
      */
     public int countNodesWithFile(String relativePathFromVoltDBRoot) {
-        final String pathWithinVoltDBRoot = File.separator + "voltdbroot" + File.separator + relativePathFromVoltDBRoot;
+        final String pathWithinVoltDBRoot = File.separator + relativePathFromVoltDBRoot;
         int total = 0;
         for (Map.Entry<String, String> entry : m_hostRoots.entrySet()) {
+            assert( entry.getValue().contains("voltdbroot") ) : entry.getValue();
             File testFile = new VoltFile(entry.getValue() + pathWithinVoltDBRoot);
             assert( !testFile.exists() || testFile.isFile() ) : testFile.getAbsolutePath() + " is not a file";
             if (testFile.canRead() && (testFile.length() > 0)) {
