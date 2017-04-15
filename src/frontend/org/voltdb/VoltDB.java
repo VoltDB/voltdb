@@ -712,6 +712,7 @@ public class VoltDB {
             if (stagedCatalogLocation.canRead()) {
                 switch (m_startAction) {
                 case PROBE:
+                    assert (m_pathToCatalog == null) : m_pathToCatalog;
                     m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
                     break;
                 case INITIALIZE:
