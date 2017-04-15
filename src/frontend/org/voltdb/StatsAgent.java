@@ -697,6 +697,19 @@ public class StatsAgent extends OpsAgent
         return existingSource;
     }
 
+    public void deregisterStatsSource(StatsSelector selector, long siteId, StatsSource source) {
+        assert selector != null;
+        assert source != null;
+        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
+                m_registeredStatsSources.get(selector);
+        assert siteIdToStatsSources != null;
+
+        NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
+        if (statsSources != null) {
+            statsSources.remove(source);
+        }
+    }
+
     public void deregisterStatsSourcesFor(StatsSelector selector, long siteId) {
         assert selector != null;
         final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =

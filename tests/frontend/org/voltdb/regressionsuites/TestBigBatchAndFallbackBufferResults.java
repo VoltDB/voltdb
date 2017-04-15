@@ -80,7 +80,7 @@ public class TestBigBatchAndFallbackBufferResults extends RegressionSuite {
     private static final int NO_FINAL_OPTION = 0;
     //10485743
     public void testQueryIsolation() throws IOException, ProcCallException {
-        System.out.println("test testSimpleQuery...");
+        System.out.println("test testQueryIsolation...");
         Client client = getClient();
         // Note that because there are 300 rows in the table and each row is slightly over 1MB a MOD
         // value of 6 or lower will return 50+ rows which will exceed the max result buffer limit

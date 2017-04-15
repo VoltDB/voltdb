@@ -499,6 +499,7 @@ enum TaskType {
     TASK_TYPE_RESET_DR_APPLIED_TRACKER = 7,      // not supported in EE
     TASK_TYPE_SET_MERGED_DRID_TRACKER = 8,       // not supported in EE
     TASK_TYPE_INIT_DRID_TRACKER = 9,             // not supported in EE
+    TASK_TYPE_RESET_DR_APPLIED_TRACKER_SINGLE = 10, // not supported in EE
 };
 
 // ------------------------------------------------------------------

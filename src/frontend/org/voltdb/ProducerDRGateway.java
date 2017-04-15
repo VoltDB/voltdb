@@ -140,7 +140,10 @@ public interface ProducerDRGateway {
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
      */
-    public void deactivateDRProducer();
+    public void deactivateDR();
+
+    public void deactivateDR(byte clusterId);
+
     public void activateDRProducer();
 
     /**
@@ -183,4 +186,8 @@ public interface ProducerDRGateway {
      * @return The producer node stats keyed by cluster IDs or null if on error
      */
     public Map<Byte, DRProducerNodeStats> getNodeDRStats();
+
+    public void resumeAllReadersAsync();
+
+    public void pauseAllReadersAsync();
 }
