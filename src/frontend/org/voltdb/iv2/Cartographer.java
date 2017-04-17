@@ -136,8 +136,10 @@ public class Cartographer extends StatsSource
             // let's flip it
             Map<Long, Integer> hsIdToPart = new HashMap<Long, Integer>();
             Set<LeaderCallBackInfo> newMasters = new HashSet<LeaderCallBackInfo>();
+            Set<Long> newHSIDs = Sets.newHashSet();
             for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
                 Long hsid = e.getValue().m_HSID;
+                newHSIDs.add(hsid);
                 hsIdToPart.put(hsid, e.getKey());
                 if (!m_currentSPMasters.contains(hsid)) {
                     // we want to see items which are present in the new map but not in the old,
@@ -165,9 +167,7 @@ public class Cartographer extends StatsSource
             }
 
             m_currentSPMasters.clear();
-            for (LeaderCallBackInfo leader: cache.values()) {
-                m_currentSPMasters.add(leader.m_HSID);
-            }
+            m_currentSPMasters.addAll(newHSIDs);
         }
     };
 

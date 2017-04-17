@@ -374,6 +374,9 @@ public class InitiatorMailbox implements Mailbox
         }
         m_scheduler.m_isLeader = false;
         m_repairLog.setLeaderState(false);
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
+        }
         tmLog.info("[InitiatorMailbox] starting Balance SPI for partition " + pid + " to " +
                 CoreUtils.hsIdToString(newLeaderHSId));
     }
