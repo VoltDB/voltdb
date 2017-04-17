@@ -124,7 +124,7 @@ final public class TestInitStartAction {
     /** Verifies that the VoltDB exit 'crash' was a simulated exit with the specified exit code.
      * @param exitCode Expected exit code from VoltDB
      */
-    private void expectSimulatedExit(int exitCode){
+    private void expectSimulatedExit(int exitCode) {
         assertNotNull(serverException.get());
         if (!(serverException.get() instanceof VoltDB.SimulatedExitException)) {
             System.err.println("got an unexpected exception");
@@ -141,7 +141,7 @@ final public class TestInitStartAction {
 
     /** Clears recorded crash (or simulated exit) in preparation for another test.
      */
-    private void clearCrash(){
+    private void clearCrash() {
         VoltDB.wasCrashCalled = false;
         VoltDB.crashMessage = null;
         serverException.set(null);
@@ -343,7 +343,7 @@ final public class TestInitStartAction {
             // second attempt is not valid due to existing artifacts
             new Configuration(
                     new String[]{"initialize", "voltdbroot", rootDH.getPath(), "schema", schemaFile.getPath()});
-        } catch (SimulatedExitException e){
+        } catch (SimulatedExitException e) {
             assertEquals(e.getStatus(), -1);
         }
         assertEquals(true, schemaFile.delete());

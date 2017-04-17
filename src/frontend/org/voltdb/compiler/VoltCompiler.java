@@ -614,9 +614,7 @@ public class VoltCompiler {
             file = new File("catalog-report.html");
         }
         else {
-            // it's possible that standaloneCompiler will be false and catalogContext will be null
-            //   in test code.
-
+            // it's possible that standaloneCompiler will be false and catalogContext will be null in test code.
             // if we have a context, write report to voltroot
             if (catalogContext != null) {
                 file = new File(VoltDB.instance().getVoltDBRootPath(), "catalog-report.html");
@@ -680,7 +678,7 @@ public class VoltCompiler {
         m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
 
         // generate the catalog report and write it to disk
-        if (m_generateReports){
+        if (m_generateReports) {
             try {
                 generateCatalogReport(ddlWithBatchSupport);
             }

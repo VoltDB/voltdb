@@ -35,7 +35,7 @@ public class ServerThread extends Thread {
         this(config, true);
     }
 
-    public ServerThread(VoltDB.Configuration config, boolean alwaysForceCreate){
+    public ServerThread(VoltDB.Configuration config, boolean alwaysForceCreate) {
         m_config = config;
         if (m_config.m_pathToLicense == null) {
             m_config.m_pathToLicense = getTestLicensePath();

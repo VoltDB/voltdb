@@ -535,12 +535,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getPath();
     }
 
-    private String getStagedCatalogPath(){
-        return getStagedCatalogPath(getVoltDBRootPath());
-    }
-
-    public static String getStagedCatalogPath(String voltDbRoot){
-        return voltDbRoot + File.separator + CatalogUtil.STAGED_CATALOG;
+    public static String getStagedCatalogPath(String voltDbRoot) {
+        return voltDbRoot + File.separator + CatalogUtil.STAGED_CATALOG_PATH;
     }
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
@@ -2202,22 +2198,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * </ul>
      * @param config VoltDB configuration
      */
-    private void stageSchemaFiles(Configuration config){
-        if (config.m_userSchema == null){
+    private void stageSchemaFiles(Configuration config) {
+        if (config.m_userSchema == null) {
             return; // nothing to do
         }
         assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
-        File stagedCatalogFH = new VoltFile(getStagedCatalogPath());
+        File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
 
         // this check cannot be part of managedPathsWithFiles(), since "voltdb start" can get translated into "voltdb create" after probing the mesh.
-        if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists() && stagedCatalogFH.canRead()){
+        if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
             VoltDB.crashLocalVoltDBNoArtifacts("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
         }
         final boolean standalone = true;
         final boolean isXCDR = false;
         final boolean generateReports = false; // this will be overridden if debug mode is enabled
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR, generateReports);
-        if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())){
+        if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())) {
             VoltDB.crashLocalVoltDBNoArtifacts("Could not compile specified schema " + config.m_userSchema);
         }
     }
@@ -2773,8 +2769,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (m_pathToStartupCatalog != null) {
             try {
                 startupCatalogHash = new InMemoryJarfile(m_pathToStartupCatalog).getMD5Checksum();
-            } catch (IOException e){
-                VoltDB.crashLocalVoltDB("Failed to load schema from staging location within voltdbroot: " + e.getMessage(), false, e);
+            } catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Failed to load initialized schema: " + e.getMessage(), false, e);
             }
         }
 
@@ -3968,9 +3964,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void deleteStagedCatalogIfNeeded() {
         if (((m_commandLog != null) && m_commandLog.isEnabled()) || (m_terminusNonce != null)) {
-            File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(m_nodeSettings.getVoltDBRoot().getAbsolutePath()));
+            File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(getVoltDBRootPath()));
             if (stagedCatalog.exists()) {
-                if (stagedCatalog.delete()){
+                if (stagedCatalog.delete()) {
                     hostLog.info("Saved copy of the initialized schema deleted because command logs and/or snapshots are in use.");
                 } else {
                     hostLog.warn("Failed to delete the saved copy of the initialized schema.");

@@ -709,7 +709,7 @@ public class VoltDB {
             }
 
             final File stagedCatalogLocation = new VoltFile(RealVoltDB.getStagedCatalogPath(m_voltdbRoot.getAbsolutePath()));
-            if (stagedCatalogLocation.canRead()) {
+            if (stagedCatalogLocation.isFile()) {
                 switch (m_startAction) {
                 case PROBE:
                     assert (m_pathToCatalog == null) : m_pathToCatalog;
@@ -1253,7 +1253,7 @@ public class VoltDB {
                                                   TimeUnit.SECONDS.toMillis(10));
                 } catch (IOException e) {}
 
-                if (!allowArtifacts){
+                if (!allowArtifacts) {
                     return; // this will jump to the finally block
                 }
 

@@ -279,7 +279,7 @@ public class LocalCluster extends VoltServerConfig {
             FailureState failureState,
             boolean debug,
             boolean isRejoinTest,
-            Map<String, String> env){
+            Map<String, String> env) {
         this(null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
     }
 
@@ -305,7 +305,7 @@ public class LocalCluster extends VoltServerConfig {
             try {
                 templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
                 log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
-            } catch (IOException e){
+            } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
@@ -336,7 +336,7 @@ public class LocalCluster extends VoltServerConfig {
         m_callingMethodName = traces[i].getMethodName();
 
         if (catalogJarFileName == null) {
-            if (schemaToStage == null){
+            if (schemaToStage == null) {
                 log.info("Instantiating empty LocalCluster with class.method: " +
                         m_callingClassName + "." + m_callingMethodName);
             } else {
@@ -657,7 +657,7 @@ public class LocalCluster extends VoltServerConfig {
         }
 
         final boolean alwaysForceCreate = clearLocalDataDirectories || !m_usesStagedSchema; // for backwards compatibility
-        if (m_usesStagedSchema){
+        if (m_usesStagedSchema) {
             // we really, REALLY don't want to cleanse everything all the time
             cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
         }
