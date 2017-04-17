@@ -25,13 +25,12 @@ import base64
 import os
 import sys
 
-# TODO: change to actual release version when in-service upgrade is released
 RELEASE_MAJOR_VERSION = 7
 RELEASE_MINOR_VERSION = 2
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
-    description="Generate a checklist before performing in-service upgrade.",
+    description="Generate a checklist before performing online upgrade.",
     arguments=(
             VOLT.PathArgument('newKit', 'path to new VoltDB kit directory', absolute=True, optional=False),
             VOLT.PathArgument('newRoot', 'path to the parent of new VoltDB root directory', absolute=True, optional=False),
@@ -83,11 +82,11 @@ def basicCheck(runner):
     # sanity check, in case of nodes number or K-factor is less than required
     # K = 0, abort with error message
     if kfactor == 0:
-        runner.abort("Current cluster doesn't have duplicate partitions to perform in-service upgrade. K-factor: %d" % kfactor)
+        runner.abort("Current cluster doesn't have duplicate partitions to perform online upgrade. K-factor: %d" % kfactor)
 
     # N = 1, abort with error message
     if fullClusterSize == 1:
-        runner.abort("Current cluster doesn't have enough node to perform in-service upgrade, at least two nodes are required")
+        runner.abort("Current cluster doesn't have enough node to perform online upgrade, at least two nodes are required")
 
     response = checkstats.get_stats(runner, "DRROLE")
     largestClusterId = -1
@@ -113,7 +112,8 @@ def basicCheck(runner):
 
     if error:
         runner.abort("Failed to pass pre-upgrade check. Abort. ")
-    print 'Pass pre-upgrade check.'
+    print '[1/4] Passed new VoltDB kit version check.'
+    print '[2/4] Passed new VoltDB root path existence check.'
 
     return hosts, kfactor, largestClusterId
 
@@ -128,10 +128,16 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
     files, newNodeF = generateDeploymentFile(runner, hosts, surviveSet, killSet,
                                              largestClusterId, origin_cluster_deploy,
                                              new_cluster_deploy, step)
+    printout = '[3/4] Generated deployment file: '
+    if os.path.isfile(origin_cluster_deploy):
+        printout += origin_cluster_deploy
+    if os.path.isfile(new_cluster_deploy):
+        printout += " " + new_cluster_deploy
+    print printout
 
     # 1 kill half of the cluster
     step += 1
-    generateStopNodeCommand(hosts, surviveSet, killSet, files, step)
+    generateStopNodeCommand(hosts, surviveSet[0], killSet, files, step)
 
     # 2 for the new cluster, initialize the new root path
     step += 1
@@ -149,20 +155,20 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
     # update old cluster's deployment file
     if largestClusterId == -1:
         step += 1
-        generateTurnOnXDCRCommand(runner.opts, surviveSet, files, origin_cluster_deploy, step)
+        generateTurnOnXDCRCommand(runner.opts, surviveSet[0], files, origin_cluster_deploy, step)
 
      # 6 call 'voltadmin shutdown --wait' on the original cluster
     step += 1
-    generatePauseCommand(surviveSet, files, step)
+    generatePauseCommand(surviveSet[0], files, step)
 
     # 7 kill the original cluster
     step += 1
-    generateShutdownOriginClusterCommand(surviveSet, files, step)
+    generateShutdownOriginClusterCommand(surviveSet[0], files, step)
 
     # 8 run DR RESET on one node of the new cluster.
     # TODO: If there are other clusters connect to the original cluster before, run individual DR RESET.
     step += 1
-    generateDRResetCommand(killSet, files, step)
+    generateDRResetCommand(killSet[0], files, step)
 
     # 9 initialize a new VoltDB root path on the nodes being shutdown ( may not need all of them)
     step += 1
@@ -173,7 +179,7 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
     generateNodeRejoinCommand(runner.opts, surviveSet, leadersString, files, hostcount / 2, step)
 
     cleanup(runner.opts, files, newNodeF)
-    print 'Upgrade plan generated successfully in current directory. You might modify those per-node commands to fit your own need.'
+    print '[4/4] Generated online upgrade plan: upgrade-plan.txt'
 
 def generateDeploymentFile(runner, hosts, surviveSet, killSet, largestClusterId, origin_cluster_deploy, new_cluster_deploy, step):
     files = dict()
@@ -228,13 +234,13 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, largestClusterId,
                       '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
     return files, newNodeF
 
-def generateStopNodeCommand(hosts, surviveSet, killSet, files, step):
+def generateStopNodeCommand(hosts, survivor, killSet, files, step):
     for hostId, hostInfo in hosts.hosts_by_id.items():
         if hostInfo in killSet:
             writeCommands(files[getKey(hostInfo)],
                           'Step %d: stop node' % step,
-                          'voltadmin stop -H %s:%d %s:%d' % (surviveSet[0].hostname,
-                                                             surviveSet[0].adminport,
+                          'voltadmin stop -H %s:%d %s:%d' % (survivor.hostname,
+                                                             survivor.adminport,
                                                              getHostnameOrIp(hostInfo),
                                                              hostInfo.internalport))
 
@@ -279,27 +285,27 @@ def generateStartNewClusterCommand(opts, killSet, hostcount, files, newNodeF, st
                                                                       hostcount / 2))
     return leadersString
 
-def generateTurnOnXDCRCommand(opts, surviveSet, files, origin_cluster_deploy, step):
-    writeCommands(files[getKey(surviveSet[0])],
+def generateTurnOnXDCRCommand(opts, survivor, files, origin_cluster_deploy, step):
+    writeCommands(files[getKey(survivor)],
               'Step %d: turn XDCR on in the original cluster' % step,
-              'voltadmin update -H %s:%d %s' % (surviveSet[0].hostname,
-                                                surviveSet[0].adminport,
+              'voltadmin update -H %s:%d %s' % (survivor.hostname,
+                                                survivor.adminport,
                                                 os.path.join(opts.newRoot, origin_cluster_deploy)))
 
-def generatePauseCommand(surviveSet, files, step):
-   writeCommands(files[getKey(surviveSet[0])],
+def generatePauseCommand(survivor, files, step):
+   writeCommands(files[getKey(survivor)],
                   'Step %d: wait for XDCR stream to drain' % step,
-                  'voltadmin pause --wait -H %s:%d' % (surviveSet[0].hostname, surviveSet[0].adminport))
+                  'voltadmin pause --wait -H %s:%d' % (survivor.hostname, survivor.adminport))
 
-def generateShutdownOriginClusterCommand(surviveSet, files, step):
-    writeCommands(files[getKey(surviveSet[0])],
+def generateShutdownOriginClusterCommand(survivor, files, step):
+    writeCommands(files[getKey(survivor)],
                   'Step %d: shutdown the original cluster' % step,
-                  'voltadmin shutdown -H %s:%d' % (surviveSet[0].hostname, surviveSet[0].adminport))
+                  'voltadmin shutdown -H %s:%d' % (survivor.hostname, survivor.adminport))
 
-def generateDRResetCommand(killSet, files, step):
-    writeCommands(files[getKey(killSet[0])],
+def generateDRResetCommand(victim, files, step):
+    writeCommands(files[getKey(victim)],
               'Step %d: run dr reset command to stop generating binary logs for the origin cluster' % step,
-              'voltadmin dr reset -H %s:%d' % (killSet[0].hostname, killSet[0].adminport))
+              'voltadmin dr reset -H %s:%d' % (victim.hostname, victim.adminport))
 
 def generateInitOldClusterCommmand(opts, surviveSet, files, new_cluster_deploy, halfNodes, step):
     initNodes = 0
@@ -412,7 +418,7 @@ def createDeploymentForOriginalCluster(runner, xmlString, drSource, origin_clust
     et = ElementTree.ElementTree(ElementTree.fromstring(xmlString))
     dr = et.getroot().find('./dr')
     if dr is None:
-        runner.abort("This cluster doesn't have a DR tag in its deployment file, hence we can't generate in-service upgrade plan for it. \
+        runner.abort("This cluster doesn't have a DR tag in its deployment file, hence we can't generate online upgrade plan for it. \
                     Please note add DR tag to your deployment file requires to shutdown and restart the database.")
 
     if 'id' not in dr.attrib:

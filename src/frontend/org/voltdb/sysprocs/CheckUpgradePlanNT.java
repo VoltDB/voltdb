@@ -32,10 +32,11 @@ import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 
 /*
- * Some simple file system path checks, the goal is using NT proc to do the check on
- * every node before doing the in-service upgrade.
+ * Some simple file system path checks, the goal is using NT procedure to do the check on
+ * every node before doing the online upgrade.
  */
 public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
+    private final static String SUCCESS = "Success";
 
     public static class PrerequisitesCheckNT extends VoltNTSystemProcedure {
         private final static int MINIMUM_MAJOR_VERSION = 7;
@@ -53,28 +54,30 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
 
         private static String checkVoltDBKitExistence(String newKitPath) {
             Path newKit = Paths.get(newKitPath);
-            if (Files.exists(newKit) && Files.isDirectory(newKit)) {
-                try {
-                    String version = new String(Files.readAllBytes(Paths.get(newKitPath, "version.txt")));
-                    System.out.println("Check VoltDB Kit: version is " + version);
-                    String[] versionNumber = version.split("\\.");
-                    if (versionNumber.length < 2) {
-                        return "Illegal version string format found in " + newKitPath;
-                    }
-                    int majorVersion = Integer.parseInt(versionNumber[0].trim());
-                    int minorVersion = Integer.parseInt(versionNumber[1].trim());
-                    if ( majorVersion < MINIMUM_MAJOR_VERSION ||
-                                    (majorVersion == MINIMUM_MAJOR_VERSION && minorVersion < MINIMUM_MINOR_VERSION)) {
-                        return "Version of new VoltDB kit is lower than the minimum supported version (v" +
-                                MINIMUM_MAJOR_VERSION + "." + MINIMUM_MINOR_VERSION + ")";
-                    } else {
-                        return "Success";
-                    }
-                } catch (IOException | NumberFormatException e) {
-                    return "Failed to parse version string in the new VoltDB kit";
-                }
-            } else {
+            if (!Files.exists(newKit)) {
                 return newKitPath + " doesn't exist.";
+            } else if (Files.isDirectory(newKit)) {
+                return newKitPath + " is not a directory.";
+            }
+
+            try {
+                String version = new String(Files.readAllBytes(Paths.get(newKitPath, "version.txt")));
+                System.out.println("Check VoltDB Kit: version is " + version);
+                String[] versionNumber = version.split("\\.");
+                if (versionNumber.length < 2) {
+                    return "Illegal version string format found in " + newKitPath + ": " + version;
+                }
+                int majorVersion = Integer.parseInt(versionNumber[0].trim());
+                int minorVersion = Integer.parseInt(versionNumber[1].trim());
+                if ( majorVersion < MINIMUM_MAJOR_VERSION ||
+                                (majorVersion == MINIMUM_MAJOR_VERSION && minorVersion < MINIMUM_MINOR_VERSION)) {
+                    return "Version of new VoltDB kit is lower than the minimum supported version (v" +
+                            MINIMUM_MAJOR_VERSION + "." + MINIMUM_MINOR_VERSION + ")";
+                } else {
+                    return SUCCESS;
+                }
+            } catch (IOException | NumberFormatException e) {
+                return "Failed to parse version string in the new VoltDB kit";
             }
         }
 
@@ -83,9 +86,9 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
             if (!Files.exists(newRoot)) {
                 return newRoot + " doesn't exist.";
             } else if (!Files.isDirectory(newRoot)) {
-                return newRoot + " does exist, but it doesn't look like a directory.";
+                return newRoot + " is not a directory.";
             }
-            return "Success";
+            return SUCCESS;
         }
     }
 
@@ -95,14 +98,14 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
         String kitCheckResult = vtable.getString("KIT_CHECK_RESULT");
         String rootCheckResult = vtable.getString("ROOT_CHECK_RESULT");
         StringBuilder result = new StringBuilder();
-        if (!kitCheckResult.equals("Success")){
+        if (!kitCheckResult.equals(SUCCESS)){
             result.append(kitCheckResult);
         }
-        if (!rootCheckResult.equals("Success")) {
+        if (!rootCheckResult.equals(SUCCESS)) {
             result.append(rootCheckResult);
         }
         if (result.length() == 0) {
-            result.append("Success");
+            result.append(SUCCESS);
         }
 
         return result.toString();
