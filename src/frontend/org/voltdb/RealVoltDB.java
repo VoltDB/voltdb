@@ -3971,9 +3971,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(m_nodeSettings.getVoltDBRoot().getAbsolutePath()));
             if (stagedCatalog.exists()) {
                 if (stagedCatalog.delete()){
-                    hostLog.info("Deleted VoltDB's copy of the initialized schema because durability is present.");
+                    hostLog.info("Saved copy of the initialized schema deleted because command logs and/or snapshots are in use.");
                 } else {
-                    hostLog.warn("Could not delete VoltDB's copy of the initialized schema.");
+                    hostLog.warn("Failed to delete the saved copy of the initialized schema.");
                 }
             }
         }
