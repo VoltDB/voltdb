@@ -260,7 +260,7 @@ public class TestSSL extends TestCase {
         config.m_startAction = m_cluster.isNewCli() ? StartAction.PROBE : StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("sslRejoin.jar");
         if (m_cluster.isNewCli()) {
-            config.m_voltdbRoot = new File(m_cluster.getServerSpecificRoot("0"));
+            config.m_voltdbRoot = new File(m_cluster.getServerSpecificVoltDBRoot("0"));
             config.m_forceVoltdbCreate = false;
             config.m_hostCount = hostCount;
         }

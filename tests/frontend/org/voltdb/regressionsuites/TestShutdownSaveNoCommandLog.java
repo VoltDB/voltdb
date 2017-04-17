@@ -169,7 +169,7 @@ public class TestShutdownSaveNoCommandLog extends RegressionSuite
 
     static File getSnapshotPathForHost(LocalCluster cluster, int hostId) {
         if (cluster.isNewCli()) {
-            return new File(cluster.getServerSpecificRoot(Integer.toString(hostId)), "snapshots");
+            return new File(cluster.getServerSpecificVoltDBRoot(Integer.toString(hostId)), "snapshots");
         } else {
             List<File> subRoots = cluster.getSubRoots();
             return new File (subRoots.get(hostId), "/tmp/" + System.getProperty("user.name") + "/snapshots");

@@ -109,6 +109,9 @@ public class LocalCluster extends VoltServerConfig {
     int m_replicationPort = -1;
 
     Map<String, String> m_hostRoots = new HashMap<>();
+    /** Gets the dedicated paths in the filesystem used as a root for each process.
+     * Used with NewCLI.
+     */
     public Map<String, String> getHostRoots() {
         return m_hostRoots;
     }
@@ -179,10 +182,9 @@ public class LocalCluster extends VoltServerConfig {
 
     private String m_prefix = null;
     private boolean m_isPaused = false;
+    private boolean m_usesStagedSchema;
 
     private int m_httpOverridePort = -1;
-
-    private boolean m_usesStagedSchema;
     public void setHttpOverridePort(int port) {
         m_httpOverridePort = port;
     }
@@ -651,7 +653,7 @@ public class LocalCluster extends VoltServerConfig {
             String root = m_hostRoots.get(hostIdStr);
             //For new CLI dont pass deployment for probe.
             cmdln.pathToDeployment(null);
-            cmdln.voltdbRoot(root);
+            cmdln.voltdbRoot(root + File.separator + Constants.DBROOT);
         }
 
         final boolean alwaysForceCreate = clearLocalDataDirectories || !m_usesStagedSchema; // for backwards compatibility
@@ -663,11 +665,15 @@ public class LocalCluster extends VoltServerConfig {
         m_localServer.start();
     }
 
-    public String getServerSpecificRoot(String hostId) {
+    /** Gets the voltdbroot directory for the specified host.
+     * Formerly "getServerSpecificRoot"; name changed since behavior is inconsistent with {@link VoltFile#getServerSpecificRoot(String, boolean)}.
+     */
+    public String getServerSpecificVoltDBRoot(String hostId) {
         if (!m_hostRoots.containsKey(hostId)) {
-            throw new IllegalArgumentException("getServerSpecificRoot possibly called before cluster has started.");
+            throw new IllegalArgumentException("getServerSpecificRootDirectory possibly called before cluster has started.");
         }
-        return m_hostRoots.get(hostId) + "/voltdbroot";
+        assert( new File(m_hostRoots.get(hostId)).getName().equals(Constants.DBROOT) == false ) : m_hostRoots.get(hostId);
+        return m_hostRoots.get(hostId) + File.separator + Constants.DBROOT;
     }
 
     void initLocalServer(int hostId, boolean clearLocalDataDirectories) throws IOException {
@@ -686,7 +692,8 @@ public class LocalCluster extends VoltServerConfig {
         //If we are initializing lets wait for it to finish.
         ServerThread th = new ServerThread(cmdln);
         File root = VoltFile.getServerSpecificRoot(String.valueOf(hostId), clearLocalDataDirectories);
-        cmdln.voltdbRoot(root + "/voltdbroot");
+        assert( root.getName().equals(Constants.DBROOT) == false ) : root.getAbsolutePath();
+        cmdln.voltdbRoot(new File(root, Constants.DBROOT));
         try {
             th.initialize();
         }
@@ -699,8 +706,7 @@ public class LocalCluster extends VoltServerConfig {
         }
         //Keep track by hostid the voltdbroot
         String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
-        assert( cmdln.voltdbRoot().getName().equals(Constants.DBROOT) ) : cmdln.voltdbRoot().getAbsolutePath();
-        m_hostRoots.put(hostIdStr, cmdln.voltdbRoot().getAbsolutePath());
+        m_hostRoots.put(hostIdStr, root.getAbsolutePath());
     }
 
     private boolean waitForAllReady()
@@ -942,10 +948,12 @@ public class LocalCluster extends VoltServerConfig {
                 cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
             }
         }
+        File root = null;
         try {
             //If clear clean VoltFile.getServerSpecificRoot(String.valueOf(hostId))
-            File root = new File(VoltFile.getServerSpecificRoot(String.valueOf(hostId), clearLocalDataDirectories), File.separator + Constants.DBROOT);
-            cmdln = cmdln.voltdbRoot(root);
+            root = VoltFile.getServerSpecificRoot(String.valueOf(hostId), clearLocalDataDirectories);
+            assert( root.getName().equals(Constants.DBROOT) == false ) : root.getAbsolutePath();
+            cmdln = cmdln.voltdbRoot(new File(root, Constants.DBROOT));
             cmdln = cmdln.startCommand(StartAction.INITIALIZE);
             if (clearLocalDataDirectories) {
                 cmdln.setForceVoltdbCreate(true);
@@ -1013,9 +1021,10 @@ public class LocalCluster extends VoltServerConfig {
             log.error("Failed to start cluster process:" + ex.getMessage(), ex);
             assert (false);
         }
-        String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
-        assert( cmdln.voltdbRoot().getName().equals(Constants.DBROOT) ) : cmdln.voltdbRoot().getAbsolutePath();
-        m_hostRoots.put(hostIdStr, cmdln.voltdbRoot().getPath());
+        if ( root != null ) {
+            String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
+            m_hostRoots.put(hostIdStr, root.getPath());
+        }
     }
 
     public void startOne(int hostId, boolean clearLocalDataDirectories,
@@ -2115,7 +2124,8 @@ public class LocalCluster extends VoltServerConfig {
         if (rootpath == null) {
             return null;
         }
-        File testFile = new VoltFile(rootpath + File.separator + relativePathFromVoltDBRoot);
+        assert( rootpath.contains(Constants.DBROOT) == false ) : rootpath;
+        File testFile = new VoltFile(rootpath + File.separator + Constants.DBROOT + File.separator + relativePathFromVoltDBRoot);
         return testFile.getAbsolutePath();
     }
 
@@ -2124,11 +2134,11 @@ public class LocalCluster extends VoltServerConfig {
      * @return number of nodes who have that file
      */
     public int countNodesWithFile(String relativePathFromVoltDBRoot) {
-        final String pathWithinVoltDBRoot = File.separator + relativePathFromVoltDBRoot;
+        final String pathWithinSubroot = File.separator + Constants.DBROOT + File.separator + relativePathFromVoltDBRoot;
         int total = 0;
         for (Map.Entry<String, String> entry : m_hostRoots.entrySet()) {
-            assert( entry.getValue().contains(Constants.DBROOT) ) : entry.getValue();
-            File testFile = new VoltFile(entry.getValue() + pathWithinVoltDBRoot);
+            assert( entry.getValue().contains(Constants.DBROOT) == false ) : entry.getValue();
+            File testFile = new VoltFile(entry.getValue() + pathWithinSubroot);
             if (testFile.canRead() && (testFile.length() > 0)) {
                 total++;
             }

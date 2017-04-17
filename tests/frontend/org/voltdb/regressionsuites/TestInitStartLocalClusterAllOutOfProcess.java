@@ -95,7 +95,7 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         cluster.startUp(true);
         //Get server specific root after startup.
         if (cluster.isNewCli()) {
-            voltDbRoot = new File(cluster.getServerSpecificRoot("1"));
+            voltDbRoot = new File(cluster.getServerSpecificVoltDBRoot("1"));
         } else {
             String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
             voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
