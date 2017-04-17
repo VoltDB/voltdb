@@ -839,7 +839,12 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     }
 
     TableTuple conflict(m_schema);
-    tryInsertOnAllIndexes(&target, &conflict);
+    try {
+        tryInsertOnAllIndexes(&target, &conflict);
+    } catch (SQLException& e) {
+        deleteTupleStorage(target); // also frees object columns
+        throw;
+    }
     if (!conflict.isNullTuple()) {
         throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
     }
