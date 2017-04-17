@@ -215,4 +215,8 @@ public class SysProcFragmentId
     // @PrepareShutdown
     public static final long PF_prepareShutdown = 310;
     public static final long PF_prepareShutdownAggregate = 311;
+
+    // @SwapTables
+    public static final long PF_swapTables = 320;
+    public static final long PF_swapTablesAggregate = 321;
 }
