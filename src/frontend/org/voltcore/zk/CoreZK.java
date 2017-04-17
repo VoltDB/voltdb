@@ -19,6 +19,7 @@ package org.voltcore.zk;
 
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
+import java.util.List;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -26,6 +27,8 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltdb.VoltZK;
+
+import com.google_voltpatches.common.collect.Lists;
 
 /**
  * CoreZK provides constants for all voltcore-registered
@@ -250,6 +253,32 @@ public class CoreZK {
         } catch (InterruptedException e) {
             return false;
         }
+        return false;
+    }
+
+    /**
+     * Checks if the cluster suffered an aborted join or node shutdown and is still in the process of cleaning up.
+     * @param zk    ZooKeeper client
+     * @return true if the cluster is still cleaning up.
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    public static boolean isPartitionCleanupInProgress(ZooKeeper zk) throws KeeperException, InterruptedException
+    {
+        List<String> children = zk.getChildren(VoltZK.leaders_initiators, null);
+        List<ZKUtil.ChildrenCallback> childrenCallbacks = Lists.newArrayList();
+        for (String child : children) {
+            ZKUtil.ChildrenCallback callback = new ZKUtil.ChildrenCallback();
+            zk.getChildren(ZKUtil.joinZKPath(VoltZK.leaders_initiators, child), false, callback, null);
+            childrenCallbacks.add(callback);
+        }
+
+        for (ZKUtil.ChildrenCallback callback : childrenCallbacks) {
+            if (callback.getChildren().isEmpty()) {
+                return true;
+            }
+        }
+
         return false;
     }
 }

@@ -1142,7 +1142,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_configuredReplicationFactor = topo.getReplicationFactor();
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
-                m_cartographer.setHostCount(m_config.m_hostCount);
                 m_partitionZeroLeader = new Supplier<Boolean>() {
                     @Override
                     public Boolean get() {
@@ -2074,6 +2073,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }, 0, 6, TimeUnit.MINUTES));
 
+        if (!m_rejoining) {
+            schedulePeriodicWorksForSPIBalance();
+        }
+        // other enterprise setup
+        EnterpriseMaintenance em = EnterpriseMaintenance.get();
+        if (em != null) { em.setupMaintenaceTasks(); }
+
+        GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
+    }
+
+    private void schedulePeriodicWorksForSPIBalance() {
         final long interval = Integer.getInteger("SPI_BALANCE_INTERVAL", 120);
         Runnable task = () -> {
             TreeSet<Integer> hosts = (TreeSet<Integer>)(getHostMessenger().getLiveHostIds());
@@ -2082,12 +2092,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         };
         m_periodicWorks.add(scheduleWork(task, 10, interval, TimeUnit.SECONDS));
-
-        // other enterprise setup
-        EnterpriseMaintenance em = EnterpriseMaintenance.get();
-        if (em != null) { em.setupMaintenaceTasks(); }
-
-        GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
     private void startHealthMonitor() {
@@ -3733,6 +3737,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             } else {
                 logRecoveryCompleted = true;
+            }
+
+            if (m_rejoining) {
+                schedulePeriodicWorksForSPIBalance();
             }
 
             // Join creates a truncation snapshot as part of the join process,

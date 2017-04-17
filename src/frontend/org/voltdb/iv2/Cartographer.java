@@ -85,7 +85,6 @@ public class Cartographer extends StatsSource
 
     private final int m_configuredReplicationFactor;
     private final boolean m_partitionDetectionEnabled;
-    private int m_hostCount = 0;
     private final ExecutorService m_es
             = CoreUtils.getCachedSingleThreadExecutor("Cartographer", 15000);
 
@@ -663,10 +662,6 @@ public class Cartographer extends StatsSource
         return true;
     }
 
-    public void setHostCount(int hostCount) {
-        m_hostCount = hostCount;
-    }
-
     /**
      * used to calculate the partition candidate for migration
      */
@@ -731,12 +726,29 @@ public class Cartographer extends StatsSource
     }
 
     /**
-     * find a partition and its new host
-     * @return
+     * find a partition and its target host
+     * move a  partition master from the host with most masters to a host
+     * with least masters.
+     * @return  a partition and target host
      */
     public Pair<Integer, Integer> getPartitionForMigration() {
+        try {
+            if (CoreZK.isPartitionCleanupInProgress(m_hostMessenger.getZK())) {
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("[getPartitionForMigration] cleaning up partitions.");
+                }
+                return null;
+            }
+        } catch (KeeperException | InterruptedException e) {
+            return null;
+        }
 
-        int maximalNumberOfMasters = (int)Math.ceil((double)(getPartitionCount()) / m_hostCount);
+        Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
+        if (liveHosts.size() == 1) {
+            return null;
+        }
+
+        int maximalMastersPerHost = (int)Math.ceil((double)(getPartitionCount()) / liveHosts.size());
 
         //collect host and partition info
         Map<Integer, Host> hostsMap = Maps.newHashMap();
@@ -747,17 +759,23 @@ public class Cartographer extends StatsSource
                 continue;
             }
             int leaderHostId = CoreUtils.getHostIdFromHSId(m_iv2Masters.pointInTimeCache().get(partitionId));
+            if (!liveHosts.contains(new Integer(leaderHostId))) {
+                return null;
+            }
             Host leaderHost = hostsMap.get(leaderHostId);
             if (leaderHost == null) {
-                leaderHost = new Host(leaderHostId, maximalNumberOfMasters);
+                leaderHost = new Host(leaderHostId, maximalMastersPerHost);
                 hostsMap.put(leaderHostId, leaderHost);
             }
             List<Long> sites = getReplicasForPartition(partitionId);
             for (long site : sites) {
                 int hostId = CoreUtils.getHostIdFromHSId(site);
+                if (!liveHosts.contains(new Integer(hostId))) {
+                    return null;
+                }
                 Host host = hostsMap.get(hostId);
                 if ( host ==  null) {
-                    host = new Host(hostId, maximalNumberOfMasters);
+                    host = new Host(hostId, maximalMastersPerHost);
                     hostsMap.put(hostId, host);
                 }
                 host.addPartition(partitionId, (leaderHostId == hostId));

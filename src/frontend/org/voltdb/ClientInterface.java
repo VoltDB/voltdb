@@ -2131,6 +2131,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     public void balanceSPI(int hostId) {
+
         Pair<Integer, Integer> target = m_cartographer.getPartitionForMigration();
         if (target == null || !CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
             return;
