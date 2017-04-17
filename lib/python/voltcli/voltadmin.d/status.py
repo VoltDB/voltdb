@@ -29,21 +29,20 @@ import json
     bundles=VOLT.AdminBundle(),
     description="Show status of current cluster and remote cluster(s) it connects to",
     options=(
-            VOLT.BooleanOption('-r', '--refresh', 'refresh', 'refresh the output continuously', default=False),
-            VOLT.IntegerOption('-i', '--interval', 'interval', 'refresh interval measured in seconds', default=2),
+            VOLT.BooleanOption('-c', '--continuous', 'continuous', 'continuous listing', default=False),
             VOLT.BooleanOption('-j', '--json', 'json', 'print out JSON format instead of plain text', default=False),
-            VOLT.BooleanOption('-d', '--dr', 'dr', 'display DR/XDCR related status', default=False)
+            VOLT.BooleanOption(None, '--dr', 'dr', 'display DR/XDCR related status', default=False)
     ),
 )
 
 def status(runner):
-    if runner.opts.refresh:
+    if runner.opts.continuous:
         try:
             while True:
                 # clear screen first
                 tmp = subprocess.call('clear', shell=True)
                 doStatus(runner)
-                time.sleep(runner.opts.interval)
+                time.sleep(2)  # used to be runner.opts.interval, default as 2 seconds
         except KeyboardInterrupt, e:
             pass  # don't care
     else:
