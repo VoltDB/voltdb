@@ -94,5 +94,3 @@ Add the --ssl=SSL.properties argument to your command line.
    trustStorePassword=example</td>
 ```
 
-Any other SSL properties will need to be set by amending the Java command line in the "sqlcmd" and "voltadmin" scripts. If you are not comfortable doing this, contact VoltDB Support for assistance.
-

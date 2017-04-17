@@ -290,6 +290,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void resetDrAppliedTracker(byte clusterId) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public boolean hasRealDrAppliedTracker(byte clusterId) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -299,6 +309,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
+
         @Override
         public Pair<Long, Long> getDrLastAppliedUniqueIds()
         {

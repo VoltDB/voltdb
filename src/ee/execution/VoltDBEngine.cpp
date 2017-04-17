@@ -1433,6 +1433,11 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
     }
 }
 
+
+const unsigned char* VoltDBEngine::getResultsBuffer() const {
+    return (const unsigned char*)m_resultOutput.data();
+}
+
 int VoltDBEngine::getResultsSize() const {
     return static_cast<int>(m_resultOutput.size());
 }
