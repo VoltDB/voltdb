@@ -15,7 +15,8 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 def reset_remote(runner):
-    result = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT], [runner.opts.clusterId, runner.opts.forcing * 1]).table(0)
+    result = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT],
+                              [runner.opts.clusterId, runner.opts.forcing * 1, runner.opts.resetAll * 1]).table(0)
     status = result.tuple(0).column_integer(0)
     message = result.tuple(0).column_string(1)
     if status == 0:
@@ -29,6 +30,7 @@ def reset_remote(runner):
     options = (
             VOLT.BooleanOption('-f', '--force', 'forcing', 'bypass precheck', default = False),
             VOLT.IntegerOption('-c', '--cluster', 'clusterId', 'dr cluster Id', default = -1),
+            VOLT.BooleanOption('-a', '--all', 'resetAll', 'reset all connected cluster(s)', default = False),
     ),
     modifiers = (
             VOLT.Modifier('reset', reset_remote, 'reset one/all remote dr cluster(s).'),
