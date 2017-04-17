@@ -41,13 +41,14 @@ public class TestSqlInsertSuite extends RegressionSuite {
 
     public void testInsert() throws Exception
     {
+        Client client = getClient();
 
         // test with no fields provided (all column values must be provided)
         validateInsertStmt("insert into p1 values (1, 2, 3, 4, 5, 6);",
                 1, 2, 3, 4, 5, 6);
 
         // not enough values
-        verifyStmtFails(getClient(), "insert into p1 values (1, 2, 3);", "row column count mismatch");
+        verifyStmtFails(client, "insert into p1 values (1, 2, 3);", "row column count mismatch");
 
         // test with all fields specified (in order)
         validateInsertStmt("insert into p1 (ccc, bbb, aaa, zzz, yyy, xxx) values (1, 2, 3, 4, 5, 6);",
@@ -67,17 +68,23 @@ public class TestSqlInsertSuite extends RegressionSuite {
 
         // test with no values provided for NOT NULL columns
         // explicitly set not null field to null.
-        verifyStmtFails(getClient(), "insert into p1 (ccc, zzz) values (null, 7);", "CONSTRAINT VIOLATION");
+        verifyStmtFails(client, "insert into p1 (ccc, zzz) values (null, 7);", "CONSTRAINT VIOLATION");
 
         // try to insert into not null column with no default value
-        verifyStmtFails(getClient(), "insert into p1 (ccc) values (32)", "Column ZZZ has no default and is not nullable");
+        verifyStmtFails(client, "insert into p1 (ccc) values (32)", "Column ZZZ has no default and is not nullable");
 
 
-        verifyStmtFails(getClient(), "insert into p1  values (1, 2, 3, 4, 5, 6), (1, 2, 3, 4, 5, 6);",
+        verifyStmtFails(client, "insert into p1  values (1, 2, 3, 4, 5, 6), (1, 2, 3, 4, 5, 6);",
                 "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
 
-        verifyStmtFails(getClient(), "insert into p1 (ccc, zzz) values (1, 2), (3, 4);",
+        verifyStmtFails(client, "insert into p1 (ccc, zzz) values (1, 2), (3, 4);",
                 "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
+
+        // There is an index defined on 1/ccc.
+        verifyStmtFails(client, "insert into p1 (ccc, zzz) values (0, 1);",
+                "Attempted to divide 1 by 0");
+        // Make sure the row is not inserted into the table (ENG-12024).
+        validateTableOfScalarLongs(client, "select count(*) from p1 where ccc = 0;", new long[] {0});
     }
 
     // See also tests for INSERT using DEFAULT NOW columns in TestFunctionsSuite.java
@@ -104,6 +111,7 @@ public class TestSqlInsertSuite extends RegressionSuite {
                 "xxx bigint " + // default null
                 ");" +
                 "PARTITION TABLE P1 ON COLUMN ccc;" +
+                "CREATE INDEX IDX_P1 ON P1(1/ccc);" +
                 ""
                 ;
         try {

@@ -1865,7 +1865,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return ! m_orderColumns.isEmpty();
     }
 
-    public void setUnsafeMVMessage(String msg) {
+    public void setUnsafeDDLMessage(String msg) {
         m_mvUnSafeErrorMessage = msg;
     }
 
