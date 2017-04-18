@@ -537,7 +537,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         final short version = 1;
         long safe = m_gapTracker.commit(-1L);
         long pausedOffset = m_pauseOffset.get();
-        if (safe > m_lastCommittedOffset || pausedOffset != -1) {
+        if (m_lastCommittedOffset != pausedOffset && (safe > m_lastCommittedOffset || pausedOffset != -1)) {
             long now = System.currentTimeMillis();
             OffsetCommitResponse offsetCommitResponse = null;
             try {
