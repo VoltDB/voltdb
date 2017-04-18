@@ -230,6 +230,14 @@ public:
         return m_tupleCount * m_tempTuple.tupleLength();
     }
 
+    void signature(char const* signature) {
+        ::memcpy(&m_signature, signature, 20);
+    }
+
+    const char* signature() {
+        return m_signature;
+    }
+
     void notifyQuantumRelease() {
         if (compactionPredicate()) {
             doForcedCompaction();
@@ -264,7 +272,8 @@ public:
            (PersistentTable* otherTable,
             std::vector<std::string> const& theIndexes,
             std::vector<std::string> const& otherIndexes,
-            bool fallible = true);
+            bool fallible = true,
+            bool isUndo = false);
 
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can

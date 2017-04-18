@@ -46,6 +46,7 @@
 #include "persistenttable.h"
 
 #include "AbstractDRTupleStream.h"
+#include "DRTupleStream.h"
 #include "ConstraintFailureException.h"
 #include "CopyOnWriteContext.h"
 #include "DRTupleStreamUndoAction.h"
@@ -626,7 +627,8 @@ static bool hasNameIntegrity(std::string const& tableName,
 void PersistentTable::swapTable(PersistentTable* otherTable,
         std::vector<std::string> const& theIndexNames,
         std::vector<std::string> const& otherIndexNames,
-        bool fallible) {
+        bool fallible,
+        bool isUndo) {
     assert(hasNameIntegrity(name(), theIndexNames));
     assert(hasNameIntegrity(otherTable->name(), otherIndexNames));
     CompiledSwap compiled(*this, *otherTable,
@@ -635,12 +637,21 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     swapTableIndexes(otherTable,
             compiled.m_theIndexes,
             compiled.m_otherIndexes);
+    assert(m_drEnabled == otherTable->m_drEnabled);
+
+    if (!isUndo && m_drEnabled) {
+        ExecutorContext::getEngine()->swapDRActions(otherTable, this);
+    }
+
     if (fallible) {
+        assert(!isUndo);
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-        uq->registerUndoAction(
-                new (*uq) PersistentTableUndoSwapTableAction(this, otherTable,
-                        theIndexNames,
-                        otherIndexNames));
+        if (uq) {
+            uq->registerUndoAction(
+                    new (*uq) PersistentTableUndoSwapTableAction(this, otherTable,
+                            theIndexNames,
+                            otherIndexNames));
+        }
     }
 
     // Switch arguments here to Account here for the actual table pointers
@@ -839,7 +850,12 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     }
 
     TableTuple conflict(m_schema);
-    tryInsertOnAllIndexes(&target, &conflict);
+    try {
+        tryInsertOnAllIndexes(&target, &conflict);
+    } catch (SQLException& e) {
+        deleteTupleStorage(target); // also frees object columns
+        throw;
+    }
     if (!conflict.isNullTuple()) {
         throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
     }
