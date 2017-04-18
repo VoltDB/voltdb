@@ -658,6 +658,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> closeAndDelete() {
+        //Activate for close so we can do cleanup.
+        activate();
         m_closed = true;
         RunnableWithES runnable = new RunnableWithES("closeAndDelete") {
             @Override
@@ -672,10 +674,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        return stashOrSubmitTask(runnable, false, false);
+        return stashOrSubmitTask(runnable, true, false);
     }
 
     public ListenableFuture<?> close() {
+        //Activate for close so we can do cleanup.
+        activate();
         m_closed = true;
         //If we are waiting at this allow to break out when close comes in.
         m_allowAcceptingMastership.release();
@@ -693,7 +697,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        return stashOrSubmitTask(runnable, false, false);
+        return stashOrSubmitTask(runnable, true, false);
     }
 
     public ListenableFuture<BBContainer> poll() {
