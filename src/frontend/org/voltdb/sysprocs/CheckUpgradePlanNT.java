@@ -62,7 +62,6 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
 
             try {
                 String version = new String(Files.readAllBytes(Paths.get(newKitPath, "version.txt")));
-                System.out.println("Check VoltDB Kit: version is " + version);
                 String[] versionNumber = version.split("\\.");
                 if (versionNumber.length < 2) {
                     return "Illegal version string format found in " + newKitPath + ": " + version;

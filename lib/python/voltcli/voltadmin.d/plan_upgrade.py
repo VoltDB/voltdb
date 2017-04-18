@@ -168,7 +168,7 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
     # 8 run DR RESET on one node of the new cluster.
     # TODO: If there are other clusters connect to the original cluster before, run individual DR RESET.
     step += 1
-    generateDRResetCommand(killSet[0], files, step)
+    generateDRResetCommand(runner, surviveSet[0], files, step)
 
     # 9 initialize a new VoltDB root path on the nodes being shutdown ( may not need all of them)
     step += 1
@@ -302,10 +302,26 @@ def generateShutdownOriginClusterCommand(survivor, files, step):
                   'Step %d: shutdown the original cluster' % step,
                   'voltadmin shutdown -H %s:%d' % (survivor.hostname, survivor.adminport))
 
-def generateDRResetCommand(victim, files, step):
-    writeCommands(files[getKey(victim)],
-              'Step %d: run dr reset command to stop generating binary logs for the origin cluster' % step,
-              'voltadmin dr reset -H %s:%d' % (victim.hostname, victim.adminport))
+def generateDRResetCommand(runner, survivor, files, step):
+    remoteTopo = dict()
+    # Find remote covering host through drconsumer stats, one for each remote cluster
+    response = checkstats.get_stats(runner, "DRCONSUMER")
+    for tuple in response.table(1).tuples():
+        remote_cluster_id = tuple[4]
+        covering_host = tuple[7]
+        last_applied_ts = tuple[9]
+        if covering_host != '':
+            if remote_cluster_id not in remoteTopo:
+                remoteTopo[remote_cluster_id] = covering_host
+
+    # assume remote cluster use the same admin port
+    command = ""
+    for clusterId, covering_host in remoteTopo.items():
+        command += 'voltadmin dr reset --cluster=%s -H %s:%d --force\n' % (survivor.clusterid, covering_host.split(":")[0], survivor.adminport)
+    writeCommands(files[getKey(survivor)],
+                  'Step %d: run dr reset command to tell other clusters to stop generating binary logs for the origin cluster' % step,
+                  command)
+
 
 def generateInitOldClusterCommmand(opts, surviveSet, files, new_cluster_deploy, halfNodes, step):
     initNodes = 0
