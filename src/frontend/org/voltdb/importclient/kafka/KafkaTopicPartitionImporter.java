@@ -544,7 +544,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 BlockingChannel channel = null;
                 int retries = 3;
                 if (pausedOffset != -1) {
-                    info(null, "Using paused offset to commit: " + pausedOffset);
+                    rateLimitedLog(Level.INFO, null, "Using paused offset to commit: " + pausedOffset);
                 }
                 while (channel == null && --retries >= 0) {
                     if ((channel = m_offsetManager.get()) == null) {
