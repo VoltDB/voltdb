@@ -24,4 +24,4 @@ def resume(runner):
     if status == 0:
         runner.info('The cluster has resumed.')
     else:
-        runner.error('The cluster has failed to resume with status: %d' % status)
+        runner.abort('The cluster has failed to resume with status: %d' % status)

@@ -24,4 +24,4 @@ def promote(runner):
     if status == 0:
         runner.info('The cluster is promoted to normal operation.')
     else:
-        runner.error('The cluster failed to promote with status: %d' % status)
+        runner.abort('The cluster failed to promote with status: %d' % status)
