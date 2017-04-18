@@ -195,5 +195,4 @@ public class CompleteTransactionTask extends TransactionTask
         sb.append("  MSG: ").append(m_completeMsg.toString());
         return sb.toString();
     }
-
 }

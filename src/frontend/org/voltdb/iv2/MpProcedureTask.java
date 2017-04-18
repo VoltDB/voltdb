@@ -117,8 +117,6 @@ public class MpProcedureTask extends ProcedureTask
                                                        "txnId", TxnEgo.txnIdToString(getTxnId())));
         }
 
-        hostLog.debug("STARTING: " + this);
-
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txnState;
         // Check for restarting sysprocs
@@ -204,7 +202,7 @@ public class MpProcedureTask extends ProcedureTask
                 restartTransaction();
             }
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("[MpProcedureTask]RESTART: " + this);
+                hostLog.debug("[MpProcedureTask]MISROUTED-RESTART: " + this);
             }
         } else {
             if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {

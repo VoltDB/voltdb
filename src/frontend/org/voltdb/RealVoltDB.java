@@ -2084,14 +2084,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void schedulePeriodicWorksForSPIBalance() {
-        final long interval = Integer.getInteger("SPI_BALANCE_INTERVAL", 120);
+        final long interval = Integer.getInteger("SPI_BALANCE_INTERVAL", 60);
         Runnable task = () -> {
             TreeSet<Integer> hosts = (TreeSet<Integer>)(getHostMessenger().getLiveHostIds());
             if (m_clientInterface != null && m_myHostId == hosts.pollLast()) {
                 m_clientInterface.balanceSPI(m_myHostId);
             }
         };
-        m_periodicWorks.add(scheduleWork(task, 10, interval, TimeUnit.SECONDS));
+        m_periodicWorks.add(scheduleWork(task, interval, interval, TimeUnit.SECONDS));
     }
 
     private void startHealthMonitor() {
@@ -4469,32 +4469,4 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public Cartographer getCartograhper() {
         return m_cartographer;
     }
-
-//    private void startBalanceSPI() {
-//        Runnable task = () -> {
-//            final long interval = Integer.getInteger("SPI_BALANCE_RETRY_INTERVAL", 10);
-//            final int retrySalt = Integer.getInteger("SPI_BALANCE_RETRY_INTERVAL_SALT", 30);
-//            final Random salt = new Random();
-//            long sleep = interval;
-//            final int maxSleep = 300;
-//            while (true) {
-//                final int spiHost = CoreZK.createSPIMigrationIndicator(getHostMessenger().getZK(), m_myHostId);
-//                if (spiHost == -1) {
-//                    break;
-//                }
-//                //another node is working on SPI balance
-//                try {
-//                    Thread.sleep(TimeUnit.SECONDS.toMillis(sleep));
-//                } catch (InterruptedException ignoreIt) {
-//                }
-//                //exponential back off with a salt to avoid collision. Max is 5 minutes.
-//                sleep = Math.min(sleep * 2, maxSleep) + salt.nextInt(retrySalt);
-//                if (sleep > maxSleep) {
-//                    sleep = interval;
-//                }
-//            }
-//            m_clientInterface.callBalanceSPI(m_myHostId);
-//        };
-//        m_es.execute(task);
-//    }
 }
