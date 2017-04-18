@@ -177,6 +177,21 @@ public class SQLPatternFactory
             return new SQLPatternPartElement("[\\w.$]+");
         }
 
+        public static SQLPatternPart functionName()
+        {
+            return new SQLPatternPartElement("[\\w$]+");
+        }
+
+        public static SQLPatternPart classDotMethod()
+        {
+            /* (?:\w+\.)+[\w$]+
+             * This pattern matches the string <class-name>.<method-name>
+             * (?:\w+\.)+ matches the class name with the package path, ended with a dot.
+             * [\w$]+ matches the method name.
+             */
+            return new SQLPatternPartElement("(?:\\w+\\.)+[\\w$]+");
+        }
+
         public static SQLPatternPart languageName()
         {
             //TODO: Does not recognize quoted identifiers.

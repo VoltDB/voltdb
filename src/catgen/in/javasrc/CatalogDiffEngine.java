@@ -446,6 +446,7 @@ public class CatalogDiffEngine {
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
+            suspect instanceof Function ||
             suspect instanceof SnapshotSchedule ||
             // refs are safe to add drop if the thing they reference is
             suspect instanceof ConstraintRef ||

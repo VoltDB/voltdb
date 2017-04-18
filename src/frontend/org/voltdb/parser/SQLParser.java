@@ -172,6 +172,21 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_CREATE_PROCEDURE_FROM_SQL");
 
     /*
+     * CREATE FUNCTION <NAME> FROM METHOD <CLASS NAME>.<METHOD NAME>
+     *
+     * CREATE FUNCTION with the designated method from the given class.
+     *
+     * Capture groups:
+     *  (1) Function name
+     *  (2) The class and method name for the function implementation.
+     */
+    private static final Pattern PAT_CREATE_FUNCTION_FROM_METHOD =
+        SPF.statement(
+            SPF.token("create"), SPF.token("function"), SPF.capture(SPF.functionName()),
+            SPF.token("from"), SPF.token("method"), SPF.capture(SPF.classDotMethod())
+        ).compile("PAT_CREATE_FUNCTION_FROM_METHOD");
+
+    /*
      * CREATE PROCEDURE <NAME> [ <MODIFIER_CLAUSE> ... ] AS ### <PROCEDURE_CODE> ### LANGUAGE <LANGUAGE_NAME>
      *
      * CREATE PROCEDURE with inline implementation script, e.g. Groovy, statement regex
@@ -340,7 +355,7 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE)|" +                // token options after CREATE
+            "(?:PROCEDURE|ROLE|FUNCTION)|" +                // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
@@ -718,6 +733,16 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * Match statement against the pattern for create function from method
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchCreateFunctionFromMethod(String statement)
+    {
+        return PAT_CREATE_FUNCTION_FROM_METHOD.matcher(statement);
+    }
+
+    /**
      * Match statement against pattern for drop procedure
      * @param statement  statement to match against
      * @return           pattern matcher object
@@ -1020,7 +1045,7 @@ public class SQLParser extends SQLPatternFactory
          * find any reasonable solution.
          */
         Matcher stringFragmentMatcher = SingleQuotedString.matcher(query);
-        ArrayList<String> stringFragments = new ArrayList<String>();
+        ArrayList<String> stringFragments = new ArrayList<>();
         int i = 0;
         while (stringFragmentMatcher.find()) {
             stringFragments.add(stringFragmentMatcher.group());
@@ -1044,7 +1069,7 @@ public class SQLParser extends SQLPatternFactory
 
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
-        ArrayList<String> queries = new ArrayList<String>();
+        ArrayList<String> queries = new ArrayList<>();
         for (String fragment : sqlFragments) {
             if (fragment.isEmpty()) {
                 continue;
@@ -1079,7 +1104,7 @@ public class SQLParser extends SQLPatternFactory
         // quotes don't trigger a false positive for the START of an unsafe string.
         // Skipping is accomplished by resetting paramText to an offset substring
         // after copying the skipped (or substituted) text to a string builder.
-        ArrayList<String> originalString = new ArrayList<String>();
+        ArrayList<String> originalString = new ArrayList<>();
         Matcher stringMatcher = SingleQuotedString.matcher(paramText);
         StringBuilder safeText = new StringBuilder();
         while (stringMatcher.find()) {
@@ -1100,7 +1125,7 @@ public class SQLParser extends SQLPatternFactory
         // Save anything after the last found string.
         safeText.append(paramText);
 
-        ArrayList<String> params = new ArrayList<String>();
+        ArrayList<String> params = new ArrayList<>();
         int subCount = 0;
         int neededSubs = originalString.size();
         // Split the params at the separators
