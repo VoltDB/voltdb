@@ -45,10 +45,33 @@ while [ -n "$1" ]; do
                     ;;
             esac
             ;;
+        --voltdbroot)
+            shift
+            VOLTDBROOT="$1"
+            if [ ! -d "$VOLTDBROOT" ] ; then
+                echo "$0: Source directory \"$VOLTDBROOT\" does not exist."
+                exit 100
+            fi
+            shift
+            ;;
+        --objdir)
+            shift
+            OBJDIR="$1"
+            shift
+            if [ ! -d "$OBJDIR" ] ; then
+                echo "$0: Object directory \"$OBJDIR\" does not exist."
+                exit 100
+            fi
+            ;;
         --help)
             echo 'Usage: generate-ee-unit-tests [ options ] -- test classes'
             echo 'Options:'
             echo ' --verbose                Run java -v'
+            echo ' --voltdbroot DIR         The root of the voltdb tree is DIR.'
+            echo ' --objdir DIR             The object directory, where all the'
+            echo '                          builds occur, is DIR.  This will typically be'
+            echo '                          /home/user/.../voltdb/obj/debug for a release'
+            echo '                          build.  This is required.'
             echo ' --build buildType        Set the build type.  The'
             echo '                          possibilities are debug,'
             echo '                          release and memcheck.'
@@ -79,6 +102,15 @@ if [ -z "$TEST_CLASSES" ] ; then
     echo "$0: No test classes specified."
     exit 100
 fi
+if [ -z "$OBJDIR" ] ; then
+    echo "$0: --objdir is required."
+    exit 100
+fi
+if [ -z "$VOLTDBROOT" ] ; then
+    echo "$0: --voltdbroot is required."
+    exit 100
+fi
+
 for CLASS in $TEST_CLASSES; do
-    (set $ECHO; java $VERBOSE -cp prod:test:../../lib/\*:../../third_party/java/jars/\* -Dlog4j.configuration=file:../../tests/log4j-allconsole.xml $CLASS ${NAMES_ONLY} --generated-dir "$GENERATED_DIR/src")
+    (set $ECHO; java $VERBOSE -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDBROOT}/lib/\*:${VOLTDBROOT}/third_party/java/jars/\* -Dlog4j.configuration=file:${VOLTDBROOT}/tests/log4j-allconsole.xml $CLASS ${NAMES_ONLY} --generated-dir "$GENERATED_DIR/src")
 done
