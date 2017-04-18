@@ -387,7 +387,7 @@ public class KafkaLoader {
                     }
                     if (params == null) continue;
                     m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
-                } catch (Exception ex) {
+                } catch (Throwable ex) {
                     m_log.error("Consumer stopped", ex);
                     System.exit(1);
                 }
