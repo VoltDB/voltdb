@@ -66,6 +66,7 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -393,7 +394,7 @@ public class DDLCompiler {
             return;
         }
         // Okay, get a list of deleted column names
-        Set<String> removedColumns = new HashSet<String>();
+        Set<String> removedColumns = new HashSet<>();
         for (VoltXMLElement e : columnsDiff.getRemovedNodes()) {
             assert(e.attributes.get("name") != null);
             removedColumns.add(e.attributes.get("name"));
@@ -1230,7 +1231,7 @@ public class DDLCompiler {
     }
 
     private TreeSet<String> getExportTableNames() {
-        TreeSet<String> exportTableNames = new TreeSet<String>();
+        TreeSet<String> exportTableNames = new TreeSet<>();
         NavigableMap<String, NavigableSet<String>> exportsByTargetName = m_tracker.getExportedTables();
         for (Entry<String, NavigableSet<String>> e : exportsByTargetName.entrySet()) {
             for (String tableName : e.getValue()) {
@@ -1558,8 +1559,8 @@ public class DDLCompiler {
         assert node.name.equals("table");
 
         // Construct table-specific maps
-        HashMap<String, Column> columnMap = new HashMap<String, Column>();
-        HashMap<String, Index> indexMap = new HashMap<String, Index>();
+        HashMap<String, Column> columnMap = new HashMap<>();
+        HashMap<String, Index> indexMap = new HashMap<>();
 
         final String name = node.attributes.get("name");
 
@@ -1587,10 +1588,10 @@ public class DDLCompiler {
         table.setIsreplicated(true);
 
         // map of index replacements for later constraint fixup
-        final Map<String, String> indexReplacementMap = new TreeMap<String, String>();
+        final Map<String, String> indexReplacementMap = new TreeMap<>();
 
         // Need the columnTypes sorted by column index.
-        SortedMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
+        SortedMap<Integer, VoltType> columnTypes = new TreeMap<>();
         for (VoltXMLElement subNode : node.children) {
 
             if (subNode.name.equals("columns")) {
@@ -1940,10 +1941,10 @@ public class DDLCompiler {
         // can be indexed. We scan for result type at first here and block those which
         // can't be indexed like boolean, geo ... We gather rest of expression into
         // checkExpressions list.  We will check on them all at once.
-        List<AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> checkExpressions = new ArrayList<>();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
-                exprs = new ArrayList<AbstractExpression>();
+                exprs = new ArrayList<>();
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
                     expr.resolveForTable(table);
@@ -1995,6 +1996,7 @@ public class DDLCompiler {
             }
         }
 
+        UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
         if (exprs == null) {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
@@ -2020,10 +2022,8 @@ public class DDLCompiler {
                                 colType.getName() + " values must be the only component of an index key: \"" + nonint_col_name + "\"";
                         throw compiler.new VoltCompilerException(emsg);
                     }
-
                 }
             }
-
         }
         else {
             for (AbstractExpression expression : exprs) {
@@ -2057,11 +2057,13 @@ public class DDLCompiler {
                         }
                     }
                 }
+                expression.findUnsafeOperatorsForDDL(unsafeOps);
             }
         }
 
         Index index = table.getIndexes().add(name);
         index.setCountable(false);
+        index.setIssafewithnonemptysources(! unsafeOps.isUnsafe());
 
         String indexNameNoCase = name.toLowerCase();
         // The index is a hash iff:

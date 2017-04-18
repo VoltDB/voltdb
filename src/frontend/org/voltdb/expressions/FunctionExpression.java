@@ -368,7 +368,7 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     @Override
-    public void findNonemptyMVSafeOperations(MVUnsafeOperators ops) {
+    public void findUnsafeOperatorsForDDL(UnsafeOperatorsForDDL ops) {
         ops.add(explain("Be Explicit"));
     }
 }

@@ -29,21 +29,20 @@ import json
     bundles=VOLT.AdminBundle(),
     description="Show status of current cluster and remote cluster(s) it connects to",
     options=(
-            VOLT.BooleanOption('-r', '--refresh', 'refresh', 'refresh the output continuously', default=False),
-            VOLT.IntegerOption('-i', '--interval', 'interval', 'refresh interval measured in seconds', default=2),
+            VOLT.BooleanOption('-c', '--continuous', 'continuous', 'continuous listing', default=False),
             VOLT.BooleanOption('-j', '--json', 'json', 'print out JSON format instead of plain text', default=False),
-            VOLT.BooleanOption('-d', '--dr', 'dr', 'display DR/XDCR related status', default=False)
+            VOLT.BooleanOption(None, '--dr', 'dr', 'display DR/XDCR related status', default=False)
     ),
 )
 
 def status(runner):
-    if runner.opts.refresh:
+    if runner.opts.continuous:
         try:
             while True:
                 # clear screen first
                 tmp = subprocess.call('clear', shell=True)
                 doStatus(runner)
-                time.sleep(runner.opts.interval)
+                time.sleep(2)  # used to be runner.opts.interval, default as 2 seconds
         except KeyboardInterrupt, e:
             pass  # don't care
     else:
@@ -144,7 +143,7 @@ def getClusterInfo(runner):
             if last_queued_drid == -1:
                 delay = 0
             else:
-                delay = (last_queued_ts - last_acked_ts).microseconds / 1000
+                delay = (last_queued_ts - last_acked_ts).total_seconds()
             cluster.get_remote_cluster(remote_cluster_id).update_producer_latency(host_name, remote_cluster_id, delay)
 
         # Find remote topology through drconsumer stats
@@ -159,14 +158,14 @@ def getClusterInfo(runner):
     return cluster
 
 def printPlainSummary(cluster):
-    header1 = "Cluster %s, version %s, hostcount %d, kfactor %d" % (cluster.id,
-                                                                    cluster.version,
-                                                                    cluster.hostcount,
-                                                                    cluster.kfactor)
+    header1 = "Cluster {}, version {}, hostcount {}, kfactor {}".format(cluster.id,
+                                                                        cluster.version,
+                                                                        cluster.hostcount,
+                                                                        cluster.kfactor)
 
     livehost = len(cluster.hosts_by_id)
     missing = cluster.hostcount - livehost
-    header2 = " %d live host%s, %d missing host%s, %d live client%s, uptime %s" % (
+    header2 = " {} live host{}, {} missing host{}, {} live client{}, uptime {}".format(
                 livehost, 's' if livehost > 2 else '',
                 missing, 's' if missing > 2 else '',
                 cluster.liveclients, 's' if cluster.liveclients > 2 else '',
@@ -175,14 +174,14 @@ def printPlainSummary(cluster):
     delimiter = '-' * header1.__len__()
 
     # print host info
-    hostHeader = '%8s%16s' % ("HostId", "Host Name")
+    hostHeader = '{:>8}{:>16}'.format("HostId", "Host Name")
     for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
-        hostHeader += '%20s' % ("Cluster " + str(clusterId) + " (" + remoteCluster.status + ")")
+        hostHeader += '{:>20}'.format("Cluster " + str(clusterId) + " (" + remoteCluster.status + ")")
     rows = list()
     for hostId, hostname in cluster.hosts_by_id.items():
-        row = "%8d%16s" % (hostId, hostname)
+        row = "{:>8}{:>16}".format(hostId, hostname)
         for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
-            row += '%17d ms' % (remoteCluster.producer_max_latency[hostname + str(clusterId)])
+            row += '{:>17} s'.format(remoteCluster.producer_max_latency[hostname + str(clusterId)])
         rows.append(row)
 
     sys.stdout.write(header1)

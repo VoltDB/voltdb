@@ -198,14 +198,15 @@ begin PlanFragment               "Instructions to the executor to execute part o
   string planhash                "SHA-1 Hash of the plan assumed to be unique"
 end
 
-begin Index              "A index structure on a database table's columns"
-  bool unique            "May the index contain duplicate keys?"
-  bool assumeUnique      "User allow unique index on partition table without including partition key?"
-  bool countable         "Index counter feature"
-  int type               "What data structure is the index using and what kinds of keys does it support?"
-  ColumnRef* columns     "Columns referenced by the index"
-  string expressionsjson "A serialized representation of the optional expression trees"
-  string predicatejson   "A serialized representation of the optional predicate for partial indexes"
+begin Index                        "A index structure on a database table's columns"
+  bool unique                      "May the index contain duplicate keys?"
+  bool assumeUnique                "User allow unique index on partition table without including partition key?"
+  bool countable                   "Index counter feature"
+  int type                         "What data structure is the index using and what kinds of keys does it support?"
+  ColumnRef* columns               "Columns referenced by the index"
+  string expressionsjson           "A serialized representation of the optional expression trees"
+  string predicatejson             "A serialized representation of the optional predicate for partial indexes"
+  bool isSafeWithNonemptySources   "Is this an index which may be created with non-empty source tables"
 end
 
 begin TableRef
