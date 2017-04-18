@@ -2476,7 +2476,7 @@ TEST CASES
         <isset property="reportpath"/>
     </condition>
 
-    <exec dir='${sqlcmdtest.dir}' executable='python2.6' failonerror="true">
+    <exec dir='${sqlcmdtest.dir}' executable='python2.7' failonerror="true">
         <arg value='sqlcmdtest.py' />
     </exec>
 </target>
@@ -2498,7 +2498,7 @@ TEST CASES
         <isset property="reportpath"/>
     </condition>
 
-    <exec dir='${sqlcmdtest.dir}' executable='python2.6' failonerror="true">
+    <exec dir='${sqlcmdtest.dir}' executable='python2.7' failonerror="true">
         <arg value='sqlcmdtest.py' />
         <arg value='--refresh' />
     </exec>

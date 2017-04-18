@@ -56,7 +56,7 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
             Path newKit = Paths.get(newKitPath);
             if (!Files.exists(newKit)) {
                 return newKitPath + " doesn't exist.";
-            } else if (Files.isDirectory(newKit)) {
+            } else if (!Files.isDirectory(newKit)) {
                 return newKitPath + " is not a directory.";
             }
 
