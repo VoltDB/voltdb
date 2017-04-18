@@ -674,7 +674,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        return stashOrSubmitTask(runnable, true, false);
+        return stashOrSubmitTask(runnable, false, false);
     }
 
     public ListenableFuture<?> close() {
@@ -697,7 +697,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        return stashOrSubmitTask(runnable, true, false);
+        return stashOrSubmitTask(runnable, false, false);
     }
 
     public ListenableFuture<BBContainer> poll() {
