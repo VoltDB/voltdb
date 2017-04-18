@@ -22,7 +22,7 @@ def reset_remote(runner):
     if status == 0:
         runner.info(message)
     else:
-        runner.error(message)
+        runner.abort(message)
 
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
@@ -38,4 +38,10 @@ def reset_remote(runner):
 )
 
 def dr(runner):
+    if runner.opts.forcing and runner.opts.resetAll:
+        runner.abort_with_help('You cannot specify both --force and --all options.')
+    if runner.opts.clusterId >= 0 and runner.opts.resetAll:
+        runner.abort_with_help('You cannot specify both --cluster and --all options.')
+    if runner.opts.clusterId < -1 or runner.opts.clusterId > 127:
+        runner.abort_with_help('The dr cluster id must be in the range of 0 to 127.')
     runner.go()
