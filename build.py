@@ -553,6 +553,15 @@ if whichtests in ("${eetestsuite}", "plannodes"):
      WindowFunctionPlanNodeTest
     """
 
+#
+# This is set to a list of class names.  Each of
+# these will be run to (1) find out the names of
+# all tests for the makefile and (2) generate the
+# tests.
+#
+CTX.GENERATOR_CLASSES = [
+    "org.voltdb.planner.eegentests.GenerateEETests"
+]
 ###############################################################################
 #
 # Print some configuration information.  This is useful for debugging.

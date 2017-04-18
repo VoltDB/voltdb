@@ -40,6 +40,7 @@ class BuildContext:
         self.MINORVERSION = 0
         self.PATCHLEVEL   = 0
         self.S2GEO_LIBS = ""
+        self.GENERATOR_CLASSES = []
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
@@ -209,9 +210,6 @@ def buildGeneratedTests(CTX, makefile, all_gen_tests):
     makefile.write("build-generated-tests: ${GENERATED_TESTS}\n")
     makefile.write("clean-generated-tests:\n")
     makefile.write("\trm -rf ${GENERATED_OBJ}/* ${GENERATED_BIN}/*\n")
-    makefile.write('\n')
-    makefile.write('run-generated-tests: ${GENERATED_TESTS}\n')
-    makefile.write('\tfor file in ${GENERATED_TESTS}; do echo :---- $$file ----:; $$file; done')
     makefile.write('\n')
     makefile.write('make-generated-dirs: ${GENERATED_DIR}\n')
     makefile.write('\tmkdir -p ${GENERATED_OBJ} ${GENERATED_BIN}\n')
@@ -393,17 +391,19 @@ def buildThirdPartyTools(CTX, makefile):
 
     return None
 
-def generatedEETestFiles(generated_dir, buildType):
-    if not os.path.exists(generated_dir):
-        print('Making generated files for %s in %s' % (buildType, generated_dir))
-        os.system("tools/generate-ee-unit-tests.sh --build %s" % buildType)
-    answer = []
-    for (dir, subdir, files) in os.walk(generated_dir):
-        ldir = os.path.normpath(dir).split(os.sep)[-1]
-        for file in files:
-            if file[-4:] == '.cpp':
-                answer += [(ldir, file[:-4])]
-                print("Adding generated file %s/%s" % (ldir, file))
+def generatedEETestFiles(generated_dir, buildType, testClasses):
+    if not os.path.isdir(generated_dir):
+        os.makedirs(generated_dir + "/src")
+    tcArgs = ["tools/generate-ee-unit-tests.sh",
+               "--build",
+               buildType,
+               "--names-only"]
+    for tc in testClasses:
+        tcArgs += ["--test-class", tc.strip()]
+    p = Popen(tcArgs, stdout=PIPE)
+    processStdOut = p.communicate()[0]
+    names = processStdOut.split()
+    answer = (name.split("/") for name in names)
     return answer
 
 def buildMakefile(CTX):
@@ -454,8 +454,8 @@ def buildMakefile(CTX):
         tests += [os.path.join(TEST_PREFIX, dir, test) for test in test_names]
     # All generated tests.
     all_gen_tests = generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated'),
-                                         CTX.LEVEL.lower())
-    print(all_gen_tests)
+                                         CTX.LEVEL.lower(),
+                                         CTX.GENERATOR_CLASSES)
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
     makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
@@ -810,7 +810,8 @@ def runTests(CTX):
                        testname) for testname in test_names]
     if TEST_GENERATED:
         for dirname, testname in generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated'),
-                                                      CTX.LEVEL.lower()):
+                                                      CTX.LEVEL.lower(),
+                                                      CTX.GENERATOR_CLASSES):
             tests += [(os.path.join(OUTPUT_PREFIX, 'generated', 'bin'),
                        dirname,
                        testname)]

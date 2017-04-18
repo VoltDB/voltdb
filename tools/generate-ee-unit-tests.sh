@@ -12,19 +12,24 @@
 BUILD=debug
 VERBOSE=
 GENERATED_DIR="generated"
+ECHO=+x
 while [ -n "$1" ]; do
     case "$1" in
         --debug)
-            set -x
+            ECHO=-x
             shift
             ;;
         --verbose)
             VERBOSE=-v
             shift
             ;;
-        --generated-dir)
+        --names-only)
+            NAMES_ONLY=--names-only
             shift
-            GENERATED_DIR="$1"
+            ;;
+        --test-class)
+            shift
+            TEST_CLASSES="$TEST_CLASSES $1"
             shift
             ;;
         --build)
@@ -41,12 +46,20 @@ while [ -n "$1" ]; do
             esac
             ;;
         --help)
-            echo 'Usage: generate-ee-unit-tests [ options ]'
+            echo 'Usage: generate-ee-unit-tests [ options ] -- test classes'
             echo 'Options:'
             echo ' --verbose                Run java -v'
             echo ' --build buildType        Set the build type.  The'
             echo '                          possibilities are debug,'
             echo '                          release and memcheck.'
+            echo ' --names-only             Only echo the test names'
+            echo ' --test-class class-name  Run the given class name'
+            echo '                          as a Java main program.  It'
+            echo '                          will know which tests it'
+            echo '                          generates.  This can be'
+            echo '                          repeated multiple times, but'
+            echo '                          there must be at least one of'
+            echo '                          these options provided.'
             echo ' --generated-dir dirname  Put generated artifacts in'
             echo '                          obj/$BUILD/dirname, where'
             echo '                          $BUILD is the build type.'
@@ -57,7 +70,15 @@ while [ -n "$1" ]; do
             exit 100
             ;;
         *)
-
+            echo "$0: Unknown command line parameter $1"
+            exit 100
+            ;;
     esac
 done
-java $VERBOSE -cp obj/$BUILD/prod:obj/$BUILD/test:lib/\*:third_party/java/jars/\* org.voltdb.planner.eegentests.EEPlanTestGenerator --generated-dir "obj/$BUILD/$GENERATED_DIR/src"
+if [ -z "$TEST_CLASSES" ] ; then
+    echo "$0: No test classes specified."
+    exit 100
+fi
+for CLASS in $TEST_CLASSES; do
+    (set $ECHO; java $VERBOSE -cp prod:test:../../lib/\*:../../third_party/java/jars/\* -Dlog4j.configuration=file:../../tests/log4j-allconsole.xml $CLASS ${NAMES_ONLY} --generated-dir "$GENERATED_DIR/src")
+done

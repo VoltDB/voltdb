@@ -208,6 +208,8 @@ public class EEPlanGenerator extends PlannerTestCase {
 
     private String m_sourceDir = "tests/ee";
 
+    private boolean m_namesOnly = false;
+
     protected String getPlanString(String sqlStmt) throws JSONException {
         AbstractPlanNode node = compile(sqlStmt);
         String planString = PlanSelector.outputPlanDebugString(node);
@@ -506,7 +508,8 @@ public class EEPlanGenerator extends PlannerTestCase {
          * @param testConfig
          */
         public void addTest(TestConfig testConfig) {
-            System.out.printf("Adding test %d: %s\n", m_testConfigs.size(), testConfig.m_testName);
+            System.err.printf("Adding test %d: %s\n", m_testConfigs.size(), testConfig.m_testName);
+            System.err.flush();
             m_testConfigs.add(testConfig);
         }
 
@@ -733,7 +736,6 @@ public class EEPlanGenerator extends PlannerTestCase {
         public String getClassName() {
             return m_class.getSimpleName();
         }
-
     }
 
     /**
@@ -821,6 +823,10 @@ public class EEPlanGenerator extends PlannerTestCase {
      * @throws Exception
      */
     protected void generateTests(String testFolder, String testClassName, DBConfig db) throws Exception {
+        if (m_namesOnly) {
+            System.out.printf("%s/%s\n", testFolder, testClassName);
+            return;
+        }
         Map<String, String> params = new HashMap<>();
         params.put("SOURCE_PACKAGE_NAME",   db.getClassPackageName());
         params.put("SOURCE_CLASS_NAME",     db.getClassName());
@@ -890,6 +896,8 @@ public class EEPlanGenerator extends PlannerTestCase {
                 } else {
                     throw new IllegalArgumentException("No argument for --generated-dir.");
                 }
+            } else if ("--names-only".equals(arg)) {
+                m_namesOnly  = true;
             }
         }
     }
@@ -901,7 +909,7 @@ public class EEPlanGenerator extends PlannerTestCase {
             String value   = params.get(entry.getKey());
             template = template.replace(pattern, value);
         }
-        File outputDir = new File(String.format("%s/%s", m_sourceDir, testFolder));
+        File outputDir = new File(String.format("%s/%s", testFolder, m_sourceDir));
         if (! outputDir.exists() && !outputDir.mkdirs()) {
             throw new IOException("Cannot make test source folder \"" + outputDir + "\"");
         }

@@ -63,12 +63,12 @@ import org.voltdb.catalog.Database;
  * the generator member functions, as is done in this file.
  *
  */
-public class EEPlanTestGenerator extends EEPlanGenerator {
+public class GenerateEETests extends EEPlanGenerator {
     private static final String DDL_FILENAME = "testplans-ee-generators.sql";
 
     @Override
     public void setUp() throws Exception {
-        super.setUp(EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+        super.setUp(GenerateEETests.class.getResource(DDL_FILENAME),
                     "testplansgenerator",
                     true);
     }
@@ -251,7 +251,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         // joinOutput, need to be added.  Any number of tables
         // can be added.
         DBConfig dbc = new DBConfig(getClass(),
-                                   EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                   GenerateEETests.class.getResource(DDL_FILENAME),
                                    getCatalogString(),
                                    AAAConfig,
                                    BBBConfig,
@@ -371,7 +371,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         TableConfig TConfig = makeTConfig(db);
         TableConfig testOutput = makeTestOutput(db);
         DBConfig maxDB = new DBConfig(getClass(),
-                                      EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                      GenerateEETests.class.getResource(DDL_FILENAME),
                                       getCatalogString(),
                                       TConfig,
                                       testOutput);
@@ -395,7 +395,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         TableConfig TConfig = makeTConfig(db);
         TableConfig testOutput = makeTestOutput(db);
         DBConfig minDB = new DBConfig(getClass(),
-                                      EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                      GenerateEETests.class.getResource(DDL_FILENAME),
                                       getCatalogString(),
                                       TConfig,
                                       testOutput);
@@ -460,7 +460,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         TableConfig TConfig = makeTConfig(db);
         TableConfig sumOutput = makeSumOutput(db);
         DBConfig sumDB = new DBConfig(getClass(),
-                                      EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                      GenerateEETests.class.getResource(DDL_FILENAME),
                                       getCatalogString(),
                                       TConfig,
                                       sumOutput);
@@ -541,7 +541,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         TableConfig countOutput = makeCountOutput(db);
 
         DBConfig countDB = new DBConfig(getClass(),
-                                        EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                        GenerateEETests.class.getResource(DDL_FILENAME),
                                         getCatalogString(),
                                         countInput,
                                         countOutput);
@@ -667,7 +667,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         TableConfig rankDenseOutput = makeRankDenseOutput(db);
 
         DBConfig rankDB = new DBConfig(getClass(),
-                                       EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                       GenerateEETests.class.getResource(DDL_FILENAME),
                                        getCatalogString(),
                                        rankInput,
                                        rankOutput,
@@ -692,7 +692,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
     }
 
     public static void main(String args[]) {
-        EEPlanTestGenerator tg = new EEPlanTestGenerator();
+        GenerateEETests tg = new GenerateEETests();
         tg.processArgs(args);
         try {
             tg.setUp();
