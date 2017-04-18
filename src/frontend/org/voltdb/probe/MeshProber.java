@@ -92,7 +92,6 @@ public class MeshProber implements JoinAcceptor {
     private static final String ENTERPRISE = "enterprise";
     private static final String TERMINUS_NONCE = "terminusNonce";
     private static final String MISSING_HOST_COUNT = "missingHostCount";
-    private static final String STARTUP_CATALOG_HASH = "startupCatalogHash";
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
 
@@ -199,7 +198,6 @@ public class MeshProber implements JoinAcceptor {
     protected final boolean m_safeMode;
     protected final String m_terminusNonce;
     protected final int m_missingHostCount;
-    protected final UUID m_startupCatalogHash;
     protected final HostCriteriaRef m_hostCriteria = new HostCriteriaRef();
     /*
      * on probe startup mode this future is set when there are enough
@@ -213,7 +211,7 @@ public class MeshProber implements JoinAcceptor {
             boolean bare, UUID configHash, Supplier<Integer> hostCountSupplier,
             int kFactor, boolean paused, Supplier<NodeState> nodeStateSupplier,
             boolean addAllowed, boolean safeMode, String terminusNonce,
-            int missingHostCount, UUID startupCatalogHash) {
+            int missingHostCount) {
 
         checkArgument(versionChecker != null, "version checker is null");
         checkArgument(configHash != null, "config hash is null");
@@ -229,7 +227,6 @@ public class MeshProber implements JoinAcceptor {
                 hostCountSupplier.get(), coordinators.size());
         checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
                 "terminus should not be blank");
-        // stagedConfigHash can be null - that means there isn't a staged catalog
 
         this.m_coordinators = ImmutableSortedSet.copyOf(coordinators);
         this.m_versionChecker = versionChecker;
@@ -245,7 +242,6 @@ public class MeshProber implements JoinAcceptor {
         this.m_safeMode = safeMode;
         this.m_terminusNonce = terminusNonce;
         this.m_missingHostCount = missingHostCount;
-        this.m_startupCatalogHash = startupCatalogHash;
 
         this.m_meshHash = Digester.md5AsUUID("hostCount="+ hostCountSupplier.get() + '|' + this.m_coordinators.toString());
     }
@@ -320,10 +316,6 @@ public class MeshProber implements JoinAcceptor {
         return m_missingHostCount;
     }
 
-    public UUID getStartupCatalogHash() {
-        return m_startupCatalogHash;
-    }
-
     public HostCriteria asHostCriteria() {
         return new HostCriteria(
                 m_paused,
@@ -336,8 +328,7 @@ public class MeshProber implements JoinAcceptor {
                 m_nodeStateSupplier.get(),
                 m_addAllowed,
                 m_safeMode,
-                m_terminusNonce,
-                m_startupCatalogHash
+                m_terminusNonce
                 );
     }
 
@@ -353,8 +344,7 @@ public class MeshProber implements JoinAcceptor {
                 m_nodeStateSupplier.get(),
                 m_addAllowed,
                 m_safeMode,
-                m_terminusNonce,
-                m_startupCatalogHash
+                m_terminusNonce
                 );
     }
 
@@ -661,7 +651,7 @@ public class MeshProber implements JoinAcceptor {
                 + ", meshHash=" + m_meshHash + ", hostCount=" + m_hostCountSupplier.get()
                 + ", kFactor=" + m_kFactor + ", paused=" + m_paused
                 + ", addAllowed=" + m_addAllowed + ", safeMode=" + m_safeMode
-                + ", missingHostCount=" + m_missingHostCount + ", m_startupCatalogHash=" + m_startupCatalogHash + "]";
+                + ", missingHostCount=" + m_missingHostCount + "]";
     }
 
     public void appendTo(JSONWriter jw) throws JSONException {
@@ -683,7 +673,6 @@ public class MeshProber implements JoinAcceptor {
         jw.keySymbolValuePair(SAFE_MODE, m_safeMode);
         jw.keySymbolValuePair(TERMINUS_NONCE, m_terminusNonce);
         jw.keySymbolValuePair(MISSING_HOST_COUNT, m_missingHostCount);
-        jw.keySymbolValuePair(STARTUP_CATALOG_HASH, m_startupCatalogHash.toString());
 
         jw.endObject();
     }
@@ -779,7 +768,6 @@ public class MeshProber implements JoinAcceptor {
         protected boolean m_safeMode = false;
         protected String m_terminusNonce = null;
         protected int m_missingHostCount = 0;
-        protected UUID m_startupCatalogHash = null;
 
         protected Builder() {
         }
@@ -799,7 +787,6 @@ public class MeshProber implements JoinAcceptor {
             m_safeMode = o.m_safeMode;
             m_terminusNonce = o.m_terminusNonce;
             m_missingHostCount = o.m_missingHostCount;
-            m_startupCatalogHash = o.m_startupCatalogHash;
             return this;
         }
 
@@ -891,11 +878,6 @@ public class MeshProber implements JoinAcceptor {
             return this;
         }
 
-        public Builder startupCatalogHash(UUID startupCatalogHash) {
-            m_startupCatalogHash = startupCatalogHash;
-            return this;
-        }
-
         public MeshProber build() {
             if (m_hostCountSupplier == null && m_coordinators != null) {
                 m_hostCountSupplier = Suppliers.ofInstance(m_coordinators.size());
@@ -914,8 +896,7 @@ public class MeshProber implements JoinAcceptor {
                     m_addAllowed,
                     m_safeMode,
                     m_terminusNonce,
-                    m_missingHostCount,
-                    m_startupCatalogHash
+                    m_missingHostCount
                     );
         }
     }

@@ -1358,11 +1358,29 @@ public class VoltDB {
     public static String crashMessage;
 
     public static boolean exitAfterMessage = false;
+
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
+        crashGlobalVoltDB(errMsg, stackTrace, t, true);
+    }
+
+    /**
+     * Exit the process with an error message, but do not leave any crash files or stack traces.
+     * Also notify all connected peers that the node is going down.
+     * Intended usage: when the cluster would be inconsistent due to a well understood user error.
+     */
+    public static void crashGlobalVoltDBNoArtifacts(String errMsg) {
+        crashGlobalVoltDB(errMsg, false, null, false);
+    }
+
+    /**
+     * Exit the process with an error message, optionally with a stack trace.
+     * Also notify all connected peers that the node is going down.
+     */
+    public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t, boolean allowArtifacts) {
         // for test code
         wasCrashCalled = true;
         crashMessage = errMsg;
@@ -1391,7 +1409,7 @@ public class VoltDB {
         // finally block does its best to ensure death, no matter what context this
         // is called in
         finally {
-            crashLocalVoltDB(errMsg, stackTrace, t);
+            crashLocalVoltDB(errMsg, stackTrace, t, allowArtifacts);
         }
     }
 

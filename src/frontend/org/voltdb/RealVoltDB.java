@@ -215,7 +215,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
-    private VoltDB.Configuration m_config = new VoltDB.Configuration();
+    VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
@@ -982,7 +982,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_clusterSettings.set(clusterSettings, 1);
 
-            MeshProber.Determination determination = buildClusterMesh(readDepl, m_pathToStartupCatalog);
+            MeshProber.Determination determination = buildClusterMesh(readDepl);
             if (m_config.m_startAction == StartAction.PROBE) {
                 String action = "Starting a new database cluster";
                 if (determination.startAction.doesRejoin()) {
@@ -2755,7 +2755,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * rejoining, it will return when the node and agreement
      * site are synched to the existing cluster.
      */
-    MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl, String startupCatalogPath) {
+    MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
                 || pathsWithRecoverableArtifacts(readDepl.deployment).isEmpty();
         setBare(bareAtStartup);
@@ -2766,15 +2766,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return m_clusterSettings.get().hostcount();
             }
         };
-
-        UUID startupCatalogHash = null;
-        if (m_pathToStartupCatalog != null) {
-            try {
-                startupCatalogHash = new InMemoryJarfile(m_pathToStartupCatalog).getMD5Checksum();
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Failed to load initialized schema: " + e.getMessage(), false, e);
-            }
-        }
 
         ClusterType clusterType = readDepl.deployment.getCluster();
 
@@ -2793,7 +2784,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .safeMode(m_config.m_safeMode)
                 .terminusNonce(getTerminusNonce())
                 .missingHostCount(m_config.m_missingHostCount)
-                .startupCatalogHash(startupCatalogHash)
                 .build();
 
         HostAndPort hostAndPort = criteria.getLeader();

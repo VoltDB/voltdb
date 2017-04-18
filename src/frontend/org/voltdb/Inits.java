@@ -280,6 +280,23 @@ public class Inits {
         return Arrays.copyOf(buffer, totalBytes);
     }
 
+    // NOTE: This MUST be deterministic. Separate nodes may verify that the SHA-1 hashes of empty catalog files match.
+    private void createEmptyStartupJarFileIfNeeded(){
+        if (m_rvdb.m_pathToStartupCatalog == null) {
+            try {
+                File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile(
+                    DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
+                if (emptyJarFile == null) {
+                    VoltDB.crashLocalVoltDB("Failed to generate empty catalog.");
+                }
+                m_rvdb.m_pathToStartupCatalog = emptyJarFile.getAbsolutePath();
+            }
+            catch (IOException e) {
+                VoltDB.crashLocalVoltDB("I/O exception while creating empty catalog jar file.", false, e);
+            }
+        }
+    }
+
     class DistributeCatalog extends InitWork {
         DistributeCatalog() {
             dependsOn(CreateRestoreAgentAndPlan.class);
@@ -292,19 +309,7 @@ public class Inits {
 
                 try {
                     // If no catalog was supplied provide an empty one.
-                    if (m_rvdb.m_pathToStartupCatalog == null) {
-                        try {
-                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile(
-                                DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
-                            if (emptyJarFile == null) {
-                                VoltDB.crashLocalVoltDB("Failed to generate empty catalog.");
-                            }
-                            m_rvdb.m_pathToStartupCatalog = emptyJarFile.getAbsolutePath();
-                        }
-                        catch (IOException e) {
-                            VoltDB.crashLocalVoltDB("I/O exception while creating empty catalog jar file.", false, e);
-                        }
-                    }
+                    createEmptyStartupJarFileIfNeeded();
 
                     // Get the catalog bytes and byte count.
                     byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
@@ -363,6 +368,22 @@ public class Inits {
                     VoltDB.crashLocalVoltDB("System was interrupted while waiting for a catalog.", false, null);
                 }
             } while (catalogStuff == null || catalogStuff.catalogBytes.length == 0);
+
+            assert( m_rvdb.m_config.m_startAction != StartAction.PROBE );
+            if (m_rvdb.m_config.m_startAction == StartAction.CREATE){
+                // We may have received a staged catalog from the leader.
+                // Check if it matches ours.
+                createEmptyStartupJarFileIfNeeded();
+                InMemoryJarfile thisNodeCatalog = null;
+                try {
+                    thisNodeCatalog = new InMemoryJarfile(m_rvdb.m_pathToStartupCatalog);
+                } catch (IOException e){
+                    VoltDB.crashLocalVoltDB("Failed to load initialized schema: " + e.getMessage(), false, e);
+                }
+                if (!Arrays.equals(catalogStuff.getCatalogHash(), thisNodeCatalog.getSha1Hash())) {
+                    VoltDB.crashGlobalVoltDBNoArtifacts("Nodes have been initialized with different schemas. All nodes must initialize with identical schemas.");
+                }
+            }
 
             String serializedCatalog = null;
             byte[] catalogJarBytes = null;

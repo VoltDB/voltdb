@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
@@ -235,12 +234,13 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         return crc.getValue();
     }
 
-    private byte[] getChecksum(String checksumType) {
+    public byte[] getSha1Hash() {
+
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance(checksumType);
+            md = MessageDigest.getInstance("SHA-1");
         } catch (NoSuchAlgorithmException e) {
-            VoltDB.crashLocalVoltDB("JVM has no " + checksumType + " hash.", true, e);
+            VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
         }
 
         for (Entry<String, byte[]> e : super.entrySet()) {
@@ -264,15 +264,8 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
                 md.update(e.getValue());
             }
         }
+
         return md.digest();
-    }
-
-    public byte[] getSha1Hash() {
-        return getChecksum("SHA-1");
-    }
-
-    public UUID getMD5Checksum() {
-        return Digester.md5AsUUID(getChecksum("MD5"));
     }
 
     public byte[] put(String key, File value) throws IOException {
