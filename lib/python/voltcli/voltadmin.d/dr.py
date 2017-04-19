@@ -29,7 +29,7 @@ def reset_remote(runner):
     description = 'DR control command.',
     options = (
             VOLT.BooleanOption('-f', '--force', 'forcing', 'bypass precheck', default = False),
-            VOLT.IntegerOption('-c', '--cluster', 'clusterId', 'dr cluster Id', default = -1),
+            VOLT.IntegerOption('-c', '--cluster', 'clusterId', 'cluster ID', default = -1),
             VOLT.BooleanOption('-a', '--all', 'resetAll', 'reset all connected cluster(s)', default = False),
     ),
     modifiers = (
@@ -43,5 +43,5 @@ def dr(runner):
     if runner.opts.clusterId >= 0 and runner.opts.resetAll:
         runner.abort_with_help('You cannot specify both --cluster and --all options.')
     if runner.opts.clusterId < -1 or runner.opts.clusterId > 127:
-        runner.abort_with_help('The dr cluster id must be in the range of 0 to 127.')
+        runner.abort_with_help('The cluster ID must be in the range of 0 to 127.')
     runner.go()
