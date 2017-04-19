@@ -21,7 +21,8 @@ def reset_remote(runner):
     if status == 0:
         runner.info(message)
     else:
-        runner.error(message)
+        runner.abort(message)
+
 
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
