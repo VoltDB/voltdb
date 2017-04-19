@@ -105,7 +105,6 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
@@ -2133,17 +2132,37 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public void balanceSPI(int hostId) {
 
         Pair<Integer, Integer> target = m_cartographer.getPartitionForMigration();
-        if (target == null || !CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
+        if (target == null) {
+            return;
+        }
+
+        int partitionId = target.getFirst();
+        int targetHostId = target.getSecond();
+        int partitionKey = -1;
+
+        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+        ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
+        partitionKeys.flattenToBuffer(buf);
+        buf.flip();
+        VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+        keyCopy.resetRowPosition();
+        while (keyCopy.advanceRow()) {
+            if (partitionId == keyCopy.getLong("PARTITION_ID")) {
+                partitionKey = (int)(keyCopy.getLong("PARTITION_KEY"));
+                break;
+            }
+        }
+
+        if (partitionKey == -1) {
+            hostLog.warn("Could not find the partition key for partition " + partitionId);
+            return;
+        }
+
+        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
             return;
         }
 
         try {
-            VoltTable vt = TheHashinator.getPartitionKeys(VoltType.INTEGER);
-            Map<Integer, Integer> pIDKeyMap = Maps.newHashMap();
-            while (vt.advanceRow()) {
-                pIDKeyMap.put((int)(vt.getLong(0)), ((int)vt.getLong(1)));
-            }
-
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
             final String procedureName = "@BalanceSPI";
             Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
@@ -2151,17 +2170,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             StoredProcedureInvocation spi = new StoredProcedureInvocation();
             spi.setProcName(procedureName);
 
-            int partitionId = target.getFirst();
-            int targetHostId = target.getSecond();
+            hostLog.info(String.format("Migrating the mastership of partition %d to host %d.",
+                    partitionId, targetHostId));
 
-            if (hostLog.isDebugEnabled()) {
-                vt.resetRowPosition();
-                hostLog.debug(vt.toFormattedString());
-                hostLog.debug(String.format("Moving spi. Partition key %d, partition %d, target host %d",
-                        pIDKeyMap.get(partitionId), partitionId,targetHostId));
-            }
-
-            spi.setParams(pIDKeyMap.get(partitionId), partitionId,targetHostId);
+            spi.setParams(partitionKey, partitionId,targetHostId);
             spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
             if (spi.getSerializedParams() == null) {
                 spi = MiscUtils.roundTripForCL(spi);
