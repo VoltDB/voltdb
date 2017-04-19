@@ -1342,7 +1342,7 @@ public class CatalogDiffEngine {
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         newType.writeCreationCommand(m_sb);
-        newType.writeFieldCommands(m_sb);
+        newType.writeFieldCommands(m_sb, null);
         newType.writeChildCommands(m_sb);
 
         // add it to the set of additions to later compute descriptive text
