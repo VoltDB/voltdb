@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb;
+package org.voltdb.regressionsuites;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -32,7 +32,10 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
+import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -47,6 +50,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Digester;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.io.Files;
 
@@ -67,12 +71,31 @@ final public class TestStartWithSchema {
     static final String mismatchSchema =
             "create table TEST (myval bigint not null, PRIMARY KEY(myval));";
 
-    @Test
-    public void testMatch() throws Exception
+    /** Counts how many nodes contain staged catalogs (user-initialized schemas)
+     * @param cluster
+     * @return number of nodes in cluster that have staged catalogs
+     */
+    static int countNodesWithStagedCatalog(LocalCluster cluster) {
+        final String pathWithinSubroot = File.separator + Constants.DBROOT + File.separator + CatalogUtil.STAGED_CATALOG_PATH;
+        int total = 0;
+        for (Map.Entry<String, String> entry : cluster.getHostRoots().entrySet()) {
+            assert( entry.getValue().contains(Constants.DBROOT) == false ) : entry.getValue();
+            File testFile = new VoltFile(entry.getValue() + pathWithinSubroot);
+            if (testFile.canRead() && (testFile.length() > 0)) {
+                total++;
+            }
+        }
+        return total;
+    }
+
+    LocalCluster cluster = null;
+
+    @Before
+    public void setUp() throws Exception
     {
         // Creates a cluster on the local machine using NewCLI, staging the specified schema.
         // Catalog compilation is taken care of by VoltDB itself - no need to do so explicitly.
-        LocalCluster cluster = new LocalCluster(
+        cluster = new LocalCluster(
                 schema,
                 null,
                 siteCount,
@@ -86,7 +109,14 @@ final public class TestStartWithSchema {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.setUseDDLSchema(true);
         cluster.compileDeploymentOnly(builder);
+        new File(builder.getPathToDeployment()).deleteOnExit();
+        // positive tests should succeed; negative tests look for the exception
+        cluster.setExpectedToCrash(false);
+    }
 
+    @Test
+    public void testMatch() throws Exception
+    {
         System.out.println("Start up is expected to succeed");
         boolean clearLocalDataDirectories = true;
         boolean skipInit = false;
@@ -109,12 +139,11 @@ final public class TestStartWithSchema {
         assertEquals(1, response.getResults()[0].getRowCount());
 
         // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
-        int nodesWithStagedCatalog = cluster.countNodesWithFile(CatalogUtil.STAGED_CATALOG_PATH);
+        int nodesWithStagedCatalog = TestStartWithSchema.countNodesWithStagedCatalog(cluster);
         assertEquals(hostCount, nodesWithStagedCatalog);
 
         client.close();
         cluster.shutDown();
-        new File(builder.getPathToDeployment()).delete();
     }
 
     /** Verify that one node having a staged catalog that is different prevents cluster from starting.
@@ -122,21 +151,7 @@ final public class TestStartWithSchema {
     @Test
     public void testMismatch() throws Exception
     {
-        LocalCluster cluster = new LocalCluster(
-                schema,
-                null,
-                siteCount,
-                hostCount,
-                kfactor,
-                clusterID,
-                BackendTarget.NATIVE_EE_JNI,
-                FailureState.ALL_RUNNING, false, false, null);
-        cluster.setHasLocalServer(false);
-        cluster.overrideAnyRequestForValgrind();
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.setUseDDLSchema(true);
-        cluster.compileDeploymentOnly(builder);
-        cluster.setMismatchSchemaForInit(mismatchSchema, 1); // creates mismatch on node 1
+        cluster.setMismatchSchemaForInit(mismatchSchema, 1);
 
         System.out.println("Start up is expected to fail");
         boolean clearLocalDataDirectories = true;
@@ -154,35 +169,18 @@ final public class TestStartWithSchema {
                 throw e;
             }
         }
-
         // cluster should already be shut down
-        new File(builder.getPathToDeployment()).delete();
     }
 
     @Test
     public void testMissing() throws Exception
     {
-        LocalCluster cluster = new LocalCluster(
-                schema,
-                null,
-                siteCount,
-                hostCount,
-                kfactor,
-                clusterID,
-                BackendTarget.NATIVE_EE_JNI,
-                FailureState.ALL_RUNNING, false, false, null);
-        cluster.setHasLocalServer(false);
-        cluster.overrideAnyRequestForValgrind();
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.setUseDDLSchema(true);
-        cluster.compileDeploymentOnly(builder);
         cluster.setMismatchSchemaForInit(null, 2); // leave node 2 bare
 
         System.out.println("Start up is expected to fail");
         boolean clearLocalDataDirectories = true;
         boolean skipInit = false;
         try {
-            cluster.setExpectedToCrash(false); // ensure we get the exception
             cluster.startUp(clearLocalDataDirectories, skipInit);
             fail("Cluster started with a node missing the staged schema");
         } catch (Exception e){
@@ -194,8 +192,6 @@ final public class TestStartWithSchema {
                 throw e;
             }
         }
-
         // cluster should already be shut down
-        new File(builder.getPathToDeployment()).delete();
     }
 }

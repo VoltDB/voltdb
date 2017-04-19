@@ -31,7 +31,6 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -45,18 +44,10 @@ import org.junit.rules.TemporaryFolder;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.regressionsuites.LocalCluster.FailureState;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
@@ -124,7 +115,7 @@ final public class TestInitStartAction {
     /** Verifies that the VoltDB exit 'crash' was a simulated exit with the specified exit code.
      * @param exitCode Expected exit code from VoltDB
      */
-    private void expectSimulatedExit(int exitCode) {
+    private void expectSimulatedExit(int exitCode){
         assertNotNull(serverException.get());
         if (!(serverException.get() instanceof VoltDB.SimulatedExitException)) {
             System.err.println("got an unexpected exception");
@@ -141,7 +132,7 @@ final public class TestInitStartAction {
 
     /** Clears recorded crash (or simulated exit) in preparation for another test.
      */
-    private void clearCrash() {
+    private void clearCrash(){
         VoltDB.wasCrashCalled = false;
         VoltDB.crashMessage = null;
         serverException.set(null);
@@ -343,7 +334,7 @@ final public class TestInitStartAction {
             // second attempt is not valid due to existing artifacts
             new Configuration(
                     new String[]{"initialize", "voltdbroot", rootDH.getPath(), "schema", schemaFile.getPath()});
-        } catch (SimulatedExitException e) {
+        } catch (SimulatedExitException e){
             assertEquals(e.getStatus(), -1);
         }
         assertEquals(true, schemaFile.delete());

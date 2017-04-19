@@ -826,6 +826,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
+            final File stagedCatalogLocation = new VoltFile(RealVoltDB.getStagedCatalogPath(config.m_voltdbRoot.getAbsolutePath()));
+            if (stagedCatalogLocation.isFile()) {
+                switch (config.m_startAction) {
+                case PROBE:
+                    assert (config.m_pathToCatalog == null) : config.m_pathToCatalog;
+                    config.m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
+                    break;
+                case INITIALIZE:
+                    // existence of previous staged catalog will be addressed later
+                    break;
+                default:
+                    hostLog.warn("Initialized schema is present, but is being ignored and may be removed.");
+                    break;
+                }
+            }
+
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
                 try {
@@ -2209,14 +2225,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // this check cannot be part of managedPathsWithFiles(), since "voltdb start" can get translated into "voltdb create" after probing the mesh.
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
-            VoltDB.crashLocalVoltDBNoArtifacts("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
+            String message = "A previous database was initialized with a schema. You must init with --force to overwrite the schema.";
+            hostLog.fatal(message);
+            consoleLog.fatal(message);
+            VoltDB.exit(-1);
         }
         final boolean standalone = true;
         final boolean isXCDR = false;
         final boolean generateReports = false; // this will be overridden if debug mode is enabled
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR, generateReports);
         if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())) {
-            VoltDB.crashLocalVoltDBNoArtifacts("Could not compile specified schema " + config.m_userSchema);
+            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
         }
     }
 

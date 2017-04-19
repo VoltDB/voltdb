@@ -32,10 +32,6 @@ public class ServerThread extends Thread {
     VoltDB.Configuration m_config;
 
     public ServerThread(VoltDB.Configuration config) {
-        this(config, true);
-    }
-
-    public ServerThread(VoltDB.Configuration config, boolean alwaysForceCreate) {
         m_config = config;
         if (m_config.m_pathToLicense == null) {
             m_config.m_pathToLicense = getTestLicensePath();
@@ -56,7 +52,7 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-        m_config.m_forceVoltdbCreate |= alwaysForceCreate;
+        m_config.m_forceVoltdbCreate = true;
         if (config.m_startAction == StartAction.INITIALIZE || config.m_startAction == StartAction.GET) {
             VoltDB.ignoreCrash = true;
         }

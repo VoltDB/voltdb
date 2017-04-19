@@ -708,21 +708,6 @@ public class VoltDB {
                 referToDocAndExit();
             }
 
-            final File stagedCatalogLocation = new VoltFile(RealVoltDB.getStagedCatalogPath(m_voltdbRoot.getAbsolutePath()));
-            if (stagedCatalogLocation.isFile()) {
-                switch (m_startAction) {
-                case PROBE:
-                    assert (m_pathToCatalog == null) : m_pathToCatalog;
-                    m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
-                    break;
-                case INITIALIZE:
-                    // existence of previous staged catalog will be addressed later
-                    break;
-                default:
-                    hostLog.warn("Initialized schema is present, but is being ignored and may be removed.");
-                    break;
-                }
-            }
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes
@@ -1146,7 +1131,7 @@ public class VoltDB {
     }
 
     public static void crashLocalVoltDB(String errMsg) {
-        crashLocalVoltDB(errMsg, false, null, true);
+        crashLocalVoltDB(errMsg, false, null);
     }
 
     /**
@@ -1189,23 +1174,10 @@ public class VoltDB {
             log.warn("failed to issue a crash SNMP trap", t);
         }
     }
-
-    /**
-     * Exit the process with an error message, but no artifacts.
-     * Typical usage: user errors on start-up.
-     */
-    public static void crashLocalVoltDBNoArtifacts(String errMsg) {
-        crashLocalVoltDB(errMsg, false, null, false);
-    }
-
     /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
-        crashLocalVoltDB(errMsg, stackTrace, thrown, true);
-    }
-
-    private static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown, boolean allowArtifacts) {
         if (exitAfterMessage) {
             System.err.println(errMsg);
             VoltDB.exit(-1);
@@ -1252,10 +1224,6 @@ public class VoltDB {
                     VoltTrace.closeAllAndShutdown(new File(instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath(),
                                                   TimeUnit.SECONDS.toMillis(10));
                 } catch (IOException e) {}
-
-                if (!allowArtifacts) {
-                    return; // this will jump to the finally block
-                }
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
@@ -1358,29 +1326,11 @@ public class VoltDB {
     public static String crashMessage;
 
     public static boolean exitAfterMessage = false;
-
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
-        crashGlobalVoltDB(errMsg, stackTrace, t, true);
-    }
-
-    /**
-     * Exit the process with an error message, but do not leave any crash files or stack traces.
-     * Also notify all connected peers that the node is going down.
-     * Intended usage: when the cluster would be inconsistent due to a well understood user error.
-     */
-    public static void crashGlobalVoltDBNoArtifacts(String errMsg) {
-        crashGlobalVoltDB(errMsg, false, null, false);
-    }
-
-    /**
-     * Exit the process with an error message, optionally with a stack trace.
-     * Also notify all connected peers that the node is going down.
-     */
-    public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t, boolean allowArtifacts) {
         // for test code
         wasCrashCalled = true;
         crashMessage = errMsg;
@@ -1409,7 +1359,7 @@ public class VoltDB {
         // finally block does its best to ensure death, no matter what context this
         // is called in
         finally {
-            crashLocalVoltDB(errMsg, stackTrace, t, allowArtifacts);
+            crashLocalVoltDB(errMsg, stackTrace, t);
         }
     }
 

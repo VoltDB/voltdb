@@ -675,22 +675,22 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.pathToDeployment(null);
             cmdln.voltdbRoot(root + File.separator + Constants.DBROOT);
         }
-
-        final boolean alwaysForceCreate = clearLocalDataDirectories || !m_usesStagedSchema; // for backwards compatibility
+        m_localServer = new ServerThread(cmdln);
         if (m_usesStagedSchema) {
-            // we really, REALLY don't want to cleanse everything all the time
+            // ServerThread sets this to true, always - override with our desired behavior.
+            // Only do this for staged schema tests - preserve old behavior for others.
             cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
         }
-        m_localServer = new ServerThread(cmdln, alwaysForceCreate);
         m_localServer.start();
     }
 
     /** Gets the voltdbroot directory for the specified host.
-     * Formerly "getServerSpecificRoot"; name changed since behavior is inconsistent with {@link VoltFile#getServerSpecificRoot(String, boolean)}.
+     * WARNING: behavior is inconsistent with {@link VoltFile#getServerSpecificRoot(String, boolean)},
+     * which returns the parent directory of voltdbroot.
      */
-    public String getServerSpecificVoltDBRoot(String hostId) {
+    public String getServerSpecificRoot(String hostId) {
         if (!m_hostRoots.containsKey(hostId)) {
-            throw new IllegalArgumentException("getServerSpecificRootDirectory possibly called before cluster has started.");
+            throw new IllegalArgumentException("getServerSpecificRoot possibly called before cluster has started.");
         }
         assert( new File(m_hostRoots.get(hostId)).getName().equals(Constants.DBROOT) == false ) : m_hostRoots.get(hostId);
         return m_hostRoots.get(hostId) + File.separator + Constants.DBROOT;
@@ -1054,7 +1054,7 @@ public class LocalCluster extends VoltServerConfig {
         }
     }
 
-    public void startOne(int hostId, boolean clearLocalDataDirectories,
+    void startOne(int hostId, boolean clearLocalDataDirectories,
             StartAction startAction, boolean waitForReady, String placementGroup) throws IOException
     {
         PipeToFile ptf = null;
@@ -2165,36 +2165,5 @@ public class LocalCluster extends VoltServerConfig {
 
     public void setDeplayBetweenNodeStartup(long deplayBetweenNodeStartup) {
         m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
-    }
-
-    /** Obtains location of a file in a node's voltdbroot.
-     * @param relativePathFromVoltDBRoot
-     * @return absolute file path
-     */
-    public String getFileFromVoltDbRoot(String nodeID, String relativePathFromVoltDBRoot) {
-        String rootpath = m_hostRoots.get(nodeID);
-        if (rootpath == null) {
-            return null;
-        }
-        assert( rootpath.contains(Constants.DBROOT) == false ) : rootpath;
-        File testFile = new VoltFile(rootpath + File.separator + Constants.DBROOT + File.separator + relativePathFromVoltDBRoot);
-        return testFile.getAbsolutePath();
-    }
-
-    /** Counts how many nodes contain a given file in their voltDbRoots
-     * @param relativePathFromVoltDBRoot
-     * @return number of nodes who have that file
-     */
-    public int countNodesWithFile(String relativePathFromVoltDBRoot) {
-        final String pathWithinSubroot = File.separator + Constants.DBROOT + File.separator + relativePathFromVoltDBRoot;
-        int total = 0;
-        for (Map.Entry<String, String> entry : m_hostRoots.entrySet()) {
-            assert( entry.getValue().contains(Constants.DBROOT) == false ) : entry.getValue();
-            File testFile = new VoltFile(entry.getValue() + pathWithinSubroot);
-            if (testFile.canRead() && (testFile.length() > 0)) {
-                total++;
-            }
-        }
-        return total;
     }
 }

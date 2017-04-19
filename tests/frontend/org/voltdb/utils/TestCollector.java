@@ -105,7 +105,7 @@ public class TestCollector extends JUnit4LocalClusterTest {
         cluster.startUp(true);
         //Get server specific root after startup.
         if (cluster.isNewCli()) {
-            voltDbRoot = new File(cluster.getServerSpecificVoltDBRoot("0"));
+            voltDbRoot = new File(cluster.getServerSpecificRoot("0"));
         } else {
             String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
             voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
