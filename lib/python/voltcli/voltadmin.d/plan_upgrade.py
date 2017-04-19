@@ -110,15 +110,19 @@ def basicCheck(runner):
     for tuple in response.table(0).tuples():
         hostId = tuple[0]
         result = tuple[1]
+        warnings = tuple[2]
         if result != 'Success':
             error = True
             host = hosts.hosts_by_id[hostId]
             if host is None:
                 runner.abort('@CheckUpgradePlanNT returns a host id ' + hostId + " that doesn't belong to the cluster.")
             runner.error('Check failed on host ' + getHostnameOrIp(host) + " with the cause: " + result)
+        if warnings is not None:
+            runner.warning('host ' + getHostnameOrIp(host) + ': ' + warnings)
 
     if error:
         runner.abort("Failed to pass pre-upgrade check. Abort. ")
+
     print '[1/4] Passed new VoltDB kit version check.'
     print '[2/4] Passed new VoltDB root path existence check.'
 
@@ -447,8 +451,8 @@ def createDeploymentForOriginalCluster(runner, xmlString, drSource, origin_clust
 
     dr = et.getroot().find('./dr')
     if dr is None:
-        runner.abort("This cluster doesn't have a DR tag in its deployment file, hence we can't generate online upgrade plan for it. \
-                    Please note add DR tag to your deployment file requires to shutdown and restart the database.")
+        runner.abort("This cluster doesn't have a DR tag in its deployment file, hence we can't generate online upgrade plan for it. " +
+                     "Adding DR tag to your deployment file requires to shutdown and restart the database.")
 
     if 'id' not in dr.attrib:
         clusterId = 0;  # by default clusterId is 0
