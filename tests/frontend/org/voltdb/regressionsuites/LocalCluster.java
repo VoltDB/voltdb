@@ -185,6 +185,12 @@ public class LocalCluster extends VoltServerConfig {
     private boolean m_usesStagedSchema;
 
     private int m_httpOverridePort = -1;
+
+    /** Schema to use on the mismatched node, or null to initialize a bare node. */
+    private String m_mismatchSchema = null;
+    /** Node to initialize with a different schema, or null to use the same schema on all nodes. */
+    private Integer m_mismatchNode = null;
+
     public void setHttpOverridePort(int port) {
         m_httpOverridePort = port;
     }
@@ -440,6 +446,20 @@ public class LocalCluster extends VoltServerConfig {
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
     }
 
+    /** Directs this LocalCluster to initialize one of its nodes with a different schema.
+     * Only use this with NewCLI clusters that have an initialized schema.
+     *
+     * @pre the node specified is not running
+     * @param mismatchSchema schema to put on one node, or null if node should be empty
+     * @param nodeID node to put the mismatch, or null to re-enable matched schemas
+     */
+    public void setMismatchSchemaForInit( String mismatchSchema, Integer nodeID ){
+        assert isNewCli();
+        assert m_usesStagedSchema;
+        m_mismatchSchema = mismatchSchema;
+        m_mismatchNode = nodeID;
+    }
+
     public CommandLine getTemplateCommandLine() {
         return templateCmdLine;
     }
@@ -686,7 +706,10 @@ public class LocalCluster extends VoltServerConfig {
                 cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
             }
         }
-
+        if (new Integer(hostId).equals(m_mismatchNode)) {
+            assert m_usesStagedSchema;
+            cmdln.m_userSchema = m_mismatchSchema == null ? null : VoltProjectBuilder.createFileForSchema(m_mismatchSchema);
+        }
         cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
 
         //If we are initializing lets wait for it to finish.
@@ -959,6 +982,10 @@ public class LocalCluster extends VoltServerConfig {
                 cmdln.setForceVoltdbCreate(true);
             } else {
                 cmdln.setForceVoltdbCreate(false);
+            }
+            if (new Integer(hostId).equals(m_mismatchNode)) {
+                assert m_usesStagedSchema;
+                cmdln.m_userSchema = m_mismatchSchema == null ? null : VoltProjectBuilder.createFileForSchema(m_mismatchSchema);
             }
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();

@@ -396,6 +396,6 @@ final public class TestInitStartAction {
         assertEquals(true, schemaFile.delete());
     }
 
-    /* For 'voltdb start' test coverage see TestStartWithSchema (in Pro) and TestHostMessenger.
+    /* For 'voltdb start' test coverage see TestStartWithSchema and (in Pro) TestStartWithSchemaAndDurability.
      */
 }
