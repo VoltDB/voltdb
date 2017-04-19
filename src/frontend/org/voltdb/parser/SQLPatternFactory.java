@@ -151,6 +151,11 @@ public class SQLPatternFactory
             return new SQLPatternPartElement(str);
         }
 
+        public static SQLPatternPart dot()
+        {
+            return new SQLPatternPartElement("\\.");
+        }
+
         public static SQLPatternPart tokenAlternatives(String... strs)
         {
             return oneOf(strs);
@@ -182,14 +187,9 @@ public class SQLPatternFactory
             return new SQLPatternPartElement("[\\w$]+");
         }
 
-        public static SQLPatternPart classDotMethod()
+        public static SQLPatternPart classPath()
         {
-            /* (?:\w+\.)+[\w$]+
-             * This pattern matches the string <class-name>.<method-name>
-             * (?:\w+\.)+ matches the class name with the package path, ended with a dot.
-             * [\w$]+ matches the method name.
-             */
-            return new SQLPatternPartElement("(?:\\w+\\.)+[\\w$]+");
+            return new SQLPatternPartElement("(?:\\w+\\.)*\\w+");
         }
 
         public static SQLPatternPart languageName()

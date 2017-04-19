@@ -183,8 +183,25 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern PAT_CREATE_FUNCTION_FROM_METHOD =
         SPF.statement(
             SPF.token("create"), SPF.token("function"), SPF.capture(SPF.functionName()),
-            SPF.token("from"), SPF.token("method"), SPF.capture(SPF.classDotMethod())
+            SPF.token("from"), SPF.token("method"),
+            SPF.capture(SPF.classPath()), SPF.dot().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+            SPF.capture(SPF.functionName().withFlags(ADD_LEADING_SPACE_TO_CHILD))
         ).compile("PAT_CREATE_FUNCTION_FROM_METHOD");
+
+    /*
+     * DROP FUNCTION <NAME>
+     *
+     * Drop a user-defined function.
+     *
+     * Capture groups:
+     *  (1) Function name
+     *  (2) if exists
+     */
+    private static final Pattern PAT_DROP_FUNCTION =
+        SPF.statement(
+            SPF.token("drop"), SPF.token("function"), SPF.capture(SPF.functionName()),
+            SPF.optional(SPF.capture(SPF.clause(SPF.token("if"), SPF.token("exists"))))
+        ).compile("PAT_DROP_FUNCTION");
 
     /*
      * CREATE PROCEDURE <NAME> [ <MODIFIER_CLAUSE> ... ] AS ### <PROCEDURE_CODE> ### LANGUAGE <LANGUAGE_NAME>
@@ -304,8 +321,9 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern PAT_DROP_STREAM =
             SPF.statementLeader(
                     SPF.token("drop"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
-                    SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exisit")))
+                    SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exists")))
                     ).compile("PAT_DROP_STREAM");
+
     /**
      * NB supports only unquoted table names
      * Captures 1 group, the table name.
@@ -740,6 +758,16 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchCreateFunctionFromMethod(String statement)
     {
         return PAT_CREATE_FUNCTION_FROM_METHOD.matcher(statement);
+    }
+
+    /**
+     * Match statement against the pattern for drop function
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchDropFunction(String statement)
+    {
+        return PAT_DROP_FUNCTION.matcher(statement);
     }
 
     /**

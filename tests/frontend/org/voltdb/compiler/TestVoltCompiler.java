@@ -2278,7 +2278,6 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE FUNCTION func FROM METHOD .method",
                 "CREATE FUNCTION func FROM METHOD package..class.method",
                 "CREATE FUNCTION func FROM METHOD package.class.method."
-                // Test more later.
         };
         String expectedError = "Invalid CREATE FUNCTION statement: \"%s\", "
                 + "expected syntax: \"CREATE FUNCTION <name> FROM METHOD <class-name>.<method-name>\"";
@@ -2286,6 +2285,20 @@ public class TestVoltCompiler extends TestCase {
         for (String ddl : ddls) {
             fbs = checkInvalidDDL(ddl + ";");
             assertTrue(isFeedbackPresent(String.format(expectedError, ddl), fbs));
+        }
+
+        String[][] ddlsAndInvalidIdentifiers = new String[][] {
+                // Test identifiers
+                {"CREATE FUNCTION 1nvalid FROM METHOD package.class.method", "1nvalid"},
+                {"CREATE FUNCTION func FROM METHOD 1nvalid.class.method", "1nvalid.class"},
+                {"CREATE FUNCTION func FROM METHOD package.1nvalid.method", "package.1nvalid"},
+                {"CREATE FUNCTION func FROM METHOD package.class.1nvalid", "1nvalid"}
+        };
+        expectedError = "Unknown indentifier in DDL: \"%s\" contains invalid identifier \"%s\"";
+        for (String[] ddlAndInvalidIdentifier : ddlsAndInvalidIdentifiers) {
+            fbs = checkInvalidDDL(ddlAndInvalidIdentifier[0] + ";");
+            assertTrue(isFeedbackPresent(
+                    String.format(expectedError, ddlAndInvalidIdentifier[0], ddlAndInvalidIdentifier[1]), fbs));
         }
     }
 

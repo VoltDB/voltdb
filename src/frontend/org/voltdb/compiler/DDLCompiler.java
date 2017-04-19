@@ -54,6 +54,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
+import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
@@ -615,7 +616,38 @@ public class DDLCompiler {
         // Matches if it is CREATE FUNCTION <name> FROM METHOD <class-name>.<method-name>
         statementMatcher = SQLParser.matchCreateFunctionFromMethod(statement);
         if (statementMatcher.matches()) {
-            return UDFUtils.processCreateFunctionStatement(statementMatcher, db, m_compiler);
+            String functionName = checkIdentifierStart(statementMatcher.group(1), statement);
+            String className = checkIdentifierStart(statementMatcher.group(2), statement);
+            String methodName = checkIdentifierStart(statementMatcher.group(3), statement);
+            CatalogMap<Function> functions = db.getFunctions();
+            if (functions.get(functionName) != null) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Function name \"%s\" in CREATE FUNCTION statement already exists.",
+                        functionName));
+            }
+            Function func = functions.add(functionName);
+            func.setFunctionname(functionName);
+            func.setClassname(className);
+            func.setMethodname(methodName);
+            return true;
+        }
+
+        // Matches if it is DROP FUNCTION <name>
+        statementMatcher = SQLParser.matchDropFunction(statement);
+        if (statementMatcher.matches()) {
+            String functionName = checkIdentifierStart(statementMatcher.group(1), statement);
+            boolean ifExists = statementMatcher.group(2) != null;
+            CatalogMap<Function> functions = db.getFunctions();
+            if (functions.get(functionName) == null) {
+                if (! ifExists) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Function name \"%s\" in DROP FUNCTION statement does not exist.",
+                            functionName));
+                }
+                return true;
+            }
+            functions.delete(functionName);
+            return true;
         }
 
         // Matches if it is DROP PROCEDURE <proc-name or classname>
