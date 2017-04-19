@@ -178,7 +178,8 @@ public class SQLParser extends SQLPatternFactory
      *
      * Capture groups:
      *  (1) Function name
-     *  (2) The class and method name for the function implementation.
+     *  (2) The class name
+     *  (3) The method name
      */
     private static final Pattern PAT_CREATE_FUNCTION_FROM_METHOD =
         SPF.statement(
@@ -195,7 +196,7 @@ public class SQLParser extends SQLPatternFactory
      *
      * Capture groups:
      *  (1) Function name
-     *  (2) if exists
+     *  (2) If exists
      */
     private static final Pattern PAT_DROP_FUNCTION =
         SPF.statement(
