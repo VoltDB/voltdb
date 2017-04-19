@@ -417,6 +417,13 @@ def generatedEETestFiles(output_prefix, buildType, testClasses, doGenerateFiles)
         tcArgs += ["--test-class", tc.strip()]
     p = Popen(tcArgs, stdout=PIPE)
     p.wait()
+    #
+    # Sometimes, in a pro build, the command above
+    # makes the folder obj/${BUILD}/testoutput.  We
+    # don't really want this here, and it causes the
+    # Jenkins jobs to fail.  So we just delete it here.
+    #
+    os.system("rm -rf %s/obj/%s/testoutput" % (rootdir, buildType))
     if p.returncode != 0:
         print("Fatal Error: %s" % p.communicate()[0])
         sys.exit(p.returncode)
@@ -424,7 +431,6 @@ def generatedEETestFiles(output_prefix, buildType, testClasses, doGenerateFiles)
     print('processStdOut: %s' % processStdOut)
     names = processStdOut.split()
     names = list(names)
-    print('names: %s' % list(names))
     all_gen_tests = list((name.split("/") for name in names))
     return all_gen_tests
 
