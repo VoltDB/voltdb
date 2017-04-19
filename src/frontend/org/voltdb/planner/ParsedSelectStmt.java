@@ -59,8 +59,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public ArrayList<ParsedColInfo> m_displayColumns = new ArrayList<>();
     private ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<>();
     private AbstractExpression m_having = null;
-    public ArrayList<ParsedColInfo> m_groupByColumns = new ArrayList<>();
-    public ArrayList<ParsedColInfo> m_distinctGroupByColumns = null;
+    private List<ParsedColInfo> m_groupByColumns = new ArrayList<>();
+    private ArrayList<ParsedColInfo> m_distinctGroupByColumns = null;
     private boolean m_groupAndOrderByPermutationWasTested = false;
     private boolean m_groupAndOrderByPermutationResult = false;
 
@@ -79,7 +79,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private ArrayList<ParsedColInfo> m_avgPushdownDisplayColumns = null;
     private ArrayList<ParsedColInfo> m_avgPushdownAggResultColumns = null;
-    private ArrayList<ParsedColInfo> m_avgPushdownGroupByColumns = null;
+    private List<ParsedColInfo> m_avgPushdownGroupByColumns = null;
     private ArrayList<ParsedColInfo> m_avgPushdownDistinctGroupByColumns = null;
     private ArrayList<ParsedColInfo> m_avgPushdownOrderColumns = null;
     private AbstractExpression m_avgPushdownHaving = null;
@@ -288,7 +288,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_displayColumns = new ArrayList<>();
         ArrayList<ParsedColInfo> tmpAggResultColumns = m_aggResultColumns;
         m_aggResultColumns = new ArrayList<>();
-        ArrayList<ParsedColInfo> tmpGroupByColumns = m_groupByColumns;
+        List<ParsedColInfo> tmpGroupByColumns = m_groupByColumns;
         m_groupByColumns = new ArrayList<>();
         ArrayList<ParsedColInfo> tmpDistinctGroupByColumns = m_distinctGroupByColumns;
         m_distinctGroupByColumns = new ArrayList<>();
@@ -1444,12 +1444,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     /**
      * Simplify the EXISTS expression:
+     *  0. LIMIT 0 => FALSE
      *  1. EXISTS ( table-agg-without-having-groupby) => TRUE
-     *  2. Replace the display columns with a single dummy column "1"
-     *     and GROUP BY expressions
+     *  2. Remove any ORDER BY columns
      *  3. Drop DISTINCT expression
      *  4. Add LIMIT 1
-     *  5. Remove ORDER BY expressions if HAVING expression is not present
      *
      * @param selectStmt
      * @return existsExpr
@@ -1463,6 +1462,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_limitOffset.getLimit() == 0) {
             return ConstantValueExpression.getFalse();
         }
+
         // Except for "limit 0 offset ?" which is already covered,
         // can't optimize away the entire expression if there are
         // limit and/or offset parameters
@@ -1481,49 +1481,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Remove ORDER BY columns
         m_orderColumns.clear();
 
-        // Can drop GROUP BY expressions if there are no
-        // HAVING/OFFSET expressions
-        if (m_having == null && !hasOffset()) {
-            m_groupByColumns.clear();
-            m_groupByExpressions.clear();
-        }
-
-        // Remove all non-aggregate display columns if GROUP BY is empty
-        if (m_groupByColumns.isEmpty()) {
-            Iterator<ParsedColInfo >iter = m_displayColumns.iterator();
-            while (iter.hasNext()) {
-                ParsedColInfo col = iter.next();
-                if (!col.expression.hasAnySubexpressionOfClass(
-                        AggregateExpression.class)) {
-                    iter.remove();
-                }
-            }
-        }
-
-        // If m_displayColumns is empty from the previous step
-        // add a single dummy column
-        if (m_displayColumns.isEmpty()) {
-            ParsedColInfo col = new ParsedColInfo();
-            col.expression =
-                    ConstantValueExpression.makeExpression(VoltType.NUMERIC, "1");
-            ExpressionUtil.finalizeValueTypes(col.expression);
-
-            col.tableName = TEMP_TABLE_NAME;
-            col.tableAlias = TEMP_TABLE_NAME;
-            col.columnName = "$$_EXISTS_$$";
-            col.alias = "$$_EXISTS_$$";
-            col.index = 0;
-            m_projectSchema = null;
-            m_displayColumns.add(col);
-        }
-
-        if (m_aggResultColumns.isEmpty()) {
-            m_hasAggregateExpression = false;
-            m_hasAverage = false;
-        }
-
+        // Redo TVE placement since we've cleared the ORDER BY columns.
         placeTVEsinColumns();
-        needComplexAggregation();
 
         // Drop DISTINCT expression
         m_distinct = false;
@@ -1955,6 +1914,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public List<ParsedColInfo> groupByColumns() {
         return Collections.unmodifiableList(m_groupByColumns);
+    }
+
+    public List<ParsedColInfo> distinctGroupByColumns() {
+        return Collections.unmodifiableList(m_distinctGroupByColumns);
     }
 
     @Override
