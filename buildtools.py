@@ -391,20 +391,42 @@ def buildThirdPartyTools(CTX, makefile):
 
     return None
 
-def generatedEETestFiles(generated_dir, buildType, testClasses):
-    if not os.path.isdir(generated_dir):
-        os.makedirs(generated_dir + "/src")
+def findRootDir():
+    wd = os.getcwd()
+    while wd != "/" and not os.path.exists(os.path.join(wd, "version.txt")):
+        wd = os.path.realpath(os.path.join(wd, ".."))
+    if wd != "/":
+        return wd
+    return None
+
+def generatedEETestFiles(output_prefix, buildType, testClasses, doGenerateFiles):
+    rootdir = findRootDir()
+    if not rootdir:
+        print("Can't find root directory.")
+        sys.exit(100)
     tcArgs = ["tools/generate-ee-unit-tests.sh",
                "--build",
                buildType,
-               "--names-only"]
+               "--voltdbroot",
+               rootdir,
+               "--objdir",
+               os.path.join(rootdir, output_prefix)]
+    if not doGenerateFiles:
+        tcArgs += ["--names-only"]
     for tc in testClasses:
         tcArgs += ["--test-class", tc.strip()]
     p = Popen(tcArgs, stdout=PIPE)
+    p.wait()
+    if p.returncode != 0:
+        print("Fatal Error: %s" % p.communicate()[0])
+        sys.exit(p.returncode)
     processStdOut = p.communicate()[0]
+    print('processStdOut: %s' % processStdOut)
     names = processStdOut.split()
-    answer = (name.split("/") for name in names)
-    return answer
+    names = list(names)
+    print('names: %s' % list(names))
+    all_gen_tests = list((name.split("/") for name in names))
+    return all_gen_tests
 
 def buildMakefile(CTX):
     global version
@@ -453,9 +475,10 @@ def buildMakefile(CTX):
         test_names = CTX.TESTS[dir].split()
         tests += [os.path.join(TEST_PREFIX, dir, test) for test in test_names]
     # All generated tests.
-    all_gen_tests = generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated'),
+    all_gen_tests = generatedEETestFiles(OUTPUT_PREFIX,
                                          CTX.LEVEL.lower(),
-                                         CTX.GENERATOR_CLASSES)
+                                         CTX.GENERATOR_CLASSES,
+                                         True)
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
     makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
@@ -809,9 +832,8 @@ def runTests(CTX):
                        dirname,
                        testname) for testname in test_names]
     if TEST_GENERATED:
-        for dirname, testname in generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated'),
-                                                      CTX.LEVEL.lower(),
-                                                      CTX.GENERATOR_CLASSES):
+        for dirname, testname in generatedEETestFiles(OUTPUT_PREFIX, CTX.LEVEL.lower(),
+                                                      CTX.GENERATOR_CLASSES, False):
             tests += [(os.path.join(OUTPUT_PREFIX, 'generated', 'bin'),
                        dirname,
                        testname)]

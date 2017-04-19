@@ -823,8 +823,8 @@ public class EEPlanGenerator extends PlannerTestCase {
      * @throws Exception
      */
     protected void generateTests(String testFolder, String testClassName, DBConfig db) throws Exception {
+        System.out.printf("%s/%s\n", testFolder, testClassName);
         if (m_namesOnly) {
-            System.out.printf("%s/%s\n", testFolder, testClassName);
             return;
         }
         Map<String, String> params = new HashMap<>();
@@ -909,7 +909,7 @@ public class EEPlanGenerator extends PlannerTestCase {
             String value   = params.get(entry.getKey());
             template = template.replace(pattern, value);
         }
-        File outputDir = new File(String.format("%s/%s", testFolder, m_sourceDir));
+        File outputDir = new File(String.format("%s/%s", m_sourceDir, testFolder));
         if (! outputDir.exists() && !outputDir.mkdirs()) {
             throw new IOException("Cannot make test source folder \"" + outputDir + "\"");
         }

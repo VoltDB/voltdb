@@ -552,7 +552,6 @@ if whichtests in ("${eetestsuite}", "plannodes"):
      PlanNodeUtilTest
      WindowFunctionPlanNodeTest
     """
-
 #
 # This is set to a list of class names.  Each of
 # these will be run to (1) find out the names of

@@ -11,7 +11,6 @@
 
 BUILD=debug
 VERBOSE=
-GENERATED_DIR="generated"
 ECHO=+x
 while [ -n "$1" ]; do
     case "$1" in
@@ -48,11 +47,17 @@ while [ -n "$1" ]; do
         --voltdbroot)
             shift
             VOLTDBROOT="$1"
+            shift
             if [ ! -d "$VOLTDBROOT" ] ; then
                 echo "$0: Source directory \"$VOLTDBROOT\" does not exist."
                 exit 100
             fi
-            shift
+            if [ ! -d "$VOLTDBROOT/lib" ] \
+                || [ ! -d "$VOLTDBROOT/third_party/java/jars" ] \
+                || [ ! -f "$VOLTDBROOT/tests/log4j-allconsole.xml" ] ; then
+                  echo "$0: Source directory \"$VOLTDBROOT\" is implausible.  Is it right?"
+                  exit 100
+            fi
             ;;
         --objdir)
             shift
@@ -61,6 +66,10 @@ while [ -n "$1" ]; do
             if [ ! -d "$OBJDIR" ] ; then
                 echo "$0: Object directory \"$OBJDIR\" does not exist."
                 exit 100
+            fi
+            if [ ! -d "$OBJDIR/prod" ] ; then
+                 echo "$0: Object directory \"$OBJDIR\" is not plausible.  Is it right?"
+                 exit 100
             fi
             ;;
         --help)
@@ -83,13 +92,6 @@ while [ -n "$1" ]; do
             echo '                          repeated multiple times, but'
             echo '                          there must be at least one of'
             echo '                          these options provided.'
-            echo ' --generated-dir dirname  Put generated artifacts in'
-            echo '                          obj/$BUILD/dirname, where'
-            echo '                          $BUILD is the build type.'
-            echo '                          Files will go:'
-            echo '                            obj/$BUILD/dirname/src  source files'
-            echo '                            obj/$BUILD/dirname/obj  .o files'
-            echo '                            obj/$BUILD/dirname/bin  executable files'
             exit 100
             ;;
         *)
@@ -106,6 +108,7 @@ if [ -z "$OBJDIR" ] ; then
     echo "$0: --objdir is required."
     exit 100
 fi
+GENERATED_DIR="$OBJDIR/generated"
 if [ -z "$VOLTDBROOT" ] ; then
     echo "$0: --voltdbroot is required."
     exit 100
