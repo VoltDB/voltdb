@@ -25,9 +25,6 @@ import base64
 import os
 import sys
 
-RELEASE_MAJOR_VERSION = 7
-RELEASE_MINOR_VERSION = 2
-
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
     description="Generate a checklist before performing online upgrade.",
