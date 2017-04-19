@@ -547,6 +547,7 @@ def checkAbsPaths(runner, root, filename):
 
     return ret
 
+# package ElementTree has a problem of not indent sub-element correctly, thus this function is used to beautify output xml.
 def prettyprint(elem, level=0):
     tabspace = "    "
     i = "\n" + level * tabspace
