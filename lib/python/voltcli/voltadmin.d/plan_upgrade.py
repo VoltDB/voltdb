@@ -573,8 +573,9 @@ def prettyprint(elem, level=0):
 
 def checkNewNode(hostname):
     try:
-        output = subprocess.check_output("ping -c 1 " + hostname, shell=False)
+        output = subprocess.check_output("ping -c 1 " + hostname, shell=True)
     except Exception, e:
+        print e
         return False
 
     return True
