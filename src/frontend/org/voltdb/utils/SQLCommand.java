@@ -994,7 +994,7 @@ public class SQLCommand
         Procedures.put("@GC",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@ResetDR",
-                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("tinyint", "tinyint")).build());
+                ImmutableMap.<Integer, List<String>>builder().put( 3, Arrays.asList("tinyint", "tinyint", "tinyint")).build());
         Procedures.put("@SwapTables",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
         Procedures.put("@Trace",

@@ -145,26 +145,26 @@ public class MaterializedViewProcessor {
             List<AbstractExpression> groupbyExprs = null;
             if (stmt.hasComplexGroupby()) {
                 groupbyExprs = new ArrayList<>();
-                for (ParsedColInfo col: stmt.m_groupByColumns) {
+                for (ParsedColInfo col: stmt.groupByColumns()) {
                     groupbyExprs.add(col.expression);
                 }
             }
 
             // Generate query XMLs for min/max recalculation (ENG-8641)
             boolean isMultiTableView = stmt.m_tableList.size() > 1;
-            MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns, isMultiTableView);
+            MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.groupByColumns(), stmt.m_displayColumns, isMultiTableView);
             List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
 
             // create an index and constraint for the table
             // After ENG-7872 is fixed if there is no group by column then we will not create any
             // index or constraint in order to avoid error and crash.
-            if (stmt.m_groupByColumns.size() != 0) {
+            if (stmt.groupByColumns().size() != 0) {
                 Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
                 pkIndex.setType(IndexType.BALANCED_TREE.getValue());
                 pkIndex.setUnique(true);
                 // add the group by columns from the src table
                 // assume index 1 throuh #grpByCols + 1 are the cols
-                for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
+                for (int i = 0; i < stmt.groupByColumns().size(); i++) {
                     ColumnRef c = pkIndex.getColumns().add(String.valueOf(i));
                     c.setColumn(destColumnArray.get(i));
                     c.setIndex(i);
@@ -222,8 +222,8 @@ public class MaterializedViewProcessor {
                             }
                         }
                         else {
-                            for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
-                                ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+                            for (int i = 0; i < stmt.groupByColumns().size(); i++) {
+                                ParsedColInfo gbcol = stmt.groupByColumns().get(i);
                                 if (gbcol.tableName.equals(srcTableName) && gbcol.columnName.equals(partitionColName)) {
                                     destTable.setPartitioncolumn(destColumnArray.get(i));
                                     break;
@@ -235,7 +235,7 @@ public class MaterializedViewProcessor {
 
                 compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, mvHandlerInfo);
                 compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandlerInfo);
-                mvHandlerInfo.setGroupbycolumncount(stmt.m_groupByColumns.size());
+                mvHandlerInfo.setGroupbycolumncount(stmt.groupByColumns().size());
 
                 for (int i=0; i<stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
@@ -277,8 +277,8 @@ public class MaterializedViewProcessor {
                 }
                 else {
                     // add the group by columns from the src table
-                    for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
-                        ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+                    for (int i = 0; i < stmt.groupByColumns().size(); i++) {
+                        ParsedColInfo gbcol = stmt.groupByColumns().get(i);
                         Column srcCol = srcColumnArray.get(gbcol.index);
                         ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
                         // groupByColumns is iterating in order of groups. Store that grouping order
@@ -297,18 +297,18 @@ public class MaterializedViewProcessor {
                 }
 
                 // Set up COUNT(*) column
-                ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
+                ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.groupByColumns().size());
                 assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
                 assert(countCol.expression.getLeft() == null);
                 processMaterializedViewColumn(srcTable,
-                        destColumnArray.get(stmt.m_groupByColumns.size()),
+                        destColumnArray.get(stmt.groupByColumns().size()),
                         ExpressionType.AGGREGATE_COUNT_STAR, null);
 
                 // prepare info for aggregation columns.
                 List<AbstractExpression> aggregationExprs = new ArrayList<>();
                 boolean hasAggregationExprs = false;
                 ArrayList<AbstractExpression> minMaxAggs = new ArrayList<>();
-                for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                for (int i = stmt.groupByColumns().size() + 1; i < stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     AbstractExpression aggExpr = col.expression.getLeft();
                     if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
@@ -348,14 +348,14 @@ public class MaterializedViewProcessor {
 
                 // This is to fix the data type mismatch of the COUNT(*) column (and potentially other columns).
                 // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column.
-                for (int i=0; i<=stmt.m_groupByColumns.size(); i++) {
+                for (int i=0; i<=stmt.groupByColumns().size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
                     setTypeAttributesForColumn(destColumn, col.expression);
                 }
 
                 // parse out the aggregation columns into the dest table
-                for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                for (int i = stmt.groupByColumns().size() + 1; i < stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
 
@@ -468,7 +468,7 @@ public class MaterializedViewProcessor {
      */
 
     private void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt) throws VoltCompilerException {
-        int groupColCount = stmt.m_groupByColumns.size();
+        int groupColCount = stmt.groupByColumns().size();
         int displayColCount = stmt.m_displayColumns.size();
         StringBuffer msg = new StringBuffer();
         msg.append("Materialized view \"" + viewName + "\" ");
@@ -483,7 +483,7 @@ public class MaterializedViewProcessor {
         // First, check the group by columns.  They are at
         // the beginning of the display list.
         for (i = 0; i < groupColCount; i++) {
-            ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+            ParsedColInfo gbcol = stmt.groupByColumns().get(i);
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             // The columns must be equal.
             if (!outcol.expression.equals(gbcol.expression)) {

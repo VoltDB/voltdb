@@ -643,8 +643,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
-    //When loading catalog we do isStreamUpdate to false as stream tables will get created and thus roll will happen.
-    if (processCatalogAdditions(false, timestamp) == false) {
+    //When loading catalog we do isStreamUpdate to true as we are starting fresh or rejoining/recovering.
+    if (processCatalogAdditions(true, timestamp) == false) {
         return false;
     }
 

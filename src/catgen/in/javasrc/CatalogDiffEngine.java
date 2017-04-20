@@ -222,7 +222,8 @@ public class CatalogDiffEngine {
      * @return true if changes require export generation to be updated.
      */
     public boolean requiresNewExportGeneration() {
-        return m_requiresNewExportGeneration;
+        // TODO: return m_requiresNewExportGeneration;
+        return true;
     }
 
     public String[][] tablesThatMustBeEmpty() {

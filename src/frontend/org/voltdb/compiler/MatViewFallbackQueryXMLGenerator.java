@@ -31,14 +31,14 @@ public class MatViewFallbackQueryXMLGenerator {
 
     private VoltXMLElement m_xml;
     private int m_maxElementId;
-    private ArrayList<ParsedColInfo> m_groupByColumnsParsedInfo;
-    private ArrayList<ParsedColInfo> m_displayColumnsParsedInfo;
+    private List<ParsedColInfo> m_groupByColumnsParsedInfo;
+    private List<ParsedColInfo> m_displayColumnsParsedInfo;
     private ArrayList<VoltXMLElement> m_fallbackQueryXMLs;
     private final boolean m_isMultiTableView;
 
     public MatViewFallbackQueryXMLGenerator(VoltXMLElement xmlquery,
-                                            ArrayList<ParsedColInfo> groupByColumnsParsedInfo,
-                                            ArrayList<ParsedColInfo> displayColumnsParsedInfo,
+                                            List<ParsedColInfo> groupByColumnsParsedInfo,
+                                            List<ParsedColInfo> displayColumnsParsedInfo,
                                             boolean isMultiTableView) {
         m_xml = xmlquery.duplicate();
         m_groupByColumnsParsedInfo = groupByColumnsParsedInfo;
