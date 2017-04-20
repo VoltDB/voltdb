@@ -24,6 +24,7 @@ from urllib2 import Request, urlopen, URLError
 import base64
 import os
 import sys
+import subprocess
 
 RELEASE_MAJOR_VERSION = 7
 RELEASE_MINOR_VERSION = 2
@@ -40,12 +41,12 @@ RELEASE_MINOR_VERSION = 2
 )
 
 def plan_upgrade(runner):
-    hosts, kfactor, largestClusterId = basicCheck(runner)
+    hosts, kfactor, clusterIds = basicCheck(runner)
 
     generateCommands(runner,
                      hosts,
                      kfactor,
-                     largestClusterId)
+                     clusterIds)
 
 def basicCheck(runner):
     response = runner.call_proc('@SystemInformation',
@@ -66,6 +67,13 @@ def basicCheck(runner):
 
     if fullClusterSize % 2 == 1 and runner.opts.newNode is None:
         runner.abort("The cluster has odd number of nodes, plan_upgrade needs an extra node to generate the instructions")
+    if fullClusterSize % 2 == 0 and runner.opts.newNode is not None:
+        runner.abort("For even-numbered cluster, 2 parameters are expected (received 3).")
+
+    if runner.opts.newNode is not None:
+        result = checkNewNode(runner.opts.newNode)
+        if result is False:
+            runner.abort("Failed to resolve host {}.".format(runner.opts.newNode))
 
     host = hosts.hosts_by_id.itervalues().next();
     currentVersion = host.version
@@ -89,11 +97,13 @@ def basicCheck(runner):
         runner.abort("Current cluster doesn't have enough node to perform online upgrade, at least two nodes are required")
 
     response = checkstats.get_stats(runner, "DRROLE")
-    largestClusterId = -1
+    clusterIds = []
     for tuple in response.table(0).tuples():
         remote_cluster_id = tuple[2]
-        if remote_cluster_id > largestClusterId:
-            largestClusterId = remote_cluster_id
+        if remote_cluster_id != -1:
+            clusterIds.append(remote_cluster_id)
+    if len(clusterIds) == 127:
+        runner.abort("Failed to generate upgrade plan: number of connected cluster reaches the maximum limit (127).")
 
     # Check the existence of voltdb root path and new kit on all the existing nodes
     response = runner.call_proc('@CheckUpgradePlanNT',
@@ -108,16 +118,16 @@ def basicCheck(runner):
             host = hosts.hosts_by_id[hostId]
             if host is None:
                 runner.abort('@CheckUpgradePlanNT returns a host id ' + hostId + " that doesn't belong to the cluster.")
-            print 'Pre-upgrade check fails on host ' + getHostnameOrIp(host) + " with the cause: " + result
+            runner.error('Check failed on host ' + getHostnameOrIp(host) + " with the cause: " + result)
 
     if error:
         runner.abort("Failed to pass pre-upgrade check. Abort. ")
     print '[1/4] Passed new VoltDB kit version check.'
     print '[2/4] Passed new VoltDB root path existence check.'
 
-    return hosts, kfactor, largestClusterId
+    return hosts, kfactor, clusterIds
 
-def generateCommands(runner, hosts, kfactor, largestClusterId):
+def generateCommands(runner, hosts, kfactor, clusterIds):
     hostcount = len(hosts.hosts_by_id)
     (killSet, surviveSet) = pickNodeToKill(hosts, kfactor, hostcount / 2)
 
@@ -126,7 +136,7 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
     origin_cluster_deploy = "deployment_for_current_version.xml"
     new_cluster_deploy = "deployment_for_new_version.xml"
     files, newNodeF = generateDeploymentFile(runner, hosts, surviveSet, killSet,
-                                             largestClusterId, origin_cluster_deploy,
+                                             clusterIds, origin_cluster_deploy,
                                              new_cluster_deploy, step)
     printout = '[3/4] Generated deployment file: '
     if os.path.isfile(origin_cluster_deploy):
@@ -153,7 +163,7 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
 
     # 5 only for upgrading stand-alone cluster, set up XDCR replication between two clusters
     # update old cluster's deployment file
-    if largestClusterId == -1:
+    if len(clusterIds) == 0:
         step += 1
         generateTurnOnXDCRCommand(runner.opts, surviveSet[0], files, origin_cluster_deploy, step)
 
@@ -166,7 +176,6 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
     generateShutdownOriginClusterCommand(surviveSet[0], files, step)
 
     # 8 run DR RESET on one node of the new cluster.
-    # TODO: If there are other clusters connect to the original cluster before, run individual DR RESET.
     step += 1
     generateDRResetCommand(runner, surviveSet[0], files, step)
 
@@ -181,29 +190,34 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
     cleanup(runner.opts, files, newNodeF)
     print '[4/4] Generated online upgrade plan: upgrade-plan.txt'
 
-def generateDeploymentFile(runner, hosts, surviveSet, killSet, largestClusterId, origin_cluster_deploy, new_cluster_deploy, step):
+def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, origin_cluster_deploy, new_cluster_deploy, step):
     files = dict()
+    oldDeploymentHasAbsPath = False
+    newDeploymentHasAbsPath = False
 
     # get deployment file from the original cluster
     xmlString = getCurrentDeploymentFile(runner, surviveSet[0])
 
-    if largestClusterId == -1:
+    if len(clusterIds) == 0:
         # If this is a stand-alone cluster, generate a deployment file with a XDCR connection source
-        drId = createDeploymentForOriginalCluster(runner,
-                                                  xmlString,
-                                                  getHostnameOrIp(killSet[0]) + ':' + str(killSet[0].drport),
-                                                  origin_cluster_deploy)
-        createDeploymentForNewCluster(runner,
-                                      xmlString,
-                                      drId,
-                                      getHostnameOrIp(surviveSet[0]) + ':' + str(surviveSet[0].drport),
-                                      new_cluster_deploy)
+        drId, oldDeploymentHasAbsPath = createDeploymentForOriginalCluster(runner,
+                                                                           xmlString,
+                                                                           getHostnameOrIp(killSet[0]) + ':' + str(killSet[0].drport),
+                                                                           origin_cluster_deploy)
+        newDeploymentHasAbsPath = createDeploymentForNewCluster(runner,
+                                                                xmlString,
+                                                                [drId],
+                                                                getHostnameOrIp(surviveSet[0]) + ':' + str(surviveSet[0].drport),
+                                                                new_cluster_deploy)
     else:
-        createDeploymentForNewCluster(runner,
-                                      xmlString,
-                                      largestClusterId,
-                                      None,
-                                      new_cluster_deploy)
+        newDeploymentHasAbsPath = createDeploymentForNewCluster(runner,
+                                                                xmlString,
+                                                                clusterIds,
+                                                                None,
+                                                                new_cluster_deploy)
+
+    if oldDeploymentHasAbsPath or newDeploymentHasAbsPath:
+        warningForDeploy = "Warn: Absolute paths in generated deployment file are commented out to avoid accidentally damage to your original cluster's artifact. Please review the file before use.\n"
 
     # generate instructions to copy deployment file to individual node
     for hostId, hostInfo in hosts.hosts_by_id.items():
@@ -213,18 +227,18 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, largestClusterId,
         if hostInfo in killSet:
             writeCommands(file,
                           'Step %d: copy deployment file' % step,
-                          '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
+                          '%s#instruction# copy %s to %s' % (warningForDeploy, new_cluster_deploy, runner.opts.newRoot))
         if hostInfo in surviveSet:
-            if largestClusterId == -1:
+            if len(clusterIds) == 0:
                 # for stand-alone cluster
                 writeCommands(file,
                               'Step %d: copy deployment file' % step,
-                              '#instruction# copy %s and %s to %s' % (origin_cluster_deploy, new_cluster_deploy, runner.opts.newRoot))
+                              '%s#instruction# copy %s and %s to %s' % (warningForDeploy, origin_cluster_deploy, new_cluster_deploy, runner.opts.newRoot))
             else:
                 # for multi-cluster
                 writeCommands(file,
                               'Step %d: copy deployment file' % step,
-                              '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
+                              '%s#instruction# copy %s to %s' % (warningForDeploy, new_cluster_deploy, runner.opts.newRoot))
     newNodeF = None
     if runner.opts.newNode is not None:
         newNodeF = open("upgradePlan-%s.txt" % (runner.opts.newNode), 'w+')
@@ -432,6 +446,8 @@ def getCurrentDeploymentFile(runner, host):
 # Only stand-alone cluster needs it
 def createDeploymentForOriginalCluster(runner, xmlString, drSource, origin_cluster_deploy):
     et = ElementTree.ElementTree(ElementTree.fromstring(xmlString))
+    hasAbsPath = checkAbsPaths(runner, et.getroot(), origin_cluster_deploy)
+
     dr = et.getroot().find('./dr')
     if dr is None:
         runner.abort("This cluster doesn't have a DR tag in its deployment file, hence we can't generate online upgrade plan for it. \
@@ -453,18 +469,19 @@ def createDeploymentForOriginalCluster(runner, xmlString, drSource, origin_clust
         connection.attrib['source'] = drSource
     connection.attrib['enabled'] = 'true'
 
+    prettyprint(et.getroot())
     et.write(origin_cluster_deploy)
-    return clusterId;
-
+    return clusterId, hasAbsPath;
 
 # Both stand-alone and multisite cluster need it
-def createDeploymentForNewCluster(runner, xmlString, largestClusterId, drSource, new_cluster_deploy):
+def createDeploymentForNewCluster(runner, xmlString, clusterIds, drSource, new_cluster_deploy):
     et = ElementTree.ElementTree(ElementTree.fromstring(xmlString))
+    hasAbsPath = checkAbsPaths(runner, et.getroot(), new_cluster_deploy)
 
-    clusterId = largestClusterId + 1
-    # cluster id ranges from 0 to 127
-    if clusterId > 127:
-        clusterId = 0
+    # Prefer not to use 0 as the cluster Id
+    for clusterId in range(1, 127):
+        if clusterId not in clusterIds:
+            break
 
     # since we check the existence of DR tag when generating deployment file for origin cluster, it's safe to skip it here
     dr = et.getroot().find('./dr')
@@ -498,4 +515,59 @@ def createDeploymentForNewCluster(runner, xmlString, largestClusterId, drSource,
             # Don't change the source if it exists
             pass
 
+    prettyprint(et.getroot())
     et.write(new_cluster_deploy)
+    return hasAbsPath
+
+def commentAbsPath(root, pathname, comment):
+    path = root.find(pathname)
+    if os.path.isabs(path.attrib['path']):
+        commentedPath = ElementTree.Comment(ElementTree.tostring(path))
+        root.append(comment)
+        root.append(commentedPath)
+        root.remove(path)
+        return True
+    return False
+
+# Check if the path is an absolute path, if true then comment the path in case of overwriting important artifact accidentally
+def checkAbsPaths(runner, root, filename):
+    ret = False;
+    comment = ElementTree.Comment("ERROR: PLEASE EDIT THE PATH BEFORE USE!")
+    paths = root.find('./paths')
+    ret |= commentAbsPath(paths, 'voltdbroot', comment)
+    ret |= commentAbsPath(paths, 'snapshots', comment)
+    ret |= commentAbsPath(paths, 'exportoverflow', comment)
+    ret |= commentAbsPath(paths, 'droverflow', comment)
+    ret |= commentAbsPath(paths, 'commandlog', comment)
+    ret |= commentAbsPath(paths, 'commandlogsnapshot', comment)
+
+    # If any of the path is an absolute path, print an warning to console
+    if ret:
+        runner.warning(filename + " contains absolute paths. To avoid overwriting artifacts of the original cluster, please review the file before use.")
+
+    return ret
+
+# package ElementTree has a problem of not indent sub-element correctly, thus this function is used to beautify output xml.
+def prettyprint(elem, level=0):
+    tabspace = "    "
+    i = "\n" + level * tabspace
+    if len(elem):
+        if not elem.text or not elem.text.strip():
+            elem.text = i + "  "
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+        for elem in elem:
+            prettyprint(elem, level + 1)
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+    else:
+        if level and (not elem.tail or not elem.tail.strip()):
+            elem.tail = i
+
+def checkNewNode(hostname):
+    try:
+        output = subprocess.check_output("ping -c 1 " + hostname, shell=False)
+    except Exception, e:
+        return False
+
+    return True
