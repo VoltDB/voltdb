@@ -458,7 +458,7 @@ def createDeploymentForOriginalCluster(runner, xmlString, drSource, origin_clust
     dr = et.getroot().find('./dr')
     if dr is None:
         runner.abort("This cluster doesn't have a DR tag in its deployment file, hence we can't generate online upgrade plan for it. " +
-                     "Adding DR tag to your deployment file requires to shutdown and restart the database.")
+                     "In order to add DR tag to the deployment file, users are required to shutdown the database.")
 
     if 'id' not in dr.attrib:
         clusterId = 0;  # by default clusterId is 0

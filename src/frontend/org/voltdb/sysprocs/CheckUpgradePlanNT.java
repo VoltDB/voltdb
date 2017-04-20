@@ -35,6 +35,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.utils.CatalogUtil;
 
 /*
  * Some simple file system path checks, the goal is using NT procedure to do the check on
@@ -51,7 +52,7 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
             String ret = checkVoltDBKitExistence(newKitPath);
             String ret2 = checkVoltDBRootExistence(newRootPath);
             String ret3 = validateXDCRRequirement();
-            String warning = nonFatalCheck();
+            String warning = checkWarnings();
             VoltTable vt = new VoltTable(
                     new ColumnInfo[] { new ColumnInfo("KIT_CHECK_RESULT", VoltType.STRING),
                                        new ColumnInfo("ROOT_CHECK_RESULT", VoltType.STRING),
@@ -124,19 +125,28 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
             return SUCCESS;
         }
 
-        private static String nonFatalCheck() {
+        /*
+         * Create warnings if
+         * 1) not all the user tables are DR table, or
+         * 2) cluster runs on XDCR mode but is not listening on the DR port.
+         */
+        private static String checkWarnings() {
             StringBuilder warning = new StringBuilder();
             CatalogContext context = VoltDB.instance().getCatalogContext();
+            if (context.getDeployment().getDr() != null && context.getDeployment().getDr().isListen() == false) {
+                warning.append("Target VoltDB cluster is not listening on DR port.(set listen=\"true\" under DR tag of the deployment file)\n");
+            }
+
             for (Table tb : context.database.getTables()) {
-                if (!tb.getTypeName().startsWith("VOLTDB_AUTOGEN_") && !tb.getIsdred()) {
+                if (!tb.getTypeName().equals(CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE)
+                        && !tb.getTypeName().equals(CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE)
+                        && !tb.getIsdred()) {
                     warning.append(tb.getTypeName()).append(" is not a DR table.").append("\n");
                 }
             }
-            if (context.getDeployment().getDr() != null && context.getDeployment().getDr().isListen() == false) {
-                warning.append("Target VoltDB cluster is not listening on DR port.(set listen=\"true\" under DR tag of the deployment file)");
-            }
+
             if (warning.length() != 0) {
-                return warning.substring(0, warning.length() - 1); // get rid of the '\n'
+                return warning.substring(0, warning.length() - 1); // get rid of the last '\n'
             }
             return null;
         }
