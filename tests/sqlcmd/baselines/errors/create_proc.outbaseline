@@ -12,6 +12,7 @@ Things will not go well if this test is not starting with an empty class list.
 
 
 create procedure from class sqlcmdtest.Trivial;
+
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
@@ -61,6 +62,7 @@ Command succeeded.
 --- Non-Procedure Classes ----------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
 
+
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
@@ -97,6 +99,7 @@ Command succeeded.
 
 create procedure from class sqlcmdtest.Trivial;
 Command succeeded.
+
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
@@ -173,6 +176,7 @@ remove classes sqlcmdtest.*;
 Command succeeded.
 
 create procedure from class sqlcmdtest.Trivial;
+
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
@@ -227,6 +231,7 @@ Command succeeded.
 
 create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
+
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
@@ -289,6 +294,7 @@ Command succeeded.
 
 drop procedure Breakable0;
 Command succeeded.
+
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
@@ -352,6 +358,7 @@ Command succeeded.
 
 create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
+
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
@@ -414,6 +421,7 @@ Command succeeded.
 
 drop procedure Breakable0;
 Command succeeded.
+
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
