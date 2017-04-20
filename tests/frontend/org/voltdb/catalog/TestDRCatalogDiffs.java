@@ -772,10 +772,11 @@ public class TestDRCatalogDiffs {
      * Don't serialize views, DR doesn't care.
      */
     @Test
-    public void testFilterViewInfo() throws Exception {
+    public void testFilterForDR() throws Exception {
         String masterSchema =
         "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
         "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+        "CREATE INDEX T1_IDX ON T1 (C2);\n" +
         "CREATE VIEW foo (C1, total) AS SELECT C1, COUNT(*) FROM T1 GROUP BY C1;\n" +
         "CREATE VIEW foo2 (C1, total) AS SELECT T1.C1, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1;\n" +
         "DR TABLE T1;\n" +
@@ -787,6 +788,7 @@ public class TestDRCatalogDiffs {
 
         assertFalse(decodedCommands.contains(" views "));
         assertFalse(decodedCommands.contains(" mvHandlerInfo "));
+        assertFalse(decodedCommands.contains(" isSafeWithNonemptySources "));
     }
 
     private CatalogDiffEngine runCatalogDiff(String masterSchema, boolean isMasterXDCR,
