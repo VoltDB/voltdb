@@ -93,7 +93,8 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
 
             // Check whether upgrade/downgrade across two major versions
             if (Math.abs(newKitVersion[0] - currentVersion[0]) >= 2) {
-                return "Online upgrade/downgrade across two major versions is not supported.";
+                return String.format("Online upgrade/downgrade across two major versions (%d.%d -> %d.%d) is not supported.",
+                        currentVersion[0], currentVersion[1], newKitVersion[0], newKitVersion[1]);
             }
 
             return SUCCESS;
@@ -117,7 +118,7 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
 
             CatalogContext context = VoltDB.instance().getCatalogContext();
             if (context.getDeployment().getDr() != null && context.getDeployment().getDr().getRole() != DrRoleType.XDCR) {
-                return "Target VoltDB cluster must have XDCR enabled (DRRole=\"xdcr\").";
+                return "Target VoltDB cluster must have XDCR enabled (set role=\"xdcr\" under DR tag of the deployment file).";
             }
 
             return SUCCESS;
@@ -127,15 +128,15 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
             StringBuilder warning = new StringBuilder();
             CatalogContext context = VoltDB.instance().getCatalogContext();
             for (Table tb : context.database.getTables()) {
-                if (!tb.getIsdred()) {
-                    warning.append(tb.getTypeName()).append(" is not a DR table.\n");
+                if (!tb.getTypeName().startsWith("VOLTDB_AUTOGEN_") && !tb.getIsdred()) {
+                    warning.append(tb.getTypeName()).append(" is not a DR table.").append("\n");
                 }
             }
             if (context.getDeployment().getDr() != null && context.getDeployment().getDr().isListen() == false) {
-                warning.append("Target VoltDB cluster is not listening on DR port.");
+                warning.append("Target VoltDB cluster is not listening on DR port.(set listen=\"true\" under DR tag of the deployment file)");
             }
             if (warning.length() != 0) {
-                return warning.toString();
+                return warning.substring(0, warning.length() - 1); // get rid of the '\n'
             }
             return null;
         }

@@ -107,21 +107,24 @@ def basicCheck(runner):
                                 [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
                                 [runner.opts.newKit, runner.opts.newRoot])
     error = False
+    warnings = ""
     for tuple in response.table(0).tuples():
         hostId = tuple[0]
         result = tuple[1]
-        warnings = tuple[2]
+        warning = tuple[2]
         if result != 'Success':
             error = True
             host = hosts.hosts_by_id[hostId]
             if host is None:
                 runner.abort('@CheckUpgradePlanNT returns a host id ' + hostId + " that doesn't belong to the cluster.")
             runner.error('Check failed on host ' + getHostnameOrIp(host) + " with the cause: " + result)
-        if warnings is not None:
-            runner.warning('host ' + getHostnameOrIp(host) + ': ' + warnings)
+        if warning is not None:
+            warnings += 'On host ' + getHostnameOrIp(host) + ': \n' + warning
 
     if error:
         runner.abort("Failed to pass pre-upgrade check. Abort. ")
+    if warnings != "":
+        runner.warning(warnings)
 
     print '[1/4] Passed new VoltDB kit version check.'
     print '[2/4] Passed new VoltDB root path existence check.'
