@@ -21,6 +21,7 @@ from voltcli import checkstats
 from xml.etree import ElementTree
 from collections import defaultdict
 from urllib2 import Request, urlopen, URLError
+import cStringIO
 import base64
 import os
 import sys
@@ -59,7 +60,7 @@ def basicCheck(runner):
     host = hosts.hosts_by_id.itervalues().next();
     fullClusterSize = int(host.fullclustersize)
     if len(hosts.hosts_by_id) < fullClusterSize:
-        runner.abort("Current cluster needs %d more node(s) to achieve full K-safety. In-service upgrade is not recommended in partial K-safety cluster."
+        runner.abort("Current cluster needs %d more node(s) to achieve full K-safety. Online upgrade is not supported in partial K-safety cluster."
                      % (fullClusterSize - len(hosts.hosts_by_id)))
 
     if fullClusterSize % 2 == 1 and runner.opts.newNode is None:
@@ -139,7 +140,7 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
     (killSet, surviveSet) = pickNodeToKill(hosts, kfactor, hostcount / 2)
 
     # 0 generate deployment file
-    step = 0
+    step = 1
     origin_cluster_deploy = "deployment_for_current_version.xml"
     new_cluster_deploy = "deployment_for_new_version.xml"
     files, newNodeF = generateDeploymentFile(runner, hosts, surviveSet, killSet,
@@ -184,7 +185,7 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
 
     # 8 run DR RESET on one node of the new cluster.
     step += 1
-    generateDRResetCommand(runner, surviveSet[0], files, step)
+    generateDRResetCommand(runner, surviveSet[0], killSet[0], clusterIds, files, step)
 
     # 9 initialize a new VoltDB root path on the nodes being shutdown ( may not need all of them)
     step += 1
@@ -228,8 +229,8 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, origi
 
     # generate instructions to copy deployment file to individual node
     for hostId, hostInfo in hosts.hosts_by_id.items():
-        file = open("upgradePlan-%s:%s-%s.txt" % (hostInfo.ipaddress, hostInfo.internalport, hostInfo.hostname), 'w+')
-        writeHeader(file)
+        file = cStringIO.StringIO()
+        writeHeader(file, "Upgrade Plan for server {}".format(getHostnameOrIp(hostInfo)))
         files[getKey(hostInfo)] = file
         if hostInfo in killSet:
             writeCommands(file,
@@ -248,8 +249,8 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, origi
                               '%s#instruction# copy %s to %s' % (warningForDeploy, new_cluster_deploy, runner.opts.newRoot))
     newNodeF = None
     if runner.opts.newNode is not None:
-        newNodeF = open("upgradePlan-%s.txt" % (runner.opts.newNode), 'w+')
-        writeHeader(newNodeF)
+        newNodeF = cStringIO.StringIO()
+        writeHeader(file, "Upgrade Plan for server {}".format(runner.opts.newNode))
         writeCommands(newNodeF,
                       'Step %d: copy deployment file' % step,
                       '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
@@ -323,22 +324,27 @@ def generateShutdownOriginClusterCommand(survivor, files, step):
                   'Step %d: shutdown the original cluster' % step,
                   'voltadmin shutdown -H %s:%d' % (survivor.hostname, survivor.adminport))
 
-def generateDRResetCommand(runner, survivor, files, step):
-    remoteTopo = dict()
-    # Find remote covering host through drconsumer stats, one for each remote cluster
-    response = checkstats.get_stats(runner, "DRCONSUMER")
-    for tuple in response.table(1).tuples():
-        remote_cluster_id = tuple[4]
-        covering_host = tuple[7]
-        last_applied_ts = tuple[9]
-        if covering_host != '':
-            if remote_cluster_id not in remoteTopo:
-                remoteTopo[remote_cluster_id] = covering_host
-
-    # assume remote cluster use the same admin port
+def generateDRResetCommand(runner, survivor, victim, clusterIds, files, step):
     command = ""
-    for clusterId, covering_host in remoteTopo.items():
-        command += 'voltadmin dr reset --cluster=%s -H %s:%d --force\n' % (survivor.clusterid, covering_host.split(":")[0], survivor.adminport)
+    if len(clusterIds) == 0:
+        command = 'voltadmin dr reset --cluster=%s -H %s:%d --force\n' % (survivor.clusterid, getHostnameOrIp(victim), victim.adminport)
+    else:
+        remoteTopo = dict()
+        # Find remote covering host through drconsumer stats, one for each remote cluster
+        response = checkstats.get_stats(runner, "DRCONSUMER")
+        for tuple in response.table(1).tuples():
+            remote_cluster_id = tuple[4]
+            covering_host = tuple[7]
+            last_applied_ts = tuple[9]
+            if covering_host != '':
+                if remote_cluster_id not in remoteTopo:
+                    remoteTopo[remote_cluster_id] = covering_host
+
+        # assume remote cluster use the same admin port
+        for clusterId, covering_host in remoteTopo.items():
+            command += 'voltadmin dr reset --cluster=%s -H %s:%d --force\n' % (survivor.clusterid, covering_host.split(":")[0], survivor.adminport)
+        command = command[:-1]
+
     writeCommands(files[getKey(survivor)],
                   'Step %d: run dr reset command to tell other clusters to stop generating binary logs for the origin cluster' % step,
                   command)
@@ -371,17 +377,19 @@ def generateNodeRejoinCommand(opts, surviveSet, leadersString, files, halfNodes,
 
 def cleanup(opts, files, newNodeF):
     upgradePlan = open("upgrade-plan.txt", 'w+')
+
+    upgradePlan.write("Instructions:\n\n")
+    upgradePlan.write("1. This plan provides steps to be executed on each of the servers in the cluster.\n")
+    upgradePlan.write("2. The steps for each server are listed separately.\n")
+    upgradePlan.write("3. For each step (0, 1, 2, etc.), execute that step on all servers to which it applies before moving on to the next step.\n\n")
+
     for key, file in files.items():
-        file.seek(0)
-        upgradePlan.write(file.read() + '\n')
+        upgradePlan.write(file.getvalue() + '\n')
         file.close()
-        os.remove(file.name)
 
     if opts.newNode is not None:
-        newNodeF.seek(0)
-        upgradePlan.write(newNodeF.read() + '\n')
+        upgradePlan.write(newNodeF.getvalue() + '\n')
         newNodeF.close()
-        os.remove(newNodeF.name)
 
     upgradePlan.close()
 
@@ -421,10 +429,10 @@ def getHostnameOrIp(host):
     else:
         return host.hostname
 
-def writeHeader(file):
+def writeHeader(file, name):
     delimiter = '=' * 40
     file.write(delimiter + '\n')
-    file.write(file.name);
+    file.write(name);
     file.write('\n')
     file.write(delimiter)
     file.write('\n')
@@ -573,7 +581,7 @@ def prettyprint(elem, level=0):
 
 def checkNewNode(hostname):
     try:
-        output = subprocess.check_output("ping -c 1 " + hostname, shell=False)
+        subprocess.check_output(["ping", "-c 1", hostname], shell=False)
     except Exception, e:
         return False
 
