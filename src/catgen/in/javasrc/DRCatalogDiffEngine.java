@@ -40,7 +40,8 @@ import org.voltdb.utils.Encoder;
  * - All shared DR tables have the same unique indexes/primary keys
  */
 public class DRCatalogDiffEngine extends CatalogDiffEngine {
-    /* White list of fields for the catalog types that we care about for DR.
+    /* White list of fields that we care about for DR for table children classes.
+       This is used only in serialize commands for DR method.
        There are duplicates added to the set because it lists all the fields per type */
     private static Set<String> s_whiteListFields = Sets.newHashSet(
             /* Column */
