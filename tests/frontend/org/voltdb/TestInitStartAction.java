@@ -52,10 +52,9 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
 
-/** Tests starting the server with NewCLI (init + start).
- * Covers the staged catalog approach (init --schema --classes) as well.
- * There's a counterpart in Pro called "TestStagedCatalogsWithDurability"
- * that addresses interations with features that aren't in Community.
+/** Tests starting the server with init + start without a schema,
+ * and 'init --schema --classes'.
+ * Starting after 'init --schema' is covered in "TestStartWithSchema" and (in Pro) "TestStartWithSchemaAndDurability".
  */
 final public class TestInitStartAction {
 

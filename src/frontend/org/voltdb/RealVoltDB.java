@@ -215,7 +215,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
-    VoltDB.Configuration m_config = new VoltDB.Configuration();
+    private VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
@@ -395,6 +395,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             return txnId >= m_safeMpTxnId;
         }
+    }
+
+    StartAction getStartAction() {
+        return m_config.m_startAction;
     }
 
     private long m_recoveryStartTime;
@@ -2215,10 +2219,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
 
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
-            String message = "A previous database was initialized with a schema. You must init with --force to overwrite the schema.";
-            hostLog.fatal(message);
-            consoleLog.fatal(message);
-            VoltDB.exit(-1);
+            VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
         }
         final boolean standalone = true;
         final boolean isXCDR = false;
