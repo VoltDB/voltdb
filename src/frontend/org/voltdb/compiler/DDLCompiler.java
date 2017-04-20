@@ -638,15 +638,16 @@ public class DDLCompiler {
             String functionName = checkIdentifierStart(statementMatcher.group(1), statement);
             boolean ifExists = statementMatcher.group(2) != null;
             CatalogMap<Function> functions = db.getFunctions();
-            if (functions.get(functionName) == null) {
+            if (functions.get(functionName) != null) {
+                functions.delete(functionName);
+            }
+            else {
                 if (! ifExists) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Function name \"%s\" in DROP FUNCTION statement does not exist.",
                             functionName));
                 }
-                return true;
             }
-            functions.delete(functionName);
             return true;
         }
 
