@@ -369,7 +369,7 @@ public class Inits {
             } while (catalogStuff == null || catalogStuff.catalogBytes.length == 0);
 
             assert( m_rvdb.m_config.m_startAction != StartAction.PROBE );
-            if (m_rvdb.m_config.m_startAction == StartAction.CREATE){
+            if (m_rvdb.m_config.m_startAction == StartAction.CREATE) {
                 // We may have received a staged catalog from the leader.
                 // Check if it matches ours.
                 if (m_rvdb.m_pathToStartupCatalog == null) {

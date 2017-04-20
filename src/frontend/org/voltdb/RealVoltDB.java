@@ -2207,15 +2207,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
     }
 
-    /**
-     * Takes the schema and stored procedures files given at initialization and performs the following tasks:
-     * <p><ul>
-     * <li>creates if necessary the voltdbroot/starter/bootstrap/existing directory tree
-     * <li>fail if database artifacts already exist and --force was not supplied (this is unexpected due to earlier checks)
-     * <li>moves the specified files to the 'existing' directory
-     * </ul>
-     * @param config VoltDB configuration
-     */
     private void stageSchemaFiles(Configuration config) {
         if (config.m_userSchema == null) {
             return; // nothing to do
@@ -2223,7 +2214,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
 
-        // this check cannot be part of managedPathsWithFiles(), since "voltdb start" can get translated into "voltdb create" after probing the mesh.
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
             String message = "A previous database was initialized with a schema. You must init with --force to overwrite the schema.";
             hostLog.fatal(message);
