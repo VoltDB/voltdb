@@ -379,6 +379,7 @@ CTX.INPUT['storage'] = """
  ElasticScanner.cpp
  ExportTupleStream.cpp
  LargeTempTable.cpp
+ LargeTempTableBlock.cpp
  MaterializedViewHandler.cpp
  MaterializedViewTriggerForInsert.cpp
  MaterializedViewTriggerForWrite.cpp

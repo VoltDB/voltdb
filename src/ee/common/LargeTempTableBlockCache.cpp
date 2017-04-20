@@ -25,50 +25,48 @@ namespace voltdb {
 
     LargeTempTableBlockCache::LargeTempTableBlockCache()
         : m_cache()
-        , m_emptyEntries(NUM_CACHE_ENTRIES)
+          //, m_emptyEntries(NUM_CACHE_ENTRIES)
         , m_liveEntries()
-        , m_unpinnedEntries()
+        // , m_unpinnedEntries()
     {
         // At initialization, all cache entries are empty.
-        auto cacheIt = m_cache.begin();
-        for (; cacheIt != m_cache.end(); ++cacheIt) {
-            m_emptyEntries.push_back(&(*cacheIt));
-        }
+        // auto cacheIt = m_cache.begin();
+        // for (; cacheIt != m_cache.end(); ++cacheIt) {
+        //     m_emptyEntries.push_back(&(*cacheIt));
+        // }
     }
 
-    std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock() {
+    std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock(LargeTempTable* ltt) {
         int64_t id = getNextId();
 
-        if (m_emptyEntries.size() > 0) {
-            LargeTempTableBlock *emptyBlock = m_emptyEntries.back();
-            m_emptyEntries.pop_back();
-            m_liveEntries[id] = emptyBlock;
-            return std::make_pair(id, emptyBlock);
-        }
-
-        assert(false);
+        m_cache.emplace_back(ltt);
+        LargeTempTableBlock *emptyBlock = &(m_cache.back());
+        m_liveEntries[id] = emptyBlock;
+        return std::make_pair(id, emptyBlock);
     }
 
     LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
         assert(m_liveEntries.find(blockId) != std::end(m_liveEntries));
 
-        // If it's in the unpinned entries list, remove it
-        auto unpinnedIt = m_unpinnedEntries.begin();
-        for (; unpinnedIt != m_unpinnedEntries.end(); ++unpinnedIt) {
-            if (*unpinnedIt == blockId) {
-                m_unpinnedEntries.erase(unpinnedIt);
-                break;
-            }
-        }
+        // return *(m_liveEntries.find(blockId));
+
+        // // If it's in the unpinned entries list, remove it
+        // auto unpinnedIt = m_unpinnedEntries.begin();
+        // for (; unpinnedIt != m_unpinnedEntries.end(); ++unpinnedIt) {
+        //     if (*unpinnedIt == blockId) {
+        //         m_unpinnedEntries.erase(unpinnedIt);
+        //         break;
+        //     }
+        // }
 
         return m_liveEntries[blockId];
     }
 
     void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
-        m_unpinnedEntries.push_front(blockId);
+        //m_unpinnedEntries.push_front(blockId);
     }
 
     void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
-        assert(false);
+        //assert(false);
     }
 }

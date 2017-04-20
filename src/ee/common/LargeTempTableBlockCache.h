@@ -22,7 +22,6 @@
 #ifndef VOLTDB_LARGETEMPTABLEBLOCKCACHE_H
 #define VOLTDB_LARGETEMPTABLEBLOCKCACHE_H
 
-#include <array>
 #include <deque>
 #include <list>
 #include <map>
@@ -31,65 +30,19 @@
 
 #include <boost/scoped_array.hpp>
 
+#include "storage/LargeTempTableBlock.h"
 #include "common/types.h"
 
 namespace voltdb {
 
-    // Move this to ee/storage? xxx
-    class LargeTempTableBlock {
-        friend class LargeTempTableTest_MultiBlock;
-    public:
-        LargeTempTableBlock()
-            : m_data(new char[getBlocksize()])
-            , m_usedBytes(0)
-        {
-        }
+    class LargeTempTable;
 
-        static size_t getBlocksize() {
-            return blocksizeRef();
-        }
-
-        char* getData() {
-            return m_data;
-        }
-
-        void incrementUsedBytes(size_t byteCount) {
-            m_usedBytes += byteCount;
-        }
-
-        size_t getUsedBytes() const {
-            return m_usedBytes;
-        }
-
-        size_t getRemainingBytes() const {
-            return getBlocksize() - getUsedBytes();
-        }
-
-        void makeEmpty() {
-            m_usedBytes = 0;
-        }
-
-        // xxx make this protected
-        static void setBlocksize(size_t newSize) {
-            blocksizeRef() = newSize;
-        }
-
-    private:
-
-        static size_t& blocksizeRef() {
-            static size_t theBlocksize = 2 * 1024 * 1024;
-            return theBlocksize;
-        }
-
-        char* m_data;
-        size_t m_usedBytes;
-    };
-
+    // xxx This class really belongs in storage
     class LargeTempTableBlockCache {
     public:
         LargeTempTableBlockCache();
 
-        std::pair<int64_t, LargeTempTableBlock*> getEmptyBlock();
+        std::pair<int64_t, LargeTempTableBlock*> getEmptyBlock(LargeTempTable* ltt);
 
         void unpinBlock(int64_t blockId);
 
@@ -107,13 +60,13 @@ namespace voltdb {
             return nextId;
         }
 
-        std::array<LargeTempTableBlock, NUM_CACHE_ENTRIES> m_cache;
+        std::vector<LargeTempTableBlock> m_cache;
 
-        std::vector<LargeTempTableBlock*> m_emptyEntries;
+        /* std::vector<LargeTempTableBlock*> m_emptyEntries; */
 
         std::map<int64_t, LargeTempTableBlock*> m_liveEntries;
 
-        std::list<int64_t> m_unpinnedEntries;
+        /* std::list<int64_t> m_unpinnedEntries; */
 
         int64_t m_nextId;
     };

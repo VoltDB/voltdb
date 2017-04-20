@@ -29,6 +29,7 @@
 namespace voltdb {
 
 class LargeTableIterator;
+class LargeTempTableBlock;
 
 class LargeTempTable : public Table {
 
@@ -78,14 +79,7 @@ public:
 
 protected:
 
-    LargeTempTable()
-        : Table(LargeTempTableBlock::getBlocksize())
-        , m_iter(this)
-        , m_blockForWriting(nullptr)
-        , m_blockIds()
-        , m_numTuples(0)
-    {
-    }
+    LargeTempTable();
 
 private:
 

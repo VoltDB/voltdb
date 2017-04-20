@@ -85,6 +85,7 @@ class TableTuple {
     // friend access is intended to allow write access to the tuple flags -- try not to abuse it...
     friend class Table;
     friend class TempTable;
+    friend class LargeTempTable;
     friend class PersistentTable;
     friend class ElasticScanner;
     friend class PoolBackedTupleStorage;

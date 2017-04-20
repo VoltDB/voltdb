@@ -80,30 +80,30 @@ bool LargeTableIterator::next(TableTuple& out) {
         return false;
     }
 
-    char* data = m_currBlock->getData();
-    ReferenceSerializeInputBE input(data + m_currPosition,
-                                    LargeTempTableBlock::getBlocksize() - m_currPosition);
-    out = m_storage.tuple();
+    /* char* data = m_currBlock->getData(); */
+    /* ReferenceSerializeInputBE input(data + m_currPosition, */
+    /*                                 LargeTempTableBlock::getBlocksize() - m_currPosition); */
+    /* out = m_storage.tuple(); */
 
-    out.deserializeFrom(input, ExecutorContext::getTempStringPool());
+    /* out.deserializeFrom(input, ExecutorContext::getTempStringPool()); */
 
-    // xxx hack!
-    m_currPosition = input.getRawPointer() - data;
+    /* // xxx hack! */
+    /* m_currPosition = input.getRawPointer() - data; */
 
-    assert(m_currPosition <= m_currBlock->getUsedBytes());
-    if (m_currPosition == m_currBlock->getUsedBytes()) {
-        LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    /* assert(m_currPosition <= m_currBlock->getUsedBytes()); */
+    /* if (m_currPosition == m_currBlock->getUsedBytes()) { */
+    /*     LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache(); */
 
-        // unpin the current block
-        lttCache->unpinBlock(*m_blockIterator);
+    /*     // unpin the current block */
+    /*     lttCache->unpinBlock(*m_blockIterator); */
 
-        // Get the next block if one exists
-        ++m_blockIterator;
-        if (m_blockIterator != std::end(*m_blockIds)) {
-            m_currBlock = lttCache->fetchBlock(*m_blockIterator);
-            m_currPosition = 0;
-        }
-    }
+    /*     // Get the next block if one exists */
+    /*     ++m_blockIterator; */
+    /*     if (m_blockIterator != std::end(*m_blockIds)) { */
+    /*         m_currBlock = lttCache->fetchBlock(*m_blockIterator); */
+    /*         m_currPosition = 0; */
+    /*     } */
+    /* } */
 
     return true;
 }

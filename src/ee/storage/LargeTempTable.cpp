@@ -22,16 +22,25 @@
 #include "common/LargeTempTableBlockCache.h"
 #include "storage/LargeTableIterator.h"
 #include "storage/LargeTempTable.h"
+#include "storage/LargeTempTableBlock.h"
 
 namespace voltdb {
 
-bool LargeTempTable::insertTuple(TableTuple& tuple) {
-    ReferenceSerializeOutput output;
+    // Copied from temptable.h
+    static const int BLOCKSIZE = 131072;
 
-    size_t neededBytes = tuple.serializationSize();
+    LargeTempTable::LargeTempTable()
+        : Table(BLOCKSIZE)
+        , m_iter(this)
+        , m_blockForWriting(nullptr)
+        , m_blockIds()
+    {
+    }
 
-    // Do we need to request a tuple block?
-    if (m_blockForWriting == nullptr || neededBytes > m_blockForWriting->getRemainingBytes()) {
+bool LargeTempTable::insertTuple(TableTuple& source) {
+    TableTuple target(m_schema);
+
+    if (m_blockForWriting == nullptr || !m_blockForWriting->hasFreeTuples()) {
         LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
         if (m_blockForWriting != nullptr) {
@@ -40,19 +49,15 @@ bool LargeTempTable::insertTuple(TableTuple& tuple) {
         }
 
         int64_t nextBlockId;
-        std::tie(nextBlockId, m_blockForWriting) = lttBlockCache->getEmptyBlock();
+        std::tie(nextBlockId, m_blockForWriting) = lttBlockCache->getEmptyBlock(this);
         m_blockIds.push_back(nextBlockId);
-        assert(neededBytes <= m_blockForWriting->getRemainingBytes());
     }
 
-    size_t startPos = m_blockForWriting->getUsedBytes();
-    output.initializeWithPosition(m_blockForWriting->getData(), LargeTempTableBlock::getBlocksize(), startPos);
-    tuple.serializeTo(output);
-
-    size_t usedBytes = output.position() - startPos;
-    m_blockForWriting->incrementUsedBytes(usedBytes);
-
-    ++m_numTuples;
+    char* data;
+    std::tie(data, std::ignore) = m_blockForWriting->nextFreeTuple();
+    target.move(data);
+    target.copyForPersistentInsert(source, m_blockForWriting->getPool()); // tuple in freelist must be already cleared
+    target.setActiveTrue();
 
     return true;
 }
