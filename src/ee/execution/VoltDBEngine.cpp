@@ -643,8 +643,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
-    //When loading catalog we do isStreamUpdate to false as stream tables will get created and thus roll will happen.
-    if (processCatalogAdditions(false, timestamp) == false) {
+    //When loading catalog we do isStreamUpdate to true as we are starting fresh or rejoining/recovering.
+    if (processCatalogAdditions(true, timestamp) == false) {
         return false;
     }
 
@@ -1249,6 +1249,48 @@ void VoltDBEngine::rebuildTableCollections() {
 
     }
     resetDRConflictStreamedTables();
+}
+
+void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table2) {
+    TableCatalogDelegate* tcd1 = getTableDelegate(table1->name());
+    TableCatalogDelegate* tcd2 = getTableDelegate(table2->name());
+    assert(!tcd1->materialized());
+    assert(!tcd2->materialized());
+    // Point the Map from signature hash point to the correct persistent tables
+    int64_t hash1 = *reinterpret_cast<const int64_t*>(tcd1->signatureHash());
+    int64_t hash2 = *reinterpret_cast<const int64_t*>(tcd2->signatureHash());
+    // Most swap action is already done.
+    // But hash(tcd1) is still pointing to old persistent table1, which is now table2.
+    assert(m_tablesBySignatureHash[hash1] == table2);
+    assert(m_tablesBySignatureHash[hash2] == table1);
+    m_tablesBySignatureHash[hash1] = table1;
+    m_tablesBySignatureHash[hash2] = table2;
+    table1->signature(tcd1->signatureHash());
+    table2->signature(tcd2->signatureHash());
+
+    // Generate swap table DREvent
+    assert(table1->isDREnabled() == table2->isDREnabled());
+    assert(table1->isDREnabled()); // This is checked before calling this method.
+    int64_t lastCommittedSpHandle = m_executorContext->lastCommittedSpHandle();
+    int64_t spHandle = m_executorContext->currentSpHandle();
+    int64_t uniqueId = m_executorContext->currentUniqueId();
+    // Following are stored: name1.length, name1, name2.length, name2, hash1, hash2
+    int32_t bufferLength = 4 + table1->name().length() + 4 + table2->name().length() + 8 + 8;
+    char* payloadBuffer[bufferLength];
+    ExportSerializeOutput io(payloadBuffer, bufferLength);
+    io.writeBinaryString(table1->name().c_str(), table1->name().length());
+    io.writeBinaryString(table2->name().c_str(), table2->name().length());
+    io.writeLong(hash1);
+    io.writeLong(hash2);
+    ByteArray payload(io.data(), io.size());
+
+    quiesce(lastCommittedSpHandle);
+    m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+            spHandle, uniqueId, payload);
+    if (m_executorContext->drReplicatedStream()) {
+        m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+                spHandle, uniqueId, payload);
+    }
 }
 
 void VoltDBEngine::resetDRConflictStreamedTables() {

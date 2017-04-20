@@ -22,7 +22,7 @@ create procedure from class sqlcmdtest.Trivial;
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  	tinyint, tinyint
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -72,7 +72,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  	tinyint, tinyint
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -109,7 +109,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  	tinyint, tinyint
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -186,7 +186,7 @@ create procedure from class sqlcmdtest.Trivial;
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  	tinyint, tinyint
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -241,7 +241,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  	tinyint, tinyint
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -304,7 +304,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  	tinyint, tinyint
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -368,7 +368,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  	tinyint, tinyint
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -431,7 +431,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  	tinyint, tinyint
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar

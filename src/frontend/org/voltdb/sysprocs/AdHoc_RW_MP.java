@@ -20,7 +20,6 @@ package org.voltdb.sysprocs;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Database;
 
 /**
  * Execute a user-provided read-write multi-partition SQL statement.
@@ -33,17 +32,12 @@ import org.voltdb.catalog.Database;
 @ProcInfo(singlePartition = false)
 public class AdHoc_RW_MP extends AdHocBase {
 
-    Database m_db = null;
-
     /**
      * System procedure run hook.
      * Use the base class implementation.
      *
-     * @param ctx  execution context
-     * @param aggregatorFragments  aggregator plan fragments
-     * @param collectorFragments  collector plan fragments
-     * @param sqlStatements  source SQL statements
-     * @param replicatedTableDMLFlags  flags set to 1 when replicated
+     * @param ctx execution context
+     * @param serializedBatchData serialized batch data
      *
      * @return  results as VoltTable array
      */
