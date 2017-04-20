@@ -107,18 +107,28 @@ def basicCheck(runner):
                                 [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING],
                                 [runner.opts.newKit, runner.opts.newRoot])
     error = False
+    warnings = ""
     for tuple in response.table(0).tuples():
         hostId = tuple[0]
         result = tuple[1]
+        warning = tuple[2]
         if result != 'Success':
             error = True
             host = hosts.hosts_by_id[hostId]
             if host is None:
                 runner.abort('@CheckUpgradePlanNT returns a host id ' + hostId + " that doesn't belong to the cluster.")
             runner.error('Check failed on host ' + getHostnameOrIp(host) + " with the cause: " + result)
+        if warning is not None:
+            host = hosts.hosts_by_id[hostId]
+            if host is None:
+                runner.abort('@CheckUpgradePlanNT returns a host id ' + hostId + " that doesn't belong to the cluster.")
+            warnings += 'On host ' + getHostnameOrIp(host) + ': \n' + warning + '\n'
 
     if error:
         runner.abort("Failed to pass pre-upgrade check. Abort. ")
+    if warnings != "":
+        runner.warning(warnings[:-1])  # get rid of last '\n'
+
     print '[1/4] Passed new VoltDB kit version check.'
     print '[2/4] Passed new VoltDB root path existence check.'
 
@@ -447,8 +457,8 @@ def createDeploymentForOriginalCluster(runner, xmlString, drSource, origin_clust
 
     dr = et.getroot().find('./dr')
     if dr is None:
-        runner.abort("This cluster doesn't have a DR tag in its deployment file, hence we can't generate online upgrade plan for it. \
-                    Please note add DR tag to your deployment file requires to shutdown and restart the database.")
+        runner.abort("This cluster doesn't have a DR tag in its deployment file, hence we can't generate online upgrade plan for it. " +
+                     "In order to add DR tag to the deployment file, users are required to shutdown the database.")
 
     if 'id' not in dr.attrib:
         clusterId = 0;  # by default clusterId is 0
