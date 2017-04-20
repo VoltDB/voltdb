@@ -830,22 +830,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
-            final File stagedCatalogLocation = new VoltFile(RealVoltDB.getStagedCatalogPath(config.m_voltdbRoot.getAbsolutePath()));
-            if (stagedCatalogLocation.isFile()) {
-                switch (config.m_startAction) {
-                case PROBE:
-                    assert (config.m_pathToCatalog == null) : config.m_pathToCatalog;
-                    config.m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
-                    break;
-                case INITIALIZE:
-                    // existence of previous staged catalog will be addressed later
-                    break;
-                default:
-                    hostLog.warn("Initialized schema is present, but is being ignored and may be removed.");
-                    break;
-                }
-            }
-
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
                 try {
@@ -878,6 +862,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // config UUID is part of the status tracker.
             m_statusTracker = new NodeStateTracker();
+            final File stagedCatalogLocation = new VoltFile(RealVoltDB.getStagedCatalogPath(config.m_voltdbRoot.getAbsolutePath()));
 
             if (config.m_startAction.isLegacy()) {
                 File rootFH = CatalogUtil.getVoltDbRoot(readDepl.deployment.getPaths());
@@ -902,6 +887,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             return;
                         }
                     }
+                }
+                if (stagedCatalogLocation.isFile()) {
+                    hostLog.warn("Initialized schema is present, but is being ignored and may be removed.");
+                }
+            } else {
+                assert (config.m_startAction == StartAction.PROBE);
+                if (stagedCatalogLocation.isFile()) {
+                    assert (config.m_pathToCatalog == null) : config.m_pathToCatalog;
+                    config.m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
                 }
             }
 

@@ -161,11 +161,7 @@ final public class TestStartWithSchema {
             cluster.startUp(clearLocalDataDirectories, skipInit);
             fail("Cluster started with mismatched schemas");
         } catch (Exception e){
-            if (e.getMessage() != null &&
-                    e.getMessage().contains("external processes failed to start"))
-            {
-                // expected
-            } else {
+            if (e.getMessage() == null || !e.getMessage().contains("external processes failed to start")){
                 throw e;
             }
         }
@@ -184,11 +180,7 @@ final public class TestStartWithSchema {
             cluster.startUp(clearLocalDataDirectories, skipInit);
             fail("Cluster started with a node missing the staged schema");
         } catch (Exception e){
-            if (e.getMessage() != null &&
-                e.getMessage().contains("external processes failed to start"))
-            {
-                // expected
-            } else {
+            if (e.getMessage() == null || !e.getMessage().contains("external processes failed to start")){
                 throw e;
             }
         }
