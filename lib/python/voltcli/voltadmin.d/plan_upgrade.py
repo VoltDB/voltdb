@@ -119,12 +119,15 @@ def basicCheck(runner):
                 runner.abort('@CheckUpgradePlanNT returns a host id ' + hostId + " that doesn't belong to the cluster.")
             runner.error('Check failed on host ' + getHostnameOrIp(host) + " with the cause: " + result)
         if warning is not None:
-            warnings += 'On host ' + getHostnameOrIp(host) + ': \n' + warning
+            host = hosts.hosts_by_id[hostId]
+            if host is None:
+                runner.abort('@CheckUpgradePlanNT returns a host id ' + hostId + " that doesn't belong to the cluster.")
+            warnings += 'On host ' + getHostnameOrIp(host) + ': \n' + warning + '\n'
 
     if error:
         runner.abort("Failed to pass pre-upgrade check. Abort. ")
     if warnings != "":
-        runner.warning(warnings)
+        runner.warning(warnings[:-1])  # get rid of last '\n'
 
     print '[1/4] Passed new VoltDB kit version check.'
     print '[2/4] Passed new VoltDB root path existence check.'
