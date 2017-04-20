@@ -193,14 +193,13 @@ public class VoltCompiler {
 
         public String getLogString() {
             String retval = new String();
-            if (fileName != null) {
+            if (! fileName.equals(NO_FILENAME)) {
                 retval += "[" + fileName;
                 if (lineNo != NO_LINE_NUMBER)
                     retval += ":" + lineNo;
-                retval += "]";
+                retval += "]: ";
             }
-
-            retval += ": " + message;
+            retval += message;
             return retval;
         }
 
@@ -962,7 +961,7 @@ public class VoltCompiler {
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             String origFilename = m_currentFilename;
             try {
-                if (m_currentFilename == null || m_currentFilename.equals(NO_FILENAME))
+                if (m_currentFilename.equals(NO_FILENAME))
                     m_currentFilename = schemaReader.getName();
 
                 // add the file object's path to the list of files for the jar

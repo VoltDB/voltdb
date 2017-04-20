@@ -23,6 +23,7 @@ package org.voltdb.catalog;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Set;
 
 
 /**
@@ -262,27 +263,29 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         sb.append("\n");
     }
 
-    void writeFieldCommands(StringBuilder sb) {
+    void writeFieldCommands(StringBuilder sb, Set<String> whiteListFields) {
         int i = 0;
         for (String field : getFields()) {
-            writeCommandForField(sb, field, i == 0);
-            ++i;
+            if (whiteListFields == null || whiteListFields.contains(field)) {
+                writeCommandForField(sb, field, i == 0);
+                ++i;
+            }
         }
     }
 
     void writeChildCommands(StringBuilder sb)  {
-        writeChildCommands(sb, null);
+        writeChildCommands(sb, null, null);
     }
 
     /**
      * Write catalog commands of the children in the white list.
      * @param whiteList A white list of CatalogType classes
      */
-    void writeChildCommands(StringBuilder sb, Collection<Class<? extends CatalogType> > whiteList)  {
+    void writeChildCommands(StringBuilder sb, Collection<Class<? extends CatalogType> > whiteList, Set<String> whiteListFields)  {
         for (String childCollection : getChildCollections()) {
             CatalogMap<? extends CatalogType> map = getCollection(childCollection);
             if (whiteList == null || whiteList.contains(map.m_cls)) {
-                map.writeCommandsForMembers(sb);
+                map.writeCommandsForMembers(sb, whiteListFields);
             }
         }
     }

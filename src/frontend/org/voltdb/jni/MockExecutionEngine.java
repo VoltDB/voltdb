@@ -25,6 +25,7 @@ import java.util.Random;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.HybridCrc32;
 import org.voltdb.ParameterSet;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -33,6 +34,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
+import org.voltdb.messaging.FastDeserializer;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -44,16 +46,19 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    protected VoltTable[] coreExecutePlanFragments(
+    protected FastDeserializer coreExecutePlanFragments(
+            final int bufferHint,
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            final boolean[] isWriteFrag,
+            final HybridCrc32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
-            final long undoToken) throws EEException
+            final long undoToken, boolean traceOn) throws EEException
     {
         if (numFragmentIds != 1) {
             return null;
@@ -116,7 +121,9 @@ public class MockExecutionEngine extends ExecutionEngine {
                   new VoltTable.ColumnInfo("foo", VoltType.INTEGER)
         });
         vt.addRow(Integer.valueOf(1));
-        return new VoltTable[] { vt };
+        ByteBuffer buf = ByteBuffer.allocate(vt.getSerializedSize());
+        vt.flattenToBuffer(buf);
+        return new FastDeserializer(buf);
     }
 
     @Override
@@ -129,7 +136,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void coreUpdateCatalog(final long txnId, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(final long txnId, final boolean isStreamUpdate, final String catalogDiffs) throws EEException {
     }
 
     @Override

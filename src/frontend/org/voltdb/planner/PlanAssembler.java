@@ -212,7 +212,7 @@ public class PlanAssembler {
         return false;
     }
 
-    private boolean isPartitionColumnInGroupbyList(ArrayList<ParsedColInfo> groupbyColumns) {
+    private boolean isPartitionColumnInGroupbyList(List<ParsedColInfo> groupbyColumns) {
         assert(m_parsedSelect != null);
 
         if (groupbyColumns == null) {
@@ -305,7 +305,7 @@ public class PlanAssembler {
             m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
-            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_groupByColumns)) {
+            if (isPartitionColumnInGroupbyList(m_parsedSelect.groupByColumns())) {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
             if (isPartitionColumnInWindowedAggregatePartitionByList()) {
@@ -2522,11 +2522,14 @@ public class PlanAssembler {
                 }
             }
 
-            int outputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
             NodeSchema top_agg_schema = new NodeSchema();
 
-            for (ParsedColInfo col : m_parsedSelect.m_aggResultColumns) {
+
+            for ( int outputColumnIndex = 0;
+                    outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
+                    outputColumnIndex += 1) {
+                ParsedColInfo col = m_parsedSelect.m_aggResultColumns.get(outputColumnIndex);
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
@@ -2555,12 +2558,12 @@ public class PlanAssembler {
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
-                            tve);
+                            tve, outputColumnIndex);
                     top_schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
-                            tve);
+                            tve, outputColumnIndex);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -2649,7 +2652,8 @@ public class PlanAssembler {
                     schema_col = new SchemaColumn(
                             col.tableName, col.tableAlias,
                             col.columnName, col.alias,
-                            col.expression);
+                            col.expression,
+                            outputColumnIndex);
                     AbstractExpression topExpr = null;
                     if (col.groupBy) {
                         topExpr = m_parsedSelect.m_groupByExpressions.get(col.alias);
@@ -2659,15 +2663,15 @@ public class PlanAssembler {
                     }
                     top_schema_col = new SchemaColumn(
                             col.tableName, col.tableAlias,
-                            col.columnName, col.alias, topExpr);
+                            col.columnName, col.alias,
+                            topExpr, outputColumnIndex);
                 }
 
                 agg_schema.addColumn(schema_col);
                 top_agg_schema.addColumn(top_schema_col);
-                outputColumnIndex++;
             }// end for each ParsedColInfo in m_aggResultColumns
 
-            for (ParsedColInfo col : m_parsedSelect.m_groupByColumns) {
+            for (ParsedColInfo col : m_parsedSelect.groupByColumns()) {
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
@@ -2707,7 +2711,7 @@ public class PlanAssembler {
                 index, fromTableAlias, bindings);
         gbInfo.m_canBeFullySerialized =
                 (gbInfo.m_coveredGroupByColumns.size() ==
-                m_parsedSelect.m_groupByColumns.size());
+                m_parsedSelect.groupByColumns().size());
     }
 
     // Turn sequential scan to index scan for group by if possible
@@ -2721,7 +2725,7 @@ public class PlanAssembler {
         String fromTableAlias = root.getTargetTableAlias();
         assert(fromTableAlias != null);
 
-        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
+        List<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns();
         Table targetTable = m_catalogDb.getTables().get(root.getTargetTableName());
         assert(targetTable != null);
         CatalogMap<Index> allIndexes = targetTable.getIndexes();
@@ -2775,7 +2779,7 @@ public class PlanAssembler {
             List<AbstractExpression> bindings) {
         List<Integer> coveredGroupByColumns = new ArrayList<>();
 
-        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.m_groupByColumns;
+        List<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns();
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {
             List<ColumnRef> indexedColRefs =
@@ -3153,7 +3157,7 @@ public class PlanAssembler {
         AggregatePlanNode distinctAggNode = new HashAggregatePlanNode();
         distinctAggNode.setOutputSchema(m_parsedSelect.getDistinctProjectionSchema());
 
-        for (ParsedColInfo col : m_parsedSelect.m_distinctGroupByColumns) {
+        for (ParsedColInfo col : m_parsedSelect.distinctGroupByColumns()) {
             distinctAggNode.addGroupByExpression(col.expression);
         }
 

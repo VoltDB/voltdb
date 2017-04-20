@@ -71,7 +71,10 @@ protected:
     void validateRow(voltdb::TableTuple &tuple, int32_t valueA, double valueB, const char* valueC) {
         ASSERT_EQ(valueA, voltdb::ValuePeeker::peekInteger(tuple.getNValue(0)));
         ASSERT_EQ(valueB, voltdb::ValuePeeker::peekDouble(tuple.getNValue(1)));
-        ASSERT_EQ(0, strcmp(valueC, voltdb::ValuePeeker::peekObjectValue(tuple.getNValue(2))));
+
+        int32_t length = 0;
+        const char* data = voltdb::ValuePeeker::peekObject(tuple.getNValue(2), &length);
+        ASSERT_EQ(0, strncmp(valueC, data, length));
     }
 
     void validatePerFragmentStatsBuffer(int32_t expectedSucceededFragmentsCount, int32_t batchSize) {
@@ -125,7 +128,7 @@ TEST_F(PerFragmentStatsTest, TestPerFragmentStatsBuffer) {
     voltdb::ReferenceSerializeInputBE params(m_parameter_buffer.get(), m_smallBufferSize);
     m_engine->resetPerFragmentStatsOutputBuffer();
     // This batch should succeed and return 0.
-    ASSERT_EQ(0, m_engine->executePlanFragments(4, planfragmentIds, NULL, params, 1000, 1000, 1000, 1000, 1));
+    ASSERT_EQ(0, m_engine->executePlanFragments(4, planfragmentIds, NULL, params, 1000, 1000, 1000, 1000, 1, false));
     // Fetch the results. We have forced them to be written
     // to our own buffer in the local engine.  But we don't
     // know how much of the buffer is actually used.  So we
@@ -164,7 +167,7 @@ TEST_F(PerFragmentStatsTest, TestPerFragmentStatsBuffer) {
     addParameters(1, 4.0, "str%%");
     // This batch should FAIL and return 1.
     m_engine->resetPerFragmentStatsOutputBuffer();
-    ASSERT_EQ(1, m_engine->executePlanFragments(4, planfragmentIds, NULL, params, 1001, 1001, 1001, 1001, 2));
+    ASSERT_EQ(1, m_engine->executePlanFragments(4, planfragmentIds, NULL, params, 1001, 1001, 1001, 1001, 2, false));
     // Verify that 2 out of 4 fragments succeeded.
     validatePerFragmentStatsBuffer(2, 4);
     delete[] planfragmentIds;

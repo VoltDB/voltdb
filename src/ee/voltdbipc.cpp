@@ -355,6 +355,12 @@ typedef struct {
     char log[0];
 }__attribute__((packed)) apply_binary_log;
 
+typedef struct {
+    struct ipc_command cmd;
+    int64_t timestamp;
+    int32_t isStreamChange;
+    char data[0];
+}__attribute__((packed)) update_catalog_cmd;
 
 using namespace voltdb;
 
@@ -565,18 +571,13 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
 
 int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
     assert(m_engine);
+    update_catalog_cmd *uc = (update_catalog_cmd*) cmd;
     if (!m_engine) {
         return kErrorCode_Error;
     }
 
-    struct updatecatalog {
-        struct ipc_command cmd;
-        int64_t timestamp;
-        char data[];
-    };
-    struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
+        if (m_engine->updateCatalog(ntohll(uc->timestamp), (uc->isStreamChange != 0), std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
     }
@@ -638,9 +639,11 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_perFragmentStatsBuffer = new char[MAX_MSG_SZ];
         std::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
         m_exceptionBuffer = new char[MAX_MSG_SZ];
-        m_engine->setBuffers(NULL, 0, m_perFragmentStatsBuffer, MAX_MSG_SZ,
-                                      m_reusedResultBuffer, MAX_MSG_SZ,
-                                      m_exceptionBuffer, MAX_MSG_SZ);
+        m_engine->setBuffers(NULL, 0,
+                             m_perFragmentStatsBuffer, MAX_MSG_SZ,
+                             NULL, 0,
+                             m_reusedResultBuffer, MAX_MSG_SZ,
+                             m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
         m_tupleBufferSize = MAX_MSG_SZ;
         m_tupleBuffer = new char[m_tupleBufferSize];
@@ -791,6 +794,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
 
     // and reset to space for the results output
     m_engine->resetReusedResultOutputBuffer(1); // 1 byte to add status code
+    // We can't update the result from getResultsBuffer (which may use the failoverBuffer)
+    m_reusedResultBuffer[0] = kErrorCode_Success;
     m_engine->resetPerFragmentStatsOutputBuffer(queryCommand->perFragmentTimingEnabled);
 
     try {
@@ -802,7 +807,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
                                                 ntohll(queryCommand->spHandle),
                                                 ntohll(queryCommand->lastCommittedSpHandle),
                                                 ntohll(queryCommand->uniqueId),
-                                                ntohll(queryCommand->undoToken));
+                                                ntohll(queryCommand->undoToken),
+                                                false);
     }
     catch (const FatalException &e) {
         crashVoltDB(e);
@@ -814,9 +820,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     if (errors == 0) {
         // write the results array back across the wire
         const int32_t size = m_engine->getResultsSize();
-        char *resultBuffer = m_engine->getReusedResultBuffer();
-        resultBuffer[0] = kErrorCode_Success;
-        writeOrDie(m_fd, (unsigned char*)resultBuffer, size);
+        writeOrDie(m_fd, m_engine->getResultsBuffer(), size);
     } else {
         sendException(kErrorCode_Error);
     }
@@ -1232,7 +1236,7 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
                 const int32_t size = m_engine->getResultsSize();
                 // write the dependency tables back across the wire
                 // the result set includes the total serialization size
-                writeOrDie(m_fd, (unsigned char*)(m_engine->getReusedResultBuffer()), size);
+                writeOrDie(m_fd, m_engine->getResultsBuffer(), size);
             }
             else {
                 int32_t zero = 0;
@@ -1578,11 +1582,11 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
         voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
         ReferenceSerializeInputBE input(task->task, MAX_MSG_SZ);
         m_engine->resetReusedResultOutputBuffer(1);
+        // We can't update the result from getResultsBuffer (which may use the failoverBuffer)
+        m_reusedResultBuffer[0] = kErrorCode_Success;
         m_engine->executeTask(taskId, input);
         int32_t responseLength = m_engine->getResultsSize();
-        char *resultsBuffer = m_engine->getReusedResultBuffer();
-        resultsBuffer[0] = kErrorCode_Success;
-        writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
+        writeOrDie(m_fd, m_engine->getResultsBuffer(), responseLength);
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }

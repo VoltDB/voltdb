@@ -21,7 +21,7 @@ create procedure from class sqlcmdtest.Trivial;
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -37,6 +37,9 @@ create procedure from class sqlcmdtest.Trivial;
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -67,7 +70,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -83,6 +86,9 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -100,7 +106,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -116,6 +122,9 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -173,7 +182,7 @@ create procedure from class sqlcmdtest.Trivial;
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -189,6 +198,9 @@ create procedure from class sqlcmdtest.Trivial;
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -224,7 +236,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -240,6 +252,9 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -283,7 +298,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -299,6 +314,9 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -343,7 +361,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -359,6 +377,9 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -402,7 +423,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -418,6 +439,9 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar

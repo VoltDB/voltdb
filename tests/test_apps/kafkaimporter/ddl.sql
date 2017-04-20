@@ -84,13 +84,13 @@ CREATE TABLE kafkamirrortable2
 PARTITION TABLE kafkamirrortable2 ON COLUMN key;
 
 -- Export table
-CREATE STREAM kafkaexporttable1 PARTITION ON COLUMN KEY
+CREATE STREAM kafkaexporttable1 PARTITION ON COLUMN KEY EXPORT TO TARGET default
      (
                   KEY   BIGINT NOT NULL ,
                   value BIGINT NOT NULL
      );
 
-CREATE STREAM kafkaexporttable2 PARTITION ON COLUMN KEY
+CREATE STREAM kafkaexporttable2 PARTITION ON COLUMN KEY EXPORT TO TARGET default
     (
           key                       BIGINT        NOT NULL
         , value                     BIGINT        NOT NULL

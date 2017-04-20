@@ -59,12 +59,12 @@ public class Quiesce extends VoltSystemProcedure {
                 context.getSiteProcedureConnection().quiesce();
                 VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
                 results.addRow(context.getSiteId());
-                return new DependencyPair(DEP_SITES, results);
+                return new DependencyPair.TableDependencyPair(DEP_SITES, results);
             }
             else if (fragmentId == SysProcFragmentId.PF_quiesce_processed_sites) {
                 VoltTable dummy = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
                 dummy.addRow(VoltSystemProcedure.STATUS_OK);
-                return new DependencyPair(DEP_PROCESSED_SITES, dummy);
+                return new DependencyPair.TableDependencyPair(DEP_PROCESSED_SITES, dummy);
             }
         }
         catch (Exception ex) {

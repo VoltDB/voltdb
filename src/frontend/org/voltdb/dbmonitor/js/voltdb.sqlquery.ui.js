@@ -78,7 +78,7 @@ $(document).ready(function () {
         gutter.dispatchEvent(mousemove);
         gutter.dispatchEvent(mouseup);
     };
-    
+
     $("#bntTimeoutSetting").popup({
         open: function (event, ui, ele) {
             $("#errorQueryTimeoutConfig").hide();
@@ -447,7 +447,7 @@ $(document).ready(function () {
         return false;
     });
 
-    // Table Accordion	
+    // Table Accordion
     $('#accordionTable').accordion({
         collapsible: true,
         active: false,
@@ -479,7 +479,7 @@ $(document).ready(function () {
     });
 
 
-    // Views Accordion	
+    // Views Accordion
     $('#accordionViews').accordion({
         collapsible: true,
         active: false,
@@ -738,7 +738,6 @@ $(document).ready(function () {
             $('#querybox-'+tab_counter).text(tabQuery == undefined ? '' : tabQuery)
             SQLQueryRender.addQueryBtn(tab_counter)
 
-
             $('#exportType-' + tab_counter).change(function () {
                 var tab_id = $(this).attr('id').split('-')[1]
                 if ($('#exportType-'+ tab_id).val() == 'HTML') {
@@ -803,10 +802,26 @@ $(document).ready(function () {
                 SQLQueryRender.queryNameList.push(tabName == undefined ? 'Query' + tab_counter : tabName)
             }
 
+            function handlePaste (e) {
+                var clipboardData, pastedData;
+                // Stop data actually being pasted into div
+                e.stopPropagation();
+                e.preventDefault();
+
+                // Get pasted data via clipboard API
+                clipboardData = e.originalEvent.clipboardData || window.clipboardData;
+                pastedData = clipboardData.getData('Text');
+                var tabCounter = e.target.id.split("-")[1];
+                $("#querybox-" + tabCounter).html(pastedData);
+            }
+
+            $('#querybox-'+tab_counter).bind('paste', handlePaste);
+
             tab_counter++
             this.showHideNewTab()
             SQLQueryRender.enableDisableCrossTab()
         }
+
 
         this.addQueryBtn = function(tab_id){
             var htmlBtn = '<ul class="btnList clsQueryBtnList" id="queryBtnList-'+ tab_id+'"> ' +
@@ -1019,7 +1034,7 @@ $(document).ready(function () {
             defSrcHeader += '<div id="defaultProcedure" class="listView">';
             var defSrcFooter = '</div>';
             defSrc = defSrcHeader + (defSrc != '' ? defSrc : '<div style="font-size:12px">No default stored procedures found.</div>') + defSrcFooter;
-            
+
             var userProcHeader = "";
             userProcHeader += '<h3 id="userDefinedStoredProcs" class="systemHeader">User Defined Stored Procedures</h3>';
             userProcHeader += '<div id="userProcedure" class="listView">';
@@ -1225,7 +1240,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
         modal: true
     });
 
-    // Export Type Change	 
+    // Export Type Change
     $('#exportType').change(function () {
         if ($('#exportType').val() == 'HTML') {
             $('#resultHtml').css('display', 'block');

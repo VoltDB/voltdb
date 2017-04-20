@@ -233,7 +233,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 }
                 pmp.countdownProgress();
             }
-        }
+        } // end while we have more tuples to scan
 
         if (m_aggExec != NULL) {
             m_aggExec->p_execute_finish();

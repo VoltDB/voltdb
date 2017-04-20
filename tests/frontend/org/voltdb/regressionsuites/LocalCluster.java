@@ -482,7 +482,7 @@ public class LocalCluster extends VoltServerConfig {
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
         //if cleardirectory is true we dont skip init.
-        startUp(clearLocalDataDirectories, (clearLocalDataDirectories ? false : true));
+        startUp(clearLocalDataDirectories, ! clearLocalDataDirectories);
     }
 
     public void setForceVoltdbCreate(boolean newVoltdb) {
@@ -600,6 +600,7 @@ public class LocalCluster extends VoltServerConfig {
         m_cmdLines.add(cmdln);
         if (isNewCli) {
             cmdln.m_startAction = StartAction.PROBE;
+            cmdln.enableAdd(action == StartAction.JOIN);
             cmdln.m_hostCount = m_hostCount;
             String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
             String root = m_hostRoots.get(hostIdStr);
@@ -704,12 +705,10 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public void startUp(boolean clearLocalDataDirectories, boolean skipInit) {
-        VoltServerConfig.addInstance(this);
-
-        assert (!m_running);
         if (m_running) {
             return;
         }
+        VoltServerConfig.addInstance(this);
 
         // needs to be called before any call to pick a filename
         VoltDB.setDefaultTimezone();
@@ -2002,6 +2001,22 @@ public class LocalCluster extends VoltServerConfig {
     public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder) throws IOException {
+        return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort, remoteReplicationPort,
+                pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, null);
+    }
+
+    public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
+                                                  int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+                                                  DrRoleType drRole, boolean hasLocalServer, String callingMethodName) throws IOException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort, remoteReplicationPort,
+                pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, callingMethodName);
+    }
+
+    public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
+                                                  int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+                                                  DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
+                                                  String callingMethodName) throws IOException {
         builder.addLiteralSchema(schemaDDL);
         builder.setDrProducerEnabled();
         if (drRole == DrRoleType.REPLICA) {
@@ -2014,6 +2029,9 @@ public class LocalCluster extends VoltServerConfig {
         }
         LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI, false);
         lc.setReplicationPort(replicationPort);
+        if (callingMethodName != null) {
+            lc.setCallingMethodName(callingMethodName);
+        }
         boolean success = lc.compile(builder, pathToVoltDBRoot);
         assert(success);
 
@@ -2041,6 +2059,12 @@ public class LocalCluster extends VoltServerConfig {
         for (String address : getListenerAddresses()) {
             client.createConnection(address);
         }
+        return client;
+    }
+
+    public Client createAdminClient(ClientConfig config) throws IOException {
+        Client client = ClientFactory.createClient(config);
+        client.createConnection(getAdminAddress(0));
         return client;
     }
 

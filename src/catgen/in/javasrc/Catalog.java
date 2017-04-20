@@ -247,7 +247,7 @@ public class Catalog extends CatalogType {
     public String serialize() {
         StringBuilder sb = new StringBuilder();
 
-        writeFieldCommands(sb);
+        writeFieldCommands(sb, null);
         writeChildCommands(sb);
 
         return sb.toString();
