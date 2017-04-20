@@ -25,6 +25,9 @@ import time
 import subprocess
 import json
 
+RELEASE_MAJOR_VERSION = 7
+RELEASE_MINOR_VERSION = 2
+
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
     description="Show status of current cluster and remote cluster(s) it connects to",
@@ -95,9 +98,17 @@ def getClusterInfo(runner):
 
     # get current version and root directory from an arbitrary node
     host = hosts.hosts_by_id.itervalues().next()
+
+    # ClusterId in @SystemInformation is added in v7.2, so must check the version of target cluster to make it work properly.
+    version = host.version
+    versionStr = version.split('.')
+    majorVersion = int(versionStr[0])
+    minorVersion = int(versionStr[1])
+    if majorVersion < RELEASE_MAJOR_VERSION or (majorVersion == RELEASE_MAJOR_VERSION and minorVersion < RELEASE_MINOR_VERSION):
+        runner.abort("Only v7.2 or higher version of VoltDB supports this command. Target cluster running on v" + version + ".")
+
     clusterId = host.clusterid
     fullClusterSize = int(host.fullclustersize)
-    version = host.version
     uptime = host.uptime
 
     response = runner.call_proc('@SystemInformation',
