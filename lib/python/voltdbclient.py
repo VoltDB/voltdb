@@ -854,6 +854,7 @@ class VoltColumn:
     def __init__(self, fser = None, type = None, name = None):
         if fser != None:
             self.type = fser.readByte()
+            self.name = None
         elif type != None and name != None:
             self.type = type
             self.name = name
@@ -862,7 +863,7 @@ class VoltColumn:
         # If the name is empty, use the default "modified tuples". Has to do
         # this because HSQLDB doesn't return a column name if the table is
         # empty.
-        return "(%s: %d)" % (self.name and self.name or "modified tuples",
+        return "(%s: %d)" % (self.name or "modified tuples" ,
                              self.type)
 
     def __eq__(self, other):
@@ -935,6 +936,7 @@ class VoltTable:
         headersize = self.fser.readInt32()
         statuscode = self.fser.readByte()
         columncount = self.fser.readInt16()
+        if statuscode: columncount=0
         for i in xrange(columncount):
             column = VoltColumn(fser = self.fser)
             self.columns.append(column)
@@ -942,6 +944,7 @@ class VoltTable:
 
         # 3.
         rowcount = self.fser.readInt32()
+        if statuscode: rowcount=0
         for i in xrange(rowcount):
             rowsize = self.fser.readInt32()
             # list comprehension: build list by calling read for each column in
