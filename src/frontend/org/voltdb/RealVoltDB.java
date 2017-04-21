@@ -3806,7 +3806,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         consoleLog.info("Promoting replication role from replica to master.");
         hostLog.info("Promoting replication role from replica to master.");
         shutdownReplicationConsumerRole();
-        replaceDRConsumerStatsWithDummy();
         if (m_clientInterface != null) {
             m_clientInterface.setReplicationRole(getReplicationRole());
         }
