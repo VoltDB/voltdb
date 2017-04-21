@@ -176,7 +176,9 @@ $(document).ready(function () {
                     if(localStorage.queries != undefined){
                         queries = $.parseJSON(localStorage.queries)
                         $.each(queries, function(key){
-                            arr.push(key.split('_')[1])
+                            var keySplit = key.split('_')
+                            keySplit.shift()
+                            arr.push(keySplit.join('_'))
                         })
                     }
                     if ($.inArray(value, SQLQueryRender.queryNameList) != -1 || $.inArray(value, arr) != -1) {
@@ -297,7 +299,9 @@ $(document).ready(function () {
         key_index = 0
         if(!$.isEmptyObject(queryData)){
             $.each(queryData, function(key){
-                if(key.split('_')[1] == oldName)
+                keySplit = key.split('_')
+                keySplit.shift()
+                if(keySplit.join('_') == oldName)
                     key_index = parseInt(key.split('_')[0])
             })
         }
@@ -648,7 +652,9 @@ $(document).ready(function () {
             }
 
             $.each( queryData, function( key, value ) {
-                SQLQueryRender.createQueryTab(key.split('_')[1], value)
+                var keySplit = key.split('_')
+                keySplit.shift()
+                SQLQueryRender.createQueryTab(keySplit.join('_'), value)
             });
 
             if($.isEmptyObject(queryData)){
@@ -864,7 +870,7 @@ $(document).ready(function () {
             $('#worktabs ul li').each(function(){
                 count++
             })
-            if(count == 11)
+            if(count >= 11)
                 $('#liNewQuery').hide()
             else
                 $('#liNewQuery').show()
