@@ -21,19 +21,18 @@ import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.ReplicationRole;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
-public class UpdateApplicationCatalog extends UpdateApplicationBase {
+public class Promote extends UpdateApplicationBase {
 
-    public CompletableFuture<ClientResponse> run(byte[] catalogJarBytes, String deploymentString) {
-        // catalogJarBytes if null, when passed along, will tell the
-        // catalog change planner that we want to use the current catalog.
-
-        //
-        // InvocationDispatcher
-        //
+    public CompletableFuture<ClientResponse> run(byte[] jarfileBytes, String classesToDeleteSelector) {
+        if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                    "@Promote issued on non-replica cluster. No action taken.");
+        }
 
         DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
@@ -42,7 +41,7 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         String hostname = "facebook.com";
         AuthUser user = null;
         String invocationName = "@UpdateApplicationCatalog";
-        boolean isPromotion = false;
+        boolean isPromotion = true;
         boolean useDDLSchema = false;
         boolean internalCall = false;
         boolean adminMode = false;
@@ -52,26 +51,15 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
         }
-        // We have an @UAC.  Is it okay to run it?
-        // If we weren't provided operationBytes, it's a deployment-only change and okay to take
-        // master and adhoc DDL method chosen
-        if (catalogJarBytes != null &&
-            useDDLSchema)
-        {
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    "Cluster is configured to use AdHoc DDL to change application " +
-                    "schema.  Use of @UpdateApplicationCatalog is forbidden.");
-        }
 
         ChangeDescription ccr = null;
         try {
             ccr = prepareApplicationCatalogDiff(invocationName,
-                                                catalogJarBytes,
-                                                deploymentString,
+                                                null,
+                                                null,
                                                 new String[0],
                                                 null,
-                                                false,
+                                                isPromotion,
                                                 drRole,
                                                 useDDLSchema,
                                                 false,
@@ -109,4 +97,5 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                              ccr.deploymentHash,
                              ccr.hasSchemaChange ?  1 : 0);
     }
+
 }

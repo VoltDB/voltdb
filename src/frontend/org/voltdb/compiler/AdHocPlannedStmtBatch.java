@@ -61,6 +61,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     // The original work request to the planner
     public final AdHocPlannerWork work;
 
+    final Object userParamSet;
+
     /**
      * Statement batch constructor.
      *
@@ -84,12 +86,50 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             String errors) {
         this.work = work;
 
+        userParamSet = work.userParamSet;
+
         this.clientHandle = work.clientHandle;
         this.connectionId = work.connectionId;
         this.hostname =
             (work.clientData == null) ? "" : ((Connection)work.clientData).getHostnameAndIPAndPort();
         this.adminConnection = work.adminConnection;
         this.clientData = work.clientData;
+
+        this.plannedStatements = stmts;
+        boolean allReadOnly = true;
+        for (AdHocPlannedStatement plannedStmt : stmts) {
+            // The first non-select statement makes it not read-only.
+            if (!plannedStmt.core.readOnly) {
+                allReadOnly = false;
+                break;
+            }
+        }
+        this.readOnly = allReadOnly;
+        this.partitionParamIndex = partitionParamIndex;
+        this.partitionParamType = partitionParamType;
+        this.partitionParamValue = partitionParamValue;
+        this.errorMsg = errors;
+    }
+
+    /** Secondary constructor for new NTProcs adhoc path */
+    public AdHocPlannedStmtBatch(
+            Object[] userParamSet,
+            String hostname,
+            boolean adminConnection,
+            List<AdHocPlannedStatement> stmts,
+            int partitionParamIndex,
+            VoltType partitionParamType,
+            Object partitionParamValue,
+            String errors) {
+        this.work = null;
+
+        this.userParamSet = userParamSet;
+
+        this.clientHandle = -3;
+        this.connectionId = -3;
+        this.hostname = hostname;
+        this.adminConnection = adminConnection;
+        this.clientData = null;
 
         this.plannedStatements = stmts;
         boolean allReadOnly = true;
@@ -253,7 +293,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         int size = 0; // sizeof batch
 
         ParameterSet userParamCache = null;
-        if (work.userParamSet == null) {
+        if (userParamSet == null) {
             userParamCache = ParameterSet.emptyParameterSet();
         } else {
             Object[] typedUserParams = new Object[work.userParamSet.length];

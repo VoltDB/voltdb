@@ -15,31 +15,27 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.sysprocs;
 
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import org.voltdb.CatalogContext;
+import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 
-/**
- * Sysproc variant of VoltNTProcedure adds the all-hosts method.
- *
- */
-public class VoltNTSystemProcedure extends VoltNonTransactionalProcedure {
+public class SwapTables extends AdHocNTBase {
 
-    /**
-     * Run a non-transactional (only) procedure on each live host.
-     */
-    protected CompletableFuture<Map<Integer,ClientResponse>> callNTProcedureOnAllHosts(String procName, Object... params) {
-        return m_runner.callAllNodeNTProcedure(procName, params);
-    }
+    public CompletableFuture<ClientResponse> run(String theTable, String otherTable) {
+        String sql = "@SwapTables " + theTable + " " + otherTable;
+        Object[] userParams = null;
 
-    protected String getHostname() {
-        return "www.evilbunnies.com";
-    }
+        CatalogContext context = VoltDB.instance().getCatalogContext();
+        List<String> sqlStatements = new ArrayList<>(1);
+        sqlStatements.add(sql);
 
-    protected boolean isAdminConnection() {
-        return false;
+        return runNonDDLAdHoc(context, sqlStatements, true, null, ExplainMode.NONE, userParams);
     }
 }

@@ -567,9 +567,9 @@ public abstract class ProcedureCompiler {
         try {
             procClass.newInstance();
         } catch (InstantiationException e) {
-            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
+            throw new RuntimeException("Error instantiating procedure \"" + procClass.getName() + "\"", e);
         } catch (IllegalAccessException e) {
-            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
+            throw new RuntimeException("Error instantiating procedure \"" + procClass.getName() + "\"", e);
         }
 
         // find the run() method and get the params

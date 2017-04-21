@@ -155,7 +155,7 @@ public class PlannerTool {
         return plan;
     }
 
-    synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
+    public synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
             boolean isExplainMode, final Object[] userParams) {
 
         CacheUse cacheUse = CacheUse.FAIL;

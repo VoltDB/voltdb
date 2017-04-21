@@ -46,7 +46,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.sysprocs.AdHoc_RO_MP;
 import org.voltdb.sysprocs.GC;
-import org.voltdb.sysprocs.UpdateApplicationCatalog;
+import org.voltdb.sysprocs.UpdateCore;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -659,7 +659,7 @@ public class TestNTProcs extends TestCase {
 
         assertTrue(VoltTableUtil.tableContainsString(statsT, "UpdateApplicationCatalog", true));
 
-        Map<String, Long> stats = aggregateProcRow(client, UpdateApplicationCatalog.class.getName());
+        Map<String, Long> stats = aggregateProcRow(client, UpdateCore.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
 
         localServer.shutdown();

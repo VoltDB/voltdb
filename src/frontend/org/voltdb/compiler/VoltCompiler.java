@@ -221,7 +221,7 @@ public class VoltCompiler {
         }
     }
 
-    class VoltCompilerException extends Exception {
+    public class VoltCompilerException extends Exception {
         private static final long serialVersionUID = -2267780579911448600L;
         private String message = null;
 

@@ -292,6 +292,10 @@ public class ProcedureRunnerNT {
         Object[] paramList = paramListIn;
 
         try {
+            if (m_paramTypes[0] == ParameterSet.class) {
+                paramList = new Object[] { ParameterSet.fromArrayNoCopy(paramListIn) };
+            }
+
             if (paramList.length != m_paramTypes.length) {
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
