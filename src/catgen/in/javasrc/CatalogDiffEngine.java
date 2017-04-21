@@ -1547,6 +1547,7 @@ public class CatalogDiffEngine {
      */
     enum DiffClass {
         PROC (Procedure.class),
+        FUNC (Function.class),
         TABLE (Table.class),
         USER (User.class),
         GROUP (Group.class),
@@ -1681,6 +1682,9 @@ public class CatalogDiffEngine {
             }
         };
         wroteChanges |= basicMetaChangeDesc(sb, "PROCEDURE CHANGES:", DiffClass.PROC, crudProcFilter, null);
+
+        // DESCRIBE FUNCTION CHANGES
+        wroteChanges |= basicMetaChangeDesc(sb, "FUNCTION CHANGES:", DiffClass.FUNC, null, null);
 
         // DESCRIBE GROUP CHANGES
         wroteChanges |= basicMetaChangeDesc(sb, "GROUP CHANGES:", DiffClass.GROUP, null, null);

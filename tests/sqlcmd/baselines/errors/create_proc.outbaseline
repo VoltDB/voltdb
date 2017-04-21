@@ -7,7 +7,7 @@ Expect a blank line output after this one.
 
 Things will not go well if this test is not starting with an empty class list.
 
---- Empty Class List -----------------------
+--- Empty Class List ---------------------------------------
 
 
 
@@ -211,7 +211,7 @@ create procedure from class sqlcmdtest.Trivial;
 @ValidatePartitioning     	int, varbinary
 
 
---- Empty Class List -----------------------
+--- Empty Class List ---------------------------------------
 
 
 
@@ -332,13 +332,13 @@ Command succeeded.
 remove classes sqlcmdtest.*;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List ---------------------------------------
 
 
 
 load classes sqlcmdtest-killed-procs.jar;
 
---- Empty Class List -----------------------
+--- Empty Class List ---------------------------------------
 
 
 
@@ -459,6 +459,6 @@ Command succeeded.
 remove classes sqlcmdtest.*;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List ---------------------------------------
 
 

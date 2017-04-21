@@ -32,7 +32,7 @@ Command succeeded.
 drop table raw if exists;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List ---------------------------------------
 
 
 
@@ -49,6 +49,23 @@ Command succeeded.
 --- Non-Procedure Classes ----------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+load classes sqlcmdtest-funcs.jar;
+Command succeeded.
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
 
@@ -159,6 +176,7 @@ InsertEmployee            	varchar, varchar, varchar
 --- Non-Procedure Classes ----------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
 
@@ -263,8 +281,56 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 --- Non-Procedure Classes ----------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
+
+--- User-defined Functions ---------------------------------
+
+
+create function IntFunction from method sqlcmdtest.IntFunction;
+Command succeeded.
+
+--- User-defined Functions ---------------------------------
+IntFunction         scalar function     sqlcmdtest.IntFunction                            
+
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+drop function IntFunction;
+Command succeeded.
+
+--- User-defined Functions ---------------------------------
+
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+drop function IntFunction if exists;
+Command succeeded.
 
 remove classes sqlcmdtest.InsertEmployee;
 Command succeeded.
@@ -278,13 +344,14 @@ Command succeeded.
 --- Non-Procedure Classes ----------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
 
 remove classes sqlcmdtest.*;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List ---------------------------------------
 
 
 

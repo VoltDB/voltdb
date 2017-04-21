@@ -421,7 +421,7 @@ public class SQLCommand
         // This would save churn on startup and on DDL update.
         if (Classlist.isEmpty()) {
             System.out.println();
-            System.out.println("--- Empty Class List -----------------------");
+            printCatalogHeader("Empty Class List");
             System.out.println();
         }
         List<String> list = new LinkedList<>(Classlist.keySet());
@@ -432,9 +432,9 @@ public class SQLCommand
         }
         String format = " %1$-" + padding + "s";
         String categoryHeader[] = new String[] {
-                "--- Potential Procedure Classes ----------------------------",
-                "--- Active Procedure Classes  ------------------------------",
-                "--- Non-Procedure Classes ----------------------------------"};
+                "Potential Procedure Classes",
+                "Active Procedure Classes",
+                "Non-Procedure Classes"};
         for (int i = 0; i<3; i++) {
             boolean firstInCategory = true;
             for (String classname : list) {
@@ -450,7 +450,7 @@ public class SQLCommand
                 if (firstInCategory) {
                     firstInCategory = false;
                     System.out.println();
-                    System.out.println(categoryHeader[i]);
+                    printCatalogHeader(categoryHeader[i]);
                 }
                 System.out.printf(format, classname);
                 System.out.println();
@@ -473,7 +473,7 @@ public class SQLCommand
 
     private static void execListFunctions() throws Exception {
         System.out.println();
-        System.out.println("--- User-defined Functions ---------------------------------");
+        printCatalogHeader("User-defined Functions");
         String outputFormat = "%-20s%-20s%-50s";
         VoltTable tableData = m_client.callProcedure("@SystemCatalog", "FUNCTIONS").getResults()[0];
         while (tableData.advanceRow()) {
@@ -507,14 +507,14 @@ public class SQLCommand
                 if (firstSysProc) {
                     firstSysProc = false;
                     System.out.println();
-                    System.out.println("--- System Procedures --------------------------------------");
+                    printCatalogHeader("System Procedures");
                 }
             }
             else {
                 if (firstUserProc) {
                     firstUserProc = false;
                     System.out.println();
-                    System.out.println("--- User Procedures ----------------------------------------");
+                    printCatalogHeader("User Procedures");
                 }
             }
             for (List<String> parameterSet : Procedures.get(procedure).values()) {
@@ -543,10 +543,14 @@ public class SQLCommand
         }
     }
 
+    private static void printCatalogHeader(final String name) {
+        System.out.println("--- " + name + " " + String.join("", Collections.nCopies(57 - name.length(), "-")));
+    }
+
     private static void printTables(final String name, final Collection<String> tables)
     {
         System.out.println();
-        System.out.println("--- " + name + " --------------------------------------------");
+        printCatalogHeader(name);
         for (String table : tables) {
             System.out.println(table);
         }
