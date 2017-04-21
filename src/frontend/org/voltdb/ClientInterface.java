@@ -2129,6 +2129,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_dispatcher.handleFailedHosts(failedHosts);
     }
 
+    /**Move partition leader from one host to another.
+     * The algo: find a partition leader from a host which hosts the most partition leaders
+     * and find the host which hosts the partition replica and the least number of partition leaders.
+     * Repeatedly call this task until no qualified partition is available.
+     * @param hostId  The local host id
+     */
     public void balanceSPI(int hostId) {
 
         Pair<Integer, Integer> target = m_cartographer.getPartitionForMigration();
@@ -2170,8 +2176,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             StoredProcedureInvocation spi = new StoredProcedureInvocation();
             spi.setProcName(procedureName);
 
-            hostLog.info(String.format("Migrating the mastership of partition %d to host %d.",
-                    partitionId, targetHostId));
+            hostLog.info(String.format("Migrating the mastership of partition %d to host %d (partition key %d)",
+                    partitionId, targetHostId, partitionKey));
 
             spi.setParams(partitionKey, partitionId,targetHostId);
             spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));

@@ -2073,9 +2073,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }, 0, 6, TimeUnit.MINUTES));
 
-        if (!m_rejoining) {
-            schedulePeriodicWorksForSPIBalance();
-        }
         // other enterprise setup
         EnterpriseMaintenance em = EnterpriseMaintenance.get();
         if (em != null) { em.setupMaintenaceTasks(); }
@@ -2083,15 +2080,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
-    private void schedulePeriodicWorksForSPIBalance() {
+    // The latest joined host will take over partition leader migration. The task is executed every minute by default
+    private void scheduleBalanceSpiTask() {
         final long interval = Integer.getInteger("SPI_BALANCE_INTERVAL", 60);
         Runnable task = () -> {
             TreeSet<Integer> hosts = (TreeSet<Integer>)(getHostMessenger().getLiveHostIds());
-            if (m_clientInterface != null && m_myHostId == hosts.pollLast()) {
+            if (m_myHostId == hosts.pollLast()) {
                 m_clientInterface.balanceSPI(m_myHostId);
             }
         };
-        m_periodicWorks.add(scheduleWork(task, interval, interval, TimeUnit.SECONDS));
+        m_periodicWorks.add(scheduleWork(task, 60, interval, TimeUnit.SECONDS));
     }
 
     private void startHealthMonitor() {
@@ -3739,10 +3737,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 logRecoveryCompleted = true;
             }
 
-            if (m_rejoining) {
-                schedulePeriodicWorksForSPIBalance();
-            }
-
             // Join creates a truncation snapshot as part of the join process,
             // so there is no need to wait for the truncation snapshot requested
             // above to finish.
@@ -3760,6 +3754,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_joining = false;
                 consoleLog.info(String.format("Node %s completed", actionName));
             }
+
+            //start balance spi task
+            scheduleBalanceSpiTask();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
@@ -3948,6 +3945,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+
+            // start balance spi task
+            scheduleBalanceSpiTask();
         }
 
         try {
