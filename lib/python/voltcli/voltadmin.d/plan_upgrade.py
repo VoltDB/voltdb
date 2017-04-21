@@ -250,7 +250,7 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, origi
     newNodeF = None
     if runner.opts.newNode is not None:
         newNodeF = cStringIO.StringIO()
-        writeHeader(file, "Upgrade Plan for server {}".format(runner.opts.newNode))
+        writeHeader(newNodeF, "Upgrade Plan for server {}".format(runner.opts.newNode))
         writeCommands(newNodeF,
                       'Step %d: copy deployment file' % step,
                       '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
