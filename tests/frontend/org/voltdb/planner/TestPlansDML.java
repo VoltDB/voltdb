@@ -27,7 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -260,6 +262,114 @@ public class TestPlansDML extends PlannerTestCase {
         pns = compileToFragments("DELETE FROM P1 WHERE A > 0");
         assertTrue(pns.size() == 2);
         checkPredicate(pns.get(1).getChild(0).getChild(0), ExpressionType.COMPARE_GREATERTHAN);
+    }
+
+    public void testDMLwithExpressionSubqueries() {
+
+        String dmlSQL;
+
+        dmlSQL = "UPDATE R1 SET C = 1 WHERE C IN (SELECT A FROM R2 WHERE R2.A = R1.C);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "UPDATE R1 SET C = 1 WHERE EXISTS (SELECT A FROM R2 WHERE R1.C = R2.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "UPDATE R1 SET C = 1 WHERE C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.COMPARE_GREATERTHAN);
+
+        dmlSQL = "UPDATE P1 SET C = 1 WHERE A = 0 AND C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.CONJUNCTION_AND);
+
+        dmlSQL = "UPDATE P1 SET C = (SELECT C FROM R2 WHERE A = 0) ;";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
+
+        dmlSQL = "UPDATE P1 set C = ? WHERE A = (SELECT MAX(R1.C) FROM R1 WHERE R1.A = P1.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.COMPARE_EQUAL);
+
+        dmlSQL = "UPDATE P1 set C = (SELECT C FROM R1 WHERE R1.C = P1.C LIMIT 1);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
+
+        dmlSQL = "UPSERT INTO R6 (A, C) SELECT A, C FROM R2 WHERE NOT EXISTS (SELECT 1 FROM R6 WHERE R6.A = R2.C) ORDER BY 1, 2;";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_NOT);
+
+        dmlSQL = "DELETE FROM R1 WHERE C IN (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "DELETE FROM R1 WHERE EXISTS (SELECT A FROM R2 WHERE R1.C = R2.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "DELETE FROM R1 WHERE C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.COMPARE_GREATERTHAN);
+
+        dmlSQL = "DELETE FROM P1 WHERE C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.COMPARE_GREATERTHAN);
+
+        dmlSQL = "DELETE FROM P1 WHERE A = 0 AND C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.CONJUNCTION_AND);
+
+        dmlSQL = "INSERT INTO P1 SELECT * FROM P1 PA WHERE NOT EXISTS (SELECT A FROM R1 RB WHERE PA.A = RB.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_NOT);
+
+        dmlSQL = "INSERT INTO R1 SELECT * FROM R1 RA WHERE NOT EXISTS (SELECT A FROM R1 RB WHERE RA.A = RB.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_NOT);
+
+        dmlSQL = "INSERT INTO R1 SELECT * FROM R1 RA WHERE RA.A IN (SELECT A FROM R2 WHERE R2.A > 0);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "INSERT INTO R1 (A, C, D) SELECT (SELECT MAX(A) FROM R1), 32, 32 FROM R1;";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
+
+        dmlSQL = "INSERT INTO R1 (A, C, D) VALUES ((SELECT MAX(A) FROM R1), 32, 32);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
+
+        // Distributed expression subquery
+        failToCompile("DELETE FROM R1 WHERE C > ALL (SELECT A FROM P2 WHERE A = 1);", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
+
+        // Distributed expression subquery
+        failToCompile("UPDATE R1 SET C = (SELECT A FROM P2 WHERE A = 1);", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
+        failToCompile("insert into P1 (A,C) " +
+                "select A,C from R2 " +
+                "where not exists (select A from P1 AP1 where R2.A = AP1.A);",
+                "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables.");
+
+        // Distributed expression subquery with inferred partitioning
+        failToCompile("DELETE FROM R1 WHERE C > ALL (SELECT A FROM P2);", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
+
+        // Column count mismatch between the UPDATE columns and the columns returned by the scalar subquery
+        failToCompile("UPDATE P1 set C = (SELECT (A,C) FROM R1 WHERE R1.C = P1.C LIMIT 1);", "row column count mismatch");
+    }
+
+    void checkDMLPlanNodeAndSubqueryExpression(String dmlSQL, ExpressionType filterType) {
+        List<AbstractPlanNode> pns = compileToFragments(dmlSQL);
+        AbstractPlanNode dmlNode;
+
+        if (pns.size() == 2) {
+            dmlNode = pns.get(1).getChild(0);
+        } else {
+            dmlNode = pns.get(0);
+        }
+
+        String dmlType = dmlSQL.substring(0, dmlSQL.indexOf(' ')).trim().toUpperCase();
+        if ("UPSERT".equalsIgnoreCase(dmlType)) {
+            // UPSERT is INSERT
+            dmlType = "INSERT";
+        }
+        assertEquals(dmlType, dmlNode.getPlanNodeType().toString());
+
+        PlanNodeType nodeType = dmlNode.getPlanNodeType();
+        while(nodeType != PlanNodeType.SEQSCAN && nodeType != PlanNodeType.MATERIALIZE && nodeType != PlanNodeType.INDEXSCAN) {
+            dmlNode = dmlNode.getChild(0);
+            nodeType = dmlNode.getPlanNodeType();
+        }
+        assertNotNull(dmlNode);
+
+        // Verify DML Predicate
+        if (filterType != null) {
+            AbstractExpression predicate = ((AbstractScanPlanNode) dmlNode).getPredicate();
+            assertNotNull(predicate);
+            assertEquals(filterType, predicate.getExpressionType());
+            assertTrue(predicate.hasAnySubexpressionOfClass(SelectSubqueryExpression.class));
+        }
     }
 
     private void checkPredicate(AbstractPlanNode pn, ExpressionType type) {
