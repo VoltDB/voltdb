@@ -25,8 +25,9 @@
 namespace voltdb {
 
     LargeTempTableBlock::LargeTempTableBlock(LargeTempTable *ltt)
-        : m_tupleBlockPointer(new TupleBlock(ltt, TBBucketPtr()))
-        , m_pool(new Pool())
+        : m_pool(new Pool())
+        , m_tupleBlockPointer(new TupleBlock(ltt, TBBucketPtr()))
+
     {
     }
 

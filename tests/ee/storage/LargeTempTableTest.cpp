@@ -240,6 +240,7 @@ int main() {
 
     assert (voltdb::ExecutorContext::getExecutorContext() == NULL);
 
+    ThreadLocalPool tlPool;
     boost::scoped_ptr<voltdb::Pool> testPool(new voltdb::Pool());
     voltdb::UndoQuantum* wantNoQuantum = NULL;
     voltdb::Topend* topless = NULL;

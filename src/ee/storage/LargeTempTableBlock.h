@@ -49,8 +49,8 @@ namespace voltdb {
 
     private:
 
-        TBPtr m_tupleBlockPointer;
         std::unique_ptr<Pool> m_pool;
+        TBPtr m_tupleBlockPointer;
     };
 } // end namespace voltdb
 
