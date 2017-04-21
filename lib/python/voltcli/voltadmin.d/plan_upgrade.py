@@ -27,6 +27,8 @@ import os
 import sys
 import subprocess
 
+warningForDeploy = None
+
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
     description="Generate a checklist before performing online upgrade.",
@@ -96,10 +98,11 @@ def basicCheck(runner):
 
     response = checkstats.get_stats(runner, "DRROLE")
     clusterIds = []
+    clusterIds.append(int(host.clusterid))  # add local cluster id first
     for tuple in response.table(0).tuples():
         remote_cluster_id = tuple[2]
         if remote_cluster_id != -1:
-            clusterIds.append(remote_cluster_id)
+            clusterIds.append(remote_cluster_id)  # add remote cluster id if exists
     if len(clusterIds) == 127:
         runner.abort("Failed to generate upgrade plan: number of connected cluster reaches the maximum limit (127).")
 
@@ -137,7 +140,7 @@ def basicCheck(runner):
 
 def generateCommands(runner, hosts, kfactor, clusterIds):
     hostcount = len(hosts.hosts_by_id)
-    (killSet, surviveSet) = pickNodeToKill(hosts, kfactor, hostcount / 2)
+    (killSet, surviveSet) = pickNodeToKill(hosts, int(kfactor), hostcount / 2)
 
     # 0 generate deployment file
     step = 1
@@ -171,7 +174,7 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
 
     # 5 only for upgrading stand-alone cluster, set up XDCR replication between two clusters
     # update old cluster's deployment file
-    if len(clusterIds) == 0:
+    if len(clusterIds) == 1:
         step += 1
         generateTurnOnXDCRCommand(runner.opts, surviveSet[0], files, origin_cluster_deploy, step)
 
@@ -200,31 +203,26 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
 
 def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, origin_cluster_deploy, new_cluster_deploy, step):
     files = dict()
-    oldDeploymentHasAbsPath = False
     newDeploymentHasAbsPath = False
+    drSource = None
+    post_upgrade_deploy = None
 
     # get deployment file from the original cluster
     xmlString = getCurrentDeploymentFile(runner, surviveSet[0])
 
-    if len(clusterIds) == 0:
-        # If this is a stand-alone cluster, generate a deployment file with a XDCR connection source
-        drId, oldDeploymentHasAbsPath = createDeploymentForOriginalCluster(runner,
-                                                                           xmlString,
-                                                                           getHostnameOrIp(killSet[0]) + ':' + str(killSet[0].drport),
-                                                                           origin_cluster_deploy)
-        newDeploymentHasAbsPath = createDeploymentForNewCluster(runner,
-                                                                xmlString,
-                                                                [drId],
-                                                                getHostnameOrIp(surviveSet[0]) + ':' + str(surviveSet[0].drport),
-                                                                new_cluster_deploy)
-    else:
-        newDeploymentHasAbsPath = createDeploymentForNewCluster(runner,
-                                                                xmlString,
-                                                                clusterIds,
-                                                                None,
-                                                                new_cluster_deploy)
+    # If this is a stand-alone cluster, generate a deployment file with a XDCR connection source
+    if len(clusterIds) == 1:
+        drSource = getHostnameOrIp(surviveSet[0]) + ':' + str(surviveSet[0].drport)
+        post_upgrade_deploy = origin_cluster_deploy
 
-    if oldDeploymentHasAbsPath or newDeploymentHasAbsPath:
+    newDeploymentHasAbsPath = createDeploymentForNewCluster(runner,
+                                                            xmlString,
+                                                            clusterIds,
+                                                            getHostnameOrIp(surviveSet[0]) + ':' + str(surviveSet[0].drport),
+                                                            new_cluster_deploy,
+                                                            origin_cluster_deploy)
+
+    if newDeploymentHasAbsPath:
         warningForDeploy = "Warn: Absolute paths in generated deployment file are commented out to avoid accidentally damage to your original cluster's artifact. Please review the file before use.\n"
 
     # generate instructions to copy deployment file to individual node
@@ -237,7 +235,7 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, origi
                           'Step %d: copy deployment file' % step,
                           '%s#instruction# copy %s to %s' % (warningForDeploy, new_cluster_deploy, runner.opts.newRoot))
         if hostInfo in surviveSet:
-            if len(clusterIds) == 0:
+            if len(clusterIds) == 1:
                 # for stand-alone cluster
                 writeCommands(file,
                               'Step %d: copy deployment file' % step,
@@ -326,7 +324,7 @@ def generateShutdownOriginClusterCommand(survivor, files, step):
 
 def generateDRResetCommand(runner, survivor, victim, clusterIds, files, step):
     command = ""
-    if len(clusterIds) == 0:
+    if len(clusterIds) == 1:
         command = 'voltadmin dr reset --cluster=%s -H %s:%d --force\n' % (survivor.clusterid, getHostnameOrIp(victim), victim.adminport)
     else:
         remoteTopo = dict()
@@ -343,7 +341,10 @@ def generateDRResetCommand(runner, survivor, victim, clusterIds, files, step):
         # assume remote cluster use the same admin port
         for clusterId, covering_host in remoteTopo.items():
             command += 'voltadmin dr reset --cluster=%s -H %s:%d --force\n' % (survivor.clusterid, covering_host.split(":")[0], survivor.adminport)
-        command = command[:-1]
+        for clusterId in range(1, 127):
+            if clusterId not in clusterIds:
+                break
+        command += 'voltadmin dr reset --cluster=%s -H %s:%d --force' % (survivor.clusterid, getHostnameOrIp(victim), victim.adminport)
 
     writeCommands(files[getKey(survivor)],
                   'Step %d: run dr reset command to tell other clusters to stop generating binary logs for the origin cluster' % step,
@@ -382,6 +383,9 @@ def cleanup(opts, files, newNodeF):
     upgradePlan.write("1. This plan provides steps to be executed on each of the servers in the cluster.\n")
     upgradePlan.write("2. The steps for each server are listed separately.\n")
     upgradePlan.write("3. For each step (0, 1, 2, etc.), execute that step on all servers to which it applies before moving on to the next step.\n\n")
+
+    if warningForDeploy is not None:
+        upgradePlan.write(warningForDeploy + '\n')
 
     for key, file in files.items():
         upgradePlan.write(file.getvalue() + '\n')
@@ -489,7 +493,7 @@ def createDeploymentForOriginalCluster(runner, xmlString, drSource, origin_clust
     return clusterId, hasAbsPath;
 
 # Both stand-alone and multisite cluster need it
-def createDeploymentForNewCluster(runner, xmlString, clusterIds, drSource, new_cluster_deploy):
+def createDeploymentForNewCluster(runner, xmlString, clusterIds, drSource, new_cluster_deploy, origin_cluster_deploy):
     et = ElementTree.ElementTree(ElementTree.fromstring(xmlString))
     hasAbsPath = checkAbsPaths(runner, et.getroot(), new_cluster_deploy)
 
@@ -532,6 +536,11 @@ def createDeploymentForNewCluster(runner, xmlString, clusterIds, drSource, new_c
 
     prettyprint(et.getroot())
     et.write(new_cluster_deploy)
+
+    # In single cluster case, create deployment file with disabled DR connection
+    if origin_cluster_deploy is not None:
+        connection.attrib['enabled'] = 'false'
+        et.write(origin_cluster_deploy)
     return hasAbsPath
 
 def commentAbsPath(root, pathname, comment):
