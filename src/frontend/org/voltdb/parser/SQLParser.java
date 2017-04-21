@@ -190,7 +190,7 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_CREATE_FUNCTION_FROM_METHOD");
 
     /*
-     * DROP FUNCTION <NAME>
+     * DROP FUNCTION <NAME> [IF EXISTS]
      *
      * Drop a user-defined function.
      *
