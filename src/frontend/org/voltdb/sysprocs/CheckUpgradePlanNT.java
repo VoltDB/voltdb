@@ -118,10 +118,6 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
             }
 
             CatalogContext context = VoltDB.instance().getCatalogContext();
-            System.out.println("Is DR null: " + (context.getDeployment().getDr() == null));
-            if (context.getDeployment().getDr() != null) {
-                System.out.println("DR role: " + context.getDeployment().getDr().getRole());
-            }
             if (context.getDeployment().getDr() == null || context.getDeployment().getDr().getRole() != DrRoleType.XDCR) {
                 return "Target VoltDB cluster must have XDCR enabled (set role=\"xdcr\" under DR tag of the deployment file).";
             }
