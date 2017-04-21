@@ -319,6 +319,7 @@ public class VoltProjectBuilder {
 
     private String m_drMasterHost;
     private Integer m_preferredSource;
+    private Boolean m_drConsumerConnectionEnabled = null;
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
 
@@ -747,6 +748,14 @@ public class VoltProjectBuilder {
 
     public void setPreferredSource(int preferredSource) {
         m_preferredSource = preferredSource;
+    }
+
+    public void setDrConsumerConnectionEnabled() {
+        m_drConsumerConnectionEnabled = true;
+    }
+
+    public void setDrConsumerConnectionDisabled() {
+        m_drConsumerConnectionEnabled = false;
     }
 
     public void setDrProducerEnabled()
@@ -1291,6 +1300,7 @@ public class VoltProjectBuilder {
             dr.setConnection(conn);
             conn.setSource(m_drMasterHost);
             conn.setPreferredSource(m_preferredSource);
+            conn.setEnabled(m_drConsumerConnectionEnabled);
         }
 
         // Have some yummy boilerplate!
