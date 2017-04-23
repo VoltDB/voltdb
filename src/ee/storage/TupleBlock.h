@@ -214,7 +214,7 @@ public:
         m_freeList.clear();
     }
 
-    inline uint32_t unusedTupleBoundry() {
+    inline uint32_t unusedTupleBoundary() {
         return m_nextFreeTuple;
     }
 

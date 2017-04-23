@@ -39,8 +39,8 @@ namespace voltdb {
     std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock(LargeTempTable* ltt) {
         int64_t id = getNextId();
 
-        m_cache.emplace_back(ltt);
-        LargeTempTableBlock *emptyBlock = &(m_cache.back());
+        m_cache.emplace_back(new LargeTempTableBlock(ltt));
+        LargeTempTableBlock *emptyBlock = m_cache.back().get();
         m_liveEntries[id] = emptyBlock;
         return std::make_pair(id, emptyBlock);
     }

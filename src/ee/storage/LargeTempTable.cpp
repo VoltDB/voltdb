@@ -59,11 +59,13 @@ bool LargeTempTable::insertTuple(TableTuple& source) {
     target.copyForPersistentInsert(source, m_blockForWriting->getPool()); // tuple in freelist must be already cleared
     target.setActiveTrue();
 
+    ++m_tupleCount;
+
     return true;
 }
 
-LargeTableIterator LargeTempTable::largeIterator() const {
-    return LargeTableIterator(schema(), &m_blockIds);
+LargeTableIterator LargeTempTable::largeIterator() {
+    return LargeTableIterator(this, m_blockIds.begin());
 }
 
 } // namespace voltdb

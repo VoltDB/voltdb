@@ -48,6 +48,11 @@ public:
         return NValue::getDoubleValue(value);
     }
 
+    static NValue getDecimalValue(double value) {
+        NValue doubleNVal = ValueFactory::getDoubleValue(value);
+        return doubleNVal.castAsDecimal();
+    }
+
     static NValue getBooleanValue(bool value) {
         return NValue::getBooleanValue(value);
     }

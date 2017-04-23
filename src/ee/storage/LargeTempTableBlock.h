@@ -39,6 +39,15 @@ namespace voltdb {
         bool hasFreeTuples() const;
         std::pair<char*, int> nextFreeTuple();
 
+        uint32_t unusedTupleBoundary() {
+            return m_tupleBlockPointer->unusedTupleBoundary();
+        }
+
+        char* address() {
+            return m_tupleBlockPointer->address();
+        }
+
+
         const Pool* getPool() const {
             return m_pool.get();
         }

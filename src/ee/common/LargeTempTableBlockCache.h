@@ -60,7 +60,7 @@ namespace voltdb {
             return nextId;
         }
 
-        std::vector<LargeTempTableBlock> m_cache;
+        std::vector<std::unique_ptr<LargeTempTableBlock>> m_cache;
 
         /* std::vector<LargeTempTableBlock*> m_emptyEntries; */
 

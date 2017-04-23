@@ -22,9 +22,14 @@
 #ifndef _VOLTDB_LARGETABLEITERATOR_H
 #define _VOLTDB_LARGETABLEITERATOR_H
 
+#include <vector>
+
 #include "common/executorcontext.hpp"
 #include "common/tabletuple.h"
 #include "common/LargeTempTableBlockCache.h"
+
+#include "storage/table.h"
+#include "storage/LargeTempTable.h"
 
 namespace voltdb {
 
@@ -35,77 +40,81 @@ class LargeTableIterator {
 public:
 
     LargeTableIterator(const LargeTableIterator& that)
-        : m_schema(that.m_schema)
-        , m_currBlock(nullptr)
-        , m_blockIds(that.m_blockIds)
-        , m_blockIterator(that.m_blockIterator)
-        , m_currPosition(that.m_currPosition)
-        , m_storage(that.m_schema)
+        : m_tupleLength(that.m_tupleLength)
+        , m_activeTuples(that.m_activeTuples)
+        , m_foundTuples(that.m_foundTuples)
+        , m_blockIdIterator(that.m_blockIdIterator)
+        , m_currBlock(that.m_currBlock)
+        , m_currBlockId(that.m_currBlockId)
+        , m_dataPtr(that.m_dataPtr)
+        , m_blockOffset(that.m_blockOffset)
     {
-        // xxx this is too expensive because the tuple storage gets
-        // realloced... can use move ctor?
     }
 
     inline bool next(TableTuple& out);
     bool hasNext() const;
 
 protected:
-    LargeTableIterator(const TupleSchema *schema,
-                       const std::vector<int64_t> *blockIds)
-        : m_schema(schema)
+ LargeTableIterator(Table* table, std::vector<int64_t>::iterator start)
+     : m_tupleLength(table->m_tupleLength)
+        , m_activeTuples(table->m_tupleCount)
+        , m_foundTuples(0)
+        , m_blockIdIterator(start)
         , m_currBlock(nullptr)
-        , m_blockIds(blockIds)
-        , m_blockIterator(std::begin(*blockIds))
-        , m_currPosition(0)
-        , m_storage(schema)
+        , m_currBlockId(-1)
+        , m_dataPtr(NULL)
+        , m_blockOffset(0)
     {
-        LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-        m_currBlock = lttCache->fetchBlock(*m_blockIterator);
     }
 
 private:
+    const uint32_t m_tupleLength;
+    const uint32_t m_activeTuples;
 
-    const TupleSchema* m_schema;
+    uint32_t m_foundTuples;
+
+    std::vector<int64_t>::iterator m_blockIdIterator;
     LargeTempTableBlock* m_currBlock;
-    const std::vector<int64_t> *m_blockIds;
-    std::vector<int64_t>::const_iterator m_blockIterator;
-    size_t m_currPosition;
-    StandAloneTupleStorage m_storage;
-
+    int64_t m_currBlockId;
+    char * m_dataPtr;
+    uint32_t m_blockOffset;
 };
 
 
 bool LargeTableIterator::next(TableTuple& out) {
-    if (m_blockIterator == std::end(*m_blockIds)) {
-        return false;
-    }
+    if (m_foundTuples < m_activeTuples) {
+        if (m_currBlock == NULL ||
+            m_blockOffset >= m_currBlock->unusedTupleBoundary()) {
+            LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    /* char* data = m_currBlock->getData(); */
-    /* ReferenceSerializeInputBE input(data + m_currPosition, */
-    /*                                 LargeTempTableBlock::getBlocksize() - m_currPosition); */
-    /* out = m_storage.tuple(); */
+            if (m_currBlock != NULL) {
+                lttCache->unpinBlock(m_currBlockId);
+            }
 
-    /* out.deserializeFrom(input, ExecutorContext::getTempStringPool()); */
+            // delete as you go logic should be here
 
-    /* // xxx hack! */
-    /* m_currPosition = input.getRawPointer() - data; */
+            m_currBlockId = *m_blockIdIterator;
+            m_currBlock = lttCache->fetchBlock(m_currBlockId);
 
-    /* assert(m_currPosition <= m_currBlock->getUsedBytes()); */
-    /* if (m_currPosition == m_currBlock->getUsedBytes()) { */
-    /*     LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache(); */
+            m_dataPtr = m_currBlock->address();
 
-    /*     // unpin the current block */
-    /*     lttCache->unpinBlock(*m_blockIterator); */
+            ++m_blockIdIterator;
 
-    /*     // Get the next block if one exists */
-    /*     ++m_blockIterator; */
-    /*     if (m_blockIterator != std::end(*m_blockIds)) { */
-    /*         m_currBlock = lttCache->fetchBlock(*m_blockIterator); */
-    /*         m_currPosition = 0; */
-    /*     } */
-    /* } */
+            m_blockOffset = 0;
+        } // end if we need to transition to the next block
+        else {
+            m_dataPtr += m_tupleLength;
+        }
 
-    return true;
+        out.move(m_dataPtr);
+
+        ++m_foundTuples;
+        ++m_blockOffset;
+
+        return true;
+    } // end if there are still more tuples
+
+    return false;
 }
 
 

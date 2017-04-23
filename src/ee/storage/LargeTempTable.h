@@ -41,7 +41,7 @@ public:
         return m_iter;
     }
 
-    LargeTableIterator largeIterator() const;
+    LargeTableIterator largeIterator();
 
     TableIterator& iteratorDeletingAsWeGo() {
         return m_iter;
