@@ -26,6 +26,7 @@
 
 #include "harness.h"
 
+#include "common/LargeTempTableBlockCache.h"
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
@@ -286,9 +287,83 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 }
 
 TEST_F(LargeTempTableTest, OverflowCache) {
-    /*
-     * Limit the ltt block cache size to a fixed number of entries
-     */
+
+    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 131072;
+    TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
+                                      VALUE_TYPE_DOUBLE,
+                                      VALUE_TYPE_DOUBLE,
+                                      VALUE_TYPE_DOUBLE,
+                                      VALUE_TYPE_DECIMAL,
+                                      VALUE_TYPE_DECIMAL,
+                                      VALUE_TYPE_DECIMAL,
+                                      std::make_pair(VALUE_TYPE_VARCHAR, 15),
+                                      std::make_pair(VALUE_TYPE_VARCHAR, 15),
+                                      std::make_pair(VALUE_TYPE_VARCHAR, 15));
+
+    std::vector<std::string> names{
+        "pk",
+        "val0",
+        "val1",
+        "val2",
+        "dec0",
+        "dec1",
+        "dec2",
+        "text0",
+        "text1",
+        "text2"
+    };
+
+    voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
+        "ltmp",
+        schema,
+        names);
+    ltt->incrementRefcount();
+
+    StandAloneTupleStorage tupleWrapper(schema);
+    TableTuple tuple = tupleWrapper.tuple();
+
+    for (int i = 0; i < 500; ++i) {
+        std::string text(15, 'a' + (i % 26));
+        setTupleValues(&tuple,
+                       i,
+                       0.5 * i,
+                       0.5 * i + 1,
+                       0.5 * i + 2,
+                       toDecimal(0.5 * i),
+                       toDecimal(0.5 * i + 1),
+                       toDecimal(0.5 * i + 2),
+                       text,
+                       text,
+                       text);
+
+        ltt->insertTuple(tuple);
+    }
+
+    ASSERT_EQ(2, ltt->allocatedBlockCount());
+
+    LargeTableIterator iter = ltt->largeIterator();
+    TableTuple iterTuple(ltt->schema());
+    int i = 0;
+    while (iter.next(iterTuple)) {
+        std::string text(15, 'a' + (i % 26));
+        assertTupleValuesEqual(&iterTuple,
+                               i,
+                               0.5 * i,
+                               0.5 * i + 1,
+                               0.5 * i + 2,
+                               toDecimal(0.5 * i),
+                               toDecimal(0.5 * i + 1),
+                               toDecimal(0.5 * i + 2),
+                               text,
+                               text,
+                               text);
+        ++i;
+    }
+
+    ASSERT_EQ(500, i);
+
+    ltt->decrementRefcount();
+
 }
 
 int main() {

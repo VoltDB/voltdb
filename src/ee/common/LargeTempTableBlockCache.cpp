@@ -44,7 +44,7 @@ namespace voltdb {
         LargeTempTableBlock *emptyBlock = m_cache.back().get();
         m_liveEntries[id] = emptyBlock;
 
-        m_totalAllocatedBytes += emptyBlock->getAllocatedMemory();
+        increaseAllocatedMemory(emptyBlock->getAllocatedMemory());
 
         return std::make_pair(id, emptyBlock);
     }
@@ -76,6 +76,12 @@ namespace voltdb {
 
     void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
         m_totalAllocatedBytes += numBytes;
-        // if we are now overfull, expunge a block.
+
+        if (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
+            std::cout << "overflow!!! " << m_totalAllocatedBytes << std::endl;
+            // if we are now overfull, expunge a block.
+            assert(false);
+        }
+
     }
 }

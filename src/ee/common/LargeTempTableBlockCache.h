@@ -33,12 +33,17 @@
 #include "storage/LargeTempTableBlock.h"
 #include "common/types.h"
 
+class LargeTempTableTest_OverflowCache;
+
 namespace voltdb {
 
     class LargeTempTable;
 
     // xxx This class really belongs in storage
     class LargeTempTableBlockCache {
+
+        friend class ::LargeTempTableTest_OverflowCache;
+
     public:
         LargeTempTableBlockCache();
 
@@ -54,7 +59,11 @@ namespace voltdb {
 
     private:
 
-        static const int NUM_CACHE_ENTRIES = 25;
+        // Set to be modifiable here for testing purposes
+        static int64_t& CACHE_SIZE_IN_BYTES() {
+            static int64_t cacheSizeInBytes = 50 * 1024 * 1024; // 50 MB
+            return cacheSizeInBytes;
+        }
 
         int64_t getNextId() {
             int64_t nextId = m_nextId;

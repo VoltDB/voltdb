@@ -241,7 +241,7 @@ public:
      * tuple block.
      */
     inline int64_t getAllocatedMemory() {
-        return m_tupleLength + m_tuplesPerBlock;
+        return m_tupleLength * m_tuplesPerBlock;
     }
 private:
     char*   m_storage;
