@@ -198,7 +198,7 @@ public class DDLCompiler {
                             .addNextProcessorFor(new DRTable(this))
                             .addNextProcessorFor(new SetGlobalParam(this))
                             // CatchAllStatement need to be the last processor in the chain.
-                            .addNextProcessorFor(new CatchAllStatement(m_statementProcessor));
+                            .addNextProcessorFor(new CatchAllStatement(this, m_statementProcessor));
     }
 
     public static abstract class StatementProcessor {

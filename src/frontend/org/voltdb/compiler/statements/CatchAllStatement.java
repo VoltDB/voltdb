@@ -18,6 +18,7 @@
 package org.voltdb.compiler.statements;
 
 import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
@@ -27,8 +28,8 @@ public class CatchAllStatement extends StatementProcessor {
 
     private VoltDBStatementProcessor m_firstProcessor;
 
-    public CatchAllStatement(VoltDBStatementProcessor firstProcessor) {
-        super(null);
+    public CatchAllStatement(DDLCompiler ddlCompiler, VoltDBStatementProcessor firstProcessor) {
+        super(ddlCompiler);
         m_firstProcessor = firstProcessor;
     }
 
