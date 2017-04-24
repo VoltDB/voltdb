@@ -172,6 +172,39 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_CREATE_PROCEDURE_FROM_SQL");
 
     /*
+     * CREATE FUNCTION <NAME> FROM METHOD <CLASS NAME>.<METHOD NAME>
+     *
+     * CREATE FUNCTION with the designated method from the given class.
+     *
+     * Capture groups:
+     *  (1) Function name
+     *  (2) The class name
+     *  (3) The method name
+     */
+    private static final Pattern PAT_CREATE_FUNCTION_FROM_METHOD =
+        SPF.statement(
+            SPF.token("create"), SPF.token("function"), SPF.capture(SPF.functionName()),
+            SPF.token("from"), SPF.token("method"),
+            SPF.capture(SPF.classPath()), SPF.dot().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+            SPF.capture(SPF.functionName().withFlags(ADD_LEADING_SPACE_TO_CHILD))
+        ).compile("PAT_CREATE_FUNCTION_FROM_METHOD");
+
+    /*
+     * DROP FUNCTION <NAME> [IF EXISTS]
+     *
+     * Drop a user-defined function.
+     *
+     * Capture groups:
+     *  (1) Function name
+     *  (2) If exists
+     */
+    private static final Pattern PAT_DROP_FUNCTION =
+        SPF.statement(
+            SPF.token("drop"), SPF.token("function"), SPF.capture(SPF.functionName()),
+            SPF.optional(SPF.capture(SPF.clause(SPF.token("if"), SPF.token("exists"))))
+        ).compile("PAT_DROP_FUNCTION");
+
+    /*
      * CREATE PROCEDURE <NAME> [ <MODIFIER_CLAUSE> ... ] AS ### <PROCEDURE_CODE> ### LANGUAGE <LANGUAGE_NAME>
      *
      * CREATE PROCEDURE with inline implementation script, e.g. Groovy, statement regex
@@ -289,8 +322,9 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern PAT_DROP_STREAM =
             SPF.statementLeader(
                     SPF.token("drop"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
-                    SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exisit")))
+                    SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exists")))
                     ).compile("PAT_DROP_STREAM");
+
     /**
      * NB supports only unquoted table names
      * Captures 1 group, the table name.
@@ -340,7 +374,7 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE)|" +                // token options after CREATE
+            "(?:PROCEDURE|ROLE|FUNCTION)|" +                // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
@@ -718,6 +752,26 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * Match statement against the pattern for create function from method
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchCreateFunctionFromMethod(String statement)
+    {
+        return PAT_CREATE_FUNCTION_FROM_METHOD.matcher(statement);
+    }
+
+    /**
+     * Match statement against the pattern for drop function
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchDropFunction(String statement)
+    {
+        return PAT_DROP_FUNCTION.matcher(statement);
+    }
+
+    /**
      * Match statement against pattern for drop procedure
      * @param statement  statement to match against
      * @return           pattern matcher object
@@ -1020,7 +1074,7 @@ public class SQLParser extends SQLPatternFactory
          * find any reasonable solution.
          */
         Matcher stringFragmentMatcher = SingleQuotedString.matcher(query);
-        ArrayList<String> stringFragments = new ArrayList<String>();
+        ArrayList<String> stringFragments = new ArrayList<>();
         int i = 0;
         while (stringFragmentMatcher.find()) {
             stringFragments.add(stringFragmentMatcher.group());
@@ -1044,7 +1098,7 @@ public class SQLParser extends SQLPatternFactory
 
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
-        ArrayList<String> queries = new ArrayList<String>();
+        ArrayList<String> queries = new ArrayList<>();
         for (String fragment : sqlFragments) {
             if (fragment.isEmpty()) {
                 continue;
@@ -1079,7 +1133,7 @@ public class SQLParser extends SQLPatternFactory
         // quotes don't trigger a false positive for the START of an unsafe string.
         // Skipping is accomplished by resetting paramText to an offset substring
         // after copying the skipped (or substituted) text to a string builder.
-        ArrayList<String> originalString = new ArrayList<String>();
+        ArrayList<String> originalString = new ArrayList<>();
         Matcher stringMatcher = SingleQuotedString.matcher(paramText);
         StringBuilder safeText = new StringBuilder();
         while (stringMatcher.find()) {
@@ -1100,7 +1154,7 @@ public class SQLParser extends SQLPatternFactory
         // Save anything after the last found string.
         safeText.append(paramText);
 
-        ArrayList<String> params = new ArrayList<String>();
+        ArrayList<String> params = new ArrayList<>();
         int subCount = 0;
         int neededSubs = originalString.size();
         // Split the params at the separators

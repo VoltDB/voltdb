@@ -81,7 +81,8 @@ public class SQLLexer extends SQLPatternFactory
         // Non-rename-able objects
         new ObjectToken("view", false),
         new ObjectToken("procedure", false),
-        new ObjectToken("role", false)
+        new ObjectToken("role", false),
+        new ObjectToken("function", false)
     };
 
     private final static String[] MODIFIER_TOKENS = {
@@ -312,7 +313,7 @@ public class SQLLexer extends SQLPatternFactory
      * @return list of individual SQL statements
      */
     public static List<String> splitStatements(final String sql) {
-        List<String> statements = new ArrayList<String>();
+        List<String> statements = new ArrayList<>();
         // Use a character array for efficient character-at-a-time scanning.
         char[] buf = sql.toCharArray();
         // Set to null outside of quoted segments or the quote character inside them.
