@@ -50,6 +50,8 @@ namespace voltdb {
 
         void releaseBlock(int64_t blockId);
 
+        void increaseAllocatedMemory(int64_t numBytes);
+
     private:
 
         static const int NUM_CACHE_ENTRIES = 25;
@@ -69,6 +71,7 @@ namespace voltdb {
         /* std::list<int64_t> m_unpinnedEntries; */
 
         int64_t m_nextId;
+        int64_t m_totalAllocatedBytes;
     };
 }
 

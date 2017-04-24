@@ -37,7 +37,8 @@ namespace voltdb {
         LargeTempTableBlock(LargeTempTable* ltt);
 
         bool hasFreeTuples() const;
-        std::pair<char*, int> nextFreeTuple();
+
+        void insertTuple(const TableTuple& source);
 
         uint32_t unusedTupleBoundary() {
             return m_tupleBlockPointer->unusedTupleBoundary();
@@ -47,14 +48,7 @@ namespace voltdb {
             return m_tupleBlockPointer->address();
         }
 
-
-        const Pool* getPool() const {
-            return m_pool.get();
-        }
-
-        Pool* getPool() {
-            return m_pool.get();
-        }
+        int64_t getAllocatedMemory() const;
 
     private:
 

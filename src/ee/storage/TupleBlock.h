@@ -235,6 +235,14 @@ public:
     inline TBBucketPtr currentBucket() {
         return m_bucket;
     }
+
+    /**
+     * Return the number of bytes in the storage for this
+     * tuple block.
+     */
+    inline int64_t getAllocatedMemory() {
+        return m_tupleLength + m_tuplesPerBlock;
+    }
 private:
     char*   m_storage;
     uint32_t m_references;

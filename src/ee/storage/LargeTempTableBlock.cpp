@@ -35,7 +35,24 @@ namespace voltdb {
         return m_tupleBlockPointer->hasFreeTuples();
     }
 
-    std::pair<char*, int> LargeTempTableBlock::nextFreeTuple() {
-        return m_tupleBlockPointer->nextFreeTuple();
+    void LargeTempTableBlock::insertTuple(const TableTuple& source) {
+        TableTuple target(source.getSchema());
+        int64_t origPoolMemory = m_pool->getAllocatedMemory();
+
+        char* data;
+        std::tie(data, std::ignore) = m_tupleBlockPointer->nextFreeTuple();
+        target.move(data);
+        target.copyForPersistentInsert(source, m_pool.get());
+        target.setActiveTrue();
+
+        int64_t increasedMemory = m_pool->getAllocatedMemory() - origPoolMemory;
+        if (increasedMemory > 0) {
+            LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+            lttBlockCache->increaseAllocatedMemory(increasedMemory);
+        }
+    }
+
+    int64_t LargeTempTableBlock::getAllocatedMemory() const {
+        return m_pool->getAllocatedMemory() + m_tupleBlockPointer->getAllocatedMemory();
     }
 }

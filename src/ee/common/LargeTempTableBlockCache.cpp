@@ -27,6 +27,7 @@ namespace voltdb {
         : m_cache()
           //, m_emptyEntries(NUM_CACHE_ENTRIES)
         , m_liveEntries()
+        , m_totalAllocatedBytes(0)
         // , m_unpinnedEntries()
     {
         // At initialization, all cache entries are empty.
@@ -42,6 +43,9 @@ namespace voltdb {
         m_cache.emplace_back(new LargeTempTableBlock(ltt));
         LargeTempTableBlock *emptyBlock = m_cache.back().get();
         m_liveEntries[id] = emptyBlock;
+
+        m_totalAllocatedBytes += emptyBlock->getAllocatedMemory();
+
         return std::make_pair(id, emptyBlock);
     }
 
@@ -68,5 +72,10 @@ namespace voltdb {
 
     void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
         //assert(false);
+    }
+
+    void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
+        m_totalAllocatedBytes += numBytes;
+        // if we are now overfull, expunge a block.
     }
 }

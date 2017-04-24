@@ -53,11 +53,7 @@ bool LargeTempTable::insertTuple(TableTuple& source) {
         m_blockIds.push_back(nextBlockId);
     }
 
-    char* data;
-    std::tie(data, std::ignore) = m_blockForWriting->nextFreeTuple();
-    target.move(data);
-    target.copyForPersistentInsert(source, m_blockForWriting->getPool()); // tuple in freelist must be already cleared
-    target.setActiveTrue();
+    m_blockForWriting->insertTuple(source);
 
     ++m_tupleCount;
 

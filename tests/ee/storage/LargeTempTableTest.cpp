@@ -285,6 +285,12 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     ltt->decrementRefcount();
 }
 
+TEST_F(LargeTempTableTest, OverflowCache) {
+    /*
+     * Limit the ltt block cache size to a fixed number of entries
+     */
+}
+
 int main() {
 
     assert (voltdb::ExecutorContext::getExecutorContext() == NULL);

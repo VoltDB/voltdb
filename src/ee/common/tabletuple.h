@@ -86,6 +86,7 @@ class TableTuple {
     friend class Table;
     friend class TempTable;
     friend class LargeTempTable;
+    friend class LargeTempTableBlock;
     friend class PersistentTable;
     friend class ElasticScanner;
     friend class PoolBackedTupleStorage;
