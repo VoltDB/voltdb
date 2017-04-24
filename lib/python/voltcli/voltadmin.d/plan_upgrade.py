@@ -71,7 +71,7 @@ def basicCheck(runner):
     if runner.opts.newNode is not None:
         result = checkNewNode(runner.opts.newNode)
         if result is False:
-            runner.abort("Failed to resolve host {}.".format(runner.opts.newNode))
+            runner.abort("Failed to resolve host {0}.".format(runner.opts.newNode))
 
     host = hosts.hosts_by_id.itervalues().next();
     currentVersion = host.version
@@ -222,7 +222,7 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
     # generate instructions to copy deployment file to individual node
     for hostId, hostInfo in hosts.hosts_by_id.items():
         file = cStringIO.StringIO()
-        writeHeader(file, "Upgrade Plan for server {}".format(getHostnameOrIp(hostInfo)))
+        writeHeader(file, "Upgrade Plan for server {0}".format(getHostnameOrIp(hostInfo)))
         files[getKey(hostInfo)] = file
         if hostInfo in killSet:
             writeCommands(file,
@@ -242,7 +242,7 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
     newNodeF = None
     if runner.opts.newNode is not None:
         newNodeF = cStringIO.StringIO()
-        writeHeader(newNodeF, "Upgrade Plan for server {}".format(runner.opts.newNode))
+        writeHeader(newNodeF, "Upgrade Plan for server {0}".format(runner.opts.newNode))
         writeCommands(newNodeF,
                       'Step %d: copy deployment file' % step,
                       '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
@@ -504,7 +504,7 @@ def createDeploymentForNewCluster(runner, xmlString, clusterIds, drSource, new_c
     connection.attrib['enabled'] = 'true'
     if drSource is not None:
         # for stand-alone cluster
-        if 'source' in connection.attrib:
+        if 'source' in connection.attrib and connection.attrib['source'] != '':
             connection.attrib['source'] += ',' + drSource
         else:
             connection.attrib['source'] = drSource
@@ -530,6 +530,7 @@ def createDeploymentForNewCluster(runner, xmlString, clusterIds, drSource, new_c
     # In single cluster case, create deployment file with disabled DR connection
     if post_upgrade_deploy is not None:
         connection.attrib['enabled'] = 'false'
+        connection.attrib['source'] = ''
         et.write(post_upgrade_deploy)
     return hasAbsPath
 
