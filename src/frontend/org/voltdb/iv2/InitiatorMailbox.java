@@ -30,9 +30,11 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.Consistency;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
@@ -74,6 +76,7 @@ public class InitiatorMailbox implements Mailbox
     private final LeaderCacheReader m_masterLeaderCache;
     private long m_hsId;
     protected RepairAlgo m_algo;
+    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     /*
      * Hacky global map of initiator mailboxes to support assertions
@@ -180,6 +183,8 @@ public class InitiatorMailbox implements Mailbox
          * Only used for an assertion on locking.
          */
         m_allInitiatorMailboxes.add(this);
+
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     public JoinProducerBase getJoinProducer()
@@ -384,7 +389,8 @@ public class InitiatorMailbox implements Mailbox
     // After the SPI migration has been requested, all the sp requests will be sent back to the sender
     // if these requests are intended for leader. Client interface will restart these transactions.
     private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
-        if (m_scheduler.isLeader() || message.toReplica()) {
+        if (m_scheduler.isLeader() || message.toReplica() ||
+                (message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
             return false;
         }
         InitiateResponseMessage response = new InitiateResponseMessage(message);

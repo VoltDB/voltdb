@@ -223,12 +223,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
     {
         if (tmLog.isDebugEnabled()) {
-            hostLog.debug("[updateReplicas] replicas: " + Arrays.toString(replicas.toArray()));
-            if (partitionMasters != null && partitionMasters.keySet() != null) {
-                hostLog.debug("[updateReplicas] partition master keys: " + Arrays.toString(partitionMasters.keySet().toArray()));
-            }
-            if (partitionMasters != null && partitionMasters.values() != null) {
-                hostLog.debug("[updateReplicas] partition master values: " + Arrays.toString(partitionMasters.values().toArray()));
+            tmLog.debug("[updateReplicas] replicas: " + Arrays.toString(replicas.toArray()) + " on " + CoreUtils.hsIdToString(m_mailbox.getHSId()));
+            if (partitionMasters != null) {
+                if (partitionMasters.keySet() != null) {
+                    tmLog.debug("[updateReplicas] partition master keys: " + Arrays.toString(partitionMasters.keySet().toArray()));
+                }
+                if (partitionMasters.values() != null) {
+                    tmLog.debug("[updateReplicas] partition master values: " + Arrays.toString(partitionMasters.values().toArray()));
+                }
             }
         }
         // First - correct the official replica set.
@@ -237,7 +239,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
         sendToHSIds.remove(m_mailbox.getHSId());
         m_sendToHSIds = Longs.toArray(sendToHSIds);
-
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
         List<DuplicateCounterKey> doneCounters = new LinkedList<DuplicateCounterKey>();
@@ -1171,25 +1172,27 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
 
         if (tmLog.isDebugEnabled()) {
-            tmLog.debug("[SpScheduler]local site:" + CoreUtils.hsIdToString(m_mailbox.getHSId())
-                  + " MSG: " + msg + "\nTxn:" + (txn != null ? txn.getNotice() : "") + "\nisLeader:" + m_isLeader
-                   );
+            tmLog.debug("[SpScheduler] execution site:" + CoreUtils.hsIdToString(m_mailbox.getHSId())
+                  + "\n" + msg + "\ntransaction:" + (txn != null ? txn.getNotice() : "") + "\nleader:" + m_isLeader);
         }
 
-        // The site has not seen any fragments of the transaction yet, but it has been marked as non-leader.
+        // The site has not seen any fragments of the transaction yet
         if (!m_isLeader && txn == null) {
             return;
         }
 
-        // A transaction may be restarted from a mis-routed fragment or via master change repair process.
-        // The site may have see all the fragments of a transaction,
-        if (m_isLeader || message.isToLeader()) {
+        // 1) The site is not a leader any more, thanks to spi migration but the message is intended for leader.
+        //    action: advance TxnEgo, send it to all original replicas (before spi migration)
+        // 2) The site is the new leader but the message is intended for replica
+        //    action: no TxnEgo advance
+        if ((m_isLeader && message.isToLeader())|| message.isToLeader()) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
             msg.setToLeader(false);
+            msg.setAckRequestedFromSender(true);
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
@@ -1199,7 +1202,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         " MSG:" + msg + "\nTxn:" + (txn != null ? txn.getNotice() : "") +
                         "\nisLeader:" + m_isLeader);
             }
-            setMaxSeenTxnId(msg.getSpHandle());
+            if(!m_isLeader && message.isToLeader()) {
+                setMaxSeenTxnId(msg.getSpHandle());
+            }
         }
 
         // We can currently receive CompleteTransactionMessages for multipart procedures
@@ -1207,7 +1212,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // now, fix that later.
         if (txn != null)
         {
-            final FragmentTaskMessage frag = (FragmentTaskMessage) txn.getNotice();
             CompleteTransactionMessage finalMsg = msg;
             final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
             if (traceLog != null) {
@@ -1218,7 +1222,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             final boolean isSysproc = ((FragmentTaskMessage) txn.getNotice()).isSysProcTask();
-            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc)) {
+            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc) && message.isToLeader()) {
 
                 DuplicateCounter counter;
                 counter = new DuplicateCounter(msg.getCoordinatorHSId(),
@@ -1277,7 +1281,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //
         // The SPI uses this response message to track if all replicas have
         // committed the transaction.
-        if (!m_isLeader && msg.getSPIHSId() != m_mailbox.getHSId()) {
+        if (!m_isLeader && msg.isAckRequestedFromSender()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }

@@ -232,7 +232,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + (System.currentTimeMillis() - startTime) + " ms. of "
                             + "trying. Retrying.");
                 }
-             //   m_scheduler.setSpiBalanceRequested(false);
             }
             // Tag along and become the export master too
             // leave the export on the former leader, now a replica
