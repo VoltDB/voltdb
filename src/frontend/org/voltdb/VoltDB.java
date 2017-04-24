@@ -980,6 +980,9 @@ public class VoltDB {
         }
 
         public static String getPathToCatalogForTest(String jarname) {
+            if (jarname == null) {
+                return null; // NewCLI tests that init with schema do not want a pre-compiled catalog
+            }
 
             // first try to get the "right" place to put the thing
             if (System.getenv("TEST_DIR") != null) {

@@ -222,7 +222,8 @@ public class CatalogDiffEngine {
      * @return true if changes require export generation to be updated.
      */
     public boolean requiresNewExportGeneration() {
-        return m_requiresNewExportGeneration;
+        // TODO: return m_requiresNewExportGeneration;
+        return true;
     }
 
     public String[][] tablesThatMustBeEmpty() {
@@ -1342,7 +1343,7 @@ public class CatalogDiffEngine {
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         newType.writeCreationCommand(m_sb);
-        newType.writeFieldCommands(m_sb);
+        newType.writeFieldCommands(m_sb, null);
         newType.writeChildCommands(m_sb);
 
         // add it to the set of additions to later compute descriptive text

@@ -2757,6 +2757,65 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{ 10, "foo", 20, 40.0, 11, "bar", 30, 99.0 }}, vt);
     }
 
+    public void testExistsBugEng12204() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "insert into p1 values (0, 'foo', 0, 0.1);");
+        client.callProcedure("@AdHoc", "insert into r1 values (0, 'foo', 0, 0.1);");
+        client.callProcedure("@AdHoc", "insert into r1 values (1, 'baz', 1, 1.1);");
+
+        VoltTable vt;
+
+        // Simplified version of query that caused a crash
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * "
+                        + "FROM P1 "
+                        + "WHERE EXISTS ("
+                        + "  SELECT SUM(ID) "
+                        + "  FROM R1 "
+                        + "  WHERE DESC = 'bar' "
+                        + "  GROUP BY NUM)").getResults()[0];
+        assertContentOfTable(new Object[][] {}, vt);
+
+        // Subquery returns zero rows, so NOT EXISTS returns true
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * "
+                        + "FROM P1 "
+                        + "WHERE NOT EXISTS ("
+                        + "  SELECT SUM(ID) "
+                        + "  FROM R1 "
+                        + "  WHERE DESC = 'bar' "
+                        + "  GROUP BY NUM) "
+                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
+        assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
+
+        // WHERE predicate in inner query sometimes returns true, sometimes false
+        // (bug occurred when predicate was always false and pass through values were
+        // uninitialized)
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * "
+                        + "FROM P1 "
+                        + "WHERE EXISTS ("
+                        + "  SELECT SUM(ID) "
+                        + "  FROM R1 "
+                        + "  WHERE DESC = 'baz' "
+                        + "  GROUP BY NUM) "
+                        + "ORDER BY 1, 2, 3, 4").getResults()[0];
+        assertContentOfTable(new Object[][] {{0, "foo", 0, 0.1}}, vt);
+
+        // The original query
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * "
+                        + "FROM P1 T2 "
+                        + "WHERE NOT EXISTS ("
+                        + "  SELECT SUM(COT(ID)) "
+                        + "  FROM R1 T2 "
+                        + "  WHERE DESC <> DESC "
+                        + "  GROUP BY NUM, NUM) "
+                        + "OFFSET 9;").getResults()[0];
+        assertContentOfTable(new Object[][] {}, vt);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //

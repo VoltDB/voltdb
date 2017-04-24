@@ -247,8 +247,8 @@ public abstract class StatementCompiler {
             planDescription.append("\nPLAN:\n");
             planDescription.append(plan.explainedPlan);
             String planString = planDescription.toString();
-            // only write to disk if compiler is in standalone mode
-            if (compiler.standaloneCompiler) {
+            // only write to disk if compiler is in standalone mode and allows reports
+            if (compiler.standaloneCompiler && compiler.m_generateReports) {
                 BuildDirectoryUtils.writeFile(null, name + ".txt", planString, false);
             }
             compiler.captureDiagnosticContext(planString);
