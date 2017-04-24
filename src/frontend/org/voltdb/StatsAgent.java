@@ -532,8 +532,8 @@ public class StatsAgent extends OpsAgent
         case LIVECLIENTS:
             stats = collectStats(StatsSelector.LIVECLIENTS, interval);
             break;
-        case LATENCY:
-            stats = collectStats(StatsSelector.LATENCY, interval);
+        case LATENCY_COMPRESSED:
+            stats = collectStats(StatsSelector.LATENCY_COMPRESSED, interval);
             break;
         case LATENCY_HISTOGRAM:
             stats = collectStats(StatsSelector.LATENCY_HISTOGRAM, interval);

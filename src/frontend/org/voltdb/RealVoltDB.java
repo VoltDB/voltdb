@@ -1264,7 +1264,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_liveClientsStats = new LiveClientsStats();
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
-            getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
+            getStatsAgent().registerStatsSource(StatsSelector.LATENCY_COMPRESSED, 0, m_latencyStats);
             m_latencyHistogramStats = new LatencyHistogramStats(m_myHostId);
             getStatsAgent().registerStatsSource(StatsSelector.LATENCY_HISTOGRAM,
                     0, m_latencyHistogramStats);
