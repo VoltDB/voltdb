@@ -102,31 +102,32 @@ public class LatencyStats extends SiteStatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("TIMESTAMP", VoltType.TIMESTAMP));
-        columns.add(new ColumnInfo("INTERVAL",  VoltType.INTEGER));   // seconds
-        columns.add(new ColumnInfo("P50",       VoltType.BIGINT));    // microseconds
-        columns.add(new ColumnInfo("P95",       VoltType.BIGINT));    // microseconds
-        columns.add(new ColumnInfo("P99",       VoltType.BIGINT));    // microseconds
-        columns.add(new ColumnInfo("P99.9",     VoltType.BIGINT));    // microseconds
-        columns.add(new ColumnInfo("P99.99",    VoltType.BIGINT));    // microseconds
-        columns.add(new ColumnInfo("P99.999",   VoltType.BIGINT));    // microseconds
+        columns.add(new ColumnInfo("INTERVAL",  VoltType.INTEGER)); // seconds
+        columns.add(new ColumnInfo("COUNT",     VoltType.INTEGER)); // # samples
+        columns.add(new ColumnInfo("P50",       VoltType.BIGINT));  // milliseconds
+        columns.add(new ColumnInfo("P95",       VoltType.BIGINT));  // milliseconds
+        columns.add(new ColumnInfo("P99",       VoltType.BIGINT));  // milliseconds
+        columns.add(new ColumnInfo("P99.9",     VoltType.BIGINT));  // milliseconds
+        columns.add(new ColumnInfo("P99.99",    VoltType.BIGINT));  // milliseconds
+        columns.add(new ColumnInfo("P99.999",   VoltType.BIGINT));  // milliseconds
+        columns.add(new ColumnInfo("MAX",       VoltType.BIGINT));  // milliseconds
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-
+        super.updateStatsRow(rowKey, rowValues);
         AbstractHistogram diffHist = m_diffHistProvider.get();
-        long histTimestamp = diffHist.getEndTimeStamp();
-        assert histTimestamp > 0; // histTimestamp is in milliseconds since the epoch
 
-        rowValues[columnNameToIndex.get("TIMESTAMP")] = new TimestampType(TimeUnit.MILLISECONDS.toMicros(histTimestamp));
+        // Override timestamp from the procedure call with the one from when the data was fetched.
+        rowValues[columnNameToIndex.get("TIMESTAMP")] = diffHist.getEndTimeStamp();
         rowValues[columnNameToIndex.get("INTERVAL")]  = INTERVAL_SECONDS;
+        rowValues[columnNameToIndex.get("COUNT")]     = diffHist.getTotalCount();
         rowValues[columnNameToIndex.get("P50")]       = diffHist.getValueAtPercentile(0.50);
         rowValues[columnNameToIndex.get("P95")]       = diffHist.getValueAtPercentile(0.95);
         rowValues[columnNameToIndex.get("P99")]       = diffHist.getValueAtPercentile(0.99);
         rowValues[columnNameToIndex.get("P99.9")]     = diffHist.getValueAtPercentile(0.999);
         rowValues[columnNameToIndex.get("P99.99")]    = diffHist.getValueAtPercentile(0.9999);
         rowValues[columnNameToIndex.get("P99.999")]   = diffHist.getValueAtPercentile(0.99999);
-        super.updateStatsRow(rowKey, rowValues);
+        rowValues[columnNameToIndex.get("MAX")]       = diffHist.getMaxValue();
     }
 }
