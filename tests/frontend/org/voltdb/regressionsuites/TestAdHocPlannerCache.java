@@ -32,9 +32,9 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.sysprocs.AdHocNTBase;
 
 public class TestAdHocPlannerCache extends RegressionSuite {
     // 1 means cache level 1, the literal sql string cache
@@ -292,7 +292,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
     public void subtest2AdHocParameters(Client client) throws IOException, ProcCallException {
         System.out.println("subtest2AdHocParameters...");
         String sql;
-        String errorMsg = AsyncCompilerAgent.AdHocErrorResponseMessage;
+        String errorMsg = AdHocNTBase.AdHocErrorResponseMessage;
 
         //
         // Multiple AdHoc queries with question marks per procedure call

@@ -196,15 +196,13 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
 
         AdHocPlannedStmtBatch plannedStmtBatch =
-                new AdHocPlannedStmtBatch(
-                        userParamSet,
-                        getHostname(),
-                        false,
-                        stmts,
-                        partitionParamIndex,
-                        partitionParamType,
-                        partitionParamValue,
-                        errorSummary);
+                new AdHocPlannedStmtBatch(userParamSet,
+                                          stmts,
+                                          partitionParamIndex,
+                                          partitionParamType,
+                                          partitionParamValue,
+                                          null,
+                                          errorSummary);
 
         // TODO: re-enable this
         /*if (adhocLog.isDebugEnabled()) {
@@ -213,7 +211,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
         if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.endAsync("planadhoc", plannedStmtBatch.clientHandle));
+            traceLog.add(() -> VoltTrace.endAsync("planadhoc", getClientHandle()));
         }
 
         if (explainMode == ExplainMode.EXPLAIN_ADHOC) {

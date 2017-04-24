@@ -17,13 +17,8 @@
 package org.voltdb;
 
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
-import org.voltdb.compiler.AdHocPlannerWork;
-import org.voltdb.compiler.AsyncCompilerAgent;
-import org.voltdb.compiler.AsyncCompilerResult;
-import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /*
  * Wrapper around a planner tied to a specific catalog version. This planner
@@ -32,17 +27,17 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * via AdHocPlannerWork
  */
 public class CatalogSpecificPlanner {
-    private final AsyncCompilerAgent m_agent;
+    //private final AsyncCompilerAgent m_agent;
     private final CatalogContext m_catalogContext;
 
-    public CatalogSpecificPlanner(AsyncCompilerAgent agent, CatalogContext context) {
-        m_agent = agent;
+    public CatalogSpecificPlanner(/*AsyncCompilerAgent agent,*/ CatalogContext context) {
+        //m_agent = agent;
         m_catalogContext = context;
     }
 
     public ListenableFuture<AdHocPlannedStmtBatch> plan(String sql,
             Object[] userParams, boolean singlePartition) {
-        final SettableFuture<AdHocPlannedStmtBatch> retval = SettableFuture.create();
+        /*final SettableFuture<AdHocPlannedStmtBatch> retval = SettableFuture.create();
         AsyncCompilerWorkCompletionHandler completionHandler = new AsyncCompilerWorkCompletionHandler()
         {
             @Override
@@ -53,6 +48,7 @@ public class CatalogSpecificPlanner {
         AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(-1, sql, userParams,
                 singlePartition, m_catalogContext, completionHandler);
         m_agent.compileAdHocPlanForProcedure(work);
-        return retval;
+        return retval;*/
+        return null;
     }
 }

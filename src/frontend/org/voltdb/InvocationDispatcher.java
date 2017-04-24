@@ -61,7 +61,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Permission;
-import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
@@ -1361,27 +1360,5 @@ public final class InvocationDispatcher {
     /** test only */
     long countNTWaitingProcs() {
         return m_NTProcedureService.m_outstanding.size();
-    }
-
-    public static final StoredProcedureInvocation getUpdateCatalogExecutionTask(CatalogChangeResult changeResult) {
-        // create the execution site task
-        StoredProcedureInvocation task = new StoredProcedureInvocation();
-        task.setProcName("@UpdateApplicationCatalog");
-        task.setParams(changeResult.encodedDiffCommands,
-                       changeResult.catalogHash,
-                       changeResult.catalogBytes,
-                       changeResult.expectedCatalogVersion,
-                       changeResult.deploymentString,
-                       changeResult.tablesThatMustBeEmpty,
-                       changeResult.reasonsForEmptyTables,
-                       changeResult.requiresSnapshotIsolation ? 1 : 0,
-                       changeResult.worksWithElastic ? 1 : 0,
-                       changeResult.deploymentHash,
-                       changeResult.hasSchemaChange ? 1 : 0,
-                       changeResult.requiresNewExportGeneration ? 1 : 0);
-        task.clientHandle = changeResult.clientHandle;
-        // DR stuff
-        task.type = changeResult.invocationType;
-        return task;
     }
 }

@@ -42,4 +42,8 @@ public class VoltNTSystemProcedure extends VoltNonTransactionalProcedure {
     protected boolean isAdminConnection() {
         return false;
     }
+
+    protected long getClientHandle() {
+        return 0;
+    }
 }

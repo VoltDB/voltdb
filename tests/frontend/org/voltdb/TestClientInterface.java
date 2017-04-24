@@ -68,7 +68,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
@@ -80,15 +79,12 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.AdHocPlannerWork;
-import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestClientInterface {
@@ -305,188 +301,6 @@ public class TestClientInterface {
             assertEquals(new Long(m_cartographer.getHSIdForMultiPartitionInitiator()), destinationCaptor.getValue());
         }
         return message;
-    }
-
-    @Test
-    public void testExplain() throws IOException {
-        ByteBuffer msg = createMsg("@Explain", "select * from a");
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNull(resp);
-        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_messenger).send(eq(32L), captor.capture());
-        assertTrue(captor.getValue().payload instanceof AdHocPlannerWork );
-        System.out.println( captor.getValue().payload.toString() );
-        String payloadString = captor.getValue().payload.toString();
-        assertTrue(payloadString.contains("user partitioning: none"));
-    }
-
-    @Test
-    public void testAdHoc() throws IOException {
-        ByteBuffer msg = createMsg("@AdHoc", "select * from a");
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNull(resp);
-        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_messenger).send(eq(32L), captor.capture());
-        assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
-        String payloadString = captor.getValue().payload.toString();
-        assertTrue(payloadString.contains("user partitioning: none"));
-
-        // single-part adhoc
-        reset(m_messenger);
-        msg = createMsg("@AdHocSpForTest", "select * from a where i = 3", 3);
-        resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNull(resp);
-        verify(m_messenger).send(eq(32L), captor.capture());
-        assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
-        payloadString = captor.getValue().payload.toString();
-        assertTrue(payloadString.contains("user params: empty"));
-        assertTrue(payloadString.contains("user partitioning: 3"));
-    }
-
-    @Test
-    public void testFinishedSPAdHocPlanning() throws Exception {
-        // Need a batch and a statement
-        /*String query = "select * from a where i = ?";
-        int partitionParamIndex = 0;
-        Object[] extractedValues =  new Object[0];
-        VoltType[] paramTypes =  new VoltType[]{VoltType.INTEGER};
-        AdHocPlannedStmtBatch plannedStmtBatch =
-                AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes,
-                                                         new Object[]{3}, partitionParamIndex,
-                                                         m_context.getCatalogHash());
-        m_ci.getDispatcher().processFinishedCompilerWork(plannedStmtBatch).run();
-
-        ArgumentCaptor<Long> destinationCaptor =
-                ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
-                ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
-        verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
-        Iv2InitiateTaskMessage message = messageCaptor.getValue();
-
-        assertTrue(message.isReadOnly());  // readonly
-        assertTrue(message.isSinglePartition()); // single-part
-        assertEquals("@AdHoc_RO_SP", message.getStoredProcedureName());
-
-        // SP AdHoc should have partitioning parameter serialized in the parameter set
-        Object partitionParam = message.getStoredProcedureInvocation().getParameterAtIndex(0);
-        assertTrue(partitionParam instanceof byte[]);
-        VoltType type = VoltType.get((Byte) message.getStoredProcedureInvocation().getParameterAtIndex(1));
-        assertTrue(type.isBackendIntegerType());
-        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2);
-        ByteBuffer buf = ByteBuffer.wrap(serializedData);
-        Object[] parameters = AdHocPlannedStmtBatch.userParamsFromBuffer(buf);
-        assertEquals(1, parameters.length);
-        assertEquals(3, parameters[0]);
-        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
-        assertTrue(Arrays.equals(VoltType.valueToBytes(3), (byte[]) partitionParam));
-        assertEquals(1, statements.length);
-        String sql = new String(statements[0].sql, Constants.UTF8ENCODING);
-        assertEquals(query, sql);*/
-    }
-
-    /**
-     * Fake an adhoc compiler result and return it to the CI, see if CI
-     * initiates the txn.
-     */
-    @Test
-    public void testFinishedMPAdHocPlanning() throws Exception {
-        // Need a batch and a statement
-        /*String query = "select * from a";
-        Object[] extractedValues =  new Object[0];
-        VoltType[] paramTypes =  new VoltType[0];
-        AdHocPlannedStmtBatch plannedStmtBatch =
-            AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes, null, -1,
-                    m_context.getCatalogHash());
-        m_ci.getDispatcher().processFinishedCompilerWork(plannedStmtBatch).run();
-
-        ArgumentCaptor<Long> destinationCaptor =
-                ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
-                ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
-        verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
-        Iv2InitiateTaskMessage message = messageCaptor.getValue();
-
-        //assertFalse(boolValues.get(0)); // is admin
-        assertTrue(message.isReadOnly());  // readonly
-        assertFalse(message.isSinglePartition()); // single-part
-        //assertFalse(boolValues.get(3)); // every site
-        assertEquals("@AdHoc_RO_MP", message.getStoredProcedureName());
-
-        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(0);
-        ByteBuffer buf = ByteBuffer.wrap(serializedData);
-        Object[] parameters = AdHocPlannedStmtBatch.userParamsFromBuffer(buf);
-        assertEquals(0, parameters.length);
-        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
-        assertEquals(1, statements.length);
-        String sql = new String(statements[0].sql, Constants.UTF8ENCODING);
-        assertEquals(query, sql);*/
-    }
-
-    @Test
-    public void testUpdateCatalog() throws IOException {
-        // only makes sense in pro (sysproc suite has a complementary test for community)
-        if (VoltDB.instance().getConfig().m_isEnterprise) {
-            String catalogHex = Encoder.hexEncode("blah");
-            ByteBuffer msg = createMsg("@UpdateApplicationCatalog", catalogHex, "blah");
-            ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-            assertNull(resp);
-            ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-            verify(m_messenger).send(eq(32L), // A fixed number set in setUpOnce()
-                                     captor.capture());
-            assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
-        }
-    }
-
-    @Test
-    public void testNegativeUpdateCatalog() throws IOException {
-        ByteBuffer msg = createMsg("@UpdateApplicationCatalog", new Integer(1), new Long(0));
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        // expect an error response from handleRead.
-        assertNotNull(resp);
-        assertTrue(resp.getStatus() != 0);
-    }
-
-
-    /**
-     * Fake a catalog diff compiler result and send it back to the CI, see if CI
-     * initiates a new txn.
-     */
-    @Test
-    public void testFinishedCatalogDiffing() {
-        /*CatalogChangeResult catalogResult = new CatalogChangeResult();
-        catalogResult.clientData = null;
-        catalogResult.clientHandle = 0;
-        catalogResult.connectionId = 0;
-        catalogResult.adminConnection = false;
-        // catalog change specific boiler plate
-        catalogResult.catalogHash = "blah".getBytes();
-        catalogResult.catalogBytes = "blah".getBytes();
-        catalogResult.deploymentString = "blah";
-        catalogResult.expectedCatalogVersion = 3;
-        catalogResult.encodedDiffCommands = "diff";
-        catalogResult.invocationType = ProcedureInvocationType.VERSION2;
-        catalogResult.originalTxnId = 12345678l;
-        catalogResult.originalUniqueId = 87654321l;
-        catalogResult.diffCommandsLength = 10;
-        catalogResult.user = new AuthSystem.AuthDisabledUser();
-        m_ci.getDispatcher().processFinishedCompilerWork(catalogResult).run();
-
-        ArgumentCaptor<Long> destinationCaptor =
-                ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
-                ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
-        verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
-        Iv2InitiateTaskMessage message = messageCaptor.getValue();
-        //assertFalse(boolValues.get(0)); // is admin
-        assertFalse(message.isReadOnly()); // readonly
-        assertFalse(message.isSinglePartition()); // single-part
-        //assertFalse(boolValues.get(3)); // every site
-        assertEquals("@UpdateApplicationCatalog", message.getStoredProcedureName());
-        assertEquals("diff", message.getStoredProcedureInvocation().getParameterAtIndex(0));
-        assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
-        assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
-        assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
-        assertEquals(ProcedureInvocationType.VERSION2, message.getStoredProcedureInvocation().getType());*/
     }
 
     @Test

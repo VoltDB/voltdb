@@ -24,15 +24,12 @@ import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.network.Connection;
-import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.planner.CorePlan;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
@@ -43,14 +40,14 @@ import org.voltdb.plannodes.SendPlanNode;
  * Both AdHocPlannedStmtBatch and AdHocPlannedStatement are derived from
  * AsyncCompilerResult. So there's some data redundancy, e.g. clientData.
  */
-public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Cloneable {
-    private static final long serialVersionUID = -8627490621430290801L;
+public class AdHocPlannedStmtBatch implements Cloneable {
 
     // One or the other of these may be assigned if the planner infers single partition work.
     // Not persisted across serializations.
     public final int partitionParamIndex;
     public final VoltType partitionParamType;
     public final Object partitionParamValue;
+    public final String errorMsg;
 
     // The planned statements.
     public final List<AdHocPlannedStatement> plannedStatements;
@@ -58,10 +55,9 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     // Assume the batch is read-only until we see the first non-select statement.
     public final boolean readOnly;
 
-    // The original work request to the planner
-    public final AdHocPlannerWork work;
+    final Object[] userPartitionKey;
 
-    final Object userParamSet;
+    final Object[] userParamSet;
 
     /**
      * Statement batch constructor.
@@ -71,66 +67,21 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      * text and assuring that the individual SQL statements correspond to the
      * original.
      *
-     * @param work                  the original work request
      * @param stmts                 the planned statements
      * @param partitionParamIndex   the (possibly inferred) partition parameter index
      * @param partitionParamValue   the (possibly inferred) partition parameter value
      * @param errors                sad news from the planner or null
      */
-    public AdHocPlannedStmtBatch(
-            AdHocPlannerWork work,
-            List<AdHocPlannedStatement> stmts,
-            int partitionParamIndex,
-            VoltType partitionParamType,
-            Object partitionParamValue,
-            String errors) {
-        this.work = work;
-
-        userParamSet = work.userParamSet;
-
-        this.clientHandle = work.clientHandle;
-        this.connectionId = work.connectionId;
-        this.hostname =
-            (work.clientData == null) ? "" : ((Connection)work.clientData).getHostnameAndIPAndPort();
-        this.adminConnection = work.adminConnection;
-        this.clientData = work.clientData;
-
-        this.plannedStatements = stmts;
-        boolean allReadOnly = true;
-        for (AdHocPlannedStatement plannedStmt : stmts) {
-            // The first non-select statement makes it not read-only.
-            if (!plannedStmt.core.readOnly) {
-                allReadOnly = false;
-                break;
-            }
-        }
-        this.readOnly = allReadOnly;
-        this.partitionParamIndex = partitionParamIndex;
-        this.partitionParamType = partitionParamType;
-        this.partitionParamValue = partitionParamValue;
-        this.errorMsg = errors;
-    }
-
-    /** Secondary constructor for new NTProcs adhoc path */
-    public AdHocPlannedStmtBatch(
-            Object[] userParamSet,
-            String hostname,
-            boolean adminConnection,
-            List<AdHocPlannedStatement> stmts,
-            int partitionParamIndex,
-            VoltType partitionParamType,
-            Object partitionParamValue,
-            String errors) {
-        this.work = null;
-
+    public AdHocPlannedStmtBatch(Object[] userParamSet,
+                                 List<AdHocPlannedStatement> stmts,
+                                 int partitionParamIndex,
+                                 VoltType partitionParamType,
+                                 Object partitionParamValue,
+                                 Object[] userPartitionKey,
+                                 String errors)
+    {
         this.userParamSet = userParamSet;
 
-        this.clientHandle = -3;
-        this.connectionId = -3;
-        this.hostname = hostname;
-        this.adminConnection = adminConnection;
-        this.clientData = null;
-
         this.plannedStatements = stmts;
         boolean allReadOnly = true;
         for (AdHocPlannedStatement plannedStmt : stmts) {
@@ -145,35 +96,38 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         this.partitionParamType = partitionParamType;
         this.partitionParamValue = partitionParamValue;
         this.errorMsg = errors;
+        this.userPartitionKey = userPartitionKey;
     }
 
-    public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId, String sql,
-            Object[] extractedValues, VoltType[] paramTypes,
-            Object[] userParams, int partitionParamIndex, byte[] catalogHash)
+    public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId,
+                                                           String sql,
+                                                           Object[] extractedValues,
+                                                           VoltType[] paramTypes,
+                                                           Object[] userParams,
+                                                           int partitionParamIndex,
+                                                           byte[] catalogHash)
     {
-        return mockStatementBatch(replySiteId, sql, extractedValues, paramTypes, userParams, partitionParamIndex, catalogHash, true, false);
+        return mockStatementBatch(replySiteId,
+                                  sql,
+                                  extractedValues,
+                                  paramTypes,
+                                  userParams,
+                                  partitionParamIndex,
+                                  null,
+                                  catalogHash,
+                                  true);
     }
 
-    public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId, String sql,
-            Object[] extractedValues, VoltType[] paramTypes,
-            Object[] userParams, int partitionParamIndex, byte[] catalogHash,
-            boolean readOnly, boolean isAdmin)
+    public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId,
+                                                           String sql,
+                                                           Object[] extractedValues,
+                                                           VoltType[] paramTypes,
+                                                           Object[] userParams,
+                                                           int partitionParamIndex,
+                                                           Object[] userPartitionKey,
+                                                           byte[] catalogHash,
+                                                           boolean readOnly)
     {
-        // Mock up a dummy completion handler to satisfy the dummy work request.
-        AsyncCompilerWorkCompletionHandler dummyHandler = new AsyncCompilerWorkCompletionHandler() {
-
-            @Override
-            public void onCompletion(AsyncCompilerResult result) {
-                System.out.println("Hmm. Never expected to call this dummy handler.");
-            }
-        };
-        // Mock up a dummy work request.
-        AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(replySiteId,
-                                                                                sql,
-                                                                                userParams,
-                                                                                false, // mock inferred partitioning
-                                                                                null, dummyHandler,
-                                                                                isAdmin);
         // Mock up dummy results from the work request.
         CorePlan core = new CorePlan(new byte[0],
                 partitionParamIndex == -1 ? new byte[20] : null,
@@ -192,8 +146,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         stmts.add(s);
         VoltType partitionParamType = null;
         Object partitionParamValue = null;
-        if (work.userPartitionKey != null) {
-            partitionParamValue = work.userPartitionKey[0];
+        if (userPartitionKey != null) {
+            partitionParamValue = userPartitionKey[0];
         }
         else if (partitionParamIndex > -1) {
             partitionParamValue = userParams[partitionParamIndex];
@@ -202,21 +156,27 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             partitionParamType = VoltType.typeFromObject(partitionParamValue);
         }
         // Finally, mock up the planned batch.
-        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,
+        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(userParams,
                                                                            stmts,
                                                                            partitionParamIndex,
                                                                            partitionParamType,
                                                                            partitionParamValue,
+                                                                           null,
                                                                            null);
         return plannedStmtBatch;
     }
 
     @Override
     public String toString() {
+        String sql = "";
+        for (AdHocPlannedStatement ahps : plannedStatements) {
+            sql += new String(ahps.sql, Constants.UTF8ENCODING) + "\n";
+        }
+
         String retval = super.toString();
         retval += "\n  partition param: " + ((partitionParamValue != null) ? partitionParamValue.toString() : "null");
         retval += "\n  partition param index: " + partitionParamIndex;
-        retval += "\n  sql: " + work.sqlBatchText;
+        retval += "\n  sql: " + sql;
         return retval;
     }
 
@@ -296,7 +256,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         if (userParamSet == null) {
             userParamCache = ParameterSet.emptyParameterSet();
         } else {
-            Object[] typedUserParams = new Object[work.userParamSet.length];
+            Object[] typedUserParams = new Object[userParamSet.length];
             int ii = 0;
             for (AdHocPlannedStatement cs : plannedStatements) {
                 for (VoltType paramType : cs.core.parameterTypes) {
@@ -309,7 +269,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                     }
                     typedUserParams[ii] =
                             ParameterConverter.tryToMakeCompatible(paramType.classFromType(),
-                                                                   work.userParamSet[ii]);
+                                                                   userParamSet[ii]);
                     // System.out.println("DEBUG typed parameter: " + work.userParamSet[ii] +
                     //         "using type: " + paramType + "as: " + typedUserParams[ii]);
                     ii++;
@@ -362,10 +322,6 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         return statements;
     }
 
-    public ExplainMode getExplainMode() {
-        return work.explainMode;
-    }
-
     /*
      * Return the partitioning value (if any) for an SP statement batch.
      * It may have come from a number of sources:
@@ -379,12 +335,12 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      * partitioning parameter (after opting out of or failing parameterization).
      */
     public Object partitionParam() {
-        if (work.userPartitionKey != null) {
-            return work.userPartitionKey[0];
+        if (userPartitionKey != null) {
+            return userPartitionKey[0];
         }
-        if (partitionParamIndex > -1 && work.userParamSet != null &&
-                work.userParamSet.length > partitionParamIndex) {
-            Object userParamValue = work.userParamSet[partitionParamIndex];
+        if (partitionParamIndex > -1 && userParamSet != null &&
+                userParamSet.length > partitionParamIndex) {
+            Object userParamValue = userParamSet[partitionParamIndex];
             if (partitionParamType == null) {
                 return userParamValue;
             } else {

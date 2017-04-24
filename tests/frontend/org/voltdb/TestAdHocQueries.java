@@ -44,9 +44,9 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -711,7 +711,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             //
             // test batch with extra parameter call
             //
-            String errorMsg = AsyncCompilerAgent.AdHocErrorResponseMessage;
+            String errorMsg = AdHocNTBase.AdHocErrorResponseMessage;
             // test batch question mark parameter guards
 
             adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = 'a2';";
