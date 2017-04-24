@@ -123,6 +123,7 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
+import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
@@ -429,9 +430,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
     String m_licenseInformation = "";
-    private LatencyStats m_latencyStats;
 
-    private LatencyHistogramStats m_latencyHistogramStats;
+    private LatencyStats m_latencyStats;
+    private LatencyHistogramStats m_latencyCompressedStats;
+    private LatencyUncompressedHistogramStats m_latencyHistogramStats;
 
     private File getConfigDirectory() {
         return getConfigDirectory(m_config);
@@ -1263,9 +1265,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_initiatorStats = new InitiatorStats(m_myHostId);
             m_liveClientsStats = new LiveClientsStats();
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
+
             m_latencyStats = new LatencyStats(m_myHostId);
-            getStatsAgent().registerStatsSource(StatsSelector.LATENCY_COMPRESSED, 0, m_latencyStats);
-            m_latencyHistogramStats = new LatencyHistogramStats(m_myHostId);
+            getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
+            m_latencyCompressedStats = new LatencyHistogramStats(m_myHostId);
+            getStatsAgent().registerStatsSource(StatsSelector.LATENCY_COMPRESSED, 0, m_latencyCompressedStats);
+            m_latencyHistogramStats = new LatencyUncompressedHistogramStats(m_myHostId);
             getStatsAgent().registerStatsSource(StatsSelector.LATENCY_HISTOGRAM,
                     0, m_latencyHistogramStats);
 
@@ -3237,7 +3242,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_computationService = null;
                 m_catalogContext = null;
                 m_initiatorStats = null;
-                m_latencyStats = null;
+                m_latencyCompressedStats = null;
                 m_latencyHistogramStats = null;
 
                 AdHocCompilerCache.clearHashCache();

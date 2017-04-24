@@ -17,42 +17,60 @@
 
 package org.voltdb.dtxn;
 
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
-import org.HdrHistogram_voltpatches.AtomicHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
-import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.types.TimestampType;
+import org.voltdb.VoltTable.ColumnInfo;
 
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
-
-/**
- * Class that provides latency information in buckets. Each bucket contains the
- * number of procedures with latencies in the range.
- */
 public class LatencyStats extends SiteStatsSource {
-    /**
-     * A dummy iterator that wraps and int and provides the
-     * Iterator<Object> necessary for getStatsRowKeyIterator()
-     *
-     */
-    private static class DummyIterator implements Iterator<Object> {
-        boolean oneRow = false;
+
+    public static final int INTERVAL_SECONDS = 5;
+
+    private AtomicReference<AbstractHistogram> m_diffHistProvider = new AtomicReference<AbstractHistogram>();
+    private ScheduledExecutorService m_updater = Executors.newScheduledThreadPool(1);
+
+    private class UpdaterJob implements Runnable {
+
+        private AbstractHistogram m_previousHist = LatencyHistogramStats.constructHistogram(false);
+
+        @Override
+        public void run() {
+            AbstractHistogram currentHist = LatencyHistogramStats.constructHistogram(false);
+            ClientInterface ci = VoltDB.instance().getClientInterface();
+            if (ci != null) {
+                List<AbstractHistogram> thisci = ci.getLatencyStats();
+                for (AbstractHistogram info : thisci) {
+                    currentHist.add(info);
+                }
+            }
+            AbstractHistogram diffHist = currentHist.copy();
+            diffHist.subtract(m_previousHist);
+            diffHist.setEndTimeStamp(System.currentTimeMillis());
+            m_previousHist = currentHist;
+            m_diffHistProvider.set(diffHist);
+        }
+    }
+
+    /** A dummy iterator that lets getStatsRowKeyIterator() access a single row. */
+    private static class SingleRowIterator implements Iterator<Object> {
+        boolean rowProvided = false;
 
         @Override
         public boolean hasNext() {
-            if (!oneRow) {
-                oneRow = true;
+            if (!rowProvided) {
+                rowProvided = true;
                 return true;
             }
             return false;
@@ -69,81 +87,46 @@ public class LatencyStats extends SiteStatsSource {
         }
     }
 
-    public static AbstractHistogram constructHistogram(boolean threadSafe) {
-        final long highestTrackableValue = 60L * 60L * 1000000L;
-        final int numberOfSignificantValueDigits = 3;
-        if (threadSafe) {
-            return new AtomicHistogram( highestTrackableValue, numberOfSignificantValueDigits);
-        } else {
-            return new Histogram( highestTrackableValue, numberOfSignificantValueDigits);
-        }
-    }
-
-    private WeakReference<byte[]> m_compressedCache = null;
-    private WeakReference<byte[]> m_serializedCache = null;
-
-    private AbstractHistogram m_totals = constructHistogram(false);
-
-    private final static int EXPIRATION = Integer.getInteger("LATENCY_CACHE_EXPIRATION", 900);
-
-    private Supplier<AbstractHistogram> getHistogramSupplier() {
-        return Suppliers.memoizeWithExpiration(new Supplier<AbstractHistogram>() {
-            @Override
-            public AbstractHistogram get() {
-                m_totals.reset();
-                ClientInterface ci = VoltDB.instance().getClientInterface();
-                if (ci != null) {
-                    List<AbstractHistogram> thisci = ci.getLatencyStats();
-                    for (AbstractHistogram info : thisci) {
-                        m_totals.add(info);
-                    }
-                }
-                m_compressedCache = null;
-                m_serializedCache = null;
-
-                return m_totals;
-            }
-        }, EXPIRATION, TimeUnit.MILLISECONDS);
-    }
-    private Supplier<AbstractHistogram> m_histogramSupplier = getHistogramSupplier();
-
-    public byte[] getSerializedCache() {
-        byte[] retval = null;
-        if (m_serializedCache == null || (retval = m_serializedCache.get()) == null) {
-            retval = m_histogramSupplier.get().toUncompressedBytes();
-            m_serializedCache = new WeakReference<byte[]>(retval);
-        }
-        return retval;
-    }
-
-    public byte[] getCompressedCache() {
-        byte[] retval = null;
-        if (m_compressedCache == null || (retval = m_compressedCache.get()) == null) {
-            retval = AbstractHistogram.toCompressedBytes(getSerializedCache(), CompressionStrategySnappy.INSTANCE);
-            m_compressedCache = new WeakReference<byte[]>(retval);
-        }
-        return retval;
-    }
-
     public LatencyStats(long siteId) {
         super(siteId, false);
+        m_diffHistProvider.set(LatencyHistogramStats.constructHistogram(false));
+        final int initialDelay = 0;
+        m_updater.scheduleAtFixedRate(new UpdaterJob(), initialDelay, INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        m_histogramSupplier.get();
-        return new DummyIterator();
+        return new SingleRowIterator();
     }
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("HISTOGRAM", VoltType.VARBINARY));
+        columns.add(new ColumnInfo("TIMESTAMP", VoltType.TIMESTAMP));
+        columns.add(new ColumnInfo("INTERVAL",  VoltType.INTEGER));   // seconds
+        columns.add(new ColumnInfo("P50",       VoltType.BIGINT));    // microseconds
+        columns.add(new ColumnInfo("P95",       VoltType.BIGINT));    // microseconds
+        columns.add(new ColumnInfo("P99",       VoltType.BIGINT));    // microseconds
+        columns.add(new ColumnInfo("P99.9",     VoltType.BIGINT));    // microseconds
+        columns.add(new ColumnInfo("P99.99",    VoltType.BIGINT));    // microseconds
+        columns.add(new ColumnInfo("P99.999",   VoltType.BIGINT));    // microseconds
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("HISTOGRAM")] = getCompressedCache();
+
+        AbstractHistogram diffHist = m_diffHistProvider.get();
+        long histTimestamp = diffHist.getEndTimeStamp();
+        assert histTimestamp > 0; // histTimestamp is in milliseconds since the epoch
+
+        rowValues[columnNameToIndex.get("TIMESTAMP")] = new TimestampType(TimeUnit.MILLISECONDS.toMicros(histTimestamp));
+        rowValues[columnNameToIndex.get("INTERVAL")]  = INTERVAL_SECONDS;
+        rowValues[columnNameToIndex.get("P50")]       = diffHist.getValueAtPercentile(0.50);
+        rowValues[columnNameToIndex.get("P95")]       = diffHist.getValueAtPercentile(0.95);
+        rowValues[columnNameToIndex.get("P99")]       = diffHist.getValueAtPercentile(0.99);
+        rowValues[columnNameToIndex.get("P99.9")]     = diffHist.getValueAtPercentile(0.999);
+        rowValues[columnNameToIndex.get("P99.99")]    = diffHist.getValueAtPercentile(0.9999);
+        rowValues[columnNameToIndex.get("P99.999")]   = diffHist.getValueAtPercentile(0.99999);
         super.updateStatsRow(rowKey, rowValues);
     }
 }

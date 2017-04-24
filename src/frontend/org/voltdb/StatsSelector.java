@@ -22,7 +22,8 @@ public enum StatsSelector {
     PROCEDURE,        // invoked as @stat procedure
     STARVATION,
     INITIATOR,        // invoked as @stat initiator
-    LATENCY_COMPRESSED,          // invoked as @stat latency
+    LATENCY,          // invoked as @stat latency
+    LATENCY_COMPRESSED,    // pre-7.3 this was @Statistics LATENCY
     LATENCY_HISTOGRAM,
     PARTITIONCOUNT,
     IOSTATS,
