@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+import sys
 
 def reset_remote(runner):
     result = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT],
@@ -22,7 +23,8 @@ def reset_remote(runner):
     if status == 0:
         runner.info(message)
     else:
-        runner.abort(message)
+        runner.error(message)
+        sys.exit(1)
 
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
