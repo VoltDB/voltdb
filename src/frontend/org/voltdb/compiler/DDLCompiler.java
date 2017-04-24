@@ -302,13 +302,15 @@ public class DDLCompiler {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(stmt, db, whichProcs);
+                // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
+                // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
+                processed = m_statementProcessor.process(stmt, db, whichProcs);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                 throw m_compiler.new VoltCompilerException(msg);
             }
-            if (!processed) {
+            if (! processed) {
                 try {
                     //* enable to debug */ System.out.println("DEBUG: " + stmt.statement);
                     // kind of ugly.  We hex-encode each statement so we can
@@ -533,24 +535,6 @@ public class DDLCompiler {
         while( loc > 0 && loc < identifier.length());
 
         return identifier;
-    }
-
-
-
-   /**
-     * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
-     * CREATE PROCEDURE, and CREATE ROLE.
-     * @param statement  DDL statement string
-     * @param db
-     * @param whichProcs
-     * @return true if statement was handled, otherwise it should be passed to HSQL
-     * @throws VoltCompilerException
-     */
-    private boolean processVoltDBStatement(DDLStatement ddlStatement, Database db,
-                                           DdlProceduresToLoad whichProcs)
-            throws VoltCompilerException
-    {
-        return m_statementProcessor.process(ddlStatement, db, whichProcs);
     }
 
     /**
