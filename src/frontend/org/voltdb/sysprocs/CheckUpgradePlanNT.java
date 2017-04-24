@@ -118,7 +118,7 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
             }
 
             CatalogContext context = VoltDB.instance().getCatalogContext();
-            if (context.getDeployment().getDr() != null && context.getDeployment().getDr().getRole() != DrRoleType.XDCR) {
+            if (context.getDeployment().getDr() == null || context.getDeployment().getDr().getRole() != DrRoleType.XDCR) {
                 return "Target VoltDB cluster must have XDCR enabled (set role=\"xdcr\" under DR tag of the deployment file).";
             }
 
@@ -138,8 +138,9 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
             }
 
             for (Table tb : context.database.getTables()) {
-                if (!tb.getTypeName().equals(CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE)
+                if (!tb.getTypeName().equals(CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE)         /* skip conflict export table */
                         && !tb.getTypeName().equals(CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE)
+                        && tb.getMaterializer() == null                                                 /* skip view table */
                         && !tb.getIsdred()) {
                     warning.append(tb.getTypeName()).append(" is not a DR table.").append("\n");
                 }
