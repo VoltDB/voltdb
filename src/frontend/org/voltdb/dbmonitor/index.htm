@@ -69,7 +69,7 @@
                                 <li id="navSchema"><a href="#o">Schema</a></li>
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
                                 <li id="navDR" style="display: none;"><a href="#">DR</a></li>
-                                <li id="navImporter"><a href="#">Importer</a></li>
+                                <li id="navImporter" style="display:none"><a href="#">Importer</a></li>
                             </ul>
                         </nav>
                     </div>
@@ -1176,7 +1176,7 @@
                         </div>
                         <div class="clear"></div>
                     </div>
-                    <div class="graphChart" id="graphChartImporter" style="display:none">
+                    <div class="graphChart" id="graphChartImporter">
                         <div id="chartOutTransaction" class="chart left">
                             <div class="chartHeader" id="chartOutTransHeader">
                                 <h1>Outstanding Transaction<span class="activeServerName" title=""></span>
@@ -1205,11 +1205,6 @@
                             <svg id="visualisationFailureRate" width="100%" height="400"></svg>
                         </div>
                         <div class="clear"></div>
-                    </div>
-                    <div id="divNoImportDataMsg" style="display:none">
-                        <div class="content contentNoImportDataMsg displayPre">
-                            No data is available.
-                        </div>
                     </div>
                 </div>
             </div>
