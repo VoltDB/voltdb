@@ -58,69 +58,96 @@ class InsertPlanNode;
 class TempTable;
 
 /**
- *
+ * This is the executor for insert nodes.
  */
 class InsertExecutor : public AbstractExecutor
 {
-public:
-    InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node),
+ public:
+ InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+     : AbstractExecutor(engine, abstract_node),
         m_node(NULL),
         m_inputTable(NULL),
         m_partitionColumn(-1),
         m_multiPartition(false),
         m_isStreamed(false),
+        m_hasStreamView(false),
         m_isUpsert(false),
         m_sourceIsPartitioned(false),
         m_hasPurgeFragment(false),
+        m_templateTupleStorage(),
+        m_nowFields(),
+        m_targetTable(NULL),
+        m_modifiedTuples(0),
+        m_outputTable(NULL),
+        m_count_tuple(),
+        m_persistentTable(NULL),
+        m_upsertTuple(),
         m_templateTuple(),
-        m_memoryPool(),
-        m_nowFields()
-    {
-    }
+        m_inputTuple(),
+        m_tempPool(NULL)
+            {
+            }
 
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
+    bool p_execute_init();
+    void p_execute_finish();
+    void p_execute_tuple(TableTuple &tuple);
 
-        InsertPlanNode* m_node;
-        TempTable* m_inputTable;
+ protected:
+    bool p_init(AbstractPlanNode*,
+                TempTableLimits* limits);
+    bool p_execute(const NValueArray &params);
 
-        int m_partitionColumn;
-        bool m_multiPartition;
-        bool m_isStreamed;
-        bool m_hasStreamView;
-        bool m_isUpsert;
-        bool m_sourceIsPartitioned;
-        bool m_hasPurgeFragment;
 
-    private:
+    InsertPlanNode* m_node;
+    TempTable* m_inputTable;
 
-        /** If the table is at or over its tuple limit, this method
-         * executes the purge fragment for the table.  Returns true if
-         * nothing went wrong (regardless of whether the purge
-         * fragment was executed) and false otherwise.
-         *
-         * The purge fragment might perform a truncate table,
-         * in which case the persistent table object we're inserting
-         * into might change.  Passing a pointer-to-pointer allows
-         * the callee to update the persistent table pointer.
-         */
-        void executePurgeFragmentIfNeeded(PersistentTable** table);
+    int m_partitionColumn;
+    bool m_multiPartition;
+    bool m_isStreamed;
+    bool m_hasStreamView;
+    bool m_isUpsert;
+    bool m_sourceIsPartitioned;
+    bool m_hasPurgeFragment;
 
-        /** A tuple with the target table's schema that is populated
-         * with default values for each field. */
-        StandAloneTupleStorage m_templateTuple;
+ private:
 
-        /** A memory pool for allocating non-inlined varchar and
-         * varbinary default values */
-        Pool m_memoryPool;
+    /** If the table is at or over its tuple limit, this method
+     * executes the purge fragment for the table.  Returns true if
+     * nothing went wrong (regardless of whether the purge
+     * fragment was executed) and false otherwise.
+     *
+     * The purge fragment might perform a truncate table,
+     * in which case the persistent table object we're inserting
+     * into might change.  Passing a pointer-to-pointer allows
+     * the callee to update the persistent table pointer.
+     */
+    void executePurgeFragmentIfNeeded(PersistentTable** table);
 
-        /** A list of indexes of each column in the template tuple
-         * that has a DEFAULT of NOW, which must be set on each
-         * execution of this plan. */
-        std::vector<int> m_nowFields;
+    /** A tuple with the target table's schema that is populated
+     * with default values for each field. */
+    StandAloneTupleStorage m_templateTupleStorage;
+
+    /** A memory pool for allocating non-inlined varchar and
+     * varbinary default values */
+    Pool m_memoryPool;
+
+    /** A list of indexes of each column in the template tuple
+     * that has a DEFAULT of NOW, which must be set on each
+     * execution of this plan. */
+    std::vector<int> m_nowFields;
+    /*
+     * These are logically local variables to p_execute.
+     * But they are shared between p_execute and p_execute_init.
+     */
+    Table* m_targetTable;
+    int m_modifiedTuples;
+    Table* m_outputTable;
+    TableTuple m_count_tuple;
+    PersistentTable* m_persistentTable;
+    TableTuple m_upsertTuple;
+    TableTuple m_templateTuple;
+    TableTuple m_inputTuple;
+    Pool* m_tempPool;
 };
 
 }

@@ -50,6 +50,7 @@
 #include "common/FatalException.hpp"
 #include "executors/aggregateexecutor.h"
 #include "executors/executorutil.h"
+#include "executors/insertexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
@@ -102,7 +103,12 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // Inline aggregation can be serial, partial or hash
     m_aggExec = voltdb::getInlineAggregateExecutor(node);
+    m_insertExec = dynamic_cast<InsertExecutor *>(node->getInlinePlanNode(PLAN_NODE_TYPE_INSERT));
 
+    // For the moment we will not produce a plan with both an
+    // inline aggregate and an inline insert node.  This just
+    // confuses things.
+    assert(m_aggExec != NULL || m_insertExec != NULL);
     return true;
 }
 
@@ -160,7 +166,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // to do here
     //
     if (node->getPredicate() != NULL || projection_node != NULL ||
-        limit_node != NULL || m_aggExec != NULL)
+        limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL)
     {
         //
         // Just walk through the table using our iterator and apply
@@ -187,13 +193,22 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
         TableTuple temp_tuple;
         assert(m_tmpOutputTable);
-        if (m_aggExec != NULL) {
+        if (m_aggExec != NULL || m_insertExec != NULL) {
             const TupleSchema * inputSchema = input_table->schema();
             if (projection_node != NULL) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
-            temp_tuple = m_aggExec->p_execute_init(params, &pmp,
-                    inputSchema, m_tmpOutputTable, &postfilter);
+            if (m_aggExec != NULL) {
+                temp_tuple = m_aggExec->p_execute_init(params, &pmp,
+                        inputSchema, m_tmpOutputTable, &postfilter);
+            } else if (m_insertExec != NULL) {
+                // We may actually find out during initialization
+                // that we are done.  See the definition of InsertExecutor::p_execute_init.
+                if (m_insertExec->p_execute_init()) {
+                    return true;
+                }
+                temp_tuple = m_tmpOutputTable->tempTuple();
+            }
         } else {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
@@ -225,11 +240,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                         NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
-                    outputTuple(postfilter, temp_tuple);
+                    outputTuple(temp_tuple);
                 }
                 else
                 {
-                    outputTuple(postfilter, tuple);
+                    outputTuple(tuple);
                 }
                 pmp.countdownProgress();
             }
@@ -237,6 +252,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         if (m_aggExec != NULL) {
             m_aggExec->p_execute_finish();
+        }
+        if (m_insertExec != NULL) {
+            m_insertExec->p_execute_finish();
         }
     }
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
@@ -248,9 +266,18 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-void SeqScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
+/*
+ * We may output a tuple to an inline aggregate or
+ * inline insert node.  If there is a limit or projection, this will have
+ * been applied already.  So we don't really care about those here.
+ */
+void SeqScanExecutor::outputTuple(TableTuple& tuple) {
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_tuple(tuple);
+        return;
+    }
+    if (m_insertExec != NULL) {
+        m_insertExec->p_execute_tuple(tuple);
         return;
     }
     //
