@@ -707,6 +707,8 @@ public class EEPlanGenerator extends PlannerTestCase {
                 sb.append("    {\n")
                   .append("        // SQL Statement\n")
                   .append(String.format("        %s,\n", cleanString(tc.m_sqlString, "        ")))
+                  .append("        // Failure is expected\n")
+                  .append(String.format("        %s,\n", tc.isExpectedToFail() ? "true" : "false"))
                   .append("        // Plan String\n")
                   .append(String.format("        %s,\n", cleanString(getPlanString(tc.m_sqlString), "        ")))
                   .append(String.format("        %s\n",  tc.getOutputTableName()))
@@ -745,15 +747,18 @@ public class EEPlanGenerator extends PlannerTestCase {
     protected static class TestConfig {
         TestConfig(String       testName,
                    String       sqlString,
+                   boolean      expectFail,
                    TableConfig  expectedOutput) {
             m_testName       = testName;
             m_sqlString      = sqlString;
             m_expectedOutput = expectedOutput;
+            m_expectFail     = expectFail;
         }
 
         public TestConfig(String testName,
-                   String sqlString) {
-            this(testName, sqlString, null);
+                   String sqlString,
+                   boolean expectFail) {
+            this(testName, sqlString, expectFail, null);
         }
 
         /**
@@ -764,10 +769,21 @@ public class EEPlanGenerator extends PlannerTestCase {
             return m_expectedOutput != null;
         }
 
+        /**
+         * Return the expected output table.  This may be null.
+         * @return The expected output table, or null if the output is unspecified.
+         */
         public TableConfig getExpectedOutput() {
             return m_expectedOutput;
         }
 
+        /**
+         * Return true if this test is expected to fail.
+         * @return true iff this test is expected to fail.
+         */
+        public boolean isExpectedToFail() {
+            return m_expectFail;
+        }
         /**
          * Return the number of rows in the expected
          * output.  If this is -1, there is no expected
@@ -812,6 +828,7 @@ public class EEPlanGenerator extends PlannerTestCase {
         private String      m_testName;
         private String      m_sqlString;
         private TableConfig m_expectedOutput;
+        private boolean     m_expectFail;
     }
 
     /**

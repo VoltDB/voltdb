@@ -428,7 +428,6 @@ def generatedEETestFiles(output_prefix, buildType, testClasses, doGenerateFiles)
         print("Fatal Error: %s" % p.communicate()[0])
         sys.exit(p.returncode)
     processStdOut = p.communicate()[0]
-    print('processStdOut: %s' % processStdOut)
     names = processStdOut.split()
     names = list(names)
     all_gen_tests = list((name.split("/") for name in names))

@@ -341,7 +341,7 @@ public:
         executeFragment(m_fragmentNumber, test.m_planString);
         // If we have expected output data, then validate it.
         if (test.m_outputConfig != NULL) {
-            validateResult(test.m_outputConfig);
+            validateResult(test.m_outputConfig, test.m_expectFail);
         }
     }
     /**
@@ -374,7 +374,7 @@ public:
      * know how much of the buffer is actually used.  So we
      * need to query the engine.
      */
-    void validateResult(const TableConfig *answer) {
+    void validateResult(const TableConfig *answer, bool expectFail) {
         int nRows = answer->m_numRows;
         int nCols = answer->m_numCols;
         size_t result_size = m_engine->getResultsSize();
@@ -396,12 +396,19 @@ public:
             for (int32_t col = 0; col < nCols; col += 1) {
                 int32_t expected = answer->m_contents[row * nCols + col];
                 if (answer->m_types[col] == voltdb::VALUE_TYPE_VARCHAR) {
-                    const char *actualStr = voltdb::ValuePeeker::peekObjectValue(tuple.getNValue(col));
+                    voltdb::NValue nval = tuple.getNValue(col);
+                    int32_t actualSize;
+                    const char *actualStr = voltdb::ValuePeeker::peekObject(nval, &actualSize);
+                    if (actualStr == NULL) {
+                        actualSize = -1;
+                    }
                     const char *expStr = answer->m_strings[expected];
+                    size_t expSize = (expStr != NULL) ? strlen(expStr) : -1;
                     bool neq = (((actualStr == NULL) != (expStr == NULL))
+                                || (actualSize != expSize)
                                 || ((actualStr != NULL)
                                     && (expStr != NULL)
-                                    && (::strcmp(actualStr, expStr) != 0)));
+                                    && (::strncmp(actualStr, expStr, actualSize) != 0)));
                     VOLT_TRACE("Row %02d, col %02d: expected \"%s\", got \"%s\" (%s)",
                                row, col,
                                expStr, actualStr,
@@ -409,7 +416,7 @@ public:
                     if (neq) {
                         failed = true;
                     }
-                } else {
+                } else if (answer->m_types[col] == voltdb::VALUE_TYPE_INTEGER) {
                     int32_t v1 = voltdb::ValuePeeker::peekAsInteger(tuple.getNValue(col));
                     VOLT_TRACE("Row %02d, col %02d: expected %04d, got %04d (%s)",
                                row, col,
@@ -418,6 +425,11 @@ public:
                     if (expected != v1) {
                         failed = true;
                     }
+                } else {
+                    printf("Value type %d is not expected.  Only %d and %d are supported.\n",
+                           answer->m_types[col],
+                           voltdb::VALUE_TYPE_INTEGER,
+                           voltdb::VALUE_TYPE_VARCHAR);
                 }
             }
         }
@@ -426,7 +438,7 @@ public:
             VOLT_TRACE("Unexpected next element\n");
             failed = true;
         }
-        ASSERT_FALSE(failed);
+        ASSERT_EQ(expectFail, failed);
     }
 
     void validateDMLResultTable(voltdb::TempTable *result, int64_t expectedModifiedTuples = 1) {

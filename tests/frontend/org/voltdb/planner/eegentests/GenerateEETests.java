@@ -263,11 +263,13 @@ public class GenerateEETests extends EEPlanGenerator {
         // and expects the result to be orderByOutput.
         dbc.addTest(new TestConfig("test_order_by",
                                   "select A, B from AAA order by A, B;",
+                                  false,
                                   orderByOutput));
         // Add another test.  This test runs the select
         // statement and expects the result to be joinOutput.
         dbc.addTest(new TestConfig("test_join",
                                   "select AAA.A, AAA.B, BBB.C from AAA join BBB on AAA.C = BBB.C order by AAA.A, AAA.B, AAA.C;",
+                                  false,
                                   joinOutput));
         // In this case we don't care about the output
         // at all.  We just want to run the test.  This could
@@ -275,7 +277,7 @@ public class GenerateEETests extends EEPlanGenerator {
         // non-deterministic, or to do profiling, where we don't
         // care about specifying the output, and it will not
         // be validated at all.
-        dbc.addTest(new TestConfig("test_cache", "select * from CCC;"));
+        dbc.addTest(new TestConfig("test_cache", "select * from CCC;", false));
         // Now, write the tests in the file executors/TestGeneratedPlans.cpp.
         generateTests("executors", "TestGeneratedPlans", dbc);
     }
@@ -377,14 +379,17 @@ public class GenerateEETests extends EEPlanGenerator {
                                       testOutput);
         maxDB.addTest(new TestConfig("test_max_first_row",
                                      "select A, B, max(-1 * abs(1-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                     false,
                                      testOutput));
 
         maxDB.addTest(new TestConfig("test_max_middle_row",
                                      "select A, B, max(-1 * abs(3-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                     false,
                                      testOutput));
 
         maxDB.addTest(new TestConfig("test_max_last_row",
                                      "select A, B, max(-1 * abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                     false,
                                      testOutput));
 
         generateTests("executors", "TestWindowedMax", maxDB);
@@ -401,14 +406,17 @@ public class GenerateEETests extends EEPlanGenerator {
                                       testOutput);
         minDB.addTest(new TestConfig("test_min_last_row",
                                      "select A, B, min(abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                     false,
                                      testOutput));
 
         minDB.addTest(new TestConfig("test_min_middle_row",
                                      "select A, B, min(abs(3-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                     false,
                                      testOutput));
 
         minDB.addTest(new TestConfig("test_min_first_row",
                                      "select A, B, min(abs(1-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                     false,
                                      testOutput));
 
         generateTests("executors", "TestWindowedMin", minDB);
@@ -466,6 +474,7 @@ public class GenerateEETests extends EEPlanGenerator {
                                       sumOutput);
         sumDB.addTest(new TestConfig("test_min_last_row",
                                      "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                     false,
                                      sumOutput));
 
         generateTests("executors", "TestWindowedSum", sumDB);
@@ -550,11 +559,13 @@ public class GenerateEETests extends EEPlanGenerator {
 
         countDB.addTest(new TestConfig("test_count_star",
                                        sqlStmt,
+                                       false,
                                        countOutput));
         sqlStmt = "select A, B, C, count(A+B) over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
 
         countDB.addTest(new TestConfig("test_count",
                                        sqlStmt,
+                                       false,
                                        countOutput));
         generateTests("executors", "TestWindowedCount", countDB);
     }
@@ -677,14 +688,57 @@ public class GenerateEETests extends EEPlanGenerator {
 
         rankDB.addTest(new TestConfig("test_rank",
                                       sqlStmt,
+                                      false,
                                       rankOutput));
         sqlStmt = "select A, B, C, dense_rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
 
         rankDB.addTest(new TestConfig("test_dense_rank",
                                       sqlStmt,
+                                      false,
                                       rankDenseOutput));
         generateTests("executors", "TestWindowedRank", rankDB);
     }
+
+    public void generatedStringPlan() throws Exception {
+        Database db = getDatabase();
+        // We test a particular possible bug in the test framework.
+        // If the found values are shorter than the expected values
+        // comparing the two may cause a read to non-existent memory.
+        final TableConfig CCCConfig = new TableConfig("CCC",
+                                                      db,
+                                                      new Object[][] {
+            { 100, "alpha", "beta" }
+        });
+        final TableConfig tooLongAnswerConfig = new TableConfig("CCCLongAns",
+                                                         db,
+                                                         new Object[][] {
+            { 100, "alphaalpha", "betabeta" }
+
+        });
+        final TableConfig tooShortAnswerConfig = new TableConfig("CCCShortAns",
+                                                         db,
+                                                         new Object[][] {
+            { 100, "al", "be" }
+
+        });
+
+        DBConfig GSDB = new DBConfig(getClass(),
+                                      GenerateEETests.class.getResource(DDL_FILENAME),
+                                      getCatalogString(),
+                                      CCCConfig,
+                                      tooShortAnswerConfig,
+                                      tooLongAnswerConfig);
+        GSDB.addTest(new TestConfig("test_long_string",
+                                     "select * from CCC;",
+                                     true,
+                                     tooLongAnswerConfig));
+        GSDB.addTest(new TestConfig("test_short_string",
+                                     "select * from CCC;",
+                                     true,
+                                     tooShortAnswerConfig));
+        generateTests("executors", "TestGeneratedString", GSDB);
+    }
+
 
     @Override
     protected void tearDown() throws Exception {
@@ -702,6 +756,7 @@ public class GenerateEETests extends EEPlanGenerator {
             tg.generatedMaxPlan();
             tg.generatedSumPlan();
             tg.generatedRankPlan();
+            tg.generatedStringPlan();
         } catch (Exception e) {
             System.err.printf("Unexpected exception: %s\n", e.getMessage());
             e.printStackTrace();

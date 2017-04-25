@@ -61,6 +61,18 @@ create table CCC (
   data varchar(1024)
 );
 
+create table CCCLongAns (
+  id integer,
+  name varchar(32),
+  data varchar(1024)
+);
+
+create table CCCShortAns (
+  id integer,
+  name varchar(32),
+  data varchar(1024)
+);
+
 create table test_order_by (
   a integer,
   b integer

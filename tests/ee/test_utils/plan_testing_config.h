@@ -92,6 +92,7 @@ struct TestConfig {
      */
     typedef TableConfig::contentType contentType;
     const char           *m_sql;
+    const bool            m_expectFail;
     const char           *m_planString;
     const TableConfig    *m_outputConfig;
 };
