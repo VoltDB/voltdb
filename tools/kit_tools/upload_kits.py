@@ -24,7 +24,7 @@ def str_option_to_bool(opt):
 def upload_kits(version,
                 upload_type="minimal",
                 remote_dir="/var/www/downloads.voltdb.com/technologies/server",
-                kit_dir="/home/tests/releases/released",
+                kit_dir="/home/test/releases/released",
                 dry_run='False'):
 
     """ Upload kits to the voltdb download site.
@@ -64,7 +64,7 @@ def upload_kits(version,
         if filecheck.succeeded:
             count += 1
             if dry_run:
-                print "DRYRUN put: " + f + "  -->  " + remote_dir
+                print "DRYRUN:" + f + "  -->  " + remote_dir
             else:
                 with cd(remote_dir):
                     put(f, k % version)
