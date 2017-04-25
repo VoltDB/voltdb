@@ -32,9 +32,9 @@ except ImportError, e:
     ssl_available = False
     ssl_exception = e
 try:
-    import krbV
+    import gssapi
     kerberos_available = True
-except  ImportError, e:
+except ImportError, e:
     kerberos_available = False
     kerberos_exception = e
 
@@ -75,6 +75,9 @@ class ReadBuffer(object):
 
     def buffer_length(self):
         return len(self._buf)
+
+    def remaining(self):
+        return (len(self._buf) - self._off)
 
     def get_buffer(self):
         return self._buf
@@ -133,6 +136,11 @@ class FastSerializer:
     # default decimal scale
     DEFAULT_DECIMAL_SCALE = 12
 
+    # protocol constants
+    AUTH_HANDSHAKE_VERSION = 2
+    AUTH_SERVICE_NAME = 4
+    AUTH_HANDSHAKE = 5
+
     # procedure call result codes
     PROC_OK = 0
 
@@ -155,7 +163,7 @@ class FastSerializer:
 
     def __init__(self, host = None, port = 21212, usessl = False,
                  username = "", password = "",
-                 kerberos = None,
+                 kerberos = False,
                  dump_file_path = None,
                  connect_timeout = 8,
                  procedure_timeout = None,
@@ -180,6 +188,11 @@ class FastSerializer:
         self.host = host
         self.port = port
         self.usessl = usessl
+        if kerberos is None:
+            self.usekerberos = False
+        else:
+            self.usekerberos = kerberos
+        self.kerberosprinciple = None
         self.ssl_config = ssl_config
         self.ssl_config_file = ssl_config_file
         if not dump_file_path is None:
@@ -280,15 +293,14 @@ class FastSerializer:
 
         self.read_buffer = ReadBuffer()
 
-        if not username is None and not password is None and not host is None:
+        if self.usekerberos and kerberos_available and self.has_ticket():
+            assert not self.socket is None
+            self.socket.settimeout(connect_timeout)
+            self.authenticate(str(self.kerberosprinciple), "")
+        elif not username is None and not password is None and not host is None:
             assert not self.socket is None
             self.socket.settimeout(connect_timeout)
             self.authenticate(username, password)
-        elif not kerberos is None:
-            assert not self.socket is None
-            self.socket.settimeout(connect_timeout)
-            kerberos_ticket = KerberosTicket(kerberos)
-            self.authenticate(username, kerberos_ticket)
 
         if self.socket:
             self.socket.settimeout(self.default_timeout)
@@ -392,10 +404,13 @@ class FastSerializer:
         self.writeByte(1)
 
         # service requested
-        self.writeString("database")
+        if (self.usekerberos):
+            self.writeString("kerberos")
+        else:
+            self.writeString("database")
 
         if username:
-            # utf8 encode supplied username
+            # utf8 encode supplied username or kerberos principal name
             self.writeString(username)
         else:
             # no username, just output length of 0
@@ -422,6 +437,52 @@ class FastSerializer:
         version = self.readByte()
         status = self.readByte()
 
+        if (version == self.AUTH_HANDSHAKE_VERSION):
+            #service name supplied by VoltDB Server
+            service_string = self.readString().encode('ascii','ignore')
+            try:
+                service_name = gssapi.Name(service_string, name_type=gssapi.NameType.kerberos_principal)
+                ctx = gssapi.SecurityContext(name=service_name, mech=gssapi.MechType.kerberos)
+                in_token = None
+                out_token = ctx.step(in_token)
+                while not ctx.complete:
+                    self.writeByte(self.AUTH_HANDSHAKE_VERSION)
+                    self.writeByte(self.AUTH_HANDSHAKE)
+                    self.wbuf.extend(out_token)
+                    self.prependLength()
+                    self.flush()
+
+                    try:
+                        self.bufferForRead()
+                    except IOError, e:
+                        print "ERROR: Connection failed. Please check that the host, port and ssl settings are correct."
+                        raise e
+                    except socket.timeout:
+                        raise RuntimeError("Authentication timed out after %d seconds."
+                                            % self.socket.gettimeout())
+                    version = self.readByte()
+                    status = self.readByte()
+                    if version != self.AUTH_HANDSHAKE_VERSION or status != self.AUTH_HANDSHAKE:
+                        raise RuntimeError("Authentication failed.")
+
+                    in_token = self.readVarbinaryContent(self.read_buffer.remaining()).tostring()
+                    out_token = ctx.step(in_token)
+
+                try:
+                    self.bufferForRead()
+                except IOError, e:
+                    print "ERROR: Connection failed. Please check that the host, port and ssl settings are correct."
+                    raise e
+                except socket.timeout:
+                    raise RuntimeError("Authentication timed out after %d seconds."
+                                        % self.socket.gettimeout())
+                version = self.readByte()
+                status = self.readByte()
+
+            except Exception, e:
+                raise RuntimeError("Authentication failed.")
+
+
         if status != 0:
             raise RuntimeError("Authentication failed.")
 
@@ -432,18 +493,21 @@ class FastSerializer:
         for x in range(self.readInt32()):
             self.readByte()
 
-    def has_ticket():
+    def has_ticket(self):
         '''
         Checks to see if the user has a valid ticket.
         '''
-        ctx = krbV.default_context()
-        cc = ctx.default_ccache()
+        default_cred = None
+        retval = False
         try:
-            princ = cc.principal()
-            retval = True
-        except krbV.Krb5Error:
-            retval = False
-
+            default_cred = gssapi.creds.Credentials(usage='initiate')
+            if default_cred.lifetime > 0:
+                self.kerberosprinciple = str(default_cred.name)
+                retval = True
+            else:
+                print "ERROR: Kerberos principal found but login expired."
+        except gssapi.raw.misc.GSSError as e:
+            print "ERROR: unable to find default principal from Kerberos cache."
         return retval
 
     def setInputByteOrder(self, bom):
