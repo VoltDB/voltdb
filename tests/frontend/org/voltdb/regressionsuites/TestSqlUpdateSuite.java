@@ -60,6 +60,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
     public void testUpdate() throws Exception {
         subtestUpdateBasic();
         subtestENG11918();
+        subtestUpdateWithSubquery();
         subtestUpdateWithCaseWhen();
     }
 
@@ -161,6 +162,53 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
                  "Illegal to modify a materialized view.");
         verifyStmtFails(client, "UPDATE P1 SET NUM = 1 WHERE COUNT(*) IS NULL", "invalid WHERE expression");
+    }
+
+    public void subtestUpdateWithSubquery() throws Exception {
+        Client client = getClient();
+        String tables[] = {"P1", "R1"};
+        // insert rows where ID is 0..3
+        insertRows(client, "R2", 4);
+
+        for (String table : tables) {
+            // insert rows where ID is 0 and num is 0..9
+            insertRows(client, table, 10);
+
+            // update rows where ID is 0 and 5
+            VoltTable vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = NUM + 20 WHERE ID IN (SELECT ID * 5 FROM R2 " +
+            " WHERE R2.NUM * 5 = " + table + ".NUM)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 2 });
+
+            String stmt = "SELECT NUM FROM " + table + " ORDER BY NUM";
+            validateTableOfScalarLongs(client, stmt, new long[] { 1, 2, 3, 4, 6, 7, 8, 9, 20, 25 });
+
+            vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = (SELECT MAX(NUM) FROM R2)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 10 });
+
+            stmt = "SELECT NUM FROM " + table + " ORDER BY NUM";
+            validateTableOfScalarLongs(client, stmt, new long[] { 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 });
+
+            vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = 20 WHERE ID = (SELECT MAX(NUM) FROM R2)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 1 });
+
+            stmt = "SELECT NUM FROM " + table + " WHERE ID = (SELECT MAX(NUM) FROM R2)";
+            validateTableOfScalarLongs(client, stmt, new long[] { 20 });
+
+            vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = (SELECT R2.NUM + " + table + ".ID FROM R2 WHERE R2.ID = 3) " +
+                    "WHERE " + table + ".ID = 8;")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 1 });
+            stmt = "SELECT NUM FROM " + table + " WHERE ID = 8";
+            validateTableOfScalarLongs(client, stmt, new long[] { 11 });
+
+}
     }
 
     private void subtestUpdateWithCaseWhen() throws Exception {

@@ -52,6 +52,10 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
 
+/** Tests starting the server with init + start without a schema,
+ * and 'init --schema --classes'.
+ * Starting after 'init --schema' is covered in "TestStartWithSchema" and (in Pro) "TestStartWithSchemaAndDurability".
+ */
 final public class TestInitStartAction {
 
     static File rootDH;
@@ -133,7 +137,9 @@ final public class TestInitStartAction {
         serverException.set(null);
     }
 
-
+    /** Tests starting an empty database with the NewCLI commands "init" and "start",
+     * plus a few error cases.
+     */
     @Test
     public void testInitStartAction() throws Exception {
 
@@ -230,18 +236,13 @@ final public class TestInitStartAction {
         assertTrue(legacyOnes.stream().allMatch(StartAction::isLegacy));
     }
 
-
     /*
-     * Tests:
+     * "voltdb init --schema --procedures" tests:
      * 1.  Positive test with valid schema that requires no procedures
      * 2a. Positive test with valid schema and procedures that are in CLASSPATH
      * 2b. Negative test with valid files but not "init --force"
      * 3.  Negative test with a bad schema
      * 4.  Negative test with procedures missing
-     *
-     * CAVEAT: Until ENG-11953 is complete, the files will be installed but not honored.
-     * The only verification performed during init are sanity checks.
-     * More comprehensive checks will be added during 'start', since 'init' has no way to verify that the entire cluster has the same schema.
      *
      * Note that SimulatedExitException is thrown by the command line parser with no descriptive details.
      * VoltDB.crashLocalVoltDB() throws an AssertionError with the message "Faux crash of VoltDB successful."
@@ -384,4 +385,7 @@ final public class TestInitStartAction {
         assertTrue(VoltDB.crashMessage.contains("Could not compile specified schema"));
         assertEquals(true, schemaFile.delete());
     }
+
+    /* For 'voltdb start' test coverage see TestStartWithSchema and (in Pro) TestStartWithSchemaAndDurability.
+     */
 }

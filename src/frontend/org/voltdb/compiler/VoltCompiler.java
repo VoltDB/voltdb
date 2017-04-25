@@ -156,6 +156,7 @@ public class VoltCompiler {
     private final HashSet<Class<?>> m_cachedAddedClasses = new HashSet<>();
 
     private final boolean m_isXDCR;
+    boolean m_generateReports;
 
     /**
      * Represents output from a compile. This works similarly to Log4j; there
@@ -193,14 +194,13 @@ public class VoltCompiler {
 
         public String getLogString() {
             String retval = new String();
-            if (fileName != null) {
+            if (! fileName.equals(NO_FILENAME)) {
                 retval += "[" + fileName;
                 if (lineNo != NO_LINE_NUMBER)
                     retval += ":" + lineNo;
-                retval += "]";
+                retval += "]: ";
             }
-
-            retval += ": " + message;
+            retval += message;
             return retval;
         }
 
@@ -333,10 +333,14 @@ public class VoltCompiler {
         }
     }
 
-    /** Passing true to constructor indicates the compiler is being run in standalone mode */
     public VoltCompiler(boolean standaloneCompiler, boolean isXDCR) {
+        this(standaloneCompiler, isXDCR, true);
+    }
+
+    public VoltCompiler(boolean standaloneCompiler, boolean isXDCR, boolean generateReports) {
         this.standaloneCompiler = standaloneCompiler;
         this.m_isXDCR = isXDCR;
+        this.m_generateReports = generateReports || DEBUG_MODE;
 
         // reset the cache
         m_cachedAddedClasses.clear();
@@ -345,7 +349,7 @@ public class VoltCompiler {
     /** Parameterless constructor is for embedded VoltCompiler use only.
      * @param isXDCR*/
     public VoltCompiler(boolean isXDCR) {
-        this(false, isXDCR);
+        this(false, isXDCR, true);
     }
 
     public boolean hasErrors() {
@@ -584,6 +588,48 @@ public class VoltCompiler {
         return true;
     }
 
+    private void generateCatalogReport( String ddlWithBatchSupport ) throws IOException {
+        VoltDBInterface voltdb = VoltDB.instance();
+        // try to get a catalog context
+        CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
+        ClusterSettings clusterSettings = catalogContext != null ? catalogContext.getClusterSettings() : null;
+        int tableCount = catalogContext != null ? catalogContext.tables.size() : 0;
+        Deployment deployment = catalogContext != null ? catalogContext.cluster.getDeployment().get("deployment") : null;
+        int hostcount = clusterSettings != null ? clusterSettings.hostcount() : 1;
+        int kfactor = deployment != null ? deployment.getKfactor() : 0;
+        int sitesPerHost = 8;
+        if  (voltdb != null && voltdb.getCatalogContext() != null) {
+            sitesPerHost =  voltdb.getCatalogContext().getNodeSettings().getLocalSitesCount();
+        }
+        boolean isPro = MiscUtils.isPro();
+
+        long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
+        m_report = ReportMaker.report(m_catalog, minHeapRqt, isPro, hostcount,
+                sitesPerHost, kfactor, m_warnings, ddlWithBatchSupport);
+        m_reportPath = null;
+        File file = null;
+
+        // write to working dir when using VoltCompiler directly
+        if (standaloneCompiler) {
+            file = new File("catalog-report.html");
+        }
+        else {
+            // it's possible that standaloneCompiler will be false and catalogContext will be null in test code.
+            // if we have a context, write report to voltroot
+            if (catalogContext != null) {
+                file = new File(VoltDB.instance().getVoltDBRootPath(), "catalog-report.html");
+            }
+        }
+
+        // if there's a good place to write the report, do so
+        if (file != null) {
+            FileWriter fw = new FileWriter(file);
+            fw.write(m_report);
+            fw.close();
+            m_reportPath = file.getAbsolutePath();
+        }
+    }
+
     /**
      * Internal method for compiling with and without a project.xml file or DDL files.
      *
@@ -632,52 +678,14 @@ public class VoltCompiler {
         m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
 
         // generate the catalog report and write it to disk
-        try {
-            VoltDBInterface voltdb = VoltDB.instance();
-            // try to get a catalog context
-            CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
-            ClusterSettings clusterSettings = catalogContext != null ? catalogContext.getClusterSettings() : null;
-            int tableCount = catalogContext != null ? catalogContext.tables.size() : 0;
-            Deployment deployment = catalogContext != null ? catalogContext.cluster.getDeployment().get("deployment") : null;
-            int hostcount = clusterSettings != null ? clusterSettings.hostcount() : 1;
-            int kfactor = deployment != null ? deployment.getKfactor() : 0;
-            int sitesPerHost = 8;
-            if  (voltdb != null && voltdb.getCatalogContext() != null) {
-                sitesPerHost =  voltdb.getCatalogContext().getNodeSettings().getLocalSitesCount();
+        if (m_generateReports) {
+            try {
+                generateCatalogReport(ddlWithBatchSupport);
             }
-            boolean isPro = MiscUtils.isPro();
-
-            long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
-            m_report = ReportMaker.report(m_catalog, minHeapRqt, isPro, hostcount,
-                    sitesPerHost, kfactor, m_warnings, ddlWithBatchSupport);
-            m_reportPath = null;
-            File file = null;
-
-            // write to working dir when using VoltCompiler directly
-            if (standaloneCompiler) {
-                file = new File("catalog-report.html");
+            catch (IOException e) {
+                e.printStackTrace();
+                return null;
             }
-            else {
-                // it's possible that standaloneCompiler will be false and catalogContext will be null
-                //   in test code.
-
-                // if we have a context, write report to voltroot
-                if (catalogContext != null) {
-                    file = new File(VoltDB.instance().getVoltDBRootPath(), "catalog-report.html");
-                }
-            }
-
-            // if there's a good place to write the report, do so
-            if (file != null) {
-                FileWriter fw = new FileWriter(file);
-                fw.write(m_report);
-                fw.close();
-                m_reportPath = file.getAbsolutePath();
-            }
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-            return null;
         }
 
         jarOutput.put(AUTOGEN_DDL_FILE_NAME, m_canonicalDDL.getBytes(Constants.UTF8ENCODING));
@@ -697,8 +705,10 @@ public class VoltCompiler {
                 addBuildInfo(jarOutput);
             }
             jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
-            // put the compiler report into the jarfile
-            jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
+            if (m_generateReports) {
+                // put the compiler report into the jarfile
+                jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
+            }
         }
         catch (final Exception e) {
             e.printStackTrace();
@@ -962,7 +972,7 @@ public class VoltCompiler {
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             String origFilename = m_currentFilename;
             try {
-                if (m_currentFilename == null || m_currentFilename.equals(NO_FILENAME))
+                if (m_currentFilename.equals(NO_FILENAME))
                     m_currentFilename = schemaReader.getName();
 
                 // add the file object's path to the list of files for the jar

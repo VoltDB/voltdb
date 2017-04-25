@@ -168,6 +168,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
 
+        void swapDRActions(PersistentTable* table1, PersistentTable* table2);
+
         ExecutorContext* getExecutorContext() { return m_executorContext; }
 
         int getCurrentIndexInBatch() const { return m_currentIndexInBatch; }
@@ -232,9 +234,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         bool loadCatalog(int64_t timestamp, std::string const& catalogPayload);
 
-        bool updateCatalog(int64_t timestamp, std::string const& catalogPayload);
+        bool updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload);
 
-        bool processCatalogAdditions(int64_t timestamp);
+        bool processCatalogAdditions(bool isStreamUpdate, int64_t timestamp);
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.
@@ -306,6 +308,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Sets the output and exception buffer to be empty, and then
          * serializes the exception. */
         void serializeException(SerializableEEException const& e);
+
+        /**
+         * Retrieves the result buffer that could be either a buffer assigned through setBuffers() or
+         * the fallback buffer created dynamically for results larger than 10MB
+         */
+        const unsigned char* getResultsBuffer() const;
 
         /**
          * Retrieves the size in bytes of the data that has been placed in the reused result buffer

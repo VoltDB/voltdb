@@ -233,9 +233,9 @@ function QueryUI(queryTab) {
         if (source != null){
             source = source.replace(/^\s+|\s+$/g,'');
             if (source == '')
-                source = $('#querybox-' + query_id)[0].innerText;
+                source = $('#querybox-' + query_id)[0].innerText.replace(/\s+/g, ' ');
         } else
-            source = $('#querybox-' + query_id)[0].innerText;
+            source = $('#querybox-' + query_id)[0].innerText.replace(/\s+/g, ' ');
 
         source = source.replace(/^\s+|\s+$/g,'');
         if (source == '')

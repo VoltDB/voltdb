@@ -204,6 +204,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
 
         final NodeSchema outer_schema = m_children.get(0).getOutputSchema();
         final NodeSchema inner_schema = m_children.get(1).getOutputSchema();
+        final int outerSize = outer_schema.size();
+        final int innerSize = inner_schema.size();
 
         // resolve predicates
         resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
@@ -221,11 +223,12 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
             int index;
-            if (i < outer_schema.size()) {
+            if (i < outerSize) {
                 index = tve.setColumnIndexUsingSchema(outer_schema);
             }
             else {
                 index = tve.setColumnIndexUsingSchema(inner_schema);
+                index += outerSize;
             }
 
             if (index == -1) {
@@ -234,6 +237,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
             }
 
             tve.setColumnIndex(index);
+            tve.setDifferentiator(index);
         }
 
         // We want the output columns to be ordered like [outer table columns][inner table columns],

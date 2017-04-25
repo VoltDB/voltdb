@@ -643,9 +643,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
-
-    // load up all the tables, adding all tables
-    if (processCatalogAdditions(timestamp) == false) {
+    //When loading catalog we do isStreamUpdate to true as we are starting fresh or rejoining/recovering.
+    if (processCatalogAdditions(true, timestamp) == false) {
         return false;
     }
 
@@ -787,7 +786,7 @@ static bool haveDifferentSchema(catalog::Table* t1, voltdb::PersistentTable* t2)
  * Use the txnId of the catalog update as the generation for export
  * data.
  */
-bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
+bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestamp) {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
@@ -853,12 +852,11 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
         else {
 
             //////////////////////////////////////////////
-            // update the export info for existing tables
+            // update the export info for existing tables can not be done now so ignore streamed table.
             //
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
-
             /*
              * Instruct the table that was not added but is being retained to flush
              * Then tell it about the new export generation/catalog txnid
@@ -867,15 +865,18 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
              */
             auto streamedTable = tcd->getStreamedTable();
             if (streamedTable) {
-                streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                if (!tcd->exportEnabled()) {
-                    // Evaluate export enabled or not and cache it on the tcd.
-                    tcd->evaluateExport(*m_database, *catalogTable);
-                    // If enabled hook up streamer
-                    if (tcd->exportEnabled() && streamedTable->enableStream()) {
-                        //Reset generation after stream wrapper is created.
-                        streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                        m_exportingTables[catalogTable->signature()] = streamedTable;
+                //Dont update and roll generation if this is just a non stream table update.
+                if (isStreamUpdate) {
+                    streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                    if (!tcd->exportEnabled()) {
+                        // Evaluate export enabled or not and cache it on the tcd.
+                        tcd->evaluateExport(*m_database, *catalogTable);
+                        // If enabled hook up streamer
+                        if (tcd->exportEnabled() && streamedTable->enableStream()) {
+                            //Reset generation after stream wrapper is created.
+                            streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                            m_exportingTables[catalogTable->signature()] = streamedTable;
+                        }
                     }
                 }
 
@@ -1102,16 +1103,14 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
  * current and the desired catalog. Execute those commands and create,
  * delete or modify the corresponding exectution engine objects.
  */
-bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPayload) {
+bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload) {
     // clean up execution plans when the tables underneath might change
     if (m_plans) {
         m_plans->clear();
     }
 
     assert(m_catalog != NULL); // the engine must be initialized
-
     VOLT_DEBUG("Updating catalog...");
-
     // apply the diff commands to the existing catalog
     // throws SerializeEEExceptions on error.
     m_catalog->execute(catalogPayload);
@@ -1132,7 +1131,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
 
     processCatalogDeletes(timestamp);
 
-    if (processCatalogAdditions(timestamp) == false) {
+    if (processCatalogAdditions(isStreamUpdate, timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
@@ -1250,6 +1249,48 @@ void VoltDBEngine::rebuildTableCollections() {
 
     }
     resetDRConflictStreamedTables();
+}
+
+void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table2) {
+    TableCatalogDelegate* tcd1 = getTableDelegate(table1->name());
+    TableCatalogDelegate* tcd2 = getTableDelegate(table2->name());
+    assert(!tcd1->materialized());
+    assert(!tcd2->materialized());
+    // Point the Map from signature hash point to the correct persistent tables
+    int64_t hash1 = *reinterpret_cast<const int64_t*>(tcd1->signatureHash());
+    int64_t hash2 = *reinterpret_cast<const int64_t*>(tcd2->signatureHash());
+    // Most swap action is already done.
+    // But hash(tcd1) is still pointing to old persistent table1, which is now table2.
+    assert(m_tablesBySignatureHash[hash1] == table2);
+    assert(m_tablesBySignatureHash[hash2] == table1);
+    m_tablesBySignatureHash[hash1] = table1;
+    m_tablesBySignatureHash[hash2] = table2;
+    table1->signature(tcd1->signatureHash());
+    table2->signature(tcd2->signatureHash());
+
+    // Generate swap table DREvent
+    assert(table1->isDREnabled() == table2->isDREnabled());
+    assert(table1->isDREnabled()); // This is checked before calling this method.
+    int64_t lastCommittedSpHandle = m_executorContext->lastCommittedSpHandle();
+    int64_t spHandle = m_executorContext->currentSpHandle();
+    int64_t uniqueId = m_executorContext->currentUniqueId();
+    // Following are stored: name1.length, name1, name2.length, name2, hash1, hash2
+    int32_t bufferLength = 4 + table1->name().length() + 4 + table2->name().length() + 8 + 8;
+    char* payloadBuffer[bufferLength];
+    ExportSerializeOutput io(payloadBuffer, bufferLength);
+    io.writeBinaryString(table1->name().c_str(), table1->name().length());
+    io.writeBinaryString(table2->name().c_str(), table2->name().length());
+    io.writeLong(hash1);
+    io.writeLong(hash2);
+    ByteArray payload(io.data(), io.size());
+
+    quiesce(lastCommittedSpHandle);
+    m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+            spHandle, uniqueId, payload);
+    if (m_executorContext->drReplicatedStream()) {
+        m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+                spHandle, uniqueId, payload);
+    }
 }
 
 void VoltDBEngine::resetDRConflictStreamedTables() {
@@ -1432,6 +1473,11 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
             initMaterializedViews(catalogTable, streamedTable);
         }
     }
+}
+
+
+const unsigned char* VoltDBEngine::getResultsBuffer() const {
+    return (const unsigned char*)m_resultOutput.data();
 }
 
 int VoltDBEngine::getResultsSize() const {

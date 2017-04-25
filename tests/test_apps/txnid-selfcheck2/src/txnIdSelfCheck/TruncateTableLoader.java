@@ -152,9 +152,9 @@ public class TruncateTableLoader extends BenchmarkThread {
         ClientResponse clientResponse = null;
         String swapProcName = "@SwapTables";
         // swaptables sysproc is ALWAYS MP
-        clientResponse = TxnId2Utils.doAdHoc(client, swapProcName + " "
-                + tableName.toUpperCase() + " "
-                + (shouldRollback == 0 ? swapTableName.toUpperCase() : "NONEXISTENT_TABLE"));
+        clientResponse = TxnId2Utils.doProcCall(client, swapProcName,
+                tableName.toUpperCase(),
+                (shouldRollback == 0 ? swapTableName.toUpperCase() : "NONEXISTENT_TABLE"));
         if (isStatusSuccess(clientResponse, shouldRollback, "swap", tableName)) {
             Benchmark.txnCount.incrementAndGet();
             nSwaps++;

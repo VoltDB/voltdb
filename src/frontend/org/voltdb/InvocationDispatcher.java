@@ -1713,7 +1713,8 @@ public final class InvocationDispatcher {
                           changeResult.requiresSnapshotIsolation ? 1 : 0,
                           changeResult.worksWithElastic ? 1 : 0,
                           changeResult.deploymentHash,
-                          changeResult.hasSchemaChange ? 1 : 0);
+                          changeResult.hasSchemaChange ? 1 : 0,
+                          changeResult.requiresNewExportGeneration ? 1 : 0);
            task.clientHandle = changeResult.clientHandle;
            // DR stuff
            task.type = changeResult.invocationType;
@@ -1806,7 +1807,12 @@ public final class InvocationDispatcher {
                 task.setProcName("@AdHoc_RO_MP");
             }
             else {
-                task.setProcName("@AdHoc_RW_MP");
+                if ("@SwapTables".equals(plannedStmtBatch.work.invocationName)) {
+                    task.setProcName("@SwapTables");
+                }
+                else {
+                    task.setProcName("@AdHoc_RW_MP");
+                }
             }
             task.setParams(buf.array());
         }

@@ -396,6 +396,14 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.getImporterGraphInformation = function (onInformationLoaded) {
+            var importerDetails = {};
+            VoltDBService.GetImporterInformation(function (connection) {
+                getImporterDetails(connection, importerDetails);
+                onInformationLoaded(importerDetails);
+            });
+        };
+
         //Check if DR is enable or not
         this.GetDrStatusInformation = function (onInformationLoaded) {
             var drStatus = {};
@@ -1316,6 +1324,56 @@ function alertNodeClicked(obj) {
                 sysMemory[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 sysMemory[hostName]["PERCENT_USED"] = info[colIndex["PERCENT_USED"]];
             });
+        };
+
+        var getImporterDetails = function (connection, importerDetails) {
+            var colIndex = {};
+            var counter = 0;
+
+            if (connection.Metadata['@Statistics_IMPORTER'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_IMPORTER'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOSTNAME"
+                || columnInfo["name"] == "SUCCESSES" || columnInfo["name"] == "FAILURES"
+                || columnInfo["name"] == "OUTSTANDING_REQUESTS" || columnInfo["name"] == "IMPORTER_NAME")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            if(connection.Metadata["@Statistics_IMPORTER"].data.length > 0){
+                var rowCount = connection.Metadata["@Statistics_IMPORTER"].data.length
+                var success = 0;
+                var failures = 0;
+                var outStanding = 0;
+                var importerName = ""
+                connection.Metadata["@Statistics_IMPORTER"].data.forEach(function (info) {
+                    if(importerName != info[colIndex["IMPORTER_NAME"]]){
+                        importerName = info[colIndex["IMPORTER_NAME"]];
+                        success = 0;
+                        failures = 0;
+                        outStanding = 0;
+                    }
+                    if (!importerDetails.hasOwnProperty("SUCCESSES")) {
+                        importerDetails["SUCCESSES"] = {};
+                        importerDetails["FAILURES"]= {};
+                        importerDetails["OUTSTANDING_REQUESTS"]= {};
+                    }
+                    outStanding += info[colIndex["OUTSTANDING_REQUESTS"]];
+                    success += info[colIndex["SUCCESSES"]];
+                    failures += info[colIndex["FAILURES"]];
+
+                    importerDetails["SUCCESSES"][importerName] = success;
+                    importerDetails["SUCCESSES"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    importerDetails["FAILURES"][importerName] = failures;
+                    importerDetails["FAILURES"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                    importerDetails["OUTSTANDING_REQUESTS"][importerName] = outStanding;
+                    importerDetails["HOSTNAME"] = info[colIndex["HOSTNAME"]];
+                    importerDetails["OUTSTANDING_REQUESTS"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+
+                });
+            }
         };
 
         var getLiveClientData = function (connection, clientInfo) {

@@ -447,84 +447,97 @@ public class SocketJoiner {
     private void processSSC(ServerSocketChannel ssc) throws Exception {
         SocketChannel sc = null;
         while ((sc = ssc.accept()) != null) {
-            sc.socket().setTcpNoDelay(true);
-            sc.socket().setPerformancePreferences(0, 2, 1);
-            final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
+            try {
+                sc.socket().setTcpNoDelay(true);
+                sc.socket().setPerformancePreferences(0, 2, 1);
+                final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
 
-            /*
-             * Send the current time over the new connection for a clock skew check
-             */
-            ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
-            currentTimeBuf.putLong(System.currentTimeMillis());
-            currentTimeBuf.flip();
-            while (currentTimeBuf.hasRemaining()) {
-                sc.write(currentTimeBuf);
+                /*
+                 * Send the current time over the new connection for a clock skew check
+                 */
+                ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
+                currentTimeBuf.putLong(System.currentTimeMillis());
+                currentTimeBuf.flip();
+                while (currentTimeBuf.hasRemaining()) {
+                    sc.write(currentTimeBuf);
+                }
+
+                /*
+                 * Read a length prefixed JSON message
+                 */
+                JSONObject jsObj = readJSONObjFromWire(sc, remoteAddress);
+
+                LOG.info(jsObj.toString(2));
+
+                // get the connecting node's version string
+                String remoteBuildString = jsObj.getString(VERSION_STRING);
+
+                VersionChecker versionChecker = m_acceptor.getVersionChecker();
+                // send a response with version/build data of this node
+                JSONObject returnJs = new JSONObject();
+                returnJs.put(VERSION_STRING, versionChecker.getVersionString());
+                returnJs.put(BUILD_STRING, versionChecker.getBuildString());
+                returnJs.put(VERSION_COMPATIBLE,
+                        versionChecker.isCompatibleVersionString(remoteBuildString));
+
+                // inject acceptor fields
+                m_acceptor.decorate(returnJs, Optional.of(m_paused.get()));
+
+                byte jsBytes[] = returnJs.toString(4).getBytes(StandardCharsets.UTF_8);
+
+                ByteBuffer returnJsBuffer = ByteBuffer.allocate(4 + jsBytes.length);
+                returnJsBuffer.putInt(jsBytes.length);
+                returnJsBuffer.put(jsBytes).flip();
+                while (returnJsBuffer.hasRemaining()) {
+                    sc.write(returnJsBuffer);
+                }
+
+                /*
+                 * The type of connection, it can be a new request to join the cluster
+                 * or a node that is connecting to the rest of the cluster and publishing its
+                 * host id or a request to add a new connection to the request node.
+                 */
+                String type = jsObj.getString(TYPE);
+
+                /*
+                 * The new connection may specify the address it is listening on,
+                 * or it can be derived from the connection itself
+                 */
+                InetSocketAddress listeningAddress;
+                if (jsObj.has(ADDRESS)) {
+                    listeningAddress = new InetSocketAddress(
+                            InetAddress.getByName(jsObj.getString(ADDRESS)),
+                            jsObj.getInt(PORT));
+                } else {
+                    listeningAddress =
+                        new InetSocketAddress(
+                                ((InetSocketAddress)sc.socket().
+                                        getRemoteSocketAddress()).getAddress().getHostAddress(),
+                                        jsObj.getInt(PORT));
+                }
+
+                hostLog.info("Received request type " + type);
+                if (type.equals(ConnectionType.REQUEST_HOSTID.name())) {
+                    m_joinHandler.requestJoin(sc, listeningAddress, jsObj);
+                } else if (type.equals(ConnectionType.PUBLISH_HOSTID.name())){
+                    m_joinHandler.notifyOfJoin(jsObj.getInt(HOST_ID), sc, listeningAddress, jsObj);
+                } else if (type.equals(ConnectionType.REQUEST_CONNECTION.name())) {
+                    m_joinHandler.notifyOfConnection(jsObj.getInt(HOST_ID), sc, listeningAddress);
+                } else {
+                    throw new RuntimeException("Unexpected message type " + type + " from " + remoteAddress);
+                }
+            } catch (Exception ex) {
+                // do not leak sockets when exception happens
+                try {
+                    sc.close();
+                } catch (IOException ioex) {
+                    // ignore the close exception on purpose
+                }
+
+                // re-throw the exception, it will be handled by the caller
+                throw ex;
             }
 
-            /*
-             * Read a length prefixed JSON message
-             */
-            JSONObject jsObj = readJSONObjFromWire(sc, remoteAddress);
-
-            LOG.info(jsObj.toString(2));
-
-            // get the connecting node's version string
-            String remoteBuildString = jsObj.getString(VERSION_STRING);
-
-            VersionChecker versionChecker = m_acceptor.getVersionChecker();
-            // send a response with version/build data of this node
-            JSONObject returnJs = new JSONObject();
-            returnJs.put(VERSION_STRING, versionChecker.getVersionString());
-            returnJs.put(BUILD_STRING, versionChecker.getBuildString());
-            returnJs.put(VERSION_COMPATIBLE,
-                    versionChecker.isCompatibleVersionString(remoteBuildString));
-
-            // inject acceptor fields
-            m_acceptor.decorate(returnJs, Optional.of(m_paused.get()));
-
-            byte jsBytes[] = returnJs.toString(4).getBytes(StandardCharsets.UTF_8);
-
-            ByteBuffer returnJsBuffer = ByteBuffer.allocate(4 + jsBytes.length);
-            returnJsBuffer.putInt(jsBytes.length);
-            returnJsBuffer.put(jsBytes).flip();
-            while (returnJsBuffer.hasRemaining()) {
-                sc.write(returnJsBuffer);
-            }
-
-            /*
-             * The type of connection, it can be a new request to join the cluster
-             * or a node that is connecting to the rest of the cluster and publishing its
-             * host id or a request to add a new connection to the request node.
-             */
-            String type = jsObj.getString(TYPE);
-
-            /*
-             * The new connection may specify the address it is listening on,
-             * or it can be derived from the connection itself
-             */
-            InetSocketAddress listeningAddress;
-            if (jsObj.has(ADDRESS)) {
-                listeningAddress = new InetSocketAddress(
-                        InetAddress.getByName(jsObj.getString(ADDRESS)),
-                        jsObj.getInt(PORT));
-            } else {
-                listeningAddress =
-                    new InetSocketAddress(
-                            ((InetSocketAddress)sc.socket().
-                                    getRemoteSocketAddress()).getAddress().getHostAddress(),
-                                    jsObj.getInt(PORT));
-            }
-
-            hostLog.info("Received request type " + type);
-            if (type.equals(ConnectionType.REQUEST_HOSTID.name())) {
-                m_joinHandler.requestJoin(sc, listeningAddress, jsObj);
-            } else if (type.equals(ConnectionType.PUBLISH_HOSTID.name())){
-                m_joinHandler.notifyOfJoin(jsObj.getInt(HOST_ID), sc, listeningAddress, jsObj);
-            } else if (type.equals(ConnectionType.REQUEST_CONNECTION.name())) {
-                m_joinHandler.notifyOfConnection(jsObj.getInt(HOST_ID), sc, listeningAddress);
-            } else {
-                throw new RuntimeException("Unexpected message type " + type + " from " + remoteAddress);
-            }
         }
     }
 
