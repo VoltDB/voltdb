@@ -293,7 +293,11 @@ class FastSerializer:
 
         self.read_buffer = ReadBuffer()
 
-        if self.usekerberos and kerberos_available and self.has_ticket():
+        if self.usekerberos:
+            if not kerberos_available:
+                raise RuntimeError("Requested Kerberos authentication but unable to import the GSSAPI package.")
+            if not self.has_ticket():
+                raise RuntimeError("Requested Kerberos authentication but no valid ticket found. Authenticate with Kerberos first.")
             assert not self.socket is None
             self.socket.settimeout(connect_timeout)
             self.authenticate(str(self.kerberosprinciple), "")
