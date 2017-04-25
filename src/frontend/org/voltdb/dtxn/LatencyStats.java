@@ -28,15 +28,19 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.voltdb.ClientInterface;
-import org.voltdb.SiteStatsSource;
+import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.VoltTable.ColumnInfo;
 
-public class LatencyStats extends SiteStatsSource {
+/** Source of @Statistics LATENCY.
+ * This aims to provide useful data for lightweight monitoring.
+ * To get a complete latency curve, get the whole histogram via @Statistics LATENCY_COMPRESSED or @Statistics LATENCY_HISTOGRAM (both undocumented)
+ */
+public class LatencyStats extends StatsSource {
 
-    public static final int INTERVAL_SECONDS = 5;
+    public static final int INTERVAL_MS = Integer.getInteger("LATENCY_STATS_WINDOW_MS", (int) TimeUnit.SECONDS.toMillis(5));
 
     private AtomicReference<AbstractHistogram> m_diffHistProvider = new AtomicReference<AbstractHistogram>();
     private ScheduledExecutorService m_updater = Executors.newScheduledThreadPool(1);
@@ -87,11 +91,11 @@ public class LatencyStats extends SiteStatsSource {
         }
     }
 
-    public LatencyStats(long siteId) {
-        super(siteId, false);
+    public LatencyStats() {
+        super(false);
         m_diffHistProvider.set(LatencyHistogramStats.constructHistogram(false));
         final int initialDelay = 0;
-        m_updater.scheduleAtFixedRate(new UpdaterJob(), initialDelay, INTERVAL_SECONDS, TimeUnit.SECONDS);
+        m_updater.scheduleAtFixedRate(new UpdaterJob(), initialDelay, INTERVAL_MS, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -102,15 +106,15 @@ public class LatencyStats extends SiteStatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("INTERVAL",  VoltType.INTEGER)); // seconds
-        columns.add(new ColumnInfo("COUNT",     VoltType.INTEGER)); // # samples
-        columns.add(new ColumnInfo("P50",       VoltType.BIGINT));  // milliseconds
-        columns.add(new ColumnInfo("P95",       VoltType.BIGINT));  // milliseconds
-        columns.add(new ColumnInfo("P99",       VoltType.BIGINT));  // milliseconds
-        columns.add(new ColumnInfo("P99.9",     VoltType.BIGINT));  // milliseconds
-        columns.add(new ColumnInfo("P99.99",    VoltType.BIGINT));  // milliseconds
-        columns.add(new ColumnInfo("P99.999",   VoltType.BIGINT));  // milliseconds
-        columns.add(new ColumnInfo("MAX",       VoltType.BIGINT));  // milliseconds
+        columns.add(new ColumnInfo("COUNT",   VoltType.INTEGER)); // samples
+        columns.add(new ColumnInfo("TPS",     VoltType.INTEGER)); // samples per second
+        columns.add(new ColumnInfo("P50",     VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P95",     VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P99",     VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P99.9",   VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P99.99",  VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P99.999", VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("MAX",     VoltType.BIGINT));  // microseconds
     }
 
     @Override
@@ -120,8 +124,8 @@ public class LatencyStats extends SiteStatsSource {
 
         // Override timestamp from the procedure call with the one from when the data was fetched.
         rowValues[columnNameToIndex.get("TIMESTAMP")] = diffHist.getEndTimeStamp();
-        rowValues[columnNameToIndex.get("INTERVAL")]  = INTERVAL_SECONDS;
         rowValues[columnNameToIndex.get("COUNT")]     = diffHist.getTotalCount();
+        rowValues[columnNameToIndex.get("TPS")]       = (int) (TimeUnit.SECONDS.toMillis(diffHist.getTotalCount()) / INTERVAL_MS);
         rowValues[columnNameToIndex.get("P50")]       = diffHist.getValueAtPercentile(0.50);
         rowValues[columnNameToIndex.get("P95")]       = diffHist.getValueAtPercentile(0.95);
         rowValues[columnNameToIndex.get("P99")]       = diffHist.getValueAtPercentile(0.99);
