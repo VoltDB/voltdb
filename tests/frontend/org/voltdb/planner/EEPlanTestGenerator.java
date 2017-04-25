@@ -795,6 +795,27 @@ public class EEPlanTestGenerator extends PlannerTestCase {
         generateTests("executors", "TestWindowedRank", rankDB);
     }
 
+    public void testGenerateInlineInsert() throws Exception {
+        TableConfig TConfig = new TableConfig("T",
+                                                new String[] {"A", "B", "C"},
+                                                new int[][] {
+                                                    // A   B     C
+                                                    //-------------
+                                                    {  1,  1,  101},
+                                                });
+        DBConfig IIDB = new DBConfig(getClass(),
+                                   EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                   getCatalogString(),
+                                   TConfig);
+        IIDB.addTest(new TestConfig("test_inline_insert",
+                                    "insert into AAA select * from T;",
+                                    new int[][] {
+            { 1, 1, 101}
+        }));
+        generateTests("executors", "TestInlineInsert", IIDB);
+
+    }
+
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
