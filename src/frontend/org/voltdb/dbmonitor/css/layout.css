@@ -3995,6 +3995,9 @@ fieldset { border:1px solid #ccc; padding:20px;}
    background-color: #fff;
  }
 
+.contentNoImportDataMsg {
+    font-size: 14px
+}
  .gutter {
    background-color: transparent;
 

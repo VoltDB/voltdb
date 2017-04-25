@@ -127,8 +127,8 @@ public class KafkaLoader {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
             }
             m_es.awaitTermination(365, TimeUnit.DAYS);
-        } catch (Exception ex) {
-            m_log.error("Error in Kafka Consumer", ex);
+        } catch (Throwable terminate) {
+            m_log.error("Error in Kafka Consumer", terminate);
             System.exit(-1);
         }
         close();
@@ -387,8 +387,8 @@ public class KafkaLoader {
                     }
                     if (params == null) continue;
                     m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
-                } catch (Exception ex) {
-                    m_log.error("Consumer stopped", ex);
+                } catch (Throwable terminate) {
+                    m_log.error("Consumer stopped", terminate);
                     System.exit(1);
                 }
             }

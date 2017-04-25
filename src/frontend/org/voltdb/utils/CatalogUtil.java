@@ -185,7 +185,7 @@ public abstract class CatalogUtil {
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
 
-    public final static String[] CATALOG_DEFAULT_ARTIFCATS = {
+    public final static String[] CATALOG_DEFAULT_ARTIFACTS = {
             VoltCompiler.AUTOGEN_DDL_FILE_NAME,
             CATALOG_BUILDINFO_FILENAME,
             CATALOG_REPORT_FILENAME,
@@ -195,8 +195,7 @@ public abstract class CatalogUtil {
 
     private static boolean m_exportEnabled = false;
     public static final String CATALOG_FILE_NAME = "catalog.jar";
-
-    public static final String STAGED_CATALOG_FILE_NAME = "staged-catalog.jar";
+    public static final String STAGED_CATALOG_PATH = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -332,7 +331,7 @@ public abstract class CatalogUtil {
      */
     public static InMemoryJarfile getCatalogJarWithoutDefaultArtifacts(final InMemoryJarfile jarfile) {
         InMemoryJarfile cloneJar = jarfile.deepCopy();
-        for (String entry : CATALOG_DEFAULT_ARTIFCATS) {
+        for (String entry : CATALOG_DEFAULT_ARTIFACTS) {
             cloneJar.remove(entry);
         }
         return cloneJar;

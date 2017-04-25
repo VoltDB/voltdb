@@ -472,16 +472,23 @@ public class VoltProjectBuilder {
         addSchema(schemaURL.getPath());
     }
 
-    /**
-     * This is test code written by Ryan, even though it was
-     * committed by John.
+    /** Creates a temporary file for the supplied schema text.
+     * The file is not left open, and will be deleted upon process exit.
      */
-    public void addLiteralSchema(String ddlText) throws IOException {
-        File temp = File.createTempFile("literalschema", "sql");
+    public static File createFileForSchema(String ddlText) throws IOException {
+        File temp = File.createTempFile("literalschema", ".sql");
         temp.deleteOnExit();
         FileWriter out = new FileWriter(temp);
         out.write(ddlText);
         out.close();
+        return temp;
+    }
+
+    /**
+     * Adds the supplied schema by creating a temp file for it.
+     */
+    public void addLiteralSchema(String ddlText) throws IOException {
+        File temp = createFileForSchema(ddlText);
         addSchema(URLEncoder.encode(temp.getAbsolutePath(), "UTF-8"));
     }
 
@@ -904,25 +911,50 @@ public class VoltProjectBuilder {
             }
         }
         if (deployment != null) {
-            try {
-                m_pathToDeployment = writeDeploymentFile(deploymentVoltRoot, deployment);
-            } catch (Exception e) {
-                System.out.println("Failed to create deployment file in testcase.");
-                e.printStackTrace();
-                System.out.println("hostcount: " + deployment.hostCount);
-                System.out.println("sitesPerHost: " + deployment.sitesPerHost);
-                System.out.println("clusterId: " + deployment.clusterId);
-                System.out.println("replication: " + deployment.replication);
-                System.out.println("voltRoot: " + deploymentVoltRoot);
-                System.out.println("ppdEnabled: " + ppdEnabled);
-                System.out.println("snapshotPath: " + snapshotPath);
-                System.out.println("ppdPrefix: " + ppdPrefix);
-                // sufficient to escape and fail test cases?
-                throw new RuntimeException(e);
-            }
+            compileDeploymentOnly(deploymentVoltRoot, deployment);
         }
 
         return success;
+    }
+
+    /** Generate a deployment file based on the options passed and set in this object.
+     * @pre This VoltProjectBuilder has all its options set, except those passed as arguments to this method.
+     * @param voltDbRoot
+     * @param hostCount
+     * @param sitesPerHost
+     * @param replication
+     * @param clusterId
+     * @return path to deployment file that was written
+     */
+    public String compileDeploymentOnly(String voltDbRoot,
+                                        int hostCount,
+                                        int sitesPerHost,
+                                        int replication,
+                                        int clusterId)
+    {
+        DeploymentInfo deployment = new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId);
+        return compileDeploymentOnly(voltDbRoot, deployment);
+    }
+
+    private String compileDeploymentOnly(String voltDbRoot, DeploymentInfo deployment)
+    {
+        try {
+            m_pathToDeployment = writeDeploymentFile(voltDbRoot, deployment);
+        } catch (Exception e) {
+            System.out.println("Failed to create deployment file in testcase.");
+            e.printStackTrace();
+            System.out.println("hostcount: " + deployment.hostCount);
+            System.out.println("sitesPerHost: " + deployment.sitesPerHost);
+            System.out.println("clusterId: " + deployment.clusterId);
+            System.out.println("replication: " + deployment.replication);
+            System.out.println("voltRoot: " + voltDbRoot);
+            System.out.println("ppdEnabled: " + m_ppdEnabled);
+            System.out.println("snapshotPath: " + m_snapshotPath);
+            System.out.println("ppdPrefix: " + m_ppdPrefix);
+            // sufficient to escape and fail test cases?
+            throw new RuntimeException(e);
+        }
+        return m_pathToDeployment;
     }
 
     /**
@@ -1011,9 +1043,11 @@ public class VoltProjectBuilder {
         // <paths>
         PathsType paths = factory.createPathsType();
         deployment.setPaths(paths);
-        Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
-        paths.setVoltdbroot(voltdbroot);
-        voltdbroot.setPath(voltRoot);
+        if ((voltRoot != null) && !voltRoot.trim().isEmpty()) {
+            Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
+            paths.setVoltdbroot(voltdbroot);
+            voltdbroot.setPath(voltRoot);
+        }
 
         if (m_snapshotPath != null) {
             PathsType.Snapshots snapshotPathElement = factory.createPathsTypeSnapshots();

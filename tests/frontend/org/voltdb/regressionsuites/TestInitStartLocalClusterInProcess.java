@@ -249,7 +249,7 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
         Set<String> files = jarFile.keySet();
         // if empty, none
         if (files.size() == 0) return false;
-        for (String artifacts : CatalogUtil.CATALOG_DEFAULT_ARTIFCATS) {
+        for (String artifacts : CatalogUtil.CATALOG_DEFAULT_ARTIFACTS) {
             if (files.contains(artifacts)) return true;
         }
         return false;
