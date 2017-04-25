@@ -410,6 +410,13 @@ $(document).ready(function () {
                 $("#VDBQHelp").hide();
                 $("#VDBAdmHelp").hide();
                 MonitorGraphUI.UpdateCharts();
+            }  else if (VoltDbUI.CurrentTab ==  NavigationTabs.Importer){
+                $("#showMyHelp").html("Importer Help");
+                $("#VDBMonHelp").show();
+                $("#VDBSchHelp").hide();
+                $("#VDBQHelp").hide();
+                $("#VDBAdmHelp").hide();
+                MonitorGraphUI.RefreshImporterGraph();
             }
             shortcut.remove("f5");
             shortcut.remove("f6");
@@ -770,14 +777,7 @@ var loadPage = function (serverName, portid) {
                 } else {
                     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
                 }
-            } else if (curTab == NavigationTabs.Importer) {
-                $("#overlay").show();
-                setTimeout(function () {
-                    $("#navImporter> a").trigger("click");
-                    MonitorGraphUI.RefreshImporterGraph(VoltDbUI.getFromLocalStorage("importer-graph-view"))
-                    }, 100);
-
-            } else{
+            }  else{
                 setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
             }
         }
@@ -1153,15 +1153,19 @@ var loadPage = function (serverName, portid) {
 
         voltDbRenderer.getImporterGraphInformation(function(importerDetails){
             if(!$.isEmptyObject(importerDetails)){
+                var curTab = VoltDbUI.getCookie("current-tab");
                 graphView = $("#importerGraphView").val();
+                $('#navImporter').show();
+                if(curTab == NavigationTabs.Importer && !$("#navImporter").hasClass('active')){
+                    $("#overlay").show();
+                    setTimeout(function () { $("#navImporter> a").trigger("click"); }, 100);
+                }
+
                 if(VoltDbUI.isFirstImporterLoad){
                     MonitorGraphUI.SetImporterData(importerDetails)
                     MonitorGraphUI.AddImporterGraph(VoltDbUI.getFromLocalStorage("importer-graph-view"), $('#chartOutTransaction'), $('#chartSuccessRate'), $('#chartFailureRate'));
                     VoltDbUI.isFirstImporterLoad = false;
                 }
-                $('#divNoImportDataMsg').hide();
-                $('#graphChartImporter').show();
-
 
                 var dataMapper = MonitorGraphUI.getImportMapperData();
                 var colorIndex = MonitorGraphUI.getDataMapperIndex(dataMapper);
@@ -1175,13 +1179,16 @@ var loadPage = function (serverName, portid) {
                         }
                     }
                 });
-                var curTab = VoltDbUI.getCookie("current-tab");
+
+
                 MonitorGraphUI.RefreshOutTransGraph(importerDetails["OUTSTANDING_REQUESTS"], graphView, curTab);
                 MonitorGraphUI.RefreshSuccessRateGraph(importerDetails["SUCCESSES"], graphView, curTab);
                 MonitorGraphUI.RefreshFailureRateGraph(importerDetails["FAILURES"], graphView, curTab);
+                MonitorGraphUI.RefreshImporterGraph(VoltDbUI.getFromLocalStorage("importer-graph-view"))
             } else {
-                $('#divNoImportDataMsg').show();
-                $('#graphChartImporter').hide();
+                if($("#navImporter").hasClass('active'))
+                    setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
+                $('#navImporter').hide()
             }
         });
 
