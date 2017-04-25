@@ -932,11 +932,11 @@ class VoltTable:
     def readFromSerializer(self):
         # 1.
         tablesize = self.fser.readInt32()
+        limit_position = self.fser.read_buffer._off + tablesize
         # 2.
         headersize = self.fser.readInt32()
         statuscode = self.fser.readByte()
         columncount = self.fser.readInt16()
-        if statuscode: columncount=0
         for i in xrange(columncount):
             column = VoltColumn(fser = self.fser)
             self.columns.append(column)
@@ -944,7 +944,6 @@ class VoltTable:
 
         # 3.
         rowcount = self.fser.readInt32()
-        if statuscode: rowcount=0
         for i in xrange(rowcount):
             rowsize = self.fser.readInt32()
             # list comprehension: build list by calling read for each column in
@@ -952,6 +951,10 @@ class VoltTable:
             row = [self.fser.read(self.columns[j].type)
                    for j in xrange(columncount)]
             self.tuples.append(row)
+
+        # advance offset to end of table-size on read_buffer
+        if self.fser.read_buffer._off != limit_position:
+            self.fser.read_buffer._off = limit_position
 
         return self
 
