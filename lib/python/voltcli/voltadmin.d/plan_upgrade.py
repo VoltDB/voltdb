@@ -70,8 +70,8 @@ def basicCheck(runner):
 
     if runner.opts.newNode is not None:
         result = checkNewNode(runner.opts.newNode)
-        if result is False:
-            runner.abort("Failed to resolve host {0}.".format(runner.opts.newNode))
+        if result is not None:
+            runner.abort("Failed to resolve host {0}:{1}.".format(runner.opts.newNode, result))
 
     host = hosts.hosts_by_id.itervalues().next();
     currentVersion = host.version
@@ -581,8 +581,8 @@ def prettyprint(elem, level=0):
 
 def checkNewNode(hostname):
     try:
-        subprocess.check_output(["ping", "-c 1", hostname], shell=False)
+        subprocess.call(["ping", "-c 1", hostname], stdout=open(os.devnull, 'wb'))
     except Exception, e:
-        return False
+        return e
 
-    return True
+    return None
