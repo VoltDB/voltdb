@@ -130,20 +130,19 @@ public class TruncateTableLoader extends BenchmarkThread {
 
     private long[] swapTables(byte shouldRollback, String sp) throws IOException, ProcCallException {
         if (USE_SWAP_TABLES_SYSPROC)
-            return swapTables_adhoc(shouldRollback, sp);
+            return swapTables_sysproc(shouldRollback, sp);
         else
             return swapTables_dml(shouldRollback, sp);
     }
 
-    private long[] swapTables_adhoc(byte shouldRollback, String sp) throws IOException, ProcCallException {
-        long[] rowCounts = new long[2];
+    private long[] swapTables_sysproc(byte shouldRollback, String sp) throws IOException, ProcCallException {
+        long[] b4RowCounts = new long[] {-1, -1};
+        long[] afterRowCounts = new long[] {-1, -1};
 
         // Get the row counts, before doing the table-swap
-        long tableRowCount = -1;
-        long swapRowCount  = -1;
         try {
-            tableRowCount = TxnId2Utils.getRowCount(client, tableName);
-            swapRowCount  = TxnId2Utils.getRowCount(client, swapTableName);
+            b4RowCounts[0] = TxnId2Utils.getRowCount(client, tableName);
+            b4RowCounts[1]  = TxnId2Utils.getRowCount(client, swapTableName);
         } catch (Exception e) {
             hardStop("getrowcount exception", e);
         }
@@ -152,34 +151,54 @@ public class TruncateTableLoader extends BenchmarkThread {
         ClientResponse clientResponse = null;
         String swapProcName = "@SwapTables";
         // swaptables sysproc is ALWAYS MP
-        clientResponse = TxnId2Utils.doProcCall(client, swapProcName,
+        // we use one-shot here to bypass the retry mechanisms of doProcCall,
+        // then we evaluate the response and check the behavior
+        clientResponse = TxnId2Utils.doProcCallOneShot(client, swapProcName,
                 tableName.toUpperCase(),
-                (shouldRollback == 0 ? swapTableName.toUpperCase() : "NONEXISTENT_TABLE"));
-        if (isStatusSuccess(clientResponse, shouldRollback, "swap", tableName)) {
-            Benchmark.txnCount.incrementAndGet();
-            nSwaps++;
+                shouldRollback == 0 ? swapTableName.toUpperCase() : "NONEXISTENT_TABLE");
+        Boolean result = isStatusSuccess(clientResponse, shouldRollback, "swap", tableName);
 
-            // Confirm that the table-swap worked correctly, by checking the row counts
-            // nb. swap is not supported with DR yet, with XDCR this check is likeley to fail
-            // unless we take other action or change the test.
-            try {
-                rowCounts[0] = TxnId2Utils.getRowCount(client, tableName);
-                rowCounts[1] = TxnId2Utils.getRowCount(client, swapTableName);
-            } catch (Exception e) {
-                hardStop("getrowcount exception", e);
-            }
-            int z = shouldRollback == 0 ? 0 : 1;
-            if (rowCounts[(z + 0) & 1] != swapRowCount || rowCounts[(z + 1) & 1] != tableRowCount) {
+        /* check the table counts and various result cases
+         * success: tables should be swapped (counts appear swapped)
+         * failed: tables should not be swapped
+         * indeterminate: tables should either be swapped or not
+         */
+        try {
+            afterRowCounts[0] = TxnId2Utils.getRowCount(client, tableName);
+            afterRowCounts[1] = TxnId2Utils.getRowCount(client, swapTableName);
+        } catch (Exception e) {
+            hardStop("getrowcount exception", e);
+        }
+
+        // if we can't tell if the txn committed or not
+        if (!result && TxnId2Utils.isTransactionStateIndeterminate(clientResponse)) {
+            // the best we can do is check that neither table has been mutated is some unexpected way
+            if ( ! (afterRowCounts[0] == b4RowCounts[0] || afterRowCounts[0] == b4RowCounts[1])
+                    || ! (afterRowCounts[1] == b4RowCounts[0] || afterRowCounts[1] == b4RowCounts[1])) {
                 String message = swapProcName + " on " + tableName + ", " + swapTableName
-                        + " failed to swap row counts correctly: went from " + tableRowCount
-                        + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1] + ", rollback: " + shouldRollback;
+                        + " count(s) are not as expected after an indeterminate result: before: " + b4RowCounts[0] + ", " + b4RowCounts[1]
+                        + " after: " + afterRowCounts[0] + ", " + afterRowCounts[1] + ", rollback: " + shouldRollback;
                 hardStop("TruncateTableLoader: " + message);
             }
+        } else {
+            // either succeeded or failed or rollback deterministic response, tables should NOT be swapped
+            // if shouldRollback is set the operation will fail (ie. result will be false)
+            // z==0 compares the counts in the swapped (success) configuration
+            int z = result ? 0 : 1;
+            if (afterRowCounts[(z + 0) & 1] != b4RowCounts[1] || afterRowCounts[(z + 1) & 1] != b4RowCounts[0]) {
+                String message = swapProcName + " on " + tableName + ", " + swapTableName
+                        + " failed to swap row counts correctly: went from " + b4RowCounts[0] + ", " + b4RowCounts[1]
+                        + " to " + afterRowCounts[0] + ", " + afterRowCounts[1] + ", rollback: " + shouldRollback;
+                hardStop("TruncateTableLoader: " + message);
+            }
+            if (result) {
+                if (shouldRollback != 0)
+                    hardStop("shouldRollback is set but operation passed");
+                Benchmark.txnCount.incrementAndGet();
+                nSwaps++;
+            }
         }
-        else {
-            hardStop(clientResponse.toString());
-        }
-        return rowCounts;
+        return afterRowCounts;
     }
 
     private long[] swapTables_dml(byte shouldRollback, String sp) throws IOException, ProcCallException {
