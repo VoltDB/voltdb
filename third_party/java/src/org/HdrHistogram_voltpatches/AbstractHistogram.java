@@ -2407,23 +2407,20 @@ public abstract class AbstractHistogram extends AbstractHistogramBase implements
 
     public static Histogram fromCompressedBytes(byte bytes[], CompressionStrategy strategy) {
         try {
-            return fromUncompressedBytes(strategy.uncompress(bytes));
+            ByteBuffer buf = ByteBuffer.wrap(strategy.uncompress(bytes));
+            buf.order(ByteOrder.LITTLE_ENDIAN);
+            final long lTrackableValue = buf.getLong();
+            final long hTrackableValue = buf.getLong();
+            final int nSVD = buf.getInt();
+            Histogram h = new Histogram(lTrackableValue, hTrackableValue, nSVD);
+            h.addToTotalCount(buf.getLong());
+            for (int ii = 0; ii < h.countsArrayLength; ii++) {
+                h.addToCountAtIndex(ii, buf.getLong());
+            }
+            return h;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static Histogram fromUncompressedBytes(byte[] bytes) {
-        ByteBuffer buf = ByteBuffer.wrap(bytes);
-        buf.order(ByteOrder.LITTLE_ENDIAN);
-        final long lTrackableValue = buf.getLong();
-        final long hTrackableValue = buf.getLong();
-        final int nSVD = buf.getInt();
-        Histogram h = new Histogram(lTrackableValue, hTrackableValue, nSVD);
-        h.addToTotalCount(buf.getLong());
-        for (int ii = 0; ii < h.countsArrayLength; ii++) {
-            h.addToCountAtIndex(ii, buf.getLong());
-        }
-        return h;
-    }
 }

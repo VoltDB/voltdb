@@ -24,7 +24,6 @@
 package org.voltdb.regressionsuites.statistics;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -244,7 +243,9 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
     private static long getTimestampFromLatencyStatsCall(Client client) throws Exception {
         VoltTable[] results = client.callProcedure("@Statistics", "LATENCY", 0).getResults();
         assertEquals(1, results.length);
-        results[0].advanceRow();
+        do {
+            results[0].advanceRow();
+        } while (results[0].getLong("HOST_ID") != 0);
         return results[0].getLong("TIMESTAMP"); // milliseconds
     }
 
@@ -317,60 +318,6 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
             invocations += h.getTotalCount();
         }
         assertTrue(invocations > 0);
-    }
-
-    public void testLatencyHistogram() throws Exception {
-        System.out.println("\n\nTESTING LATENCY_HISTOGRAM STATS\n\n\n");
-        Client client  = getFullyConnectedClient();
-
-        ColumnInfo[] expectedSchema = new ColumnInfo[6];
-        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
-        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
-        expectedSchema[4] = new ColumnInfo("HISTOGRAM", VoltType.VARBINARY);
-        expectedSchema[5] = new ColumnInfo("UNCOMPRESSED_HISTOGRAM", VoltType.VARBINARY);
-        VoltTable expectedTable = new VoltTable(expectedSchema);
-
-        VoltTable[] results = null;
-
-        // Do some stuff to generate some latency stats
-        for (int i = 0; i < SITES * HOSTS; i++) {
-            results = client.callProcedure("NEW_ORDER.insert", i).getResults();
-        }
-
-        results = client.callProcedure("@Statistics", "LATENCY_HISTOGRAM", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Test latency histogram table: " + results[0].toString());
-
-        validateSchema(results[0], expectedTable);
-        // should have at least one row from each host
-        results[0].advanceRow();
-        Map<String, String> columnTargets = new HashMap<String, String>();
-        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
-        validateRowSeenAtAllHosts(results[0], columnTargets, false);
-        // actually, there are 26 rows per host so:
-        assertEquals(HOSTS, results[0].getRowCount());
-        // Check for non-zero invocations (ENG-4668)
-        long invocations_compressed = 0;
-        results[0].resetRowPosition();
-        while (results[0].advanceRow()) {
-            byte histogramBytes[] = results[0].getVarbinary("HISTOGRAM");
-            Histogram h = AbstractHistogram.fromCompressedBytes(histogramBytes, CompressionStrategySnappy.INSTANCE);
-            invocations_compressed += h.getTotalCount();
-        }
-        assertTrue(invocations_compressed > 0);
-
-        long invocations_uncompressed = 0;
-        results[0].resetRowPosition();
-        while (results[0].advanceRow()) {
-            byte histogramBytes[] = results[0].getVarbinary("UNCOMPRESSED_HISTOGRAM");
-            Histogram h = AbstractHistogram.fromUncompressedBytes(histogramBytes);
-            invocations_uncompressed += h.getTotalCount();
-        }
-        assertTrue(invocations_uncompressed > 0);
-        assertEquals(invocations_compressed, invocations_uncompressed);
     }
 
     public void testInitiatorStatistics() throws Exception {
