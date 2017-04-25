@@ -24,11 +24,11 @@ import org.voltdb.compiler.DDLCompiler.StatementProcessor;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
-public class CatchAllStatement extends StatementProcessor {
+public class CatchAllVoltDBStatement extends StatementProcessor {
 
     private VoltDBStatementProcessor m_firstProcessor;
 
-    public CatchAllStatement(DDLCompiler ddlCompiler, VoltDBStatementProcessor firstProcessor) {
+    public CatchAllVoltDBStatement(DDLCompiler ddlCompiler, VoltDBStatementProcessor firstProcessor) {
         super(ddlCompiler);
         m_firstProcessor = firstProcessor;
     }

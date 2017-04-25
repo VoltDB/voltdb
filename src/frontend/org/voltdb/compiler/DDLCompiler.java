@@ -58,7 +58,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compiler.statements.CatchAllStatement;
+import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
 import org.voltdb.compiler.statements.CreateProcedureAsSQL;
 import org.voltdb.compiler.statements.CreateProcedureAsScript;
@@ -110,7 +110,7 @@ public class DDLCompiler {
     private String m_fullDDL = "";
     private int m_currLineNo = 1;
 
-    private final VoltDBStatementProcessor m_statementProcessor = new VoltDBStatementProcessor(this);
+    private final VoltDBStatementProcessor m_voltStatementProcessor;
 
     // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     private final VoltDDLElementTracker m_tracker;
@@ -183,22 +183,23 @@ public class DDLCompiler {
         m_tracker = tracker;
         m_classLoader = classLoader;
         m_mvProcessor = new MaterializedViewProcessor(m_compiler, m_hsql);
-        m_statementProcessor.addNextProcessorFor(new CreateProcedureFromClass(this))
-                            .addNextProcessorFor(new CreateProcedureAsScript(this))
-                            .addNextProcessorFor(new CreateProcedureAsSQL(this))
-                            .addNextProcessorFor(new CreateFunctionFromMethod(this))
-                            .addNextProcessorFor(new DropFunction(this))
-                            .addNextProcessorFor(new DropProcedure(this))
-                            .addNextProcessorFor(new PartitionStatement(this))
-                            .addNextProcessorFor(new ReplicateTable(this))
-                            .addNextProcessorFor(new ImportClass(this))
-                            .addNextProcessorFor(new CreateRole(this))
-                            .addNextProcessorFor(new DropRole(this))
-                            .addNextProcessorFor(new DropStream(this))
-                            .addNextProcessorFor(new DRTable(this))
-                            .addNextProcessorFor(new SetGlobalParam(this))
-                            // CatchAllStatement need to be the last processor in the chain.
-                            .addNextProcessorFor(new CatchAllStatement(this, m_statementProcessor));
+        m_voltStatementProcessor = new VoltDBStatementProcessor(this);
+        m_voltStatementProcessor.addNextProcessor(new CreateProcedureFromClass(this))
+                                .addNextProcessor(new CreateProcedureAsScript(this))
+                                .addNextProcessor(new CreateProcedureAsSQL(this))
+                                .addNextProcessor(new CreateFunctionFromMethod(this))
+                                .addNextProcessor(new DropFunction(this))
+                                .addNextProcessor(new DropProcedure(this))
+                                .addNextProcessor(new PartitionStatement(this))
+                                .addNextProcessor(new ReplicateTable(this))
+                                .addNextProcessor(new ImportClass(this))
+                                .addNextProcessor(new CreateRole(this))
+                                .addNextProcessor(new DropRole(this))
+                                .addNextProcessor(new DropStream(this))
+                                .addNextProcessor(new DRTable(this))
+                                .addNextProcessor(new SetGlobalParam(this))
+                                // CatchAllVoltDBStatement need to be the last processor in the chain.
+                                .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
 
     public static abstract class StatementProcessor {
@@ -223,7 +224,7 @@ public class DDLCompiler {
             }
         }
 
-        public final StatementProcessor addNextProcessorFor(StatementProcessor next) {
+        public final StatementProcessor addNextProcessor(StatementProcessor next) {
             m_next = next;
             return m_next;
         }
@@ -304,7 +305,7 @@ public class DDLCompiler {
             try {
                 // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
                 // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
-                processed = m_statementProcessor.process(stmt, db, whichProcs);
+                processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
