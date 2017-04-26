@@ -129,17 +129,23 @@ def run_once(name, command, statements_path, results_path,
         server = subprocess.Popen(command + " backend=" + name, shell=True)
 
     client = None
+    clientException = None
     for i in xrange(30):
         try:
             client = VoltQueryClient(host, port)
             client.set_quiet(True)
             client.set_timeout(5.0) # 5 seconds
             break
-        except socket.error:
+        except socket.error as e:
+            clientException = e
             time.sleep(1)
 
     if client == None:
-        print >> sys.stderr, "Unable to connect/create client"
+        print >> sys.stderr, "Unable to connect/create client: there may be a problem with the VoltDB server or its ports:"
+        print >> sys.stderr, "name:", str(name)
+        print >> sys.stderr, "host:", str(host)
+        print >> sys.stderr, "port:", str(port)
+        print >> sys.stderr, "client (socket.error) exception:", str(clientException)
         sys.stderr.flush()
         return -1
 
