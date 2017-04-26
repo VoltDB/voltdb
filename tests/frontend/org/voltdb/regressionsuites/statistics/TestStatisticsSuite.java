@@ -254,27 +254,28 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         Client client = getFullyConnectedClient();
 
         // To verify that subsequent timestamps are the same,
-        // take 3 samples and validate that at least one pair of adjacent samples match.
-        // This means sampling on both sides of a rollover doesn't result in failure.
-        final long ts1 = getTimestampFromLatencyStatsCall(client);
-        final long ts2 = getTimestampFromLatencyStatsCall(client);
-        final long ts3 = getTimestampFromLatencyStatsCall(client);
-        if (ts1 != ts3){
-            System.out.println("WARNING: Consecutive timestamp samples are not all from the same window.");
-            System.out.println("This is a rare but benign corner case, but may indicate a bug.");
-        }
-        System.out.println("Consecutive timestamps: " + ts1 + ", " + ts2 + ", " + ts3);
-        assertTrue((ts1 == ts2) || (ts2 == ts3));
-        assertTrue(ts3 >= ts1);
+        // take samples and validate that at least one pair of adjacent samples match.
+        // Sampling on both sides of a rollover event should not produce a failure,
+        // nor should intermittent sluggishness during the JUnit test.
+        final int maxAttempts = 100;
+        int numAttempts = 0;
+        long previousTimestamp;
+        long currentTimestamp = getTimestampFromLatencyStatsCall(client);
+        do {
+            previousTimestamp = currentTimestamp;
+            currentTimestamp = getTimestampFromLatencyStatsCall(client);
+        } while (numAttempts++ < maxAttempts && previousTimestamp != currentTimestamp);
 
-        // Verify that 5 seconds later the timestamps are not the same.
-        final int delayMsec = LatencyStats.INTERVAL_MS;
-        final int fudgeFactorMsec = 10;
-        final long ts4 = getTimestampFromLatencyStatsCall(client); // don't let above printing affect timing
-        Thread.sleep(delayMsec + fudgeFactorMsec);
-        final long ts5 = getTimestampFromLatencyStatsCall(client);
-        System.out.println("Non-consecutive timestamps: " + ts4 + ", " + ts5);
-        assertTrue(ts5 > ts4);
+        System.out.println(numAttempts + " attempts made at obtaining timestamps from the same time window.");
+        assertTrue("Unable to use timestamps to verify that data comes from the same window.", numAttempts < maxAttempts);
+
+        // Verify that >5 seconds later the timestamps are not the same.
+        final int extraDelayMsec = 1000;
+        previousTimestamp = currentTimestamp;
+        Thread.sleep(LatencyStats.INTERVAL_MS + extraDelayMsec);
+        currentTimestamp = getTimestampFromLatencyStatsCall(client);
+        System.out.println("Non-consecutive timestamps: " + previousTimestamp + ", " + currentTimestamp);
+        assertTrue(currentTimestamp > previousTimestamp);
     }
 
     public void testLatencyCompressed() throws Exception {
