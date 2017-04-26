@@ -458,9 +458,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 } else {
                     if (drLog.isTraceEnabled()) {
                         drLog.trace(String.format("P%d binary log site idempotency check failed. " +
-                                                  "Site doesn't have tracker for this cluster while the last received is %s",
-                                                  producerPartitionId,
-                                                  DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
+                                        "Site doesn't have tracker for this cluster while the last received is %s",
+                                producerPartitionId,
+                                DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
                     }
                 }
             }
@@ -542,8 +542,37 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public void resetDrAppliedTracker() {
             m_maxSeenDrLogsBySrcPartition.clear();
+            if (drLog.isDebugEnabled()) {
+                drLog.debug("Cleared DR Applied tracker");
+            }
             m_lastLocalSpUniqueId = -1L;
             m_lastLocalMpUniqueId = -1L;
+        }
+
+        @Override
+        public void resetDrAppliedTracker(byte clusterId) {
+            m_maxSeenDrLogsBySrcPartition.remove((int) clusterId);
+            if (drLog.isDebugEnabled()) {
+                drLog.debug("Reset DR Applied tracker for " + clusterId);
+            }
+            if (m_maxSeenDrLogsBySrcPartition.isEmpty()) {
+                m_lastLocalSpUniqueId = -1L;
+                m_lastLocalMpUniqueId = -1L;
+            }
+        }
+
+        @Override
+        public boolean hasRealDrAppliedTracker(byte clusterId) {
+            boolean has = false;
+            if (m_maxSeenDrLogsBySrcPartition.containsKey((int) clusterId)) {
+                for (DRConsumerDrIdTracker tracker: m_maxSeenDrLogsBySrcPartition.get((int) clusterId).values()) {
+                    if (tracker.isRealTracker()) {
+                        has = true;
+                        break;
+                    }
+                }
+            }
+            return has;
         }
 
         @Override

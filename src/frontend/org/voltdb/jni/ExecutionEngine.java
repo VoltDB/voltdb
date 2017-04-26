@@ -69,7 +69,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         GENERATE_DR_EVENT(6),
         RESET_DR_APPLIED_TRACKER(7),
         SET_MERGED_DRID_TRACKER(8),
-        INIT_DRID_TRACKER(9);
+        INIT_DRID_TRACKER(9),
+        RESET_DR_APPLIED_TRACKER_SINGLE(10);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -83,7 +84,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         NOT_A_EVENT(0),
         POISON_PILL(1),
         CATALOG_UPDATE(2),
-        DR_STREAM_START(3);
+        DR_STREAM_START(3),
+        SWAP_TABLE(4);
 
         private EventType(int typeId) {
             this.typeId = typeId;

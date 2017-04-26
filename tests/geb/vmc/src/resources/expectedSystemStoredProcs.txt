@@ -22,3 +22,5 @@
 @Promote
 @ValidatePartitioning
 @GetPartitionKeys
+@Trace
+@Trace

@@ -104,6 +104,10 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             }
         }
 
+        if (config.isValgrind()) {
+            reuseServer = false;
+        }
+
         final String enabled_configs = System.getenv().get("VOLT_REGRESSIONS");
         System.out.println("VOLT REGRESSIONS ENABLED: " + enabled_configs);
 

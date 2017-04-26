@@ -32,9 +32,9 @@ from subprocess import Popen, PIPE, STDOUT
 from time import time
 from traceback import print_exc
 
-__SYMBOL_DEFN  = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.+)")
+__SYMBOL_DEFN  = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.*)")
 __SYMBOL_REF   = re.compile(r"{(?P<symbolname>[\w-]+)}")
-__OPTIONAL     = re.compile(r"\[(?P<optionaltext>[^\[\]]*)\]")
+__OPTIONAL     = re.compile(r"(?<!\\)\[(?P<optionaltext>[^\[\]]*[^\[\]\\]?)\]")
 __WEIGHTED_XOR = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
 __XOR          = ' | '
 
@@ -127,8 +127,8 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
         #print 'DEBUG: bracketed_name:', str(bracketed_name)
         #print 'DEBUG: symbol_name :', str(symbol_name)
         #print 'DEBUG: definition:', str(definition)
-        if not definition:
-            print "ERROR: Could not find symbol_name '" + str(symbol_name) + "' in grammar dictionary!!!"
+        if definition is None:
+            print "ERROR: Could not find definition of '" + str(symbol_name) + "' in grammar dictionary!!!"
             break
         # Check how deep into a recursive definition we're going
         if symbol_depth.get(symbol_name):
@@ -179,11 +179,18 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
 
     if count >= max_count:
         print "Gave up after", count, "iterations: possible infinite loop in grammar dictionary!!!"
+        if debug:
+            if bracketed_name:
+                print "DEBUG: bracketed_name:", bracketed_name
+            if symbol_name:
+                print "DEBUG: symbol_name   :", symbol_name
+            if definition:
+                print "DEBUG: definition    :", definition
         if debug > 4:
-            print "DEBUG: sql:", sql.strip()
-            print "DEBUG: symbol_depth:\n", symbol_depth
+            print "DEBUG: sql:", sql.strip(), "\n"
+            print "DEBUG: symbol_depth:\n", symbol_depth, "\n\n"
 
-    return sql.strip() + ';'
+    return sql.strip().replace('\[', '[').replace('\]', ']') + ';'
 
 
 def print_file_tail(from_file, to_file, number_of_lines=50):
@@ -200,9 +207,11 @@ def print_file_tail(from_file, to_file, number_of_lines=50):
                  + tail_proc.communicate()[0].replace('\\n', '\n')
 
     # Note that the Java exceptions are listed after 'ERROR', and will therefore
-    # not be included in the 'ERROR' totals, since they are in a separate category
+    # not be included in the 'ERROR' totals, since they are in a separate category;
+    # instead, they will be included in the separate Java 'Exception' total
     error_types = ['Error compiling query', 'ERROR: IN: NodeSchema', 'ERROR', \
-                   'NullPointerException', 'ClassCastException', 'IndexOutOfBoundsException', 'VoltTypeException']
+                   'NullPointerException', 'ClassCastException', 'IndexOutOfBoundsException',
+                   'VoltTypeException', 'Exception']
     error_count = 0
     for e in error_types:
         command = 'grep -c "' + e + '" ' + from_file
@@ -210,14 +219,22 @@ def print_file_tail(from_file, to_file, number_of_lines=50):
             print 'DEBUG: grep command:', command
             sys.stdout.flush()
         grep_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
-        num_errors = int(grep_proc.communicate()[0].replace('\\n', ''))
+        try:
+            num_errors = int(grep_proc.communicate()[0].replace('\\n', ''))
+        except Exception as ex:
+            tail_message += "Error reading file '"+from_file+"':\n   " + str(ex)
+            break
         if e is 'ERROR':
-            tail_message += "\nNumber of all other 'ERROR' messages        : {:4d}".format(num_errors - error_count)
-            tail_message += "\nTotal Number of all 'ERROR' messages        : {:4d}".format(num_errors)
-            tail_message += "\nJava Exceptions: "
+            tail_message += "\nNumber of all other 'ERROR' messages        : {0:4d}".format(num_errors - error_count)
+            tail_message += "\nTotal Number of all 'ERROR' messages        : {0:4d}".format(num_errors)
+            tail_message += "\n\nJava Exceptions: "
+            error_count = 0
+        elif e is 'Exception':
+            tail_message += "\nNumber of other (Java) 'Exception' messages : {0:4d}".format(num_errors - error_count)
+            tail_message += "\nTotal Number of (Java) 'Exception' messages : {0:4d}".format(num_errors)
         else:
             error_count  += num_errors
-            tail_message += "\nNumber of {:27s} errors: {:4d}".format("'"+e+"'", num_errors)
+            tail_message += "\nNumber of {0:27s} errors: {1:4d}".format("'"+e+"'", num_errors)
 
     print >> to_file, tail_message
 
@@ -412,7 +429,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     exit(99)
         if sql_contains_echo_substring and options.echo_grammar:
             print >> echo_output_file, '\nGrammar symbols used (in order), and how many times:'
-            for order, symbol, count in sorted([(v[1],v[0],k) for k,v in symbol_depth.items()]):
+            for order, count, symbol in sorted([(v[1],v[0],k) for k,v in symbol_depth.items()]):
                 print >> echo_output_file, symbol, ':', count
 
     else:

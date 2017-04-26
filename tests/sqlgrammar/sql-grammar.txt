@@ -49,12 +49,13 @@
 # Table and view names pre-defined in the DDL associated with this test
 # (and very occasionally, a nonexistent table name, view name, or, below,
 # column name is used)
-legit-table-name        ::= P1  | R1  | P2  | R2
-legit-view-name         ::= VP1 | VR1 | VP2 | VR2
+legit-table-name        ::= R0 | P0 | R1 | P1 | R2 | P2 | R3 | P3 | R4 | P4 | \
+                            R5 | P5 | R6 | P6 | R7 | P7
+legit-view-name         ::= VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | VR5 | VP5
 table-name              ::= {legit-table-name} 199| NONEXISTENT_TABLE
 view-name               ::= {legit-view-name}  199| NONEXISTENT_VIEW
 
-# TODO: also pre-define some Indexes & Stored Procedures
+# TODO: also pre-define some Stored Procedures
 
 # Column names used in the pre-defined DDL, of every possible data type ...
 int-column-name         ::= ID | TINY | SMALL | INT | BIG
@@ -64,7 +65,7 @@ byte-column-name        ::= TINY
 # as the other options, making each numeric column name equally likely
 numeric-column-name     ::= {int-column-name} 5| NUM | DEC
 
-string-column-name      ::= VCHAR | VCHAR_INLINE_MAX | VCHAR_INLINE
+string-column-name      ::= VCHAR_INLINE | VCHAR_INLINE_MAX | VCHAR | VCHAR_JSON
 timestamp-column-name   ::= TIME
 varbinary-column-name   ::= VARBIN
 point-column-name       ::= POINT
@@ -72,9 +73,12 @@ polygon-column-name     ::= POLYGON
 geo-column-name         ::= {point-column-name} | {polygon-column-name}
 non-int-str-column-name ::= {geo-column-name} 2| {timestamp-column-name} | {varbinary-column-name}
 
+# PostgreSQL-compatible version of the above: avoids problems involving SELECT with Geospatial types
+pg-point-column-name    ::= _variable\[point\]
+pg-polygon-column-name  ::= _variable\[polygon\]
+
 table-column-name       ::= {numeric-column-name} 2| {string-column-name} | {non-int-str-column-name}
-view-column-name        ::= {table-column-name} | {table-column-name}_COUNT | TOTAL_COUNT | \
-                            {numeric-column-name}_SUM | {numeric-column-name}_AVG
+view-column-name        ::= {table-column-name}
 legit-column-name       ::= {table-column-name} 9| {view-column-name}
 column-name             ::= {legit-column-name} 399| NONEXISTENT_COLUMN
 column-list             ::= {column-name} [, {column-list}]
@@ -114,18 +118,16 @@ ordered-values-list     ::= {integer-non-null-value}, {byte-value}, {integer-val
                             {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, \
                             {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value}
 random-order-value-list ::= {random-type-value} [, {random-order-value-list}]
-random-type-value       ::= {integer-value}  4| {numeric-value} 2| {string-value} 3| {timestamp-value} | \
+random-type-value       ::= {integer-value}  4| {numeric-value} 2| {string-value} 4| {timestamp-value} | \
                             {varbinary-value} | {point-value}    | {polygon-value}
 simple-insert-values    ::= IN{in-or-up-sert-values}
 simple-insert-select    ::= IN{in-or-up-sert-select}
 
-# The "3" before some "|" symbols makes the preceding option 3 times as likely
-# as the other options, making NULL values less likely
-in-or-up-sert-values    ::= {insert-values-multiple} 3| {insert-values-all}     9| {insert-values-backward} 9| \
-                            {insert-values-id-num}    | {insert-values-id-str}   | {insert-values-id-time}   | \
+in-or-up-sert-values    ::= {insert-values-multiple} 8| {insert-values-all}    22| {insert-values-backward} 22| \
+                            {insert-values-id-num}   7| {insert-values-id-str}  4| {insert-values-id-time}    | \
                             {insert-values-id-varbin} | {insert-values-id-point} | {insert-values-id-poly}
-in-or-up-sert-select    ::= {insert-select-multiple} 3| {insert-select-all}     9| {insert-select-backward} 9| \
-                            {insert-select-id-num}    | {insert-select-id-str}   | {insert-select-id-time}   | \
+in-or-up-sert-select    ::= {insert-select-multiple} 8| {insert-select-all}    22| {insert-select-backward} 22| \
+                            {insert-select-id-num}   7| {insert-select-id-str}  4| {insert-select-id-time}    | \
                             {insert-select-id-varbin} | {insert-select-id-point} | {insert-select-id-poly}
 
 # We leave the IN off of INSERT here, so these can also be used for UPSERT
@@ -140,15 +142,15 @@ insert-values-multiple  ::= SERT INTO {table-name} ( ID, {numeric-column-name}, 
                             {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) VALUES ( {integer-non-null-value}, \
                             {numeric-value}, {string-value}, {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value} )
 insert-values-all       ::= SERT INTO {table-name} ( \
-                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN, POINT, POLYGON \
-                            ) VALUES ( {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, {integer-value}, \
-                            {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, {timestamp-value}, \
-                            {varbinary-value}, {point-value}, {polygon-value} )
+                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, VCHAR_JSON, TIME, VARBIN,  \
+                            POINT, POLYGON) VALUES ( {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value},  \
+                            {integer-value}, {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value},  \
+                            {json-value}, {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value} )
 insert-values-backward  ::= SERT INTO {table-name} ( \
-                            POLYGON, POINT, VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID \
-                            ) VALUES ( {polygon-value}, {point-value}, {varbinary-value}, {timestamp-value}, {string-value}, \
-                            {string-value}, {string-value}, {numeric-value}, {numeric-value}, {integer-value}, {integer-value}, \
-                            {integer-value}, {byte-value}, {integer-non-null-value} )
+                            POLYGON, POINT, VARBIN, TIME, VCHAR_JSON, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, DEC, NUM, BIG, INT, \
+                            SMALL, TINY, ID ) VALUES ( {polygon-value}, {point-value}, {varbinary-value}, {timestamp-value}, \
+                            {json-value}, {string-value}, {string-value}, {string-value}, {numeric-value}, {numeric-value}, \
+                            {integer-value}, {integer-value}, {integer-value}, {byte-value}, {integer-non-null-value} )
 
 insert-select-id-num    ::= SERT INTO {table-name} (ID, {numeric-column-name})   SELECT {int-column-name}, {numeric-column-name}   FROM {table-reference}
 insert-select-id-str    ::= SERT INTO {table-name} (ID, {string-column-name})    SELECT {int-column-name}, {string-column-name}    FROM {table-reference}
@@ -193,7 +195,7 @@ update-statement        ::= UPDATE {table-name} SET {column-updates} [{where-cla
 column-updates          ::= {column-update} [, {column-updates}]
 column-update           ::= {column-name}           = {value-expression}     | \
                             {numeric-column-name}   = {numeric-expression}  7| \
-                            {string-column-name}    = {string-expression}   3| \
+                            {string-column-name}    = {string-expression}   4| \
                             {timestamp-column-name} = {timestamp-expression} | \
                             {varbinary-column-name} = {varbinary-expression} | \
                             {point-column-name}     = {point-expression}     | \
@@ -246,6 +248,11 @@ table-reference         ::= {table-name} [[AS] {table-alias}] 3| {view-name} [[A
 top-clause              ::= TOP {non-negative-int-value}
 top-one                 ::= TOP 1
 star                    ::= *
+# PostgreSQL-compatible versions of the above: avoids problems involving SELECT * with Geospatial types;
+# and involving TOP, which PostgreSQL does not support
+pg-star                 ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, VCHAR_JSON, TIME, VARBIN, AsText(POINT), AsText(POLYGON)
+pg-top-clause           ::=
+pg-top-one              ::=
 
 where-clause            ::= WHERE {boolean-expression}
 boolean-expression      ::=   [NOT ] {boolean-type-expr}   [[{and-or} {boolean-expression}]] 3| \
@@ -260,19 +267,22 @@ join-condition          ::= ON {join-expression} | USING ({column-reference})
 # TODO: probably should be more specific (e.g. equi-join)
 join-expression         ::= {boolean-expression}
 
-group-clause            ::= GROUP BY  {group-by-list}  [HAVING {boolean-expression}]
-order-by-clause         ::= [ORDER BY {order-by-list}]
-sort-clause             ::= {order-by-clause} [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
+group-clause            ::= GROUP BY {group-by-list} [HAVING {boolean-expression}]
+order-by-clause         ::= ORDER BY {order-by-list}
+sort-clause             ::= [{order-by-clause}] [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
 group-by-list           ::= {column-ref-or-expr}                 [, {group-by-list}]
 order-by-list           ::= {column-ref-or-expr} [{asc-or-desc}] [, {order-by-list}]
 asc-or-desc             ::= ASC | DESC
 
+# PostgreSQL-compatible version of the above: avoids LIMIT or OFFSET without ORDER BY
+pg-sort-clause          ::= {order-by-clause}, ID [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
+
 # TODO: add more expression types, and boolean expression types,
 # using different data types (varbinary, point, polygon)
-value-expression        ::= {numeric-expression} | {string-expression} | {timestamp-expression}
+value-expression        ::= {numeric-expression} 7| {string-expression} 4| {timestamp-expression}
 selection-expression    ::= {value-expression} 9| COUNT(*)
 boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {sub-query} | \
-                            {boolean-numeric-expr} 7| {boolean-string-expr} 3| {boolean-timestamp-expr} | \
+                            {boolean-numeric-expr} 7| {boolean-string-expr} 4| {boolean-timestamp-expr} | \
                             EXISTS {sub-query}
 boolean-numeric-expr    ::= {numeric-expression}   {comparison-operator} {numeric-expression}   4| \
                             {numeric-column-name}   IN {numeric-sub-query}
@@ -286,7 +296,7 @@ comparison-operator     ::= = | <> | != | < | > | <= | >=
 # Sub-queries, scalar and otherwise, of various types
 #
 sub-query               ::= ({select-statement}) 3| {scalar-sub-query}
-scalar-sub-query        ::= {numeric-scalar-sub-q} 7| {string-scalar-sub-q} 3| \
+scalar-sub-query        ::= {numeric-scalar-sub-q} 7| {string-scalar-sub-q} 4| \
                             {timestamp-scalar-sub-q}
 
 numeric-sub-query       ::= (SELECT {top-all-or-distinct}   {numeric-expression} FROM {from-clause})
@@ -392,17 +402,19 @@ string-non-null-value   ::= '{characters}'
 # The "3" before the "|" makes the "string-non-null-value" option 3 times as
 # likely as the NULL option, making NULL values less likely
 string-value            ::= {string-non-null-value} 3| NULL
+# TODO: make this into actual JSON strings:
+json-value              ::= {string-value}
 
 string-expression       ::= {string-value} 20| {string-column-name} 50| {string-function-expr} 20| \
                             {non-num-aggregate-func}({string-expression}) 9| {string-scalar-sub-q}
-string-function-expr    ::= {string-expression} {string-operator} {string-expression} | \
-                            {string-function-1arg} ({string-expression}) | \
-                            {string-function-2args}({string-expression}, {string-expression}) | \
-                            {string-function-2args}({string-expression}, {string-expression}, {case-sensitivity}) | \
-                            {string-function-3args}({string-expression}, {string-expression}, {string-expression}) | \
-                            {string-function-4args}({string-expression}, {string-expression}, {string-expression}, {string-expression}) | \
-                            {string-valued-int-expr}  | {string-val-str-int-expr} | \
-                            {string-val-num-int-expr} | {string-special-func-expr}
+string-function-expr    ::= {string-expression} {string-operator} {string-expression} 2| \
+                            {string-valued-int-expr}  4| {string-val-str-int-expr}  5| \
+                            {string-val-num-int-expr} 2| {string-special-func-expr} 3| \
+                            {string-function-1arg} ({string-expression}) 3| \
+                            {string-function-2args}({string-expression}, {string-expression}) 2| \
+                            {string-function-2args}({string-expression}, {string-expression}, {case-sensitivity})  2| \
+                            {string-function-3args}({string-expression}, {string-expression}, {string-expression}) 2| \
+                            {string-function-4args}({string-expression}, {string-expression}, {string-expression}, {string-expression})
 string-operator         ::= || | +
 string-function-1arg    ::= LOWER  | TRIM | UPPER
 string-function-2args   ::= CONCAT | REGEXP_POSITION
@@ -460,6 +472,9 @@ day                     ::= {month} 12| {hour-more-than-12} 11| 24 | 25 | 26 | 2
 hour                    ::= {month} 12| {hour-more-than-12} 11| 00
 minute-or-second        ::= {digit-0-to-5}{digit}
 
+# PostgreSQL-compatible version of the above: avoids April 31, February 29 in non-leap year, etc.
+pg-day                  ::= {month} 12| {hour-more-than-12} 11| 24 | 25 | 26 | 27 | 28
+
 timestamp-non-null-value::= '{year}-{month}-{day} {hour}:{minute-or-second}:{minute-or-second}[.{digit}{digit}{digit}]'
 
 # The "3" before the "|" makes the "timestamp-non-null-value" option 3 times as
@@ -468,11 +483,15 @@ timestamp-value         ::= {timestamp-non-null-value} 3| NULL
 
 timestamp-expression    ::= {timestamp-value} 20| {timestamp-column-name} 50| {timestamp-function-expr} 20| \
                             {non-num-aggregate-func}({timestamp-expression}) 9| {timestamp-scalar-sub-q}
-timestamp-function-expr ::= CURRENT_TIMESTAMP[()] | NOW[()] | \
+timestamp-function-expr ::= {timestamp-func-0args} 2| \
                             FROM_UNIXTIME({int-expression}) | \
                             TO_TIMESTAMP({short-time-unit}, {int-expression}) | \
                             TRUNCATE({dateadd-time-unit}, {timestamp-expression}) | \
                             DATEADD({dateadd-time-unit}, {int-expression}, {timestamp-expression})
+timestamp-func-0args    ::= CURRENT_TIMESTAMP[()] | NOW[()]
+
+# PostgreSQL-compatible version of the above: avoids presence or absence of parens not supported
+pg-timestamp-func-0args ::= CURRENT_TIMESTAMP | NOW()
 
 # Some functions of a timestamp produce an integer value
 int-valued-time-func    ::= DAY | DAYOFMONTH | DAYOFWEEK | DAYOFYEAR | HOUR | MINUTE | \
@@ -480,7 +499,7 @@ int-valued-time-func    ::= DAY | DAYOFMONTH | DAYOFWEEK | DAYOFYEAR | HOUR | MI
 int-valued-time-expr    ::= {int-valued-time-func}({timestamp-expression})
 
 # One function of a timestamp produces a numeric (float) value
-num-valued-time-func    ::= SECOND | {int-valued-time-func}
+num-valued-time-func    ::= {int-valued-time-func} 3| SECOND
 num-valued-time-expr    ::= {num-valued-time-func}({timestamp-expression})
 
 # Some functions of a time-unit (string) and a timestamp produce an integer value
@@ -521,12 +540,24 @@ varbinary-expression    ::= {varbinary-column-name} 3| {varbinary-value}
 #
 # TODO: flesh this part out ...
 
+digit-less-than-8       ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+digit-less-than-9       ::= {digit-less-than-8} 8| 8
+number-less-than-80     ::= {digit-less-than-8}[{digit}][.{non-negative-int-value}]
+number-less-than-90     ::= {digit-less-than-9}[{digit}][.{non-negative-int-value}]
+number-less-than-100    ::= {digit}[{digit}][.{non-negative-int-value}]
+
 # Latitude is a number between -100 and 100 (exclusive); longitude is between
 # -200 and 200 (exclusive); these include some illegal values, which is OK
-number-less-than-100    ::= {digit}[{digit}][.{non-negative-int-value}]
 latitude                ::= [-]{number-less-than-100}
 longitude               ::= [-][1]{number-less-than-100}
-point-non-null-value    ::= pointFromText('POINT({longitude} {latitude})')
+point-non-null-value    ::= PointFromText('POINT({longitude} {latitude})')
+
+# PostgreSQL-compatible version of the above: avoids differing treatment of illegal values:
+# Latitude is a number between -90 and 90 (exclusive);
+# longitude is between -180 and 180 (exclusive);
+# illegal values not allowed, since they cause inconsistencies with PostgreSQL
+pg-latitude             ::= [-]{number-less-than-90}
+pg-longitude            ::= [-][1]{number-less-than-80}
 
 # The "3" before the "|" makes the "point-non-null-value" option 3 times as
 # likely as the NULL option, making NULL values less likely
@@ -544,8 +575,8 @@ point-expression        ::= {point-column-name} 3| {point-value}
 # TODO: flesh this part out ...
 
 # About a quarter of these simple polygons will be defined clockwise, hence invalid
-polygon-non-null-value  ::= polygonFromText('POLYGON((0 0, {longitude} 0, 0 {latitude}, 0 0))') | \
-                            polygonFromText('POLYGON((-2 -2, 10 -2, -2 10, -2 -2),(-1 -1, -1 {digit}, {digit} -1, -1 -1))')
+polygon-non-null-value  ::= PolygonFromText('POLYGON((0 0, {longitude} 0, 0 {latitude}, 0 0))') | \
+                            PolygonFromText('POLYGON((-2 -2, 10 -2, -2 10, -2 -2),(-1 -1, -1 {digit}, {digit} -1, -1 -1))')
 
 # The "3" before the "|" makes the "polygon-non-null-value" option 3 times as
 # likely as the NULL option, making NULL values less likely
@@ -563,6 +594,9 @@ polygon-expression      ::= {polygon-column-name} 3| {polygon-value}
 # i.e. GEOGRAPHY_POINT & GEOGRAPHY); these definitions are largely the same,
 # but with the points and polygons [and varbinary?] left out, or NULL
 #
+# Note: this section is not currently used, though it may be used in the future,
+# in a version that feeds queries to SQLCoverage (see ENG-10240); though more
+# likely it will be replaced by the various 'pg-...' definitions above.
 
 ng-non-int-str-column-name ::= {timestamp-column-name} | {varbinary-column-name} | {int-column-name}
 

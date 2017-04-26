@@ -13,7 +13,7 @@ This describes a step by step procedure for setting up an Eclipse project with a
 * You have added the voltdb[-ent]-version/bin directory to your PATH
 * You have installed Eclipse and set up a workspace
 
-In order to run unit tests or debug stored procedures, it is necessary to run an instance of the VoltDB database within a java process.  Two utility classes are used to do this, which are maintained in the app-debug-and-test repository.  Follow the steps below to download this repository and build a jar containing these two classes, which you will add to your Eclipse project later.  You can run these commands in any directory you wish.
+In order to run unit tests or debug stored procedures, it is necessary to run an instance of the VoltDB database within a java process.  In v7.2, code was added to Voltdb to do this.  If you are using v7.1 or earlier, you can load equivalent code from the app-debug-and-test repository.  Follow the steps below to download this repository and build a jar containing these two classes, which you will add to your Eclipse project later.  You can run these commands in any directory you wish.
 
     git clone https://github.com/VoltDB/app-debug-and-test.git
     cd app-debug-and-test
@@ -39,7 +39,7 @@ Check that VoltDBProcedureTestUtils.jar was built in the app-debug-and-test dire
 ###  Configure the Build Path
 VoltDB stored procedures depend on loading a voltdb[-ent]-<version>.jar library jar file found in the "voltdb" folder of your VoltDB distribution.
 
-In order to write a unit test that creates an in-process VoltDB instance, you also need the VoltDBProcedureTestUtils.jar file built earlier, as well as the third-party libraries found in the "lib" folder of your VoltDB distribution.
+If you are using v7.1 or earlier, in order to write a unit test that creates an in-process VoltDB instance, you also need the VoltDBProcedureTestUtils.jar file built earlier, as well as the third-party libraries found in the "lib" folder of your VoltDB distribution.
 
 * Right click the "TEST" project and select "Build Path" and then "Configure Build Path...".
 * Select the Libraries tab.
@@ -52,7 +52,7 @@ In order to write a unit test that creates an in-process VoltDB instance, you al
     * Click "OK" on the dialog
 * Click "Add External JARs..." and select all jar files in the VoltDB distribution "lib" folder.
 * Click "Add External JARs..." and select the voltdb (not client) jar file the VoltDB distribution "voltdb" folder.
-* Click "Add External JARs..." and select the app-debug-and-test/VoltDBProcedureTestUtils.jar file you built eariler.
+* Click "Add External JARs..." and select the app-debug-and-test/VoltDBProcedureTestUtils.jar file you built eariler (only if you are using v7.1 or earlier)
 * Click "Add External JARs..." and select the app-debug-and-test/lib/junit-version.jar file.  Optionally, you could use another junit-version.jar file if you already have one.
 * Click "OK"
 

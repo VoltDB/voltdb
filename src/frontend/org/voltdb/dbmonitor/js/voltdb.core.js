@@ -346,7 +346,8 @@
                 '@ValidatePartitioning': { '2': ['int', 'varbinary'] },
                 '@GetPartitionKeys': { '1': ['varchar'] },
                 '@GC': { '0': [] },
-                '@StopNode': { '1': ['int'] }
+                '@StopNode': { '1': ['int'] },
+                '@Trace': { '2': ['varchar', 'varchar'], '1': ['varchar']},
             };
             return this;
         };
@@ -603,7 +604,8 @@
                     '@UpdateLogging': { '1': ['Configuration (xml)', 'Returns Table[]'] },
                     '@Promote': { '0': ['Returns bit'] },
                     '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] },
-                    '@GetPartitionKeys': { '1': ['VoltType (varchar)', 'Returns Table[]'] }
+                    '@GetPartitionKeys': { '1': ['VoltType (varchar)', 'Returns Table[]'] },
+                    '@Trace': { '2': ['Trace Category State (varchar)', 'Category (varchar)', 'Returns Table[]'], '1': ['Trace State (varchar)', 'Returns Table[]']},
                 };
 
                 var childConnectionQueue = connection.getQueue();

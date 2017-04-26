@@ -71,7 +71,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -113,7 +113,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -219,7 +219,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar

@@ -17,10 +17,14 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class MaterializePlanNode extends ProjectionPlanNode {
@@ -49,6 +53,13 @@ public class MaterializePlanNode extends ProjectionPlanNode {
         // MaterializePlanNodes have no children
         assert(m_children.size() == 0);
         // MaterializePlanNode's output schema is pre-determined, don't touch
+        // except when its output column(s) has a scalar subquery expression
+        // Generate the output schema for subqueries if any
+        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
+        for (AbstractExpression expr: exprs) {
+            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
+        }
+
         return;
     }
 
@@ -56,6 +67,7 @@ public class MaterializePlanNode extends ProjectionPlanNode {
     public void resolveColumnIndexes() {
         // MaterializePlanNodes have no children
         assert(m_children.size() == 0);
+        resolveSubqueryColumnIndexes();
     }
 
     @Override

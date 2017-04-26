@@ -833,4 +833,8 @@ public class MockVoltDB implements VoltDBInterface
     public SnmpTrapSender getSnmpTrapSender() {
         return new DummySnmpTrapSender();
     }
+
+    @Override
+    public void swapTables(String oneTable, String otherTable) {
+    }
 }
