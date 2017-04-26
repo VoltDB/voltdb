@@ -64,23 +64,23 @@ namespace {
 extern TestConfig allTests[];
 };
 
-class TestWindowedSum : public PlanTestingBaseClass<EngineTestTopend> {
+class TestInlineInsert : public PlanTestingBaseClass<EngineTestTopend> {
 public:
     /*
      * This constructor lets us set the global random seed for the
      * random number generator.  It would be better to have a seed
      * just for this test.  But that is not easily done.
      */
-    TestWindowedSum(uint32_t randomSeed = (unsigned int)time(NULL)) {
+    TestInlineInsert(uint32_t randomSeed = (unsigned int)time(NULL)) {
         initialize(m_PartitionByExecutorDB, randomSeed);
     }
 
-    ~TestWindowedSum() { }
+    ~TestInlineInsert() { }
 protected:
     static DBConfig         m_PartitionByExecutorDB;
 };
 
-TEST_F(TestWindowedSum, test_min_last_row) {
+TEST_F(TestInlineInsert, test_inline_insert) {
     static int testIndex = 0;
     executeTest(allTests[testIndex]);
 }
@@ -94,39 +94,10 @@ const char *T_ColumnNames[] = {
 };
 
 
-const int NUM_TABLE_ROWS_T = 30;
+const int NUM_TABLE_ROWS_T = 1;
 const int NUM_TABLE_COLS_T = 3;
 const int TData[NUM_TABLE_ROWS_T * NUM_TABLE_COLS_T] = {
-      1,  1,  1,
-      1,  1,  2,
-      1,  1,  3,
-      1,  1,  4,
-      1,  1,  5,
-      1,  2,  1,
-      1,  2,  2,
-      1,  2,  3,
-      1,  2,  4,
-      1,  2,  5,
-      1,  3,  1,
-      1,  3,  2,
-      1,  3,  3,
-      1,  3,  4,
-      1,  3,  5,
-      2,  1,  1,
-      2,  1,  2,
-      2,  1,  3,
-      2,  1,  4,
-      2,  1,  5,
-      2,  2,  1,
-      2,  2,  2,
-      2,  2,  3,
-      2,  2,  4,
-      2,  2,  5,
-      2,  3,  1,
-      2,  3,  2,
-      2,  3,  3,
-      2,  3,  4,
-      2,  3,  5,
+      1,  1,101,
 };
 
 
@@ -145,39 +116,10 @@ const TableConfig *allTables[] = {
 
 };
 
-const int NUM_OUTPUT_ROWS_TEST_MIN_LAST_ROW = 30;
-const int NUM_OUTPUT_COLS_TEST_MIN_LAST_ROW = 3;
-const int outputTable_test_min_last_row[NUM_OUTPUT_ROWS_TEST_MIN_LAST_ROW * NUM_OUTPUT_COLS_TEST_MIN_LAST_ROW] = {
-      1,  1, 20,
-      1,  1, 20,
-      1,  1, 20,
-      1,  1, 20,
-      1,  1, 20,
-      1,  2, 45,
-      1,  2, 45,
-      1,  2, 45,
-      1,  2, 45,
-      1,  2, 45,
-      1,  3, 75,
-      1,  3, 75,
-      1,  3, 75,
-      1,  3, 75,
-      1,  3, 75,
-      2,  1, 20,
-      2,  1, 20,
-      2,  1, 20,
-      2,  1, 20,
-      2,  1, 20,
-      2,  2, 45,
-      2,  2, 45,
-      2,  2, 45,
-      2,  2, 45,
-      2,  2, 45,
-      2,  3, 75,
-      2,  3, 75,
-      2,  3, 75,
-      2,  3, 75,
-      2,  3, 75,
+const int NUM_OUTPUT_ROWS_TEST_INLINE_INSERT = 1;
+const int NUM_OUTPUT_COLS_TEST_INLINE_INSERT = 1;
+const int outputTable_test_inline_insert[NUM_OUTPUT_ROWS_TEST_INLINE_INSERT * NUM_OUTPUT_COLS_TEST_INLINE_INSERT] = {
+      1,
 };
 
 
@@ -185,178 +127,35 @@ const int outputTable_test_min_last_row[NUM_OUTPUT_ROWS_TEST_MIN_LAST_ROW * NUM_
 TestConfig allTests[1] = {
     {
         // SQL Statement
-        "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+        "insert into AAA select * from T;",
         // Plan String
         "{\n"
         "    \"EXECUTE_LIST\": [\n"
         "        6,\n"
-        "        5,\n"
-        "        4,\n"
-        "        3,\n"
-        "        2,\n"
-        "        1\n"
+        "        4\n"
         "    ],\n"
         "    \"PLAN_NODES\": [\n"
         "        {\n"
-        "            \"CHILDREN_IDS\": [2],\n"
-        "            \"ID\": 1,\n"
+        "            \"CHILDREN_IDS\": [6],\n"
+        "            \"ID\": 4,\n"
         "            \"PLAN_NODE_TYPE\": \"SEND\"\n"
         "        },\n"
         "        {\n"
-        "            \"CHILDREN_IDS\": [3],\n"
-        "            \"ID\": 2,\n"
-        "            \"OUTPUT_SCHEMA\": [\n"
-        "                {\n"
-        "                    \"COLUMN_NAME\": \"A\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"COLUMN_NAME\": \"B\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 2,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"COLUMN_NAME\": \"R\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 6\n"
-        "                    }\n"
-        "                }\n"
-        "            ],\n"
-        "            \"PLAN_NODE_TYPE\": \"PROJECTION\"\n"
-        "        },\n"
-        "        {\n"
-        "            \"CHILDREN_IDS\": [4],\n"
-        "            \"ID\": 3,\n"
-        "            \"PLAN_NODE_TYPE\": \"ORDERBY\",\n"
-        "            \"SORT_COLUMNS\": [\n"
-        "                {\n"
-        "                    \"SORT_DIRECTION\": \"ASC\",\n"
-        "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"SORT_DIRECTION\": \"ASC\",\n"
-        "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 2,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"SORT_DIRECTION\": \"ASC\",\n"
-        "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 6\n"
-        "                    }\n"
-        "                }\n"
-        "            ]\n"
-        "        },\n"
-        "        {\n"
-        "            \"AGGREGATE_COLUMNS\": [{\n"
-        "                \"AGGREGATE_EXPRESSIONS\": [{\n"
-        "                    \"LEFT\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    },\n"
-        "                    \"RIGHT\": {\n"
-        "                        \"COLUMN_IDX\": 2,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    },\n"
-        "                    \"TYPE\": 1,\n"
-        "                    \"VALUE_TYPE\": 6\n"
-        "                }],\n"
-        "                \"AGGREGATE_OUTPUT_COLUMN\": 0,\n"
-        "                \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_SUM\"\n"
-        "            }],\n"
-        "            \"CHILDREN_IDS\": [5],\n"
-        "            \"ID\": 4,\n"
-        "            \"OUTPUT_SCHEMA\": [\n"
-        "                {\n"
-        "                    \"COLUMN_NAME\": \"R\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 6\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"COLUMN_NAME\": \"A\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"COLUMN_NAME\": \"B\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"COLUMN_NAME\": \"C\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 2,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                }\n"
-        "            ],\n"
-        "            \"PARTITIONBY_EXPRESSIONS\": [{\n"
-        "                \"COLUMN_IDX\": 0,\n"
-        "                \"TYPE\": 32,\n"
-        "                \"VALUE_TYPE\": 5\n"
-        "            }],\n"
-        "            \"PLAN_NODE_TYPE\": \"WINDOWFUNCTION\",\n"
-        "            \"SORT_COLUMNS\": [{\"SORT_EXPRESSION\": {\n"
-        "                \"COLUMN_IDX\": 1,\n"
-        "                \"TYPE\": 32,\n"
-        "                \"VALUE_TYPE\": 5\n"
-        "            }}]\n"
-        "        },\n"
-        "        {\n"
-        "            \"CHILDREN_IDS\": [6],\n"
-        "            \"ID\": 5,\n"
-        "            \"PLAN_NODE_TYPE\": \"ORDERBY\",\n"
-        "            \"SORT_COLUMNS\": [\n"
-        "                {\n"
-        "                    \"SORT_DIRECTION\": \"ASC\",\n"
-        "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"SORT_DIRECTION\": \"ASC\",\n"
-        "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                }\n"
-        "            ]\n"
-        "        },\n"
-        "        {\n"
         "            \"ID\": 6,\n"
-        "            \"INLINE_NODES\": [{\n"
+        "            \"INLINE_NODES\": [\n"
+        "                {\n"
+        "                    \"CHILDREN_IDS\": [6],\n"
+        "                    \"FIELD_MAP\": [\n"
+        "                        0,\n"
+        "                        1,\n"
+        "                        2\n"
+        "                    ],\n"
+        "                    \"ID\": 5,\n"
+        "                    \"MULTI_PARTITION\": true,\n"
+        "                    \"PLAN_NODE_TYPE\": \"INSERT\",\n"
+        "                    \"TARGET_TABLE_NAME\": \"AAA\"\n"
+        "                },\n"
+        "               {\n"
         "                \"ID\": 7,\n"
         "                \"OUTPUT_SCHEMA\": [\n"
         "                    {\n"
@@ -392,15 +191,15 @@ TestConfig allTests[1] = {
         "        }\n"
         "    ]\n"
         "}",
-        NUM_OUTPUT_ROWS_TEST_MIN_LAST_ROW,
-        NUM_OUTPUT_COLS_TEST_MIN_LAST_ROW,
-        outputTable_test_min_last_row
+        NUM_OUTPUT_ROWS_TEST_INLINE_INSERT,
+        NUM_OUTPUT_COLS_TEST_INLINE_INSERT,
+        outputTable_test_inline_insert
     },
 };
 
 }
 
-DBConfig TestWindowedSum::m_PartitionByExecutorDB =
+DBConfig TestInlineInsert::m_PartitionByExecutorDB =
 
 {
     //

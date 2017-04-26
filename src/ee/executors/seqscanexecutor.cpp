@@ -108,7 +108,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // For the moment we will not produce a plan with both an
     // inline aggregate and an inline insert node.  This just
     // confuses things.
-    assert(m_aggExec != NULL || m_insertExec != NULL);
+    assert(m_aggExec == NULL || m_insertExec == NULL);
     return true;
 }
 

@@ -75,7 +75,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
     assert(m_node);
     assert(m_node->getTargetTable());
-    assert(m_node->getInputTableCount() == 1);
+    // assert(m_node->getInputTableCount() == 1);
 
     Table* targetTable = m_node->getTargetTable();
     m_isUpsert = m_node->isUpsert();

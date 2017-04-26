@@ -796,7 +796,8 @@ public class PlannerTestCase extends TestCase {
         "}\n";
 
     protected String getPlanString(String sqlStmt) throws JSONException {
-        AbstractPlanNode node = compile(sqlStmt);
+        List<AbstractPlanNode> fragments = compileToFragments(sqlStmt);
+        AbstractPlanNode node = fragments.get(fragments.size()-1);
         String planString = PlanSelector.outputPlanDebugString(node);
         return planString;
     }

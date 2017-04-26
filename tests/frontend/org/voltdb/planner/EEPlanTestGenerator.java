@@ -810,7 +810,7 @@ public class EEPlanTestGenerator extends PlannerTestCase {
         IIDB.addTest(new TestConfig("test_inline_insert",
                                     "insert into AAA select * from T;",
                                     new int[][] {
-            { 1, 1, 101}
+            { 1 }
         }));
         generateTests("executors", "TestInlineInsert", IIDB);
 
