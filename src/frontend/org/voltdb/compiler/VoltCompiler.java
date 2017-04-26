@@ -369,12 +369,12 @@ public class VoltCompiler {
     void addInfo(final String msg, final int lineNo) {
         final Feedback fb = new Feedback(Severity.INFORMATIONAL, msg, m_currentFilename, lineNo);
         m_infos.add(fb);
-        //if (standaloneCompiler) {
+        if (standaloneCompiler) {
             compilerLog.info(fb.getLogString());
-        //}
-        //else {
-        //    compilerLog.debug(fb.getLogString());
-        //}
+        }
+        else {
+            compilerLog.debug(fb.getLogString());
+        }
     }
 
     void addWarn(final String msg, final int lineNo) {
