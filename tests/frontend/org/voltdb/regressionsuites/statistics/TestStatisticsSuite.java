@@ -249,32 +249,66 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         return results[0].getLong("TIMESTAMP"); // milliseconds
     }
 
+    // Helper for testLatencyTiming
+    private static VoltTable runLatencyStatsCall(Client client) throws Exception {
+        VoltTable[] results = client.callProcedure("@Statistics", "LATENCY", 0).getResults();
+        assertEquals(1, results.length);
+        // HOST_ID ordering isn't deterministic, so guarantee the same host is always used.
+        do {
+            results[0].advanceRow();
+        } while (results[0].getLong("HOST_ID") != 0);
+        return results[0];
+    }
+
+    // Ensures @Statistics LATENCY timestamp reflects the time slice associated with the statistics.
     public void testLatencyTiming() throws Exception {
         System.out.println("\n\nTESTING LATENCY STATS TIMING\n\n\n");
         Client client = getFullyConnectedClient();
 
-        // To verify that subsequent timestamps are the same,
-        // take 3 samples and validate that at least one pair of adjacent samples match.
-        // This means sampling on both sides of a rollover doesn't result in failure.
-        final long ts1 = getTimestampFromLatencyStatsCall(client);
-        final long ts2 = getTimestampFromLatencyStatsCall(client);
-        final long ts3 = getTimestampFromLatencyStatsCall(client);
-        if (ts1 != ts3){
-            System.out.println("WARNING: Consecutive timestamp samples are not all from the same window.");
-            System.out.println("This is a rare but benign corner case, but may indicate a bug.");
-        }
-        System.out.println("Consecutive timestamps: " + ts1 + ", " + ts2 + ", " + ts3);
-        assertTrue((ts1 == ts2) || (ts2 == ts3));
-        assertTrue(ts3 >= ts1);
+        final int maxIterations = 100000;
+        final int requiredBinRollovers = 2;
+        final int fudgeFactorMs = LatencyStats.INTERVAL_MS / 5;
+        System.out.println("LOGGING TEST PARAMETERS");
+        System.out.println("maxIterations = " + maxIterations);
+        System.out.println("requiredBinRollovers = " + requiredBinRollovers);
+        System.out.println("LatencyStats.INTERVAL_MS = " + LatencyStats.INTERVAL_MS);
+        System.out.println("fudgeFactorMs = " + fudgeFactorMs);
 
-        // Verify that 5 seconds later the timestamps are not the same.
-        final int delayMsec = LatencyStats.INTERVAL_MS;
-        final int fudgeFactorMsec = 10;
-        final long ts4 = getTimestampFromLatencyStatsCall(client); // don't let above printing affect timing
-        Thread.sleep(delayMsec + fudgeFactorMsec);
-        final long ts5 = getTimestampFromLatencyStatsCall(client);
-        System.out.println("Non-consecutive timestamps: " + ts4 + ", " + ts5);
-        assertTrue(ts5 > ts4);
+        VoltTable resultsPrevious = runLatencyStatsCall(client);
+        long timePrevious = resultsPrevious.getLong("TIMESTAMP"); // milliseconds
+        int iterationCount = 0;
+        int numTimeHops = 0;
+        do {
+            if ((iterationCount % 1000) == 0) {
+                System.out.println(iterationCount + " iterations of " + maxIterations + " max completed");
+            }
+            VoltTable resultsCurrent = runLatencyStatsCall(client);
+            long timeCurrent = resultsPrevious.getLong("TIMESTAMP"); // milliseconds
+
+            if (timeCurrent != timePrevious) {
+                if ((timePrevious + LatencyStats.INTERVAL_MS - fudgeFactorMs < timeCurrent)
+                 && (timePrevious + LatencyStats.INTERVAL_MS + fudgeFactorMs > timeCurrent))
+                {
+                    System.out.println("Latency bin rollover detected. Timestamp jumped from " + timePrevious + " to " + timeCurrent);
+                    System.out.println("Time difference of " + (timeCurrent - timePrevious) / 1000.0 + " seconds.");
+                    numTimeHops++;
+                } else {
+                    System.err.println("\n\nFOUND A PROBLEM: Timestamp changed from " + timePrevious + " to " + timeCurrent);
+                    System.err.println("Time difference of " + (timeCurrent - timePrevious) / 1000.0 + " seconds.");
+                    System.err.println("Previous VoltTable: " + resultsPrevious);
+                    System.err.println("Current VoltTable: " + resultsCurrent);
+                    fail("Timestamp changed, but not by the expected bin interval");
+                }
+            }
+            resultsPrevious = resultsCurrent;
+            timePrevious = timeCurrent;
+        } while ((numTimeHops < requiredBinRollovers) && (iterationCount++ < maxIterations));
+
+        if (numTimeHops != requiredBinRollovers) {
+            System.err.println("Last timestamp is " + timePrevious);
+            System.err.println("Last VoltTable: " + resultsPrevious);
+            fail("Timestamp never changed!");
+        }
     }
 
     public void testLatencyCompressed() throws Exception {
