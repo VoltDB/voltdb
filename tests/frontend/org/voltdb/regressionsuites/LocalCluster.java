@@ -2104,13 +2104,8 @@ public class LocalCluster extends VoltServerConfig {
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
                                                   String callingMethodName) throws IOException {
-        /* TODO: add this to compileBuilder
-        if (callingMethodName != null) {
-            lc.setCallingMethodName(callingMethodName);
-        }
-        */
         LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
-                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder);
+                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, callingMethodName);
 
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(hasLocalServer);
@@ -2142,7 +2137,8 @@ public class LocalCluster extends VoltServerConfig {
     public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
                                        int kfactor, int clusterId, int replicationPort,
                                        int remoteReplicationPort, String pathToVoltDBRoot, String jar,
-                                       DrRoleType drRole, VoltProjectBuilder builder)
+                                       DrRoleType drRole, VoltProjectBuilder builder,
+                                       String callingMethodName)
         throws IOException {
         builder.addLiteralSchema(schemaDDL);
         builder.setDrProducerEnabled();
@@ -2156,6 +2152,9 @@ public class LocalCluster extends VoltServerConfig {
         }
         LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI, false);
         lc.setReplicationPort(replicationPort);
+        if (callingMethodName != null) {
+            lc.setCallingMethodName(callingMethodName);
+        }
         assert(lc.compile(builder, pathToVoltDBRoot));
         return lc;
     }
