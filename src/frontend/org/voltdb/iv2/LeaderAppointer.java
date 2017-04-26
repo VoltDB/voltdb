@@ -254,6 +254,11 @@ public class LeaderAppointer implements Promotable
                     // This should never happen
                     VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
                 }
+            } else {
+                // update partition call backs after spi balance
+                for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
+                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSID);
+                }
             }
         }
     };
@@ -690,6 +695,18 @@ public class LeaderAppointer implements Promotable
         }
         catch (InterruptedException e) {
             tmLog.warn("Unexpected interrupted exception", e);
+        }
+    }
+
+    /**
+     * update the partition call back with current master and replica
+     * @param partitionId  partition id
+     * @param newMasterHISD new master HSID
+     */
+    public void updatePartitionLeader(int partitionId, long newMasterHISD) {
+        PartitionCallback cb = m_callbacks.get(partitionId);
+        if (cb != null) {
+            cb.m_currentLeader = newMasterHISD;
         }
     }
 }
