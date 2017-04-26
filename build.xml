@@ -135,6 +135,7 @@
     <pathelement location='${build.test.dir}' />
     <fileset dir='${lib.dir}'>
         <include name='*.jar' />
+		<exclude name ="kafka-clients-0.8.2.2.jar" />
     </fileset>
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />

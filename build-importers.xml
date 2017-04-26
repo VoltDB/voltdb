@@ -71,7 +71,7 @@
             <zipgroupfileset dir="${base.dir}/lib/" includes="scala-parser-combinators_2.11-1.0.2.jar" />
             <zipgroupfileset dir="${base.dir}/lib/" includes="scala-xml_2.11-1.0.2.jar" />
             <zipgroupfileset dir="${base.dir}/lib" includes="kafka_2.11-0.8.2.2.jar" />
-            <zipgroupfileset dir="${base.dir}/lib/" includes="kafka-clients-0.8.2.2.jar" />
+            <zipgroupfileset dir="${base.dir}/lib/" includes="kafka-clients-0.10.1.1.jar" />
             <zipgroupfileset dir="${base.dir}/lib/" includes="snappy-java-1.1.1.7.jar" />
             <zipgroupfileset dir="${base.dir}/lib/" includes="lz4-1.2.0.jar" />
             <manifest>
