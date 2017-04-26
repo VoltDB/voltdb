@@ -625,7 +625,7 @@
                 ChartFailureRate.lines.forceY([0, 0.1]);
 
                 d3.select('#visualisationFailureRate')
-                    .datum(dataFailureRate)
+                    .datum([])
                     .transition().duration(500)
                     .call(ChartFailureRate);
 
@@ -970,7 +970,7 @@
             dataOutTrans = getEmptyDataForImporterView(view)['OUTSTANDING_REQUESTS'];
             dataSuccessRate = getEmptyDataForImporterView(view)['SUCCESSES'];
             dataFailureRate = getEmptyDataForImporterView(view)['FAILURES'];
-            changeAxisTimeFormat(view);
+            changeImporterAxisTimeFormat(view);
         };
 
         this.RefreshGraph = function (view) {
@@ -999,7 +999,7 @@
             }
 
             nv.utils.windowResize(ChartCpu.update);
-            changeImporterAxisTimeFormat(view);
+            changeAxisTimeFormat(view);
         };
 
         this.RefreshDrGraph = function (view) {
