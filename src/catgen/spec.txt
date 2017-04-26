@@ -38,6 +38,7 @@ begin Database                       "A set of schema, procedures and other meta
   Table*     tables                  "The set of Tables for the database"
   Program*   programs                "The set of programs allowed to access this database"
   Procedure* procedures              "The set of stored procedures/transactions for this database"
+  Function*  functions               "The set of user-defined functions for this database"
   Connector* connectors              "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
   bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
@@ -116,6 +117,12 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   ProcParameter* parameters "The set of parameters to this stored procedure"
   bool allowedInShutdown    "Whether this procedure is allowed to be executed during shutdown"
   bool transactional        "Whether the code needs to access state or just run anywhere"
+end
+
+begin Function javaonly     "A user-defined function"
+  string functionName       "The name of the function"
+  string className          "The class name of the function implementation"
+  string methodName         "The method name of the function implementation"
 end
 
 begin Table                                  "A table (relation) in the database"
