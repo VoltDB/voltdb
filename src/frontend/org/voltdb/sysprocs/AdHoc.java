@@ -30,6 +30,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.parser.SQLLexer;
 
@@ -183,7 +184,7 @@ public class AdHoc extends AdHocNTBase {
                         "Server is paused and is available in read-only mode - please try again later.");
             }*/
 
-            ChangeDescription ccr = null;
+            CatalogChangeResult ccr = null;
             try {
                 ccr = prepareApplicationCatalogDiff(invocationName,
                                                     null,

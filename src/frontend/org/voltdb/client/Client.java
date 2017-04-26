@@ -200,7 +200,7 @@ public interface Client {
      *
      * <p>This method is a convenience method that is equivalent to reading the catalog
      * file into a byte array in Java code, then calling {@link #callProcedure(String, Object...)}
-     * with "@UpdateApplicationCatalog" as the procedure name, followed by they bytes of the catalog
+     * with "@UpdateApplicationCatalog" as the procedure name, followed by the bytes of the catalog
      * and the string value of the deployment file.</p>
      *
      * @param catalogPath Path to the catalog jar file.
@@ -223,7 +223,7 @@ public interface Client {
      * <p>This method is a convenience method that is equivalent to reading the catalog
      * file into a byte array in Java code, then calling
      * {@link #callProcedure(ProcedureCallback, String, Object...)} with
-     * "@UpdateApplicationCatalog" as the procedure name, followed by they bytes of the catalog
+     * "@UpdateApplicationCatalog" as the procedure name, followed by the bytes of the catalog
      * and the string value of the deployment file.</p>
      *
      * @param callback ProcedureCallback that will be invoked with procedure results.

@@ -122,7 +122,7 @@ public class UpdateCore extends VoltSystemProcedure {
         for (String tableName : allTables.keySet()) {
             Table table = tables.get(tableName);
             if (table == null) {
-                String msg = String.format("@UpdateApplicationCatalog was checking to see if table %s was empty, " +
+                String msg = String.format("@UpdateCore was checking to see if table %s was empty, " +
                                            "presumably as part of a schema change, and it failed to find the table " +
                                            "in the current catalog context.", tableName);
                 throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
@@ -138,7 +138,7 @@ public class UpdateCore extends VoltSystemProcedure {
                                                               getTransactionTime().getTime());
         if ((s1 == null) || (s1.length == 0)) {
             String tableNames = StringUtils.join(tablesThatMustBeEmpty, ", ");
-            String msg = String.format("@UpdateApplicationCatalog was checking to see if tables (%s) were empty ," +
+            String msg = String.format("@UpdateCore was checking to see if tables (%s) were empty ," +
                                        "presumably as part of a schema change, but failed to get the row counts " +
                                        "from the native storage engine.", tableNames);
             throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);

@@ -23,6 +23,7 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 public class UpdateApplicationCatalog extends UpdateApplicationBase {
@@ -64,7 +65,7 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                     "schema.  Use of @UpdateApplicationCatalog is forbidden.");
         }
 
-        ChangeDescription ccr = null;
+        CatalogChangeResult ccr = null;
         try {
             ccr = prepareApplicationCatalogDiff(invocationName,
                                                 catalogJarBytes,

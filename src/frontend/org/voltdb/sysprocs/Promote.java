@@ -24,6 +24,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ReplicationRole;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 public class Promote extends UpdateApplicationBase {
@@ -52,7 +53,7 @@ public class Promote extends UpdateApplicationBase {
                     "Server is paused and is available in read-only mode - please try again later.");
         }
 
-        ChangeDescription ccr = null;
+        CatalogChangeResult ccr = null;
         try {
             ccr = prepareApplicationCatalogDiff(invocationName,
                                                 null,

@@ -34,8 +34,8 @@ import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.ClassMatcher;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler;
@@ -51,27 +51,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     protected static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    class ChangeDescription {
-        public byte[] catalogHash;
-        public byte[] catalogBytes;
-        public String deploymentString;
-        public String encodedDiffCommands;
-        public int diffCommandsLength;
-        public String[] tablesThatMustBeEmpty;
-        public String[] reasonsForEmptyTables;
-        public boolean requiresSnapshotIsolation;
-        public boolean worksWithElastic;
-        public ProcedureInvocationType invocationType;
-        // null or source version string if an automatic upgrade was done.
-        public String upgradedFromVersion;
-        public byte[] deploymentHash;
-        public boolean isForReplay;
-        // mark it false for UpdateClasses, in future may be marked false for deployment changes
-        public boolean hasSchemaChange;
-        public int expectedCatalogVersion = -1;
-    }
-
-    class PrepareDiffFailureException extends Exception {
+    public static class PrepareDiffFailureException extends Exception {
         private static final long serialVersionUID = 1L;
 
         public final byte statusCode;
@@ -92,22 +72,22 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * For UpdateClasses, this will contain the class deletion patterns
      * For AdHoc DDL work, this will be null
      */
-    public ChangeDescription prepareApplicationCatalogDiff(String invocationName,
-                                                           final byte[] operationBytes,
-                                                           final String operationString,
-                                                           final String[] adhocDDLStmts,
-                                                           final byte[] replayHashOverride,
-                                                           final boolean isPromotion,
-                                                           final DrRoleType drRole,
-                                                           final boolean useAdhocDDL,
-                                                           boolean adminConnection,
-                                                           String hostname,
-                                                           String user)
+    public static CatalogChangeResult prepareApplicationCatalogDiff(String invocationName,
+                                                             final byte[] operationBytes,
+                                                             final String operationString,
+                                                             final String[] adhocDDLStmts,
+                                                             final byte[] replayHashOverride,
+                                                             final boolean isPromotion,
+                                                             final DrRoleType drRole,
+                                                             final boolean useAdhocDDL,
+                                                             boolean adminConnection,
+                                                             String hostname,
+                                                             String user)
                                                                    throws PrepareDiffFailureException
     {
 
         // create the change result and set up all the boiler plate
-        ChangeDescription retval = new ChangeDescription();
+        CatalogChangeResult retval = new CatalogChangeResult();
         retval.tablesThatMustBeEmpty = new String[0]; // ensure non-null
         retval.hasSchemaChange = true;
 
@@ -305,7 +285,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * jarfile
      * @throws VoltCompilerException
      */
-    protected InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile, String[] adhocDDLStmts, boolean isXDCR)
+    protected static InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile, String[] adhocDDLStmts, boolean isXDCR)
     throws IOException, VoltCompilerException
     {
         StringBuilder sb = new StringBuilder();
@@ -327,7 +307,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * @return NUll if no classes changed, otherwise return the update jar file.
      * @throws ClassNotFoundException
      */
-    protected InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
+    protected static InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
             InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
