@@ -75,15 +75,19 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
     assert(m_node);
     assert(m_node->getTargetTable());
-    // assert(m_node->getInputTableCount() == 1);
+    assert(m_node->getInputTableCount() == (m_node->isInline() ? 0 : 1));
 
     Table* targetTable = m_node->getTargetTable();
     m_isUpsert = m_node->isUpsert();
 
     setDMLCountOutputTable(limits);
 
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
-    assert(m_inputTable);
+    if ( ! m_node->isInline()) {
+        m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
+        assert(m_inputTable);
+    } else {
+        m_inputTable = NULL;
+    }
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
@@ -98,6 +102,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     }
     if (m_isUpsert) {
         VOLT_TRACE("init Upsert Executor actually");
+        assert( ! m_node->isInline() );
         if (m_isStreamed) {
             VOLT_ERROR("UPSERT is not supported for Stream table %s", targetTable->name().c_str());
         }
@@ -160,11 +165,12 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
     }
 }
 
-bool InsertExecutor::p_execute_init() {
+bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
-    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTable()));
-    assert(m_inputTable);
+    assert(inputSchema);
+    assert(m_node->isInline() || (m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTable())));
+    assert(m_node->isInline() || m_inputTable);
 
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
@@ -178,7 +184,7 @@ bool InsertExecutor::p_execute_init() {
         NULL : static_cast<PersistentTable*>(m_targetTable);
     m_upsertTuple = TableTuple(m_targetTable->schema());
 
-    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
+    VOLT_TRACE("INPUT TABLE: %s\n", m_node->isInline() ? "INLINE" : m_inputTable->debug().c_str());
 
     // count the number of successful inserts
     m_modifiedTuples = 0;
@@ -214,8 +220,7 @@ bool InsertExecutor::p_execute_init() {
                m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
                "single" : "multi", m_engine->getPartitionId());
     VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
-    m_inputTuple = TableTuple(m_inputTable->schema());
-    assert (m_inputTuple.sizeInValues() == m_inputTable->columnCount());
+    m_inputTuple = TableTuple(inputSchema);
     m_tempPool = ExecutorContext::getTempStringPool();
     return false;
 }
@@ -246,7 +251,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         // values -- the DEFAULT values that are stored in templateTuple
         // DO NOT get copied to an existing tuple.
         m_templateTuple.setNValueAllocateForObjectCopies(fieldMap[i],
-                                                         m_inputTuple.getNValue(i),
+                                                         tuple.getNValue(i),
                                                          m_tempPool);
     }
 
@@ -321,6 +326,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         m_targetTable = m_persistentTable;
     }
     m_targetTable->insertTuple(m_templateTuple);
+    std::cout << "Insert table:\n" << m_targetTable->debug() << "\n";
     // successfully inserted
     ++m_modifiedTuples;
     return;
@@ -333,6 +339,7 @@ void InsertExecutor::p_execute_finish() {
 
     // add to the planfragments count of modified tuples
     m_engine->addToTuplesModified(m_modifiedTuples);
+    std::cout << "InsertExecutor output table:\n" << m_outputTable->debug() << "\n";
     VOLT_DEBUG("Finished inserting %d tuples", m_modifiedTuples);
 }
 
@@ -342,7 +349,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // replicated table, we only insert on one site.  So
     // we will be done on all the other sites.
     //
-    if (p_execute_init()) {
+    const TupleSchema *inputSchema = m_inputTable->schema();
+    if (p_execute_init(inputSchema)) {
         return true;
     }
 
@@ -357,4 +365,15 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
     p_execute_finish();
     return true;
+}
+
+namespace voltdb {
+InsertExecutor *getInlineInsertExecutor(const AbstractPlanNode *node) {
+    InsertExecutor *answer = NULL;
+    InsertPlanNode *insertNode = dynamic_cast<InsertPlanNode *>(node->getInlinePlanNode(PLAN_NODE_TYPE_INSERT));
+    if (insertNode) {
+        answer = dynamic_cast<InsertExecutor *>(insertNode->getExecutor());
+    }
+    return answer;
+}
 }

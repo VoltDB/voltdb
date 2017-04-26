@@ -88,7 +88,7 @@ class InsertExecutor : public AbstractExecutor
             {
             }
 
-    bool p_execute_init();
+    bool p_execute_init(const TupleSchema *inputSchema);
     void p_execute_finish();
     void p_execute_tuple(TableTuple &tuple);
 
@@ -150,6 +150,11 @@ class InsertExecutor : public AbstractExecutor
     Pool* m_tempPool;
 };
 
+/**
+ * Given an abstract plan node, extract an inline InsertExecutor
+ * for its InlineInsertPlanNode if there be any.
+ */
+InsertExecutor *getInlineInsertExecutor(const AbstractPlanNode *node);
 }
 
 #endif

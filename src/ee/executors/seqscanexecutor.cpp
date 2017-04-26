@@ -54,6 +54,7 @@
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
+#include "plannodes/insertnode.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
@@ -103,7 +104,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // Inline aggregation can be serial, partial or hash
     m_aggExec = voltdb::getInlineAggregateExecutor(node);
-    m_insertExec = dynamic_cast<InsertExecutor *>(node->getInlinePlanNode(PLAN_NODE_TYPE_INSERT));
+    m_insertExec = voltdb::getInlineInsertExecutor(node);
 
     // For the moment we will not produce a plan with both an
     // inline aggregate and an inline insert node.  This just
@@ -148,7 +149,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //
     int num_of_columns = -1;
     ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-    if (projection_node != NULL) {
+    if (m_insertExec) {
+        num_of_columns = static_cast<int> (m_insertExec->getTempOutputTable()->schema()->columnCount());
+    } else if (projection_node != NULL) {
         num_of_columns = static_cast<int> (projection_node->getOutputColumnExpressions().size());
     }
     //
@@ -204,7 +207,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             } else if (m_insertExec != NULL) {
                 // We may actually find out during initialization
                 // that we are done.  See the definition of InsertExecutor::p_execute_init.
-                if (m_insertExec->p_execute_init()) {
+                if (m_insertExec->p_execute_init(inputSchema)) {
                     return true;
                 }
                 temp_tuple = m_tmpOutputTable->tempTuple();
