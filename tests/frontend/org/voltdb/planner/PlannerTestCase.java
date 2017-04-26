@@ -319,7 +319,7 @@ public class PlannerTestCase extends TestCase {
         return m_aide.getCatalogString();
     }
 
-    Database getDatabase() {
+    protected Database getDatabase() {
         return m_aide.getDatabase();
     }
 

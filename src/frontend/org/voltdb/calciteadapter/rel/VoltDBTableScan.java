@@ -4,10 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexProgram;
@@ -51,6 +54,29 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
         }
       }
 
+    @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
+    	      RelMetadataQuery mq) {
+        double dRows = table.getRowCount();
+        double dCpu = dRows + 1; // ensure non-zero cost
+        double dIo = 0;
+        RexLocalRef cond = m_program.getCondition();
+        if (cond != null) {
+            dRows *=  0.9;
+            }
+        RelOptCost cost = planner.getCostFactory().makeCost(dRows, dCpu, dIo);
+        return cost;
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        double dRows = super.estimateRowCount(mq);
+        RexLocalRef cond = m_program.getCondition();
+        if (cond != null) {
+            dRows *=  0.2;
+            }
+        return dRows;
+    }
+
     @Override
     public AbstractPlanNode toPlanNode() {
         // Start with the inlined project.
@@ -71,6 +97,8 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
         sspn.setPredicate(predList);
 
         sspn.addInlinePlanNode(ppn);
+
+
         return sspn;
     }
 
@@ -85,6 +113,13 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
 
     public RelNode copy(RexProgram program) {
         VoltDBTableScan newScan = new VoltDBTableScan(getCluster(), getTable(), m_voltDBTable, program);
+
+        return newScan;
+    }
+
+    public RelNode copy() {
+    	// Do we need a deep copy including the inputs?
+        VoltDBTableScan newScan = new VoltDBTableScan(getCluster(), getTable(), m_voltDBTable, m_program);
 
         return newScan;
     }

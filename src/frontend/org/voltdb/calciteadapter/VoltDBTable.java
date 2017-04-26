@@ -6,6 +6,7 @@ import java.util.List;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptTable.ToRelContext;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
@@ -99,12 +100,15 @@ public class VoltDBTable implements TranslatableTable {
         RelDataType rowType = node.getRowType();
 
         if (! getCatTable().getIsreplicated()) {
+            RelTraitSet traits = cluster.traitSet().replace(VoltDBConvention.INSTANCE);
+            VoltDBPartitioning partitioning = new VoltDBPartitioning(this);
             node = new VoltDBSend(
                     cluster,
-                    cluster.traitSet(),
+                    traits,
                     node,
                     cluster.getRexBuilder().identityProjects(rowType),
-                    rowType);
+                    rowType,
+                    partitioning);
         }
 
         return node;

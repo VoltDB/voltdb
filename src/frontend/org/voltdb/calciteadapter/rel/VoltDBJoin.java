@@ -2,18 +2,19 @@ package org.voltdb.calciteadapter.rel;
 
 import java.util.Set;
 
-import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.util.Util;
 import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -60,6 +61,26 @@ public class VoltDBJoin extends Join implements VoltDBRel {
         return pw;
     }
 
+    @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
+  	      RelMetadataQuery mq) {
+
+        double rowCount = mq.getRowCount(this);
+
+        final double rightRowCount = right.estimateRowCount(mq);
+        final double leftRowCount = left.estimateRowCount(mq);
+        if (Double.isInfinite(leftRowCount)) {
+          rowCount = leftRowCount;
+        } else {
+          rowCount += Util.nLogN(leftRowCount);
+        }
+        if (Double.isInfinite(rightRowCount)) {
+          rowCount = rightRowCount;
+        } else {
+          rowCount += rightRowCount;
+        }
+        return planner.getCostFactory().makeCost(rowCount, 0, 0);
+    }
+
     @Override
     public AbstractPlanNode toPlanNode() {
         NestLoopPlanNode nlpn = new NestLoopPlanNode();
@@ -99,6 +120,19 @@ public class VoltDBJoin extends Join implements VoltDBRel {
                 getVariablesSet(),
                 getJoinType(),
                 program
+                );
+    }
+
+    public RelNode copy(RelNode left, RelNode right) {
+        return new VoltDBJoin(
+                getCluster(),
+                getTraitSet(),
+                left,
+                right,
+                getCondition(),
+                getVariablesSet(),
+                getJoinType(),
+                m_program
                 );
     }
 

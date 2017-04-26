@@ -1,4 +1,4 @@
-package org.voltdb.calciteadapter.rules;
+package org.voltdb.calciteadapter.rules.rel;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;

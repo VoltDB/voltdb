@@ -1,4 +1,4 @@
-package org.voltdb.calciteadapter.rules;
+package org.voltdb.calciteadapter.rules.convert;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +13,7 @@ import org.apache.calcite.rel.logical.LogicalJoin;
 import org.voltdb.calciteadapter.VoltDBConvention;
 import org.voltdb.calciteadapter.rel.VoltDBJoin;
 
-class VoltDBJoinRule extends ConverterRule {
+public class VoltDBJoinRule extends ConverterRule {
 
         public static final VoltDBJoinRule INSTANCE = new VoltDBJoinRule();
 

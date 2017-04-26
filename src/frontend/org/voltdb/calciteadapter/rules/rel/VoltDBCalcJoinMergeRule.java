@@ -1,11 +1,11 @@
-package org.voltdb.calciteadapter.rules;
+package org.voltdb.calciteadapter.rules.rel;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.logical.LogicalCalc;
 import org.voltdb.calciteadapter.rel.VoltDBJoin;
 
-class VoltDBCalcJoinMergeRule extends RelOptRule {
+public class VoltDBCalcJoinMergeRule extends RelOptRule {
 
       public static final VoltDBCalcJoinMergeRule INSTANCE = new VoltDBCalcJoinMergeRule();
 

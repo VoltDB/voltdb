@@ -20,6 +20,7 @@ import org.apache.calcite.util.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -94,6 +95,11 @@ public class RexConverter {
 
             AbstractExpression ae = null;
             switch (call.op.kind) {
+            case AND:
+            	ae = new ConjunctionExpression(
+            			ExpressionType.CONJUNCTION_AND,
+            			aeOperands.get(0),
+                        aeOperands.get(1));
             case EQUALS:
                 ae = new ComparisonExpression(
                         ExpressionType.COMPARE_EQUAL,

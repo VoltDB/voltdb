@@ -1,4 +1,4 @@
-package org.voltdb.calciteadapter.rules;
+package org.voltdb.calciteadapter.rules.convert;
 
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptUtil;
@@ -9,9 +9,9 @@ import org.voltdb.calciteadapter.VoltDBConvention;
 import org.voltdb.calciteadapter.rel.VoltDBProject;
 
 // unneeded for now???
-class VoltDBProjectRule extends ConverterRule {
+public class VoltDBProjectRule extends ConverterRule {
 
-    static final VoltDBProjectRule INSTANCE = new VoltDBProjectRule();
+    public static final VoltDBProjectRule INSTANCE = new VoltDBProjectRule();
 
     private VoltDBProjectRule() {
       super(LogicalProject.class, RelOptUtil.PROJECT_PREDICATE, Convention.NONE,

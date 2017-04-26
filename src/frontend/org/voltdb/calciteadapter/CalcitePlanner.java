@@ -116,6 +116,7 @@ public class CalcitePlanner {
             System.out.println(sb.toString());
             System.out.println("\nAnd here's the error:");
             System.out.println(e.getMessage());
+            e.printStackTrace();
             throw new PlanningErrorException(e.getMessage());
         }
 
