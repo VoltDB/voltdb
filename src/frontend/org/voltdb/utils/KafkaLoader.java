@@ -151,6 +151,24 @@ public class KafkaLoader {
             close();
         } else if (m_config.kversion == KAFKA_0_10_2_API){
             try {
+//                Properties props = getKafka10ConfigProperties();
+//                KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
+//                
+//                try {
+//                    consumer.subscribe(Arrays.asList(m_config.topic));
+//                    while (true) {
+//                        ConsumerRecords<String, String> records = consumer.poll(100);
+//                        for (ConsumerRecord<String, String> record : records) {
+//                            System.out.println("topic : " + record.topic() + ", offset: " + record.offset() + " key " 
+//                                    + record.key() +", value " + new String (record.value()));
+//                        }
+//                    }
+//                } catch (Throwable terminate) {
+//                    System.out.println("error " + terminate.getMessage());
+//                    
+//                } finally {
+//                    consumer.close();
+//                }
                 m_es = getConsumerExecutor();
 
                 if (m_config.useSuppliedProcedure) {
@@ -505,9 +523,11 @@ public class KafkaLoader {
             // max number of records return per poll
             props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, String.valueOf(m_config.batch));
             props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                    "org.apache.kafka.common.serialization.StringDeserializer");
+                    //"org.apache.kafka.common.serialization.StringDeserializer");
+                    "org.apache.kafka.common.serialization.ByteArrayDeserializer");
             props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                    "org.apache.kafka.common.serialization.StringDeserializer");
+                    //"org.apache.kafka.common.serialization.StringDeserializer");
+                    "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         } else {
             props.load(new FileInputStream(new File(m_config.config)));
             //Get GroupId from property if present and use it.
@@ -636,10 +656,10 @@ public class KafkaLoader {
                     if (record.serializedValueSize() < 0) {
                         m_log.debug("got zero size record at offset " + record.offset());
                     }
-                    byte[] msg = record.value();
-                    long offset = record.offset();
-                    String smsg = new String(msg);
                     try {
+                        byte[] msg = record.value();
+                        long offset = record.offset();
+                        String smsg = new String(msg);
                         Object params[];
                         if (m_formatter != null) {
                             try {
