@@ -276,7 +276,6 @@ public:
         assert(result.get() != NULL);
         ASSERT_TRUE(result != NULL);
 
-        std::cout << "OutputTable:\n" << result->debug() << "\n";
         const voltdb::TupleSchema* res_schema = result->schema();
         voltdb::TableTuple tuple(res_schema);
         voltdb::TableIterator &iter = result->iterator();

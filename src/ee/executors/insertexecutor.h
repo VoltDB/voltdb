@@ -78,7 +78,6 @@ class InsertExecutor : public AbstractExecutor
         m_nowFields(),
         m_targetTable(NULL),
         m_modifiedTuples(0),
-        m_outputTable(NULL),
         m_count_tuple(),
         m_persistentTable(NULL),
         m_upsertTuple(),
@@ -88,10 +87,14 @@ class InsertExecutor : public AbstractExecutor
             {
             }
 
-    bool p_execute_init(const TupleSchema *inputSchema);
+    bool p_execute_init(const TupleSchema *inputSchema,
+                        TempTable *newOutputTable);
     void p_execute_finish();
     void p_execute_tuple(TableTuple &tuple);
 
+    Table *getTargetTable() {
+        return m_targetTable;
+    }
  protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
@@ -141,7 +144,6 @@ class InsertExecutor : public AbstractExecutor
      */
     Table* m_targetTable;
     int m_modifiedTuples;
-    Table* m_outputTable;
     TableTuple m_count_tuple;
     PersistentTable* m_persistentTable;
     TableTuple m_upsertTuple;

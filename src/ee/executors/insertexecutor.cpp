@@ -80,9 +80,16 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     Table* targetTable = m_node->getTargetTable();
     m_isUpsert = m_node->isUpsert();
 
-    setDMLCountOutputTable(limits);
-
+    //
+    // The insert node's input schema is fixed.  But
+    // if this is an inline node we don't set it here.
+    // We let the parent node set it in p_execute_init.
+    //
+    // Also, we don't want to set the input table for inline
+    // insert nodes.
+    //
     if ( ! m_node->isInline()) {
+        setDMLCountOutputTable(limits);
         m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
         assert(m_inputTable);
     } else {
@@ -165,7 +172,8 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
     }
 }
 
-bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema) {
+bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
+                                    TempTable *newOutputTable) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
     assert(inputSchema);
@@ -189,9 +197,9 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema) {
     // count the number of successful inserts
     m_modifiedTuples = 0;
 
-    m_outputTable = m_node->getOutputTable();
-    assert(m_outputTable);
-    m_count_tuple = m_outputTable->tempTuple();
+    m_tmpOutputTable = newOutputTable;
+    assert(m_tmpOutputTable);
+    m_count_tuple = m_tmpOutputTable->tempTuple();
 
     // For export tables with no partition column,
     // if the data is from a replicated source,
@@ -206,7 +214,7 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema) {
             !m_engine->isLocalSite(ValueFactory::getBigIntValue(0L))) {
         m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(0L));
         // put the tuple into the output table
-        m_outputTable->insertTuple(m_count_tuple);
+        m_tmpOutputTable->insertTuple(m_count_tuple);
         return true;
     }
     m_templateTuple = m_templateTupleStorage.tuple();
@@ -216,9 +224,11 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema) {
         m_templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
 
-    VOLT_DEBUG("This is a %s-row insert on partition with id %d",
-               m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
-               "single" : "multi", m_engine->getPartitionId());
+    VOLT_DEBUG("This is a %s insert on partition with id %d",
+               m_node->isInline() ? "inline"
+                       : (m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
+                               "single-row" : "multi-row"),
+               m_engine->getPartitionId());
     VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
     m_inputTuple = TableTuple(inputSchema);
     m_tempPool = ExecutorContext::getTempStringPool();
@@ -326,7 +336,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         m_targetTable = m_persistentTable;
     }
     m_targetTable->insertTuple(m_templateTuple);
-    std::cout << "Insert table:\n" << m_targetTable->debug() << "\n";
+    VOLT_DEBUG("Target table:\n%s\n", m_targetTable->debug().c_str());
     // successfully inserted
     ++m_modifiedTuples;
     return;
@@ -335,12 +345,13 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
 void InsertExecutor::p_execute_finish() {
     m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_modifiedTuples));
     // put the tuple into the output table
-    m_outputTable->insertTuple(m_count_tuple);
+    m_tmpOutputTable->insertTuple(m_count_tuple);
 
     // add to the planfragments count of modified tuples
     m_engine->addToTuplesModified(m_modifiedTuples);
-    std::cout << "InsertExecutor output table:\n" << m_outputTable->debug() << "\n";
     VOLT_DEBUG("Finished inserting %d tuples", m_modifiedTuples);
+    VOLT_DEBUG("InsertExecutor output table:\n%s\n", m_tmpOutputTable->debug().c_str());
+    VOLT_DEBUG("InsertExecutor target table:\n%s\n", m_targetTable->debug().c_str());
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
@@ -350,7 +361,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // we will be done on all the other sites.
     //
     const TupleSchema *inputSchema = m_inputTable->schema();
-    if (p_execute_init(inputSchema)) {
+    if (p_execute_init(inputSchema, m_tmpOutputTable)) {
         return true;
     }
 

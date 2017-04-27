@@ -75,6 +75,13 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     bool isSubquery = node->isSubQuery();
     assert(isSubquery || node->getTargetTable());
     assert((! isSubquery) || (node->getChildren().size() == 1));
+    // Inline aggregation can be serial, partial or hash
+    m_aggExec = voltdb::getInlineAggregateExecutor(node);
+    m_insertExec = voltdb::getInlineInsertExecutor(node);
+    // For the moment we will not produce a plan with both an
+    // inline aggregate and an inline insert node.  This just
+    // confuses things.
+    assert(m_aggExec == NULL || m_insertExec == NULL);
 
     //
     // OPTIMIZATION: If there is no predicate for this SeqScan,
@@ -85,11 +92,16 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // modify an input table, so this operation is safe
     //
     if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0) {
-        // Create output table based on output schema from the plan
-        const std::string& temp_name = (node->isSubQuery()) ?
-                node->getChildren()[0]->getOutputTable()->name():
-                node->getTargetTable()->name();
-        setTempOutputTable(limits, temp_name);
+        if (m_insertExec) {
+            setDMLCountOutputTable(limits);
+        }
+        else {
+            // Create output table based on output schema from the plan.
+            const std::string& temp_name = (node->isSubQuery()) ?
+                    node->getChildren()[0]->getOutputTable()->name():
+                    node->getTargetTable()->name();
+            setTempOutputTable(limits, temp_name);
+        }
     }
     //
     // Otherwise create a new temp table that mirrors the
@@ -102,14 +114,6 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
                              node->getTargetTable());
     }
 
-    // Inline aggregation can be serial, partial or hash
-    m_aggExec = voltdb::getInlineAggregateExecutor(node);
-    m_insertExec = voltdb::getInlineInsertExecutor(node);
-
-    // For the moment we will not produce a plan with both an
-    // inline aggregate and an inline insert node.  This just
-    // confuses things.
-    assert(m_aggExec == NULL || m_insertExec == NULL);
     return true;
 }
 
@@ -149,9 +153,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //
     int num_of_columns = -1;
     ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-    if (m_insertExec) {
-        num_of_columns = static_cast<int> (m_insertExec->getTempOutputTable()->schema()->columnCount());
-    } else if (projection_node != NULL) {
+    if (projection_node != NULL) {
         num_of_columns = static_cast<int> (projection_node->getOutputColumnExpressions().size());
     }
     //
@@ -196,23 +198,25 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
         TableTuple temp_tuple;
         assert(m_tmpOutputTable);
+        const TupleSchema * inputSchema = input_table->schema();
         if (m_aggExec != NULL || m_insertExec != NULL) {
-            const TupleSchema * inputSchema = input_table->schema();
             if (projection_node != NULL) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
             if (m_aggExec != NULL) {
                 temp_tuple = m_aggExec->p_execute_init(params, &pmp,
                         inputSchema, m_tmpOutputTable, &postfilter);
-            } else if (m_insertExec != NULL) {
+            }
+            else if (m_insertExec != NULL) {
                 // We may actually find out during initialization
                 // that we are done.  See the definition of InsertExecutor::p_execute_init.
-                if (m_insertExec->p_execute_init(inputSchema)) {
+                if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable)) {
                     return true;
                 }
-                temp_tuple = m_tmpOutputTable->tempTuple();
+                temp_tuple = m_insertExec->getTargetTable()->tempTuple();
             }
-        } else {
+        }
+        else {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
 

@@ -795,7 +795,7 @@ public class EEPlanTestGenerator extends PlannerTestCase {
         generateTests("executors", "TestWindowedRank", rankDB);
     }
 
-    public void testGenerateInlineInsert() throws Exception {
+    public void notestGenerateInlineInsert() throws Exception {
         TableConfig TConfig = new TableConfig("T",
                                                 new String[] {"A", "B", "C"},
                                                 new int[][] {
@@ -812,7 +812,7 @@ public class EEPlanTestGenerator extends PlannerTestCase {
                                     new int[][] {
             { 1 }
         }));
-        generateTests("executors", "TestInlineInsert", IIDB);
+        // generateTests("executors", "TestInlineInsert", IIDB);
 
     }
 
