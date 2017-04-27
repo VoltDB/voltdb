@@ -52,11 +52,11 @@ public class LatencyStats extends StatsSource {
         @Override
         public void run() {
             AbstractHistogram currentHist = LatencyHistogramStats.constructHistogram(false);
-            ClientInterface ci = VoltDB.instance().getClientInterface();
-            if (ci != null) {
-                List<AbstractHistogram> thisci = ci.getLatencyStats();
-                for (AbstractHistogram info : thisci) {
-                    currentHist.add(info);
+            ClientInterface clientInterface = VoltDB.instance().getClientInterface();
+            if (clientInterface != null) {
+                List<AbstractHistogram> statsHists = clientInterface.getLatencyStats();
+                for (AbstractHistogram hist : statsHists) {
+                    currentHist.add(hist);
                 }
             }
             AbstractHistogram diffHist = currentHist.copy();
@@ -105,16 +105,17 @@ public class LatencyStats extends StatsSource {
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("COUNT",   VoltType.INTEGER)); // samples
-        columns.add(new ColumnInfo("TPS",     VoltType.INTEGER)); // samples per second
-        columns.add(new ColumnInfo("P50",     VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P95",     VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P99",     VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P99.9",   VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P99.99",  VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("P99.999", VoltType.BIGINT));  // microseconds
-        columns.add(new ColumnInfo("MAX",     VoltType.BIGINT));  // microseconds
+        super.populateColumnSchema(columns);                       // timestamp is milliseconds
+        columns.add(new ColumnInfo("INTERVAL", VoltType.INTEGER)); // milliseconds
+        columns.add(new ColumnInfo("COUNT",    VoltType.INTEGER)); // samples
+        columns.add(new ColumnInfo("TPS",      VoltType.INTEGER)); // samples per second
+        columns.add(new ColumnInfo("P50",      VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P95",      VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P99",      VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P99.9",    VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P99.99",   VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("P99.999",  VoltType.BIGINT));  // microseconds
+        columns.add(new ColumnInfo("MAX",      VoltType.BIGINT));  // microseconds
     }
 
     @Override
@@ -124,6 +125,7 @@ public class LatencyStats extends StatsSource {
 
         // Override timestamp from the procedure call with the one from when the data was fetched.
         rowValues[columnNameToIndex.get("TIMESTAMP")] = diffHist.getEndTimeStamp();
+        rowValues[columnNameToIndex.get("INTERVAL")]  = INTERVAL_MS;
         rowValues[columnNameToIndex.get("COUNT")]     = diffHist.getTotalCount();
         rowValues[columnNameToIndex.get("TPS")]       = (int) (TimeUnit.SECONDS.toMillis(diffHist.getTotalCount()) / INTERVAL_MS);
         rowValues[columnNameToIndex.get("P50")]       = diffHist.getValueAtPercentile(0.50);

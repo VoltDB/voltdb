@@ -3242,6 +3242,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_computationService = null;
                 m_catalogContext = null;
                 m_initiatorStats = null;
+                m_latencyStats = null;
                 m_latencyCompressedStats = null;
                 m_latencyHistogramStats = null;
 

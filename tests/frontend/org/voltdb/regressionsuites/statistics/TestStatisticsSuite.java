@@ -168,19 +168,20 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         System.out.println("\n\nTESTING LATENCY STATS VALIDITY\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[12];
-        expectedSchema[0]  = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedSchema[1]  = new ColumnInfo("HOST_ID", VoltType.INTEGER);
-        expectedSchema[2]  = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3]  = new ColumnInfo("COUNT",   VoltType.INTEGER); // samples
-        expectedSchema[4]  = new ColumnInfo("TPS",     VoltType.INTEGER); // samples per second
-        expectedSchema[5]  = new ColumnInfo("P50",     VoltType.BIGINT);  // microseconds
-        expectedSchema[6]  = new ColumnInfo("P95",     VoltType.BIGINT);  // microseconds
-        expectedSchema[7]  = new ColumnInfo("P99",     VoltType.BIGINT);  // microseconds
-        expectedSchema[8]  = new ColumnInfo("P99.9",   VoltType.BIGINT);  // microseconds
-        expectedSchema[9]  = new ColumnInfo("P99.99",  VoltType.BIGINT);  // microseconds
-        expectedSchema[10] = new ColumnInfo("P99.999", VoltType.BIGINT);  // microseconds
-        expectedSchema[11] = new ColumnInfo("MAX",     VoltType.BIGINT);  // microseconds
+        ColumnInfo[] expectedSchema = new ColumnInfo[13];
+        expectedSchema[0]  = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);  // milliseconds
+        expectedSchema[1]  = new ColumnInfo("HOST_ID",   VoltType.INTEGER);
+        expectedSchema[2]  = new ColumnInfo("HOSTNAME",  VoltType.STRING);
+        expectedSchema[3]  = new ColumnInfo("INTERVAL",  VoltType.INTEGER); // milliseconds
+        expectedSchema[4]  = new ColumnInfo("COUNT",     VoltType.INTEGER); // samples
+        expectedSchema[5]  = new ColumnInfo("TPS",       VoltType.INTEGER); // samples per second
+        expectedSchema[6]  = new ColumnInfo("P50",       VoltType.BIGINT);  // microseconds
+        expectedSchema[7]  = new ColumnInfo("P95",       VoltType.BIGINT);  // microseconds
+        expectedSchema[8]  = new ColumnInfo("P99",       VoltType.BIGINT);  // microseconds
+        expectedSchema[9]  = new ColumnInfo("P99.9",     VoltType.BIGINT);  // microseconds
+        expectedSchema[10] = new ColumnInfo("P99.99",    VoltType.BIGINT);  // microseconds
+        expectedSchema[11] = new ColumnInfo("P99.999",   VoltType.BIGINT);  // microseconds
+        expectedSchema[12] = new ColumnInfo("MAX",       VoltType.BIGINT);  // microseconds
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
@@ -215,17 +216,19 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
             results[0].resetRowPosition();
             invocations = 0;
             while (results[0].advanceRow()) {
-                final long count = results[0].getLong("COUNT"); // samples
-                final long tps = results[0].getLong("TPS"); // samples per second
-                final long p50 = results[0].getLong("P50");  // microseconds
-                final long p95 = results[0].getLong("P95");  // microseconds
-                final long p99 = results[0].getLong("P99");  // microseconds
-                final long p39 = results[0].getLong("P99.9");  // microseconds
-                final long p49 = results[0].getLong("P99.99");  // microseconds
-                final long p59 = results[0].getLong("P99.999");  // microseconds
-                final long max = results[0].getLong("MAX");  // microseconds
-                // need to do calculation exact same way due to rounding errors
-                assertEquals(tps, (int) (TimeUnit.SECONDS.toMillis(count) / LatencyStats.INTERVAL_MS));
+                final long interval = results[0].getLong("INTERVAL"); // milliseconds
+                final long count    = results[0].getLong("COUNT");    // samples
+                final long tps      = results[0].getLong("TPS");      // samples per second
+                final long p50      = results[0].getLong("P50");      // microseconds
+                final long p95      = results[0].getLong("P95");      // microseconds
+                final long p99      = results[0].getLong("P99");      // microseconds
+                final long p39      = results[0].getLong("P99.9");    // microseconds
+                final long p49      = results[0].getLong("P99.99");   // microseconds
+                final long p59      = results[0].getLong("P99.999");  // microseconds
+                final long max      = results[0].getLong("MAX");      // microseconds
+                assertEquals(interval, LatencyStats.INTERVAL_MS);
+                // Test needs to do this calculation the exact same way as code due to fixed point rounding errors
+                assertEquals(tps, (int) (TimeUnit.SECONDS.toMillis(count) / interval));
                 assertTrue(p50 <= p95);
                 assertTrue(p95 <= p99);
                 assertTrue(p99 <= p39);
