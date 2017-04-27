@@ -2696,6 +2696,12 @@ public class TestFunctionsSuite extends RegressionSuite {
                 expectedError,
                 "REPEAT", 4611686018427387903L, 1);
         }
+
+        // Make sure that repeating an empty string a lot of times completes
+        // in a reasonable time.  It's tough to validate execution in a JUnit test,
+        // but trust me this would take a long time if the EE was being naive.
+        cr = client.callProcedure("@AdHoc", "select repeat('', 100000000000) from P1 limit 1");
+        assertContentOfTable(new Object[][] {{""}}, cr.getResults()[0]);
     }
 
     public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
