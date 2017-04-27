@@ -139,12 +139,12 @@ public class LatencyStats extends StatsSource {
         rowValues[columnNameToIndex.get("INTERVAL")]  = INTERVAL_MS;
         rowValues[columnNameToIndex.get("COUNT")]     = diffHist.getTotalCount();
         rowValues[columnNameToIndex.get("TPS")]       = (int) (TimeUnit.SECONDS.toMillis(diffHist.getTotalCount()) / INTERVAL_MS);
-        rowValues[columnNameToIndex.get("P50")]       = diffHist.getValueAtPercentile(50.0);
-        rowValues[columnNameToIndex.get("P95")]       = diffHist.getValueAtPercentile(95.0);
-        rowValues[columnNameToIndex.get("P99")]       = diffHist.getValueAtPercentile(99.0);
-        rowValues[columnNameToIndex.get("P99.9")]     = diffHist.getValueAtPercentile(99.9);
-        rowValues[columnNameToIndex.get("P99.99")]    = diffHist.getValueAtPercentile(99.99);
-        rowValues[columnNameToIndex.get("P99.999")]   = diffHist.getValueAtPercentile(99.999);
+        rowValues[columnNameToIndex.get("P50")]       = diffHist.getValueAtPercentile(50D);
+        rowValues[columnNameToIndex.get("P95")]       = diffHist.getValueAtPercentile(95D);
+        rowValues[columnNameToIndex.get("P99")]       = diffHist.getValueAtPercentile(99D);
+        rowValues[columnNameToIndex.get("P99.9")]     = diffHist.getValueAtPercentile(99.9D);
+        rowValues[columnNameToIndex.get("P99.99")]    = diffHist.getValueAtPercentile(99.99D);
+        rowValues[columnNameToIndex.get("P99.999")]   = diffHist.getValueAtPercentile(99.999D);
         rowValues[columnNameToIndex.get("MAX")]       = diffHist.getMaxValue();
     }
 }
