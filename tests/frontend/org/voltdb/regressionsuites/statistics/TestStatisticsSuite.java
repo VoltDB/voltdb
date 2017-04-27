@@ -164,10 +164,13 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
     }
 
+    /** Make sure @Statistics LATENCY returns sane data in the expected formats.
+     */
     public void testLatencyValidity() throws Exception {
         System.out.println("\n\nTESTING LATENCY STATS VALIDITY\n\n\n");
         Client client  = getFullyConnectedClient();
 
+        // Validate column names, types and ordering.
         ColumnInfo[] expectedSchema = new ColumnInfo[13];
         expectedSchema[0]  = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);  // milliseconds
         expectedSchema[1]  = new ColumnInfo("HOST_ID",   VoltType.INTEGER);
@@ -186,16 +189,20 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
         VoltTable[] results = null;
 
-        // Do some stuff to generate some latency stats
+        // Do some work that will generate latency stats
         for (int i = 0; i < SITES * HOSTS; i++) {
             results = client.callProcedure("NEW_ORDER.insert", i).getResults();
         }
 
-        // Since statistics are a rolling 5 second window, retry until we've seen the window with our data.
-        long invocations;
+        // Statistics roll over every 5 seconds.
+        // Retry until we've seen the window with our data.
+        // We retry more often than that so that we don't miss the window;
+        // this also speeds up tests when the data comes in towards the end of a window.
+        long samplesFound;
         int numInvocations = 0;
         final int delayMsec = (int) TimeUnit.SECONDS.toMillis(1);
         final int invocationLimit = 2 * LatencyStats.INTERVAL_MS / delayMsec;
+        assertTrue(delayMsec < LatencyStats.INTERVAL_MS); // prevent misleading test failures if INTERVAL_MS changes
         do {
             Thread.sleep(delayMsec);
 
@@ -212,9 +219,9 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
             validateRowSeenAtAllHosts(results[0], columnTargets, false);
             assertEquals(HOSTS, results[0].getRowCount());
 
-            // Check for non-zero invocations (ENG-4668)
+            // Search all nodes for the one that has our data
             results[0].resetRowPosition();
-            invocations = 0;
+            samplesFound = 0;
             while (results[0].advanceRow()) {
                 final long interval = results[0].getLong("INTERVAL"); // milliseconds
                 final long count    = results[0].getLong("COUNT");    // samples
@@ -226,41 +233,57 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
                 final long p49      = results[0].getLong("P99.99");   // microseconds
                 final long p59      = results[0].getLong("P99.999");  // microseconds
                 final long max      = results[0].getLong("MAX");      // microseconds
+
+                // Run sanity checks on the data
                 assertEquals(interval, LatencyStats.INTERVAL_MS);
-                // Test needs to do this calculation the exact same way as code due to fixed point rounding errors
+                // Test needs to do this calculation the exact same way as the code due to fixed point rounding
                 assertEquals(tps, (int) (TimeUnit.SECONDS.toMillis(count) / interval));
+                assertTrue(count == 0 || p50 > 0);
                 assertTrue(p50 <= p95);
                 assertTrue(p95 <= p99);
                 assertTrue(p99 <= p39);
                 assertTrue(p39 <= p49);
                 assertTrue(p49 <= p59);
                 assertTrue(p59 <= max);
-                invocations += count;
+                samplesFound += count;
             }
             numInvocations++;
-        } while (invocations == 0 && numInvocations < invocationLimit);
+        } while (samplesFound == 0 && numInvocations < invocationLimit);
 
-        assertTrue(invocations > 0);
+        assertTrue(samplesFound > 0);
     }
 
     private static long getTimestampFromLatencyStatsCall(Client client) throws Exception {
         VoltTable[] results = client.callProcedure("@Statistics", "LATENCY", 0).getResults();
         assertEquals(1, results.length);
+        // Guarantee the same host is used every time - they are not always returned in a consistent order.
+        // Expect about 20% failure if this loop is commented out.
         do {
             results[0].advanceRow();
         } while (results[0].getLong("HOST_ID") != 0);
-        return results[0].getLong("TIMESTAMP"); // milliseconds
+        return results[0].getLong("TIMESTAMP");
     }
 
+    /** Verify that the timestamp from "@Statistics LATENCY"
+     * is associated with the data window, not the procedure call.
+     *
+     * We do this by checking:
+     * 1. Consecutive calls return the same timestamp (since they represent the same bin).
+     * 2. Calls separated by more than a full time window return different timestamps.
+     *
+     * There are a lot of reasons two consecutive calls would not return the same timestamp.
+     * Notably, histogram bin rollovers and sluggishness that cause the test to not execute.
+     * Keep trying until identical timestamps are observed -
+     * an implementation that gives each call a unique timestamp will still fail the test.
+     */
     public void testLatencyTiming() throws Exception {
         System.out.println("\n\nTESTING LATENCY STATS TIMING\n\n\n");
         Client client = getFullyConnectedClient();
 
-        // To verify that subsequent timestamps are the same,
-        // take samples and validate that at least one pair of adjacent samples match.
-        // Sampling on both sides of a rollover event should not produce a failure,
-        // nor should intermittent sluggishness during the JUnit test.
-        final int maxAttempts = 100;
+        // Don't make so many attempts where a broken implementation will 'get lucky' and pass,
+        // but also try enough times to avoid the benign situations mentioned above.
+        // This may require some tweaking.
+        final int maxAttempts = 12;
         int numAttempts = 0;
         long previousTimestamp;
         long currentTimestamp = getTimestampFromLatencyStatsCall(client);
