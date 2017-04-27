@@ -34,9 +34,20 @@ import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.VoltTable.ColumnInfo;
 
-/** Source of @Statistics LATENCY.
- * This aims to provide useful data for lightweight monitoring.
- * To get a complete latency curve, get the whole histogram via @Statistics LATENCY_COMPRESSED or @Statistics LATENCY_HISTOGRAM (both undocumented)
+/** Source of @Statistics LATENCY, which provides key latency metrics from the past 5 seconds of transactions.
+ * This is intended to be used as part of a manual or automatic monitoring solution,
+ * where plotting latency fluctuations over time with minimal post-processing is desired.
+ *
+ * Each call returns latency percentiles from the most recent complete window,
+ * along with the timestamp associated with that window.
+ * Samples are calculated by using a differential histogram,
+ * subtracting the previous window's histogram from the current one.
+ * Tables with the same HOST_ID and TIMESTAMP represent the same data.
+ *
+ * Statistics are returned with one row for each node.
+ *
+ * To get a complete latency curve which includes all data since VoltDB started,
+ * get the whole histogram via @Statistics LATENCY_COMPRESSED or @Statistics LATENCY_HISTOGRAM (both undocumented).
  */
 public class LatencyStats extends StatsSource {
 
