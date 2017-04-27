@@ -253,7 +253,8 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         assertTrue(samplesFound > 0);
     }
 
-    private static long getTimestampFromLatencyStatsCall(Client client) throws Exception {
+    // Helper method for testLatencyTiming()
+    private static VoltTable doLatencyStatsCall(Client client) throws Exception {
         VoltTable[] results = client.callProcedure("@Statistics", "LATENCY", 0).getResults();
         assertEquals(1, results.length);
         // Guarantee the same host is used every time - they are not always returned in a consistent order.
@@ -261,7 +262,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         do {
             results[0].advanceRow();
         } while (results[0].getLong("HOST_ID") != 0);
-        return results[0].getLong("TIMESTAMP");
+        return results[0];
     }
 
     /** Verify that the timestamp from "@Statistics LATENCY"
@@ -285,23 +286,38 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         // This may require some tweaking.
         final int maxAttempts = 12;
         int numAttempts = 0;
-        long previousTimestamp;
-        long currentTimestamp = getTimestampFromLatencyStatsCall(client);
+        VoltTable previous;
+        VoltTable current = doLatencyStatsCall(client);
         do {
-            previousTimestamp = currentTimestamp;
-            currentTimestamp = getTimestampFromLatencyStatsCall(client);
-        } while (numAttempts++ < maxAttempts && previousTimestamp != currentTimestamp);
+            previous = current;
+            current = doLatencyStatsCall(client);
+        } while (numAttempts++ < maxAttempts && previous.getLong("TIMESTAMP") != current.getLong("TIMESTAMP"));
 
         System.out.println(numAttempts + " attempts made at obtaining timestamps from the same time window.");
         assertTrue("Unable to use timestamps to verify that data comes from the same window.", numAttempts < maxAttempts);
 
+        // Verify that matching timestamps implies matching data
+        assertEquals(previous.getLong("TIMESTAMP"),  current.getLong("TIMESTAMP"));
+        assertEquals(previous.getLong("HOST_ID"),    current.getLong("HOST_ID"));
+        assertEquals(previous.getString("HOSTNAME"), current.getString("HOSTNAME"));
+        assertEquals(previous.getLong("INTERVAL"),   current.getLong("INTERVAL"));
+        assertEquals(previous.getLong("COUNT"),      current.getLong("COUNT"));
+        assertEquals(previous.getLong("TPS"),        current.getLong("TPS"));
+        assertEquals(previous.getLong("P50"),        current.getLong("P50"));
+        assertEquals(previous.getLong("P95"),        current.getLong("P95"));
+        assertEquals(previous.getLong("P99"),        current.getLong("P99"));
+        assertEquals(previous.getLong("P99.9"),      current.getLong("P99.9"));
+        assertEquals(previous.getLong("P99.99"),     current.getLong("P99.99"));
+        assertEquals(previous.getLong("P99.999"),    current.getLong("P99.999"));
+        assertEquals(previous.getLong("MAX"),        current.getLong("MAX"));
+
         // Verify that >5 seconds later the timestamps are not the same.
         final int extraDelayMsec = 1000;
-        previousTimestamp = currentTimestamp;
+        final long beforeTimestamp = current.getLong("TIMESTAMP");
         Thread.sleep(LatencyStats.INTERVAL_MS + extraDelayMsec);
-        currentTimestamp = getTimestampFromLatencyStatsCall(client);
-        System.out.println("Non-consecutive timestamps: " + previousTimestamp + ", " + currentTimestamp);
-        assertTrue(currentTimestamp > previousTimestamp);
+        final long afterTimestamp = doLatencyStatsCall(client).getLong("TIMESTAMP");
+        System.out.println("Non-consecutive timestamps: " + beforeTimestamp + ", " + afterTimestamp);
+        assertTrue(afterTimestamp > beforeTimestamp);
     }
 
     public void testLatencyCompressed() throws Exception {
