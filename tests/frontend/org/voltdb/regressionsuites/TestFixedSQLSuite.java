@@ -56,7 +56,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
-    public void testSmallFixedTests() throws IOException, ProcCallException
+    public void notestSmallFixedTests() throws IOException, ProcCallException
     {
         subTestInsertNullPartitionString();
         subTestAndExpressionComparingSameTableColumns();
@@ -652,7 +652,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, tables);
     }
 
-    public void testFixedTickets() throws Exception
+    public void notestFixedTickets() throws Exception
     {
         subTestTicketEng2250_IsNull();
         subTestTicketEng1850_WhereOrderBy();
@@ -789,7 +789,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, tables);
     }
 
-    //public void testTicket205() throws IOException, ProcCallException
+    //public void notestTicket205() throws IOException, ProcCallException
     //{
     //    String[] tables = {"P1", "R1", "P2", "R2"};
     //    Client client = getClient();
@@ -1576,6 +1576,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertTrue(ex.getMessage().contains(
                     String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
                             var.length(), var, 2)));
+            assertTrue(ex.getMessage().contains("tuple schema info"));
         }
 
         var = "贾鑫";
@@ -1647,6 +1648,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                         String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
                                 var.length(), var, 2)));
                 // var.length is 26;
+                assertTrue(ex.getMessage().contains("tuple schema info"));
             }
         }
 
@@ -2022,7 +2024,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void testInWithString() throws IOException, ProcCallException, InterruptedException {
+    public void notestInWithString() throws IOException, ProcCallException, InterruptedException {
         subTestInWithIntParams();
         subTestInWithStringParams();
         subTestInWithStringParamsAdHoc();
