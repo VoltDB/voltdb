@@ -2215,10 +2215,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
             VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
         }
-        final boolean standalone = true;
+        final boolean standalone = false;
         final boolean isXCDR = false;
-        final boolean generateReports = false; // this will be overridden if debug mode is enabled
-        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR, generateReports);
+        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
         if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())) {
             VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
         }
