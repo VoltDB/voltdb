@@ -2133,7 +2133,7 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.pathToDeployment(voltProjectBuilder.compileDeploymentOnly(m_voltdbroot, m_hostCount, m_siteCount, m_kfactor, m_clusterId));
         m_compiled = true;
     }
-    
+
     public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
                                        int kfactor, int clusterId, int replicationPort,
                                        int remoteReplicationPort, String pathToVoltDBRoot, String jar,
