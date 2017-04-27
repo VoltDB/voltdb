@@ -190,9 +190,10 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                 errorMsgs.add("Assertion Error in Ad Hoc Planning: " + ae);
             }
         }
-        String errorSummary = null;
+
         if (!errorMsgs.isEmpty()) {
-            errorSummary = StringUtils.join(errorMsgs, "\n");
+            String errorSummary = StringUtils.join(errorMsgs, "\n");
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errorSummary);
         }
 
         AdHocPlannedStmtBatch plannedStmtBatch =
@@ -201,8 +202,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                           partitionParamIndex,
                                           partitionParamType,
                                           partitionParamValue,
-                                          null,
-                                          errorSummary);
+                                          userPartitionKey == null ? null : new Object[] { userPartitionKey });
 
         // TODO: re-enable this
         /*if (adhocLog.isDebugEnabled()) {

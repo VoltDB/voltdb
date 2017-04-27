@@ -47,7 +47,6 @@ public class AdHocPlannedStmtBatch implements Cloneable {
     public final int partitionParamIndex;
     public final VoltType partitionParamType;
     public final Object partitionParamValue;
-    public final String errorMsg;
 
     // The planned statements.
     public final List<AdHocPlannedStatement> plannedStatements;
@@ -77,8 +76,7 @@ public class AdHocPlannedStmtBatch implements Cloneable {
                                  int partitionParamIndex,
                                  VoltType partitionParamType,
                                  Object partitionParamValue,
-                                 Object[] userPartitionKey,
-                                 String errors)
+                                 Object[] userPartitionKey)
     {
         this.userParamSet = userParamSet;
 
@@ -95,7 +93,6 @@ public class AdHocPlannedStmtBatch implements Cloneable {
         this.partitionParamIndex = partitionParamIndex;
         this.partitionParamType = partitionParamType;
         this.partitionParamValue = partitionParamValue;
-        this.errorMsg = errors;
         this.userPartitionKey = userPartitionKey;
     }
 
@@ -161,7 +158,6 @@ public class AdHocPlannedStmtBatch implements Cloneable {
                                                                            partitionParamIndex,
                                                                            partitionParamType,
                                                                            partitionParamValue,
-                                                                           null,
                                                                            null);
         return plannedStmtBatch;
     }

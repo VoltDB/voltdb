@@ -17,28 +17,58 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import org.voltdb.VoltNTSystemProcedure;
+import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.ParameterSet;
+import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.parser.SQLLexer;
 
-public class AdHocSpForTest extends VoltNTSystemProcedure {
-    public CompletableFuture<ClientResponse> run(byte[] jarfileBytes, String classesToDeleteSelector) {
-        /*ParameterSet params = task.getParams();
-        assert(params.size() > 1);
+public class AdHocSpForTest extends AdHocNTBase {
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        if (params.size() < 2) {
+            return makeQuickResponse(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    String.format("@AdHocSpForTest expects at least 2 paramters but got %d.", params.size()));
+        }
+
         Object[] paramArray = params.toArray();
         String sql = (String) paramArray[0];
-        // get the partition param which must exist
-        Object[] userPartitionKey = Arrays.copyOfRange(paramArray, 1, 2);
+        Object userPartitionKey = paramArray[1];
+
         Object[] userParams = null;
-        // There's no reason (any more) that AdHocSP's can't have '?' parameters, but
-        // note that the explicit partition key argument is not considered one of them.
         if (params.size() > 2) {
             userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
         }
-        ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
-        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, userPartitionKey, user);*/
 
-        return null;
+        List<String> sqlStatements = SQLLexer.splitStatements(sql);
+        if (sqlStatements.size() != 1) {
+            return makeQuickResponse(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    "@AdHocSpForTest expects precisely one statement (no batching).");
+        }
+
+        // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
+        for (String stmt : sqlStatements) {
+            if (SQLLexer.isComment(stmt) || stmt.trim().isEmpty()) {
+                continue;
+            }
+            String ddlToken = SQLLexer.extractDDLToken(stmt);
+            if (ddlToken != null) {
+                return makeQuickResponse(
+                        ClientResponse.GRACEFUL_FAILURE,
+                        "@AdHocSpForTest doesn't support DDL.");
+            }
+        }
+
+        return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
+                              sqlStatements,
+                              false,
+                              userPartitionKey,
+                              ExplainMode.NONE,
+                              userParams);
     }
 }

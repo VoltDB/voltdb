@@ -64,9 +64,9 @@ import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Charsets;
-import org.voltdb.utils.VoltTrace;
 
 public class ProcedureRunner {
 
@@ -672,9 +672,10 @@ public class ProcedureRunner {
 
         try {
             AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition).get();
-            if (batch.errorMsg != null) {
-                throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + batch.errorMsg);
-            }
+            // TODO fix
+            //if (batch.errorMsg != null) {
+            //    throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + batch.errorMsg);
+            //}
 
             if (m_isReadOnly && !batch.isReadOnly()) {
                 throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");

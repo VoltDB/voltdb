@@ -36,31 +36,6 @@ import org.voltdb.parser.SQLLexer;
 
 public class AdHoc extends AdHocNTBase {
 
-    /*final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
-    if (traceLog != null) {
-        traceLog.add(() -> VoltTrace.beginAsync("planadhoc", task.getClientHandle(),
-                                                "clientHandle", Long.toString(task.getClientHandle()),
-                                                "sql", sql));
-    }
-
-    List<String> sqlStatements = SQLLexer.splitStatements(sql);
-    String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
-
-    AdHocPlannerWork ahpw = new AdHocPlannerWork(
-            m_siteId,
-            task.clientHandle, handler.connectionId(),
-            handler.isAdmin(), ccxn,
-            sql, stmtsArray, userParams, null, explainMode,
-            userPartitionKey == null, userPartitionKey,
-            task.getProcName(),
-            task.getBatchTimeout(),
-            DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
-            VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
-            m_adhocCompletionHandler, user);
-    LocalObjectMessage work = new LocalObjectMessage( ahpw );
-
-    m_mailbox.send(m_plannerSiteId, work);*/
-
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
         final String invocationName = "@AdHoc";
 
@@ -72,7 +47,6 @@ public class AdHoc extends AdHocNTBase {
         }
 
         List<String> sqlStatements = SQLLexer.splitStatements(sql);
-        String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
 
         // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
         Boolean hasDDL = null;
