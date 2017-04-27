@@ -79,10 +79,12 @@ public class ProcedureRunnerNT {
     protected String m_statusString = null;
     protected byte m_appStatusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
     protected String m_appStatusString = null;
+    protected final boolean m_isAdmin;
 
     ProcedureRunnerNT(long id,
                       AuthUser user,
                       Connection ccxn,
+                      boolean isAdmin,
                       long ciHandle,
                       long clientHandle,
                       VoltNonTransactionalProcedure procedure,
@@ -97,6 +99,7 @@ public class ProcedureRunnerNT {
         m_id = id;
         m_user = user;
         m_ccxn = ccxn;
+        m_isAdmin = isAdmin;
         m_ciHandle = ciHandle;
         m_clientHandle = clientHandle;
         m_procedure = procedure;
@@ -292,7 +295,8 @@ public class ProcedureRunnerNT {
         Object[] paramList = paramListIn;
 
         try {
-            if (m_paramTypes[0] == ParameterSet.class) {
+            if ((m_paramTypes.length > 0) && (m_paramTypes[0] == ParameterSet.class)) {
+                assert(m_paramTypes.length == 1);
                 paramList = new Object[] { ParameterSet.fromArrayNoCopy(paramListIn) };
             }
 
@@ -467,5 +471,23 @@ public class ProcedureRunnerNT {
 
     public void setAppStatusString(String statusString) {
         m_appStatusString = statusString;
+    }
+
+    // BELOW TO SUPPORT NT SYSPROCS
+
+    protected String getHostname() {
+        return m_ccxn.getHostnameOrIP(m_clientHandle);
+    }
+
+    protected boolean isAdminConnection() {
+        return m_isAdmin;
+    }
+
+    protected long getClientHandle() {
+        return m_clientHandle;
+    }
+
+    protected String getUsername() {
+        return m_user.m_name;
     }
 }

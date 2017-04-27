@@ -69,8 +69,7 @@ public class Promote extends UpdateApplicationBase {
         }
         catch (Exception e) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-            // TODO: return proper error from exception
-            return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, "ALL IS LOST");
+            return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, e.getMessage());
         }
         // Log something useful about catalog upgrades when they occur.
         if (ccr.upgradedFromVersion != null) {

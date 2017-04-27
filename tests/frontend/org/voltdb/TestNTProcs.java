@@ -657,7 +657,7 @@ public class TestNTProcs extends TestCase {
         VoltTable statsT = getStats(client, "PROCEDURE");
         System.out.println("STATS: " + statsT.toFormattedString());
 
-        assertTrue(VoltTableUtil.tableContainsString(statsT, "UpdateApplicationCatalog", true));
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "UpdateCore", true));
 
         Map<String, Long> stats = aggregateProcRow(client, UpdateCore.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());

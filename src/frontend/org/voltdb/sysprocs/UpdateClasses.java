@@ -19,7 +19,6 @@ package org.voltdb.sysprocs;
 
 import java.util.concurrent.CompletableFuture;
 
-import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
@@ -37,15 +36,12 @@ public class UpdateClasses extends UpdateApplicationBase {
 
         // TODO: add hostname/user to NTSysprocProc API
         // TODO: make this stuff real?
-        String hostname = "facebook.com";
-        AuthUser user = null;
         String invocationName = "@UpdateClasses";
         boolean isPromotion = false;
-        boolean useDDLSchema = true;
+        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();;
         boolean internalCall = false;
-        boolean adminMode = false;
 
-        if (!allowPausedModeWork(internalCall, adminMode)) {
+        if (!allowPausedModeWork(internalCall, isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
@@ -71,13 +67,12 @@ public class UpdateClasses extends UpdateApplicationBase {
                                                 drRole,
                                                 useDDLSchema,
                                                 false,
-                                                hostname,
+                                                getHostname(),
                                                 "NOUSER");
         }
         catch (Exception e) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-            // TODO: return proper error from exception
-            return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, "ALL IS LOST");
+            return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, e.getMessage());
         }
         // Log something useful about catalog upgrades when they occur.
         if (ccr.upgradedFromVersion != null) {

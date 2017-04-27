@@ -744,6 +744,7 @@ public final class InvocationDispatcher {
         m_NTProcedureService.callProcedureNT(handle,
                                              user,
                                              ccxn,
+                                             handler.isAdmin(),
                                              task.clientHandle,
                                              ntPriority,
                                              task.getProcName(),

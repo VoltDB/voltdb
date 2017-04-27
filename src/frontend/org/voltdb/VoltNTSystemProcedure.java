@@ -36,14 +36,18 @@ public class VoltNTSystemProcedure extends VoltNonTransactionalProcedure {
     }
 
     protected String getHostname() {
-        return "www.evilbunnies.com";
+        return m_runner.getHostname();
     }
 
     protected boolean isAdminConnection() {
-        return false;
+        return m_runner.isAdminConnection();
     }
 
     protected long getClientHandle() {
-        return 0;
+        return m_runner.getClientHandle();
+    }
+
+    protected String getUsername() {
+        return m_runner.getUsername();
     }
 }

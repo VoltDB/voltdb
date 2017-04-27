@@ -67,17 +67,25 @@ public class NTProcedureService {
         final long ciHandle;
         final AuthUser user;
         final Connection ccxn;
+        final boolean isAdmin;
         final long clientHandle;
         final boolean ntPriority;
         final String procName;
         final ParameterSet paramListIn;
 
-        PendingInvocation(long ciHandle, AuthUser user, Connection ccxn, long clientHandle,
-                          boolean ntPriority, String procName, ParameterSet paramListIn)
+        PendingInvocation(long ciHandle,
+                          AuthUser user,
+                          Connection ccxn,
+                          boolean isAdmin,
+                          long clientHandle,
+                          boolean ntPriority,
+                          String procName,
+                          ParameterSet paramListIn)
         {
             this.ciHandle = ciHandle;
             this.user = user;
             this.ccxn = ccxn;
+            this.isAdmin = isAdmin;
             this.clientHandle = clientHandle;
             this.ntPriority = ntPriority;
             this.procName = procName;
@@ -189,7 +197,11 @@ public class NTProcedureService {
          * From the generator, create an actual procedure runner to be used
          * for a single invocation of an NT procedure run.
          */
-        ProcedureRunnerNT generateProcedureRunnerNT(AuthUser user, Connection ccxn, long ciHandle, long clientHandle)
+        ProcedureRunnerNT generateProcedureRunnerNT(AuthUser user,
+                                                    Connection ccxn,
+                                                    boolean isAdmin,
+                                                    long ciHandle,
+                                                    long clientHandle)
                 throws InstantiationException, IllegalAccessException
         {
             // every single call gets a unique id as a key for the outstanding procedure map
@@ -201,6 +213,7 @@ public class NTProcedureService {
             ProcedureRunnerNT runner = new ProcedureRunnerNT(id,
                                                              user,
                                                              ccxn,
+                                                             isAdmin,
                                                              ciHandle,
                                                              clientHandle,
                                                              procedure,
@@ -337,7 +350,8 @@ public class NTProcedureService {
 
         // release all of the pending invocations into the real queue
         m_pendingInvocations
-            .forEach(pi -> callProcedureNT(pi.ciHandle, pi.user, pi.ccxn, pi.clientHandle, pi.ntPriority, pi.procName, pi.paramListIn));
+            .forEach(pi -> callProcedureNT(pi.ciHandle, pi.user, pi.ccxn, pi.isAdmin,
+                    pi.clientHandle, pi.ntPriority, pi.procName, pi.paramListIn));
         m_pendingInvocations.clear();
     }
 
@@ -348,6 +362,7 @@ public class NTProcedureService {
     synchronized void callProcedureNT(final long ciHandle,
                                       final AuthUser user,
                                       final Connection ccxn,
+                                      final boolean isAdmin,
                                       final long clientHandle,
                                       final boolean ntPriority,
                                       final String procName,
@@ -357,7 +372,7 @@ public class NTProcedureService {
         // drained when un-paused. We're counting on regular upstream backpressure
         // to prevent this from getting too out of hand.
         if (m_paused) {
-            PendingInvocation pi = new PendingInvocation(ciHandle, user, ccxn, clientHandle, ntPriority, procName, paramListIn);
+            PendingInvocation pi = new PendingInvocation(ciHandle, user, ccxn, isAdmin, clientHandle, ntPriority, procName, paramListIn);
             m_pendingInvocations.add(pi);
             return;
         }
@@ -372,7 +387,7 @@ public class NTProcedureService {
 
         ProcedureRunnerNT tempRunner = null;
         try {
-            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, ciHandle, clientHandle);
+            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, clientHandle);
         } catch (InstantiationException | IllegalAccessException e1) {
             // I don't expect to hit this, but it's here...
             // must be done as IRM to CI mailbox for backpressure accounting
@@ -392,7 +407,13 @@ public class NTProcedureService {
         Runnable invocationRunnable = new Runnable() {
             @Override
             public void run() {
-                runner.call(paramListIn.toArray());
+                try {
+                    runner.call(paramListIn.toArray());
+                }
+                catch (Throwable ex) {
+                    ex.printStackTrace();
+                    throw ex;
+                }
             }
         };
 

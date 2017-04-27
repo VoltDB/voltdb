@@ -19,7 +19,6 @@ package org.voltdb.sysprocs;
 
 import java.util.concurrent.CompletableFuture;
 
-import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
@@ -41,10 +40,9 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         // TODO: add hostname/user to NTSysprocProc API
         // TODO: make this stuff real?
         String hostname = "facebook.com";
-        AuthUser user = null;
         String invocationName = "@UpdateApplicationCatalog";
         boolean isPromotion = false;
-        boolean useDDLSchema = false;
+        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();;
         boolean internalCall = false;
         boolean adminMode = false;
 
@@ -81,8 +79,7 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         }
         catch (Exception e) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-            // TODO: return proper error from exception
-            return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, "ALL IS LOST");
+            return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, e.getMessage());
         }
         // Log something useful about catalog upgrades when they occur.
         if (ccr.upgradedFromVersion != null) {

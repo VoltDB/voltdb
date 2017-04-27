@@ -39,6 +39,11 @@ public class AdHoc extends AdHocNTBase {
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
         final String invocationName = "@AdHoc";
 
+        if (params.size() == 0) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                    "Adhoc system procedure requires at least the query parameter.");
+        }
+
         Object[] paramArray = params.toArray();
         String sql = (String) paramArray[0];
         Object[] userParams = null;
@@ -140,9 +145,7 @@ public class AdHoc extends AdHocNTBase {
 
             // Is it forbidden by the replication role and configured schema change method?
             // master and UAC method chosen:
-            //CatalogContext context = VoltDB.instance().getCatalogContext();
-            //VoltDB.instance().get
-            boolean useAdhocDDL = true;
+            boolean useAdhocDDL = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
             // TODO fix this hack
             if (!useAdhocDDL) {
                 return makeQuickResponse(
@@ -151,12 +154,12 @@ public class AdHoc extends AdHocNTBase {
                         "to change application schema.  AdHoc DDL is forbidden.");
             }
 
-            // TODO re-enable this check
-            /*if (!allowPausedModeWork(internalCall, adminConnection)) {
+            // TODO figure out when internalmode matters
+            if (!allowPausedModeWork(false, isAdminConnection())) {
                 return makeQuickResponse(
                         ClientResponse.SERVER_UNAVAILABLE,
                         "Server is paused and is available in read-only mode - please try again later.");
-            }*/
+            }
 
             CatalogChangeResult ccr = null;
             try {
@@ -169,13 +172,12 @@ public class AdHoc extends AdHocNTBase {
                                                     DrRoleType.NONE,
                                                     true,
                                                     false,
-                                                    "hostname.server.com",
-                                                    "NOUSER");
+                                                    getHostname(),
+                                                    getUsername());
             }
             catch (Exception e) {
                 hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-                // TODO: return proper error from exception
-                return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, "ALL IS LOST");
+                return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, e.getMessage());
             }
 
             // case for @CatalogChangeResult

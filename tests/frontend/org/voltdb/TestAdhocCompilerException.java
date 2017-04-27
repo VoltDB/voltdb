@@ -79,9 +79,8 @@ public class TestAdhocCompilerException extends AdhocDDLTestBase
                     tryNewClientWithValidDDL();
                     fail("Timeout, server was probably hung. " + message);
                 }
-                String expectedMessage = "Unexpected async compiler exception";
-                assertTrue(String.format("Unexpected exception message: %s...", expectedMessage),
-                           message.startsWith(expectedMessage));
+                assertTrue(String.format("Unexpected exception message: %s...", message),
+                           message.contains(AdHocNTBase.DEBUG_EXCEPTION_DDL));
                 threw = true;
             }
             assertTrue("Expected exception", threw);

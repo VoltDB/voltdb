@@ -253,8 +253,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                         null,
                         vt,
                         null);
-        // TODO: check if I need this
-        //response.setClientHandle( planBatch.clientHandle );
 
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);
@@ -287,8 +285,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                         null,
                         new VoltTable[] { vt },
                         null);
-        // TODO: check if I need this
-        //response.setClientHandle( planBatch.clientHandle );
 
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);
