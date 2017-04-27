@@ -156,7 +156,6 @@ public class VoltCompiler {
     private final HashSet<Class<?>> m_cachedAddedClasses = new HashSet<>();
 
     private final boolean m_isXDCR;
-    boolean m_generateReports;
 
     /**
      * Represents output from a compile. This works similarly to Log4j; there
@@ -334,13 +333,8 @@ public class VoltCompiler {
     }
 
     public VoltCompiler(boolean standaloneCompiler, boolean isXDCR) {
-        this(standaloneCompiler, isXDCR, true);
-    }
-
-    public VoltCompiler(boolean standaloneCompiler, boolean isXDCR, boolean generateReports) {
         this.standaloneCompiler = standaloneCompiler;
         this.m_isXDCR = isXDCR;
-        this.m_generateReports = generateReports || DEBUG_MODE;
 
         // reset the cache
         m_cachedAddedClasses.clear();
@@ -349,7 +343,7 @@ public class VoltCompiler {
     /** Parameterless constructor is for embedded VoltCompiler use only.
      * @param isXDCR*/
     public VoltCompiler(boolean isXDCR) {
-        this(false, isXDCR, true);
+        this(false, isXDCR);
     }
 
     public boolean hasErrors() {
@@ -678,14 +672,12 @@ public class VoltCompiler {
         m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
 
         // generate the catalog report and write it to disk
-        if (m_generateReports) {
-            try {
-                generateCatalogReport(ddlWithBatchSupport);
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-                return null;
-            }
+        try {
+            generateCatalogReport(ddlWithBatchSupport);
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+            return null;
         }
 
         jarOutput.put(AUTOGEN_DDL_FILE_NAME, m_canonicalDDL.getBytes(Constants.UTF8ENCODING));
@@ -705,10 +697,8 @@ public class VoltCompiler {
                 addBuildInfo(jarOutput);
             }
             jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
-            if (m_generateReports) {
-                // put the compiler report into the jarfile
-                jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
-            }
+            // put the compiler report into the jarfile
+            jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
         }
         catch (final Exception e) {
             e.printStackTrace();
