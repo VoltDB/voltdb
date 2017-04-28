@@ -23,6 +23,7 @@ public enum StatsSelector {
     STARVATION,
     INITIATOR,        // invoked as @stat initiator
     LATENCY,          // invoked as @stat latency
+    LATENCY_COMPRESSED,  // before V7.3 this was @Statistics LATENCY
     LATENCY_HISTOGRAM,
     PARTITIONCOUNT,
     IOSTATS,
