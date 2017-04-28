@@ -23,6 +23,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.CatalogChangeResult;
+import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 public class UpdateApplicationCatalog extends UpdateApplicationBase {
@@ -77,10 +78,11 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                                                 hostname,
                                                 "NOUSER");
         }
-        catch (Exception e) {
+        catch (PrepareDiffFailureException pe) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-            return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, e.getMessage());
+            return makeQuickResponse(pe.statusCode, pe.getMessage());
         }
+
         // Log something useful about catalog upgrades when they occur.
         if (ccr.upgradedFromVersion != null) {
             hostLog.info(String.format("In order to update the application catalog it was "

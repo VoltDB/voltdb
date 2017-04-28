@@ -31,6 +31,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.CatalogChangeResult;
+import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.parser.SQLLexer;
 
@@ -175,9 +176,9 @@ public class AdHoc extends AdHocNTBase {
                                                     getHostname(),
                                                     getUsername());
             }
-            catch (Exception e) {
+            catch (PrepareDiffFailureException pe) {
                 hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-                return makeQuickResponse(ClientResponse.UNEXPECTED_FAILURE, e.getMessage());
+                return makeQuickResponse(pe.statusCode, pe.getMessage());
             }
 
             // case for @CatalogChangeResult

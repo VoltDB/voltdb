@@ -36,6 +36,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.CatalogChangeResult;
+import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.ClassMatcher;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler;
@@ -50,16 +51,6 @@ import org.voltdb.utils.InMemoryJarfile;
 public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     protected static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    public static class PrepareDiffFailureException extends Exception {
-        private static final long serialVersionUID = 1L;
-
-        public final byte statusCode;
-        public PrepareDiffFailureException(byte statusCode, String msg) {
-            super(msg);
-            this.statusCode = statusCode;
-        }
-    }
 
     /**
      *
@@ -104,7 +95,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             String deploymentString = operationString;
             if ("@UpdateApplicationCatalog".equals(invocationName)) {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
-                if (operationBytes == null) {
+                if ((operationBytes == null) || (operationBytes.length == 0)) {
                     newCatalogJar = oldJar;
                 } else {
                     newCatalogJar = CatalogUtil.loadInMemoryJarFile(operationBytes);
@@ -269,6 +260,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.reasonsForEmptyTables = emptyTablesAndReasons[1];
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
             retval.worksWithElastic = diff.worksWithElastic();
+        }
+        catch (PrepareDiffFailureException e) {
+            compilerLog.warn(e.getMessage(), e);
+            throw e;
         }
         catch (Exception e) {
             String msg = "Unexpected error in adhoc or catalog update: " + e.getClass() + ", " +
