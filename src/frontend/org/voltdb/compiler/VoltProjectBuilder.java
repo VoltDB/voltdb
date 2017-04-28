@@ -318,6 +318,7 @@ public class VoltProjectBuilder {
     private boolean m_useDDLSchema = false;
 
     private String m_drMasterHost;
+    private Integer m_preferredSource;
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
 
@@ -742,6 +743,10 @@ public class VoltProjectBuilder {
 
     public void setDRMasterHost(String drMasterHost) {
         m_drMasterHost = drMasterHost;
+    }
+
+    public void setPreferredSource(int preferredSource) {
+        m_preferredSource = preferredSource;
     }
 
     public void setDrProducerEnabled()
@@ -1285,6 +1290,7 @@ public class VoltProjectBuilder {
             ConnectionType conn = factory.createConnectionType();
             dr.setConnection(conn);
             conn.setSource(m_drMasterHost);
+            conn.setPreferredSource(m_preferredSource);
         }
 
         // Have some yummy boilerplate!

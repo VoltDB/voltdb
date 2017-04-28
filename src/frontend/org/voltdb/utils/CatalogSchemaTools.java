@@ -41,6 +41,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
@@ -101,8 +102,8 @@ public abstract class CatalogSchemaTools {
         // we can return the full CREATE TABLE statement, so accumulate it separately
         final StringBuilder table_sb = new StringBuilder();
 
-        final Set<Index> skip_indexes = new HashSet<Index>();
-        final Set<Constraint> skip_constraints = new HashSet<Constraint>();
+        final Set<Index> skip_indexes = new HashSet<>();
+        final Set<Constraint> skip_constraints = new HashSet<>();
 
         if (tableIsView) {
             table_sb.append("CREATE VIEW ").append(catalog_tbl.getTypeName()).append(" (");
@@ -421,6 +422,12 @@ public abstract class CatalogSchemaTools {
         sb.append(";\n");
     }
 
+    public static void toSchema(StringBuilder sb, Function func)
+    {
+        String functionDDLTemplate = "CREATE FUNCTION %s FROM METHOD %s.%s;\n\n";
+        sb.append(String.format(functionDDLTemplate, func.getFunctionname(), func.getClassname(), func.getMethodname()));
+    }
+
     /**
      * Convert a Catalog Procedure into a DDL string.
      * @param proc
@@ -548,12 +555,12 @@ public abstract class CatalogSchemaTools {
                 }
                 sb.append("\n");
 
-                List<Table> viewList = new ArrayList<Table>();
+                List<Table> viewList = new ArrayList<>();
 
                 CatalogMap<Table> tables = db.getTables();
                 if (! tables.isEmpty()) {
                     sb.append(startBatch);
-                    for (Table table : db.getTables()) {
+                    for (Table table : tables) {
                         Object annotation = table.getAnnotation();
                         if (annotation != null && ((TableAnnotation) annotation).ddl != null
                                 && table.getMaterializer() != null) {
@@ -572,10 +579,18 @@ public abstract class CatalogSchemaTools {
 
                 CatalogMap<Procedure> procedures = db.getProcedures();
                 if (! procedures.isEmpty()) {
-                    for (Procedure proc : db.getProcedures()) {
+                    for (Procedure proc : procedures) {
                         toSchema(sb, proc);
                     }
                 }
+
+                CatalogMap<Function> functions = db.getFunctions();
+                if (! functions.isEmpty()) {
+                    for (Function func : functions) {
+                        toSchema(sb, func);
+                    }
+                }
+
                 if (! tables.isEmpty()) {
                     sb.append(endBatch);
                 }

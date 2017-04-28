@@ -246,21 +246,21 @@ public:
     void executeFragment(fragmentId_t fragmentId, const char *plan) {
         m_topend->addPlan(fragmentId, plan);
 
-            // Make sure the parameter buffer is filled
-            // with healthful zeros, and then create an input
-            // deserializer.
-            memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
-            voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), m_smallBufferSize);
+        // Make sure the parameter buffer is filled
+        // with healthful zeros, and then create an input
+        // deserializer.
+        memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
+        voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), m_smallBufferSize);
 
-            //
-            // Execute the plan.  You'd think this would be more
-            // impressive.
-            //
-            try {
-                m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1, false);
-            } catch (voltdb::SerializableEEException &ex) {
-                throw;
-            }
+        //
+        // Execute the plan.  You'd think this would be more
+        // impressive.
+        //
+        try {
+            m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1, false);
+        } catch (voltdb::SerializableEEException &ex) {
+            throw;
+        }
     }
 
     /**
@@ -283,7 +283,8 @@ public:
             printf("No results!!\n");
             ASSERT_FALSE(true);
         }
-        ASSERT_EQ(nCols, result->columnCount());
+        int32_t resColCount = result->columnCount();
+        ASSERT_EQ(nCols, resColCount);
         bool failed = false;
         for (int32_t row = 0; row < nRows; row += 1) {
             ASSERT_TRUE(iter.next(tuple));

@@ -2215,10 +2215,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
             VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
         }
-        final boolean standalone = true;
+        final boolean standalone = false;
         final boolean isXCDR = false;
-        final boolean generateReports = false; // this will be overridden if debug mode is enabled
-        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR, generateReports);
+        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
         if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())) {
             VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
         }
@@ -3440,7 +3439,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_consumerDRGateway.updateCatalog(m_catalogContext,
                                                       (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
                                                        ? newDRConnectionSource
-                                                       : null));
+                                                       : null),
+                                                      (byte) m_catalogContext.cluster.getPreferredsource());
                 }
 
                 // Check if this is promotion
@@ -4101,6 +4101,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         Cartographer.class,
                         HostMessenger.class,
                         byte.class,
+                        byte.class,
                         String.class,
                         int.class);
                 m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
@@ -4108,6 +4109,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         m_cartographer,
                         m_messenger,
                         drConsumerClusterId,
+                        (byte) m_catalogContext.cluster.getPreferredsource(),
                         drIfAndPort.getFirst(),
                         drIfAndPort.getSecond());
                 m_globalServiceElector.registerService(m_consumerDRGateway);
