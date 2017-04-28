@@ -28,6 +28,9 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process DR TABLE table-name [DISABLE]
+ */
 public class DRTable extends StatementProcessor {
 
     public DRTable(DDLCompiler ddlCompiler) {

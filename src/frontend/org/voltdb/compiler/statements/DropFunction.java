@@ -29,6 +29,9 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process DROP FUNCTION <function-name>
+ */
 public class DropFunction extends StatementProcessor {
 
     public DropFunction(DDLCompiler ddlCompiler) {

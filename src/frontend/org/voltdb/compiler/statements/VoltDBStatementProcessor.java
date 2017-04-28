@@ -27,6 +27,11 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Check if a statement is VoltDB-specific.
+ * If it is, then hand it over to the subsequent processors to handle.
+ * If not, end the chain now and give it to HSQL for handling.
+ */
 public class VoltDBStatementProcessor extends StatementProcessor {
 
     public VoltDBStatementProcessor(DDLCompiler ddlCompiler) {

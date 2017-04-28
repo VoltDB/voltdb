@@ -27,6 +27,13 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process
+ * CREATE PROCEDURE procedure-name
+ * [PARTITION ON TABLE table-name COLUMN column-name [PARAMETER position]]
+ * [ALLOW role-name [,...]]
+ * AS sql-statement
+ */
 public class CreateProcedureAsScript extends StatementProcessor {
 
     public CreateProcedureAsScript(DDLCompiler ddlCompiler) {

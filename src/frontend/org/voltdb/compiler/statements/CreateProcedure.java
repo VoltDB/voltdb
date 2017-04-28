@@ -26,6 +26,10 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * This class serves as the base class of two CREATE PROCEDURE processors,
+ * it has some functions that are shared by the two processors.
+ */
 public abstract class CreateProcedure extends StatementProcessor {
 
     public CreateProcedure(DDLCompiler ddlCompiler) {

@@ -28,6 +28,9 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process both PARTITION TABLE and PARTITION PROCEDURE statements.
+ */
 public class PartitionStatement extends StatementProcessor {
 
     public PartitionStatement(DDLCompiler ddlCompiler) {

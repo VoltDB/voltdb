@@ -24,6 +24,11 @@ import org.voltdb.compiler.DDLCompiler.StatementProcessor;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
+/**
+ * If a statement gets to this processor, it means that the statement was identified as
+ * a VoltDB-specific statement, but could have syntax errors.
+ * We will throw exceptions here with the correct syntax information.
+ */
 public class CatchAllVoltDBStatement extends StatementProcessor {
 
     private VoltDBStatementProcessor m_firstProcessor;

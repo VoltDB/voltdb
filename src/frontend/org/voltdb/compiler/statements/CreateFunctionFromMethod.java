@@ -29,6 +29,9 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process CREATE FUNCTION <function-name> FROM METHOD <class-name>.<method-name>
+ */
 public class CreateFunctionFromMethod extends StatementProcessor {
 
     public CreateFunctionFromMethod(DDLCompiler ddlCompiler) {

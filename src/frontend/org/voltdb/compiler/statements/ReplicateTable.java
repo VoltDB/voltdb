@@ -28,6 +28,9 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process REPLICATE TABLE <table-name>
+ */
 public class ReplicateTable extends StatementProcessor {
 
     public ReplicateTable(DDLCompiler ddlCompiler) {

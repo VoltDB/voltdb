@@ -28,6 +28,9 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process SET <PARAMETER NAME> <PARAMETER VALUE>
+ */
 public class SetGlobalParam extends StatementProcessor {
 
     public SetGlobalParam(DDLCompiler ddlCompiler) {

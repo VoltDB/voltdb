@@ -29,6 +29,13 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process
+ * CREATE PROCEDURE
+ * [PARTITION ON TABLE table-name COLUMN column-name [PARAMETER position]]
+ * [ALLOW role-name [,...]]
+ * FROM CLASS class-name
+ */
 public class CreateProcedureFromClass extends CreateProcedure {
 
     public CreateProcedureFromClass(DDLCompiler ddlCompiler) {

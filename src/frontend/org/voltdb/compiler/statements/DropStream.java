@@ -28,6 +28,9 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process DROP STREAM stream-name [IF EXISTS] [CASCADE]
+ */
 public class DropStream extends StatementProcessor {
 
     public DropStream(DDLCompiler ddlCompiler) {

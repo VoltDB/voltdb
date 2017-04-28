@@ -33,6 +33,9 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 
+/**
+ * Process CREATE ROLE role-name [WITH permission [,...]]
+ */
 public class CreateRole extends StatementProcessor {
 
     public CreateRole(DDLCompiler ddlCompiler) {

@@ -29,6 +29,9 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.utils.InMemoryJarfile;
 
+/**
+ * Process IMPORT CLASS <class-name>, notice that this is deprecated.
+ */
 public class ImportClass extends StatementProcessor {
 
     public ImportClass(DDLCompiler ddlCompiler) {
