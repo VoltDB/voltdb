@@ -7,8 +7,11 @@
 
 # compile java source
 javac -classpath ../../obj/release/prod procedures/sqlcmdtest/*.java
+javac -classpath ../../obj/release/prod functions/sqlcmdtest/*.java
 
 # build the jar file
+jar cf sqlcmdtest-funcs.jar -C functions sqlcmdtest
+
 jar cf sqlcmdtest-procs.jar -C procedures sqlcmdtest
 
 # sabotage some dependency classes to test handling of
@@ -27,3 +30,4 @@ jar cf sqlcmdtest-killed-procs.jar -C procedures sqlcmdtest
 
 # removed compiled .class file(s)
 rm -rf procedures/sqlcmdtest/*.class
+rm -rf functions/sqlcmdtest/*.class

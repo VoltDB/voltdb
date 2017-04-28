@@ -87,7 +87,7 @@ public class SQLCommand
         return m_readme;
     }
 
-    private static List<String> RecallableSessionLines = new ArrayList<String>();
+    private static List<String> RecallableSessionLines = new ArrayList<>();
     private static boolean m_testFrontEndOnly;
     private static String m_testFrontEndResult;
 
@@ -355,6 +355,9 @@ public class SQLCommand
             if (subcommand.equals("proc") || subcommand.equals("procedures")) {
                 execListProcedures();
             }
+            else if (subcommand.equals("functions")) {
+                execListFunctions();
+            }
             else if (subcommand.equals("tables")) {
                 execListTables();
             }
@@ -418,10 +421,10 @@ public class SQLCommand
         // This would save churn on startup and on DDL update.
         if (Classlist.isEmpty()) {
             System.out.println();
-            System.out.println("--- Empty Class List -----------------------");
+            printCatalogHeader("Empty Class List");
             System.out.println();
         }
-        List<String> list = new LinkedList<String>(Classlist.keySet());
+        List<String> list = new LinkedList<>(Classlist.keySet());
         Collections.sort(list);
         int padding = 0;
         for (String classname : list) {
@@ -429,9 +432,9 @@ public class SQLCommand
         }
         String format = " %1$-" + padding + "s";
         String categoryHeader[] = new String[] {
-                "--- Potential Procedure Classes ----------------------------",
-                "--- Active Procedure Classes  ------------------------------",
-                "--- Non-Procedure Classes ----------------------------------"};
+                "Potential Procedure Classes",
+                "Active Procedure Classes",
+                "Non-Procedure Classes"};
         for (int i = 0; i<3; i++) {
             boolean firstInCategory = true;
             for (String classname : list) {
@@ -447,7 +450,7 @@ public class SQLCommand
                 if (firstInCategory) {
                     firstInCategory = false;
                     System.out.println();
-                    System.out.println(categoryHeader[i]);
+                    printCatalogHeader(categoryHeader[i]);
                 }
                 System.out.printf(format, classname);
                 System.out.println();
@@ -468,8 +471,24 @@ public class SQLCommand
         System.out.println();
     }
 
+    private static void execListFunctions() throws Exception {
+        System.out.println();
+        printCatalogHeader("User-defined Functions");
+        String outputFormat = "%-20s%-20s%-50s";
+        VoltTable tableData = m_client.callProcedure("@SystemCatalog", "FUNCTIONS").getResults()[0];
+        while (tableData.advanceRow()) {
+            String functionType = tableData.getString("FUNCTION_TYPE");
+            String functionName = tableData.getString("FUNCTION_NAME");
+            String className = tableData.getString("CLASS_NAME");
+            String methodName = tableData.getString("METHOD_NAME");
+            System.out.println(String.format(outputFormat, functionName,
+                    functionType + " function", className + "." + methodName));
+        }
+        System.out.println();
+    }
+
     private static void execListProcedures() {
-        List<String> list = new LinkedList<String>(Procedures.keySet());
+        List<String> list = new LinkedList<>(Procedures.keySet());
         Collections.sort(list);
         int padding = 0;
         for (String procedure : list) {
@@ -487,14 +506,15 @@ public class SQLCommand
             if (procedure.startsWith("@")) {
                 if (firstSysProc) {
                     firstSysProc = false;
-                    System.out.println("--- System Procedures --------------------------------------");
+                    System.out.println();
+                    printCatalogHeader("System Procedures");
                 }
             }
             else {
                 if (firstUserProc) {
                     firstUserProc = false;
                     System.out.println();
-                    System.out.println("--- User Procedures ----------------------------------------");
+                    printCatalogHeader("User Procedures");
                 }
             }
             for (List<String> parameterSet : Procedures.get(procedure).values()) {
@@ -523,10 +543,14 @@ public class SQLCommand
         }
     }
 
+    private static void printCatalogHeader(final String name) {
+        System.out.println("--- " + name + " " + String.join("", Collections.nCopies(57 - name.length(), "-")));
+    }
+
     private static void printTables(final String name, final Collection<String> tables)
     {
         System.out.println();
-        System.out.println("--- " + name + " --------------------------------------------");
+        printCatalogHeader(name);
         for (String table : tables) {
             System.out.println(table);
         }
@@ -1120,9 +1144,9 @@ public class SQLCommand
 
     private static class Tables
     {
-        TreeSet<String> tables = new TreeSet<String>();
-        TreeSet<String> exports = new TreeSet<String>();
-        TreeSet<String> views = new TreeSet<String>();
+        TreeSet<String> tables = new TreeSet<>();
+        TreeSet<String> exports = new TreeSet<>();
+        TreeSet<String> views = new TreeSet<>();
     }
 
     private static Tables getTables() throws Exception
@@ -1181,12 +1205,12 @@ public class SQLCommand
             proc_param_counts.put(this_proc, curr_val);
         }
         params.resetRowPosition();
-        Set<String> userProcs = new HashSet<String>();
+        Set<String> userProcs = new HashSet<>();
         while (procs.advanceRow()) {
             String proc_name = procs.getString("PROCEDURE_NAME");
             userProcs.add(proc_name);
             Integer param_count = proc_param_counts.get(proc_name);
-            ArrayList<String> this_params = new ArrayList<String>();
+            ArrayList<String> this_params = new ArrayList<>();
             // prepopulate it to make sure the size is right
             if (param_count != null) {
                 for (int i = 0; i < param_count; i++) {
@@ -1196,11 +1220,11 @@ public class SQLCommand
             else {
                 param_count = 0;
             }
-            HashMap<Integer, List<String>> argLists = new HashMap<Integer, List<String>>();
+            HashMap<Integer, List<String>> argLists = new HashMap<>();
             argLists.put(param_count, this_params);
             procedures.put(proc_name, argLists);
         }
-        for (String proc_name : new ArrayList<String>(procedures.keySet())) {
+        for (String proc_name : new ArrayList<>(procedures.keySet())) {
             if (!proc_name.startsWith("@") && !userProcs.contains(proc_name)) {
                 procedures.remove(proc_name);
             }

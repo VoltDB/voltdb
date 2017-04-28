@@ -365,8 +365,12 @@ public:
     void initialize(const char *catalog_string,
                     uint32_t    random_seed = (uint32_t)time(NULL)) {
         PlanTestingBaseClass<EngineTestTopend>::initialize(catalog_string, random_seed);
-        m_partitioned_customer_table = getPersistentTableAndId("D_CUSTOMER", &m_partitioned_customer_table_id);
-        m_replicated_customer_table = getPersistentTableAndId("R_CUSTOMER", &m_replicated_customer_table_id);
+        m_partitioned_customer_table = getPersistentTableAndId("D_CUSTOMER",
+                                                               &m_partitioned_customer_table_id,
+                                                               &m_partitioned_customer_table);
+        m_replicated_customer_table = getPersistentTableAndId("R_CUSTOMER",
+                                                              &m_replicated_customer_table_id,
+                                                              &m_replicated_customer_table);
 
         //
         // Fill in tuples.  The IndexOrder test does not use
@@ -387,7 +391,7 @@ protected:
     voltdb::PersistentTable* m_partitioned_customer_table;
     int m_partitioned_customer_table_id;
 
-    voltdb::Table* m_replicated_customer_table;
+    voltdb::PersistentTable* m_replicated_customer_table;
     int m_replicated_customer_table_id;
 };
 // Create a random seed once and for all, and use it always.

@@ -30,6 +30,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
@@ -121,6 +122,14 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("KEY_SEQ", VoltType.SMALLINT),
                           new ColumnInfo("PK_NAME", VoltType.STRING)
         };
+
+    static public final ColumnInfo[] FUNCTIONS_SCHEMA =
+            new ColumnInfo[] {
+                              new ColumnInfo("FUNCTION_TYPE", VoltType.STRING),
+                              new ColumnInfo("FUNCTION_NAME", VoltType.STRING),
+                              new ColumnInfo("CLASS_NAME", VoltType.STRING),
+                              new ColumnInfo("METHOD_NAME", VoltType.STRING)
+            };
 
     static public final ColumnInfo[] PROCEDURES_SCHEMA =
         new ColumnInfo[] {
@@ -225,6 +234,10 @@ public class JdbcDatabaseMetaDataGenerator
         else if (selector.equalsIgnoreCase("PROCEDURES"))
         {
             result = getProcedures();
+        }
+        else if (selector.equalsIgnoreCase("FUNCTIONS"))
+        {
+            result = getFunctions();
         }
         else if (selector.equalsIgnoreCase("PROCEDURECOLUMNS"))
         {
@@ -567,6 +580,21 @@ public class JdbcDatabaseMetaDataGenerator
                 }
             }
         }
+        return results;
+    }
+
+    VoltTable getFunctions()
+    {
+        VoltTable results = new VoltTable(FUNCTIONS_SCHEMA);
+
+        for (Function func : m_database.getFunctions()) {
+            results.addRow(
+                           "scalar",                // Function Type
+                           func.getFunctionname(),  // Function Name
+                           func.getClassname(),     // Class Name
+                           func.getMethodname());   // Method Name
+        }
+
         return results;
     }
 

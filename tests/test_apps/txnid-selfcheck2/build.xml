@@ -3,11 +3,13 @@
 
     <property name="procedures.dir"     value="${basedir}/src/txnIdSelfCheck/procedures"/>
     <property name="clientsrc.dir"     value="${basedir}/src/txnIdSelfCheck"/>
+    <property name="dummysrc.dir"     value="${basedir}/src/donothing/procedures"/>
 
     <property name="build.dir"   value="build"/>
     <property name="classes.dir" value="${build.dir}/classes"/>
     <property name="clientclasses.dir" value="${build.dir}/cclasses"/>
     <property name="proceduresclasses.dir" value="${build.dir}/cclasses"/>
+    <property name="dummyclasses.dir" value="${build.dir}/dummycclasses"/>
     <property name="jar.dir"     value="${basedir}"/>
     <property name="voltdbroot.dir"     value="${basedir}/voltdbroot"/>
     <property name="log.dir"     value="${basedir}/log"/>
@@ -50,7 +52,20 @@
         </javac>
     </target>
 
-    <target name="jars" depends="procedures-compile, client-compile">
+    <target name="dummy-compile">
+        <mkdir dir="${dummyclasses.dir}"/>
+        <javac debug="on" srcdir="${dummysrc.dir}" destdir="${dummyclasses.dir}" >
+            <classpath refid="build-classpath"/>
+        </javac>
+    </target>
+
+    <target name="dummy" depends="dummy-compile">
+        <mkdir dir="${jar.dir}"/>
+        <jar destfile="${jar.dir}/dummy.jar" basedir="${dummyclasses.dir}">
+        </jar>
+    </target>
+
+    <target name="jars" depends="procedures-compile, client-compile, dummy">
         <mkdir dir="${jar.dir}"/>
         <jar destfile="${jar.dir}/txnid.jar" basedir="${proceduresclasses.dir}">
         </jar>
