@@ -54,6 +54,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
+import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
@@ -96,6 +97,7 @@ public class DDLCompiler {
 
     private static final String TABLE = "TABLE";
     private static final String PROCEDURE = "PROCEDURE";
+    private static final String FUNCTION = "FUNCTION";
     private static final String PARTITION = "PARTITION";
     private static final String REPLICATE = "REPLICATE";
     private static final String ROLE = "ROLE";
@@ -530,16 +532,16 @@ public class DDLCompiler {
 
         statement = statement.trim();
 
-        // matches if it is the beginning of a voltDB statement
+        // Matches if it is the beginning of a VoltDB statement
         Matcher statementMatcher = SQLParser.matchAllVoltDBStatementPreambles(statement);
         if ( ! statementMatcher.find()) {
             return false;
         }
 
-        // either PROCEDURE, REPLICATE, PARTITION, ROLE, EXPORT or DR
+        // Either PROCEDURE, FUNCTION, REPLICATE, PARTITION, ROLE, EXPORT or DR
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
-        // matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
+        // Matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
         statementMatcher = SQLParser.matchCreateProcedureFromClass(statement);
         if (statementMatcher.matches()) {
             if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
@@ -581,7 +583,7 @@ public class DDLCompiler {
             return true;
         }
 
-        // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS
+        // Matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS
         // ### <code-block> ### LANGUAGE <language-name>
         // We used to support Groovy in pre-5.x, but now we don't
         statementMatcher = SQLParser.matchCreateProcedureAsScript(statement);
@@ -589,7 +591,7 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException("VoltDB doesn't support inline proceudre creation..");
         }
 
-        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
+        // Matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
         statementMatcher = SQLParser.matchCreateProcedureAsSQL(statement);
         if (statementMatcher.matches()) {
             String clazz = checkProcedureIdentifier(statementMatcher.group(1), statement);
@@ -611,6 +613,44 @@ public class DDLCompiler {
             return true;
         }
 
+        // Matches if it is CREATE FUNCTION <name> FROM METHOD <class-name>.<method-name>
+        statementMatcher = SQLParser.matchCreateFunctionFromMethod(statement);
+        if (statementMatcher.matches()) {
+            String functionName = checkIdentifierStart(statementMatcher.group(1), statement);
+            String className = checkIdentifierStart(statementMatcher.group(2), statement);
+            String methodName = checkIdentifierStart(statementMatcher.group(3), statement);
+            CatalogMap<Function> functions = db.getFunctions();
+            if (functions.get(functionName) != null) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Function name \"%s\" in CREATE FUNCTION statement already exists.",
+                        functionName));
+            }
+            Function func = functions.add(functionName);
+            func.setFunctionname(functionName);
+            func.setClassname(className);
+            func.setMethodname(methodName);
+            return true;
+        }
+
+        // Matches if it is DROP FUNCTION <name>
+        statementMatcher = SQLParser.matchDropFunction(statement);
+        if (statementMatcher.matches()) {
+            String functionName = checkIdentifierStart(statementMatcher.group(1), statement);
+            boolean ifExists = statementMatcher.group(2) != null;
+            CatalogMap<Function> functions = db.getFunctions();
+            if (functions.get(functionName) != null) {
+                functions.delete(functionName);
+            }
+            else {
+                if (! ifExists) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Function name \"%s\" in DROP FUNCTION statement does not exist.",
+                            functionName));
+                }
+            }
+            return true;
+        }
+
         // Matches if it is DROP PROCEDURE <proc-name or classname>
         statementMatcher = SQLParser.matchDropProcedure(statement);
         if (statementMatcher.matches()) {
@@ -621,7 +661,7 @@ public class DDLCompiler {
             return true;
         }
 
-        // matches if it is the beginning of a partition statement
+        // Matches if it is the beginning of a partition statement
         statementMatcher = SQLParser.matchPartitionStatementPreamble(statement);
         if (statementMatcher.matches()) {
 
@@ -916,6 +956,13 @@ public class DDLCompiler {
                     "Invalid CREATE PROCEDURE statement: \"%s\", " +
                     "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
                     "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"",
+                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
+        }
+
+        if (FUNCTION.equals(commandPrefix)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE FUNCTION statement: \"%s\", " +
+                    "expected syntax: \"CREATE FUNCTION <name> FROM METHOD <class-name>.<method-name>\"",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 

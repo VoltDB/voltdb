@@ -40,6 +40,7 @@ class BuildContext:
         self.MINORVERSION = 0
         self.PATCHLEVEL   = 0
         self.S2GEO_LIBS = ""
+        self.GENERATOR_CLASSES = []
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
@@ -49,6 +50,7 @@ class BuildContext:
                 self.COVERAGE = True
             if arg in ["PROFILE"]:
                 self.PROFILE = True
+
         # Exec build.local if available, a python script provided with this
         # BuildContext object as the update-able symbol BUILD.  These example
         # build.local lines force the use of clang instead of gcc/g++.
@@ -67,7 +69,7 @@ class BuildContext:
         if self.PLATFORM == 'Linux':
             if self.compilerName() == 'gcc':
                 return "linux-x86_64:gcc -fpic"
-        print "ERROR: Don't know what platform to use to configure openssl."
+        print("ERROR: Don't know what platform to use to configure openssl.")
         sys.exit(-1)
 
     def compilerName(self):
@@ -139,7 +141,7 @@ try:
     version = readFile("version.txt")
     version = version.strip()
 except:
-    print "ERROR: Unable to read version number from version.txt."
+    print("ERROR: Unable to read version number from version.txt.")
     sys.exit(-1)
 
 # Replace the extension of filename with the
@@ -176,6 +178,42 @@ def formatList(list):
         str += (" " + name)
         indent += len(name) + 1
     return str
+
+def buildGeneratedTests(CTX, makefile, all_gen_tests):
+    makefile.write("########################################################################\n")
+    makefile.write("#\n")
+    makefile.write("# Generated C++ Tests.\n")
+    makefile.write("#\n")
+    makefile.write("########################################################################\n")
+    makefile.write("GENERATED_DIR=${OBJDIR}/generated\n")
+    makefile.write("GENERATED_SRC=$(GENERATED_DIR)/src\n")
+    makefile.write("GENERATED_OBJ=$(GENERATED_DIR)/obj\n")
+    makefile.write("GENERATED_BIN=$(GENERATED_DIR)/bin\n")
+    makefile.write("\n")
+    makefile.write('GENERATED_FILES= \\\n')
+    for gtest in all_gen_tests:
+        makefile.write('\t${GENERATED_SRC}/%s/%s.cpp \\\n' % (gtest[0], gtest[1]))
+    makefile.write('\n')
+    makefile.write("GENERATED_OBJS=$(subst $(GENERATED_SRC),$(GENERATED_OBJ),$(patsubst %.cpp,%.o,${GENERATED_FILES}))\n")
+    makefile.write("GENERATED_TESTS=$(subst $(GENERATED_SRC),$(GENERATED_BIN),$(patsubst %.cpp,%,${GENERATED_FILES}))\n")
+    makefile.write("\n")
+    makefile.write("${GENERATED_BIN}/%: ${GENERATED_OBJ}/%.o objects/harness.o objects/volt.a \\\n")
+    makefile.write("                                  | make-generated-dirs build-third-party-tools\n")
+    makefile.write('\t@mkdir -p $(shell dirname "$@")\n')
+    makefile.write("\t$(LINK.cpp) -o $@ $< objects/harness.o objects/volt.a $(LASTLDFLAGS)\n")
+    makefile.write("\n")
+    makefile.write('${GENERATED_OBJ}/%.o: ${GENERATED_SRC}/%.cpp\n')
+    makefile.write('\t@mkdir -p $(shell dirname "$@")\n')
+    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/$(TEST_PREFIX) -MMD -MP -o $@ $<\n")
+    makefile.write("\n")
+
+    makefile.write("build-generated-tests: ${GENERATED_TESTS}\n")
+    makefile.write("clean-generated-tests:\n")
+    makefile.write("\trm -rf ${GENERATED_OBJ}/* ${GENERATED_BIN}/*\n")
+    makefile.write('\n')
+    makefile.write('make-generated-dirs: ${GENERATED_DIR}\n')
+    makefile.write('\tmkdir -p ${GENERATED_OBJ} ${GENERATED_BIN}\n')
+    makefile.write('\n')
 
 def buildThirdPartyTools(CTX, makefile):
     makefile.write("########################################################################\n")
@@ -233,6 +271,7 @@ def buildThirdPartyTools(CTX, makefile):
     makefile.write('\t@echo "OPENSSL_SRC       = $(OPENSSL_SRC)"\n')
     makefile.write('\t@echo "OPENSSL_INSTALL   = $(OPENSSL_INSTALL)"\n')
     makefile.write('\t@echo "OPENSSL_VERSION   = $(OPENSSL_VERSION)"\n')
+    makefile.write('\t@echo "GENERATED_TESTS   = $(GENERATED_TESTS)"\n')
 
     #
     # start to build third party tools now
@@ -298,7 +337,7 @@ def buildThirdPartyTools(CTX, makefile):
     makefile.write('\t@echo Configuring The S2 Library for building.\n')
     makefile.write("\tif [ ! -f google-s2-geometry/Makefile ] ; then \\\n")
     makefile.write("\t    rm -rf google-s2-geometry; \\\n")
-    makefile.write('\t    mkdir google-s2-geometry; \\\n')
+    makefile.write('\t    mkdir -p google-s2-geometry; \\\n')
     makefile.write('\t    cd google-s2-geometry; \\\n')
     makefile.write('\t\tcmake -DCXX_VERSION_FLAG=\"-std=%s\" -DVOLTDB_THIRD_PARTY_CPP_DIR=\"${THIRD_PARTY_SRC}\" -DCMAKE_INSTALL_PREFIX=\"${INSTALL_DIR}\" -DCMAKE_BUILD_TYPE=\"${S2_BUILD_TYPE}\" \"${GOOGLE_S2_SRC}\"; \\\n' % CTX.CXX_VERSION_FLAG )
     makefile.write("\tfi\n")
@@ -352,6 +391,48 @@ def buildThirdPartyTools(CTX, makefile):
 
     return None
 
+def findRootDir():
+    wd = os.getcwd()
+    while wd != "/" and not os.path.exists(os.path.join(wd, "version.txt")):
+        wd = os.path.realpath(os.path.join(wd, ".."))
+    if wd != "/":
+        return wd
+    return None
+
+def generatedEETestFiles(output_prefix, buildType, testClasses, doGenerateFiles):
+    rootdir = findRootDir()
+    if not rootdir:
+        print("Can't find root directory.")
+        sys.exit(100)
+    tcArgs = ["tools/generate-ee-unit-tests.sh",
+               "--build",
+               buildType,
+               "--voltdbroot",
+               rootdir,
+               "--objdir",
+               os.path.join(rootdir, output_prefix)]
+    if not doGenerateFiles:
+        tcArgs += ["--names-only"]
+    for tc in testClasses:
+        tcArgs += ["--test-class", tc.strip()]
+    p = Popen(tcArgs, stdout=PIPE)
+    p.wait()
+    #
+    # Sometimes, in a pro build, the command above
+    # makes the folder obj/${BUILD}/testoutput.  We
+    # don't really want this here, and it causes the
+    # Jenkins jobs to fail.  So we just delete it here.
+    #
+    os.system("rm -rf %s/obj/%s/testoutput" % (rootdir, buildType))
+    if p.returncode != 0:
+        print("Fatal Error: %s" % p.communicate()[0])
+        sys.exit(p.returncode)
+    processStdOut = p.communicate()[0]
+    names = processStdOut.split()
+    names = list(names)
+    all_gen_tests = list((name.split("/") for name in names))
+    return all_gen_tests
+
 def buildMakefile(CTX):
     global version
 
@@ -382,9 +463,7 @@ def buildMakefile(CTX):
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/nativelibs"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/objects"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/static_objects"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/cpptests"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/prod"))
-
     input_paths = []
     for dir in CTX.INPUT.keys():
         input = CTX.INPUT[dir].split()
@@ -395,11 +474,16 @@ def buildMakefile(CTX):
         input = CTX.THIRD_PARTY_INPUT[dir].split()
         third_party_input_paths += [THIRD_PARTY_INPUT_PREFIX + "/" + dir + "/" + x for x in input]
 
+    # All permanent tests
     tests = []
     for dir in CTX.TESTS.keys():
-        input = CTX.TESTS[dir].split()
-        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
-
+        test_names = CTX.TESTS[dir].split()
+        tests += [os.path.join(TEST_PREFIX, dir, test) for test in test_names]
+    # All generated tests.
+    all_gen_tests = generatedEETestFiles(OUTPUT_PREFIX,
+                                         CTX.LEVEL.lower(),
+                                         CTX.GENERATOR_CLASSES,
+                                         True)
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
     makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
@@ -407,6 +491,8 @@ def buildMakefile(CTX):
     makefile.write("VOLT_LOG_LEVEL = %s\n" % CTX.LOG_LEVEL)
     makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
     makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
+    makefile.write("LASTLDFLAGS += %s\n" % (CTX.LASTLDFLAGS))
+    makefile.write("LASTIPCLDFLAGS += %s\n" % (CTX.LASTIPCLDFLAGS))
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
     makefile.write("JNIBINFLAGS += %s\n" % (JNIBINFLAGS))
     makefile.write("JNIEXT = %s\n" % (JNIEXT))
@@ -421,6 +507,7 @@ def buildMakefile(CTX):
     makefile.write('ROOTDIR=$(shell (cd ../..; /bin/pwd))\n')
     makefile.write('OBJDIR=$(ROOTDIR)/obj/${BUILD}\n')
     makefile.write('INSTALL_DIR=$(ROOTDIR)/%s\n' % THIRD_PARTY_INSTALL_DIR)
+    makefile.write("TEST_PREFIX=%s\n" % TEST_PREFIX)
     makefile.write('#\n')
     makefile.write('# This is the root of the cpp sources.\n')
     makefile.write('#\n')
@@ -433,7 +520,7 @@ def buildMakefile(CTX):
 
     if CTX.TARGET == "CLEAN":
         makefile.write(".PHONY: clean\n")
-        makefile.write("clean: \n")
+        makefile.write("clean:\n")
         makefile.write('\t${RM} "${PCRE2_SRC}"\n')
         makefile.write('\t(cd "${OPENSSL_SRC}"; make clean)\n')
         makefile.write('\trm -rf "${OBJDIR}"\n')
@@ -451,7 +538,6 @@ def buildMakefile(CTX):
         makefile.write("main:\n")
     else:
         makefile.write("main: nativelibs/libvoltdb-%s.$(JNIEXT)\n" % version)
-    makefile.write("# Suppress display of executed commands.\n")
 
     jni_objects = []
     static_objects = []
@@ -475,33 +561,24 @@ def buildMakefile(CTX):
 
     makefile.write("# main jnilib target\n")
     makefile.write("%s: %s\n" % (jnilibname, formatList(jni_objects)))
-    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ %s \n" % ( CTX.LASTLDFLAGS ) )
+    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ $(LASTLDFLAGS) \n")
     makefile.write("\n")
     cleanobjs += [ jnilibname ]
 
     makefile.write("# voltdb instance that loads the jvm from C++\n")
     makefile.write("prod/voltrun: $(SRCDIR)/voltrun.cpp " + formatList(static_objects) + "\n")
-    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^ %s\n" % ( CTX.LASTLDFLAGS ))
+    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^ $(LASTLDFLAGS)\n")
     makefile.write("\n")
     cleanobjs += ["prod/voltrun"]
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
-    makefile.write("prod/voltdbipc: $(SRCDIR)/voltdbipc.cpp " + " objects/volt.a\n")
-    makefile.write("\t$(LINK.cpp) -o $@ $^ %s %s\n" % (CTX.LASTLDFLAGS, CTX.LASTIPCLDFLAGS))
+    makefile.write("prod/voltdbipc: $(SRCDIR)/voltdbipc.cpp objects/volt.a\n")
+    makefile.write("\t$(LINK.cpp) -o $@ $^ $(LASTLDFLAGS) $(LASTIPCLDFLAGS)\n")
     makefile.write("\n")
     cleanobjs += ["prod/voltdbipc"]
-
-    makefile.write(".PHONY: test\n")
-    makefile.write("test: ")
-    for test in tests:
-        binname, objectname, sourcename = namesForTestCode(test)
-        makefile.write(binname + " ")
-    if CTX.LEVEL == "MEMCHECK":
-        makefile.write("prod/voltdbipc")
-    if CTX.LEVEL == "MEMCHECK_NOFREELIST":
-        makefile.write("prod/voltdbipc")
-    makefile.write("\n")
     makefile.write('\n')
+    makefile.write('\n')
+    
     makefile.write("objects/volt.a: %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
@@ -571,6 +648,22 @@ def buildMakefile(CTX):
     makefile.write('# Tests\n')
     makefile.write('#\n')
     makefile.write('########################################################################\n')
+
+    # build the generated tests.
+    buildGeneratedTests(CTX, makefile, all_gen_tests)
+    makefile.write("\n")
+    
+    # A target for all the tests.  This is what buildtools.py eventually uses.
+    makefile.write("#\n# A target for all the tests.  This is what buildtools.py eventually uses.\n#\n") 
+    makefile.write(".PHONY: test\n")
+    makefile.write("test: \\\n")
+    for test in tests:
+        binname, objectname, sourcename = namesForTestCode(test)
+        makefile.write("        " + binname + " \\\n")
+    makefile.write("        ${GENERATED_TESTS}")
+    if CTX.LEVEL == "MEMCHECK" or CTX.LEVEL == "MEMCHECK_NOFREELIST":
+        makefile.write("\\\n        prod/voltdbipc\n")
+    makefile.write('\n')
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
 
@@ -581,7 +674,7 @@ def buildMakefile(CTX):
         makefile.write("#\n")
         makefile.write("########################################################################\n")
         makefile.write("%s: $(ROOTDIR)/%s | build-third-party-tools \n" % (objectname, sourcename))
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/${TEST_PREFIX} -MMD -MP -o $@ $(ROOTDIR)/%s\n" % sourcename)
         makefile.write("-include %s\n" % replaceSuffix(objectname, ".d"))
         # link the test
         makefile.write("%s: objects/harness.o %s objects/volt.a  | build-third-party-tools \n" % (binname, objectname))
@@ -601,7 +694,7 @@ def buildMakefile(CTX):
     makefile.write("#\n")
     makefile.write("########################################################################\n")
     makefile.write("\n")
-    makefile.write("clean: clean-s2-geometry clean-openssl clean-3pty-install\n")
+    makefile.write("clean: clean-s2-geometry clean-openssl clean-3pty-install clean-generated-tests\n")
     makefile.write("\t${RM} %s\n" % formatList(cleanobjs))
     makefile.write("\n")
     makefile.write(".PHONY: clean-3pty-install\n")
@@ -617,23 +710,6 @@ def buildMakefile(CTX):
 def buildIPC(CTX):
     retval = os.system("make --directory=%s prod/voltdbipc -j4" % (CTX.OUTPUT_PREFIX))
     return retval
-
-class MemLeakError:
-    def __init__(self, bytes, blocks, errType, line):
-        self.bytes = bytes
-        self.blocks = blocks
-        self.errType = errType
-        self.line = line
-    def message(self):
-        return self.errType + '\n    ' + self.line
-
-class ValgrindError:
-    def __init__(self, errorCount, contextCount, errType, line):
-        self.errorCount = errorCount
-        self.contextCount = contextCount
-        self.line = line
-    def message(self):
-        return self.line
 
 class ValgrindErrorState:
     def __init__(self, expectErrorsIn, valgrindFile):
@@ -712,95 +788,138 @@ class ValgrindErrorState:
     def isExpectedState(self):
         return (self.expectErrors == self.foundErrors)
 
-    def errorMessage(self):
+    def errorMessage(self, retval):
         if self.isExpectedState():
             exp = " (Expected)"
         else:
             exp = ""
-        return ("%s\n%d Valgrind Errors%s: \n" %
+        return ("%s\n%d Valgrind Errors, return value %d%s: \n" %
                 (":-----------------------------------------------------------:", \
                  len(self.errorStrings), \
+                 retval, \
                  exp) \
                 + "\n".join(self.errorStrings))
 
-def makeValgrindFile(pidStr):
-    return "valgrind_ee_%s.xml" % pidStr
+def makeValgrindFile(testdir, pidStr):
+    return os.path.join(testdir, "valgrind_ee_%s.xml" % pidStr)
 
 def runTests(CTX):
     failedTests = []
+    successes = 0
+    failures = 0
+    # We only want to use valgrind for MEMCHECK or MEMCHECK_NOFREELIST builds.
+    usingValgrind = CTX.LEVEL == "MEMCHECK" or CTX.LEVEL == "MEMCHECK_NOFREELIST"
+    #
+    # Set executing to False to test this function without
+    # really running tests.  In this case, set exretval to 0 to simulate all
+    # successes.  Set exretval to -1 to simulate all failures.
+    #
+    executing = True
+    exretval = 0
 
     retval = os.system("make --directory=%s test -j4" % (CTX.OUTPUT_PREFIX))
     if retval != 0:
         return -1
-    TESTOBJECTS_DIR = os.environ['TEST_DIR']
     TEST_PREFIX = CTX.TEST_PREFIX.rstrip("/")
     OUTPUT_PREFIX = CTX.OUTPUT_PREFIX.rstrip("/")
-
+    GEN_TEST_PREFIX = os.path.join(OUTPUT_PREFIX, 'generated')
     tests = []
-    for dir in CTX.TESTS.keys():
-        input = CTX.TESTS[dir].split()
-        tests += [(dir, TEST_PREFIX + "/" + dir + "/" + x) for x in input]
-    successes = 0
-    failures = 0
+    # For each test we record:
+    #    The name of the binary directory, excluding the category and test names,
+    #    The Category name,
+    #    The test name,
+    TEST_PERMANENT = True  # Set to False for debugging
+    TEST_GENERATED = True  # Set to False for debugging.
+    if TEST_PERMANENT:
+        for dirname in CTX.TESTS.keys():
+            test_names = CTX.TESTS[dirname].split()
+            tests += [(os.path.join(OUTPUT_PREFIX, 'cpptests'),
+                       dirname,
+                       testname) for testname in test_names]
+    if TEST_GENERATED:
+        for dirname, testname in generatedEETestFiles(OUTPUT_PREFIX, CTX.LEVEL.lower(),
+                                                      CTX.GENERATOR_CLASSES, False):
+            tests += [(os.path.join(OUTPUT_PREFIX, 'generated', 'bin'),
+                       dirname,
+                       testname)]
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
-    for dir, test in tests:
+    for bindirname, dirname, test in tests:
         # We expect valgrind failures in all tests in memleaktests
         # except for the test named no_losses.
-        expectMemLeaks = (dir == "memleaktests") and not (test.endswith("no_losses"))
-        binname, objectname, sourcename = namesForTestCode(test)
-        targetpath = OUTPUT_PREFIX + "/" + binname
+        expectErrors = (dirname == "memleaktests") and ( test != "no_losses" )
+        srcpath = os.path.join("test", "ee", dirname, test)
+        targetpath = os.path.join(bindirname, dirname, test)
         retval = 0
         if test.endswith("CopyOnWriteTest") and CTX.LEVEL == "MEMCHECK_NOFREELIST":
             continue
         if os.path.exists(targetpath + ".py"):
             retval = os.system("/usr/bin/env python " + targetpath + ".py")
         else:
-            isValgrindTest = True;
-            for test in noValgrindTests:
-                if targetpath.find(test) != -1:
-                    isValgrindTest = False;
+            isValgrindTest = usingValgrind
+            errorState = None
+            if usingValgrind:
+                for nvgtest in noValgrindTests:
+                    if targetpath.find(nvgtest) != -1:
+                        isValgrindTest = False;
+                        break
             if CTX.PLATFORM == "Linux" and isValgrindTest:
-                valgrindFile = makeValgrindFile("%p")
-                process = Popen(executable="valgrind",
-                                args=["valgrind",
-                                      "--leak-check=full",
-                                      "--show-reachable=yes",
-                                      "--error-exitcode=-1",
-                                      "--suppressions=" + os.path.join(TEST_PREFIX,
-                                                                       "test_utils/vdbsuppressions.supp"),
-                                      "--xml=yes",
-                                      "--xml-file=" + valgrindFile,
-                                      targetpath], stderr=PIPE, bufsize=-1)
-                out_err = process.stderr.readlines()
-                retval = process.wait()
-                fileName = makeValgrindFile("%d" % process.pid)
-                errorState = ValgrindErrorState(expectMemLeaks, fileName)
+                print('Executing valgrind test %s' % targetpath)
+                sys.stdout.flush()
+                valgrindDir = os.path.join(bindirname, dirname)
+                valgrindFile = makeValgrindFile(valgrindDir, "%p")
+                if executing:
+                    process = Popen(executable="valgrind",
+                                    args=["valgrind",
+                                          "--leak-check=full",
+                                          "--show-reachable=yes",
+                                          "--error-exitcode=-1",
+                                          "--suppressions=" + os.path.join(TEST_PREFIX,
+                                                                           "test_utils/vdbsuppressions.supp"),
+                                          "--xml=yes",
+                                          "--xml-file=" + valgrindFile,
+                                          targetpath], stderr=PIPE, bufsize=-1)
+                    out_err = process.stderr.readlines()
+                    retval = process.wait()
+                    fileName = makeValgrindFile(valgrindDir, "%d" % process.pid)
+                else:
+                    fileName = None
+                    retval = exretval
+                    print('    Test %s was not run.' % os.path.join(dirname, test))
+                if retval != 0:
+                    errorState = ValgrindErrorState(expectErrors, fileName)
                 # If there are as many errors as we expect,
                 # then delete the xml file.  Otherwise keep it.
                 # It may be useful.
-                if ( not errorState.isExpectedState()):
-                    try:
-                        os.remove(fileName)
-                    except ex:
-                        pass
-                    print errorState.errorMessage()
-                    retval = -1
-                    sys.stdout.flush()
+                if errorState:
+                    if not errorState.isExpectedState():
+                        if fileName:
+                            try:
+                                os.remove(fileName)
+                            except ex:
+                                pass
+                        print(errorState.errorMessage(retval))
+                        retval = -1
+                        sys.stdout.flush()
             else:
-                retval = os.system(targetpath)
+                print('Executing non-valgrind test %s' % targetpath)
+                sys.stdout.flush()
+                if executing:
+                    retval = os.system(targetpath)
+                else:
+                    retval = exretval
         if retval == 0:
             successes += 1
         else:
-            failedTests += [binname]
+            failedTests += [os.path.join(dirname, test)]
             failures += 1
-    print "==============================================================================="
-    print "TESTING COMPLETE (PASSED: %d, FAILED: %d)" % (successes, failures)
+    print("===============================================================================")
+    print("TESTING COMPLETE (PASSED: %d, FAILED: %d)" % (successes, failures))
     for test in failedTests:
-        print "TEST: " + test + " in DIRECTORY: " + CTX.OUTPUT_PREFIX + " FAILED"
+        print("TEST: " + test + " in DIRECTORY: " + CTX.OUTPUT_PREFIX + " FAILED")
     if failures == 0:
-        print "*** SUCCESS ***"
+        print("*** SUCCESS ***")
     else:
-        print "!!! FAILURE !!!"
-    print "==============================================================================="
+        print("!!! FAILURE !!!")
+    print("===============================================================================")
 
     return failures
