@@ -44,6 +44,7 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
+
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -191,26 +192,12 @@ public class KafkaLoader10 {
                     long fc = m_failedCount.incrementAndGet();
                     if ((m_cliOptions.maxerrors > 0 && fc > m_cliOptions.maxerrors)
                             || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
-                        try {
-                            m_log.error("Kafkaloader will exit.");
-                            closeConsumer();
-                            return true;
-                        } catch (InterruptedException ex) {
-                        }
+                        m_log.error("Kafkaloader will exit.");
+                        notifyShutdown();
                     }
                 }
             }
             return false;
-        }
-
-      //Close the consumer after this app will exit.
-        public void closeConsumer() throws InterruptedException {
-            // TODO: close kafka consumer
-            if (m_es != null) {
-                m_es.shutdownNow();
-                m_es.awaitTermination(365, TimeUnit.DAYS);
-                m_es = null;
-            }
         }
 
         @Override
@@ -223,6 +210,12 @@ public class KafkaLoader10 {
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     private List<KafkaConsumer<byte[], byte[]>> m_consumers;
 
+    // stub for shutdown hook
+    void notifyShutdown() {
+        if (m_shutdown.compareAndSet(false, true)) {
+            System.out.println("shutdown signalled ... " + Thread.currentThread().getName());
+        }
+    }
 
     private Properties kafkaConfigProperties() throws IOException {
         //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
@@ -328,11 +321,7 @@ public class KafkaLoader10 {
         }
 
 
-        // stub for shutdown hook
-        void shutdown() {
-            if(m_shutdown.compareAndSet(false, true)) {
-            }
-        }
+
 
         @Override
         public void run() {
@@ -350,46 +339,66 @@ public class KafkaLoader10 {
 //            }
 //            System.out.println(topicPartitions.toString());
 
-            while (!m_shutdown.get()) {
-                ConsumerRecords<byte[], byte[]> records = null;
-                try {
-                    records = m_consumer.poll(1000); // milliseconds
-                } catch (WakeupException wakeup) {
-                    System.out.println("Wakeup exception seen " + wakeup);
-                    m_log.warn("Received wakeup exception",  wakeup);
-                    m_consumer.close();
-                    break;
-                } catch (Exception terminate) {
-                    m_log.error("Consumer got an error when polling for record", terminate);
-                    System.exit(-1);
-                }
-
-                for (ConsumerRecord<byte[], byte[]> record : records) {
-                    if (record.serializedValueSize() < 0) {
-                        m_log.debug("got zero size record at offset " + record.offset());
-                    }
+            try {
+                while (!m_shutdown.get()) {
+                    ConsumerRecords<byte[], byte[]> records = null;
                     try {
-                        byte[] msg = record.value();
-                        long offset = record.offset();
+                        records = m_consumer.poll(1000); // milliseconds
+                    } catch (WakeupException wakeup) {
+                        System.out.println("Wakeup exception seen " + wakeup);
+                        notifyShutdown();
+                        break;
+                    } catch (Exception terminate) {
+                        m_log.error("Error seen during poll", terminate);
+                        break;
+                    }
+
+                    for (ConsumerRecord<byte[], byte[]> record : records) {
+                        if (record.serializedValueSize() < 0) {
+                            m_log.debug("got zero size record at offset " + record.offset());
+                        }
+                        byte[] msg = null;
+                        long offset = 0;
+                        try {
+                            msg = record.value();
+                            offset = record.offset();
+                        } catch (Throwable error) {
+                            m_log.error("Failed fetching message from kafka record", error);
+                            notifyShutdown();
+                            break;
+                        }
+
                         String smsg = new String(msg);
                         Object params[];
-                        if (m_formatter != null) {
-                            try {
-                                params = m_formatter.transform(ByteBuffer.wrap(msg));
-                            } catch (FormatException fe) {
-                                m_log.warn("Failed to transform message: " + smsg);
+                        try {
+                            if (m_formatter != null) {
+                                try {
+                                    params = m_formatter.transform(ByteBuffer.wrap(msg));
+                                } catch (FormatException keepGoing) {
+                                    m_log.warn("Failed to transform message at offset " + offset
+                                            + ", error message: " + keepGoing.getMessage());
+                                    continue;
+                                }
+                            } else {
+                                params = m_csvParser.parseLine(smsg);
+                            }
+                            if (params == null) {
                                 continue;
                             }
-                        } else {
-                            params = m_csvParser.parseLine(smsg);
+                            m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
+                        } catch (IOException ioExcp) {
+                            m_log.error("Failed to parse message" + smsg);
+                            notifyShutdown();
+                            break;
+                        } catch (Throwable terminate) {
+                            m_log.error("Consumer stopped", terminate);
+                            notifyShutdown();
+                            break;
                         }
-                        if (params == null) continue;
-                        m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
-                    } catch (Throwable terminate) {
-                        m_log.error("Consumer stopped", terminate);
-                        System.exit(-1);
                     }
                 }
+            } finally {
+                m_consumer.close();
             }
         }
 
@@ -452,7 +461,6 @@ public class KafkaLoader10 {
 //            }
 
             m_es = getConsumerExecutor();
-
             if (m_cliOptions.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started using procedure: " + m_cliOptions.procedure);
             } else {
