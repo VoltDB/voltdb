@@ -71,6 +71,7 @@ public class ProcedureRunnerNT {
     protected final Connection m_ccxn;
     protected final long m_ciHandle;
     protected final long m_clientHandle;
+    protected final int m_timeout;
     protected final String m_procedureName;
     protected final VoltNonTransactionalProcedure m_procedure;
     protected final Method m_procMethod;
@@ -87,6 +88,7 @@ public class ProcedureRunnerNT {
                       boolean isAdmin,
                       long ciHandle,
                       long clientHandle,
+                      int timeout,
                       VoltNonTransactionalProcedure procedure,
                       String procName,
                       Method procMethod,
@@ -102,6 +104,7 @@ public class ProcedureRunnerNT {
         m_isAdmin = isAdmin;
         m_ciHandle = ciHandle;
         m_clientHandle = clientHandle;
+        m_timeout = timeout;
         m_procedure = procedure;
         m_procedureName = procName;
         m_procMethod = procMethod;
@@ -175,7 +178,7 @@ public class ProcedureRunnerNT {
      */
     protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
         MyProcedureCallback cb = new MyProcedureCallback();
-        boolean success = m_ntProcService.m_ich.callProcedure(m_user, false, 1000 * 120, cb, true, procName, params);
+        boolean success = m_ntProcService.m_ich.callProcedure(m_user, false, m_timeout, cb, true, procName, params);
         assert(success);
         return cb.fut;
     }

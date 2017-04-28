@@ -68,28 +68,22 @@ public class NTProcedureService {
         final AuthUser user;
         final Connection ccxn;
         final boolean isAdmin;
-        final long clientHandle;
         final boolean ntPriority;
-        final String procName;
-        final ParameterSet paramListIn;
+        final StoredProcedureInvocation task;
 
         PendingInvocation(long ciHandle,
                           AuthUser user,
                           Connection ccxn,
                           boolean isAdmin,
-                          long clientHandle,
                           boolean ntPriority,
-                          String procName,
-                          ParameterSet paramListIn)
+                          StoredProcedureInvocation task)
         {
             this.ciHandle = ciHandle;
             this.user = user;
             this.ccxn = ccxn;
             this.isAdmin = isAdmin;
-            this.clientHandle = clientHandle;
             this.ntPriority = ntPriority;
-            this.procName = procName;
-            this.paramListIn = paramListIn;
+            this.task = task;
         }
     }
 
@@ -201,7 +195,8 @@ public class NTProcedureService {
                                                     Connection ccxn,
                                                     boolean isAdmin,
                                                     long ciHandle,
-                                                    long clientHandle)
+                                                    long clientHandle,
+                                                    int timeout)
                 throws InstantiationException, IllegalAccessException
         {
             // every single call gets a unique id as a key for the outstanding procedure map
@@ -216,6 +211,7 @@ public class NTProcedureService {
                                                              isAdmin,
                                                              ciHandle,
                                                              clientHandle,
+                                                             timeout,
                                                              procedure,
                                                              m_procedureName,
                                                              m_procMethod,
@@ -351,7 +347,7 @@ public class NTProcedureService {
         // release all of the pending invocations into the real queue
         m_pendingInvocations
             .forEach(pi -> callProcedureNT(pi.ciHandle, pi.user, pi.ccxn, pi.isAdmin,
-                    pi.clientHandle, pi.ntPriority, pi.procName, pi.paramListIn));
+                     pi.ntPriority, pi.task));
         m_pendingInvocations.clear();
     }
 
@@ -363,19 +359,19 @@ public class NTProcedureService {
                                       final AuthUser user,
                                       final Connection ccxn,
                                       final boolean isAdmin,
-                                      final long clientHandle,
                                       final boolean ntPriority,
-                                      final String procName,
-                                      final ParameterSet paramListIn)
+                                      final StoredProcedureInvocation task)
     {
         // If paused, stuff a record of the invocation into a queue that gets
         // drained when un-paused. We're counting on regular upstream backpressure
         // to prevent this from getting too out of hand.
         if (m_paused) {
-            PendingInvocation pi = new PendingInvocation(ciHandle, user, ccxn, isAdmin, clientHandle, ntPriority, procName, paramListIn);
+            PendingInvocation pi = new PendingInvocation(ciHandle, user, ccxn, isAdmin, ntPriority, task);
             m_pendingInvocations.add(pi);
             return;
         }
+
+        String procName = task.getProcName();
 
         final ProcedureRunnerNTGenerator prntg;
         if (procName.startsWith("@")) {
@@ -387,14 +383,14 @@ public class NTProcedureService {
 
         ProcedureRunnerNT tempRunner = null;
         try {
-            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, clientHandle);
+            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, isAdmin, ciHandle, task.getClientHandle(), task.getBatchTimeout());
         } catch (InstantiationException | IllegalAccessException e1) {
             // I don't expect to hit this, but it's here...
             // must be done as IRM to CI mailbox for backpressure accounting
             ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                                                  new VoltTable[0],
                                                                  "Could not create running context for " + procName + ".",
-                                                                 clientHandle);
+                                                                 task.getClientHandle());
             InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
                                                                                            ccxn.connectionId(),
                                                                                            response);
@@ -408,7 +404,7 @@ public class NTProcedureService {
             @Override
             public void run() {
                 try {
-                    runner.call(paramListIn.toArray());
+                    runner.call(task.getParams().toArray());
                 }
                 catch (Throwable ex) {
                     ex.printStackTrace();
@@ -437,7 +433,7 @@ public class NTProcedureService {
             ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                                                  new VoltTable[0],
                                                                  "Could not submit NT procedure " + procName + " to exec service for .",
-                                                                 clientHandle);
+                                                                 task.getClientHandle());
             InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
                                                                                            ccxn.connectionId(),
                                                                                            response);

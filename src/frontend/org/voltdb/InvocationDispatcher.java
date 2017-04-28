@@ -745,10 +745,8 @@ public final class InvocationDispatcher {
                                              user,
                                              ccxn,
                                              handler.isAdmin(),
-                                             task.clientHandle,
                                              ntPriority,
-                                             task.getProcName(),
-                                             paramSet);
+                                             task);
         return null;
     }
 
