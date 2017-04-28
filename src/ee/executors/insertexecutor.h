@@ -82,7 +82,6 @@ class InsertExecutor : public AbstractExecutor
         m_persistentTable(NULL),
         m_upsertTuple(),
         m_templateTuple(),
-        m_inputTuple(),
         m_tempPool(NULL)
             {
             }
@@ -148,7 +147,6 @@ class InsertExecutor : public AbstractExecutor
     PersistentTable* m_persistentTable;
     TableTuple m_upsertTuple;
     TableTuple m_templateTuple;
-    TableTuple m_inputTuple;
     Pool* m_tempPool;
 };
 

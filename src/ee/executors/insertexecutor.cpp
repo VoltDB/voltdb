@@ -230,7 +230,6 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
                                "single-row" : "multi-row"),
                m_engine->getPartitionId());
     VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
-    m_inputTuple = TableTuple(inputSchema);
     m_tempPool = ExecutorContext::getTempStringPool();
     return false;
 }
@@ -370,8 +369,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
     //
     TableIterator iterator = m_inputTable->iterator();
-    while (iterator.next(m_inputTuple)) {
-        p_execute_tuple(m_inputTuple);
+    TableTuple inputTuple = TableTuple(inputSchema);
+    while (iterator.next(inputTuple)) {
+        p_execute_tuple(inputTuple);
     }
 
     p_execute_finish();
