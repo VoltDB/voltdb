@@ -60,7 +60,7 @@ public class DropStream extends StatementProcessor {
                         "Invalid DROP STREAM statement: table %s is not a stream.",
                         streamName));
             }
-            m_isFinal = true;
+            m_returnAfterThis = true;
         }
         return false;
     }

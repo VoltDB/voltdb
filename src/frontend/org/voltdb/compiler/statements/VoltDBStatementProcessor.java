@@ -43,7 +43,7 @@ public class VoltDBStatementProcessor extends StatementProcessor {
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
         if (ddlStatement.statement == null || ddlStatement.statement.trim().isEmpty()) {
-            m_isFinal = true;
+            m_returnAfterThis = true;
             return false;
         }
         ddlStatement.statement = ddlStatement.statement.trim();
@@ -51,7 +51,7 @@ public class VoltDBStatementProcessor extends StatementProcessor {
         // Matches if it is the beginning of a VoltDB statement
         Matcher statementMatcher = SQLParser.matchAllVoltDBStatementPreambles(ddlStatement.statement);
         if ( ! statementMatcher.find()) {
-            m_isFinal = true;
+            m_returnAfterThis = true;
             return false;
         }
         // Either PROCEDURE, FUNCTION, REPLICATE, PARTITION, ROLE, EXPORT or DR

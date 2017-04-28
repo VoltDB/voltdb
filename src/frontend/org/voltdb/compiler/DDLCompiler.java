@@ -202,7 +202,12 @@ public class DDLCompiler {
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
 
+    /**
+     * Processors for different types of DDL statements will inherit from this class.
+     * Together they will build a processing chain in a chain of responsibility (CoR) pattern.
+     */
     public static abstract class StatementProcessor {
+        //
         private StatementProcessor m_next;
 
         protected HSQLInterface m_hsql;
@@ -211,7 +216,7 @@ public class DDLCompiler {
         protected ClassLoader m_classLoader;
         protected VoltXMLElement m_schema;
         protected ClassMatcher m_classMatcher;
-        protected boolean m_isFinal = false;
+        protected boolean m_returnAfterThis = false;
 
         public StatementProcessor(DDLCompiler ddlCompiler) {
             if (ddlCompiler != null) {
@@ -238,9 +243,9 @@ public class DDLCompiler {
                 DDLStatement ddlStatement,
                 Database db,
                 DdlProceduresToLoad whichProcs) throws VoltCompilerException {
-            m_isFinal = false;
+            m_returnAfterThis = false;
             if (! processStatement(ddlStatement, db, whichProcs)) {
-                if (m_isFinal || m_next == null) {
+                if (m_returnAfterThis || m_next == null) {
                     return false;
                 }
                 return m_next.process(ddlStatement, db, whichProcs);
