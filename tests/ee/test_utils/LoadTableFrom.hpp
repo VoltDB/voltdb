@@ -129,7 +129,7 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
                                        schema, // Transfers ownership to the table.
                                        columnNames,
                                        NULL);
-    table->loadTuplesFromNoHeader(result);
+    table->loadTuplesFromNoHeader(result, ExecutorContext::getTempStringPool());
     return table;
 }
 

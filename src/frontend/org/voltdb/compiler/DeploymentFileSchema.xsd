@@ -483,6 +483,7 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="preferred-source" type="clusterIdType"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true" />
   </xs:complexType>
 

@@ -1099,7 +1099,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // Check that the unique absolute value constraint applies
             m_client.callProcedure("FOO.insert", 1, 1, 1, 1);
-            boolean threw = true;
+            boolean threw = false;
             try {
                 m_client.callProcedure("FOO.insert", -1, -1, -1, -1);
             }

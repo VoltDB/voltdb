@@ -77,7 +77,7 @@ public interface SystemProcedureExecutionContext {
     public void updateBackendLogLevels();
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
-            CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle);
+            CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean requiresNewExportGeneration);
 
     public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp);
 
@@ -103,6 +103,10 @@ public interface SystemProcedureExecutionContext {
     public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers);
 
     public void resetDrAppliedTracker();
+
+    public void resetDrAppliedTracker(byte clusterId);
+
+    public boolean hasRealDrAppliedTracker(byte clusterId);
 
     public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
 

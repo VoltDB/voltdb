@@ -6,13 +6,15 @@
 #   1.) mkdir obj/${BUILD_TYPE}
 #       where ${BUILD_TYPE} is memcheck, release or debug.
 #   2.) cd obj/${BUILD_TYPE}
-#   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE}
+#   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE} ${SRC_DIR}
+#       where ${SRC_DIR} is the pathname of the voltdb
+#       source directory, where file is.
 #   4.) make -j<N> -k install
 #       where, as usual, <N> is number telling make how much parallelism
 #       to use.  Values between 1 and 8 are typical.  Higher values
 #       may produce faster builds, or they may just gum things up.
 # If this succeeds, then the build artifacts will be placed in
-# obj/${BUILD}/prod/.
+# obj/${BUILD}/prod.
 #
 # The two artifacts are:
 #   1.) The jni library, which will be in
@@ -44,6 +46,7 @@
 # will run the tests in parallel. The option --output-on-failure
 # will only dump output if the test fails to meet its specification.
 # Note that some tests are expected to fail.
+#
 #
 ########################################################################
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.12 FATAL_ERROR)
@@ -630,7 +633,8 @@ ENABLE_TESTING()
 SET (VOLTDB_TEST_SRC tests/ee)
 SET (VOLTDB_TEST_DIR ${CMAKE_BINARY_DIR}/tests)
 SET (VOLTDB_TEST_OBJ ${VOLTDB_TEST_DIR}/obj)
-SET (VOLTDB_TEST_INSTALL_DIR ${VOLTDB_TEST_DIR}/bin)
+#
+# This is a bit adhoc.
 #
 # All the tests in ${VOLTDB_FAILING_VALGRIND_DIRS} are
 # expected to fail under valgrind except for those
@@ -670,12 +674,6 @@ SET (VOLTDB_TEST_PROGRAMS
   execution/FragmentManagerTest
   executors/OptimizedProjectorTest
   executors/MergeReceiveExecutorTest
-  executors/TestGeneratedPlans
-  executors/TestWindowedRank
-  executors/TestWindowedCount
-  executors/TestWindowedMin
-  executors/TestWindowedMax
-  executors/TestWindowedSum
   expressions/expression_test
   expressions/function_test
   indexes/index_key_test

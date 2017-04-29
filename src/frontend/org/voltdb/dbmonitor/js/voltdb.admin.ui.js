@@ -413,7 +413,7 @@ function loadAdminPage() {
     //Admin Page download link
     $('#downloadAdminConfigurations').on('click', function (e) {
         var port = VoltDBConfig.GetPortId() != null ? VoltDBConfig.GetPortId() : '8080';
-        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/deployment.xml?' + VoltDBCore.shortApiCredentials;
+        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/?' + VoltDBCore.shortApiCredentials;
         $(this).attr("href", url);
         setTimeout(function () {
             $('#downloadAdminConfigurations').attr("href", "#");
@@ -1502,7 +1502,7 @@ function loadAdminPage() {
 
     var searchSnapshots = function (e) {
         $('#btnRestore').removeClass('btn').addClass('restoreBtn');
-        $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.GIF"></td></tr>');
+        $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="images/loader-small.GIF"></td></tr>');
         voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function (snapshotList) {
             var result = '';
             var searchBox = '';

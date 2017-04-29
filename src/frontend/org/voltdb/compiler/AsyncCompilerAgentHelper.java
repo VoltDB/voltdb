@@ -242,6 +242,7 @@ public class AsyncCompilerAgentHelper
             retval.tablesThatMustBeEmpty = emptyTablesAndReasons[0];
             retval.reasonsForEmptyTables = emptyTablesAndReasons[1];
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
+            retval.requiresNewExportGeneration = diff.requiresNewExportGeneration();
             retval.worksWithElastic = diff.worksWithElastic();
         }
         catch (Exception e) {

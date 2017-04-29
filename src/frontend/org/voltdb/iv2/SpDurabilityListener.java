@@ -23,6 +23,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * This class is not thread-safe. Most of its usage is on the Site thread.
@@ -150,6 +152,13 @@ public class SpDurabilityListener implements DurabilityListener {
         private void queuePendingTasks() {
             // Notify all sync transactions and the SP UniqueId listeners
             for (TransactionTask o : m_pendingTransactions) {
+                final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+                if (traceLog != null) {
+                    traceLog.add(() -> VoltTrace.endAsync("durability",
+                                                          MiscUtils.hsIdTxnIdToString(m_spScheduler.m_mailbox.getHSId(),
+                                                                                      o.getSpHandle())));
+                }
+
                 m_pendingTasks.offer(o);
                 // Make sure all queued tasks for this MP txn are released
                 if (!o.getTransactionState().isSinglePartition()) {

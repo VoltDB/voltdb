@@ -77,10 +77,12 @@ parser.add_argument('--runalltests',
                     action='store_true',
                     help='''
                     Build and run the EE unit tests.  Use valgrind for memcheck or memcheck_nofreelist.
-                    This implies --install.  See --eetestsuite as well.''')
+                    This implies --build-tests.  See --eetestsuite as well.''')
 parser.add_argument('--eetestsuite',
+                    default=None,
                     help='''
-                    Which ee test suite to execute when testing.''')
+                    Which ee test suite to execute when testing.  The default is to run all the tests.
+                    ''')
 
 config=parser.parse_args()
 prefix=os.path.join('obj', config.buildtype)
@@ -116,6 +118,12 @@ def cmakeCommandString(config):
              % (config.buildtype, config.generator, coverage, profile, config.sourcedir)
 
 def makeCommandString(config):
+    # Calculate implications between the input parameters.
+    if config.runalltests:
+        config.buildtests = True
+    # Now, calculate the build target.
+    #
+    # We always want to do a build if we are called here.
     target='build'
     if config.buildtests:
         target += ' build-tests'
@@ -123,17 +131,16 @@ def makeCommandString(config):
         target += ' voltdbipc'
     if config.install:
         target += ' install'
-    if config.runalltests:
-        target += ' runalltests'
-    if len(target) > 0:
-        makeCmd = makeGeneratorCommand(config)
-        return ("%s %s" % (makeCmd, target))
+    makeCmd = makeGeneratorCommand(config)
+    return ("%s %s" % (makeCmd, target))
 
 def runCommand(commandStr, config):
     if config.debug:
         print(commandStr)
+        return True
     else:
-        subprocess.call(commandStr, shell = True)
+        retcode = subprocess.call(commandStr, shell = True)
+        return (retcode == 0)
 #
 # The prefix must either not exist or else
 # be a directory.  If this is a clean build we
@@ -157,5 +164,30 @@ else:
 # If we have not already configured, we want to reconfigure.
 #
 if not os.path.exists('CMakeCache.txt'):
-    runCommand(cmakeCommandString(config), config)
-runCommand(makeCommandString(config), config)
+    configCmd = cmakeCommandString(config)
+    if not runCommand(configCmd, config):
+        print("Cmake command \"%s\" failed." % configCmd)
+        sys.exit(100)
+
+#
+# Do the actual build.
+#
+buildCmd = makeCommandString(config)
+if not runCommand(buildCmd, config):
+    print("Build command \"%s\" failed." % buildCmd)
+    sys.exit(100)
+
+#
+# Do testing if requested.
+#
+if config.runalltests:
+    testCmd = "ctest --output-on-failure"
+    if config.eetestsuite:
+        testCmd += " --label-regex %s" % config.eetestsuite
+    if not runCommand(testCmd, config):
+        print("Test command \"%s\" failed." % testCmd)
+        system.exit(100)
+
+print("Build success.")
+sys.exit(0)
+

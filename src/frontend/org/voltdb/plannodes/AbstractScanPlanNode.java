@@ -86,6 +86,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (m_tableScan != null) {
             if (m_tableScan instanceof StmtTargetTableScan) {
                 tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
+                getTablesAndIndexesFromSubqueries(tablesRead, indexes);
             } else {
                 assert(m_tableScan instanceof StmtSubqueryScan);
                 getChild(0).getTablesAndIndexes(tablesRead, indexes);

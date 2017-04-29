@@ -23,6 +23,7 @@ public enum StatsSelector {
     STARVATION,
     INITIATOR,        // invoked as @stat initiator
     LATENCY,          // invoked as @stat latency
+    LATENCY_COMPRESSED,  // before V7.3 this was @Statistics LATENCY
     LATENCY_HISTOGRAM,
     PARTITIONCOUNT,
     IOSTATS,
@@ -54,7 +55,8 @@ public enum StatsSelector {
     TOPO,           // return leader and site info for iv2
     REBALANCE,      // return elastic rebalance progress
     KSAFETY,        // return ksafety coverage information
-    CPU,            // Return CPU Stats
+    CPU,            // return CPU Stats
+    GC,             // return GC Stats
 
     COMMANDLOG,     // return number of outstanding bytes and txns on this node
     IMPORTER

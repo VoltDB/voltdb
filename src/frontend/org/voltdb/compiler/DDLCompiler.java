@@ -54,6 +54,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
+import org.voltdb.catalog.Function;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
@@ -66,6 +67,7 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -95,6 +97,7 @@ public class DDLCompiler {
 
     private static final String TABLE = "TABLE";
     private static final String PROCEDURE = "PROCEDURE";
+    private static final String FUNCTION = "FUNCTION";
     private static final String PARTITION = "PARTITION";
     private static final String REPLICATE = "REPLICATE";
     private static final String ROLE = "ROLE";
@@ -393,7 +396,7 @@ public class DDLCompiler {
             return;
         }
         // Okay, get a list of deleted column names
-        Set<String> removedColumns = new HashSet<String>();
+        Set<String> removedColumns = new HashSet<>();
         for (VoltXMLElement e : columnsDiff.getRemovedNodes()) {
             assert(e.attributes.get("name") != null);
             removedColumns.add(e.attributes.get("name"));
@@ -529,16 +532,16 @@ public class DDLCompiler {
 
         statement = statement.trim();
 
-        // matches if it is the beginning of a voltDB statement
+        // Matches if it is the beginning of a VoltDB statement
         Matcher statementMatcher = SQLParser.matchAllVoltDBStatementPreambles(statement);
         if ( ! statementMatcher.find()) {
             return false;
         }
 
-        // either PROCEDURE, REPLICATE, PARTITION, ROLE, EXPORT or DR
+        // Either PROCEDURE, FUNCTION, REPLICATE, PARTITION, ROLE, EXPORT or DR
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
-        // matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
+        // Matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
         statementMatcher = SQLParser.matchCreateProcedureFromClass(statement);
         if (statementMatcher.matches()) {
             if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
@@ -580,7 +583,7 @@ public class DDLCompiler {
             return true;
         }
 
-        // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS
+        // Matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS
         // ### <code-block> ### LANGUAGE <language-name>
         // We used to support Groovy in pre-5.x, but now we don't
         statementMatcher = SQLParser.matchCreateProcedureAsScript(statement);
@@ -588,7 +591,7 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException("VoltDB doesn't support inline proceudre creation..");
         }
 
-        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
+        // Matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
         statementMatcher = SQLParser.matchCreateProcedureAsSQL(statement);
         if (statementMatcher.matches()) {
             String clazz = checkProcedureIdentifier(statementMatcher.group(1), statement);
@@ -610,6 +613,44 @@ public class DDLCompiler {
             return true;
         }
 
+        // Matches if it is CREATE FUNCTION <name> FROM METHOD <class-name>.<method-name>
+        statementMatcher = SQLParser.matchCreateFunctionFromMethod(statement);
+        if (statementMatcher.matches()) {
+            String functionName = checkIdentifierStart(statementMatcher.group(1), statement);
+            String className = checkIdentifierStart(statementMatcher.group(2), statement);
+            String methodName = checkIdentifierStart(statementMatcher.group(3), statement);
+            CatalogMap<Function> functions = db.getFunctions();
+            if (functions.get(functionName) != null) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Function name \"%s\" in CREATE FUNCTION statement already exists.",
+                        functionName));
+            }
+            Function func = functions.add(functionName);
+            func.setFunctionname(functionName);
+            func.setClassname(className);
+            func.setMethodname(methodName);
+            return true;
+        }
+
+        // Matches if it is DROP FUNCTION <name>
+        statementMatcher = SQLParser.matchDropFunction(statement);
+        if (statementMatcher.matches()) {
+            String functionName = checkIdentifierStart(statementMatcher.group(1), statement);
+            boolean ifExists = statementMatcher.group(2) != null;
+            CatalogMap<Function> functions = db.getFunctions();
+            if (functions.get(functionName) != null) {
+                functions.delete(functionName);
+            }
+            else {
+                if (! ifExists) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Function name \"%s\" in DROP FUNCTION statement does not exist.",
+                            functionName));
+                }
+            }
+            return true;
+        }
+
         // Matches if it is DROP PROCEDURE <proc-name or classname>
         statementMatcher = SQLParser.matchDropProcedure(statement);
         if (statementMatcher.matches()) {
@@ -620,7 +661,7 @@ public class DDLCompiler {
             return true;
         }
 
-        // matches if it is the beginning of a partition statement
+        // Matches if it is the beginning of a partition statement
         statementMatcher = SQLParser.matchPartitionStatementPreamble(statement);
         if (statementMatcher.matches()) {
 
@@ -915,6 +956,13 @@ public class DDLCompiler {
                     "Invalid CREATE PROCEDURE statement: \"%s\", " +
                     "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
                     "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"",
+                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
+        }
+
+        if (FUNCTION.equals(commandPrefix)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE FUNCTION statement: \"%s\", " +
+                    "expected syntax: \"CREATE FUNCTION <name> FROM METHOD <class-name>.<method-name>\"",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
@@ -1230,7 +1278,7 @@ public class DDLCompiler {
     }
 
     private TreeSet<String> getExportTableNames() {
-        TreeSet<String> exportTableNames = new TreeSet<String>();
+        TreeSet<String> exportTableNames = new TreeSet<>();
         NavigableMap<String, NavigableSet<String>> exportsByTargetName = m_tracker.getExportedTables();
         for (Entry<String, NavigableSet<String>> e : exportsByTargetName.entrySet()) {
             for (String tableName : e.getValue()) {
@@ -1558,8 +1606,8 @@ public class DDLCompiler {
         assert node.name.equals("table");
 
         // Construct table-specific maps
-        HashMap<String, Column> columnMap = new HashMap<String, Column>();
-        HashMap<String, Index> indexMap = new HashMap<String, Index>();
+        HashMap<String, Column> columnMap = new HashMap<>();
+        HashMap<String, Index> indexMap = new HashMap<>();
 
         final String name = node.attributes.get("name");
 
@@ -1587,10 +1635,10 @@ public class DDLCompiler {
         table.setIsreplicated(true);
 
         // map of index replacements for later constraint fixup
-        final Map<String, String> indexReplacementMap = new TreeMap<String, String>();
+        final Map<String, String> indexReplacementMap = new TreeMap<>();
 
         // Need the columnTypes sorted by column index.
-        SortedMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
+        SortedMap<Integer, VoltType> columnTypes = new TreeMap<>();
         for (VoltXMLElement subNode : node.children) {
 
             if (subNode.name.equals("columns")) {
@@ -1940,10 +1988,10 @@ public class DDLCompiler {
         // can be indexed. We scan for result type at first here and block those which
         // can't be indexed like boolean, geo ... We gather rest of expression into
         // checkExpressions list.  We will check on them all at once.
-        List<AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> checkExpressions = new ArrayList<>();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
-                exprs = new ArrayList<AbstractExpression>();
+                exprs = new ArrayList<>();
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
                     expr.resolveForTable(table);
@@ -1995,6 +2043,7 @@ public class DDLCompiler {
             }
         }
 
+        UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
         if (exprs == null) {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
@@ -2020,10 +2069,8 @@ public class DDLCompiler {
                                 colType.getName() + " values must be the only component of an index key: \"" + nonint_col_name + "\"";
                         throw compiler.new VoltCompilerException(emsg);
                     }
-
                 }
             }
-
         }
         else {
             for (AbstractExpression expression : exprs) {
@@ -2057,11 +2104,13 @@ public class DDLCompiler {
                         }
                     }
                 }
+                expression.findUnsafeOperatorsForDDL(unsafeOps);
             }
         }
 
         Index index = table.getIndexes().add(name);
         index.setCountable(false);
+        index.setIssafewithnonemptysources(! unsafeOps.isUnsafe());
 
         String indexNameNoCase = name.toLowerCase();
         // The index is a hash iff:

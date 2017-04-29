@@ -492,7 +492,7 @@ public class MockVoltDB implements VoltDBInterface
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
             long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
-            byte[] deploymentHash, boolean hasSchemaChange)
+            byte[] deploymentHash, boolean hasSchemaChange, boolean requiresNewExportGeneration)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
@@ -832,5 +832,9 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public SnmpTrapSender getSnmpTrapSender() {
         return new DummySnmpTrapSender();
+    }
+
+    @Override
+    public void swapTables(String oneTable, String otherTable) {
     }
 }

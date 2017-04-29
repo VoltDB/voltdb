@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
@@ -31,6 +30,8 @@ import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -87,7 +88,19 @@ public class InternalConnectionHandler {
             String procName,
             Object...args)
     {
+        return callProcedure(user, isAdmin, timeout, cb, false, null, procName, args);
+    }
 
+    public boolean callProcedure(
+            AuthUser user,
+            boolean isAdmin,
+            int timeout,
+            ProcedureCallback cb,
+            boolean ntPriority,
+            Function<Integer, Boolean> backPressurePredicate,
+            String procName,
+            Object...args)
+    {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(procName, getCatalogContext());
         if (catProc == null) {
             String fmt = "Cannot invoke procedure %s. Procedure not found.";
@@ -127,7 +140,7 @@ public class InternalConnectionHandler {
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
                 DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, adapter.connectionId());
 
-        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, null)) {
+        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, ntPriority, backPressurePredicate)) {
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -135,7 +148,7 @@ public class InternalConnectionHandler {
         return true;
     }
 
-    // Use backPressureTimeout value <= 0  for no back pressure timeout
+    // Use null backPressurePredicate for no back pressure
     public boolean callProcedure(InternalConnectionContext caller,
                                  Function<Integer, Boolean> backPressurePredicate,
                                  InternalConnectionStatsCollector statsCollector,
@@ -175,7 +188,7 @@ public class InternalConnectionHandler {
 
         final AuthUser user = getCatalogContext().authSystem.getImporterUser();
 
-        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, backPressurePredicate)) {
+        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, false, backPressurePredicate)) {
             m_failedCount.incrementAndGet();
             return false;
         }

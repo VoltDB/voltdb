@@ -73,7 +73,7 @@ public class PrepareShutdown extends Pause {
                     LOG.debug("@PrepareShutdown returning sigil " + ll(m_stat.getMzxid()));
                 }
             }
-            return new DependencyPair(DEP_prepareShutdown, t);
+            return new DependencyPair.TableDependencyPair(DEP_prepareShutdown, t);
 
         } else if (fragmentId == PF_prepareShutdownAggregate) {
 
@@ -89,7 +89,7 @@ public class PrepareShutdown extends Pause {
                 t.addRow(zktxnid);
             }
 
-            return new DependencyPair(DEP_prepareShutdonwAggregate, t);
+            return new DependencyPair.TableDependencyPair(DEP_prepareShutdonwAggregate, t);
 
         } else {
 

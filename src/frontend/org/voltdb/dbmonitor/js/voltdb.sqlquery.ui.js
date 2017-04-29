@@ -78,7 +78,7 @@ $(document).ready(function () {
         gutter.dispatchEvent(mousemove);
         gutter.dispatchEvent(mouseup);
     };
-    
+
     $("#bntTimeoutSetting").popup({
         open: function (event, ui, ele) {
             $("#errorQueryTimeoutConfig").hide();
@@ -176,7 +176,9 @@ $(document).ready(function () {
                     if(localStorage.queries != undefined){
                         queries = $.parseJSON(localStorage.queries)
                         $.each(queries, function(key){
-                            arr.push(key.split('_')[1])
+                            var keySplit = key.split('_')
+                            keySplit.shift()
+                            arr.push(keySplit.join('_'))
                         })
                     }
                     if ($.inArray(value, SQLQueryRender.queryNameList) != -1 || $.inArray(value, arr) != -1) {
@@ -297,7 +299,9 @@ $(document).ready(function () {
         key_index = 0
         if(!$.isEmptyObject(queryData)){
             $.each(queryData, function(key){
-                if(key.split('_')[1] == oldName)
+                keySplit = key.split('_')
+                keySplit.shift()
+                if(keySplit.join('_') == oldName)
                     key_index = parseInt(key.split('_')[0])
             })
         }
@@ -447,7 +451,7 @@ $(document).ready(function () {
         return false;
     });
 
-    // Table Accordion	
+    // Table Accordion
     $('#accordionTable').accordion({
         collapsible: true,
         active: false,
@@ -479,7 +483,7 @@ $(document).ready(function () {
     });
 
 
-    // Views Accordion	
+    // Views Accordion
     $('#accordionViews').accordion({
         collapsible: true,
         active: false,
@@ -648,7 +652,9 @@ $(document).ready(function () {
             }
 
             $.each( queryData, function( key, value ) {
-                SQLQueryRender.createQueryTab(key.split('_')[1], value)
+                var keySplit = key.split('_')
+                keySplit.shift()
+                SQLQueryRender.createQueryTab(keySplit.join('_'), value)
             });
 
             if($.isEmptyObject(queryData)){
@@ -738,7 +744,6 @@ $(document).ready(function () {
             $('#querybox-'+tab_counter).text(tabQuery == undefined ? '' : tabQuery)
             SQLQueryRender.addQueryBtn(tab_counter)
 
-
             $('#exportType-' + tab_counter).change(function () {
                 var tab_id = $(this).attr('id').split('-')[1]
                 if ($('#exportType-'+ tab_id).val() == 'HTML') {
@@ -808,6 +813,7 @@ $(document).ready(function () {
             SQLQueryRender.enableDisableCrossTab()
         }
 
+
         this.addQueryBtn = function(tab_id){
             var htmlBtn = '<ul class="btnList clsQueryBtnList" id="queryBtnList-'+ tab_id+'"> ' +
                           ' <li> ' +
@@ -864,7 +870,7 @@ $(document).ready(function () {
             $('#worktabs ul li').each(function(){
                 count++
             })
-            if(count == 11)
+            if(count >= 11)
                 $('#liNewQuery').hide()
             else
                 $('#liNewQuery').show()
@@ -1019,7 +1025,7 @@ $(document).ready(function () {
             defSrcHeader += '<div id="defaultProcedure" class="listView">';
             var defSrcFooter = '</div>';
             defSrc = defSrcHeader + (defSrc != '' ? defSrc : '<div style="font-size:12px">No default stored procedures found.</div>') + defSrcFooter;
-            
+
             var userProcHeader = "";
             userProcHeader += '<h3 id="userDefinedStoredProcs" class="systemHeader">User Defined Stored Procedures</h3>';
             userProcHeader += '<div id="userProcedure" class="listView">';
@@ -1225,7 +1231,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
         modal: true
     });
 
-    // Export Type Change	 
+    // Export Type Change
     $('#exportType').change(function () {
         if ($('#exportType').val() == 'HTML') {
             $('#resultHtml').css('display', 'block');

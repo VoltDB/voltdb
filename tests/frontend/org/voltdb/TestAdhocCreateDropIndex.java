@@ -308,6 +308,93 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
         }
     }
 
+    public static String unsafeIndexExprErrorMsg = "The index definition uses operations that cannot be applied";
+
+    public void ENG12024TestHelper(String ddlTemplate, String testExpression, boolean isSafeForDDL) throws Exception {
+        String ddl = String.format(ddlTemplate, testExpression);
+
+        // Create index on empty table first.
+        assertFalse(findIndexInSystemCatalogResults("IDX_ENG_12024"));
+        try {
+            m_client.callProcedure("@AdHoc", ddl);
+        }
+        catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Should be able to create an index on a empty table:\n" + ddl);
+        }
+        assertTrue(findIndexInSystemCatalogResults("IDX_ENG_12024"));
+        try {
+            m_client.callProcedure("@AdHoc", "DROP INDEX IDX_ENG_12024;");
+        }
+        catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Should be able to drop index IDX_ENG_12024.");
+        }
+        assertFalse(findIndexInSystemCatalogResults("IDX_ENG_12024"));
+
+        // Populate the table with some data and try again.
+        try {
+            m_client.callProcedure("@AdHoc", "INSERT INTO T_ENG_12024 VALUES (1, 2, 'ABC');");
+        }
+        catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Should be able to insert data into T_ENG_12024.");
+        }
+        try {
+            m_client.callProcedure("@AdHoc", ddl);
+            if (! isSafeForDDL) {
+                fail("Create index DDL on non-empty table with unsafe operators did not fail as expected:\n" + ddl);
+            }
+        }
+        catch (ProcCallException pce) {
+            if (isSafeForDDL || ! pce.getMessage().contains(unsafeIndexExprErrorMsg)) {
+                fail("Unexpected create index DDL failure (isSafeForDDL = " +
+                        (isSafeForDDL ? "true" : "false") + "):\n" + ddl);
+            }
+        }
+        m_client.callProcedure("@AdHoc", "DROP INDEX IDX_ENG_12024 IF EXISTS;");
+        m_client.callProcedure("@AdHoc", "DELETE FROM T_ENG_12024;");
+    }
+
+    @Test
+    public void testCreateUnsafeIndexOnNonemptyTable() throws Exception
+    {
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        String ddl = "CREATE TABLE T_ENG_12024 (a INT, b INT, c VARCHAR(10));";
+        createSchema(config, ddl, 2, 1, 0);
+
+        try {
+            startSystem(config);
+
+            String ddlTemplateForColumnExpression = "CREATE INDEX IDX_ENG_12024 ON T_ENG_12024(%s);";
+            String ddlTemplateForBooleanExpression = "CREATE INDEX IDX_ENG_12024 ON T_ENG_12024(a) WHERE %s;";
+
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "a", true);
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "a + b", false);
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "a - b", false);
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "a * b", false);
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "a / b", false);
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "c || c", false);
+            ENG12024TestHelper(ddlTemplateForColumnExpression, "repeat(c, 100)", false);
+
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "NOT a > b", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a IS NULL", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a = b", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a <> b", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a < b", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a > b", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a <= b", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a >= b", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "c LIKE 'abc%'", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a IS NOT DISTINCT FROM b", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a > b AND b > 0", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "a > b OR b > 0", true);
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
     private void createSchema(VoltDB.Configuration config,
                               String ddl,
                               final int sitesPerHost,

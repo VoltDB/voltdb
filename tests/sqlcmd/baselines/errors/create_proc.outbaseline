@@ -7,12 +7,13 @@ Expect a blank line output after this one.
 
 Things will not go well if this test is not starting with an empty class list.
 
---- Empty Class List -----------------------
+--- Empty Class List -----------------------------------------
 
 
 
 create procedure from class sqlcmdtest.Trivial;
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -21,7 +22,7 @@ create procedure from class sqlcmdtest.Trivial;
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -37,6 +38,9 @@ create procedure from class sqlcmdtest.Trivial;
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -48,17 +52,18 @@ exec Trivial;
 load classes sqlcmdtest-sabotaged-procs.jar;
 Command succeeded.
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
 
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -67,7 +72,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -83,6 +88,9 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -91,7 +99,8 @@ Command succeeded.
 
 create procedure from class sqlcmdtest.Trivial;
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -100,7 +109,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -116,25 +125,28 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
---- User Procedures ----------------------------------------
+--- User Procedures ------------------------------------------
 Trivial                   
 
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
 
---- Active Procedure Classes  ------------------------------
+--- Active Procedure Classes ---------------------------------
  sqlcmdtest.Trivial                    
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
 
 
@@ -142,16 +154,16 @@ exec Trivial;
 
 remove classes sqlcmdtest.*;
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
 
---- Active Procedure Classes  ------------------------------
+--- Active Procedure Classes ---------------------------------
  sqlcmdtest.Trivial                    
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
 
 
@@ -164,7 +176,8 @@ remove classes sqlcmdtest.*;
 Command succeeded.
 
 create procedure from class sqlcmdtest.Trivial;
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -173,7 +186,7 @@ create procedure from class sqlcmdtest.Trivial;
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -189,33 +202,37 @@ create procedure from class sqlcmdtest.Trivial;
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
 
---- Empty Class List -----------------------
+--- Empty Class List -----------------------------------------
 
 
 
 load classes sqlcmdtest-sabotaged-procs.jar;
 Command succeeded.
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
 
 
 create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -224,7 +241,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -240,25 +257,28 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
---- User Procedures ----------------------------------------
+--- User Procedures ------------------------------------------
 Breakable0                
 
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
 
---- Active Procedure Classes  ------------------------------
+--- Active Procedure Classes ---------------------------------
  sqlcmdtest.Breakable0                 
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
 
 
@@ -274,7 +294,8 @@ Command succeeded.
 
 drop procedure Breakable0;
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -283,7 +304,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -299,6 +320,9 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -308,33 +332,34 @@ Command succeeded.
 remove classes sqlcmdtest.*;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List -----------------------------------------
 
 
 
 load classes sqlcmdtest-killed-procs.jar;
 
---- Empty Class List -----------------------
+--- Empty Class List -----------------------------------------
 
 
 
 load classes sqlcmdtest-sabotaged-procs.jar;
 Command succeeded.
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
 
 
 create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -343,7 +368,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -359,25 +384,28 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
---- User Procedures ----------------------------------------
+--- User Procedures ------------------------------------------
 Breakable0                
 
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
  sqlcmdtest.Trivial                    
 
---- Active Procedure Classes  ------------------------------
+--- Active Procedure Classes ---------------------------------
  sqlcmdtest.Breakable0                 
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable1$NestedGetsKilled
 
 
@@ -393,7 +421,8 @@ Command succeeded.
 
 drop procedure Breakable0;
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -402,7 +431,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
-@ResetDR                  
+@ResetDR                  	tinyint, tinyint, tinyint
 @Resume                   
 @Shutdown                 
 @SnapshotDelete           	varchar, varchar
@@ -418,6 +447,9 @@ Command succeeded.
 @SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
 @UpdateApplicationCatalog 	varchar, varchar
 @UpdateClasses            	varchar, varchar
 @UpdateLogging            	varchar
@@ -427,6 +459,6 @@ Command succeeded.
 remove classes sqlcmdtest.*;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List -----------------------------------------
 
 

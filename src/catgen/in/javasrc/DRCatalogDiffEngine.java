@@ -22,6 +22,7 @@
 package org.voltdb.catalog;
 
 import java.util.List;
+import java.util.Set;
 
 import com.google_voltpatches.common.collect.Sets;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -39,6 +40,20 @@ import org.voltdb.utils.Encoder;
  * - All shared DR tables have the same unique indexes/primary keys
  */
 public class DRCatalogDiffEngine extends CatalogDiffEngine {
+    /* White list of fields that we care about for DR for table children classes.
+       This is used only in serialize commands for DR method.
+       There are duplicates added to the set because it lists all the fields per type */
+    private static Set<String> s_whiteListFields = Sets.newHashSet(
+            /* Column */
+            "index", "type", "size", "nullable", "name", "defaultvalue", "defaulttype", "aggregatetype", "matviewsource", "matview", "inbytes",
+            /* Index */
+            "unique", "assumeUnique", "countable", "type", "expressionsjson", "predicatejson",
+            /* Constraint */
+            "type", "oncommit", "index", "foreignkeytable",
+            /* Statement */
+            "sqltext", "querytype", "readonly", "singlepartition", "replicatedtabledml", "iscontentdeterministic", "isorderdeterministic", "nondeterminismdetail",
+            "cost", "seqscancount", "explainplan", "tablesread", "tablesupdated", "indexesused", "cachekeyprefix"
+            );
     public DRCatalogDiffEngine(Catalog localCatalog, Catalog remoteCatalog) {
         super(localCatalog, remoteCatalog);
     }
@@ -60,8 +75,8 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         for (Table t : db.getTables()) {
             if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
                 t.writeCreationCommand(sb);
-                t.writeFieldCommands(sb);
-                t.writeChildCommands(sb, Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class));
+                t.writeFieldCommands(sb, null);
+                t.writeChildCommands(sb, Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class), s_whiteListFields);
             }
         }
         String catalogCommands = sb.toString();
