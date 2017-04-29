@@ -1,6 +1,5 @@
 package org.voltdb.calciteadapter;
 
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
@@ -64,8 +63,6 @@ public class CalcitePlanner {
 
 
     public static CompiledPlan plan(Database db, String sql) {
-        StringBuffer sb = new StringBuffer();
-
         sql = sql.trim();
         if (sql.endsWith(";")) {
             sql = sql.substring(0, sql.length() - 1);
@@ -74,55 +71,57 @@ public class CalcitePlanner {
         Planner planner = getPlanner(schema);
         CompiledPlan compiledPlan = new CompiledPlan();
 
-        sb.append("\n*****************************************\n");
-        sb.append("Calcite Planning Details\n");
         compiledPlan.sql = sql;
+
+        SqlNode parse = null;
+        SqlNode validate = null;
+        RelNode convert = null;
+        RelTraitSet traitSet = null;
+        RelNode transform = null;
 
         try {
             // Parse the input sql
-            SqlNode parse = planner.parse(sql);
-            sb.append("\n**** Parsed stmt ****\n" + parse + "\n");
+            parse = planner.parse(sql);
 
             // Validate the input sql
-            SqlNode validate = planner.validate(parse);
-            sb.append("\n**** Validated stmt ****\n" + validate + "\n");
+            validate = planner.validate(parse);
 
             // Convert the input sql to a relational expression
-            RelNode convert = planner.rel(validate).project();
-            sb.append("\n**** Converted relational expression ****\n" +
-                    RelOptUtil.toString(convert) + "\n");
+            convert = planner.rel(validate).project();
 
             // Transform the relational expression
-            RelTraitSet traitSet = planner.getEmptyTraitSet()
+            traitSet = planner.getEmptyTraitSet()
                     .replace(VoltDBConvention.INSTANCE);
-            RelNode transform = planner.transform(0, traitSet, convert);
-
-            sb.append("**** Optimized relational expression ****\n" +
-                    RelOptUtil.toString(transform) + "\n");
+            transform = planner.transform(0, traitSet, convert);
 
             calciteToVoltDBPlan((VoltDBRel)transform, compiledPlan);
 
-            planner.close();
-            planner.reset();
-            sb.append("*****************************************\n\n");
+            String explainPlan = compiledPlan.rootPlanGraph.toExplainPlanString();
 
-            String explainPlan = compiledPlan.rootPlanGraph.toExplainPlanString() + "\n\n"
-                    + sb.toString();
             compiledPlan.explainedPlan = explainPlan;
+            // Renumber the plan node ids to start with 1
+            compiledPlan.resetPlanNodeIds(1);
 
+            PlanDebugOutput.outputPlanFullDebug(compiledPlan, compiledPlan.rootPlanGraph,
+                    "1", "1");
+            PlanDebugOutput.outputExplainedPlan(compiledPlan, "1", "1");
         }
         catch (Throwable e) {
-            System.out.println("For some reason planning failed!  Here's how far you got:");
-            System.out.println(sb.toString());
-            System.out.println("\nAnd here's the error:");
+            System.out.println("For some reason planning failed!..And here's the error:");
             System.out.println(e.getMessage());
             e.printStackTrace();
+            System.out.println("And here's how far we have gotten:\n");
             throw new PlanningErrorException(e.getMessage());
+        } finally {
+            planner.close();
+            planner.reset();
+
+            PlanDebugOutput.outputCalcitePlanningDetails(sql, parse, validate, convert, transform,
+                    "1", "1");
         }
-
-
         return compiledPlan;
     }
+
 
 
 }

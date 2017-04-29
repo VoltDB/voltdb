@@ -23,6 +23,8 @@
 
 package org.voltdb.calciteadapter;
 
+import java.util.Map;
+
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.tools.Frameworks;
 import org.voltdb.catalog.CatalogMap;
@@ -51,6 +53,10 @@ public abstract class TestCalciteBase extends PlannerTestCase {
     }
 
     protected void comparePlans(String sql, boolean singlepartitioned) {
+        comparePlans(sql, singlepartitioned, null);
+    }
+
+    protected void comparePlans(String sql, boolean singlepartitioned, Map<String, String> ignoreMap) {
 
         CompiledPlan calcitePlan = planCalcite(sql);
         System.out.println(calcitePlan.explainedPlan);
@@ -59,10 +65,17 @@ public abstract class TestCalciteBase extends PlannerTestCase {
         PlanNodeTree calcitePlanTree = new PlanNodeTree(calcitePlan.rootPlanGraph);
         PlanNodeTree voltdbPlanTree = new PlanNodeTree(voltdbPlan.rootPlanGraph);
 
-        String calcitePlanTreeJSON = voltdbPlanTree.toJSONString();
-        String voltdbPlanTreeJSON = calcitePlanTree.toJSONString();
+        String calcitePlanTreeJSON = calcitePlanTree.toJSONString();
+        String voltdbPlanTreeJSON = voltdbPlanTree.toJSONString();
         System.out.println("VoltDB : " + voltdbPlanTreeJSON);
         System.out.println("Calcite: " + calcitePlanTreeJSON);
+
+        if (ignoreMap != null) {
+            for (Map.Entry<String, String> ignore : ignoreMap.entrySet()) {
+                calcitePlanTreeJSON = calcitePlanTreeJSON.replace(ignore.getKey(), ignore.getValue());
+            }
+            System.out.println("Calcite: " + calcitePlanTreeJSON);
+        }
         assertEquals(voltdbPlanTreeJSON, calcitePlanTreeJSON);
     }
 

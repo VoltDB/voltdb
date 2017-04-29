@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
@@ -22,6 +21,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.NodeSchema;
@@ -112,10 +112,20 @@ public class RexConverter {
                         aeOperands.get(0),
                         null);
                 TypeConverter.setType(ae, call.getType());
-                default:
+                break;
+            case TIMES:
+                ae = new OperatorExpression(
+                        ExpressionType.OPERATOR_MULTIPLY,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+            default:
+                throw new CalcitePlanningException("Unsupported Calcite expression type: " +
+                        call.op.kind.toString());
             }
 
+            assert ae != null;
             assert ae.getValueType() != VoltType.INVALID;
+            ExpressionUtil.finalizeValueTypes(ae);
             return ae;
         }
 

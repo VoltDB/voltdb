@@ -83,7 +83,7 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
         assert m_program != null;
 
         ProjectionPlanNode ppn = new ProjectionPlanNode();
-        ppn.setOutputSchema(RexConverter.convertToVoltDBNodeSchema(m_program));
+        ppn.setOutputSchemaWithoutClone(RexConverter.convertToVoltDBNodeSchema(m_program));
 
         SeqScanPlanNode sspn = new SeqScanPlanNode();
         List<String> qualName = table.getQualifiedName();

@@ -28,12 +28,12 @@ public class VoltDBRules {
                 FilterToCalcRule.INSTANCE,
                 ProjectCalcMergeRule.INSTANCE,
                 ProjectToCalcRule.INSTANCE,//);
-               
+
                 // Join Order
 //                LoptOptimizeJoinRule.INSTANCE,
 //                MultiJoinOptimizeBushyRule.INSTANCE,
                 JoinCommuteRule.INSTANCE,
-                
+
                 FilterJoinRule.FILTER_ON_JOIN,
                 FilterJoinRule.JOIN
 
