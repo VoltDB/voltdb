@@ -35,6 +35,17 @@
 # have not tested this.
 #
 ########################################################################
+# Testing
+#
+# In addition to making the libraries, this file describes all the
+# C++ unit tests.  To build the tests run "make build-tests".  You
+# can use the usual -jN and -k options, of course.  To
+# run the tests, after building them, run the command "ctest".  This
+# will run the tests in parallel. The option --output-on-failure
+# will only dump output if the test fails to meet its specification.
+# Note that some tests are expected to fail.
+#
+########################################################################
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.12 FATAL_ERROR)
 PROJECT(VoltDB_EE)
 INCLUDE(ExternalProject)
@@ -62,6 +73,23 @@ INCLUDE(ExternalProject)
 #                           by the third party install procedures,
 #                           but we don't care about anything but the
 #                           static libraries and includes.
+# 3. Just to review the way CMake works:
+#    a. CMake is best thought of as a functional language which describes
+#       the artifacts to be built by describing their constituents.
+#    b. Artifacts are called *targets*.  Targets can be libraries or
+#       executables.  We can also add tests.  These three are created
+#       with ADD_LIBRARY, ADD_EXECUTABLE and ADD_TEST.
+#    c. There are three kinds of library, SHARED, STATIC and OBJECT.
+#       SHARED is the usual dynamically linked library, denoted by a
+#       .so or .dylib suffix.  STATIC libraries are the usual .a
+#       archives, though we don't use these here.  OBJECT libraries,
+#       which we do use, are just sets of .o object files which
+#       CMake manages for us.
+#    d. Targets have properties, like compilation flags, link libraries
+#       and include directories.  These are associated with a target
+#       using ADD_COMPILE_OPTIONS, TARGET_LINK_LIBRARIES and
+#       TARGET_INCLUDE_DIRECTORIES.  Tests have names and other
+#       properties.
 ########################################################################
 #
 # Options.
