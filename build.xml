@@ -1584,7 +1584,7 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py --source-directory=${basedir} --build-type=${build} --runalltests" />
+        <arg line="build_cmake.py --source-directory=${basedir} --build-type=${build} --runalltests" />
     </exec>
 </target>
 
@@ -1594,7 +1594,7 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py --source-directory=${basedir} --build-type=${build} --build-tests" />
+        <arg line="build_cmake.py --source-directory=${basedir} --build-type=${build} --build-tests" />
     </exec>
 </target>
 
@@ -1602,7 +1602,7 @@ NATIVE EE STUFF
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py --source-directory=${basedir} --build-type=${build} --install" />
+        <arg line="build_cmake.py --source-directory=${basedir} --build-type=${build} --install" />
     </exec>
 </target>
 
@@ -1611,7 +1611,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <env key="EESKIPBUILDMAKEFILE" value="true" />
-        <arg line="build.py --source-directory=${basedir} --build-type=${build} --install" />
+        <arg line="build_cmake.py --source-directory=${basedir} --build-type=${build} --install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1621,7 +1621,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="EEONLYBUILDMAKEFILE" value="true"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py --source-directory=${basedir} --build-type=${build} --configure" />
+        <arg line="build_cmake.py --source-directory=${basedir} --build-type=${build} --configure" />
     </exec>
 </target>
 
@@ -1629,7 +1629,7 @@ NATIVE EE STUFF
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py --source-directory=${basedir} --build-type=${build} --install" />
+        <arg line="build_cmake.py --source-directory=${basedir} --build-type=${build} --install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1638,7 +1638,7 @@ NATIVE EE STUFF
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py --source-directory=${basedir} --build-type=${build} ----profile --install" />
+        <arg line="build_cmake.py --source-directory=${basedir} --build-type=${build} ----profile --install" />
     </exec>
 </target>
 
@@ -1646,7 +1646,7 @@ NATIVE EE STUFF
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py  --source-directory=${basedir} --build-type=${build} ----profile --install" />
+        <arg line="build_cmake.py  --source-directory=${basedir} --build-type=${build} ----profile --install" />
     </exec>
 </target>
 
@@ -2131,7 +2131,7 @@ TEST CASES
   <!-- Whether any work needs doing is left to the C++ makefile -->
   <exec dir='.' executable='python' failonerror='true'>
     <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-    <arg line="build.py ${build} coverage" />
+    <arg line="build_cmake.py ${build} coverage" />
   </exec>
   <mkdir dir="${lcov.dir}" />
   <!-- Reset all counters -->
@@ -2193,7 +2193,7 @@ TEST CASES
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} test coverage" />
+        <arg line="build_cmake.py ${build} test coverage" />
     </exec>
 </target>
 
