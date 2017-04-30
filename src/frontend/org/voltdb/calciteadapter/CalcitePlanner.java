@@ -1,3 +1,20 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.voltdb.calciteadapter;
 
 import org.apache.calcite.plan.RelTraitSet;
@@ -62,7 +79,7 @@ public class CalcitePlanner {
     }
 
 
-    public static CompiledPlan plan(Database db, String sql) {
+    public static CompiledPlan plan(Database db, String sql, String dirName) {
         sql = sql.trim();
         if (sql.endsWith(";")) {
             sql = sql.substring(0, sql.length() - 1);
@@ -103,8 +120,8 @@ public class CalcitePlanner {
             compiledPlan.resetPlanNodeIds(1);
 
             PlanDebugOutput.outputPlanFullDebug(compiledPlan, compiledPlan.rootPlanGraph,
-                    "1", "1");
-            PlanDebugOutput.outputExplainedPlan(compiledPlan, "1", "1");
+                    dirName, "JSON");
+            PlanDebugOutput.outputExplainedPlan(compiledPlan, dirName, "CALCITE");
         }
         catch (Throwable e) {
             System.out.println("For some reason planning failed!..And here's the error:");
@@ -117,7 +134,7 @@ public class CalcitePlanner {
             planner.reset();
 
             PlanDebugOutput.outputCalcitePlanningDetails(sql, parse, validate, convert, transform,
-                    "1", "1");
+                    dirName, "DEBUG");
         }
         return compiledPlan;
     }

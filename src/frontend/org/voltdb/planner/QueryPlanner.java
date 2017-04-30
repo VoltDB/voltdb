@@ -327,7 +327,7 @@ public class QueryPlanner {
     public CompiledPlan planUsingCalcite() throws PlanningErrorException {
         // reset any error message
         m_recentErrorMsg = null;
-        CompiledPlan plan = CalcitePlanner.plan(m_db, m_sql);
+        CompiledPlan plan = CalcitePlanner.plan(m_db, m_sql, m_procName + m_stmtName);
         return plan;
     }
 

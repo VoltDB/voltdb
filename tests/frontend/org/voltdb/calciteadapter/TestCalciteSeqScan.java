@@ -47,13 +47,13 @@ public class TestCalciteSeqScan extends TestCalciteBase {
     public void testSeqScan() throws Exception {
         String sql;
         sql = "select * from R1";
-        comparePlans(sql, true);
+        comparePlans(sql);
     }
 
     public void testSeqScanWithProjection() throws Exception {
         String sql;
         sql = "select i from R1";
-        comparePlans(sql, true);
+        comparePlans(sql);
     }
 
     public void testSeqScanWithProjection1() throws Exception {
@@ -61,13 +61,13 @@ public class TestCalciteSeqScan extends TestCalciteBase {
         sql = "select i * 5 from R1";
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR\\$0", "C1");
-        comparePlans(sql, true, ignores);
+        comparePlans(sql, ignores);
     }
 
     public void testSeqScanWithFilter() throws Exception {
         String sql;
         sql = "select i from R1 where i = 5";
-        comparePlans(sql, true);
+        comparePlans(sql);
     }
 
     public void testSeqScanWithFilterWithTypeConversion() throws Exception {
@@ -78,31 +78,31 @@ public class TestCalciteSeqScan extends TestCalciteBase {
         ignores.put("\"TYPE\":7,\"VALUE_TYPE\":5,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}",
                 "\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1");
 
-        comparePlans(sql, true, ignores);
+        comparePlans(sql, ignores);
     }
 
     public void testSeqScanPartitioned() throws Exception {
         String sql;
         sql = "select * from P1";
-        comparePlans(sql, false);
+        comparePlans(sql);
     }
 
     public void testSeqScanWithProjectionPartitioned() throws Exception {
         String sql;
         sql = "select i from P1";
-        comparePlans(sql, false);
+        comparePlans(sql);
     }
 
     public void testSeqScanWithProjectionPartitioned1() throws Exception {
         String sql;
         sql = "select i * 5 from P1";
-        comparePlans(sql, false);
+        comparePlans(sql);
     }
 
     public void testSeqScanWithFilterPartitioned() throws Exception {
         String sql;
         sql = "select i from P1 where si = 5";
-        comparePlans(sql, false);
+        comparePlans(sql);
     }
 
 }

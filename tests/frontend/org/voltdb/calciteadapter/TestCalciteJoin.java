@@ -44,7 +44,7 @@ public class TestCalciteJoin extends TestCalciteBase {
     public void testDistributedJoin() throws Exception {
         String sql;
         sql = "select * from P1 join P2 on P1.I = P2.I join P3 on P2.I = P3.I";
-        comparePlans(sql, true);
+        comparePlans(sql);
     }
 
     public void testReplicatedJoin() throws Exception {
@@ -53,7 +53,7 @@ public class TestCalciteJoin extends TestCalciteBase {
         sql = "select R1.i from R1 inner join " +
               "R2  on R2.i = R1.i where R2.v = 'foo';";
 
-        comparePlans(sql, true);
+        comparePlans(sql);
     }
 
     public void testReplicatedSubqueriesJoin() throws Exception {
@@ -66,7 +66,7 @@ public class TestCalciteJoin extends TestCalciteBase {
               + "on t1.i = t2.i "
               + "where t1.i = 3;";
 
-        comparePlans(sql, true);
+        comparePlans(sql);
     }
 
 }

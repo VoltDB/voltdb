@@ -29,6 +29,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.tools.Frameworks;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannodes.PlanNodeTree;
@@ -48,19 +49,15 @@ public abstract class TestCalciteBase extends PlannerTestCase {
         return rootSchema;
     }
 
-    protected CompiledPlan planCalcite(String sql) {
-        return CalcitePlanner.plan(getDatabase(), sql);
+    protected void comparePlans(String sql) {
+        comparePlans(sql, null);
     }
 
-    protected void comparePlans(String sql, boolean singlepartitioned) {
-        comparePlans(sql, singlepartitioned, null);
-    }
+    protected void comparePlans(String sql, Map<String, String> ignoreMap) {
 
-    protected void comparePlans(String sql, boolean singlepartitioned, Map<String, String> ignoreMap) {
-
-        CompiledPlan calcitePlan = planCalcite(sql);
+        CompiledPlan calcitePlan = compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER);
         System.out.println(calcitePlan.explainedPlan);
-        CompiledPlan voltdbPlan = compileAdHocPlan(sql, true, singlepartitioned);
+        CompiledPlan voltdbPlan = compileAdHocPlan(sql, true, true);
 
         PlanNodeTree calcitePlanTree = new PlanNodeTree(calcitePlan.rootPlanGraph);
         PlanNodeTree voltdbPlanTree = new PlanNodeTree(voltdbPlan.rootPlanGraph);

@@ -130,8 +130,8 @@ public class TestCalciteOther extends TestCase {
 //        plan = CalcitePlanner.plan(db, "select * from partitioned");
 //        System.out.println(plan.explainedPlan);
 
-        plan = CalcitePlanner.plan(db, "select i from partitioned p where si = 345");
-        System.out.println(plan.explainedPlan);
+//        plan = CalcitePlanner.plan(db, "select i from partitioned p where si = 345");
+//        System.out.println(plan.explainedPlan);
 
 //        PlanNodeTree planTree = new PlanNodeTree(plan.rootPlanGraph);
 //        String planJson = planTree.toJSONString();
