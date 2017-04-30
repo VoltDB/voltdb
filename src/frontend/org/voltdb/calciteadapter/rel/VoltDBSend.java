@@ -1,3 +1,20 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.voltdb.calciteadapter.rel;
 
 import java.util.ArrayList;
@@ -24,29 +41,29 @@ import org.voltdb.plannodes.SendPlanNode;
 
 public class VoltDBSend extends Project implements VoltDBRel {
 
-	private RelDataType m_rowType;
-	private List<? extends RexNode> m_identities;
-	private VoltDBPartitioning m_partitioning;
-	private double m_costFactor = 100000.;
+    private RelDataType m_rowType;
+    private List<? extends RexNode> m_identities;
+    private VoltDBPartitioning m_partitioning;
+    private double m_costFactor = 100000.;
 
     public VoltDBSend(
-	            RelOptCluster cluster,
-	            RelTraitSet traitSet,
-	            RelNode childNode,
-	            List<? extends RexNode> identities,
-	            RelDataType rowType,
-	            VoltDBPartitioning partitioning) {
+                RelOptCluster cluster,
+                RelTraitSet traitSet,
+                RelNode childNode,
+                List<? extends RexNode> identities,
+                RelDataType rowType,
+                VoltDBPartitioning partitioning) {
         this(cluster, traitSet, childNode, identities, rowType, partitioning, 1.0);
     }
 
    public VoltDBSend(
-    		RelOptCluster cluster,
-    	    RelTraitSet traitSet,
-    	    RelNode childNode,
-    	    List<? extends RexNode> identities,
-    	    RelDataType rowType,
-    	    VoltDBPartitioning partitioning,
-    	    double costFactor) {
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode childNode,
+            List<? extends RexNode> identities,
+            RelDataType rowType,
+            VoltDBPartitioning partitioning,
+            double costFactor) {
         super(cluster, traitSet, childNode, identities, rowType);
         m_rowType = rowType;
         m_identities = identities;
@@ -60,7 +77,7 @@ public class VoltDBSend extends Project implements VoltDBRel {
         return pw;
     }
 
-    @Override 
+    @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner,
             RelMetadataQuery mq) {
 //        double rowCount = getInput().estimateRowCount(mq) * m_costFactor;
@@ -79,12 +96,11 @@ public class VoltDBSend extends Project implements VoltDBRel {
         return nlpn;
     }
 
-    
-    public static VoltDBSend convert(RelOptCluster cluster, RelTraitSet traitSet, RelNode child, 
-    		List<? extends RexNode> identities,
-    	    RelDataType rowType,
-    	    VoltDBPartitioning partitioning,
-    	    double costFactor) {
+    public static VoltDBSend convert(RelOptCluster cluster, RelTraitSet traitSet, RelNode child,
+            List<? extends RexNode> identities,
+            RelDataType rowType,
+            VoltDBPartitioning partitioning,
+            double costFactor) {
         return new VoltDBSend(cluster, traitSet, child, identities, rowType, partitioning, costFactor);
        }
 
@@ -120,7 +136,7 @@ public class VoltDBSend extends Project implements VoltDBRel {
 
         return newSend;
     }
- 
+
     public List<? extends RexNode> getIdentities() {
         return m_identities;
     }

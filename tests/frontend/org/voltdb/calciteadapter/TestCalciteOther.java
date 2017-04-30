@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -125,7 +125,7 @@ public class TestCalciteOther extends TestCase {
 
         Catalog cat = ddlToCatalog(ddl);
         CompiledPlan plan;
-        
+
         Database db = cat.getClusters().get("cluster").getDatabases().get("database");
 //        plan = CalcitePlanner.plan(db, "select * from partitioned");
 //        System.out.println(plan.explainedPlan);
@@ -146,8 +146,8 @@ public class TestCalciteOther extends TestCase {
 
         // should be t1-t2 because of an additional filer on t1 with everything else equal
 //        plan = CalcitePlanner.plan(db,
-//        		"select test.i from test inner join " +
-//        		"test_calcite  on test_calcite.i = test.i where test_calcite.v = 'foo';");
+//                "select test.i from test inner join " +
+//                "test_calcite  on test_calcite.i = test.i where test_calcite.v = 'foo';");
 //        System.out.println(plan.explainedPlan);
 
 //        plan = CalcitePlanner.plan(db,
