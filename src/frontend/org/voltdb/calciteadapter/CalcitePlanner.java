@@ -94,7 +94,8 @@ public class CalcitePlanner {
         SqlNode validate = null;
         RelNode convert = null;
         RelTraitSet traitSet = null;
-        RelNode transform = null;
+        RelNode calciteTransform = null;
+        RelNode voltDBTransform = null;
 
         try {
             // Parse the input sql
@@ -107,11 +108,16 @@ public class CalcitePlanner {
             convert = planner.rel(validate).project();
 
             // Transform the relational expression
-            traitSet = planner.getEmptyTraitSet()
-                    .replace(VoltDBConvention.INSTANCE);
-            transform = planner.transform(0, traitSet, convert);
 
-            calciteToVoltDBPlan((VoltDBRel)transform, compiledPlan);
+            // Apply standard Calcite transformations
+            traitSet = planner.getEmptyTraitSet().replace(VoltDBConvention.INSTANCE);
+            calciteTransform = planner.transform(0, traitSet, convert); // 0 means use the 0th rule set (general calcite rules)
+
+            // Apply VoltDB transformations
+//            traitSet.replace(VoltDBConvention.INSTANCE);
+            voltDBTransform = planner.transform(1, traitSet, calciteTransform); // 1 means use the 1th rule set (VoltDB-specific rules)
+
+            calciteToVoltDBPlan((VoltDBRel)voltDBTransform, compiledPlan);
 
             String explainPlan = compiledPlan.rootPlanGraph.toExplainPlanString();
 
@@ -133,8 +139,8 @@ public class CalcitePlanner {
             planner.close();
             planner.reset();
 
-            PlanDebugOutput.outputCalcitePlanningDetails(sql, parse, validate, convert, transform,
-                    dirName, "DEBUG");
+            PlanDebugOutput.outputCalcitePlanningDetails(sql, parse, validate, convert,
+                    calciteTransform, voltDBTransform, dirName, "DEBUG");
         }
         return compiledPlan;
     }

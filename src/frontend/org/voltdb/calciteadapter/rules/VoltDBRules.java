@@ -37,7 +37,7 @@ public class VoltDBRules {
     //public static final ConverterRule PROJECT_RULE = new VoltDBProjectRule();
     //public static final RelOptRule PROJECT_SCAN_MERGE_RULE = new VoltDBProjectScanMergeRule();
 
-    public static Program getProgram() {
+    public static Program[] getProgram() {
 
         Program standardRules = Programs.ofRules(
                 CalcMergeRule.INSTANCE,
@@ -54,29 +54,32 @@ public class VoltDBRules {
                 FilterJoinRule.FILTER_ON_JOIN,
                 FilterJoinRule.JOIN
 
-        // Pull up the send nodes as high as possible
-        //Program pullUpSendProg = Programs.ofRules(
-                , VoltDBCalcSendPullUpRule.INSTANCE
-                , VoltDBJoinSendPullUpRule.INSTANCE
-//                , VoltDBProjectSendPullUpRule.INSTANCE
-//                VoltDBSendPullUpJoin.INSTANCE,//);
-
-        //Program voltDBConversionRules = Programs.ofRules(
                 , VoltDBCalcScanMergeRule.INSTANCE
                 , VoltDBProjectRule.INSTANCE
                 , VoltDBJoinRule.INSTANCE
                 , VoltDBCalcJoinMergeRule.INSTANCE
 //                , VoltDBDistributedScanRule.INSTANCE
+
                 );
 
-        Program metaProgram = Programs.sequence(
-                standardRules);//,
-        //pullUpSendProg,
-          //      voltDBConversionRules);
+        // Pull up the send nodes as high as possible
+        Program voltDBRules = Programs.ofRules(
+                VoltDBCalcSendPullUpRule.INSTANCE
+                , VoltDBJoinSendPullUpRule.INSTANCE
+//                , VoltDBProjectSendPullUpRule.INSTANCE
+//                VoltDBSendPullUpJoin.INSTANCE,//);
+                );
 
-        // We don't actually handle this.
-        //    VoltDBProjectJoinMergeRule.INSTANCE
-
-        return metaProgram;
+        return new Program[] {standardRules, voltDBRules};
+//        Program metaProgram = Programs.sequence(
+//                standardRules
+//                , voltDBRules);//,
+//        //pullUpSendProg,
+//          //      voltDBConversionRules);
+//
+//        // We don't actually handle this.
+//        //    VoltDBProjectJoinMergeRule.INSTANCE
+//
+//        return metaProgram;
     }
 }

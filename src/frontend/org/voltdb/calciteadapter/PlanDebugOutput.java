@@ -33,7 +33,7 @@ public class PlanDebugOutput {
     private static final String BASE_DIR_NAME = "statement-calcite/";
 
     static void outputCalcitePlanningDetails(String sql, SqlNode parse, SqlNode validate, RelNode convert,
-            RelNode transform,
+            RelNode calciteTransform, RelNode voltDBTransform,
             String dirName, String fileName) {
         if (!VoltCompiler.DEBUG_MODE) {
             return;
@@ -59,11 +59,17 @@ public class PlanDebugOutput {
         } else {
             sb.append("\n**** Failed to convert relational expression ****\n");
         }
-        if (transform != null) {
-            sb.append("**** Optimized relational expression ****\n" +
-                RelOptUtil.toString(transform) + "\n");
+        if (calciteTransform != null) {
+            sb.append("**** Calcite Optimized relational expression ****\n" +
+                RelOptUtil.toString(calciteTransform) + "\n");
         } else {
-            sb.append("**** Failed to optimize relational expression ****\n");
+            sb.append("**** Failed to apply Calcite relational expression ****\n");
+        }
+        if (voltDBTransform != null) {
+            sb.append("**** VoltDB Optimized relational expression ****\n" +
+                RelOptUtil.toString(voltDBTransform) + "\n");
+        } else {
+            sb.append("**** Failed to apply VoltDB relational expression ****\n");
         }
         sb.append("*****************************************\n\n");
 
