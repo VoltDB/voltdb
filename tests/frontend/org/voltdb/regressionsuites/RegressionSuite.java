@@ -44,9 +44,12 @@ import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
+import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientConfig;
@@ -61,7 +64,9 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -114,6 +119,16 @@ public class RegressionSuite extends TestCase {
         m_config.startUp(true);
     }
 
+    private static Catalog getCurrentCatalog() {
+        CatalogContext context = VoltDB.instance().getCatalogContext();
+        InMemoryJarfile currentCatalogJar = context.getCatalogJar();
+        String serializedCatalogString = CatalogUtil.getSerializedCatalogStringFromJar(currentCatalogJar);
+        assertNotNull(serializedCatalogString);
+        Catalog c = new Catalog();
+        c.execute(serializedCatalogString);
+        return c;
+    }
+
     /**
      * JUnit special method called to shutdown the test. This instance will
      * stop the VoltDB server using the VoltServerConfig instance provided.
@@ -124,6 +139,12 @@ public class RegressionSuite extends TestCase {
             m_config.shutDown();
         }
         else {
+            CatalogDiffEngine diff = new CatalogDiffEngine(m_config.getInitialCatalog(), getCurrentCatalog());
+            if (diff.commands().split("\n").length > 1) {
+                fail("Catalog changed in test " + getName() +
+                        " while the regression suite optimization is on: \n" +
+                        diff.getDescriptionOfChanges(false));
+            }
             Client client = getClient();
             VoltTable tableList = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
             ArrayList<String> tableNames = new ArrayList<>(tableList.getRowCount());
