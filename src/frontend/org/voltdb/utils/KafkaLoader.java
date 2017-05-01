@@ -48,12 +48,14 @@ import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
 import kafka.javaapi.consumer.ConsumerConnector;
 import kafka.message.MessageAndMetadata;
+
 /**
  * KafkaConsumer loads data from kafka into voltdb
  * Only csv formatted data is supported at this time.
  * VARBINARY columns are not supported
  */
 public class KafkaLoader {
+
     private static final VoltLogger m_log = new VoltLogger("KAFKALOADER");
     private final KafkaConfig m_config;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
@@ -116,7 +118,6 @@ public class KafkaLoader {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.update, new KafkaBulkLoaderCallback());
         }
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
-
         m_consumer = new KafkaConsumerConnector(m_config);
         try {
             m_es = getConsumerExecutor(m_consumer, m_loader);
@@ -131,7 +132,6 @@ public class KafkaLoader {
             System.exit(-1);
         }
         close();
-
     }
 
     /**
@@ -231,7 +231,6 @@ public class KafkaLoader {
                 update = false;
                 exitWithMessageAndUsage("update is not applicable when stored procedure specified");
             }
-
             //Try and load classes we need and not packaged.
             try {
                 KafkaConfig.class.getClassLoader().loadClass("org.I0Itec.zkclient.IZkStateListener");
@@ -241,7 +240,6 @@ public class KafkaLoader {
                 System.out.println("Use the ZKLIB environment variable to specify the path to the Zookeeper jars files.");
                 System.exit(1);
             }
-
         }
 
         /**
@@ -401,7 +399,7 @@ public class KafkaLoader {
 
     private ExecutorService getConsumerExecutor(KafkaConsumerConnector consumer, CSVDataLoader loader) throws Exception {
         Map<String, Integer> topicCountMap = new HashMap<>();
-        // generate as many threads as there are partitions defined in config
+        // generate as many threads as there are partitions defined in kafka config
         ExecutorService executor = Executors.newFixedThreadPool(m_config.kpartitions);
         topicCountMap.put(m_config.topic, m_config.kpartitions);
         Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.m_consumer.createMessageStreams(topicCountMap);

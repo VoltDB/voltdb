@@ -51,8 +51,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
-
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /**
@@ -63,16 +61,59 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 public class KafkaLoader10 {
     private static final VoltLogger m_log = new VoltLogger("KAFKALOADER8");
+    private static final String KEY_DESERIALIZER = ByteArrayDeserializer.class.getName();
+    private static final String VALUE_DESERIALIZER = ByteArrayDeserializer.class.getName();
+
     private CLIOptions m_cliOptions;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
-
     private ExecutorService m_es = null;
+    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
+    private List<Kafka10ConsumerRunner> m_consumers;
 
     public KafkaLoader10(CLIOptions options) {
         m_cliOptions = options;
     }
+
+    private void shutdownExecutorNow() {
+        if (m_es == null) return;
+        try {
+            m_es.shutdownNow();
+            m_es.awaitTermination(365, TimeUnit.DAYS);
+        } catch (Throwable ignore) {
+        } finally {
+            m_es = null;
+        }
+    }
+
+    private void closeLoader() {
+        if (m_loader == null) return;
+        try {
+            m_loader.close();
+            m_loader = null;
+        } catch (Throwable ignore) {
+        } finally {
+            m_loader = null;
+        }
+    }
+
+    private void closeClient() {
+        if (m_client == null) return;
+        try {
+            m_client.close();
+        } catch (Throwable ignore) {
+        } finally {
+            m_client = null;
+        }
+    }
+
+    void close() {
+        shutdownExecutorNow();
+        closeLoader();
+        closeClient();
+    }
+
     public static class CLIOptions extends CLIConfig {
 
         @Option(shortOpt = "p", desc = "Procedure name to insert the data into the database")
@@ -119,7 +160,7 @@ public class KafkaLoader10 {
         /**
          * Batch size for processing batched operations.
          */
-        @Option(desc = "Batch Size for processing.")
+        @Option(desc = "Batch Size for processing (default: 200)")
         public int batch = 200;
 
         /**
@@ -192,7 +233,6 @@ public class KafkaLoader10 {
                     long fc = m_failedCount.incrementAndGet();
                     if ((m_cliOptions.maxerrors > 0 && fc > m_cliOptions.maxerrors)
                             || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
-                        m_log.error("Kafkaloader will exit.");
                         notifyShutdown();
                     }
                 }
@@ -207,16 +247,6 @@ public class KafkaLoader10 {
         }
     }
 
-    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
-    private List<KafkaConsumer<byte[], byte[]>> m_consumers;
-
-    // stub for shutdown hook
-    void notifyShutdown() {
-        if (m_shutdown.compareAndSet(false, true)) {
-            System.out.println("shutdown signalled ... " + Thread.currentThread().getName());
-        }
-    }
-
     private Properties kafkaConfigProperties() throws IOException {
         //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
         String groupId = "voltdb-" + (m_cliOptions.useSuppliedProcedure ? m_cliOptions.procedure : m_cliOptions.table);
@@ -224,50 +254,48 @@ public class KafkaLoader10 {
         Properties props = new Properties();
         if (m_cliOptions.config.trim().isEmpty()) {
             props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-            props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000"); // kafka's config value is 5000
+//            props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000"); // kafka's config value is 5000
             props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-            // 5 minutes before the consumer will dropped from the group
-            props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "300000");
+            props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "300000");    // 5 minutes for liveness check of consumer
             // max number of records return per poll
-            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, String.valueOf(m_cliOptions.batch));
-            props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-//                    StringDeserializer.class.getName());    // org.apache.kafka.common.serialization.StringDeserializer
-                    ByteArrayDeserializer.class.getName()); // org.apache.kafka.common.serialization.ByteArrayDeserializer
-            props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-//                    StringDeserializer.class.getName());    // org.apache.kafka.common.serialization.StringDeserializer
-                    ByteArrayDeserializer.class.getName()); // org.apache.kafka.common.serialization.ByteArrayDeserializer
+//            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, String.valueOf(m_cliOptions.batch));
         } else {
             props.load(new FileInputStream(new File(m_cliOptions.config)));
             //Get GroupId from property if present and use it.
             groupId = props.getProperty("group.id", groupId);
-            //Get zk connection from props file if present.
+
+            // get kafka broker connections from properties file if present - supplied brokers, if any, overrides
+            // the supplied command line
             m_cliOptions.brokers = props.getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
 
-            if (props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG) == null) {
+            if (props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG) == null)
                 props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-                if (props.getProperty(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG) == null)
-                    props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000");
-            }
-
             if (props.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG) == null)
                 props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
-            if (props.getProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG) == null)
-                props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                        StringDeserializer.class.getName()); // org.apache.kafka.common.serialization.StringDeserializer
-
-            if (props.getProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG) == null)
-                props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                        StringDeserializer.class.getName()); // org.apache.kafka.common.serialization.StringDeserializer
+            // Only byte array are used by Kafka Loader. If there are any deserializer supplied in config file
+            // log warning message about it
+            String deserializer = props.getProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG);
+            if (deserializer != null && KEY_DESERIALIZER.equals(deserializer.trim()) ) {
+                m_log.warn("User provided key deserializer not supported, " + KEY_DESERIALIZER
+                        + " will be used for deserializering keys");
+            }
+            deserializer = props.getProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG);
+            if ( deserializer != null && VALUE_DESERIALIZER.equals(deserializer)) {
+                m_log.warn("User provided value deserializer not supported, " + VALUE_DESERIALIZER
+                        + " will be used for deserializering values");
+            }
         }
 
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
 
         return props;
     }
 
-    private ExecutorService getConsumerExecutor() throws Exception {
+    private ExecutorService getExecutor() throws Exception {
         Properties props = kafkaConfigProperties();
         // create as many threads equal as number of partitions specified in config
         ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.kpartitions);
@@ -276,20 +304,33 @@ public class KafkaLoader10 {
             KafkaConsumer<byte[], byte[]> consumer = null;
             for (int i = 0; i < m_cliOptions.kpartitions; i++) {
                 consumer = new KafkaConsumer<>(props);
-                m_consumers.add(consumer);
+                m_consumers.add(new Kafka10ConsumerRunner(m_cliOptions, m_loader, consumer));
+
             }
         } catch (Throwable terminate) {
             m_log.error("Failed creating Kafka consumer ", terminate);
-            System.exit(-1);
+            for (Kafka10ConsumerRunner consumer : m_consumers) {
+                // close all consumer connections
+                consumer.forceClose();
+            }
+            return null;
         }
 
-        for (KafkaConsumer<byte[], byte[]> consumer : m_consumers) {
-            executor.submit(new Kafka10ConsumerRunner(m_cliOptions, m_loader, consumer));
+        for (Kafka10ConsumerRunner consumer : m_consumers) {
+            executor.submit(consumer);
         }
-
         return executor;
     }
 
+    // shutdown hook to notify kafka consumer threads of shutdown
+    private void notifyShutdown() {
+        if (m_shutdown.compareAndSet(false, true)) {
+            m_log.info("Kafka consumer shutdown signalled ... ");
+            for (Kafka10ConsumerRunner consumer : m_consumers) {
+                consumer.shutdown();
+            }
+        }
+    }
 
     class Kafka10ConsumerRunner implements Runnable {
         private KafkaConsumer<byte[], byte[]> m_consumer;
@@ -297,7 +338,7 @@ public class KafkaLoader10 {
         private final CSVDataLoader m_loader;
         private final CSVParser m_csvParser;
         private final Formatter m_formatter;
-
+        private AtomicBoolean m_closed = new AtomicBoolean(false);
 
         Kafka10ConsumerRunner(CLIOptions config, CSVDataLoader loader, KafkaConsumer<byte[], byte[]> consumer)
                 throws FileNotFoundException, IOException, ClassNotFoundException, NoSuchMethodException,
@@ -320,91 +361,76 @@ public class KafkaLoader10 {
             m_consumer = consumer;
         }
 
+        void forceClose() {
+            m_closed.set(true);
+            try {
+                m_consumer.close();
+            } catch (Exception ignore) {}
+        }
 
+        void shutdown() {
+            if (m_closed.compareAndSet(false,  true)) {
+                m_consumer.wakeup();
+            }
 
+        }
 
         @Override
         public void run() {
+            String smsg = null;
             try {
                 m_consumer.subscribe(Arrays.asList(m_config.topic));
-            } catch (IllegalArgumentException topicNotValid) {
-                m_log.error("Failed subscribing to the topic", topicNotValid);
-                System.exit(-1);
-            }
-
-//            Set<TopicPartition> partitions = m_consumer.assignment();
-//            StringBuilder topicPartitions = new StringBuilder();
-//            for (TopicPartition partition : partitions) {
-//                topicPartitions.append("Topic: " + partition.topic() + " partition: " + partition.partition() + "\n");
-//            }
-//            System.out.println(topicPartitions.toString());
-
-            try {
-                while (!m_shutdown.get()) {
-                    ConsumerRecords<byte[], byte[]> records = null;
-                    try {
-                        records = m_consumer.poll(1000); // milliseconds
-                    } catch (WakeupException wakeup) {
-                        System.out.println("Wakeup exception seen " + wakeup);
-                        notifyShutdown();
-                        break;
-                    } catch (Exception terminate) {
-                        m_log.error("Error seen during poll", terminate);
-                        break;
-                    }
-
+                while (!m_closed.get()) {
+                    ConsumerRecords<byte[], byte[]> records = m_consumer.poll(1000); // 1 second
                     for (ConsumerRecord<byte[], byte[]> record : records) {
-                        if (record.serializedValueSize() < 0) {
-                            m_log.debug("got zero size record at offset " + record.offset());
-                        }
-                        byte[] msg = null;
-                        long offset = 0;
-                        try {
-                            msg = record.value();
-                            offset = record.offset();
-                        } catch (Throwable error) {
-                            m_log.error("Failed fetching message from kafka record", error);
-                            notifyShutdown();
-                            break;
-                        }
-
-                        String smsg = new String(msg);
+                        byte[] msg  = record.value();
+                        long offset = record.offset();
+                        smsg = new String(msg);
                         Object params[];
-                        try {
-                            if (m_formatter != null) {
-                                try {
-                                    params = m_formatter.transform(ByteBuffer.wrap(msg));
-                                } catch (FormatException keepGoing) {
-                                    m_log.warn("Failed to transform message at offset " + offset
-                                            + ", error message: " + keepGoing.getMessage());
-                                    continue;
-                                }
-                            } else {
-                                params = m_csvParser.parseLine(smsg);
-                            }
-                            if (params == null) {
+                        if (m_formatter != null) {
+                            try {
+                                params = m_formatter.transform(ByteBuffer.wrap(msg));
+                            } catch (FormatException badMsg) {
+                                m_log.warn("Failed to transform message " + smsg + " at offset " + offset
+                                        + ", error message: " + badMsg.getMessage());
                                 continue;
                             }
-                            m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
-                        } catch (IOException ioExcp) {
-                            m_log.error("Failed to parse message" + smsg);
-                            notifyShutdown();
-                            break;
-                        } catch (Throwable terminate) {
-                            m_log.error("Consumer stopped", terminate);
-                            notifyShutdown();
-                            break;
+                        } else {
+                            params = m_csvParser.parseLine(smsg);
                         }
+                        if (params == null) continue;
+                        m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
                     }
                 }
+            } catch (IllegalArgumentException invalidTopic) {
+                m_closed.set(true);
+                System.out.println("Failed subscribing to the topic " + m_config.topic);
+                m_log.error("Failed subscribing to the topic " + m_config.topic, invalidTopic);
+            } catch (WakeupException wakeup) {
+                m_closed.set(true);
+//                wakeup.printStackTrace();
+                m_log.debug("Consumer signalled to terminate ", wakeup);
+            } catch (IOException ioExcp) {
+                m_closed.set(true);
+                if (m_formatter == null) {
+                    m_log.error("Failed to parse message" + smsg);
+                } else {
+                    m_log.error("Error seen when when processing message ", ioExcp);
+                }
+            } catch (Throwable terminate) {
+                m_closed.set(true);
+                terminate.printStackTrace();
+                m_log.error("Error seen during poll", terminate);
             } finally {
-                m_consumer.close();
+                try {
+                    m_consumer.close();
+                } catch (Exception ignore) {}
+                notifyShutdown();
             }
         }
-
     }
 
-    public void processKafkaMessages() throws Exception {
+    private void processKafkaMessages() throws Exception {
         // Split server list
         final String[] serverlist = m_cliOptions.servers.split(",");
 
@@ -412,14 +438,13 @@ public class KafkaLoader10 {
         m_cliOptions.password = CLIConfig.readPasswordIfNeeded(m_cliOptions.user, m_cliOptions.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(m_cliOptions.user, m_cliOptions.password, null);
+        final ClientConfig clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, null);
         if (m_cliOptions.ssl != null && !m_cliOptions.ssl.trim().isEmpty()) {
-            c_config.setTrustStoreConfigFromPropertyFile(m_cliOptions.ssl);
-            c_config.enableSSL();
+            clientConfig.setTrustStoreConfigFromPropertyFile(m_cliOptions.ssl);
+            clientConfig.enableSSL();
         }
-        c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
-
-        m_client = getClient(c_config, serverlist, m_cliOptions.port);
+        clientConfig.setProcedureCallTimeout(0);
+        m_client = getClient(clientConfig, serverlist, m_cliOptions.port);
 
         if (m_cliOptions.useSuppliedProcedure) {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_cliOptions.procedure, new KafkaBulkLoaderCallback());
@@ -427,49 +452,16 @@ public class KafkaLoader10 {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_cliOptions.table, m_cliOptions.batch, m_cliOptions.update, new KafkaBulkLoaderCallback());
         }
         m_loader.setFlushInterval(m_cliOptions.flush, m_cliOptions.flush);
-        try {
-//            Properties props = kafkaConfigProperties();
-//            KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(props);
-//            CSVParser parser = new CSVParser();
-//
-//            try {
-//                consumer.subscribe(Arrays.asList(m_cliOptions.topic));
-//                while (true) {
-//                    ConsumerRecords<byte[], byte[]> records = consumer.poll(100);
-//                    for (ConsumerRecord<byte[], byte[]> record : records) {
-//                        int serializedValueSize = record.serializedValueSize();
-//                        long offset = record.offset();
-//
-//                        byte[] rawKey = record.key();
-//                        byte[] rawValue = record.value();
-//
-//                        String smsg = new String(rawValue);
-//                        System.out.println("topic : " + record.topic() + ", offset: " + offset
-//                                + " key " + new String(rawKey) +", value " + smsg
-//                                + " serialized size: " + serializedValueSize);
-//                        Object params[] = parser.parseLine(smsg);
-//                        if (params == null) continue;
-//                        m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
-//                    }
-//                }
-//            } catch (Throwable terminate) {
-//                terminate.printStackTrace();
-//                System.out.println("error " + terminate);
-//                m_log.error("Consumer dieeddd !!!!! ", terminate);
-//            } finally {
-//                consumer.close();
-//            }
 
-            m_es = getConsumerExecutor();
+        if ((m_es = getExecutor()) != null) {
             if (m_cliOptions.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started using procedure: " + m_cliOptions.procedure);
             } else {
                 m_log.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started for table: " + m_cliOptions.table);
             }
+            m_es.shutdown();
             m_es.awaitTermination(365, TimeUnit.DAYS);
-        } catch (Throwable terminate) {
-            m_log.error("Error encountered Kafka 10 Consumer", terminate);
-            System.exit(-1);
+            m_es = null;
         }
     }
 
@@ -518,7 +510,8 @@ public class KafkaLoader10 {
             kloader.processKafkaMessages();
         } catch (Exception e) {
             m_log.error("Failure in KafkaLoader10 ", e);
-            System.exit(-1);
+        } finally {
+            kloader.close();
         }
 
         System.exit(0);
