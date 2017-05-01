@@ -191,5 +191,5 @@ public interface ProducerDRGateway {
 
     public void pauseAllReadersAsync();
 
-    public void resettingDR();
+    public void resetLocalDR();
 }
