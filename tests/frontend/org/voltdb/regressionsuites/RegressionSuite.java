@@ -140,6 +140,9 @@ public class RegressionSuite extends TestCase {
         }
         else {
             CatalogDiffEngine diff = new CatalogDiffEngine(m_config.getInitialCatalog(), getCurrentCatalog());
+            // All catalog changes will have a changed "set /clusters#cluster/databases#database schema" command.
+            // If the diff command only has this line, it means something is changed first but restored later.
+            // We will ignore this case.
             if (diff.commands().split("\n").length > 1) {
                 fail("Catalog changed in test " + getName() +
                         " while the regression suite optimization is on: \n" +
