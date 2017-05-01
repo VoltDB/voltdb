@@ -48,12 +48,14 @@ public class CreateFunctionFromMethod extends StatementProcessor {
 
     static {
         m_allowedDataTypes.add(byte.class);
+        m_allowedDataTypes.add(byte[].class);
         m_allowedDataTypes.add(short.class);
         m_allowedDataTypes.add(int.class);
         m_allowedDataTypes.add(long.class);
         m_allowedDataTypes.add(double.class);
         m_allowedDataTypes.add(float.class);
         m_allowedDataTypes.add(Byte.class);
+        m_allowedDataTypes.add(Byte[].class);
         m_allowedDataTypes.add(Short.class);
         m_allowedDataTypes.add(Integer.class);
         m_allowedDataTypes.add(Long.class);
