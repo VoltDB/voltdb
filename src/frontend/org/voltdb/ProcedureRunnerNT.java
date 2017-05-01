@@ -178,7 +178,7 @@ public class ProcedureRunnerNT {
      */
     protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
         MyProcedureCallback cb = new MyProcedureCallback();
-        boolean success = m_ntProcService.m_ich.callProcedure(m_user, false, m_timeout, cb, true, procName, params);
+        boolean success = m_ntProcService.m_ich.callProcedure(m_user, isAdminConnection(), m_timeout, cb, true, procName, params);
         assert(success);
         return cb.fut;
     }

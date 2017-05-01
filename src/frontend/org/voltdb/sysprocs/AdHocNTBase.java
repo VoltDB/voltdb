@@ -30,7 +30,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -367,7 +366,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
         // -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
-        int partition = -1;
 
         if (isSinglePartition) {
             if (plannedStmtBatch.isReadOnly()) {
@@ -387,7 +385,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                 type = VoltType.typeFromClass(partitionParam.getClass()).getValue();
                 param = VoltType.valueToBytes(partitionParam);
             }
-            partition = TheHashinator.getPartitionForParameter(type, partitionParam);
 
             // Send the partitioning parameter and its type along so that the site can check if
             // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.

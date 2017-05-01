@@ -353,6 +353,13 @@ public final class InvocationDispatcher {
             }
         }
 
+        // handle non-transactional procedures (INCLUDING NT SYSPROCS)
+        // note that we also need to check for java for now as transactional flag is
+        // only 100% when we're talking Java
+        if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
+            return dispatchNTProcedure(handler, task, user, ccxn, nowNanos, ntPriority);
+        }
+
         // check for allPartition invocation and provide a nice error if it's misused
         if (task.getAllPartition()) {
             // must be single partition and must be partitioned on parameter 0
@@ -363,13 +370,6 @@ public final class InvocationDispatcher {
                                  "and must not be a system procedure.",
                         task.clientHandle);
             }
-        }
-
-        // handle non-transactional procedures (INCLUDING NT SYSPROCS)
-        // note that we also need to check for java for now as transactional flag is
-        // only 100% when we're talking Java
-        if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
-            return dispatchNTProcedure(handler, task, user, ccxn, nowNanos, ntPriority);
         }
 
         if (catProc.getSystemproc()) {
@@ -1275,7 +1275,7 @@ public final class InvocationDispatcher {
     final static int getPartitionForProcedure(Procedure procedure, StoredProcedureInvocation task) {
         final CatalogContext.ProcedurePartitionInfo ppi =
                 (CatalogContext.ProcedurePartitionInfo)procedure.getAttachment();
-        if (procedure.getSinglepartition()) {
+        if (procedure.getTransactional() && procedure.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
             return getPartitionForProcedure( ppi.index, ppi.type, task);
         } else {

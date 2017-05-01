@@ -40,9 +40,8 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
 
         // TODO: add hostname/user to NTSysprocProc API
         // TODO: make this stuff real?
-        String hostname = "facebook.com";
+        String hostname = getHostname();
         String invocationName = "@UpdateApplicationCatalog";
-        boolean isPromotion = false;
         boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();;
         boolean internalCall = false;
         boolean adminMode = false;
