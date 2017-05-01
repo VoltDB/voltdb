@@ -44,7 +44,7 @@ show procedures;
 show classes;
 
 show functions;
-create function IntFunction from method sqlcmdtest.IntFunction;
+create function IntFunction from method sqlcmdtest.IntFunction.run;
 show functions;
 show classes;
 drop function IntFunction;
