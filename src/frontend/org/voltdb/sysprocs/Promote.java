@@ -29,7 +29,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 public class Promote extends UpdateApplicationBase {
 
-    public CompletableFuture<ClientResponse> run(byte[] jarfileBytes, String classesToDeleteSelector) {
+    public CompletableFuture<ClientResponse> run() {
         if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "@Promote issued on non-replica cluster. No action taken.");
