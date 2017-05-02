@@ -375,8 +375,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     protected void accept() {
         info(null, "Starting partition fetcher for " + m_topicAndPartition);
         long submitCount = 0;
+        long expectedCallbacks = 0;
         AtomicLong cbcnt = new AtomicLong(0);
-        @SuppressWarnings("unchecked")
         Formatter formatter = m_config.getFormatterBuilder().create();
         try {
             //Start with the starting leader.
@@ -466,13 +466,17 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         Invocation invocation = new Invocation(m_config.getProcedure(), params);
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(messageAndOffset.offset(),
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead, m_pauseOffset);
-                         if (!noTransaction && !callProcedure(invocation, cb)) {
-                              if (isDebugEnabled()) {
-                                 debug(null, "Failed to process Invocation possibly bad data: " + Arrays.toString(params));
-                              }
-                              m_gapTracker.commit(messageAndOffset.nextOffset());
+                        if (!noTransaction) {
+                            if (callProcedure(invocation, cb)) {
+                                expectedCallbacks++;
+                            } else {
+                                if (isDebugEnabled()) {
+                                    debug(null, "Failed to process Invocation possibly bad data: " + Arrays.toString(params));
+                                }
+                                m_gapTracker.commit(messageAndOffset.nextOffset());
+                            }
                          }
-                     } catch (FormatException e) {
+                    } catch (FormatException e) {
                         rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" , Arrays.toString(params));
                         m_gapTracker.commit(messageAndOffset.nextOffset());
                     }
@@ -493,23 +497,16 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         } catch (InterruptedException ie) {
                         }
                 }
-                // FIXME should this be removed also? Why is any committing done outside of CB except when
-                // Perhaps we can have a no-op procedure that runs if the usual one fails due to bad data.
-                // Handle the unexpected by stopping the importer as we do now, but w/o committing.
-                /*
                 if (shouldCommit()) {
-                    commitOffset();
+                    commitOffset(expectedCallbacks, cbcnt);
                 }
-                */
             }
         } catch (Exception ex) {
             error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
             ex.printStackTrace();
-            // THEORY: Errors must force a commit, since presumably the data was bad.
-            // Normal shutdown should not - let callbacks do that work.
         } finally {
             //Dont care about return as it wil force a commit.
-            //commitOffset();  // Anish: we have stopped reading, commit the paused offset
+            commitOffset(expectedCallbacks, cbcnt);
             KafkaStreamImporterConfig.closeConsumer(m_consumer);
             m_consumer = null;
             BlockingChannel channel = m_offsetManager.getAndSet(null);
@@ -541,17 +538,25 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         }
     }
 
-    public boolean commitOffset() {
+    public boolean commitOffset(long expectedCallbacks, AtomicLong cbcnt) {
         final short version = 1;
         long safe = m_gapTracker.commit(-1L);
-        long pausedOffset = m_pauseOffset.get();
-        if (m_lastCommittedOffset != pausedOffset && (safe > m_lastCommittedOffset || pausedOffset != -1)) {
+        final long pausedOffset = m_pauseOffset.get();
+        final boolean isPaused = pausedOffset != -1;
+        while (isPaused && expectedCallbacks < cbcnt.get()){
+            // paused offset is not dependable until all callbacks have executed
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ignoreMe) {
+            }
+        }
+        if (m_lastCommittedOffset != pausedOffset && (safe > m_lastCommittedOffset || isPaused)) {
             long now = System.currentTimeMillis();
             OffsetCommitResponse offsetCommitResponse = null;
             try {
                 BlockingChannel channel = null;
                 int retries = 3;
-                if (pausedOffset != -1) {
+                if (isPaused) {
                     rateLimitedLog(Level.INFO, null, m_topicAndPartition + " is using paused offset to commit: " + pausedOffset);
                 }
                 while (channel == null && --retries >= 0) {
@@ -560,7 +565,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
                         continue;
                     }
-                    safe = (pausedOffset != -1 ? pausedOffset : safe);
+                    safe = (isPaused ? pausedOffset : safe);
                     OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(
                             m_config.getGroupId(),
                             singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", now)),
@@ -737,19 +742,27 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             m_pauseOffset = pauseOffset;
         }
 
+        private static class PausedOffsetCalculator implements LongBinaryOperator {
+            @Override
+            public long applyAsLong(long currentValue, long givenUpdate) {
+                if (currentValue == -1){
+                    return givenUpdate;
+                } else {
+                    return Math.min(currentValue, givenUpdate);
+                }
+            }
+        }
+
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
 
             m_cbcnt.incrementAndGet();
-            if (!m_dontCommit.get() && response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
-                m_tracker.commit(m_nextoffset);
-            }
-            if (response.getStatus() == ClientResponse.SERVER_UNAVAILABLE) {
-                if (m_pauseOffset.get() == -1){
-                    System.err.println("Delaying set of pause offset");
-                    Thread.sleep(200);
+            if (!m_dontCommit.get()) {
+                if (response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
+                    m_tracker.commit(m_nextoffset);
+                } else {
+                    m_pauseOffset.accumulateAndGet(m_offset, new PausedOffsetCalculator());
                 }
-                m_pauseOffset.compareAndSet(-1, m_offset);
             }
         }
     }
