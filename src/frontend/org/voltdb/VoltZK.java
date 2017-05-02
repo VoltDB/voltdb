@@ -104,19 +104,18 @@ public class VoltZK {
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
     public static final String debugLeadersInfo(ZooKeeper zk) {
-        StringBuilder build = new StringBuilder("ZooKeeper:\n");
-        build.append(printZKDir(zk, iv2masters));
-        build.append(printZKDir(zk, iv2appointees));
-        build.append(printZKDir(zk, iv2mpi));
-        build.append(printZKDir(zk, leaders_initiators));
-        build.append(printZKDir(zk, leaders_globalservice));
+        StringBuilder builder = new StringBuilder("ZooKeeper:\n");
+        printZKDir(zk, iv2masters, builder);
+        printZKDir(zk, iv2appointees, builder);
+        printZKDir(zk, iv2mpi, builder);
+        printZKDir(zk, leaders_initiators, builder);
+        printZKDir(zk, leaders_globalservice, builder);
 
-        return build.toString();
+        return builder.toString();
     }
 
-    private static final String printZKDir(ZooKeeper zk, String dir) {
-        StringBuilder build = new StringBuilder("\t");
-        build.append(dir).append(": ");
+    private static final void printZKDir(ZooKeeper zk, String dir, StringBuilder builder) {
+        builder.append(dir).append(":\t ");
         try {
             List<String> keys = zk.getChildren(dir, null);
             boolean isData = false;
@@ -130,23 +129,23 @@ public class VoltZK {
                         data = CoreUtils.hsIdToString(Long.parseLong(data));
                     }
                     isData = true;
-                    build.append(key).append(" -> ").append(data).append(",");
+                    builder.append(key).append(" -> ").append(data).append(",");
                 } else {
                     // path may be a dir instead
                     List<String> children = zk.getChildren(path, null);
                     if (children != null) {
-                        build.append("\n").append(printZKDir(zk, path));
+                        builder.append("\n");
+                        printZKDir(zk, path, builder);
                     }
                 }
             }
             if (isData) {
-                build.append("\n");
+                builder.append("\n");
             }
         } catch (KeeperException | InterruptedException | UnsupportedEncodingException e) {
-            build.append(e.getMessage());
+            builder.append(e.getMessage());
         }
-        return build.toString();
-}
+    }
 
     // flag of initialization process complete
     public static final String init_completed = "/db/init_completed";
@@ -379,5 +378,18 @@ public class VoltZK {
             return Long.parseLong(hsid.substring(0, hsid.length() - BALANCE_SPI_SUFFIX.length()));
         }
         return Long.parseLong(hsid);
+    }
+
+    /**
+     * check if any nodes are processing Snapshot request
+     */
+    public static boolean isSnapshotInProgress(ZooKeeper zk) {
+        try {
+            List<String> keys = zk.getChildren(VoltZK.nodes_currently_snapshotting, false);
+            return !(keys.isEmpty());
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to query nodes currently snapshotting", true, e);
+        }
+        return true;
     }
 }

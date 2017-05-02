@@ -168,7 +168,7 @@ public class MpScheduler extends Scheduler
             }
         }
 
-        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas);
+        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI);
         m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
     }
 

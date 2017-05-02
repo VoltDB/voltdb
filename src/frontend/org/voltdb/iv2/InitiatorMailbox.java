@@ -510,12 +510,20 @@ public class InitiatorMailbox implements Mailbox
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("[repairReplicasWithInternal.Iv2InitiateTaskMessage]:" + work
+                        + " repaire sites:" + CoreUtils.hsIdCollectionToString(needsRepair));
+            }
             m_scheduler.handleMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof FragmentTaskMessage) {
             // We need to get this into the repair log in case we've never seen it before.  Adding fragment
             // tasks to the repair log is safe; we'll never overwrite the first fragment if we've already seen it.
             m_repairLog.deliver(repairWork);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("[repairReplicasWithInternal.FragmentTaskMessage]:" + repairWork
+                        + " repaire sites:" + CoreUtils.hsIdCollectionToString(needsRepair));
+            }
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
@@ -523,6 +531,10 @@ public class InitiatorMailbox implements Mailbox
             // ignore it, or we need to clean up, or we'll be restarting and it doesn't matter.  Make sure they
             // get into the repair log and then let them run their course.
             m_repairLog.deliver(repairWork);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("[repairReplicasWithInternal.CompleteTransactionMessage]:" + repairWork
+                        + " repaire sites:" + CoreUtils.hsIdCollectionToString(needsRepair));
+            }
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
         else {

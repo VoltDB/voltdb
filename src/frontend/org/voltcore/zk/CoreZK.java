@@ -198,7 +198,13 @@ public class CoreZK {
      */
     public static boolean createSPIBalanceIndicator(ZooKeeper zk, int hostId)
     {
+        //snapshot in progress
+        if (VoltZK.isSnapshotInProgress(zk)) {
+            return false;
+        }
+
         try {
+            //elastic join or rejoin is in progress
             if(zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null ||
                     zk.exists(rejoin_node_blocker, false) != null) {
                 return false;
@@ -232,6 +238,17 @@ public class CoreZK {
         }
 
         return true;
+    }
+
+    public static boolean isSPIBalanceInProgress(ZooKeeper zk) {
+        try {
+            if(zk.exists(spi_balance_blocker, false) != null) {
+                return true;
+            }
+        } catch (KeeperException | InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to check the existence of join or rejoin indicator", true, e);
+        }
+        return false;
     }
 
     /**

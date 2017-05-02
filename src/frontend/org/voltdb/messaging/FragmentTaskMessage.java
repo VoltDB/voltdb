@@ -1109,6 +1109,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (m_emptyForRestart)
             sb.append("\n  THIS IS A NULL FRAGMENT TASK USED FOR RESTART");
 
+        String procName = getProcedureName();
+        if (procName != null) {
+            sb.append("\n  PROC NAME:" + procName);
+        }
         return sb.toString();
     }
 

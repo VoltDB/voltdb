@@ -53,7 +53,7 @@ public class MpPromoteAlgo implements RepairAlgo
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
-
+    private final boolean m_isBalanceSPI;
     long getRequestId()
     {
         return m_requestId;
@@ -113,7 +113,19 @@ public class MpPromoteAlgo implements RepairAlgo
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
+        m_isBalanceSPI = false;
+        m_whoami = whoami;
+    }
 
+    /**
+     * Setup a new RepairAlgo but don't take any action to take responsibility.
+     */
+    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+            String whoami, boolean balanceSPI)
+    {
+        m_survivors = new ArrayList<Long>(survivors);
+        m_mailbox = mailbox;
+        m_isBalanceSPI = balanceSPI;
         m_whoami = whoami;
     }
 
@@ -145,7 +157,7 @@ public class MpPromoteAlgo implements RepairAlgo
 
         tmLog.info(m_whoami + "found " + m_survivors.size()
                  + " surviving leaders to repair. "
-                 + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
+                 + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors) + "requested id:" + m_requestId);
         VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_survivors), logRequest);
         m_mailbox.send(m_mailbox.getHSId(), logRequest);
@@ -203,7 +215,11 @@ public class MpPromoteAlgo implements RepairAlgo
                     TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
                             m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), true);
 
-                    repairSurvivors();
+                    if (m_isBalanceSPI) {
+                        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
+                    } else {
+                        repairSurvivors();
+                    }
                 }
             }
         }
