@@ -57,6 +57,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -106,6 +107,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
+import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
@@ -120,6 +122,7 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
+import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
@@ -181,6 +184,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.hash.Hashing;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -390,6 +394,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    StartAction getStartAction() {
+        return m_config.m_startAction;
+    }
+
     private long m_recoveryStartTime;
 
     CommandLog m_commandLog;
@@ -418,9 +426,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
     String m_licenseInformation = "";
-    private LatencyStats m_latencyStats;
 
-    private LatencyHistogramStats m_latencyHistogramStats;
+    private LatencyStats m_latencyStats;
+    private LatencyHistogramStats m_latencyCompressedStats;
+    private LatencyUncompressedHistogramStats m_latencyHistogramStats;
 
     private File getConfigDirectory() {
         return getConfigDirectory(m_config);
@@ -530,12 +539,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getPath();
     }
 
-    private String getStagedCatalogPath(){
-        return getStagedCatalogPath(getVoltDBRootPath());
-    }
-
-    public static String getStagedCatalogPath(String voltDbRoot){
-        return voltDbRoot + File.separator + Constants.CONFIG_DIR + File.separator + CatalogUtil.STAGED_CATALOG_FILE_NAME;
+    public static String getStagedCatalogPath(String voltDbRoot) {
+        return voltDbRoot + File.separator + CatalogUtil.STAGED_CATALOG_PATH;
     }
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
@@ -573,10 +578,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         PathsType paths = deployment.getPaths();
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
-
-        if ((path = managedPathEmptyCheck(voltDbRoot, getStagedCatalogPath())) != null){
-            nonEmptyPaths.add(path);
-        }
 
         if (!config.m_isEnterprise) {
             return nonEmptyPaths.build();
@@ -759,54 +760,52 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 System.exit(-1);
             }
 
-            // print the ascii art! But not for init.
+            // print the ascii art!.
+            // determine the edition
+            // Check license availability
+            // All above - not for init
+            String edition = "Community Edition";
             if (config.m_startAction != StartAction.INITIALIZE) {
                 consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-            }
+                // load license API
+                if (config.m_pathToLicense == null) {
+                    m_licenseApi = MiscUtils.licenseApiFactory();
+                    if (m_licenseApi == null) {
+                        hostLog.fatal("Unable to open license file in default directories");
+                    }
+                } else {
+                    m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
+                    if (m_licenseApi == null) {
+                        hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
+                    }
+                }
 
-            // load license API
-            if (config.m_pathToLicense == null) {
-                m_licenseApi = MiscUtils.licenseApiFactory();
                 if (m_licenseApi == null) {
-                    hostLog.fatal("Unable to open license file in default directories");
+                    hostLog.fatal("Please contact sales@voltdb.com to request a license.");
+                    VoltDB.crashLocalVoltDB(
+                            "Failed to initialize license verifier. " + "See previous log message for details.", false,
+                            null);
                 }
-            } else {
-                m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
-                if (m_licenseApi == null) {
-                    hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
+
+                if (config.m_isEnterprise) {
+                    if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isPro()) edition = "Pro Edition";
+                    if (m_licenseApi.isTrial()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
                 }
-            }
 
-            if (m_licenseApi == null) {
-                hostLog.fatal("Please contact sales@voltdb.com to request a license.");
-                VoltDB.crashLocalVoltDB(
-                        "Failed to initialize license verifier. " + "See previous log message for details.", false,
-                        null);
-            }
+                // this also prints out the license type on the console
+                readBuildInfo(edition);
 
-            // determine the edition
-            String edition = "Community Edition";
-            if (config.m_isEnterprise) {
-                if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
-                if (m_licenseApi.isPro()) edition = "Pro Edition";
-                if (m_licenseApi.isTrial()) edition = "Enterprise Edition";
-                if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
-            }
-
-            // this also prints out the license type on the console
-            readBuildInfo(edition);
-
-            // print out the licensee on the license
-            if (config.m_isEnterprise) {
-                String licensee = m_licenseApi.licensee();
-                if ((licensee != null) && (licensee.length() > 0)) {
-                    consoleLog.info(String.format("Licensed to: %s", licensee));
+                // print out the licensee on the license
+                if (config.m_isEnterprise) {
+                    String licensee = m_licenseApi.licensee();
+                    if ((licensee != null) && (licensee.length() > 0)) {
+                        consoleLog.info(String.format("Licensed to: %s", licensee));
+                    }
                 }
             }
 
-            if (config.m_startAction.isLegacy()) {
-                consoleLog.warn("The \"" + config.m_startAction.m_verb + "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");
-            }
             // Replay command line args that we can see
             StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
             sb.append(System.getProperty("sun.java.command", "[not available]"));
@@ -822,10 +821,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             sb.delete(0, sb.length()).append("Command line JVM classpath: ");
             sb.append(System.getProperty("java.class.path", "[not available]"));
             hostLog.info(sb.toString());
-
-            // config UUID is part of the status tracker that is slated to be an
-            // Information source for an http admun endpoint
-            m_statusTracker = new NodeStateTracker();
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate) {
@@ -859,6 +854,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
             }
+            if (config.m_startAction.isLegacy()) {
+                consoleLog.warn("The \"" + config.m_startAction.m_verb + "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");
+            }
+
+            // config UUID is part of the status tracker.
+            m_statusTracker = new NodeStateTracker();
+            final File stagedCatalogLocation = new VoltFile(RealVoltDB.getStagedCatalogPath(config.m_voltdbRoot.getAbsolutePath()));
 
             if (config.m_startAction.isLegacy()) {
                 File rootFH = CatalogUtil.getVoltDbRoot(readDepl.deployment.getPaths());
@@ -883,6 +885,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             return;
                         }
                     }
+                }
+                if (stagedCatalogLocation.isFile()) {
+                    hostLog.warn("Initialized schema is present, but is being ignored and may be removed.");
+                }
+            } else {
+                assert (config.m_startAction == StartAction.PROBE);
+                if (stagedCatalogLocation.isFile()) {
+                    assert (config.m_pathToCatalog == null) : config.m_pathToCatalog;
+                    config.m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
                 }
             }
 
@@ -1247,9 +1258,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_initiatorStats = new InitiatorStats(m_myHostId);
             m_liveClientsStats = new LiveClientsStats();
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
-            m_latencyStats = new LatencyStats(m_myHostId);
+
+            m_latencyStats = new LatencyStats();
             getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
-            m_latencyHistogramStats = new LatencyHistogramStats(m_myHostId);
+            m_latencyCompressedStats = new LatencyHistogramStats(m_myHostId);
+            getStatsAgent().registerStatsSource(StatsSelector.LATENCY_COMPRESSED, 0, m_latencyCompressedStats);
+            m_latencyHistogramStats = new LatencyUncompressedHistogramStats(m_myHostId);
             getStatsAgent().registerStatsSource(StatsSelector.LATENCY_HISTOGRAM,
                     0, m_latencyHistogramStats);
 
@@ -2173,10 +2187,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // log message unconditionally indicating that the provided host-count and admin-mode settings in
         // deployment, if any, will be ignored
-        consoleLog.info("When using the INIT command, some deployment file settings (hostcount, voltdbroot path, "
-                + "and admin-mode) are ignored");
-        hostLog.info("When using the INIT command, some deployment file settings (hostcount, voltdbroot path, "
-                + "and admin-mode) are ignored");
+        consoleLog.info("When using the INIT command, some deployment file settings (hostcount and voltdbroot path) "
+                + "are ignored");
+        hostLog.info("When using the INIT command, some deployment file settings (hostcount and voltdbroot path) are "
+                + "ignored");
 
         File depFH = getConfigLogDeployment(config);
         try (FileWriter fw = new FileWriter(depFH)) {
@@ -2189,27 +2203,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
     }
 
-    /**
-     * Takes the schema and stored procedures files given at initialization and performs the following tasks:
-     * <p><ul>
-     * <li>creates if necessary the voltdbroot/starter/bootstrap/existing directory tree
-     * <li>fail if database artifacts already exist and --force was not supplied (this is unexpected due to earlier checks)
-     * <li>moves the specified files to the 'existing' directory
-     * </ul>
-     * @param config VoltDB configuration
-     */
-    private void stageSchemaFiles(Configuration config){
-        if (config.m_userSchema == null){
+    private void stageSchemaFiles(Configuration config) {
+        if (config.m_userSchema == null) {
             return; // nothing to do
         }
         assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
-        File stagedCatalogFH = new VoltFile(getStagedCatalogPath());
-        assert( !stagedCatalogFH.exists() || config.m_forceVoltdbCreate ); // managedPathsWithFiles() checks for the staged catalog
-        final boolean standalone = true;
+        File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
+
+        if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
+            VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
+        }
+        final boolean standalone = false;
         final boolean isXCDR = false;
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
-        if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())){
-            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema, false, null);
+        if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())) {
+            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
         }
     }
 
@@ -3222,6 +3230,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_catalogContext = null;
                 m_initiatorStats = null;
                 m_latencyStats = null;
+                m_latencyCompressedStats = null;
                 m_latencyHistogramStats = null;
 
                 AdHocCompilerCache.clearHashCache();
@@ -3284,7 +3293,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             long currentTxnUniqueId,
             byte[] deploymentBytes,
             byte[] deploymentHash,
-            boolean hasSchemaChange)
+            boolean hasSchemaChange,
+            boolean requiresNewExportGeneration)
     {
         try {
             synchronized(m_catalogUpdateLock) {
@@ -3366,7 +3376,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
 
                 // 1. update the export manager.
-                ExportManager.instance().updateCatalog(m_catalogContext, diffCommands, partitions);
+                ExportManager.instance().updateCatalog(m_catalogContext, diffCommands, requiresNewExportGeneration, partitions);
 
                 // 1.1 Update the elastic join throughput settings
                 if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
@@ -3405,7 +3415,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // this after flushing the stats -- this will re-register
                 // the MPI statistics.
                 if (m_MPI != null) {
-                    m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
+                    m_MPI.updateCatalog(diffCommands, m_catalogContext, csp, requiresNewExportGeneration);
                 }
 
                 // Update catalog for import processor this should be just/stop start and updat partitions.
@@ -3423,7 +3433,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_consumerDRGateway.updateCatalog(m_catalogContext,
                                                       (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
                                                        ? newDRConnectionSource
-                                                       : null));
+                                                       : null),
+                                                      (byte) m_catalogContext.cluster.getPreferredsource());
                 }
 
                 // Check if this is promotion
@@ -3655,6 +3666,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final long megabytes = m_executionSiteRecoveryTransferred / (1024 * 1024);
         final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);
 
+        deleteStagedCatalogIfNeeded();
+
         if (m_clientInterface != null) {
             m_clientInterface.mayActivateSnapshotDaemon();
             try {
@@ -3787,7 +3800,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         consoleLog.info("Promoting replication role from replica to master.");
         hostLog.info("Promoting replication role from replica to master.");
         shutdownReplicationConsumerRole();
-        replaceDRConsumerStatsWithDummy();
         if (m_clientInterface != null) {
             m_clientInterface.setReplicationRole(getReplicationRole());
         }
@@ -3884,6 +3896,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_leaderAppointer.onReplayCompletion();
         }
 
+        deleteStagedCatalogIfNeeded();
+
         if (m_startMode != null) {
             m_mode = m_startMode;
         } else {
@@ -3935,6 +3949,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+    }
+
+    private void deleteStagedCatalogIfNeeded() {
+        if (((m_commandLog != null) && m_commandLog.isEnabled()) || (m_terminusNonce != null)) {
+            File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(getVoltDBRootPath()));
+            if (stagedCatalog.exists()) {
+                if (stagedCatalog.delete()) {
+                    hostLog.info("Saved copy of the initialized schema deleted because command logs and/or snapshots are in use.");
+                } else {
+                    hostLog.warn("Failed to delete the saved copy of the initialized schema.");
+                }
+            }
+        }
     }
 
     @Override
@@ -4068,6 +4095,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         Cartographer.class,
                         HostMessenger.class,
                         byte.class,
+                        byte.class,
                         String.class,
                         int.class);
                 m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
@@ -4075,6 +4103,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         m_cartographer,
                         m_messenger,
                         drConsumerClusterId,
+                        (byte) m_catalogContext.cluster.getPreferredsource(),
                         drIfAndPort.getFirst(),
                         drIfAndPort.getSecond());
                 m_globalServiceElector.registerService(m_consumerDRGateway);
@@ -4436,5 +4465,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public Cartographer getCartograhper() {
         return m_cartographer;
+    }
+
+    @Override
+    public void swapTables(String oneTable, String otherTable) {
+        if (m_consumerDRGateway != null) {
+            Table tableA = m_catalogContext.tables.get(oneTable);
+            Table tableB = m_catalogContext.tables.get(otherTable);
+            assert (tableA != null && tableB != null);
+            if (tableA.getIsdred() && tableB.getIsdred()) {
+                long signatureHashA = Hashing.sha1().hashString(tableA.getSignature(), Charsets.UTF_8).asLong();
+                long signatureHashB = Hashing.sha1().hashString(tableB.getSignature(), Charsets.UTF_8).asLong();
+                Set<Pair<String, Long>> swappedTables = new HashSet<>();
+                swappedTables.add(Pair.of(oneTable.toUpperCase(), signatureHashA));
+                swappedTables.add(Pair.of(otherTable.toUpperCase(), signatureHashB));
+                m_consumerDRGateway.swapTables(swappedTables);
+            }
+        }
     }
 }

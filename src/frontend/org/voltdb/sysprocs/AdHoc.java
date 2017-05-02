@@ -124,6 +124,7 @@ public class AdHoc extends AdHocNTBase {
                                   true,
                                   null,
                                   ExplainMode.NONE,
+                                  false,
                                   userParams);
         }
         else {
@@ -198,7 +199,8 @@ public class AdHoc extends AdHocNTBase {
                                  ccr.requiresSnapshotIsolation ? 1 : 0,
                                  ccr.worksWithElastic ? 1 : 0,
                                  ccr.deploymentHash,
-                                 ccr.hasSchemaChange ?  1 : 0);
+                                 ccr.hasSchemaChange ?  1 : 0,
+                                 ccr.requiresNewExportGeneration ? 1 : 0);
         }
     }
 }

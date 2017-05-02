@@ -146,7 +146,6 @@ function async-benchmark() {
         client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
         --duration=180 \
-        --kafkaserverlist=localhost:9092 \
         --alltypes=false \
         --useexport=false \
         --expected_rows=6000000 \

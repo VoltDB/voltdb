@@ -980,6 +980,9 @@ public class VoltDB {
         }
 
         public static String getPathToCatalogForTest(String jarname) {
+            if (jarname == null) {
+                return null; // NewCLI tests that init with schema do not want a pre-compiled catalog
+            }
 
             // first try to get the "right" place to put the thing
             if (System.getenv("TEST_DIR") != null) {
@@ -1217,7 +1220,10 @@ public class VoltDB {
                 }
 
                 // Flush trace files
-                VoltTrace.closeAllAndShutdown(true, TimeUnit.SECONDS.toMillis(10));
+                try {
+                    VoltTrace.closeAllAndShutdown(new File(instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath(),
+                                                  TimeUnit.SECONDS.toMillis(10));
+                } catch (IOException e) {}
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis

@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<project default="default" name="VoltDB">
+<project default="default" name="VoltDB" xmlns:if="ant:if" xmlns:jacoco="antlib:org.jacoco.ant">
 
 <!-- GENERAL HELPER MACROS -->
 <macrodef name="envdefault">
@@ -27,6 +27,7 @@
             encoding='UTF-8'
             debug='true'
             includeAntRuntime='false'>
+            <compilerarg if:set="use_jacoco" value="-g:lines"/>
             <classpath refid="project.classpath" />
         </javac>
     </sequential>
@@ -42,6 +43,13 @@
 <!-- allow env.VOLTBUILD to override "build" property -->
 <envdefault prop="build" var="VOLTBUILD" default="release" />
 <envdefault prop="jmemcheck" var="JMEMCHECK" default="memcheck" />
+
+<!-- enable code coverage for JUnit's if USE_JACOCO in environment-->
+<condition property="use_jacoco" value="true">
+    <isset property="env.USE_JACOCO"/>
+</condition>
+<property name="jacoco.agent" value="jacocoagent.jar" />
+<property name="jacoco.ant" value="jacocoant.jar" />
 
 <!-- allow env.VOLTPRO to override "voltpro" property -->
 <condition property="voltpro" value="${env.VOLTPRO}">
@@ -94,11 +102,6 @@
     <os family="mac"/>
 </condition>
 
-
-
-<!-- emma build instrumentation location -->
-<property name='build.instr.dir'             location='${build.dir}/instr' />
-
 <!-- Default heap size for Volt server (MB)  -->
 <condition property="volt.server.memory" value="2048">
     <not><isset property="volt.server.memory"/></not>
@@ -126,7 +129,6 @@
 <property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
 
 <path id='project.classpath'>
-    <pathelement location='${build.instr.dir}' />
     <pathelement location='${build.client.dir}' />
     <pathelement location='${build.prod.dir}' />
     <pathelement location='${build.testproc.dir}' />
@@ -1135,6 +1137,7 @@ JAR BUILDING
             <include name="org/jctools_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/ServerThread.class" />
             <include name="org/voltdb/benchmark/*" />
             <include name="org/voltdb/regressionsuites/Local*" />
             <include name="org/voltdb/regressionsuites/MultiConfigSuiteBuilder.class" />
@@ -1638,6 +1641,7 @@ TEST CASES
 ]]>
 </scriptdef>
 
+
 <!-- run junit for one suite -->
 <target name='junit_onesuite'>
     <!-- set defaults for junit vars if not already set -->
@@ -1686,6 +1690,7 @@ TEST CASES
             <!-- <jvmarg value="-Xcheck:jni" /> -->
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
+            <jvmarg if:set="use_jacoco" value="-javaagent:${vendor.lib.dir}/${jacoco.agent}"/>
             <!-- removed in java 8 <jvmarg value="-XX:-UseSplitVerifier"/> -->
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
@@ -1702,9 +1707,6 @@ TEST CASES
                  the single process JNI backend. -->
             <env key="BUILD" value="${build}" />
             <env key="VOLTDBIPC_PATH" value="${build.prod.dir}/voltdbipc" />
-            <!-- code coverage output settings, harmless if not in use -->
-            <jvmarg value="-Demma.coverage.out.file=${emma.dir}/coverage.emma" />
-            <jvmarg value="-Demma.coverage.out.merge=true" />
             <!-- junit log4j settings, generates log output of last suite -->
             <jvmarg value="-Dlog4j.configuration=file:${base.dir}/tests/log4j-allconsole.xml" />
 
@@ -1944,7 +1946,7 @@ TEST CASES
         <!-- Fail the build if there were any problems.
              This runs all the tests before failing. -->
         <available file="${build.testoutput.dir}/JUNITHADFAILURES" property="junit.failures"/>
-        <fail if="junit.failures" unless="emma.enabled" message="JUnit had failures" />
+        <fail if="junit.failures" unless="use_jacoco" message="JUnit had failures" />
     </sequential>
 </macrodef>
 
@@ -1991,63 +1993,38 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name='emma_junit'
-        description="run junit target and generate coverage report"
-        depends="with.emma, junit, emma-report"
-/>
+<!-- Resources for the JaCoCo task below. -->
+<taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml">
+    <classpath path="${vendor.lib.dir}/${jacoco.ant}"/>
+</taskdef>
 
-<target name='emma_junit_legacy'
-        description="run junit_legacy target and generate coverage report"
-        depends="with.emma, junit_legacy, emma-report"
-/>
+<target name="jacoco_report">
+    <jacoco:report>
+        <executiondata>
+            <file file="jacoco.exec"/>
+        </executiondata>
 
-<target name='with.emma' description="enable code coverage analysis" >
-    <!-- set up emma -->
-    <path id="emma.lib" >
-        <pathelement location="${vendor.lib.dir}/emma.jar" />
-        <pathelement location="${vendor.lib.dir}/emma_ant.jar" />
-    </path>
-    <taskdef resource="emma_ant.properties" classpathref="emma.lib" />
-    <!-- enable emma -->
-    <property name="emma.enabled" value="true" />
-    <!-- instrument the code -->
-    <property name="emma.dir" location="${build.dir}/emma" />
-    <mkdir dir="${emma.dir}" />
-    <emma>
-        <instr destdir="${build.instr.dir}/org/"
-               metadatafile="${emma.dir}/metadata.emma"
-               merge="true">
-          <instrpath path="${build.prod.dir}/org"/>
+        <structure name="VoltDB Code Coverage">
+            <classfiles>
+                <fileset dir="obj/release/prod/org">
+                    <!-- <include name="*voltdb.*"/>  -->
+                    <!-- <include name="*voltcore.*"/> -->
+                    <!--pmsg is the protobuf-generated code for dragent-->
+                    <exclude name="*pmsg.*"/>
+                    <exclude name="*exampleutils.*"/>
+                </fileset>
+            </classfiles>
+            <sourcefiles encoding="UTF-8">
+                <fileset dir="src/frontend">
+                    <!-- <include name="voltdb/**/*.java"/> -->
+                    <!-- <include name="voltcore/**/*.java"/> -->
+                </fileset>
+            </sourcefiles>
+        </structure>
 
-          <filter includes="*voltdb.*"/>
-          <filter includes="*voltcore.*"/>
-          <!--pmsg is the protobuf-generated code for dragent-->
-          <filter excludes="*pmsg.*"/>
-          <filter excludes="*exampleutils.*"/>
-        </instr>
-    </emma>
+        <html destdir="jacoco-report"/>
+    </jacoco:report>
 </target>
-
-<target
-    name='emma-report'
-    description="Generate code coverage reports.  You need call the with.emma target before your test target">
-    <emma>
-        <report
-            sourcepath="${src.gpl.dir}"
-            sort="+name"
-            metrics="method:70,block:80,line:80,class:100">
-            <fileset dir="${emma.dir}"><include name="*.emma"/></fileset>
-            <xml outfile="${emma.dir}/coverage.xml" depth="method" />
-            <html
-                outfile="${emma.dir}/coverage.html"
-                depth="method"
-                columns="name,class,method,block,line"
-                encoding="UTF-8"
-            />
-        </report>
-    </emma>
-</target>
-
 
 <!--
     this target is intended to be called only with antcall!
@@ -2365,7 +2342,7 @@ TEST CASES
         <include name="version.txt"/>
       </fileset>
     </copy>
-    <exec dir='tests/sqlcoverage' executable='python2.6' failonerror="${sqlcoverage.failonerror}">
+    <exec dir='tests/sqlcoverage' executable='python2.7' failonerror="${sqlcoverage.failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
         <arg line='sql_coverage_test.py' />
@@ -2499,7 +2476,7 @@ TEST CASES
         <isset property="reportpath"/>
     </condition>
 
-    <exec dir='${sqlcmdtest.dir}' executable='python2.6' failonerror="true">
+    <exec dir='${sqlcmdtest.dir}' executable='python2.7' failonerror="true">
         <arg value='sqlcmdtest.py' />
     </exec>
 </target>
@@ -2521,7 +2498,7 @@ TEST CASES
         <isset property="reportpath"/>
     </condition>
 
-    <exec dir='${sqlcmdtest.dir}' executable='python2.6' failonerror="true">
+    <exec dir='${sqlcmdtest.dir}' executable='python2.7' failonerror="true">
         <arg value='sqlcmdtest.py' />
         <arg value='--refresh' />
     </exec>
@@ -2613,8 +2590,6 @@ HUDSON-SPECIFIC TARGETS
 <target name='copy-coverage-files'
     description="Collect test results so that Hudson can display them even after an ant clean">
     <copy todir=".." preservelastmodified="true">
-        <fileset dir="obj/release/emma" includes="coverage.html"/>
-        <fileset dir="obj/release/emma" includes="_files/"/>
         <fileset dir="obj/release-coverage" includes="lcov-unit-tests"/>
         <fileset dir="${build.dir}" includes="testability.result.html"/>
     </copy>

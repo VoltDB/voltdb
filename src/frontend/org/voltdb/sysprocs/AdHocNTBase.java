@@ -108,6 +108,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                                boolean inferPartitioning,
                                                                Object userPartitionKey,
                                                                ExplainMode explainMode,
+                                                               boolean isSwapTables,
                                                                Object[] userParamSet)
     {
         // record the catalog version the query is planned against to
@@ -221,7 +222,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
         else {
             try {
-                return createAdHocTransaction(plannedStmtBatch);
+                return createAdHocTransaction(plannedStmtBatch, isSwapTables);
             }
             catch (VoltTypeException vte) {
                 String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
@@ -346,8 +347,10 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
 
 
-    private final CompletableFuture<ClientResponse> createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)
-            throws VoltTypeException
+    private final CompletableFuture<ClientResponse> createAdHocTransaction(
+            final AdHocPlannedStmtBatch plannedStmtBatch,
+            final boolean isSwapTables)
+                    throws VoltTypeException
     {
         ByteBuffer buf = null;
         try {
@@ -367,7 +370,11 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         // -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
 
-        if (isSinglePartition) {
+        if (isSwapTables) {
+            procedureName = "@SwapTablesCore";
+            params = new Object[] { buf.array() };
+        }
+        else if (isSinglePartition) {
             if (plannedStmtBatch.isReadOnly()) {
                 procedureName = "@AdHoc_RO_SP";
             }

@@ -229,7 +229,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle)
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean requiresNewExportGeneration)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -290,6 +290,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void resetDrAppliedTracker(byte clusterId) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public boolean hasRealDrAppliedTracker(byte clusterId) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -299,6 +309,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
+
         @Override
         public Pair<Long, Long> getDrLastAppliedUniqueIds()
         {
@@ -398,11 +409,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_shouldContinue = false;
     }
 
-    void shutdown()
-    {
-        if (m_non_voltdb_backend != null) {
-            m_non_voltdb_backend.shutdownInstance();
-        }
+    void shutdown() {
     }
 
     //

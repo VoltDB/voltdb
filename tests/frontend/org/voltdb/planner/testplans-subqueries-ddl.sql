@@ -98,7 +98,6 @@ COUNT(*) heat
 FROM pgr
 GROUP BY s, hotspot_hm;
 
-
 --- ENG-8264
 create table stores (
     type_id integer,

@@ -31,6 +31,12 @@ try:
 except ImportError, e:
     ssl_available = False
     ssl_exception = e
+try:
+    import gssapi
+    kerberos_available = True
+except ImportError, e:
+    kerberos_available = False
+    kerberos_exception = e
 
 
 decimal.getcontext().prec = 38
@@ -69,6 +75,9 @@ class ReadBuffer(object):
 
     def buffer_length(self):
         return len(self._buf)
+
+    def remaining(self):
+        return (len(self._buf) - self._off)
 
     def get_buffer(self):
         return self._buf
@@ -127,6 +136,11 @@ class FastSerializer:
     # default decimal scale
     DEFAULT_DECIMAL_SCALE = 12
 
+    # protocol constants
+    AUTH_HANDSHAKE_VERSION = 2
+    AUTH_SERVICE_NAME = 4
+    AUTH_HANDSHAKE = 5
+
     # procedure call result codes
     PROC_OK = 0
 
@@ -147,8 +161,10 @@ class FastSerializer:
     else:
         DEFAULT_SSL_CONFIG = {}
 
-    def __init__(self, host = None, port = 21212, usessl = False, username = "",
-                 password = "", dump_file_path = None,
+    def __init__(self, host = None, port = 21212, usessl = False,
+                 username = "", password = "",
+                 kerberos = False,
+                 dump_file_path = None,
                  connect_timeout = 8,
                  procedure_timeout = None,
                  default_timeout = None,
@@ -160,6 +176,7 @@ class FastSerializer:
         :param usessl: switch for use ssl or not
         :param username: authentication user name for connection or None
         :param password: authentication password for connection or None
+        :param kerberos: use Kerberos authentication
         :param dump_file_path: path to optional dump file or None
         :param connect_timeout: timeout (secs) or None for authentication (default=8)
         :param procedure_timeout: timeout (secs) or None for procedure calls (default=None)
@@ -171,6 +188,11 @@ class FastSerializer:
         self.host = host
         self.port = port
         self.usessl = usessl
+        if kerberos is None:
+            self.usekerberos = False
+        else:
+            self.usekerberos = kerberos
+        self.kerberosprinciple = None
         self.ssl_config = ssl_config
         self.ssl_config_file = ssl_config_file
         if not dump_file_path is None:
@@ -271,7 +293,15 @@ class FastSerializer:
 
         self.read_buffer = ReadBuffer()
 
-        if not username is None and not password is None and not host is None:
+        if self.usekerberos:
+            if not kerberos_available:
+                raise RuntimeError("Requested Kerberos authentication but unable to import the GSSAPI package.")
+            if not self.has_ticket():
+                raise RuntimeError("Requested Kerberos authentication but no valid ticket found. Authenticate with Kerberos first.")
+            assert not self.socket is None
+            self.socket.settimeout(connect_timeout)
+            self.authenticate(str(self.kerberosprinciple), "")
+        elif not username is None and not password is None and not host is None:
             assert not self.socket is None
             self.socket.settimeout(connect_timeout)
             self.authenticate(username, password)
@@ -378,10 +408,13 @@ class FastSerializer:
         self.writeByte(1)
 
         # service requested
-        self.writeString("database")
+        if (self.usekerberos):
+            self.writeString("kerberos")
+        else:
+            self.writeString("database")
 
         if username:
-            # utf8 encode supplied username
+            # utf8 encode supplied username or kerberos principal name
             self.writeString(username)
         else:
             # no username, just output length of 0
@@ -408,6 +441,52 @@ class FastSerializer:
         version = self.readByte()
         status = self.readByte()
 
+        if (version == self.AUTH_HANDSHAKE_VERSION):
+            #service name supplied by VoltDB Server
+            service_string = self.readString().encode('ascii','ignore')
+            try:
+                service_name = gssapi.Name(service_string, name_type=gssapi.NameType.kerberos_principal)
+                ctx = gssapi.SecurityContext(name=service_name, mech=gssapi.MechType.kerberos)
+                in_token = None
+                out_token = ctx.step(in_token)
+                while not ctx.complete:
+                    self.writeByte(self.AUTH_HANDSHAKE_VERSION)
+                    self.writeByte(self.AUTH_HANDSHAKE)
+                    self.wbuf.extend(out_token)
+                    self.prependLength()
+                    self.flush()
+
+                    try:
+                        self.bufferForRead()
+                    except IOError, e:
+                        print "ERROR: Connection failed. Please check that the host, port and ssl settings are correct."
+                        raise e
+                    except socket.timeout:
+                        raise RuntimeError("Authentication timed out after %d seconds."
+                                            % self.socket.gettimeout())
+                    version = self.readByte()
+                    status = self.readByte()
+                    if version != self.AUTH_HANDSHAKE_VERSION or status != self.AUTH_HANDSHAKE:
+                        raise RuntimeError("Authentication failed.")
+
+                    in_token = self.readVarbinaryContent(self.read_buffer.remaining()).tostring()
+                    out_token = ctx.step(in_token)
+
+                try:
+                    self.bufferForRead()
+                except IOError, e:
+                    print "ERROR: Connection failed. Please check that the host, port and ssl settings are correct."
+                    raise e
+                except socket.timeout:
+                    raise RuntimeError("Authentication timed out after %d seconds."
+                                        % self.socket.gettimeout())
+                version = self.readByte()
+                status = self.readByte()
+
+            except Exception, e:
+                raise RuntimeError("Authentication failed.")
+
+
         if status != 0:
             raise RuntimeError("Authentication failed.")
 
@@ -417,6 +496,23 @@ class FastSerializer:
         self.readInt32()
         for x in range(self.readInt32()):
             self.readByte()
+
+    def has_ticket(self):
+        '''
+        Checks to see if the user has a valid ticket.
+        '''
+        default_cred = None
+        retval = False
+        try:
+            default_cred = gssapi.creds.Credentials(usage='initiate')
+            if default_cred.lifetime > 0:
+                self.kerberosprinciple = str(default_cred.name)
+                retval = True
+            else:
+                print "ERROR: Kerberos principal found but login expired."
+        except gssapi.raw.misc.GSSError as e:
+            print "ERROR: unable to find default principal from Kerberos cache."
+        return retval
 
     def setInputByteOrder(self, bom):
         # assuming bom is high bit set?
@@ -854,6 +950,7 @@ class VoltColumn:
     def __init__(self, fser = None, type = None, name = None):
         if fser != None:
             self.type = fser.readByte()
+            self.name = None
         elif type != None and name != None:
             self.type = type
             self.name = name
@@ -862,7 +959,7 @@ class VoltColumn:
         # If the name is empty, use the default "modified tuples". Has to do
         # this because HSQLDB doesn't return a column name if the table is
         # empty.
-        return "(%s: %d)" % (self.name and self.name or "modified tuples",
+        return "(%s: %d)" % (self.name or "modified tuples" ,
                              self.type)
 
     def __eq__(self, other):
@@ -931,6 +1028,7 @@ class VoltTable:
     def readFromSerializer(self):
         # 1.
         tablesize = self.fser.readInt32()
+        limit_position = self.fser.read_buffer._off + tablesize
         # 2.
         headersize = self.fser.readInt32()
         statuscode = self.fser.readByte()
@@ -949,6 +1047,10 @@ class VoltTable:
             row = [self.fser.read(self.columns[j].type)
                    for j in xrange(columncount)]
             self.tuples.append(row)
+
+        # advance offset to end of table-size on read_buffer
+        if self.fser.read_buffer._off != limit_position:
+            self.fser.read_buffer._off = limit_position
 
         return self
 

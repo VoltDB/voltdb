@@ -69,7 +69,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         GENERATE_DR_EVENT(6),
         RESET_DR_APPLIED_TRACKER(7),
         SET_MERGED_DRID_TRACKER(8),
-        INIT_DRID_TRACKER(9);
+        INIT_DRID_TRACKER(9),
+        RESET_DR_APPLIED_TRACKER_SINGLE(10);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -83,7 +84,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         NOT_A_EVENT(0),
         POISON_PILL(1),
         CATALOG_UPDATE(2),
-        DR_STREAM_START(3);
+        DR_STREAM_START(3),
+        SWAP_TABLE(4);
 
         private EventType(int typeId) {
             this.typeId = typeId;
@@ -602,19 +604,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected abstract void coreLoadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    public final void updateCatalog(final long timestamp, final String diffCommands) throws EEException {
+    public final void updateCatalog(final long timestamp, final boolean isStreamUpdate, final String diffCommands) throws EEException {
         try {
             m_startTime = 0;
             m_logDuration = INITIAL_LOG_DURATION;
             m_fragmentContext = FragmentContext.CATALOG_UPDATE;
-            coreUpdateCatalog(timestamp, diffCommands);
+            coreUpdateCatalog(timestamp, isStreamUpdate, diffCommands);
         }
         finally {
             m_fragmentContext = FragmentContext.UNKNOWN;
         }
     }
 
-    protected abstract void coreUpdateCatalog(final long timestamp, final String diffCommands) throws EEException;
+    protected abstract void coreUpdateCatalog(final long timestamp, final boolean isStreamUpdate, final String diffCommands) throws EEException;
 
     public void setBatch(int batchIndex) {
         m_currentBatchIndex = batchIndex;
@@ -927,7 +929,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param catalogVersion
      * @return error code
      */
-    protected native int nativeUpdateCatalog(long pointer, long timestamp, byte diff_commands[]);
+    protected native int nativeUpdateCatalog(long pointer, long timestamp, boolean isStreamUpdate, byte diff_commands[]);
 
     /**
      * This method is called to initially load table data.

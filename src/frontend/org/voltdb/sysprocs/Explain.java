@@ -119,6 +119,7 @@ public class Explain extends AdHocNTBase {
                                   true,
                                   null,
                                   ExplainMode.EXPLAIN_ADHOC,
+                                  false,
                                   userParams);
         }
         else {

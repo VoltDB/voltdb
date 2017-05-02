@@ -543,11 +543,24 @@ public class TestNTProcs extends TestCase {
 
         System.out.println(statsT.toFormattedString());
 
-        Map<String, Long> stats = aggregateProcRow(client, NTProcWithFutures.class.getName());
-        assertEquals(CALL_COUNT + 1, stats.get("INVOCATIONS").longValue());
+        // repeatedly call stats until they match
+        long start = System.currentTimeMillis();
+        boolean found = false;
+        while (System.currentTimeMillis() - start < 20000) {
+            Map<String, Long> stats = aggregateProcRow(client, NTProcWithFutures.class.getName());
+            if ((CALL_COUNT + 1) == stats.get("INVOCATIONS").longValue()) {
+                found = true;
+                break;
+            }
+            Thread.sleep(1000);
+        }
 
         localServer.shutdown();
         localServer.join();
+
+        if (!found) {
+            fail();
+        }
     }
 
     //

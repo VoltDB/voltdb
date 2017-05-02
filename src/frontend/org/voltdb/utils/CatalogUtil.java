@@ -185,7 +185,7 @@ public abstract class CatalogUtil {
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
 
-    public final static String[] CATALOG_DEFAULT_ARTIFCATS = {
+    public final static String[] CATALOG_DEFAULT_ARTIFACTS = {
             VoltCompiler.AUTOGEN_DDL_FILE_NAME,
             CATALOG_BUILDINFO_FILENAME,
             CATALOG_REPORT_FILENAME,
@@ -194,6 +194,8 @@ public abstract class CatalogUtil {
     };
 
     private static boolean m_exportEnabled = false;
+    public static final String CATALOG_FILE_NAME = "catalog.jar";
+    public static final String STAGED_CATALOG_PATH = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -329,7 +331,7 @@ public abstract class CatalogUtil {
      */
     public static InMemoryJarfile getCatalogJarWithoutDefaultArtifacts(final InMemoryJarfile jarfile) {
         InMemoryJarfile cloneJar = jarfile.deepCopy();
-        for (String entry : CATALOG_DEFAULT_ARTIFCATS) {
+        for (String entry : CATALOG_DEFAULT_ARTIFACTS) {
             cloneJar.remove(entry);
         }
         return cloneJar;
@@ -1951,11 +1953,17 @@ public abstract class CatalogUtil {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
+                if (drConnection.getPreferredSource() != null) {
+                    cluster.setPreferredsource(drConnection.getPreferredSource());
+                } else { // reset to -1, if this is an update catalog
+                    cluster.setPreferredsource(-1);
+                }
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             } else {
                 if (dr.getRole() == DrRoleType.XDCR) {
                     // consumer should be enabled even without connection source for XDCR
                     cluster.setDrconsumerenabled(true);
+                    cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
                 }
             }
         } else {
@@ -2687,9 +2695,5 @@ public abstract class CatalogUtil {
         }
         return sb.toString();
     }
-
-    public static final String CATALOG_FILE_NAME = "catalog.jar";
-
-    public static final String STAGED_CATALOG_FILE_NAME = "staged-catalog.jar";
 
 }
