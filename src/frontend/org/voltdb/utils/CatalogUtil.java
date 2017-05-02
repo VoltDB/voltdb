@@ -1953,11 +1953,17 @@ public abstract class CatalogUtil {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
+                if (drConnection.getPreferredSource() != null) {
+                    cluster.setPreferredsource(drConnection.getPreferredSource());
+                } else { // reset to -1, if this is an update catalog
+                    cluster.setPreferredsource(-1);
+                }
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             } else {
                 if (dr.getRole() == DrRoleType.XDCR) {
                     // consumer should be enabled even without connection source for XDCR
                     cluster.setDrconsumerenabled(true);
+                    cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
                 }
             }
         } else {

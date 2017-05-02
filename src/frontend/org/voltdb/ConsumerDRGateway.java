@@ -34,8 +34,11 @@ public interface ConsumerDRGateway extends Promotable {
      * Notify the consumer of catalog updates.
      * @param catalog             The new catalog.
      * @param newConnectionSource The new connection source if changed, or null if not.
+     * @param snapshotSource The cluster from which this joiner cluster should request snapshot.
+     *        Use -1 if there is no preferred snapshot source. If this joiner cluster has already
+     *        received snapshot, this change will have no effect.
      */
-    void updateCatalog(CatalogContext catalog, String newConnectionSource);
+    void updateCatalog(CatalogContext catalog, String newConnectionSource, byte snapshotSource);
 
     void swapTables(final Set<Pair<String, Long>> swappedTables);
 
@@ -47,8 +50,6 @@ public interface ConsumerDRGateway extends Promotable {
      * the snapshot as a joiner.
      * @param dataSourceCluster
      * @param expectedClusterMembers
-     * @return false if this cluster is a joiner and the sync snapshot did not finish loading form the
-     *         leader cluster
      */
     void setInitialConversationMembership(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
 
@@ -79,4 +80,6 @@ public interface ConsumerDRGateway extends Promotable {
     void resumeConsumerDispatcher(byte clusterId);
 
     void resetDrAppliedTracker(byte clusterId);
+
+    void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
 }

@@ -123,6 +123,7 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
+import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
@@ -429,9 +430,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
     String m_licenseInformation = "";
-    private LatencyStats m_latencyStats;
 
-    private LatencyHistogramStats m_latencyHistogramStats;
+    private LatencyStats m_latencyStats;
+    private LatencyHistogramStats m_latencyCompressedStats;
+    private LatencyUncompressedHistogramStats m_latencyHistogramStats;
 
     private File getConfigDirectory() {
         return getConfigDirectory(m_config);
@@ -1263,9 +1265,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_initiatorStats = new InitiatorStats(m_myHostId);
             m_liveClientsStats = new LiveClientsStats();
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
-            m_latencyStats = new LatencyStats(m_myHostId);
+
+            m_latencyStats = new LatencyStats();
             getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
-            m_latencyHistogramStats = new LatencyHistogramStats(m_myHostId);
+            m_latencyCompressedStats = new LatencyHistogramStats(m_myHostId);
+            getStatsAgent().registerStatsSource(StatsSelector.LATENCY_COMPRESSED, 0, m_latencyCompressedStats);
+            m_latencyHistogramStats = new LatencyUncompressedHistogramStats(m_myHostId);
             getStatsAgent().registerStatsSource(StatsSelector.LATENCY_HISTOGRAM,
                     0, m_latencyHistogramStats);
 
@@ -2232,10 +2237,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
             VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
         }
-        final boolean standalone = true;
+        final boolean standalone = false;
         final boolean isXCDR = false;
-        final boolean generateReports = false; // this will be overridden if debug mode is enabled
-        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR, generateReports);
+        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
         if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())) {
             VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
         }
@@ -3255,6 +3259,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_catalogContext = null;
                 m_initiatorStats = null;
                 m_latencyStats = null;
+                m_latencyCompressedStats = null;
                 m_latencyHistogramStats = null;
 
                 AdHocCompilerCache.clearHashCache();
@@ -3457,7 +3462,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_consumerDRGateway.updateCatalog(m_catalogContext,
                                                       (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
                                                        ? newDRConnectionSource
-                                                       : null));
+                                                       : null),
+                                                      (byte) m_catalogContext.cluster.getPreferredsource());
                 }
 
                 // Check if this is promotion
@@ -4125,6 +4131,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         Cartographer.class,
                         HostMessenger.class,
                         byte.class,
+                        byte.class,
                         String.class,
                         int.class);
                 m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
@@ -4132,6 +4139,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         m_cartographer,
                         m_messenger,
                         drConsumerClusterId,
+                        (byte) m_catalogContext.cluster.getPreferredsource(),
                         drIfAndPort.getFirst(),
                         drIfAndPort.getSecond());
                 m_globalServiceElector.registerService(m_consumerDRGateway);

@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
@@ -71,17 +72,30 @@ final public class TestStartWithSchema {
     static final String mismatchSchema =
             "create table TEST (myval bigint not null, PRIMARY KEY(myval));";
 
+    static void ensureAllCatalogDefaultArtifactsExists(InMemoryJarfile jarFile, String nameForDebugging) {
+        Set<String> files = jarFile.keySet();
+        assertTrue(nameForDebugging + " is empty!", files.size() > 0);
+        for (String artifact : CatalogUtil.CATALOG_DEFAULT_ARTIFACTS) {
+            // NOTE: autogen-ddl.sql IS required, as it contains the schema
+            if (!artifact.equals(CatalogUtil.CATALOG_EMPTY_DDL_FILENAME)) {
+                assertTrue(nameForDebugging + " does not contain " + artifact, files.contains(artifact));
+            }
+        }
+    }
+
     /** Counts how many nodes contain staged catalogs (user-initialized schemas)
      * @param cluster
      * @return number of nodes in cluster that have staged catalogs
      */
-    static int countNodesWithStagedCatalog(LocalCluster cluster) {
+    static int countNodesWithStagedCatalog(LocalCluster cluster) throws IOException {
         final String pathWithinSubroot = File.separator + Constants.DBROOT + File.separator + CatalogUtil.STAGED_CATALOG_PATH;
         int total = 0;
         for (Map.Entry<String, String> entry : cluster.getHostRoots().entrySet()) {
             assert( entry.getValue().contains(Constants.DBROOT) == false ) : entry.getValue();
             File testFile = new VoltFile(entry.getValue() + pathWithinSubroot);
             if (testFile.canRead() && (testFile.length() > 0)) {
+                InMemoryJarfile jar = new InMemoryJarfile(testFile);
+                ensureAllCatalogDefaultArtifactsExists(jar, testFile.getAbsolutePath());
                 total++;
             }
         }

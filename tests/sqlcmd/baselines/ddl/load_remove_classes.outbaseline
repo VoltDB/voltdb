@@ -32,23 +32,40 @@ Command succeeded.
 drop table raw if exists;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List -----------------------------------------
 
 
 
 load classes sqlcmdtest-procs.jar;
 Command succeeded.
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+load classes sqlcmdtest-funcs.jar;
+Command succeeded.
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
 
@@ -62,7 +79,8 @@ create table EMPLOYEE (
   DEPARTMENT varchar,
 primary key (ID));
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -95,7 +113,7 @@ Command succeeded.
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
---- User Procedures ----------------------------------------
+--- User Procedures ------------------------------------------
 EMPLOYEE.delete           	integer
 EMPLOYEE.insert           	integer, varchar, varchar, varchar
 EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
@@ -104,7 +122,8 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 
 create procedure from class sqlcmdtest.InsertEmployee;
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -137,7 +156,7 @@ Command succeeded.
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
---- User Procedures ----------------------------------------
+--- User Procedures ------------------------------------------
 EMPLOYEE.delete           	integer
 EMPLOYEE.insert           	integer, varchar, varchar, varchar
 EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
@@ -145,18 +164,19 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 InsertEmployee            	varchar, varchar, varchar
 
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.Trivial                       
 
---- Active Procedure Classes  ------------------------------
+--- Active Procedure Classes ---------------------------------
  sqlcmdtest.InsertEmployee                
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
 
@@ -210,7 +230,8 @@ C1
 
 drop procedure InsertEmployee;
 Command succeeded.
---- System Procedures --------------------------------------
+
+--- System Procedures ----------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -243,45 +264,94 @@ Command succeeded.
 @UpdateLogging            	varchar
 @ValidatePartitioning     	int, varbinary
 
---- User Procedures ----------------------------------------
+--- User Procedures ------------------------------------------
 EMPLOYEE.delete           	integer
 EMPLOYEE.insert           	integer, varchar, varchar, varchar
 EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
 EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.InsertEmployee                
  sqlcmdtest.Trivial                       
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
+
+--- User-defined Functions -----------------------------------
+
+
+create function IntFunction from method sqlcmdtest.IntFunction;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+IntFunction         scalar function     sqlcmdtest.IntFunction                            
+
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+drop function IntFunction;
+Command succeeded.
+
+--- User-defined Functions -----------------------------------
+
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+drop function IntFunction if exists;
+Command succeeded.
 
 remove classes sqlcmdtest.InsertEmployee;
 Command succeeded.
 
---- Potential Procedure Classes ----------------------------
+--- Potential Procedure Classes ------------------------------
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
  sqlcmdtest.Trivial                       
 
---- Non-Procedure Classes ----------------------------------
+--- Non-Procedure Classes ------------------------------------
  sqlcmdtest.Breakable0$NestedGetsSabotaged
  sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.IntFunction                   
  sqlcmdtest.ReferencedGetsSabotaged       
 
 
 remove classes sqlcmdtest.*;
 Command succeeded.
 
---- Empty Class List -----------------------
+--- Empty Class List -----------------------------------------
 
 
 
