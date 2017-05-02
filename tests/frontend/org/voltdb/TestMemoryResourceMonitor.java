@@ -245,7 +245,7 @@ public class TestMemoryResourceMonitor extends TestCase
     {
         setUpServer("0.5", true); // set up server with rss limit
         m_mockStatsProducer.m_rss = 2048L*1024*1024;
-        resumeAndWait(MONITORING_INTERVAL+1);
+        resumeAndWait(MONITORING_INTERVAL+3);
         assertEquals(OperationMode.PAUSED, VoltDB.instance().getMode());
 
         // update server with rss limit

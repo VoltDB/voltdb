@@ -40,13 +40,11 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
 
         // TODO: add hostname/user to NTSysprocProc API
         // TODO: make this stuff real?
-        String hostname = getHostname();
         String invocationName = "@UpdateApplicationCatalog";
         boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();;
         boolean internalCall = false;
-        boolean adminMode = false;
 
-        if (!allowPausedModeWork(internalCall, adminMode)) {
+        if (!allowPausedModeWork(internalCall, isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
@@ -74,8 +72,8 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                                                 drRole,
                                                 useDDLSchema,
                                                 false,
-                                                hostname,
-                                                "NOUSER");
+                                                getHostname(),
+                                                getUsername());
         }
         catch (PrepareDiffFailureException pe) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");

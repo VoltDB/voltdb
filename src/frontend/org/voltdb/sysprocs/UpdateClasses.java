@@ -39,7 +39,7 @@ public class UpdateClasses extends UpdateApplicationBase {
         // TODO: make this stuff real?
         String invocationName = "@UpdateClasses";
         boolean isPromotion = false;
-        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();;
+        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
         boolean internalCall = false;
 
         if (!allowPausedModeWork(internalCall, isAdminConnection())) {
@@ -69,7 +69,7 @@ public class UpdateClasses extends UpdateApplicationBase {
                                                 useDDLSchema,
                                                 false,
                                                 getHostname(),
-                                                "NOUSER");
+                                                getUsername());
         }
         catch (PrepareDiffFailureException pe) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
