@@ -960,6 +960,10 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "order by borders.pk, places.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, vt2, vt1, GEOGRAPHY_DISTANCE_EPSILON);
+
+        // Restore catalog changes:
+        ClientResponse cr = client.callProcedure("@AdHoc", "drop procedure DWithin_Proc;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     public void testPolygonPointDWithinNegative() throws Exception {

@@ -121,6 +121,9 @@ public class RegressionSuite extends TestCase {
 
     private static Catalog getCurrentCatalog() {
         CatalogContext context = VoltDB.instance().getCatalogContext();
+        if (context == null) {
+            return null;
+        }
         InMemoryJarfile currentCatalogJar = context.getCatalogJar();
         String serializedCatalogString = CatalogUtil.getSerializedCatalogStringFromJar(currentCatalogJar);
         assertNotNull(serializedCatalogString);
@@ -139,15 +142,19 @@ public class RegressionSuite extends TestCase {
             m_config.shutDown();
         }
         else {
-            CatalogDiffEngine diff = new CatalogDiffEngine(m_config.getInitialCatalog(), getCurrentCatalog());
-            // All catalog changes will have a changed "set /clusters#cluster/databases#database schema" command.
-            // If the diff command only has this line, it means something is changed first but restored later.
-            // We will ignore this case.
-            if (diff.commands().split("\n").length > 1) {
-                fail("Catalog changed in test " + getName() +
-                        " while the regression suite optimization is on: \n" +
-                        diff.getDescriptionOfChanges(false));
+            Catalog currentCataog = getCurrentCatalog();
+            if (currentCataog != null) {
+                CatalogDiffEngine diff = new CatalogDiffEngine(m_config.getInitialCatalog(), currentCataog);
+                // All catalog changes will have a changed "set /clusters#cluster/databases#database schema" command.
+                // If the diff command only has this line, it means something is changed first but restored later.
+                // We will ignore this case.
+                if (diff.commands().split("\n").length > 1) {
+                    fail("Catalog changed in test " + getName() +
+                            " while the regression suite optimization is on: \n" +
+                            diff.getDescriptionOfChanges(false));
+                }
             }
+
             Client client = getClient();
             VoltTable tableList = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
             ArrayList<String> tableNames = new ArrayList<>(tableList.getRowCount());
