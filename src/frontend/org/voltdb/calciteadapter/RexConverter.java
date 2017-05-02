@@ -135,6 +135,7 @@ public class RexConverter {
                             ExpressionType.OPERATOR_MULTIPLY,
                             aeOperands.get(0),
                             aeOperands.get(1));
+                break;
             default:
                 throw new CalcitePlanningException("Unsupported Calcite expression type: " +
                         call.op.kind.toString());

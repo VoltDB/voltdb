@@ -21,28 +21,80 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class TypeConverter {
 
-    private static String sqlTypeNameToVoltTypeName(SqlTypeName typeName) {
-        if (typeName.getName().equals("VARCHAR")) {
-            return "STRING";
-        }
-        else if (typeName.getName().equals("DOUBLE")) {
-            return "FLOAT";
-        }
+    private final static ImmutableMap<String, VoltType> calciteToVoltDBTypeMap;
 
-        return typeName.getName();
+    private static ImmutableMap<String, VoltType> mapCalciteToVoltDB() {
+        ImmutableMap.Builder<String, VoltType> mapBuilder = ImmutableMap.builder();
+
+        for (SqlTypeName calciteType : SqlTypeName.values()) {
+            switch(calciteType.getName()) {
+                // NUMERIC
+                case "BOOLEAN"      : mapBuilder.put("BOOLEAN", VoltType.BOOLEAN);
+                    break;
+                case "TINYINT"      : mapBuilder.put("TINYINT", VoltType.TINYINT);
+                    break;
+                case "SMALLINT"     : mapBuilder.put("SMALLINT", VoltType.SMALLINT);
+                    break;
+                case "INTEGER"      : mapBuilder.put("INTEGER", VoltType.INTEGER);
+                    break;
+                case "BIGINT"       : mapBuilder.put("BIGINT", VoltType.BIGINT);
+                    break;
+                case "DECIMAL"      : mapBuilder.put("DECIMAL", VoltType.DECIMAL);
+                    break;
+                case "REAL"         : mapBuilder.put("REAL", VoltType.FLOAT);
+                    break;
+                case "DOUBLE"       : mapBuilder.put("DOUBLE", VoltType.FLOAT);
+                    break;
+                case "FLOAT"        : mapBuilder.put("FLOAT", VoltType.FLOAT);
+                    break;
+
+                // DATE TIME
+                case "TIMESTAMP"    : mapBuilder.put("TIMESTAMP", VoltType.TIMESTAMP);
+                    break;
+
+                // STRING
+                case "CHAR"         : mapBuilder.put("CHAR", VoltType.STRING);
+                    break;
+                case "VARCHAR"      : mapBuilder.put("VARCHAR", VoltType.STRING);
+                    break;
+
+                // VARBINARY
+                case "VARBINARY"    : mapBuilder.put("VARBINARY", VoltType.VARBINARY);
+                    break;
+
+                // DEFAULT INVALID
+                default             : mapBuilder.put(calciteType.getName(), VoltType.INVALID);
+            }
+        }
+        return mapBuilder.build();
+    }
+    static {
+        calciteToVoltDBTypeMap = mapCalciteToVoltDB();
     }
 
-
+    private static VoltType sqlTypeNameToVoltType(SqlTypeName typeName) {
+        return calciteToVoltDBTypeMap.get(typeName.getName());
+    }
 
     public static void setType(AbstractExpression ae, RelDataType rdt) {
-        VoltType vt = VoltType.valueOf(sqlTypeNameToVoltTypeName(rdt.getSqlTypeName()));
+        VoltType vt = sqlTypeNameToVoltType(rdt.getSqlTypeName());
         ae.setValueType(vt);
 
         if (vt.isVariableLength()) {
-            ae.setValueSize(rdt.getPrecision());
+            int size;
+            if (ae instanceof ConstantValueExpression &&
+                    (vt != VoltType.NULL) && (vt != VoltType.NUMERIC)) {
+                size = vt.getMaxLengthInBytes();
+            } else {
+                size = rdt.getPrecision();
+            }
+            ae.setValueSize(size);
         }
     }
 }

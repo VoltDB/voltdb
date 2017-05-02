@@ -52,21 +52,52 @@ public class TestCalciteSeqScan extends TestCalciteBase {
 
     public void testSeqScanWithProjection() throws Exception {
         String sql;
-        sql = "select i from R1";
+        sql = "select i, si from R1";
         comparePlans(sql);
     }
 
-    public void testSeqScanWithProjection1() throws Exception {
+    public void testSeqScanWithProjectionExpr() throws Exception {
         String sql;
         sql = "select i * 5 from R1";
         Map<String, String> ignores = new HashMap<>();
-        ignores.put("EXPR\\$0", "C1");
+        ignores.put("EXPR$0", "C1");
         comparePlans(sql, ignores);
     }
+
+    public void testSeqScanStringConst() throws Exception {
+        String sql;
+        sql = "select 'FOO1' from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        comparePlans(sql, ignores);
+    }
+
+    public void testSeqScanIntegerConst() throws Exception {
+        String sql;
+        sql = "select 1111 from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        comparePlans(sql, ignores);
+    }
+
+    // Not supported by VoltDB
+//    public void testSeqScanDoubleConst() throws Exception {
+//        String sql;
+//        sql = "select 3.5 from R1";
+//        Map<String, String> ignores = new HashMap<>();
+//        ignores.put("EXPR$0", "C1");
+//        comparePlans(sql, ignores);
+//    }
 
     public void testSeqScanWithFilter() throws Exception {
         String sql;
         sql = "select i from R1 where i = 5";
+        comparePlans(sql);
+    }
+
+    public void testSeqScanWithStringFilter() throws Exception {
+        String sql;
+        sql = "select i from R1 where v = 'FOO1'";
         comparePlans(sql);
     }
 
@@ -81,28 +112,28 @@ public class TestCalciteSeqScan extends TestCalciteBase {
         comparePlans(sql, ignores);
     }
 
-    public void testSeqScanPartitioned() throws Exception {
-        String sql;
-        sql = "select * from P1";
-        comparePlans(sql);
-    }
-
-    public void testSeqScanWithProjectionPartitioned() throws Exception {
-        String sql;
-        sql = "select i from P1";
-        comparePlans(sql);
-    }
-
-    public void testSeqScanWithProjectionPartitioned1() throws Exception {
-        String sql;
-        sql = "select i * 5 from P1";
-        comparePlans(sql);
-    }
-
-    public void testSeqScanWithFilterPartitioned() throws Exception {
-        String sql;
-        sql = "select i from P1 where si = 5";
-        comparePlans(sql);
-    }
+//    public void testSeqScanPartitioned() throws Exception {
+//        String sql;
+//        sql = "select * from P1";
+//        comparePlans(sql);
+//    }
+//
+//    public void testSeqScanWithProjectionPartitioned() throws Exception {
+//        String sql;
+//        sql = "select i from P1";
+//        comparePlans(sql);
+//    }
+//
+//    public void testSeqScanWithProjectionPartitioned1() throws Exception {
+//        String sql;
+//        sql = "select i * 5 from P1";
+//        comparePlans(sql);
+//    }
+//
+//    public void testSeqScanWithFilterPartitioned() throws Exception {
+//        String sql;
+//        sql = "select i from P1 where si = 5";
+//        comparePlans(sql);
+//    }
 
 }
