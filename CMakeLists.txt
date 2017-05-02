@@ -36,6 +36,12 @@
 # version might very well make Ubuntu 12.04 a viable platform, but we
 # have not tested this.
 #
+# We also use Google's S2 geography library, pcre2 for regular
+# expression matching and openssl for arbitrary precision arithmetic.
+# These are all included in the source code of VoltDB.  But pcre3
+# is an autoconf/automake program.  So, you will need autoconf
+# and automake.
+#
 ########################################################################
 # Testing
 #
