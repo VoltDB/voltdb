@@ -546,7 +546,7 @@ public class TestNTProcs extends TestCase {
         // repeatedly call stats until they match
         long start = System.currentTimeMillis();
         boolean found = false;
-        while (System.currentTimeMillis() - start < 20000) {
+        while ((System.currentTimeMillis() - start) < 30000) {
             Map<String, Long> stats = aggregateProcRow(client, NTProcWithFutures.class.getName());
             if ((CALL_COUNT + 1) == stats.get("INVOCATIONS").longValue()) {
                 found = true;
