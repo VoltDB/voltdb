@@ -51,7 +51,7 @@ def upload_kits(version,
     with quiet():
         dircheck = local("ls -d " + kits_home, capture=True)
     if dircheck.failed:
-        exit ("ERROR: " + dircheck.stderr)
+        exit ("FATAL: " + dircheck.stderr)
 
 
     #For all the files in minimal_kits or full_kits, upload the files
@@ -76,3 +76,5 @@ def upload_kits(version,
         print
         print "Maybe these files need to be renamed:"
         local("ls " + kits_home)
+        exit ("FATAL: No files uploaded")
+        
