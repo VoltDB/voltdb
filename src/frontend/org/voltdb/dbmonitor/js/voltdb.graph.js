@@ -649,139 +649,6 @@
             return n;
         };
 
-        function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
-            this.lowestTrackableValue = lowestTrackableValue;
-            this.highestTrackableValue = highestTrackableValue;
-            this.nSVD = nSVD;
-            this.totalCount = totalCount;
-            this.count = [];
-            this.init();
-        }
-
-        Histogram.prototype.init = function () {
-            var largestValueWithSingleUnitResolution = 2 * Math.pow(10, this.nSVD);
-            this.unitMagnitude = Math.floor(Math.log(this.lowestTrackableValue) / Math.log(2));
-            var subBucketCountMagnitude = Math.ceil(Math.log(largestValueWithSingleUnitResolution) / Math.log(2));
-            this.subBucketHalfCountMagnitude = ((subBucketCountMagnitude > 1) ? subBucketCountMagnitude : 1) - 1;
-            this.subBucketCount = Math.pow(2, (this.subBucketHalfCountMagnitude + 1));
-            this.subBucketHalfCount = this.subBucketCount / 2;
-            var subBucketMask = goog.math.Long.fromInt(this.subBucketCount - 1);
-            this.subBucketMask = subBucketMask.shiftLeft(this.unitMagnitude);
-            // Establish leadingZeroCountBase, used in getBucketIndex() fast path:
-            this.leadingZeroCountBase = 64 - this.unitMagnitude - this.subBucketHalfCountMagnitude - 1;
-            var trackableValue = (this.subBucketCount - 1) << this.unitMagnitude;
-            var bucketsNeeded = 1;
-            while (trackableValue < this.highestTrackableValue) {
-                trackableValue *= 2;
-                bucketsNeeded++;
-            }
-            this.bucketCount = bucketsNeeded;
-            this.countsArrayLength = (this.bucketCount + 1) * (this.subBucketCount / 2);
-        };
-
-        Histogram.prototype.diff = function (newer) {
-            var h = new Histogram(newer.lowestTrackableValue, newer.highestTrackableValue, newer.nSVD, newer.totalCount - this.totalCount);
-            for (var i = 0; i < h.countsArrayLength; i++) {
-                h.count[i] = newer.count[i] - this.count[i];
-            }
-            return h;
-        };
-
-        Histogram.prototype.getCountAt = function (bucketIndex, subBucketIndex) {
-            var bucketBaseIndex = (bucketIndex + 1) << this.subBucketHalfCountMagnitude;
-            var offsetInBucket = subBucketIndex - this.subBucketHalfCount;
-            var countIndex = bucketBaseIndex + offsetInBucket;
-            return this.count[countIndex];
-        };
-
-        Histogram.prototype.normalizeIndex = function (index, normalizingIndexOffset, arrayLength) {
-            if (normalizingIndexOffset == 0) {
-                // Fastpath out of normalization. Keeps integer value histograms fast while allowing
-                // others (like DoubleHistogram) to use normalization at a cost...
-                return index;
-            }
-            if ((index > arrayLength) || (index < 0)) {
-                throw new ArrayIndexOutOfBoundsException("index out of covered value range");
-            }
-            var normalizedIndex = index - normalizingIndexOffset;
-            // The following is the same as an unsigned remainder operation, as long as no double wrapping happens
-            // (which shouldn't happen, as normalization is never supposed to wrap, since it would have overflowed
-            // or underflowed before it did). This (the + and - tests) seems to be faster than a % op with a
-            // correcting if < 0...:
-            if (normalizedIndex < 0) {
-                normalizedIndex += arrayLength;
-            } else if (normalizedIndex >= arrayLength) {
-                normalizedIndex -= arrayLength;
-            }
-            return normalizedIndex;
-        };
-
-        Histogram.prototype.getCountAtIndex = function (index) {
-            return this.count[this.normalizeIndex(index, 0, this.countsArrayLength)];
-        };
-
-        Histogram.prototype.valueFromIndex2 = function (bucketIndex, subBucketIndex) {
-            return subBucketIndex * Math.pow(2, bucketIndex + this.unitMagnitude);
-        };
-
-        Histogram.prototype.valueFromIndex = function (index) {
-            var bucketIndex = (index >> this.subBucketHalfCountMagnitude) - 1;
-            var subBucketIndex = (index & (this.subBucketHalfCount - 1)) + this.subBucketHalfCount;
-            if (bucketIndex < 0) {
-                subBucketIndex -= this.subBucketHalfCount;
-                bucketIndex = 0;
-            }
-            return this.valueFromIndex2(bucketIndex, subBucketIndex);
-        };
-
-        Histogram.prototype.lowestEquivalentValue = function (value) {
-            var bucketIndex = this.getBucketIndex(value);
-            var subBucketIndex = this.getSubBucketIndex(value, bucketIndex);
-            var thisValueBaseLevel = this.valueFromIndex2(bucketIndex, subBucketIndex);
-            return thisValueBaseLevel;
-        };
-
-        Histogram.prototype.highestEquivalentValue = function (value) {
-            return this.nextNonEquivalentValue(value) - 1;
-        };
-
-        Histogram.prototype.highestEquivalentValue = function (value) {
-            return this.lowestEquivalentValue(value) + this.sizeOfEquivalentValueRange(value);
-        };
-
-        Histogram.prototype.sizeOfEquivalentValueRange = function (value) {
-            var bucketIndex = this.getBucketIndex(value);
-            var subBucketIndex = this.getSubBucketIndex(value, bucketIndex);
-            var distanceToNextValue =
-                (1 << ( this.unitMagnitude + ((subBucketIndex >= this.subBucketCount) ? (bucketIndex + 1) : bucketIndex)));
-            return distanceToNextValue;
-        };
-
-        Histogram.prototype.getBucketIndex = function (value) {
-            return this.leadingZeroCountBase - (goog.math.Long.fromNumber(value).or(this.subBucketMask)).numberOfLeadingZeros();
-        };
-
-        Histogram.prototype.getSubBucketIndex = function (value, bucketIndex) {
-            return  (value >>> (bucketIndex + this.unitMagnitude));
-        };
-
-        Histogram.prototype.getValueAtPercentile = function (percentile) {
-            var requestedPercentile = Math.min(percentile, 100.0); // Truncate down to 100%
-            var countAtPercentile = Math.floor(((percentile / 100.0) * this.totalCount) + 0.5); // round to nearest
-            countAtPercentile = Math.max(countAtPercentile, 1); // Make sure we at least reach the first recorded entry
-            var totalToCurrentIndex = 0;
-            for (var i = 0; i < this.countsArrayLength; i++) {
-                totalToCurrentIndex += this.getCountAtIndex(i);
-                if (totalToCurrentIndex >= countAtPercentile) {
-                    var valueAtIndex = this.valueFromIndex(i);
-                    return (percentile == 0.0) ?
-                        this.lowestEquivalentValue(valueAtIndex)/1000.0 :
-                        this.highestEquivalentValue(valueAtIndex)/1000.0;
-                }
-            }
-            return 0;
-        };
-
         function read32(str) {
             var s1 = str.substring(0, 2);
             var s2 = str.substring(2, 4);
@@ -794,35 +661,6 @@
             var s1 = read32(str);
             var s2 = read32(str.substring(8, 16));
             return s2 + s1;
-        }
-
-        function convert2Histogram(str) {
-            // Read lowestTrackableValue
-            var lowestTrackableValue = parseInt(read64(str), 16);
-            str = str.substring(16, str.length);
-
-            // Read highestTrackableValue
-            var highestTrackableValue = parseInt(read64(str), 16);
-            str = str.substring(16, str.length);
-
-            // Read numberOfSignificantValueDigits
-            var nSVD = parseInt(read32(str), 16);
-            str = str.substring(8, str.length);
-
-            // Read totalCount
-            var totalCount = parseInt(read64(str), 16);
-            str = str.substring(16, str.length);
-
-            var histogram = new Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount);
-
-            var i = 0;
-            while (str.length >= 16) {
-                var value = parseInt(read64(str), 16);
-                histogram.count[i] = value;
-                str = str.substring(16, str.length);
-                i++;
-            }
-            return histogram;
         }
 
         var getEmptyDataForView = function (view) {
@@ -877,6 +715,7 @@
                 'tpsDataMin': getEmptyDataForMinutesOptimized(),
                 'tpsDataDay': getEmptyDataForDaysOptimized(),
                 'tpsFirstData': true,
+                'tpsMaxTimeStamp': null,
                 'memData': getEmptyDataOptimized(),
                 'memDataMin': getEmptyDataForMinutesOptimized(),
                 'memDataDay': getEmptyDataForDaysOptimized(),
@@ -970,6 +809,7 @@
             dataOutTrans = getEmptyDataForImporterView(view)['OUTSTANDING_REQUESTS'];
             dataSuccessRate = getEmptyDataForImporterView(view)['SUCCESSES'];
             dataFailureRate = getEmptyDataForImporterView(view)['FAILURES'];
+
             changeImporterAxisTimeFormat(view);
         };
 
@@ -1269,7 +1109,7 @@
             currentTime = new Date()
         }
 
-        this.RefreshLatency = function (latency, graphView, currentTab) {
+        this.RefreshLatency = function (latency, graphView, currentTab, currentServer) {
             var monitor = Monitors;
             var dataLat = monitor.latData;
             var dataLatMin = monitor.latDataMin;
@@ -1279,6 +1119,10 @@
             var latencyArr = []
             var latencyArrMin = []
             var latencyArrDay = []
+
+            if ($.isEmptyObject(latency) || latency == undefined || !latency.hasOwnProperty(currentServer)
+            || latency[currentServer].P99 == undefined || latency[currentServer].TIMESTAMP == undefined)
+                return;
 
             if(localStorage.latencyMin != undefined){
                 latencyArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.latencyMin))
@@ -1332,28 +1176,9 @@
                 }
             }
 
-            // Compute latency statistics
-            jQuery.each(latency, function (id, val) {
-                var strLatStats = val["UNCOMPRESSED_HISTOGRAM"];
-                timeStamp = val["TIMESTAMP"];
-                var latStats = convert2Histogram(strLatStats);
-                var singlelat = 0;
-                if (!monitor.latHistogram.hasOwnProperty(id))
-                    singlelat = latStats.getValueAtPercentile(99);
-                else
-                    singlelat = monitor.latHistogram[id].diff(latStats).getValueAtPercentile(99);
-                singlelat = parseFloat(singlelat).toFixed(1) * 1;
+            var timeStamp = new Date(latency[currentServer].TIMESTAMP);
+            var lat = parseFloat(latency[currentServer].P99).toFixed(1) * 1;
 
-                if (singlelat > maxLatency) {
-                    maxLatency = singlelat;
-                }
-
-                monitor.latHistogram[id] = latStats;
-            });
-
-            var lat = maxLatency;
-            if (lat < 0)
-                lat = 0;
             if (monitor.latMaxTimeStamp <= timeStamp) {
                 if (latSecCount >= 6 || monitor.latFirstData) {
                     dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
@@ -1564,17 +1389,18 @@
             memMinCount++;
         };
 
-        this.RefreshTransaction = function (transactionDetails, graphView, currentTab) {
+        this.RefreshTransaction = function (transactionDetails, graphView, currentTab, currentServer) {
             var monitor = Monitors;
             var datatrans = monitor.tpsData;
             var datatransMin = monitor.tpsDataMin;
             var datatransDay = monitor.tpsDataDay;
-            var transacDetail = transactionDetails;
-            var transDetailsArr = [];
-            var transDetailsArrMin = [];
-            var transDetailsArrDay = [];
+            var timeStamp;
+            var transDetailsArr = []
+            var transDetailsArrMin = []
+            var transDetailsArrDay = []
 
-            if ($.isEmptyObject(transacDetail) || transacDetail == undefined || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["TimeStamp"] == undefined || transacDetail["currentTimerTick"] == undefined)
+            if ($.isEmptyObject(transactionDetails) || transactionDetails == undefined || !transactionDetails.hasOwnProperty(currentServer)
+            || transactionDetails[currentServer].TPS == undefined || transactionDetails[currentServer].TIMESTAMP == undefined)
                 return;
 
             if(localStorage.transDetailsMin != undefined){
@@ -1608,7 +1434,6 @@
                         })
                     }
                 }
-
                 if(transDetailsArrMin.length > 0 && !(currentTime.getTime() - (new Date(transDetailsArrMin[transDetailsArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
                     datatransMin = []
                     for(var j = 0; j< transDetailsArrMin.length; j++){
@@ -1619,10 +1444,10 @@
                     }
                 }
 
-                if(transDetailsArrDay.length > 0 && !(currentTime.getTime() - (new Date(transDetailsArrDay[transDetailsArrDay.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                if(transDetailsArrDay.length > 0 && !(currentTime.getTime() - (new Date(transDetailsArrMin[transDetailsArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
                     datatransDay = []
-                    for(var k = 0; k< transDetailsArrDay.length; k++){
-                        datatransDay = sliceFirstData(datatransDay, dataView.Day);
+                    for(var k = 0; k < transDetailsArrDay.length; k++){
+                        datatransDay = sliceFirstData(datatransDay, dataView.Days);
                         datatransDay.push({"x": new Date(transDetailsArrDay[k].timestamp),
                             "y": transDetailsArrDay[k].transaction
                         })
@@ -1630,125 +1455,70 @@
                 }
             }
 
-            var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
-            var currentTimerTick = transacDetail["currentTimerTick"];
+            var timeStamp = new Date(transactionDetails[currentServer].TIMESTAMP);
+            var tps = parseFloat(transactionDetails[currentServer].TPS).toFixed(1) * 1;
 
-            if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
-                var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
-                var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
-                if (calculatedValue < 0 || isNaN(calculatedValue) || (currentTimerTick - monitor.lastTimerTick == 0))
-                    calculatedValue = 0;
-
+            if (monitor.tpsMaxTimeStamp <= timeStamp) {
                 if (tpsSecCount >= 6 || monitor.tpsFirstData) {
                     datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
-                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0) || calculatedValue == 0) {
-                        datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                        transDetailsArrMin = saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
+                    if (monitor.tpsMaxTimeStamp == timeStamp) {
+                        datatransMin.push({ 'x': new Date(timeStamp), 'y': datatransMin[datatransMin.length - 1].y });
+                        transDetailsArrMin = saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(timeStamp), "transaction": datatransMin[datatransMin.length - 1].y })
                     } else {
-                        datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatransMin[datatransMin.length - 1].y });
-                        transDetailsArrMin = saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatransMin[datatransMin.length - 1].y })
+                        datatransMin.push({ 'x': new Date(timeStamp), 'y': tps });
+                        transDetailsArrMin = saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(timeStamp), "transaction": tps })
                     }
                     Monitors.tpsDataMin = datatransMin;
                     tpsSecCount = 0;
                 }
+
                 if (tpsMinCount >= 60 || monitor.tpsFirstData) {
                     datatransDay = sliceFirstData(datatransDay, dataView.Days);
-                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)|| calculatedValue == 0) {
-                        datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                        transDetailsArrDay = saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
+                    if (monitor.tpsMaxTimeStamp == timeStamp) {
+                        datatransDay.push({ 'x': new Date(timeStamp), 'y': datatransDay[datatransDay.length - 1].y });
+                        transDetailsArrDay = saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(timeStamp), "transaction": datatransMin[datatransMin.length - 1].y })
                     } else {
-                        datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatransDay[datatransDay.length - 1].y });
-                        transDetailsArrDay = saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatransDay[datatransDay.length - 1].y })
+                        datatransDay.push({ 'x': new Date(timeStamp), 'y': tps });
+                        transDetailsArrDay = saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(timeStamp), "transaction": tps })
                     }
                     Monitors.tpsDataDay = datatransDay;
                     tpsMinCount = 0;
                 }
+
                 datatrans = sliceFirstData(datatrans, dataView.Seconds);
-                if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)|| calculatedValue == 0) {
-                    datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                    transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
+                if (monitor.tpsMaxTimeStamp == timeStamp) {
+                    datatrans.push({ 'x': new Date(timeStamp), 'y': datatrans[datatrans.length - 1].y });
+                    transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(timeStamp), "transaction": datatrans[datatrans.length - 1].y })
                 } else {
-                    datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatrans[datatrans.length - 1].y });
-                    transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatrans[datatrans.length - 1].y })
+                    datatrans.push({ 'x': new Date(timeStamp), 'y': tps });
+                    transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(timeStamp), "transaction": tps })
                 }
                 Monitors.tpsData = datatrans;
-                monitor.tpsFirstData = false;
-            }
-            else{
-                var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 
-                if (tpsSecCount >= 6 || monitor.tpsFirstData) {
-                    datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
-                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
-                        transDetailsArrMin = saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
-                        datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
-                    }
-                    Monitors.tpsDataMin = datatransMin;
-                    tpsSecCount = 0;
-                }
+                localStorage.transDetails = JSON.stringify(transDetailsArr)
+                localStorage.transDetailsMin = JSON.stringify(transDetailsArrMin)
+                localStorage.transDetailsDay = JSON.stringify(transDetailsArrDay)
 
-                if (tpsMinCount >= 60 || monitor.tpsFirstData) {
-                    datatransDay = sliceFirstData(datatransDay, dataView.Days);
-                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
-                        transDetailsArrDay = saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
-                        datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
-                    }
-                    Monitors.tpsDataDay = datatransDay;
-                    tpsMinCount = 0;
-                }
+                if (graphView == 'Minutes')
+                    dataTransactions[0]["values"] = datatransMin;
+                else if (graphView == 'Days')
+                    dataTransactions[0]["values"] = datatransDay;
+                else
+                    dataTransactions[0]["values"] = datatrans;
 
-                if (monitor.tpsFirstData){
-                    if(localStorage.transDetails == undefined){
-                        datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": null });
-                        Monitors.tpsData = datatrans;
-                    }
-                    else{
-                        if (delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
-                            datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatrans[datatrans.length - 1].y });
-                            transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatrans[datatrans.length - 1].y })
-                            Monitors.tpsData = datatrans;
-                        }
-                    }
-                }
-                else{
-                    if(localStorage.transDetails == undefined){
-                        datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
-                        Monitors.tpsData = datatrans;
-                    } else {
-                        var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
-                        if (delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
-                            datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                            transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
-                            Monitors.tpsData = datatrans;
-                        }
-                    }
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && transactionChart.is(":visible")) {
+                    d3.select("#visualisationTransaction")
+                        .datum(dataTransactions)
+                        .transition().duration(500)
+                        .call(ChartTransactions);
                 }
                 monitor.tpsFirstData = false;
             }
-
-            localStorage.transDetails = JSON.stringify(transDetailsArr)
-            localStorage.transDetailsMin = JSON.stringify(transDetailsArrMin)
-            localStorage.transDetailsDay = JSON.stringify(transDetailsArrDay)
-
-            if (graphView == 'Minutes')
-                dataTransactions[0]["values"] = datatransMin;
-            else if (graphView == 'Days')
-                dataTransactions[0]["values"] = datatransDay;
-            else
-                dataTransactions[0]["values"] = datatrans;
-
-            monitor.lastTimedTransactionCount = currentTimedTransactionCount;
-            monitor.lastTimerTick = currentTimerTick;
-
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && transactionChart.is(":visible")) {
-                d3.select('#visualisationTransaction')
-                    .datum(dataTransactions)
-                    .transition().duration(500)
-                    .call(ChartTransactions);
-            }
-
+            if(timeStamp > monitor.tpsMaxTimeStamp)
+                monitor.tpsMaxTimeStamp = timeStamp;
             tpsSecCount++;
             tpsMinCount++;
+            transactionDetails = null
         };
 
         this.timeUnit = {
