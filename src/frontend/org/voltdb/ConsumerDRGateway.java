@@ -85,5 +85,5 @@ public interface ConsumerDRGateway extends Promotable {
 
     void resetLocal(boolean postCheck);
 
-    boolean isConnected();
+    boolean isSafeForResetLocal();
 }
