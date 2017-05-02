@@ -493,15 +493,23 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         } catch (InterruptedException ie) {
                         }
                 }
+                // FIXME should this be removed also? Why is any committing done outside of CB except when
+                // Perhaps we can have a no-op procedure that runs if the usual one fails due to bad data.
+                // Handle the unexpected by stopping the importer as we do now, but w/o committing.
+                /*
                 if (shouldCommit()) {
                     commitOffset();
                 }
+                */
             }
         } catch (Exception ex) {
             error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
+            ex.printStackTrace();
+            // THEORY: Errors must force a commit, since presumably the data was bad.
+            // Normal shutdown should not - let callbacks do that work.
         } finally {
             //Dont care about return as it wil force a commit.
-            commitOffset();
+            //commitOffset();  // Anish: we have stopped reading, commit the paused offset
             KafkaStreamImporterConfig.closeConsumer(m_consumer);
             m_consumer = null;
             BlockingChannel channel = m_offsetManager.getAndSet(null);
@@ -544,7 +552,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 BlockingChannel channel = null;
                 int retries = 3;
                 if (pausedOffset != -1) {
-                    rateLimitedLog(Level.INFO, null, "Using paused offset to commit: " + pausedOffset);
+                    rateLimitedLog(Level.INFO, null, m_topicAndPartition + " is using paused offset to commit: " + pausedOffset);
                 }
                 while (channel == null && --retries >= 0) {
                     if ((channel = m_offsetManager.get()) == null) {
@@ -737,6 +745,10 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 m_tracker.commit(m_nextoffset);
             }
             if (response.getStatus() == ClientResponse.SERVER_UNAVAILABLE) {
+                if (m_pauseOffset.get() == -1){
+                    System.err.println("Delaying set of pause offset");
+                    Thread.sleep(200);
+                }
                 m_pauseOffset.compareAndSet(-1, m_offset);
             }
         }
