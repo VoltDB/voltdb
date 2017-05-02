@@ -1275,7 +1275,7 @@ public final class InvocationDispatcher {
     final static int getPartitionForProcedure(Procedure procedure, StoredProcedureInvocation task) {
         final CatalogContext.ProcedurePartitionInfo ppi =
                 (CatalogContext.ProcedurePartitionInfo)procedure.getAttachment();
-        if (procedure.getTransactional() && procedure.getSinglepartition()) {
+        if (procedure.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
             return getPartitionForProcedure( ppi.index, ppi.type, task);
         } else {
