@@ -33,6 +33,7 @@ import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannodes.PlanNodeTree;
+import org.voltdb.types.PlannerType;
 
 public abstract class TestCalciteBase extends PlannerTestCase {
 
@@ -74,6 +75,16 @@ public abstract class TestCalciteBase extends PlannerTestCase {
             System.out.println("Calcite: " + calcitePlanTreeJSON);
         }
         assertEquals(voltdbPlanTreeJSON, calcitePlanTreeJSON);
+    }
+
+    protected void testPlan(String sql, PlannerType plannerType) {
+        CompiledPlan compiledPlan = (plannerType == PlannerType.CALCITE) ?
+                compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER) :
+                    compileAdHocPlan(sql, true, true);
+        PlanNodeTree planTree = new PlanNodeTree(compiledPlan.rootPlanGraph);
+        String planTreeJSON = planTree.toJSONString();
+        System.out.println(plannerType.toString() + " : " + planTreeJSON);
+        assert(compiledPlan.rootPlanGraph != null);
     }
 
 }

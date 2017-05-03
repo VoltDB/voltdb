@@ -64,31 +64,6 @@ public class TestCalciteSeqScan extends TestCalciteBase {
         comparePlans(sql, ignores);
     }
 
-    public void testSeqScanStringConst() throws Exception {
-        String sql;
-        sql = "select 'FOO1' from R1";
-        Map<String, String> ignores = new HashMap<>();
-        ignores.put("EXPR$0", "C1");
-        comparePlans(sql, ignores);
-    }
-
-    public void testSeqScanIntegerConst() throws Exception {
-        String sql;
-        sql = "select 1111 from R1";
-        Map<String, String> ignores = new HashMap<>();
-        ignores.put("EXPR$0", "C1");
-        comparePlans(sql, ignores);
-    }
-
-    // Not supported by VoltDB
-//    public void testSeqScanDoubleConst() throws Exception {
-//        String sql;
-//        sql = "select 3.5 from R1";
-//        Map<String, String> ignores = new HashMap<>();
-//        ignores.put("EXPR$0", "C1");
-//        comparePlans(sql, ignores);
-//    }
-
     public void testSeqScanWithFilter() throws Exception {
         String sql;
         sql = "select i from R1 where i = 5";

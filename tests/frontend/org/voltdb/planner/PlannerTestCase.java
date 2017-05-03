@@ -81,10 +81,10 @@ public class PlannerTestCase extends TestCase {
         return paramCount;
     }
 
-    protected void failToCompile(String sql, String... patterns) {
+    protected void failToCompile(PlannerType plannerType, String sql, String... patterns) {
         int paramCount = countQuestionMarks(sql);
         try {
-            List<AbstractPlanNode> unexpected = m_aide.compile(PlannerType.VOLTDB, sql, paramCount,
+            List<AbstractPlanNode> unexpected = m_aide.compile(plannerType, sql, paramCount,
                     m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
             printExplainPlan(unexpected);
             fail("Expected planner failure, but found success.");
@@ -97,6 +97,10 @@ public class PlannerTestCase extends TestCase {
                 }
             }
         }
+    }
+
+    protected void failToCompile(String sql, String... patterns) {
+        failToCompile(PlannerType.VOLTDB, sql, patterns);
     }
 
     protected CompiledPlan compileAdHocPlan(String sql) {

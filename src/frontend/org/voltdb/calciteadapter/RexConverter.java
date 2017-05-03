@@ -112,14 +112,88 @@ public class RexConverter {
 
             AbstractExpression ae = null;
             switch (call.op.kind) {
+            // Conjunction
             case AND:
                     ae = new ConjunctionExpression(
                             ExpressionType.CONJUNCTION_AND,
                             aeOperands.get(0),
                             aeOperands.get(1));
+                break;
+            case OR:
+                ae = new ConjunctionExpression(
+                        ExpressionType.CONJUNCTION_OR,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+
+            // Binary Comparison
             case EQUALS:
                     ae = new ComparisonExpression(
                             ExpressionType.COMPARE_EQUAL,
+                            aeOperands.get(0),
+                            aeOperands.get(1));
+                break;
+            case NOT_EQUALS:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_NOTEQUAL,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case LESS_THAN:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_LESSTHAN,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case GREATER_THAN:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_GREATERTHAN,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case LESS_THAN_OR_EQUAL:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_LESSTHANOREQUALTO,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case GREATER_THAN_OR_EQUAL:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_GREATERTHANOREQUALTO,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+            case LIKE:
+                ae = new ComparisonExpression(
+                        ExpressionType.COMPARE_LIKE,
+                        aeOperands.get(0),
+                        aeOperands.get(1));
+                break;
+//            COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
+//                // IN operator. left IN right. right must be VectorValue
+//            COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT", true),
+
+             // Arthimetic Operators
+            case PLUS:
+                ae = new OperatorExpression(
+                            ExpressionType.OPERATOR_PLUS,
+                            aeOperands.get(0),
+                            aeOperands.get(1));
+                break;
+            case MINUS:
+                ae = new OperatorExpression(
+                            ExpressionType.OPERATOR_MINUS,
+                            aeOperands.get(0),
+                            aeOperands.get(1));
+                break;
+            case TIMES:
+                ae = new OperatorExpression(
+                            ExpressionType.OPERATOR_MULTIPLY,
+                            aeOperands.get(0),
+                            aeOperands.get(1));
+                break;
+            case DIVIDE:
+                ae = new OperatorExpression(
+                            ExpressionType.OPERATOR_DIVIDE,
                             aeOperands.get(0),
                             aeOperands.get(1));
                 break;
@@ -130,12 +204,33 @@ public class RexConverter {
                             null);
                 TypeConverter.setType(ae, call.getType());
                 break;
-            case TIMES:
+            case NOT:
                 ae = new OperatorExpression(
-                            ExpressionType.OPERATOR_MULTIPLY,
+                            ExpressionType.OPERATOR_NOT,
                             aeOperands.get(0),
-                            aeOperands.get(1));
+                            null);
+                TypeConverter.setType(ae, call.getType());
                 break;
+            case IS_NULL:
+                ae = new OperatorExpression(
+                            ExpressionType.OPERATOR_IS_NULL,
+                            aeOperands.get(0),
+                            null);
+                TypeConverter.setType(ae, call.getType());
+                break;
+            case EXISTS:
+                ae = new OperatorExpression(
+                            ExpressionType.OPERATOR_EXISTS,
+                            aeOperands.get(0),
+                            null);
+                TypeConverter.setType(ae, call.getType());
+                break;
+
+//            OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
+//                // left || right (both must be char/varchar)
+//            OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
+//                // left % right (both must be integer)
+
             default:
                 throw new CalcitePlanningException("Unsupported Calcite expression type: " +
                         call.op.kind.toString());
