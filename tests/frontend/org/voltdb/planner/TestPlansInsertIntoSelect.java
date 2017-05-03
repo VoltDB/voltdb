@@ -53,7 +53,16 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                      PlanNodeType.INVALID,
                      PlanNodeType.SEND,
                      PlanNodeType.INSERT,
-                     PlanNodeType.INDEXSCAN);
+                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN, PlanNodeType.PROJECTION));
+        validatePlan("INSERT INTO T2 SELECT * from T1;",
+                     2,
+                     PlanNodeType.SEND,
+                     PlanNodeType.LIMIT,
+                     PlanNodeType.RECEIVE,
+                     PlanNodeType.INVALID,
+                     PlanNodeType.SEND,
+                     PlanNodeType.INSERT,
+                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN, PlanNodeType.PROJECTION));
     }
 
     // Note that P1 and P2 have the same partition columns
@@ -70,7 +79,7 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                      PlanNodeType.SEND,
                      PlanNodeType.INSERT,
                      PlanNodeType.PROJECTION,
-                     PlanNodeType.SEQSCAN);
+                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN, PlanNodeType.PROJECTION));
         validatePlan("INSERT INTO P2 SELECT * from P1;",
                      2,
                      PlanNodeType.SEND,
@@ -80,10 +89,19 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                      PlanNodeType.SEND,
                      PlanNodeType.INSERT,
                      PlanNodeType.PROJECTION,
-                     PlanNodeType.INDEXSCAN);
+                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN, PlanNodeType.PROJECTION));
     }
 
-    public void testInlineInsertPartitionedToReplicated() {
+    public void testInlineInsertReplicatedToPartitioned() {
+        validatePlan("INSERT INTO P1 SELECT * from T1;",
+                     2,
+                     PlanNodeType.SEND,
+                     PlanNodeType.AGGREGATE,
+                     PlanNodeType.RECEIVE,
+                     PlanNodeType.INVALID,
+                     PlanNodeType.SEND,
+                     PlanNodeType.INSERT,
+                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN, PlanNodeType.PROJECTION));
         validatePlan("INSERT INTO P1 SELECT * from T2;",
                      2,
                      PlanNodeType.SEND,
@@ -92,7 +110,7 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                      PlanNodeType.INVALID,
                      PlanNodeType.SEND,
                      PlanNodeType.INSERT,
-                     PlanNodeType.INDEXSCAN);
+                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN, PlanNodeType.PROJECTION));
     }
 
     //

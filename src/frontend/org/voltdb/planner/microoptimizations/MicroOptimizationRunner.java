@@ -37,6 +37,9 @@ public class MicroOptimizationRunner {
 
         // MP ORDER BY Optimization
         optimizations.add(new InlineOrderByIntoMergeReceive());
+        // Inline Insert has to go after InlineAggregation, though
+        // not necessarily after InlineOrderByIntoMergeReceive.
+        optimizations.add(new InlineInsert());
     }
 
     public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
