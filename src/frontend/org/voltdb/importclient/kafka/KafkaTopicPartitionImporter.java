@@ -706,7 +706,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private static class PendingWorkTracker {
         // INVARIANT: If the producer is done, m_workConsumed <= m_workProduced.
         private volatile long    m_workProduced = 0;
-        private LongAdder        m_workConsumed = new LongAdder();
+        private AtomicLong       m_workConsumed = new AtomicLong();
         private volatile boolean m_doneProducing = false;
 
         public void produceWork() {
@@ -714,24 +714,19 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         }
 
         public void consumeWork() {
-            m_workConsumed.increment();
-            // The very last callback is responsible for waking the producer
-            if (workIsComplete()) {
+            // The very last consumer is responsible for waking the producer
+            long workConsumed = m_workConsumed.incrementAndGet();
+            if (m_doneProducing && m_workProduced == workConsumed) {
                 synchronized (this) {
                     notify();
                 }
             }
         }
 
-        public boolean workIsComplete() {
-            assert (!m_doneProducing || m_workProduced >= m_workConsumed.longValue());
-            return m_doneProducing && (m_workProduced == m_workConsumed.longValue());
-        }
-
         public synchronized void waitForWorkToFinish() {
             m_doneProducing = true;
             // only one consumer calls notify(), but loop just to safeguard against being interrupted
-            while (!workIsComplete()) {
+            while (m_workProduced != m_workConsumed.longValue()) {
                 try {
                     wait();
                 } catch (InterruptedException unexpected) {
