@@ -76,12 +76,12 @@ if [ -d $VOLTDB_HOME/../../lib/voltdb ]; then
     # Linux package installation puts all libraries in /usr/lib/voltdb
     VOLTDB_VOLTDB=$(dirname $(dirname "$VOLTDB_HOME"))/lib/voltdb
     VOLTDB_LIB=$VOLTDB_VOLTDB
-	THIRD_PARTY_JARS=$(dirname $(dirname "$VOLTDB_HOME"))/third_party/java/jars
+	BUNDLES_DIR=$(dirname $(dirname "$VOLTDB_HOME"))/bundles
 else
     # distribution puts third party jars in lib and voltdb libraries in voltdb
     VOLTDB_VOLTDB=$VOLTDB_HOME/voltdb
     VOLTDB_LIB=$VOLTDB_HOME/lib
-	THIRD_PARTY_JARS=$VOLTDB_HOME/third_party/java/jars
+	BUNDLES_DIR=$VOLTDB_HOME/bundles
 fi
 
 JAVA=`which java`
@@ -114,12 +114,12 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
 fi
 
 # add kakfka jar file to classpath
-KAFKACLIENTJAR=${THIRD_PARTY_JARS}/kafka-clients-0.10.1.1.jar
-if [ ! -f ${KAFKACLIENTJAR} ]; then
+KAFKA_LOADER10_BUNDLE=${BUNDLES_DIR}/kafkaLoader10.jar
+if [ ! -f ${KAFKA_LOADER10_BUNDLE} ]; then
   echo "Couldn't find kafka jar file."
   exit 1
 fi
-CLASSPATH=${KAFKACLIENTJAR}:${CLASSPATH}
+CLASSPATH=${KAFKA_LOADER10_BUNDLE}:${CLASSPATH}
 
 
 # add voltdb artifacts to classpath
