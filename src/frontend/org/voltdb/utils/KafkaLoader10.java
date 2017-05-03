@@ -265,7 +265,7 @@ public class KafkaLoader10 {
             String autoCommit = props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG);
             if (autoCommit != null && !autoCommit.trim().isEmpty() &&
                     !("true".equals(autoCommit.trim().toLowerCase())) ) {
-                m_log.warn("Auto commit policy for Kafka loader will be set to \'true\' instead of " + autoCommit);
+                m_log.warn("Auto commit policy for Kafka loader will be set to \'true\' instead of \'" + autoCommit +"\'");
             }
 
             if (props.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG) == null)
@@ -275,13 +275,13 @@ public class KafkaLoader10 {
             // log warning message about it
             String deserializer = props.getProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG);
             if (deserializer != null && KEY_DESERIALIZER.equals(deserializer.trim()) ) {
-                m_log.warn("User provided key deserializer not supported, " + KEY_DESERIALIZER
-                        + " will be used for deserializering keys");
+                m_log.warn("Key deserializer \'" + deserializer.trim() + "\' not supported. \'"
+                        + KEY_DESERIALIZER + "\' will be used for deserializering keys");
             }
             deserializer = props.getProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG);
             if ( deserializer != null && VALUE_DESERIALIZER.equals(deserializer.trim())) {
-                m_log.warn("User provided value deserializer not supported, " + VALUE_DESERIALIZER
-                        + " will be used for deserializering values");
+                m_log.warn("Value deserializer \'" + deserializer.trim() + "\' not supported. \'"
+                        + VALUE_DESERIALIZER + "\' will be used for deserializering values");
             }
         }
 
@@ -404,22 +404,19 @@ public class KafkaLoader10 {
                 }
             } catch (IllegalArgumentException invalidTopic) {
                 m_closed.set(true);
-                System.out.println("Failed subscribing to the topic " + m_config.topic);
                 m_log.error("Failed subscribing to the topic " + m_config.topic, invalidTopic);
             } catch (WakeupException wakeup) {
                 m_closed.set(true);
-//                wakeup.printStackTrace();
                 m_log.debug("Consumer signalled to terminate ", wakeup);
             } catch (IOException ioExcp) {
                 m_closed.set(true);
                 if (m_formatter == null) {
                     m_log.error("Failed to parse message" + smsg);
                 } else {
-                    m_log.error("Error seen when when processing message ", ioExcp);
+                    m_log.error("Error seen when processing message ", ioExcp);
                 }
             } catch (Throwable terminate) {
                 m_closed.set(true);
-                terminate.printStackTrace();
                 m_log.error("Error seen during poll", terminate);
             } finally {
                 try {
@@ -501,7 +498,7 @@ public class KafkaLoader10 {
             }
             String formatter = options.m_formatterProperties.getProperty("formatter");
             if (formatter == null || formatter.trim().isEmpty()) {
-                m_log.error("formatter class must be specified in formatter file as formatter=<class>: " + options.formatter);
+                m_log.error("Formatter class must be specified in formatter file as formatter=<class>: " + options.formatter);
                 System.exit(-1);
             }
         }
