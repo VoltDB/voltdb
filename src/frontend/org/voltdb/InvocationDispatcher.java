@@ -448,6 +448,7 @@ public final class InvocationDispatcher {
                     return retval;
                 }
                 if (m_isInitialRestore.compareAndSet(true, false) && isSchemaEmpty()) {
+                    m_NTProcedureService.isRestoring = true;
                     return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
                 }
             } else if ("@Shutdown".equals(procName)) {

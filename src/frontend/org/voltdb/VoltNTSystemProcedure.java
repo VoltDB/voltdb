@@ -50,4 +50,12 @@ public class VoltNTSystemProcedure extends VoltNonTransactionalProcedure {
     protected String getUsername() {
         return m_runner.getUsername();
     }
+
+    protected boolean isRestoring() {
+        return m_runner.isRestoring();
+    }
+
+    protected void noteRestoreCompleted() {
+        m_runner.noteRestoreCompleted();
+    }
 }

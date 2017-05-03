@@ -64,23 +64,26 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * For AdHoc DDL work, this will be null
      */
     public static CatalogChangeResult prepareApplicationCatalogDiff(String invocationName,
-                                                             final byte[] operationBytes,
-                                                             final String operationString,
-                                                             final String[] adhocDDLStmts,
-                                                             final byte[] replayHashOverride,
-                                                             final boolean isPromotion,
-                                                             final DrRoleType drRole,
-                                                             final boolean useAdhocDDL,
-                                                             boolean adminConnection,
-                                                             String hostname,
-                                                             String user)
-                                                                   throws PrepareDiffFailureException
+                                                                    final byte[] operationBytes,
+                                                                    final String operationString,
+                                                                    final String[] adhocDDLStmts,
+                                                                    final byte[] replayHashOverride,
+                                                                    final boolean isPromotion,
+                                                                    final DrRoleType drRole,
+                                                                    final boolean useAdhocDDL,
+                                                                    boolean adminConnection,
+                                                                    String hostname,
+                                                                    String user)
+                                                                            throws PrepareDiffFailureException
     {
 
         // create the change result and set up all the boiler plate
         CatalogChangeResult retval = new CatalogChangeResult();
         retval.tablesThatMustBeEmpty = new String[0]; // ensure non-null
         retval.hasSchemaChange = true;
+        if (replayHashOverride != null) {
+            retval.isForReplay = true;
+        }
 
         try {
             // catalog change specific boiler plate

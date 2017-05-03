@@ -105,6 +105,9 @@ public class NTProcedureService {
     // increments for every procedure call
     long nextProcedureRunnerId = 0;
 
+    // no need for thread safety as this can't race with @UAC at startup
+    public boolean isRestoring;
+
     // names for threads in the exec service
     final static String NTPROC_THREADPOOL_NAMEPREFIX = "NTPServiceThread-";
     final static String NTPROC_THREADPOOL_PRIORITY_SUFFIX = "Priority-";

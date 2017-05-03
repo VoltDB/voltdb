@@ -493,4 +493,12 @@ public class ProcedureRunnerNT {
     protected String getUsername() {
         return m_user.m_name;
     }
+
+    protected boolean isRestoring() {
+        return m_ntProcService.isRestoring;
+    }
+
+    protected void noteRestoreCompleted() {
+        m_ntProcService.isRestoring = false;
+    }
 }

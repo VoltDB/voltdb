@@ -41,10 +41,10 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         // TODO: add hostname/user to NTSysprocProc API
         // TODO: make this stuff real?
         String invocationName = "@UpdateApplicationCatalog";
-        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();;
-        boolean internalCall = false;
+        boolean isRestoring = isRestoring();
+        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema() && !isRestoring;
 
-        if (!allowPausedModeWork(internalCall, isAdminConnection())) {
+        if (!allowPausedModeWork(isRestoring(), isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
@@ -52,13 +52,12 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         // We have an @UAC.  Is it okay to run it?
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen
-        if (catalogJarBytes != null &&
-            useDDLSchema)
+        if (catalogJarBytes != null && useDDLSchema)
         {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
-                    "Cluster is configured to use AdHoc DDL to change application " +
-                    "schema.  Use of @UpdateApplicationCatalog is forbidden.");
+                    "Cluster is configured to use AdHoc DDL to change application schema. " +
+                    "Use of @UpdateApplicationCatalog is forbidden.");
         }
 
         CatalogChangeResult ccr = null;
@@ -90,6 +89,10 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         // case for @CatalogChangeResult
         if (ccr.encodedDiffCommands.trim().length() == 0) {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
+        }
+
+        if (isRestoring) {
+            noteRestoreCompleted();
         }
 
         // initiate the transaction.
