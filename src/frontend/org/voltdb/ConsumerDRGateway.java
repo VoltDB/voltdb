@@ -50,8 +50,6 @@ public interface ConsumerDRGateway extends Promotable {
      * the snapshot as a joiner.
      * @param dataSourceCluster
      * @param expectedClusterMembers
-     * @return false if this cluster is a joiner and the sync snapshot did not finish loading form the
-     *         leader cluster
      */
     void setInitialConversationMembership(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
 
@@ -82,4 +80,6 @@ public interface ConsumerDRGateway extends Promotable {
     void resumeConsumerDispatcher(byte clusterId);
 
     void resetDrAppliedTracker(byte clusterId);
+
+    void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
 }

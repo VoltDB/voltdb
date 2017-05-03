@@ -41,15 +41,15 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
  */
 public class VoltDDLElementTracker {
     final VoltCompiler m_compiler;
-    final Map<String, String> m_partitionMap = new HashMap<String, String>();
+    final Map<String, String> m_partitionMap = new HashMap<>();
     final Map<String, ProcedureDescriptor> m_procedureMap =
-            new HashMap<String, ProcedureDescriptor>();
+            new HashMap<>();
     // map from export group name to a sorted set of table names in that group
     final NavigableMap<String, NavigableSet<String>> m_exportsByTargetName = new TreeMap<>();
     // additional non-procedure classes for the jar
-    final Set<String> m_extraClassses = new TreeSet<String>();
-    final Map<String, String> m_drTables = new LinkedHashMap<String, String>();
-    final Set<String> m_importLines = new TreeSet<String>();
+    final Set<String> m_extraClassses = new TreeSet<>();
+    final Map<String, String> m_drTables = new LinkedHashMap<>();
+    final Set<String> m_importLines = new TreeSet<>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -89,7 +89,7 @@ public class VoltDDLElementTracker {
         m_extraClassses.addAll(classNames);
     }
 
-    void addImportLine(String importLine) {
+    public void addImportLine(String importLine) {
         m_importLines.add(importLine);
     }
 
@@ -99,7 +99,7 @@ public class VoltDDLElementTracker {
      * @return name added to procedure map
      * @throws VoltCompilerException if it is already tracked
      */
-    String add(ProcedureDescriptor descriptor) throws VoltCompilerException
+    public String add(ProcedureDescriptor descriptor) throws VoltCompilerException
     {
         assert descriptor != null;
 
@@ -123,7 +123,7 @@ public class VoltDDLElementTracker {
      * @param Name of procedure being removed
      * @throws VoltCompilerException if the procedure does not exist
      */
-    void removeProcedure(String procName, boolean ifExists) throws VoltCompilerException
+    public void removeProcedure(String procName, boolean ifExists) throws VoltCompilerException
     {
         assert procName != null && ! procName.trim().isEmpty();
 
@@ -145,7 +145,7 @@ public class VoltDDLElementTracker {
      * @throws VoltCompilerException when there is no corresponding tracked
      *   procedure
      */
-    void addProcedurePartitionInfoTo( String procedureName, String partitionInfo)
+    public void addProcedurePartitionInfoTo( String procedureName, String partitionInfo)
             throws VoltCompilerException {
 
         assert procedureName != null && ! procedureName.trim().isEmpty();
@@ -204,7 +204,7 @@ public class VoltDDLElementTracker {
         // insert the table's name into the export group
         NavigableSet<String> tableGroup = m_exportsByTargetName.get(targetName);
         if (tableGroup == null) {
-            tableGroup = new TreeSet<String>();
+            tableGroup = new TreeSet<>();
             m_exportsByTargetName.put(targetName, tableGroup);
         }
         tableGroup.add(tableName);
