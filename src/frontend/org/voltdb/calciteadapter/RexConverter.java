@@ -33,6 +33,7 @@ import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexVisitorImpl;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
+import org.hsqldb_voltpatches.FunctionCustom;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
@@ -231,6 +232,16 @@ public class RexConverter {
 //            OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
 //                // left % right (both must be integer)
 
+            case OTHER:
+                if ("||".equals(call.op.getName())) {
+                    // CONCAT
+                    ae = RexConverterHelper.createFunctionExpression(call.getType(), "concat", FunctionCustom.FUNC_CONCAT_ID, aeOperands);
+                    TypeConverter.setType(ae, call.getType());
+                } else {
+                    throw new CalcitePlanningException("Unsupported Calcite expression type: " +
+                            call.op.kind.toString());
+                }
+                break;
             default:
                 throw new CalcitePlanningException("Unsupported Calcite expression type: " +
                         call.op.kind.toString());

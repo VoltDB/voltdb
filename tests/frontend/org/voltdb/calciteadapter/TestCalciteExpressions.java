@@ -94,20 +94,37 @@ public class TestCalciteExpressions extends TestCalciteBase {
         testPlan(sql, PlannerType.VOLTDB);
     }
 
-    public void testFailMimatchStringExpr() throws Exception {
+    public void testFailMismatchStringExpr() throws Exception {
         String sql;
         sql = "select '55' + 22 from R1";
-        Map<String, String> ignores = new HashMap<>();
-        ignores.put("EXPR$0", "C1");
 
         failToCompile(PlannerType.CALCITE, sql, "Cannot apply '+' to arguments of type '<CHAR(2)> + <INTEGER>'");
     }
 
     public void testConcatConstStringExpr() throws Exception {
         String sql;
-        sql = "select '44' || '22' from R1";
-        testPlan(sql, PlannerType.VOLTDB);
+        sql = "select '55' || '22' from R1";
         testPlan(sql, PlannerType.CALCITE);
+        testPlan(sql, PlannerType.VOLTDB);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        // HSQL concatenates the strings while parcing
+        String calciteExpr = "\"TYPE\":100,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ARGS\":[{\"TYPE\":30,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ISNULL\":false,\"VALUE\":\"55\"},{\"TYPE\":30,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ISNULL\":false,\"VALUE\":\"22\"}],\"NAME\":\"concat\",\"FUNCTION_ID\":124";
+        String voltDBExpr = "\"TYPE\":30,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1048576,\"ISNULL\":false,\"VALUE\":\"5522\"";
+        ignores.put(calciteExpr, voltDBExpr);
+
+        comparePlans(sql, ignores);
+    }
+
+    public void testConcatStringExpr() throws Exception {
+        String sql;
+        sql = "select v || '22' from R1";
+        testPlan(sql, PlannerType.CALCITE);
+        testPlan(sql, PlannerType.VOLTDB);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
     }
 
 }

@@ -22,6 +22,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.FunctionExpression;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -88,7 +89,9 @@ public class TypeConverter {
 
         if (vt.isVariableLength()) {
             int size;
-            if (ae instanceof ConstantValueExpression &&
+            if ((ae instanceof ConstantValueExpression ||
+                    ae instanceof FunctionExpression)
+                    &&
                     (vt != VoltType.NULL) && (vt != VoltType.NUMERIC)) {
                 size = vt.getMaxLengthInBytes();
             } else {

@@ -1827,6 +1827,7 @@ public class FunctionCustom extends FunctionSQL {
     /************************* Volt DB Extensions *************************/
 
     public static final String FUNC_CONCAT_ID_STRING = String.valueOf(FunctionCustom.FUNC_CONCAT);
+    public static final int FUNC_CONCAT_ID = FunctionCustom.FUNC_CONCAT;
 
     private static String DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR = "Custom Function";
     private static String DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD = "Custom Function Special Case";
