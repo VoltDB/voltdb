@@ -924,7 +924,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 "truncate table tiny_polygon;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("@AdHoc",
-                "alter table tiny_polygon alter column poly geography(179);");
+                "alter table tiny_polygon alter column poly geography(179) not null;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 

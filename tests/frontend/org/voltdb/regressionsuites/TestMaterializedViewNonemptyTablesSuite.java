@@ -255,6 +255,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals("View creation on empty tables should always succeed.",
                      ClientResponse.SUCCESS, cr.getStatus());
+        dropView(client, viewName);
     }
 
     public void testDropView() throws Exception {
