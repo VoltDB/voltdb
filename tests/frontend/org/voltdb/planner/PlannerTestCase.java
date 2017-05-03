@@ -625,14 +625,12 @@ public class PlannerTestCase extends TestCase {
 
     protected class PlanWithInlineNodes {
         PlanNodeType m_type = null;
+
         List<PlanNodeType> m_branches = new ArrayList<>();
-        public PlanWithInlineNodes(PlanNodeType ... nodes) {
+        public PlanWithInlineNodes(PlanNodeType mainType, PlanNodeType ... nodes) {
+            m_type = mainType;
             for (PlanNodeType node : nodes) {
-                if (m_type == null) {
-                    m_type = node;
-                } else {
-                    m_branches.add(node);
-                }
+                m_branches.add(node);
             }
         }
 
@@ -648,6 +646,9 @@ public class PlannerTestCase extends TestCase {
                     return String.format("Expected inline node type %s but didn't find it.",
                                          nodeType.name());
                 }
+            }
+            if (m_branches.size() != node.getInlinePlanNodes().size()) {
+                return String.format("Expected %d inline nodes, found %d", m_branches.size(), node.getInlinePlanNodes().size());
             }
             return null;
         }

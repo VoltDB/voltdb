@@ -1668,21 +1668,30 @@ public class PlanAssembler {
         // where to put values produced by child into the row to be inserted.
         insertNode.setFieldMap(fieldMap);
 
+        AbstractPlanNode root = insertNode;
         if (matSchema != null) {
             MaterializePlanNode matNode =
                     new MaterializePlanNode(matSchema);
             // connect the insert and the materialize nodes together
             insertNode.addAndLinkChild(matNode);
-
             retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
         }
         else {
-            insertNode.addAndLinkChild(retval.rootPlanGraph);
+            SeqScanPlanNode seqScan
+              = (retval.rootPlanGraph instanceof SeqScanPlanNode)
+                    ? ((SeqScanPlanNode)retval.rootPlanGraph)
+                    : null;
+            if (seqScan != null) {
+                seqScan.addInlinePlanNode(insertNode);
+                root = seqScan;
+            } else {
+                insertNode.addAndLinkChild(retval.rootPlanGraph);
+            }
         }
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
-            retval.rootPlanGraph = insertNode;
+            retval.rootPlanGraph = root;
             return retval;
         }
 
@@ -1690,7 +1699,7 @@ public class PlanAssembler {
         // Add a compensating sum of modified tuple counts or a limit 1
         // AND a send on top of a union-like receive node.
         boolean isReplicated = targetTable.getIsreplicated();
-        retval.rootPlanGraph = addCoordinatorToDMLNode(insertNode, isReplicated);
+        retval.rootPlanGraph = addCoordinatorToDMLNode(root, isReplicated);
         return retval;
     }
 
@@ -1808,9 +1817,7 @@ public class PlanAssembler {
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
         // If the projection can be done inline. then add the
-        // projection node inline.  Even if the rootNode is a
-        // scan, if we have a windowed expression we need to
-        // add it out of line.
+        // projection node inline.
         if (rootNode instanceof AbstractScanPlanNode) {
             rootNode.addInlinePlanNode(projectionNode);
             return rootNode;

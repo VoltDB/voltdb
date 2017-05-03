@@ -53,7 +53,7 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                      PlanNodeType.INVALID,
                      PlanNodeType.SEND,
                      PlanNodeType.INSERT,
-                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN, PlanNodeType.PROJECTION));
+                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN, PlanNodeType.PROJECTION, PlanNodeType.INSERT));
         validatePlan("INSERT INTO T2 SELECT * from T1;",
                      2,
                      PlanNodeType.SEND,
@@ -109,8 +109,7 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                      PlanNodeType.RECEIVE,
                      PlanNodeType.INVALID,
                      PlanNodeType.SEND,
-                     PlanNodeType.INSERT,
-                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN, PlanNodeType.PROJECTION));
+                     new PlanWithInlineNodes(PlanNodeType.SEQSCAN, PlanNodeType.PROJECTION, PlanNodeType.INSERT));
     }
 
     //
