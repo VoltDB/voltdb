@@ -1214,7 +1214,7 @@ function alertNodeClicked(obj) {
                     latency[hostName] = {};
                 }
                 latency[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
-                latency[hostName]["P99"] = info[colIndex["P99"]];
+                latency[hostName]["P99"] = info[colIndex["P99"]]/1000;
                 latency[hostName]["TPS"] = info[colIndex["TPS"]];
             });
         };
