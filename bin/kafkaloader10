@@ -47,7 +47,7 @@
 
 
 # The VoltDB Kafka Loader script (experimental)
-# This script is adapted from csvloader script.
+# This script is adapted from kafkaloader8 script.
 #
 # Environment Variables
 #   JAVA_HOME        The java implementation to use.  Overrides JAVA_HOME.
