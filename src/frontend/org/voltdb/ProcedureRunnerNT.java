@@ -220,12 +220,17 @@ public class ProcedureRunnerNT {
             m_outstandingAllHostProcedureHostIds = liveHostIds;
         }
 
-        // send the invocation to all live nodes
-        liveHostIds.stream()
+        // convert host ids to hsids
+        long[] hsids = liveHostIds.stream()
                 .map(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
-                .forEach(hsid -> {
-                    m_mailbox.send(hsid, workRequest);
-                });
+                .mapToLong(x -> x)
+                .toArray();
+        // send the invocation to all live nodes
+        // n.b. can't combine this step with above because sometimes the callbacks comeback so fast
+        //  you get a concurrent modification exception
+        for (long hsid : hsids) {
+            m_mailbox.send(hsid, workRequest);
+        }
 
         return m_allHostFut;
     }
