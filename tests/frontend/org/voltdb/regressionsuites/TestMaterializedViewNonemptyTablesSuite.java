@@ -315,6 +315,12 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
 
         cr = client.callProcedure("@AdHoc", "drop view T_ENG_11497_2_VIEW;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop table T_ENG_11497_1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop table T_ENG_11497_2;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     private void populateTables(Client client) throws IOException, NoConnectionsException, ProcCallException {
