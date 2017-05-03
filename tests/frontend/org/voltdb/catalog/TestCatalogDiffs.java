@@ -134,7 +134,7 @@ public class TestCatalogDiffs extends TestCase {
             assertEquals((boolean)worksWithElastic, diff.worksWithElastic());
         }
         if (expectApplyCatalogDiffToEE != null) {
-        	assertEquals(expectApplyCatalogDiffToEE.booleanValue(), diff.requiresCatalogDiffCmdsApplyToEE());
+            assertEquals(expectApplyCatalogDiffToEE.booleanValue(), diff.requiresCatalogDiffCmdsApplyToEE());
         }
         if (expectedNewGeneration != null) {
             //TODO: Enable real check.
