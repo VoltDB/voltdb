@@ -122,7 +122,7 @@
         <!-- regular build will compile the required classes -->
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/kafkastream10.jar" basedir="${build.prod.dir}">
-            <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="kafka-clients-0.10.1.1.jar" />
+            <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="kafka-clients-0.10.2.1.jar" />
             <zipgroupfileset dir="${base.dir}/lib/" includes="snappy-java-1.1.1.7.jar" />
             <zipgroupfileset dir="${base.dir}/lib/" includes="lz4-1.2.0.jar" />
         </jar>
