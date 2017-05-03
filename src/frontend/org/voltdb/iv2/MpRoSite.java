@@ -57,9 +57,9 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.messaging.FastDeserializer;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -229,7 +229,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean requiresNewExportGeneration)
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle,
+                boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
