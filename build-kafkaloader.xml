@@ -32,9 +32,6 @@
         </javac>
     </sequential>
 </macrodef>
-
-
-
 <tstamp/>
 
 <!-- make environment var foo available as env.foo -->
@@ -47,22 +44,13 @@
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.client.dir'            location='${build.dir}/clientobj' />
-<property name='build.clientsrc.dir'         location='${build.dir}/clientsrc' />
 <property name='build.kfloader.dir'          location='${build.prod.dir}' />
 <property name='build.kfloadersrc.dir'       location='${build.dir}/kfloadersrc' />
-<!--property name='build.test.dir'              location='${build.dir}/test' /-->
-<!--property name='build.admin.dir'             location='${build.dir}/admin' />
-<property name='raw.dist.dir'                location='${build.dir}' />
-<property name='dist.dir'                    location='${build.dir}/dist' />
-<property name='doc.dir'                     location='doc' /-->
 <property name='src.gpl.dir'                 location='src/frontend' />
 <property name='lib.dir'                     location='lib' />
 <property name='vendor.src.dir'              location='third_party/java/src' />
 <property name='vendor.lib.dir'              location='third_party/java/jars' />
-<!--property name='vendor.cpp.dir'              location='third_party/cpp' /-->
-<property name='depcache'                    value='.depcache' />
 
-<!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
     <os family="mac"/>
 </condition>
@@ -76,15 +64,6 @@
     <pathelement location='${build.prod.dir}' />
     <fileset dir='${vendor.lib.dir}'>
         <include name='kafka-clients-0.10.1.1.jar' />
-    </fileset>
-    <fileset dir='${lib.dir}'>
-        <include name='log4j-1.2.16.jar' />
-    </fileset>
-    <fileset dir='${lib.dir}'>
-        <include name='commons-logging-1.1.3.jar' />
-    </fileset>
-    <fileset dir='${lib.dir}'>
-        <include name='slf4j-api-1.6.2.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
 </path>
@@ -109,9 +88,9 @@ CLEANING
 ***************************************
 -->
 
-<target name='clean' description="Remove kafka loader class files">
+<target name='clean' description="Remove Kafka Loader artifacts">
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -f ${build.prod.dir}/org/voltdb/utils/KafkaLoader10'"/>
+    <arg line="-c 'rm -f ${build.prod.dir}/org/voltdb/utils/KafkaLoader10*'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf {build.kfloadersrc.dir}'"/>
@@ -125,7 +104,6 @@ STAGING SOURCE FILES
 -->
 
 <target name="stage_src" >
-  <!--mkdir dir='${build.client.dir}' /-->
   <!-- copy source files -->
   <copy todir="${build.kfloadersrc.dir}">
     <fileset refid="vendor.src.files"/>
@@ -139,18 +117,9 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" description="Compile all Java client source" depends="stage_src">
-
-    <!-- copy resources needed -->
-    <copy todir="${build.kfloadersrc.dir}">
-        <!--fileset dir="${src.gpl.dir}" includes="org/voltdb/jdbc/**/*.properties"/-->
-        <fileset dir="${src.gpl.dir}" includes="org/voltdb/client/**/*.properties"/>
-        <fileset dir="${src.gpl.dir}" includes="org/voltdb/*.properties"/>
-    </copy>
-
+<target name="compile" description="Compile Kafka Loader sources" depends="stage_src">
     <invoke-javacKF  srcdir="${build.kfloadersrc.dir}">
     </invoke-javacKF>
-
 </target>
 
 <!-- END PROJECT -->

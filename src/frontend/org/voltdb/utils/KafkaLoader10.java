@@ -60,7 +60,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
  */
 
 public class KafkaLoader10 {
-    private static final VoltLogger m_log = new VoltLogger("KAFKALOADER8");
+    private static final VoltLogger m_log = new VoltLogger("KAFKALOADER10");
     private static final String KEY_DESERIALIZER = ByteArrayDeserializer.class.getName();
     private static final String VALUE_DESERIALIZER = ByteArrayDeserializer.class.getName();
 
@@ -234,6 +234,7 @@ public class KafkaLoader10 {
                     if ((m_cliOptions.maxerrors > 0 && fc > m_cliOptions.maxerrors)
                             || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
                         notifyShutdown();
+                        return true;
                     }
                 }
             }
@@ -253,12 +254,8 @@ public class KafkaLoader10 {
 
         Properties props = new Properties();
         if (m_cliOptions.config.trim().isEmpty()) {
-            props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-//            props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000"); // kafka's config value is 5000
             props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-            props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "300000");    // 5 minutes for liveness check of consumer
-            // max number of records return per poll
-//            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, String.valueOf(m_cliOptions.batch));
+            // default liveness check of consumer is 5 minutes
         } else {
             props.load(new FileInputStream(new File(m_cliOptions.config)));
             //Get GroupId from property if present and use it.
@@ -268,8 +265,12 @@ public class KafkaLoader10 {
             // the supplied command line
             m_cliOptions.brokers = props.getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
 
-            if (props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG) == null)
-                props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+            String autoCommit = props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG);
+            if (autoCommit != null && !autoCommit.trim().isEmpty() &&
+                    !("true".equals(autoCommit.trim().toLowerCase())) ) {
+                m_log.warn("Auto commit policy for Kafka loader will be set to \'true\' instead of " + autoCommit);
+            }
+
             if (props.getProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG) == null)
                 props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
@@ -281,16 +282,18 @@ public class KafkaLoader10 {
                         + " will be used for deserializering keys");
             }
             deserializer = props.getProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG);
-            if ( deserializer != null && VALUE_DESERIALIZER.equals(deserializer)) {
+            if ( deserializer != null && VALUE_DESERIALIZER.equals(deserializer.trim())) {
                 m_log.warn("User provided value deserializer not supported, " + VALUE_DESERIALIZER
                         + " will be used for deserializering values");
             }
         }
 
+        // populate/override kafka consumer properties
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
 
         return props;
     }
