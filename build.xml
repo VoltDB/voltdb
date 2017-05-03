@@ -126,7 +126,7 @@
 
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
-<property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
+<property name="j2se_api" value="http://docs.oracle.com/javase/8/docs/api/"/>
 
 <path id='project.classpath'>
     <pathelement location='${build.client.dir}' />
@@ -135,12 +135,12 @@
     <pathelement location='${build.test.dir}' />
     <fileset dir='${lib.dir}'>
         <include name='*.jar' />
-		<exclude name ="kafka-clients-0.8.2.2.jar" />
     </fileset>
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
         <exclude name='classes-java1.7.jar' />
+        <exclude name='kafka-clients-0.10.1.1.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -1264,7 +1264,7 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" depends="catalog, dbbpool_gen, deployment_gen, compile_core, compile_pro"
+<target name="compile" depends="catalog, dbbpool_gen, deployment_gen, compile_core, compile_kafkaloader, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_client">
@@ -1272,6 +1272,12 @@ JAVA COMPILATION
         <property name="build" value="${build}"/>
     </ant>
 </target>
+
+<target name="compile_kafkaloader" depends="compile_core">
+    <ant antfile="build-kafkaloader.xml" target="compile" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
+</target>	
 
 <target name="compile_core" depends="compile_client">
     <mkdir dir='${build.prod.dir}' />
@@ -1409,7 +1415,8 @@ JAVA COMPILATION
                   io/netty_voltpatches/**/*.java
                   org/jctools_voltpatches/**/*.java"/>
     <!-- non-voltcore voltdb code -->
-    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java
+                                                    org/voltdb/utils/KafkaLoader10.java" />
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
