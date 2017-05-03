@@ -114,7 +114,7 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
 fi
 
 # add kakfka jar file to classpath
-KAFKA_LOADER10_BUNDLE=${BUNDLES_DIR}/kafkaLoader10.jar
+KAFKA_LOADER10_BUNDLE=${BUNDLES_DIR}/kafkastream10.jar
 if [ ! -f ${KAFKA_LOADER10_BUNDLE} ]; then
   echo "Couldn't find kafka jar file."
   exit 1

@@ -75,9 +75,6 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='javassist-3.20.0-GA.jar' />
     </fileset>
-    <fileset dir='${vendor.lib.dir}'>
-        <include name='kafka-clients-0.10.1.1.jar' />
-    </fileset>
     <fileset dir='${lib.dir}'>
         <include name='log4j-1.2.16.jar' />
     </fileset>
@@ -177,7 +174,6 @@
                   "
 />
 
-<!--org/voltdb/utils/KafkaLoader10.java -->
 
 <!--
 ***************************************

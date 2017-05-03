@@ -72,8 +72,6 @@
         includes="org/voltdb/utils/KafkaLoader10.java "
 />
 
-<!--org/voltdb/utils/KafkaLoader10.java -->
-
 <!--
 ***************************************
 PRIMARY ENTRY POINTS
@@ -118,9 +116,13 @@ JAVA COMPILATION
 -->
 
 <target name="compile" description="Compile Kafka Loader sources" depends="stage_src">
-    <invoke-javacKF  srcdir="${build.kfloadersrc.dir}">
-    </invoke-javacKF>
+    <invoke-javacKF  srcdir="${build.kfloadersrc.dir}" />
 </target>
 
-<!-- END PROJECT -->
+<!--
+***************************************
+JAR is build using build-importers
+***************************************
+-->
+
 </project>

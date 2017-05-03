@@ -128,15 +128,11 @@ public class KafkaLoader10 {
         @Option(shortOpt = "m", desc = "Maximum errors allowed (default: 100)")
         int maxerrors = 100;
 
-        //TODO: migrate to server:port option
-        @Option(shortOpt = "s", desc = "List of servers to connect to (default: localhost)")
-        String servers = "localhost";
+        @Option(shortOpt = "s", desc = "Comma separated list of the form server[:port] to connect to (default: localhost:"
+                + Client.VOLTDB_SERVER_PORT + ")")
+        String servers = "localhost:" + Client.VOLTDB_SERVER_PORT;
 
-        //TODO: remove port option
-        @Option(desc = "Port to use when connecting to database (default: 21212)")
-        int port = Client.VOLTDB_SERVER_PORT;
-
-        @Option(desc = "username when connecting to the database")
+        @Option(desc = "Username when connecting to the database")
         String user = "";
 
         @Option(desc = "Password to use when connecting to database")
@@ -194,9 +190,10 @@ public class KafkaLoader10 {
             if (brokers.trim().isEmpty()) {
                 exitWithMessageAndUsage("Kafka bootstrap server must be specified.");
             }
-            if (port < 0) {
-                exitWithMessageAndUsage("port number must be >= 0");
+            if (servers.trim().isEmpty()) {
+                exitWithMessageAndUsage("Provided server list can't be empty");
             }
+
             if (procedure.trim().isEmpty() && table.trim().isEmpty()) {
                 exitWithMessageAndUsage("procedure name or a table name required");
             }
@@ -208,7 +205,7 @@ public class KafkaLoader10 {
             }
             if ((useSuppliedProcedure) && (update)){
                 update = false;
-                exitWithMessageAndUsage("update is not applicable when stored procedure specified");
+                exitWithMessageAndUsage("Update is not applicable when stored procedure specified");
             }
         }
 
@@ -217,7 +214,7 @@ public class KafkaLoader10 {
          */
         @Override
         public void printUsage() {
-            System.out.println("Usage: kafkaloader [args] -b kafka-brokers -t topic tablename");
+            System.out.println("Usage: kafkaloader10 [args] -b kafka-brokers -t topic tablename");
             super.printUsage();
         }
     }
@@ -447,7 +444,7 @@ public class KafkaLoader10 {
             clientConfig.enableSSL();
         }
         clientConfig.setProcedureCallTimeout(0);
-        m_client = getClient(clientConfig, serverlist, m_cliOptions.port);
+        m_client = getClient(clientConfig, serverlist);
 
         if (m_cliOptions.useSuppliedProcedure) {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_cliOptions.procedure, new KafkaBulkLoaderCallback());
@@ -476,10 +473,10 @@ public class KafkaLoader10 {
      * @return client
      * @throws Exception
      */
-    public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {
+    public static Client getClient(ClientConfig config, String[] servers) throws Exception {
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
-            client.createConnection(server.trim(), port);
+            client.createConnection(server.trim());
         }
         return client;
     }

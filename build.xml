@@ -1283,7 +1283,7 @@ JAVA COMPILATION
     <ant antfile="build-kafkaloader.xml" target="compile" inheritAll="false">
         <property name="build" value="${build}"/>
     </ant>
-</target>	
+</target>
 
 <target name="compile_core" depends="compile_client">
     <mkdir dir='${build.prod.dir}' />
