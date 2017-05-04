@@ -150,8 +150,11 @@ public class PlannerTestCase extends TestCase {
 
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql) {
-        boolean planForSinglePartitionFalse = false;
-        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, m_noJoinOrder);
+        return compileToFragments(sql, false);
+    }
+
+    protected List<AbstractPlanNode> compileToFragments(String sql, boolean planForSinglePartition) {
+        return compileWithJoinOrderToFragments(sql, planForSinglePartition, m_noJoinOrder);
     }
 
     protected List<AbstractPlanNode> compileToFragmentsForSinglePartition(String sql) {
@@ -191,6 +194,10 @@ public class PlannerTestCase extends TestCase {
         assertFalse(pn.isEmpty());
         assertTrue(pn.get(0) != null);
         if (planForSinglePartition) {
+            if (pn.size() != 1) {
+                System.err.printf("Plan: %s\n", pn);
+                System.err.printf("Error: pn.size == %d, should be 1\n", pn.size());
+            }
             assertTrue(pn.size() == 1);
         }
         return pn;

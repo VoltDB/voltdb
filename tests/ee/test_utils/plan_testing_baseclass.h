@@ -390,6 +390,14 @@ public:
             ASSERT_FALSE(true);
         }
         int32_t resColCount = result->columnCount();
+        if (nCols != resColCount) {
+            std::cerr << "Error: nCols = "
+                      << nCols
+                      << " != resColCount = "
+                      << resColCount
+                      << "."
+                      << std::endl;
+        }
         ASSERT_EQ(nCols, resColCount);
         bool failed = false;
         for (int32_t row = 0; row < nRows; row += 1) {

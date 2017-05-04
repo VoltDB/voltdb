@@ -498,7 +498,6 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
-    TestInlineInsert
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
