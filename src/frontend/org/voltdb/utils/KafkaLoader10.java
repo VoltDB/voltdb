@@ -138,7 +138,7 @@ public class KafkaLoader10 {
         @Option(desc = "Password to use when connecting to database")
         String password = "";
 
-        @Option(shortOpt = "b", desc = "Kafka bootstrap server / broker to connect to. (format: broker:port)")
+        @Option(shortOpt = "b", desc = "Comma separated list of kafka broker(s) to connect to. (format: broker:port)")
         String brokers = ""; //No default here as default will clash with local voltdb cluster
 
         @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds (default: 10)")
@@ -476,7 +476,7 @@ public class KafkaLoader10 {
             try {
                 client.createConnection(server.trim());
             } catch (Exception closeConnectionAndRethrow) {
-                m_log.error("Failed to connect to " + server.trim() + ". Provide valid list of server(s)");
+                m_log.error("Failed to connect to " + server.trim() + ". Provide valid list of server(s).");
                 try {
                     client.close();
                 } catch (Exception ignore) {}

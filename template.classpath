@@ -45,7 +45,7 @@
 	** loader 10 and that can be ignored for export
 	-->
     <!--classpathentry kind="lib" path="third_party/java/jars/lib/kafka-clients-0.8.2.2.jar" /-->
-	<classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.10.1.1.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.10.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/kafka_2.11-0.8.2.2.jar"/>
 	<classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>
 	<classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
