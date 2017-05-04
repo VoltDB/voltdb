@@ -782,10 +782,10 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[]{0, 1});
         checkPlannerCache(client, CACHE_SKIPPED);
 
-        vt = client.callProcedure("@ExplainProc", "proc1", 1).getResults()[0];
+        vt = client.callProcedure("@ExplainProc", "proc1").getResults()[0];
         checkPlannerCache(client, CACHE_SKIPPED);
 
-        vt = client.callProcedure("@ExplainProc", "proc1", 1, 3).getResults()[0];
+        vt = client.callProcedure("@ExplainProc", "proc1").getResults()[0];
         checkPlannerCache(client, CACHE_SKIPPED);
     }
 
