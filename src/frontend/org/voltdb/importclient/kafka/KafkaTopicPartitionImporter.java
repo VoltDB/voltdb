@@ -24,6 +24,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -72,6 +73,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.LatestTime(), 1);
     private final static PartitionOffsetRequestInfo EARLIEST_OFFSET =
             new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.EarliestTime(), 1);
+
+    public static final int KAFKA_IMPORTER_MAX_SHUTDOWN_WAIT_TIME_SECONDS = Integer.getInteger("KAFKA_IMPORTER_MAX_SHUTDOWN_WAIT_TIME_SECONDS", 60);
 
     private final int m_waitSleepMs = 1;
     private final AtomicBoolean m_dead = new AtomicBoolean(false);
@@ -499,21 +502,29 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         }
                 }
                 if (shouldCommit()) {
-                    long pausedOffset = -1; // ignores paused offset since we don't want to wait for all callbacks to complete
-                    commitOffset(pausedOffset);
+                    commitOffset(false);
                 }
             }
         } catch (Exception ex) {
             error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
-            ex.printStackTrace();
         } finally {
-            long pausedOffset = m_pauseOffset.get();
-            if (pausedOffset != -1) {
-                callbackTracker.waitForWorkToFinish();
-                pausedOffset = m_pauseOffset.get();
+            final boolean usePausedOffset = m_pauseOffset.get() != -1;
+            boolean skipCommit = false;
+            if (usePausedOffset) {
+                // Paused offset is not guaranteed reliable until all callbacks have been called.
+                if (callbackTracker.waitForWorkToFinish() == false) {
+                    if (m_pauseOffset.get() < m_lastCommittedOffset) {
+                        warn(null, "Committing paused offset even though a timeout occurred waiting for pending stored procedures to finish.");
+                    } else {
+                        warn(null, "Refusing to commit paused offset because a timeout occurred waiting for pending stored procedures to finish.");
+                        skipCommit = true;
+                    }
+                }
             }
-            // Force a commit.
-            commitOffset(pausedOffset);
+            if (skipCommit == false) {
+                // Force a commit. Paused offset will be re-acquired if needed.
+                commitOffset(usePausedOffset);
+            }
             KafkaStreamImporterConfig.closeConsumer(m_consumer);
             m_consumer = null;
             BlockingChannel channel = m_offsetManager.getAndSet(null);
@@ -545,9 +556,10 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         }
     }
 
-    public boolean commitOffset(long pausedOffset) {
+    public boolean commitOffset(boolean usePausedOffset) {
         final short version = 1;
         long safe = m_gapTracker.commit(-1L);
+        final long pausedOffset = usePausedOffset ? m_pauseOffset.get() : -1;
 
         if (m_lastCommittedOffset != pausedOffset && (safe > m_lastCommittedOffset || pausedOffset != -1)) {
             long now = System.currentTimeMillis();
@@ -702,37 +714,33 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     /** Tracks number of async procedures still in flight.
      * Requires at most one producer.
      * Allows any number of consumers.
+     * Allows reporting of the number of work items consumed as a statistic.
      */
     private static class PendingWorkTracker {
-        // INVARIANT: If the producer is done, m_workConsumed <= m_workProduced.
-        private volatile long    m_workProduced = 0;
-        private AtomicLong       m_workConsumed = new AtomicLong();
-        private volatile boolean m_doneProducing = false;
+        private volatile long m_workProduced = 0;
+        private LongAdder     m_workConsumed = new LongAdder();
 
         public void produceWork() {
             m_workProduced++;
         }
 
         public void consumeWork() {
-            // The very last consumer is responsible for waking the producer
-            long workConsumed = m_workConsumed.incrementAndGet();
-            if (m_doneProducing && m_workProduced == workConsumed) {
-                synchronized (this) {
-                    notify();
-                }
-            }
+            m_workConsumed.increment();
         }
 
-        public synchronized void waitForWorkToFinish() {
-            m_doneProducing = true;
-            // only one consumer calls notify(), but loop just to safeguard against being interrupted
-            while (m_workProduced != m_workConsumed.longValue()) {
+        /** @return true if successful, false if waiting timed out */
+        public boolean waitForWorkToFinish() {
+            final int attemptIntervalMs = 100;
+            final int maxAttempts = (int) (TimeUnit.SECONDS.toMillis(KAFKA_IMPORTER_MAX_SHUTDOWN_WAIT_TIME_SECONDS) / attemptIntervalMs);
+            int attemptCount = 0;
+            while (m_workProduced != m_workConsumed.longValue() && attemptCount < maxAttempts) {
                 try {
-                    wait();
+                    Thread.sleep(attemptIntervalMs);
                 } catch (InterruptedException unexpected) {
                 }
-                assert m_workProduced == m_workConsumed.longValue();
+                attemptCount++;
             }
+            return m_workProduced == m_workConsumed.longValue();
         }
 
         public long getCallbackCount() {
