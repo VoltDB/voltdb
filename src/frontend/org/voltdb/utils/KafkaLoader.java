@@ -62,7 +62,7 @@ public class KafkaLoader {
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private KafkaConsumerConnector m_consumer = null;
-    private ExecutorService m_es = null;
+    private ExecutorService m_executorService = null;
 
     public KafkaLoader(KafkaConfig config) {
         m_config = config;
@@ -74,10 +74,10 @@ public class KafkaLoader {
             m_consumer.stop();
             m_consumer = null;
         }
-        if (m_es != null) {
-            m_es.shutdownNow();
-            m_es.awaitTermination(365, TimeUnit.DAYS);
-            m_es = null;
+        if (m_executorService != null) {
+            m_executorService.shutdownNow();
+            m_executorService.awaitTermination(365, TimeUnit.DAYS);
+            m_executorService = null;
         }
     }
     /**
@@ -120,13 +120,13 @@ public class KafkaLoader {
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
         m_consumer = new KafkaConsumerConnector(m_config);
         try {
-            m_es = getConsumerExecutor(m_consumer, m_loader);
+            m_executorService = getConsumerExecutor(m_consumer, m_loader);
             if (m_config.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started using procedure: " + m_config.procedure);
             } else {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
             }
-            m_es.awaitTermination(365, TimeUnit.DAYS);
+            m_executorService.awaitTermination(365, TimeUnit.DAYS);
         } catch (Throwable terminate) {
             m_log.error("Error in Kafka Consumer", terminate);
             System.exit(-1);

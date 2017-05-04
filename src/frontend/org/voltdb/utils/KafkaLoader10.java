@@ -68,7 +68,7 @@ public class KafkaLoader10 {
     private final static AtomicLong m_failedCount = new AtomicLong(0);
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
-    private ExecutorService m_es = null;
+    private ExecutorService m_executorService = null;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     private List<Kafka10ConsumerRunner> m_consumers;
 
@@ -77,13 +77,13 @@ public class KafkaLoader10 {
     }
 
     private void shutdownExecutorNow() {
-        if (m_es == null) return;
+        if (m_executorService == null) return;
         try {
-            m_es.shutdownNow();
-            m_es.awaitTermination(365, TimeUnit.DAYS);
+            m_executorService.shutdownNow();
+            m_executorService.awaitTermination(365, TimeUnit.DAYS);
         } catch (Throwable ignore) {
         } finally {
-            m_es = null;
+            m_executorService = null;
         }
     }
 
@@ -450,15 +450,15 @@ public class KafkaLoader10 {
         }
         m_loader.setFlushInterval(m_cliOptions.flush, m_cliOptions.flush);
 
-        if ((m_es = getExecutor()) != null) {
+        if ((m_executorService = getExecutor()) != null) {
             if (m_cliOptions.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started using procedure: " + m_cliOptions.procedure);
             } else {
                 m_log.info("Kafka Consumer from topic: " + m_cliOptions.topic + " Started for table: " + m_cliOptions.table);
             }
-            m_es.shutdown();
-            m_es.awaitTermination(365, TimeUnit.DAYS);
-            m_es = null;
+            m_executorService.shutdown();
+            m_executorService.awaitTermination(365, TimeUnit.DAYS);
+            m_executorService = null;
         }
     }
 
@@ -473,7 +473,15 @@ public class KafkaLoader10 {
     public static Client getClient(ClientConfig config, String[] servers) throws Exception {
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
-            client.createConnection(server.trim());
+            try {
+                client.createConnection(server.trim());
+            } catch (Exception closeConnectionAndRethrow) {
+                m_log.error("Failed to connect to " + server.trim() + ". Provide valid list of server(s)");
+                try {
+                    client.close();
+                } catch (Exception ignore) {}
+                throw closeConnectionAndRethrow;
+            }
         }
         return client;
     }
