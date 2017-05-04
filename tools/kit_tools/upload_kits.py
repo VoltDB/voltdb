@@ -22,7 +22,7 @@ def str_option_to_bool(opt):
 
 
 def upload_kits(version,
-                upload_type="minimal",
+                upload_type="ent",
                 remote_dir="/var/www/downloads.voltdb.com/technologies/server",
                 kit_dir="/home/test/releases/released",
                 dry_run='False'):
@@ -30,7 +30,7 @@ def upload_kits(version,
     """ Upload kits to the voltdb download site.
         Args:
             version - version number such as 7.1.2
-            upload_type - upload types are "minimal" (only enterprise kit) and "full" for all kits
+            upload_type - upload types are "ent" (only ent kit) and "all" for all kits
             remote_dir - directory to upload to
             kits_dir - directory to pull kits from
             dry_run - if true, the upload will not be done
@@ -39,12 +39,16 @@ def upload_kits(version,
     """
     if not version:
         exit ("FATAL: You must specify a version number that exists in ~tests/releases/released")
-    if upload_type not in ("minimal", "full"):
-        exit("FATAL: Upload upload_type must be minimal or full")
+
+    #Any upload_type starting with ent will work
+    #This allows the Jenkins selector to be "ent_only"
+    upload_type = upload_type[:3]
+    if upload_type not in ("ent", "all"):
+        exit("FATAL: Upload upload_type must be enterprise or all")
 
     dry_run = str_option_to_bool(dry_run)
-    minimal_kits = ["voltdb-ent-%s.tar.gz","voltdb-ent-%s.SHA256SUM","LINUX-voltdb-ent-%s.tar.gz","MAC-voltdb-ent-%s.tar.gz"]
-    full_kits = minimal_kits + ["voltdb-pro-%s.tar.gz","voltdb-pro-%s.SHA256SUM", "voltdb-%s.tar.gz"]
+    ent_kits = ["voltdb-ent-%s.tar.gz","voltdb-ent-%s.SHA256SUM","LINUX-voltdb-ent-%s.tar.gz","MAC-voltdb-ent-%s.tar.gz"]
+    all_kits = ent_kits + ["voltdb-pro-%s.tar.gz","voltdb-pro-%s.SHA256SUM", "voltdb-%s.tar.gz"]
     kits_home = kit_dir + "/voltdb-" + version
     count=0
 
@@ -54,7 +58,7 @@ def upload_kits(version,
         exit ("FATAL: " + dircheck.stderr)
 
 
-    #For all the files in minimal_kits or full_kits, upload the files
+    #For all the files in ent_kits or all_kits upload the files
     for k in eval(upload_type + "_kits"):
         f = os.path.join(kits_home, k) % version
         #print "====testing" + f
@@ -77,4 +81,3 @@ def upload_kits(version,
         print "Maybe these files need to be renamed:"
         local("ls " + kits_home)
         exit ("FATAL: No files uploaded")
-        
