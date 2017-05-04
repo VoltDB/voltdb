@@ -1364,6 +1364,10 @@ public class CatalogDiffEngine {
             processModifyResponses(errorMessage, responseList);
         }
 
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(prevType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
+        }
+
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         m_sb.append("delete ").append(prevType.getParent().getCatalogPath()).append(" ");
@@ -1394,6 +1398,10 @@ public class CatalogDiffEngine {
                 responseList = Collections.singletonList(response);
             }
             processModifyResponses(errorMessage, responseList);
+        }
+
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(newType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
         }
 
         // write the commands to make it so
