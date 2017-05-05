@@ -98,12 +98,5 @@ def isCommunityVersion(runner):
     response = runner.call_proc('@SystemInformation', [VOLT.FastSerializer.VOLTTYPE_STRING], ['OVERVIEW'])
     for tuple in response.table(0).tuples():
         if tuple[1] == "LICENSE":
-            keyValues = tuple[2].split(',')
-            for keyValue in keyValues:
-                lookUpPair = keyValue.split(':')
-                value = 'false'
-                if lookUpPair[0] == '"trial"' :
-                    value=lookUpPair[1]
-                if value.startswith('true'):
-                    return False
+            return False
     return True
