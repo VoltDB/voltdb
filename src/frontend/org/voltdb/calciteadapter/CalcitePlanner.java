@@ -96,6 +96,7 @@ public class CalcitePlanner {
         RelTraitSet traitSet = null;
         RelNode calciteTransform = null;
         RelNode voltDBTransform = null;
+        String errMsg = null;
 
         try {
             // Parse the input sql
@@ -130,6 +131,7 @@ public class CalcitePlanner {
             PlanDebugOutput.outputExplainedPlan(compiledPlan, dirName, "CALCITE");
         }
         catch (Throwable e) {
+            errMsg = e.getMessage();
             System.out.println("For some reason planning failed!..And here's the error:");
             System.out.println(e.getMessage());
             e.printStackTrace();
@@ -140,7 +142,7 @@ public class CalcitePlanner {
             planner.reset();
 
             PlanDebugOutput.outputCalcitePlanningDetails(sql, parse, validate, convert,
-                    calciteTransform, voltDBTransform, dirName, "DEBUG");
+                    calciteTransform, voltDBTransform, dirName, errMsg, "DEBUG");
         }
         return compiledPlan;
     }

@@ -32,9 +32,17 @@ public class PlanDebugOutput {
 
     private static final String BASE_DIR_NAME = "statement-calcite/";
 
+    static void outputCalcitePlanningDetails(String sql, SqlNode parse, SqlNode validate,
+            RelNode convert, RelNode calciteTransform, RelNode voltDBTransform,
+            String dirName, String fileName) {
+        outputCalcitePlanningDetails(sql, parse, validate,
+                convert, calciteTransform, voltDBTransform,
+                dirName, null, fileName);
+    }
+
     static void outputCalcitePlanningDetails(String sql, SqlNode parse, SqlNode validate, RelNode convert,
             RelNode calciteTransform, RelNode voltDBTransform,
-            String dirName, String fileName) {
+            String dirName, String errMsg, String fileName) {
         if (!VoltCompiler.DEBUG_MODE) {
             return;
         }
@@ -70,6 +78,10 @@ public class PlanDebugOutput {
                 RelOptUtil.toString(voltDBTransform) + "\n");
         } else {
             sb.append("**** Failed to apply VoltDB relational expression ****\n");
+        }
+        if (errMsg != null) {
+            sb.append("**** Calcite Error Message ****\n");
+            sb.append(errMsg);
         }
         sb.append("*****************************************\n\n");
 

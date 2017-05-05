@@ -24,6 +24,7 @@ import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.JoinCommuteRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
+import org.apache.calcite.rel.rules.SortProjectTransposeRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.voltdb.calciteadapter.rules.convert.VoltDBJoinRule;
@@ -32,6 +33,8 @@ import org.voltdb.calciteadapter.rules.rel.VoltDBCalcJoinMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendPullUpRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBJoinSendPullUpRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBSortScanMergeRule;
 
 public class VoltDBRules {
     //public static final ConverterRule PROJECT_RULE = new VoltDBProjectRule();
@@ -44,7 +47,8 @@ public class VoltDBRules {
                 FilterCalcMergeRule.INSTANCE,
                 FilterToCalcRule.INSTANCE,
                 ProjectCalcMergeRule.INSTANCE,
-                ProjectToCalcRule.INSTANCE,//);
+                ProjectToCalcRule.INSTANCE,
+                SortProjectTransposeRule.INSTANCE, // Pushes Sort rel through Project
 
                 // Join Order
 //                LoptOptimizeJoinRule.INSTANCE,
@@ -58,6 +62,8 @@ public class VoltDBRules {
                 , VoltDBProjectRule.INSTANCE
                 , VoltDBJoinRule.INSTANCE
                 , VoltDBCalcJoinMergeRule.INSTANCE
+                , VoltDBProjectScanMergeRule.INSTANCE
+                , VoltDBSortScanMergeRule.INSTANCE  // Inline LIMIT/OFFSET
 //                , VoltDBDistributedScanRule.INSTANCE
 
                 );

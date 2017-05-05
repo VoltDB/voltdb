@@ -29,13 +29,16 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexLocalRef;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.calciteadapter.VoltDBConvention;
 import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 
@@ -43,6 +46,9 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
 
     private final VoltDBTable m_voltDBTable;
     private final RexProgram m_program;
+
+    private RexNode m_offset = null;
+    private RexNode m_limit = null;
 
     public VoltDBTableScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable) {
@@ -56,6 +62,28 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
           super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
           this.m_voltDBTable = voltDBTable;
           m_program = program;
+    }
+
+    public void setOffset(RexNode offset) {
+        m_offset = offset;
+    }
+
+    public void setLimit(RexNode limit) {
+        m_limit = limit;
+        digest = "ABC";
+    }
+
+    @Override
+    protected String computeDigest() {
+        String dg = super.computeDigest();
+        if (m_limit != null) {
+            dg += '_' + Integer.toString(getLimit());
+        }
+        if (m_offset != null) {
+            dg += '_' + Integer.toString(getOffset());
+        }
+        digest = dg;
+        return dg;
     }
 
     public VoltDBTable getVoltDBTable() {
@@ -91,6 +119,10 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
         if (cond != null) {
             dRows *=  0.2;
             }
+        if (m_limit != null) {
+            double limit = getLimit();
+            dRows = Math.min(limit, dRows);
+        }
         return dRows;
     }
 
@@ -111,10 +143,21 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
         if (condition != null) {
             predList.add(RexConverter.convert(m_program.expandLocalRef(condition)));
         }
+        if (m_limit != null || m_offset != null) {
+            LimitPlanNode limitPlanNode = new LimitPlanNode();
+            if (m_limit != null) {
+                int limit = getLimit();
+                limitPlanNode.setLimit(limit);
+            }
+            if (m_offset != null) {
+                int offset = RexLiteral.intValue(m_offset);
+                limitPlanNode.setOffset(offset);
+            }
+            sspn.addInlinePlanNode(limitPlanNode);
+        }
         sspn.setPredicate(predList);
 
         sspn.addInlinePlanNode(ppn);
-
 
         return sspn;
     }
@@ -125,21 +168,44 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
         if (m_program != null) {
             m_program.explainCalc(pw);
         }
+        //@TODO explain LIMIT/OFFSET
         return pw;
     }
 
     public RelNode copy(RexProgram program) {
         VoltDBTableScan newScan = new VoltDBTableScan(getCluster(), getTable(), m_voltDBTable, program);
-
+        newScan.m_limit = m_limit;
+        newScan.m_offset = m_offset;
         return newScan;
     }
 
     public RelNode copy() {
+        return copy((RexNode) null, (RexNode) null);
+    }
+
+    public RelNode copy(RexNode limit, RexNode offset) {
         // Do we need a deep copy including the inputs?
         VoltDBTableScan newScan = new VoltDBTableScan(getCluster(), getTable(), m_voltDBTable, m_program);
+        newScan.m_limit = (limit == null) ? m_limit : limit;
+        newScan.m_offset = (offset == null) ? m_offset : offset;
 
         return newScan;
     }
 
+    private int getLimit() {
+        if (m_limit != null) {
+            return RexLiteral.intValue(m_limit);
+        } else {
+            return Integer.MAX_VALUE;
+        }
+    }
+
+    private int getOffset() {
+        if (m_offset != null) {
+            return RexLiteral.intValue(m_offset);
+        } else {
+            return 0;
+        }
+    }
 
 }
