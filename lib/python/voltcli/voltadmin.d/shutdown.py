@@ -39,7 +39,6 @@ def shutdown(runner):
     zk_pause_txnid = 0
 
     communityVersion = isCommunityVersion(runner)
-    utility.debug("Community version? ", communityVersion)
 
     if runner.opts.save and communityVersion:
         utility.warning("Snapshots not supported in the community edition. The --save option is being ignored.")
