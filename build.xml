@@ -126,7 +126,7 @@
 
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
-<property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
+<property name="j2se_api" value="http://docs.oracle.com/javase/8/docs/api/"/>
 
 <path id='project.classpath'>
     <pathelement location='${build.client.dir}' />
@@ -140,6 +140,7 @@
         <include name='*.jar' />
         <exclude name='ant.jar' />
         <exclude name='classes-java1.7.jar' />
+        <exclude name='kafka-clients-0.10.2.1.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -1012,7 +1013,7 @@ CLEANING
 <target name='clean'
     description="Remove all compiled and generated files."
     depends="cleantmp, clean_client, clean_deployment_gen,
-             clean_bindoc, clean_other_gen">
+             clean_bindoc, clean_other_gen, clean_kafkaloader">
   <exec dir='examples/adperformance' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/bank-offers' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/callcenter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
@@ -1069,6 +1070,12 @@ CLEANING
 
 <target name="clean_client">
     <ant antfile="build-client.xml" target="clean" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
+</target>
+
+<target name="clean_kafkaloader">
+    <ant antfile="build-kafkaloader.xml" target="clean" inheritAll="false">
         <property name="build" value="${build}"/>
     </ant>
 </target>
@@ -1263,11 +1270,17 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" depends="catalog, dbbpool_gen, deployment_gen, compile_core, compile_pro"
+<target name="compile" depends="catalog, dbbpool_gen, deployment_gen, compile_core, compile_kafkaloader, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_client">
     <ant antfile="build-client.xml" target="compile" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
+</target>
+
+<target name="compile_kafkaloader" depends="compile_core">
+    <ant antfile="build-kafkaloader.xml" target="compile" inheritAll="false">
         <property name="build" value="${build}"/>
     </ant>
 </target>
@@ -1408,7 +1421,8 @@ JAVA COMPILATION
                   io/netty_voltpatches/**/*.java
                   org/jctools_voltpatches/**/*.java"/>
     <!-- non-voltcore voltdb code -->
-    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java
+                                                    org/voltdb/utils/KafkaLoader10.java" />
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>

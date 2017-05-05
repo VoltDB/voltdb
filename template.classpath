@@ -39,7 +39,13 @@
 	<classpathentry kind="lib" path="third_party/java/jars/objenesis-2.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
-	<classpathentry kind="lib" path="lib/kafka-clients-0.8.2.2.jar"/>
+	<!--
+	** export system still uses producer based on Kafka 8 API. If need to debug export
+	** in IDE based on kafka 8 apis, enable line below. IDE will have errors for kafka
+	** loader 10 and that can be ignored for export
+	-->
+    <!--classpathentry kind="lib" path="third_party/java/jars/lib/kafka-clients-0.8.2.2.jar" /-->
+	<classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.10.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/kafka_2.11-0.8.2.2.jar"/>
 	<classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>
 	<classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
