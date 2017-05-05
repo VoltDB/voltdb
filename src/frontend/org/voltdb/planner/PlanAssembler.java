@@ -1657,7 +1657,9 @@ public class PlanAssembler {
             i++;
         }
 
-        // the root of the insert plan is always an InsertPlanNode
+        // the root of the insert plan may be an InsertPlanNode, or
+        // it may be a scan plan node.  We may do an inline InsertPlanNode
+        // as well.
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
         if (subquery != null) {
@@ -1681,10 +1683,14 @@ public class PlanAssembler {
               = (retval.rootPlanGraph instanceof SeqScanPlanNode)
                     ? ((SeqScanPlanNode)retval.rootPlanGraph)
                     : null;
-            if (seqScan != null) {
+            // If we have a sequential scan node without an inline aggregate
+            // node, then we can inline the insert node.
+            if (seqScan != null
+                    && (AggregatePlanNode.getInlineAggregationNode(seqScan) == null)) {
                 seqScan.addInlinePlanNode(insertNode);
                 root = seqScan;
             } else {
+                // Otherwise just make it out-of-line.
                 insertNode.addAndLinkChild(retval.rootPlanGraph);
             }
         }
