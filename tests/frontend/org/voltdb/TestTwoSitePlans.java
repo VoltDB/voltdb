@@ -198,7 +198,7 @@ public class TestTwoSitePlans extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 1,
                 1,
@@ -218,7 +218,7 @@ public class TestTwoSitePlans extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { insertStmt.getSqltext() },
                 2,
                 2,
@@ -242,7 +242,7 @@ public class TestTwoSitePlans extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         VoltTable dependency1 = null;
@@ -263,7 +263,7 @@ public class TestTwoSitePlans extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         VoltTable dependency2 = null;
@@ -287,7 +287,7 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { outDepId },
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
 

@@ -345,7 +345,11 @@ public class ProcedureRunner {
         Object[] paramList = paramListIn;
 
         // reset the hash of results for a new call
-        m_determinismHash.reset(m_systemProcedureContext.getCatalogVersion());
+        if (m_systemProcedureContext != null) {
+            m_determinismHash.reset(m_systemProcedureContext.getCatalogVersion());
+        } else {
+            m_determinismHash.reset(0);
+        }
         assert(m_determinismHash.getHeader()[0] == 0);
 
         ClientResponseImpl retval = null;
@@ -656,13 +660,6 @@ public class ProcedureRunner {
         queuedSQL.stmt = stmt;
 
         m_batch.add(queuedSQL);
-
-        if (log.isDebugEnabled()) {
-            if (!queuedSQL.stmt.isReadOnly) {
-                log.debug("voltQueueSQL receives " + queuedSQL.stmt.getText() + " " + queuedSQL.params.toString() +
-                        " txnid: " + m_txnState.txnId + ", hash: " + stmt.sqlCRC );
-            }
-        }
     }
 
     public void voltQueueSQL(final String sql, Object... args) {

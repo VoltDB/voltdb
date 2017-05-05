@@ -57,12 +57,12 @@ public class DeterminismHash {
     // 3) statement count
     public final static int HEADER_OFFSET = 3;
 
-    public final static int MAX_STATEMENTS_WITH_DETAIL = 32;
+    public final static int MAX_STATEMENTS_WITH_DETAIL = Integer.getInteger("MAX_STATEMENTS_WITH_DETAIL", 128);
 
     int m_catalogVersion = 0;
     int m_stmtCount = 0;
 
-    final int[] m_hashes = new int[MAX_STATEMENTS_WITH_DETAIL];
+    final int[] m_hashes = new int[MAX_STATEMENTS_WITH_DETAIL * 2 + HEADER_OFFSET];
 
     protected final HybridCrc32 m_inputCRC = new HybridCrc32();
     protected final HybridCrc32 m_stmtParamCRC = new HybridCrc32();
@@ -81,8 +81,7 @@ public class DeterminismHash {
         // no work done means 0 hash to convey that
         if (m_stmtCount == 0) {
             retval[0] = 0;
-        }
-        else {
+        } else {
             retval[0] = (int) m_inputCRC.getValue();
         }
         retval[1] = m_catalogVersion;
@@ -95,16 +94,16 @@ public class DeterminismHash {
      * hash for the first int value in the array.
      */
     public int[] get() {
-        int[] retval = new int[m_stmtCount * 2 + HEADER_OFFSET];
-        System.arraycopy(m_hashes, 0, retval, HEADER_OFFSET, m_stmtCount * 2);
+        int includedStmts = Math.min(m_stmtCount, MAX_STATEMENTS_WITH_DETAIL);
+        int[] retval = new int[includedStmts * 2 + HEADER_OFFSET];
+        System.arraycopy(m_hashes, 0, retval, HEADER_OFFSET, includedStmts * 2);
 
+        m_inputCRC.update(m_stmtCount);
+        m_inputCRC.update(m_catalogVersion);
         // no work done means 0 hash to convey that
         if (m_stmtCount == 0) {
             retval[0] = 0;
-        }
-        else {
-            m_inputCRC.update(m_catalogVersion);
-            m_inputCRC.update(m_stmtCount);
+        } else {
             retval[0] = (int) m_inputCRC.getValue();
         }
         retval[1] = m_catalogVersion;

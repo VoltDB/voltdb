@@ -33,7 +33,6 @@ import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
-import org.voltdb.SQLStmt;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
@@ -134,7 +133,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
@@ -189,7 +188,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
 
@@ -227,7 +226,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { deleteStmt.getSqltext() },
                 3, 3, 2, 42, WRITE_TOKEN, false);
 
@@ -244,7 +243,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         assertTrue(m_ee.m_callsFromEE > 2);
@@ -301,7 +300,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
-                new SQLStmt[] { null },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, READ_ONLY_TOKEN, false);
 
@@ -480,7 +479,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                     null,
                     paramSets,
                     null,
-                    new SQLStmt[] { null },
+                    null,
                     sqlTexts,
                     3, 3, 2, 42,
                     readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN, false);

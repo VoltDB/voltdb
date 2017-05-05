@@ -400,7 +400,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 }
             }
             // stmts can be null in FragmentTask.processFragmentTask()
-            if (stmts != null && stmts[i].isReadOnly()){
+            if (stmts != null && !stmts[i].isReadOnly()){
                 determinismHash.offerStatement(stmts[i], paramStart, m_psetBuffer);
             }
         }

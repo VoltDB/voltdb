@@ -220,6 +220,6 @@ public class SQLStmt {
      * @return true if it's read only, false otherwise
      */
     public boolean isReadOnly() {
-        return isReadOnly();
+        return isReadOnly;
     }
 }

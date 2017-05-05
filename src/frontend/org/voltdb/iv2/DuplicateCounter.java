@@ -20,12 +20,18 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.CatalogContext;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
+import org.voltdb.common.Constants;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -207,5 +213,25 @@ public class DuplicateCounter
                TxnEgo.txnIdToString(m_txnId),
                CoreUtils.hsIdCollectionToString(m_expectedHSIds));
         return msg;
+    }
+
+    public static void printDiagnosticInformation(CatalogContext context, String procName) {
+        StringBuilder sb = new StringBuilder();
+        final CatalogMap<Procedure> catalogProcedures = context.database.getProcedures();
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        for (final Procedure proc : catalogProcedures) {
+            if (proc.getTypeName().equals(procName)) {
+                for (Statement stmt : proc.getStatements()) {
+                    // compute hash for determinism check
+                    crc.reset();
+                    String sqlText = stmt.getSqltext();
+                    crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+                    int hash = (int) crc.getValue();
+                    sb.append("Statement Hash: ").append(hash);
+                    sb.append(", Statement SQL: ").append(sqlText).append("\n");
+                }
+            }
+        }
+        tmLog.error(sb.toString());
     }
 }
