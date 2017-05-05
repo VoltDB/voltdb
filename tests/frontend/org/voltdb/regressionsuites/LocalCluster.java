@@ -43,6 +43,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CommandLine;
@@ -51,7 +52,6 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
-import org.voltdb.common.Constants;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -497,8 +497,9 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public boolean compile(VoltProjectBuilder builder, final String voltRootPath) {
-        if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, voltRootPath, m_clusterId) != null;
+        if (! m_compiled) {
+            m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, voltRootPath, m_clusterId);
+            m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -508,7 +509,8 @@ public class LocalCluster extends VoltServerConfig {
     @Override
     public boolean compile(VoltProjectBuilder builder) {
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, null, m_clusterId) != null;
+            m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, null, m_clusterId);
+            m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -534,7 +536,8 @@ public class LocalCluster extends VoltServerConfig {
         }
 
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, m_clusterId);
+            m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, m_clusterId);
+            m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
