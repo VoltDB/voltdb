@@ -39,6 +39,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
@@ -103,6 +104,131 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
     }*/
 
+    public enum AdHocSQLMix {
+        EMPTY,
+        ALL_DML_OR_DQL,
+        ALL_DDL,
+        MIXED;
+    }
+
+    public static AdHocSQLMix processAdHocSQLStmtTypes(String sql, List<String> validatedHomogeonousSQL) {
+        assert(validatedHomogeonousSQL != null);
+        assert(validatedHomogeonousSQL.size() == 0);
+
+        List<String> sqlStatements = SQLLexer.splitStatements(sql);
+
+        // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
+        Boolean hasDDL = null;
+
+        for (String stmt : sqlStatements) {
+            // Simulate an unhandled exception? (ENG-7653)
+            if (DEBUG_MODE.isTrue() && stmt.equals(DEBUG_EXCEPTION_DDL)) {
+                throw new IndexOutOfBoundsException(DEBUG_EXCEPTION_DDL);
+            }
+
+            if (SQLLexer.isComment(stmt) || stmt.trim().isEmpty()) {
+                continue;
+            }
+
+            String ddlToken = SQLLexer.extractDDLToken(stmt);
+
+            if (hasDDL == null) {
+                hasDDL = (ddlToken != null) ? true : false;
+            }
+            else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null)) {
+                return AdHocSQLMix.MIXED;
+            }
+
+            validatedHomogeonousSQL.add(stmt);
+        }
+
+        if (validatedHomogeonousSQL.isEmpty()) {
+            return AdHocSQLMix.EMPTY;
+        }
+        assert(hasDDL != null);
+        return hasDDL ? AdHocSQLMix.ALL_DDL : AdHocSQLMix.ALL_DML_OR_DQL;
+    }
+
+    public static class AdHocPlanningException extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        public AdHocPlanningException(String message) {
+            super(message);
+        }
+        public AdHocPlanningException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    public static AdHocPlannedStatement compileAdHocSQL(CatalogContext context,
+                                                        String sqlStatement,
+                                                        boolean inferPartitioning,
+                                                        Object userPartitionKey,
+                                                        ExplainMode explainMode,
+                                                        //boolean isSwapTables,
+                                                        Object[] userParamSet)
+                                                                throws AdHocPlanningException
+    {
+        assert(context != null);
+        assert(sqlStatement != null);
+
+        final PlannerTool ptool = context.m_ptool;
+
+        // Take advantage of the planner optimization for inferring single partition work
+        // when the batch has one statement.
+        StatementPartitioning partitioning = null;
+
+        if (inferPartitioning) {
+            partitioning = StatementPartitioning.inferPartitioning();
+        }
+        else if (userPartitionKey == null) {
+            partitioning = StatementPartitioning.forceMP();
+        }
+        else {
+            partitioning = StatementPartitioning.forceSP();
+        }
+
+        try {
+            // I have no clue if this is threadsafe?
+            synchronized(PlannerTool.class) {
+                return ptool.planSql(sqlStatement,
+                                     partitioning,
+                                     explainMode != ExplainMode.NONE,
+                                     userParamSet);
+            }
+        }
+        catch (Exception e) {
+            throw new AdHocPlanningException("Unexpected Ad Hoc Planning Error: " + e);
+        }
+        catch (StackOverflowError error) {
+            // Overly long predicate expressions can cause a
+            // StackOverflowError in various code paths that may be
+            // covered by different StackOverflowError/Error/Throwable
+            // catch blocks. The factors that determine which code path
+            // and catch block get activated appears to be platform
+            // sensitive for reasons we do not entirely understand.
+            // To generate a deterministic error message regardless of
+            // these factors, purposely defer StackOverflowError handling
+            // for as long as possible, so that it can be handled
+            // consistently by a minimum number of high level callers like
+            // this one.
+            // This eliminates the need to synchronize error message text
+            // in multiple catch blocks, which becomes a problem when some
+            // catch blocks lead to re-wrapping of exceptions which tends
+            // to adorn the final error text in ways that are hard to track
+            // and replicate.
+            // Deferring StackOverflowError handling MAY mean ADDING
+            // explicit StackOverflowError catch blocks that re-throw
+            // the error to bypass more generic catch blocks
+            // for Error or Throwable on the same try block.
+            throw new AdHocPlanningException("Encountered stack overflow error. " +
+                    "Try reducing the number of predicate expressions in the query.");
+        }
+        catch (AssertionError ae) {
+            throw new AdHocPlanningException("Assertion Error in Ad Hoc Planning: " + ae);
+        }
+    }
+
     protected CompletableFuture<ClientResponse> runNonDDLAdHoc(CatalogContext context,
                                                                List<String> sqlStatements,
                                                                boolean inferPartitioning,
@@ -117,17 +243,13 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             context = VoltDB.instance().getCatalogContext();
         }
 
-        final PlannerTool ptool = context.m_ptool;
-
         List<String> errorMsgs = new ArrayList<>();
         List<AdHocPlannedStatement> stmts = new ArrayList<>();
         int partitionParamIndex = -1;
         VoltType partitionParamType = null;
         Object partitionParamValue = null;
         assert(sqlStatements != null);
-        // Take advantage of the planner optimization for inferring single partition work
-        // when the batch has one statement.
-        StatementPartitioning partitioning = null;
+
         boolean inferSP = (sqlStatements.size() == 1) && inferPartitioning;
 
         if (userParamSet != null && userParamSet.length > 0) {
@@ -138,18 +260,13 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
 
         for (final String sqlStatement : sqlStatements) {
-            if (inferSP) {
-                partitioning = StatementPartitioning.inferPartitioning();
-            }
-            else if (userPartitionKey == null) {
-                partitioning = StatementPartitioning.forceMP();
-            }
-            else {
-                partitioning = StatementPartitioning.forceSP();
-            }
             try {
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
-                        explainMode != ExplainMode.NONE, userParamSet);
+                AdHocPlannedStatement result = compileAdHocSQL(context,
+                                                               sqlStatement,
+                                                               inferSP,
+                                                               userPartitionKey,
+                                                               explainMode,
+                                                               userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
@@ -159,35 +276,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                 }
                 stmts.add(result);
             }
-            catch (Exception e) {
-                errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
-            }
-            catch (StackOverflowError error) {
-                // Overly long predicate expressions can cause a
-                // StackOverflowError in various code paths that may be
-                // covered by different StackOverflowError/Error/Throwable
-                // catch blocks. The factors that determine which code path
-                // and catch block get activated appears to be platform
-                // sensitive for reasons we do not entirely understand.
-                // To generate a deterministic error message regardless of
-                // these factors, purposely defer StackOverflowError handling
-                // for as long as possible, so that it can be handled
-                // consistently by a minimum number of high level callers like
-                // this one.
-                // This eliminates the need to synchronize error message text
-                // in multiple catch blocks, which becomes a problem when some
-                // catch blocks lead to re-wrapping of exceptions which tends
-                // to adorn the final error text in ways that are hard to track
-                // and replicate.
-                // Deferring StackOverflowError handling MAY mean ADDING
-                // explicit StackOverflowError catch blocks that re-throw
-                // the error to bypass more generic catch blocks
-                // for Error or Throwable on the same try block.
-                errorMsgs.add("Encountered stack overflow error. " +
-                        "Try reducing the number of predicate expressions in the query.");
-            }
-            catch (AssertionError ae) {
-                errorMsgs.add("Assertion Error in Ad Hoc Planning: " + ae);
+            catch (AdHocPlanningException e) {
+                errorMsgs.add(e.getMessage());
             }
         }
 

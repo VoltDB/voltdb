@@ -671,7 +671,7 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition).get();
+            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition);
             // TODO fix
             //if (batch.errorMsg != null) {
             //    throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + batch.errorMsg);

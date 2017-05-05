@@ -16,9 +16,15 @@
  */
 package org.voltdb;
 
-import org.voltdb.compiler.AdHocPlannedStmtBatch;
+import java.util.ArrayList;
+import java.util.List;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.compiler.AdHocPlannedStatement;
+import org.voltdb.compiler.AdHocPlannedStmtBatch;
+import org.voltdb.sysprocs.AdHocNTBase;
+import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
+import org.voltdb.sysprocs.AdHocNTBase.AdHocSQLMix;
 
 /*
  * Wrapper around a planner tied to a specific catalog version. This planner
@@ -35,20 +41,47 @@ public class CatalogSpecificPlanner {
         m_catalogContext = context;
     }
 
-    public ListenableFuture<AdHocPlannedStmtBatch> plan(String sql,
-            Object[] userParams, boolean singlePartition) {
-        /*final SettableFuture<AdHocPlannedStmtBatch> retval = SettableFuture.create();
-        AsyncCompilerWorkCompletionHandler completionHandler = new AsyncCompilerWorkCompletionHandler()
-        {
-            @Override
-            public void onCompletion(AsyncCompilerResult result) {
-                retval.set((AdHocPlannedStmtBatch)result);
-            }
-        };
-        AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(-1, sql, userParams,
-                singlePartition, m_catalogContext, completionHandler);
-        m_agent.compileAdHocPlanForProcedure(work);
-        return retval;*/
-        return null;
+    public AdHocPlannedStmtBatch plan(String sql, Object[] userParams, boolean singlePartition) throws AdHocPlanningException {
+
+        List<String> sqlStatements = new ArrayList<>();
+        AdHocSQLMix mix = AdHocNTBase.processAdHocSQLStmtTypes(sql, sqlStatements);
+
+        switch (mix) {
+        case EMPTY:
+            throw new AdHocPlanningException("No valid SQL found.");
+        case ALL_DDL:
+        case MIXED:
+            throw new AdHocPlanningException("DDL not supported in stored procedures.");
+        default:
+            break;
+        }
+
+        if (sqlStatements.size() != 1) {
+            throw new AdHocPlanningException("One statement only in stored procedures.");
+        }
+
+        sql = sqlStatements.get(0);
+
+        // any object will signify SP
+        Object partitionKey = singlePartition ? "1" : null;
+
+        List<AdHocPlannedStatement> stmts = new ArrayList<>();
+        AdHocPlannedStatement result = null;
+
+        result = AdHocNTBase.compileAdHocSQL(m_catalogContext,
+                                             sql,
+                                             false,
+                                             partitionKey,
+                                             ExplainMode.NONE,
+                                             userParams);
+        stmts.add(result);
+
+
+        return new AdHocPlannedStmtBatch(userParams,
+                                         stmts,
+                                         -1,
+                                         null,
+                                         null,
+                                         userParams);
     }
 }
