@@ -71,6 +71,7 @@ public class KafkaLoader10 {
     private ExecutorService m_executorService = null;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     private List<Kafka10ConsumerRunner> m_consumers;
+    private final long pollTimedWaitInMilliSec = Integer.getInteger("KAFKALOADER_POLLED_WAIT_MILLI_SECONDS", 1000); // 1 second
 
     public KafkaLoader10(CLIOptions options) {
         m_cliOptions = options;
@@ -381,7 +382,7 @@ public class KafkaLoader10 {
             try {
                 m_consumer.subscribe(Arrays.asList(m_config.topic));
                 while (!m_closed.get()) {
-                    ConsumerRecords<byte[], byte[]> records = m_consumer.poll(1000); // 1 second
+                    ConsumerRecords<byte[], byte[]> records = m_consumer.poll(pollTimedWaitInMilliSec);
                     for (ConsumerRecord<byte[], byte[]> record : records) {
                         byte[] msg  = record.value();
                         long offset = record.offset();
