@@ -83,7 +83,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
 
-    void resetLocal(boolean postCheck);
+    void resetLocal();
 
     boolean isSafeForResetLocal();
 }
