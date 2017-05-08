@@ -486,10 +486,10 @@ public class ProcedureRunner {
                         m_statusString);
             }
 
+            // Even when the transaction fails, the computed hashes are valuable for diagnostic purpose,
+            // so always return the hashes.
             int[] hashes = m_determinismHash.get();
-            if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hashes != null)) {
-                retval.setHashes(hashes);
-            }
+            retval.setHashes(hashes);
         }
         finally {
             // finally at the call(..) scope to ensure params can be

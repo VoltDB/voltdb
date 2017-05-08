@@ -20,18 +20,12 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.CatalogContext;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Statement;
-import org.voltdb.common.Constants;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -48,6 +42,7 @@ public class DuplicateCounter
     static final int MISMATCH = 0;
     static final int DONE = 1;
     static final int WAITING = 2;
+    static final int ABORT = 3;
 
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
@@ -57,6 +52,8 @@ public class DuplicateCounter
     int[] m_responseHashes = null;
     protected VoltMessage m_lastResponse = null;
     protected VoltTable m_lastResultTables[] = null;
+    // if any response shows the transaction aborted
+    boolean m_txnAbort = false;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
     final VoltMessage m_openMessage;
@@ -88,8 +85,8 @@ public class DuplicateCounter
         }
     }
 
-    void logRelevantMismatchInformation(int[] hashes, VoltMessage recentMessage) {
-        String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
+    void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage) {
+        String msg = String.format(reason + " COMPARING: %d to %d\n"
                 + "REQUEST MESSAGE: %s\n"
                 + "PREV RESPONSE MESSAGE: %s\n"
                 + "CURR RESPONSE MESSAGE: %s\n",
@@ -138,9 +135,12 @@ public class DuplicateCounter
         return "UNKNOWN_PROCEDURE_NAME";
     }
 
-    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message)
+    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnAbort)
     {
         if (!rejoining) {
+            if (txnAbort == true) {
+                m_txnAbort = txnAbort;
+            }
             if (m_responseHashes == null) {
                 m_responseHashes = hashes;
             }
@@ -148,8 +148,15 @@ public class DuplicateCounter
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation(hashes, message);
+                logRelevantMismatchInformation("HASH MISMATCH", hashes, message);
                 return MISMATCH;
+            }
+            else if (m_txnAbort) {
+                tmLog.fatal("Stored procedure " + getStoredProcedureName()
+                        + " succeeded on one partition but failed on another partition."
+                        + " Shutting down to preserve data integrity.");
+                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message);
+                return ABORT;
             }
             m_lastResponse = message;
             m_lastResultTables = resultTables;
@@ -180,25 +187,29 @@ public class DuplicateCounter
         ClientResponseImpl r = message.getClientResponseData();
         // get the hash of sql run
         int[] hashes = r.getHashes();
-        if (hashes == null) {
-            hashes = ZERO_HASHES;
+
+        boolean txnAbort = true;
+        if (ClientResponseImpl.isTransactionallySuccessful(message.getClientResponseData().getStatus())) {
+            txnAbort = false;
         }
-        return checkCommon(hashes, message.isRecovering(), r.getResults(), message);
+
+        return checkCommon(hashes, message.isRecovering(), r.getResults(), message, txnAbort);
     }
 
     int offer(FragmentResponseMessage message)
     {
-        return checkCommon(ZERO_HASHES, message.isRecovering(), null, message);
+        // No check on fragment message
+        return checkCommon(ZERO_HASHES, message.isRecovering(), null, message, false);
     }
 
     int offer(CompleteTransactionResponseMessage message)
     {
-        return checkCommon(ZERO_HASHES, message.isRecovering(), null, message);
+        return checkCommon(ZERO_HASHES, message.isRecovering(), null, message, false);
     }
 
     int offer(DummyTransactionResponseMessage message)
     {
-        return checkCommon(ZERO_HASHES, false, null, message);
+        return checkCommon(ZERO_HASHES, false, null, message, false);
     }
 
     VoltMessage getLastResponse()
@@ -213,25 +224,5 @@ public class DuplicateCounter
                TxnEgo.txnIdToString(m_txnId),
                CoreUtils.hsIdCollectionToString(m_expectedHSIds));
         return msg;
-    }
-
-    public static void printDiagnosticInformation(CatalogContext context, String procName) {
-        StringBuilder sb = new StringBuilder();
-        final CatalogMap<Procedure> catalogProcedures = context.database.getProcedures();
-        PureJavaCrc32C crc = new PureJavaCrc32C();
-        for (final Procedure proc : catalogProcedures) {
-            if (proc.getTypeName().equals(procName)) {
-                for (Statement stmt : proc.getStatements()) {
-                    // compute hash for determinism check
-                    crc.reset();
-                    String sqlText = stmt.getSqltext();
-                    crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
-                    int hash = (int) crc.getValue();
-                    sb.append("Statement Hash: ").append(hash);
-                    sb.append(", Statement SQL: ").append(sqlText).append("\n");
-                }
-            }
-        }
-        tmLog.error(sb.toString());
     }
 }

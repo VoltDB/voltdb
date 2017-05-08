@@ -69,6 +69,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.FileAppender;
@@ -102,9 +103,12 @@ import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Deployment;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -211,8 +215,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "</deployment>"
     };
 
-    private final VoltLogger hostLog = new VoltLogger("HOST");
-    private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
@@ -4489,5 +4493,36 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_consumerDRGateway.swapTables(swappedTables);
             }
         }
+    }
+
+    public static void printDiagnosticInformation(CatalogContext context, String procName) {
+        StringBuilder sb = new StringBuilder();
+        final CatalogMap<Procedure> catalogProcedures = context.database.getProcedures();
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        sb.append("Statements within " + procName + ": ").append("\n");
+        for (final Procedure proc : catalogProcedures) {
+            if (proc.getTypeName().equals(procName)) {
+                for (Statement stmt : proc.getStatements()) {
+                    // compute hash for determinism check
+                    crc.reset();
+                    String sqlText = stmt.getSqltext();
+                    crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+                    int hash = (int) crc.getValue();
+                    sb.append("Statement Hash: ").append(hash);
+                    sb.append(", Statement SQL: ").append(sqlText).append("\n");
+                }
+            }
+        }
+        sb.append("Default Procedures: ").append("\n");
+        for (Entry<String, Procedure> pair : context.m_defaultProcs.m_defaultProcMap.entrySet()) {
+            crc.reset();
+            String sqlText = DefaultProcedureManager.sqlForDefaultProc(pair.getValue());
+            crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+            int hash = (int) crc.getValue();
+            sb.append("Statement Hash: ").append(hash);
+            sb.append(", Statement SQL: ").append(sqlText).append("\n");
+        }
+
+        hostLog.error(sb.toString());
     }
 }
