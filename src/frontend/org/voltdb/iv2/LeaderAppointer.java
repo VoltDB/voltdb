@@ -32,6 +32,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -55,7 +56,9 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
@@ -94,6 +97,8 @@ public class LeaderAppointer implements Promotable
     private final boolean m_expectingDrSnapshot;
     private final AtomicBoolean m_snapshotSyncComplete = new AtomicBoolean(false);
     private final KSafetyStats m_stats;
+    private final AtomicReference<ImmutableSortedMap<Integer, Integer>> m_mastersByHost =
+            new AtomicReference<ImmutableSortedMap<Integer, Integer>>();
 
     /*
      * Track partitions that are cleaned up during election/promotion etc.
@@ -251,9 +256,23 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
                 }
             }
+            Map<Integer, Integer> counter = Maps.newHashMap();
+            for (Long site: currentLeaders) {
+                int host =  CoreUtils.getHostIdFromHSId(site);
+                Integer count = counter.get(host);
+                int newCount = 1;
+                if (count != null) {
+                    newCount += count.intValue();
+
+                }
+                counter.put(host, new Integer(newCount));
+            }
+            Map<Integer, Integer> sorted =
+                    counter.entrySet().stream().sorted(Map.Entry. <Integer, Integer> comparingByValue())
+                    .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+            m_mastersByHost.set(ImmutableSortedMap.copyOf(sorted));
         }
     };
-
 
     Watcher m_partitionCallback = new Watcher() {
         @Override
@@ -301,6 +320,7 @@ public class LeaderAppointer implements Promotable
         m_iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_masterCallback);
         m_stats = stats;
         m_expectingDrSnapshot = expectingDrSnapshot;
+
     }
 
     @Override
@@ -496,16 +516,12 @@ public class LeaderAppointer implements Promotable
             catch (JSONException jse) {
                 tmLog.error("Failed to find master for partition " + partitionId + ", defaulting to 0");
                 jse.printStackTrace();
-                masterHostId = -1; // stupid default
+                masterHostId = -1;
             }
         }
         else {
-            // For now, if we're appointing a new leader as a result of a
-            // failure, just pick the first replica in the children list.
-            // Could eventually do something more complex here to try to keep a
-            // semi-balance, but it's unclear that this has much utility until
-            // we add rebalancing on rejoin as well.
-            masterHostId = -1;
+            masterHostId = findHostForPartition(partitionId, children);
+            tmLog.info(String.format("Found new host %d for partition %d", masterHostId, partitionId));
         }
 
         long masterHSId = children.get(0);
@@ -685,5 +701,37 @@ public class LeaderAppointer implements Promotable
         catch (InterruptedException e) {
             tmLog.warn("Unexpected interrupted exception", e);
         }
+    }
+
+    /**
+     * Best effort to find the new host for a partition
+     * @param partitionId The partition id
+     * @param candidates  A list of existing sites for the partition
+     * @return the new host id
+     */
+    private int findHostForPartition(int partitionId, List<Long> candidates){
+        int newMasterHost = -1;
+        Set<Integer> candidateHost = Sets.newHashSet();
+        for (Long site : candidates) {
+            candidateHost.add(CoreUtils.getHostIdFromHSId(site));
+        }
+        ImmutableSortedMap<Integer, Integer> counterByHost = m_mastersByHost.get();
+        Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+
+        //Newly joined host has the replica but no masters on it
+        for (Integer host : liveHosts) {
+            if (candidateHost.contains(host) && !counterByHost.containsKey(host)) {
+                return host;
+            }
+        }
+
+        //Find a host with the partition but with the least number of masters
+        for (Integer host : counterByHost.keySet()) {
+            if (candidateHost.contains(host)) {
+                newMasterHost = host;
+                break;
+            }
+        }
+        return newMasterHost;
     }
 }
