@@ -114,6 +114,12 @@ public class CreateFunctionFromMethod extends StatementProcessor {
             }
         }
 
+        if (Modifier.isAbstract(funcClass.getModifiers())) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Cannot define function using abstract class %s",
+                    className));
+        }
+
         // get the short name of the class (no package)
         String shortName = ProcedureCompiler.deriveShortProcedureName(className);
 
