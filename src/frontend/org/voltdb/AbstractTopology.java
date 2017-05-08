@@ -206,6 +206,16 @@ public class AbstractTopology {
             this.isMissing = isMissing;
         }
 
+        public int getleaderCount() {
+            int leaders = 0;
+            for( Partition p : partitions) {
+                if (p.leaderHostId == id) {
+                    leaders++;
+                }
+            }
+            return leaders;
+        }
+
         @Override
         public String toString() {
             String[] partitionIdStrings = partitions.stream().map(p -> String.valueOf(p.id)).toArray(String[]::new);
@@ -1408,8 +1418,8 @@ public class AbstractTopology {
                 List<Host> perspectiveHosts = Lists.newArrayList();
                 for (Host host : topology.hostsById.values()) {
                     if (!missingHosts.contains(host.id)) {
-                        List<Integer> list = topology.getPartitionIdList(host.id);
-                        if (list.contains(partition.id)) {
+                        List<Integer> partitionListOnNonMissingHost = topology.getPartitionIdList(host.id);
+                        if (partitionListOnNonMissingHost.contains(partition.id)) {
                             perspectiveHosts.add(host);
                         }
                     }
@@ -1417,17 +1427,11 @@ public class AbstractTopology {
 
                 //Place the partition master to a node which hosts the partition and has the least masters.
                 assert(!perspectiveHosts.isEmpty());
-                perspectiveHosts.sort((Host a, Host b) -> {
-                    int result = 0;
-                    for (Partition p : topology.partitionsById.values()) {
-                        if ( a.id == p.leaderHostId) {
-                            result++;
-                        } else if ( b.id == p.leaderHostId) {
-                            result--;
-                        }
-                    }
-                    return result;
-                });
+                if (perspectiveHosts.size() > 1) {
+                    perspectiveHosts.sort((Host a, Host b) -> {
+                        return (a.getleaderCount() - b.getleaderCount());
+                    });
+                }
                 leaderId = perspectiveHosts.get(0).id;
                 partition.leaderHostId = leaderId;
             }
