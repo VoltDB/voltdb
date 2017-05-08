@@ -604,6 +604,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 requireCatalogDiffCmdsApplyToEE,
                 hasSchemaChange, requiresNewExportGeneration);
 
+        // This is when the UpdateApplicationCatalog really ends in the blocking path
+        log.info(String.format("Globally updating the current application catalog and deployment " +
+                "(new hashes %s, %s).",
+            Encoder.hexEncode(catalogHash).substring(0, 10),
+            Encoder.hexEncode(deploymentHash).substring(0, 10)));
+
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);
         return (new VoltTable[] {result});
