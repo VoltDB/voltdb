@@ -199,7 +199,6 @@ public class TestTwoSitePlans extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { selectStmt.getSqltext() },
                 1,
                 1,
                 0,
@@ -219,7 +218,6 @@ public class TestTwoSitePlans extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { insertStmt.getSqltext() },
                 2,
                 2,
                 1,
@@ -243,7 +241,6 @@ public class TestTwoSitePlans extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         VoltTable dependency1 = null;
         try {
@@ -264,7 +261,6 @@ public class TestTwoSitePlans extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         VoltTable dependency2 = null;
         try {
@@ -288,7 +284,6 @@ public class TestTwoSitePlans extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
 
         // The underlying buffers are being reused

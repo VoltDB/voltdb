@@ -350,7 +350,6 @@ public class ProcedureRunner {
         } else {
             m_determinismHash.reset(0);
         }
-        assert(m_determinismHash.getHeader()[0] == 0);
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
@@ -1613,7 +1612,6 @@ public class ProcedureRunner {
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
        SQLStmt[] stmts = new SQLStmt[batchSize];
-       String[] sqlTexts = new String[batchSize];
        int succeededFragmentsCount = 0;
 
        int i = 0;
@@ -1623,8 +1621,6 @@ public class ProcedureRunner {
            // use the pre-serialized params if it exists
            params[i] = qs.params;
            stmts[i] = qs.stmt;
-           // to save a for loop in executePlanFragments()
-           sqlTexts[i] = qs.stmt.getText();
            i++;
        }
 
@@ -1639,7 +1635,6 @@ public class ProcedureRunner {
                    params,
                    m_determinismHash,
                    stmts,
-                   sqlTexts,
                    m_txnState.txnId,
                    m_txnState.m_spHandle,
                    m_txnState.uniqueId,

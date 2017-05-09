@@ -399,8 +399,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                                                pset.toJSONString(), exception);
                 }
             }
-            // stmts can be null in FragmentTask.processFragmentTask()
-            if (stmts != null && !stmts[i].isReadOnly()){
+            // determinismHash can be null in FragmentTask.processFragmentTask() and many tests
+            if (stmts != null && determinismHash != null && !stmts[i].isReadOnly()){
                 determinismHash.offerStatement(stmts[i], paramStart, m_psetBuffer);
             }
         }

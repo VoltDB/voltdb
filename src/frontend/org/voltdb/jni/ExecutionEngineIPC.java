@@ -954,7 +954,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     ParameterSet pset = (ParameterSet) params;
                     fser.writeParameterSet(pset);
                 }
-                if (stmts != null && stmts[i].isReadOnly()) {
+                if (stmts != null && determinismHash != null && !stmts[i].isReadOnly()) {
                     determinismHash.offerStatement(stmts[i], paramStart, fser.getContainerNoFlip().b());
                 }
             }

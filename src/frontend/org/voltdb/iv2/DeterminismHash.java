@@ -25,7 +25,7 @@ import org.voltdb.SQLStmt;
 import org.voltdb.SQLStmtAdHocHelper;
 
 /**
- * This class expands the determinsim hash of yesteryear with an array
+ * This class expands the determinism hash with an array
  * of hashes. For speed and memory reasons, this class is a simple int
  * array, even though it's really three ints and then an array of int pairs.
  *
@@ -54,15 +54,15 @@ public class DeterminismHash {
     // HEADER IS:
     // 1) total hash
     // 2) catalog version
-    // 3) statement count
+    // 3) hash count (each statement has two hashes: SQL hash and parameter hash)
     public final static int HEADER_OFFSET = 3;
 
-    public final static int MAX_STATEMENTS_WITH_DETAIL = Integer.getInteger("MAX_STATEMENTS_WITH_DETAIL", 128);
+    public final static int MAX_HASHES_COUNT = Integer.getInteger("MAX_STATEMENTS_WITH_DETAIL", 32) * 2;
 
     int m_catalogVersion = 0;
-    int m_stmtCount = 0;
+    int m_hashCount = 0;
 
-    final int[] m_hashes = new int[MAX_STATEMENTS_WITH_DETAIL * 2 + HEADER_OFFSET];
+    final int[] m_hashes = new int[MAX_HASHES_COUNT + HEADER_OFFSET];
 
     protected final HybridCrc32 m_inputCRC = new HybridCrc32();
     protected final HybridCrc32 m_stmtParamCRC = new HybridCrc32();
@@ -70,23 +70,7 @@ public class DeterminismHash {
     public void reset(int catalogVersion) {
         m_catalogVersion = catalogVersion;
         m_inputCRC.reset();
-        m_stmtCount = 0;
-    }
-
-    /**
-     * Serialize the overall hash, catalog version and statement count into an array.
-     */
-    public int[] getHeader() {
-        int[] retval = new int[HEADER_OFFSET];
-        // no work done means 0 hash to convey that
-        if (m_stmtCount == 0) {
-            retval[0] = 0;
-        } else {
-            retval[0] = (int) m_inputCRC.getValue();
-        }
-        retval[1] = m_catalogVersion;
-        retval[2] = m_stmtCount;
-        return retval;
+        m_hashCount = 0;
     }
 
     /**
@@ -94,20 +78,20 @@ public class DeterminismHash {
      * hash for the first int value in the array.
      */
     public int[] get() {
-        int includedStmts = Math.min(m_stmtCount, MAX_STATEMENTS_WITH_DETAIL);
-        int[] retval = new int[includedStmts * 2 + HEADER_OFFSET];
-        System.arraycopy(m_hashes, 0, retval, HEADER_OFFSET, includedStmts * 2);
+        int includedHashes = Math.min(m_hashCount, MAX_HASHES_COUNT);
+        int[] retval = new int[includedHashes + HEADER_OFFSET];
+        System.arraycopy(m_hashes, 0, retval, HEADER_OFFSET, includedHashes);
 
-        m_inputCRC.update(m_stmtCount);
+        m_inputCRC.update(m_hashCount);
         m_inputCRC.update(m_catalogVersion);
         // no work done means 0 hash to convey that
-        if (m_stmtCount == 0) {
+        if (m_hashCount == 0) {
             retval[0] = 0;
         } else {
             retval[0] = (int) m_inputCRC.getValue();
         }
         retval[1] = m_catalogVersion;
-        retval[2] = m_stmtCount;
+        retval[2] = m_hashCount;
         return retval;
     }
 
@@ -119,18 +103,18 @@ public class DeterminismHash {
         int stmtHash = SQLStmtAdHocHelper.getHash(stmt);
         m_inputCRC.update(stmtHash);
 
-        if (m_stmtCount < MAX_STATEMENTS_WITH_DETAIL) {
+        if (m_hashCount < MAX_HASHES_COUNT) {
             m_stmtParamCRC.reset();
             m_stmtParamCRC.updateFromPosition(offset, psetBuffer);
 
             int perStmtCRC = (int) m_stmtParamCRC.getValue();
-            m_hashes[m_stmtCount * 2] = stmtHash;
-            m_hashes[m_stmtCount * 2 + 1] = perStmtCRC;
+            m_hashes[m_hashCount] = stmtHash;
+            m_hashes[m_hashCount + 1] = perStmtCRC;
             m_inputCRC.update(perStmtCRC);
         } else {
             m_inputCRC.updateFromPosition(offset, psetBuffer);
         }
-        m_stmtCount++;
+        m_hashCount += 2;
     }
 
     /**
@@ -157,14 +141,14 @@ public class DeterminismHash {
 
         sb.append("Full Hash ").append(hashes[0]);
         sb.append(", Catalog Version ").append(hashes[1]);
-        sb.append(", Statement Count ").append(hashes[2]);
+        sb.append(", Statement Count ").append(hashes[2] / 2);
 
-        int includedStmts = Math.min(hashes[2], MAX_STATEMENTS_WITH_DETAIL);
-        for (int i = 0; i < includedStmts; ++i) {
-            sb.append("\n  Ran Statement ").append(hashes[i * 2 + HEADER_OFFSET]);
-            sb.append(" with Parameters ").append(hashes[i * 2 + HEADER_OFFSET + 1]);
+        int includedHashes = Math.min(hashes[2], MAX_HASHES_COUNT);
+        for (int i = HEADER_OFFSET; i < HEADER_OFFSET + includedHashes; i += 2) {
+            sb.append("\n  Ran Statement ").append(hashes[i]);
+            sb.append(" with Parameters ").append(hashes[i + 1]);
         }
-        if (hashes[2] > MAX_STATEMENTS_WITH_DETAIL) {
+        if (hashes[2] > MAX_HASHES_COUNT) {
             sb.append("\n  Additional SQL statements truncated");
         }
         return sb.toString();

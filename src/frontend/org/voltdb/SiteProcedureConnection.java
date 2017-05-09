@@ -116,7 +116,6 @@ public interface SiteProcedureConnection {
             Object[] parameterSets,
             DeterminismHash determinismHash,
             SQLStmt[] stmts,
-            String[] sqlTexts,
             long txnId,
             long spHandle,
             long uniqueId,

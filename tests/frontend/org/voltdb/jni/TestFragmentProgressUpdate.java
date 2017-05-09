@@ -134,7 +134,6 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
@@ -189,7 +188,6 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
 
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
@@ -227,7 +225,6 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { deleteStmt.getSqltext() },
                 3, 3, 2, 42, WRITE_TOKEN, false);
 
         // populate plan cache
@@ -244,7 +241,6 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         assertTrue(m_ee.m_callsFromEE > 2);
         // here the m_lastTuplesAccessed is just the same as threshold, since we start a new fragment
@@ -301,7 +297,6 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new ParameterSet[] { params },
                 null,
                 null,
-                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, READ_ONLY_TOKEN, false);
 
         // If want to see the stats, please uncomment the following line.
@@ -480,7 +475,6 @@ public class TestFragmentProgressUpdate extends TestCase {
                     paramSets,
                     null,
                     null,
-                    sqlTexts,
                     3, 3, 2, 42,
                     readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN, false);
             if (readOnly && timeout > 0) {
