@@ -1218,8 +1218,16 @@ public class DDLCompiler {
             }
 
             if (subNode.name.equals("indexes")) {
-                // do non-system indexes first so they get priority when the compiler
-                // starts throwing out duplicate indexes
+
+                for (VoltXMLElement indexNode : subNode.children) {
+                    if (indexNode.name.equals("index") == false) continue;
+                    String indexName = indexNode.attributes.get("name");
+                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap,
+                                indexMap, columnMap, m_compiler);
+                    }
+                }
+
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
@@ -1229,15 +1237,6 @@ public class DDLCompiler {
                     }
                 }
 
-                // now do system indexes
-                for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
-                    String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
-                        addIndexToCatalog(db, table, indexNode, indexReplacementMap,
-                                indexMap, columnMap, m_compiler);
-                    }
-                }
             }
 
             if (subNode.name.equals("constraints")) {
@@ -1681,8 +1680,7 @@ public class DDLCompiler {
         if (has_geo_col) {
             index.setType(IndexType.COVERING_CELL_INDEX.getValue());
         }
-        else if (( ! indexNameNoCase.contains("tree") ) && indexNameNoCase.contains("hash") &&
-                 ! indexNameNoCase.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX.toLowerCase())) {
+        else if (( ! indexNameNoCase.contains("tree") ) && indexNameNoCase.contains("hash")) {
             // If the column type is not an integer, we cannot
             // make the index a hash.
             if (has_nonint_col) {

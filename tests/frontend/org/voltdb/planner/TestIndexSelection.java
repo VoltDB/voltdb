@@ -216,7 +216,7 @@ public class TestIndexSelection extends PlannerTestCase {
                 ((NestLoopIndexPlanNode) pn).getInlineIndexScan();
         assertEquals(IndexLookupType.LT, indexScan.getLookupType());
         assertEquals(
-                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "ID",
+                HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX + "A_ID",
                 indexScan.getTargetIndexName());
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
@@ -306,7 +306,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
         pn = compile("select * from l x, l where l.b = ? and DECODE(x.a, null, 0, x.a) = 0 and x.id = ? and l.lname = x.lname;");
         //*enable to debug*/System.out.println("DEBUG: " + pn.toExplainPlanString());
-        leftIndexName = HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG";
+        leftIndexName = HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX + "L_PK_LOG";
         checkDualIndexedJoin(pn, leftIndexName, "DECODE_IDX3", 1);
 
         pn = compile("select * from l x, l where l.b = ? and DECODE(x.a, null, 0, x.a) = 0 and l.id = ? and l.lname = x.lname;");
@@ -335,7 +335,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
         pn = compile("select * from l x, l where l.b = ? and DECODE(x.a, null, 0, l.a) = 0 and x.id = ? and l.lname = x.lname;");
         //*enable to debug*/System.out.println("DEBUG: " + pn.toExplainPlanString());
-        leftIndexName = HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG";
+        leftIndexName = HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX + "L_PK_LOG";
         checkDualIndexedJoin(pn, leftIndexName, "DECODE_IDX3", 1);
     }
 
