@@ -347,9 +347,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, boolean requireCatalogDiffCmdsApplyToEE)
         {
-            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation, false);
+            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation, false, requireCatalogDiffCmdsApplyToEE);
         }
 
         @Override
@@ -1227,7 +1227,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI, boolean requireCatalogDiffCmdsApplyToEE)
     {
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
@@ -1239,9 +1239,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
-        diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
-        if (diffCmds.length() == 0) {
-            // empty diff cmds for the EE to apply, so skip the JNI call
+        if (requireCatalogDiffCmdsApplyToEE == false) {
+            // catalog changes do not require applying diff cmds to EE, so skip the JNI call for performance
             hostLog.info("Skipped applying diff commands on EE.");
             return true;
         }

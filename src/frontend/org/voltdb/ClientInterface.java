@@ -2353,6 +2353,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                        changeResult.requiresSnapshotIsolation ? 1 : 0,
                        changeResult.worksWithElastic ? 1 : 0,
                        changeResult.deploymentHash,
+                       changeResult.requireCatalogDiffCmdsApplyToEE ? 1: 0,
                        changeResult.hasSchemaChange ? 1 : 0);
         task.clientHandle = changeResult.clientHandle;
         // DR stuff

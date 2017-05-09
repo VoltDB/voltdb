@@ -275,7 +275,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
             int expectedCatalogVersion = (Integer)params.toArray()[1];
             boolean requiresSnapshotIsolation = ((Byte) params.toArray()[2]) != 0;
-            boolean hasSchemaChange = ((Byte) params.toArray()[3]) != 0;
+            boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[3]) != 0;
+            boolean hasSchemaChange = ((Byte) params.toArray()[4]) != 0;
 
             CatalogAndIds catalogStuff = null;
             try {
@@ -301,10 +302,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         getUniqueId(),
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash(),
+                        requireCatalogDiffCmdsApplyToEE,
                         hasSchemaChange);
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
-                context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation);
+                context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation, requireCatalogDiffCmdsApplyToEE);
 
                 if (log.isDebugEnabled()) {
                     log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
@@ -377,6 +379,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             String catalogDiffCommands,
             int expectedCatalogVersion,
             byte requiresSnapshotIsolation,
+            byte requireCatalogDiffCmdsApplyToEE,
             byte hasSchemaChange)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
@@ -387,7 +390,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_updateCatalog;
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(
-                catalogDiffCommands, expectedCatalogVersion, requiresSnapshotIsolation, hasSchemaChange);
+                catalogDiffCommands, expectedCatalogVersion, requiresSnapshotIsolation,
+                requireCatalogDiffCmdsApplyToEE, hasSchemaChange);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
@@ -422,6 +426,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                            byte requiresSnapshotIsolation,
                            byte worksWithElastic,
                            byte[] deploymentHash,
+                           byte requireCatalogDiffCmdsApplyToEE,
                            byte hasSchemaChange)
                                    throws Exception
     {
@@ -517,6 +522,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 catalogDiffCommands,
                 expectedCatalogVersion,
                 requiresSnapshotIsolation,
+                requireCatalogDiffCmdsApplyToEE,
                 hasSchemaChange);
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

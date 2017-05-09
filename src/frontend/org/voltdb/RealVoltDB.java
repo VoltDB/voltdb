@@ -2127,6 +2127,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             long currentTxnUniqueId,
             byte[] deploymentBytes,
             byte[] deploymentHash,
+            boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange)
     {
         synchronized(m_catalogUpdateLock) {
@@ -2203,7 +2204,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
             // 1. update the export manager.
-            ExportManager.instance().updateCatalog(m_catalogContext, diffCommands, partitions);
+            ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE, partitions);
 
             // 1.1 Update the elastic join throughput settings
             if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
