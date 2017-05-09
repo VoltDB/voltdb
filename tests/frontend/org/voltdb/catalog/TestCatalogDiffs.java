@@ -200,7 +200,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compile("conflict", CONFLICTPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        String report = verifyDiff(catOriginal, catUpdated);
+        String report = verifyDiff(catOriginal, catUpdated, false);
         assertTrue(report.contains("Procedure InsertNewOrder has been modified."));
     }
 
