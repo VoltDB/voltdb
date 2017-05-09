@@ -98,7 +98,7 @@ public class LeaderAppointer implements Promotable
     private final KSafetyStats m_stats;
     private HostMessenger m_messenger;
 
-    private final AtomicReference<ImmutableSortedMap<Integer, Host>> m_mastersByHost =
+    private final AtomicReference<ImmutableSortedMap<Integer, Host>> m_hostInfoMap =
             new AtomicReference<ImmutableSortedMap<Integer, Host>>();
 
     /*
@@ -246,7 +246,9 @@ public class LeaderAppointer implements Promotable
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 try {
                     if (currentLeaders.size() == getInitialPartitionCount()) {
-                        tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
+                        }
                         m_state.set(AppointerState.DONE);
                         m_MPI.acceptPromotion();
                         m_startupLatch.set(null);
@@ -256,26 +258,24 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
                 }
             }
-
             Set<Integer> liveHosts = Sets.newHashSet();
             if (m_messenger != null){
                 liveHosts = m_messenger.getLiveHostIds();
             }
-            Map<Integer, Host> counter = Maps.newHashMap();
+            Map<Integer, Host> hostLeaderMap = Maps.newHashMap();
             for (Long site: currentLeaders) {
+                //filter our dead hosts
                 int hostId =  CoreUtils.getHostIdFromHSId(site);
-
-                //filter our dead host
                 if (liveHosts.contains(hostId)) {
-                    Host host = counter.get(hostId);
+                    Host host = hostLeaderMap.get(hostId);
                     if (host == null) {
                         host = new Host(hostId);
-                        counter.put(hostId, host);
+                        hostLeaderMap.put(hostId, host);
                     }
                     host.increasePartitionLeader();
                 }
             }
-            m_mastersByHost.set(ImmutableSortedMap.copyOf(counter));
+            m_hostInfoMap.set(ImmutableSortedMap.copyOf(hostLeaderMap));
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("[LeaderAppointer]Updated leaders: " + CoreUtils.hsIdCollectionToString(currentLeaders));
             }
@@ -552,7 +552,7 @@ public class LeaderAppointer implements Promotable
             }
         }
         else {
-            masterHostId = findHostForPartition(partitionId, children);
+            masterHostId = findHostForPartitionLeader(partitionId, children);
             tmLog.info(String.format("Found new host %d for partition %d", masterHostId, partitionId));
         }
 
@@ -743,14 +743,14 @@ public class LeaderAppointer implements Promotable
      * @param replicas  A list of existing sites for the partition
      * @return the new host id
      */
-    private int findHostForPartition(int partitionId, List<Long> replicas){
+    private int findHostForPartitionLeader(int partitionId, List<Long> replicas){
         int newMasterHost = -1;
         Set<Integer> candidateHost = Sets.newHashSet();
         for (Long site : replicas) {
             candidateHost.add(CoreUtils.getHostIdFromHSId(site));
         }
 
-        ImmutableSortedMap<Integer, Host> masterCountByHost = m_mastersByHost.get();
+        ImmutableSortedMap<Integer, Host> masterCountByHost = m_hostInfoMap.get();
         Set<Integer> liveHosts = Sets.newHashSet();
         if (m_messenger != null){
             liveHosts = m_messenger.getLiveHostIds();
@@ -764,7 +764,7 @@ public class LeaderAppointer implements Promotable
                 Host host = new Host(hostId);
                 host.increasePartitionLeader();
                 currentCountMap.put(hostId, host);
-                m_mastersByHost.set(ImmutableSortedMap.copyOf(currentCountMap));
+                m_hostInfoMap.set(ImmutableSortedMap.copyOf(currentCountMap));
                 return hostId;
             }
         }
@@ -773,7 +773,7 @@ public class LeaderAppointer implements Promotable
         SortedSet<Host> hosts = new TreeSet<Host>();
         hosts.addAll(masterCountByHost.values());
         if (tmLog.isDebugEnabled()) {
-            StringBuilder builder = new StringBuilder("[findHostForPartition]:");
+            StringBuilder builder = new StringBuilder("[findHostForPartitionLeader]:");
             builder.append(" partition:" + partitionId);
             builder.append("\nHost Info:" + hosts);
             tmLog.debug(builder.toString());
@@ -782,7 +782,7 @@ public class LeaderAppointer implements Promotable
             if (candidateHost.contains(host.id)) {
                 host.increasePartitionLeader();
                 if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("[findHostForPartition]: found host " + host.id + " for partition " + partitionId);
+                    tmLog.debug("[findHostForPartitionLeader]: found host " + host.id + " for partition " + partitionId);
                 }
                 return host.id;
             }
