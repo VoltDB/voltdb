@@ -650,7 +650,7 @@ def buildMakefile(CTX):
     makefile.write('########################################################################\n')
 
     # build the generated tests.
-    #buildGeneratedTests(CTX, makefile, all_gen_tests)
+    buildGeneratedTests(CTX, makefile, all_gen_tests)
     makefile.write("\n")
 
     # A target for all the tests.  This is what buildtools.py eventually uses.

@@ -267,7 +267,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // single-column primary keys get cascaded automagically
             assertTrue(doesColumnExist("FOO", "PKCOL"));
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE"));
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO drop column PKCOL;");
@@ -276,7 +276,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Should be able to drop a single column backing a single column primary key.");
             }
             assertFalse(doesColumnExist("FOO", "PKCOL"));
-            assertFalse(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+            assertFalse(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE"));
 
             // WEIRD: this seems like weird behavior to me still --izzy
             // Dropping a column used by a multi-column index drops the index
@@ -295,7 +295,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // Can't drop a column used by a multi-column primary key
             assertTrue(doesColumnExist("BAZ", "PKCOL1"));
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE2"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_BAZ_PK_TREE2"));
             threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
@@ -308,7 +308,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
             assertTrue("Shouldn't be able to drop a column used by a multi-column primary key", threw);
             assertTrue(doesColumnExist("BAZ", "PKCOL1"));
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE2"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_BAZ_PK_TREE2"));
 
             // Can't drop the last column in a table
             assertTrue(doesColumnExist("ONECOL", "SOLOCOL"));
@@ -451,8 +451,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertFalse(isColumnNullable("FOO", "ID"));
 
             // magic name for PK index
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
-            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE", true));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE", true));
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO add unique (ID);");
@@ -461,8 +461,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Shouldn't fail to add unique constraint to column with unique constraint");
             }
             // Unique constraint we added is redundant with existing constraint
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
-            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE", true));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE", true));
 
             // Now, drop the PK constraint
             try {
@@ -473,8 +473,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Shouldn't fail to drop primary key constraint");
             }
             // Now we create a new named index for the unique constraint.  C'est la vie.
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_CT_FOO_ID"));
-            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_CT_FOO_ID", true));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_FOO_ID"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_FOO_ID", true));
 
             // Can't add a PK constraint on the other column
             threw = false;
