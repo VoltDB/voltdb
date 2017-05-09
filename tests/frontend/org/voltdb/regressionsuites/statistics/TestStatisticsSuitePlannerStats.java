@@ -56,9 +56,9 @@ public class TestStatisticsSuitePlannerStats extends StatisticsTestSuiteBase {
         expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.INTEGER);
         expectedSchema[5] = new ColumnInfo("CACHE1_LEVEL", VoltType.INTEGER);
         expectedSchema[6] = new ColumnInfo("CACHE2_LEVEL", VoltType.INTEGER);
-        expectedSchema[7] = new ColumnInfo("CACHE1_HITS", VoltType.INTEGER);
-        expectedSchema[8] = new ColumnInfo("CACHE2_HITS", VoltType.INTEGER);
-        expectedSchema[9] = new ColumnInfo("CACHE_MISSES", VoltType.INTEGER);
+        expectedSchema[7] = new ColumnInfo("CACHE1_HITS", VoltType.BIGINT);
+        expectedSchema[8] = new ColumnInfo("CACHE2_HITS", VoltType.BIGINT);
+        expectedSchema[9] = new ColumnInfo("CACHE_MISSES", VoltType.BIGINT);
         expectedSchema[10] = new ColumnInfo("PLAN_TIME_MIN", VoltType.BIGINT);
         expectedSchema[11] = new ColumnInfo("PLAN_TIME_MAX", VoltType.BIGINT);
         expectedSchema[12] = new ColumnInfo("PLAN_TIME_AVG", VoltType.BIGINT);
