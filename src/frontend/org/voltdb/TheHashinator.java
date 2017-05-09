@@ -99,7 +99,7 @@ public abstract class TheHashinator {
      *
      * References are weak so this has no impact on memory utilization
      */
-    protected static final ConcurrentMap<Long, TheHashinator> m_cachedHashinators =
+    private static final ConcurrentMap<Long, TheHashinator> m_cachedHashinators =
             new MapMaker().weakValues().concurrencyLevel(1).initialCapacity(16).makeMap();
 
     /**
