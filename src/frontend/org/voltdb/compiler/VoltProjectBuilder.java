@@ -73,8 +73,8 @@ import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -812,12 +812,12 @@ public class VoltProjectBuilder {
                 replication, null, 0) != null;
     }
 
-    public boolean compile(final String jarPath,
+    public Catalog compile(final String jarPath,
             final int sitesPerHost,
             final int hostCount,
             final int replication, final int clusterId) {
         return compile(jarPath, sitesPerHost, hostCount,
-                replication, null, clusterId) != null;
+                replication, null, clusterId);
     }
 
     public Catalog compile(final String jarPath,

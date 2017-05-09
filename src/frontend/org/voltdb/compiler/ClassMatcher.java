@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
  *
  */
 public class ClassMatcher {
-    enum ClassNameMatchStatus {
+    public enum ClassNameMatchStatus {
         MATCH_FOUND,
         NO_WILDCARD_MATCH,
         NO_EXACT_MATCH,

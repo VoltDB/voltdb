@@ -288,11 +288,11 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 --- User-defined Functions -----------------------------------
 
 
-create function IntFunction from method sqlcmdtest.IntFunction;
+create function IntFunction from method sqlcmdtest.IntFunction.run;
 Command succeeded.
 
 --- User-defined Functions -----------------------------------
-IntFunction         scalar function     sqlcmdtest.IntFunction                            
+IntFunction         scalar function     sqlcmdtest.IntFunction.run                        
 
 
 --- Potential Procedure Classes ------------------------------

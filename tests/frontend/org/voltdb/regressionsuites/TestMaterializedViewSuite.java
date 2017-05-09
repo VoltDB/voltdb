@@ -1659,7 +1659,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             System.out.println("Now testing altering the source table of a view.");
             // 3.1 add column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;" +
+                client.callProcedure("@AdHoc",
+                        "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;" +
                         "ALTER TABLE WAS_ORDERITEMS ADD COLUMN x FLOAT;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1668,7 +1669,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.2 drop column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;" +
+                client.callProcedure("@AdHoc",
+                        "ALTER TABLE ORDERITEMS DROP COLUMN x;" +
                         "ALTER TABLE WAS_ORDERITEMS DROP COLUMN x;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1677,7 +1679,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.3 alter column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);" +
+                client.callProcedure("@AdHoc",
+                        "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);" +
                         "ALTER TABLE WAS_CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1753,6 +1756,20 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             deleteRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
         }
+
+        // Restore catalog changes:
+        try {
+            client.callProcedure("@AdHoc",
+                    "TRUNCATE TABLE CUSTOMERS;" +
+                    "TRUNCATE TABLE WAS_CUSTOMERS;");
+            client.callProcedure("@AdHoc",
+                    "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(50);" +
+                    "ALTER TABLE WAS_CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(50);");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Should be able to alter column in a view source table.");
+        }
+        verifyViewOnJoinQueryResult(client);
     }
 
     private void truncateSourceTables(Client client, int rollback,
@@ -2236,6 +2253,16 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc",
                 "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
             assertContentOfTable(new Object[][] {}, vt);
+
+            // Restore catalog changes:
+            try {
+                client.callProcedure("@AdHoc",
+                    "DROP INDEX I_ENG_11203_JOIN;" +
+                    "DROP INDEX I_ENG_11203_SINGLE;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop indexes on the joined table views V_ENG_11203_JOIN and V_ENG_11203_SINGLE.");
+            }
         }
     }
 

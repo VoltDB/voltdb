@@ -126,6 +126,8 @@ public class CatalogDiffEngine {
     // true if the difference is allowed in a running system
     private boolean m_supported;
 
+    private boolean m_requiresCatalogDiffCmdsApplyToEE = false;
+
     // true if table changes require the catalog change runs
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
@@ -208,6 +210,10 @@ public class CatalogDiffEngine {
 
     public boolean supported() {
         return m_supported;
+    }
+
+    public boolean requiresCatalogDiffCmdsApplyToEE() {
+        return m_requiresCatalogDiffCmdsApplyToEE;
     }
 
     /**
@@ -1235,6 +1241,10 @@ public class CatalogDiffEngine {
             processModifyResponses(errorMessage, responseList);
         }
 
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(newType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
+        }
+
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         newType.writeCommandForField(m_sb, field, true);
@@ -1248,6 +1258,49 @@ public class CatalogDiffEngine {
         }
         CatalogChangeGroup cgrp = m_changes.get(DiffClass.get(newType));
         cgrp.processChange(newType, prevType, field);
+    }
+
+    /**
+     * Our EE has a list of Catalog items that are in use, but Java catalog contains much more.
+     * Some of the catalog diff commands will only be useful to Java. So this function will
+     * decide whether the @param suspect catalog item will be used in EE or not.
+     * @param suspect
+     * @param prevType
+     * @param field
+     * @return true if the suspect catalog will be updated in EE, false otherwise.
+     */
+    protected static boolean checkCatalogDiffShouldApplyToEE(final CatalogType suspect)
+    {
+        // Warning:
+        // This check list should be consistent with catalog items defined in EE
+        // Once a new catalog type is added in EE, we should add it here.
+
+        if (suspect instanceof Cluster || suspect instanceof Database) {
+            return true;
+        }
+
+        if (suspect instanceof Table ||
+                suspect instanceof Column || suspect instanceof ColumnRef ||
+                suspect instanceof Index || suspect instanceof IndexRef ||
+                suspect instanceof Constraint || suspect instanceof ConstraintRef ||
+                suspect instanceof MaterializedViewInfo) {
+            return true;
+        }
+
+        if (suspect instanceof Statement || suspect instanceof PlanFragment) {
+            return true;
+        }
+
+        if (suspect instanceof Connector ||
+                suspect instanceof ConnectorProperty ||
+                suspect instanceof ConnectorTableInfo) {
+            // export table related change, should not skip EE
+            return true;
+        }
+
+        // The other changes in the catalog will not be applied to EE,
+        // including User, Group, Procedures, etc
+        return false;
     }
 
     /**
@@ -1311,6 +1364,10 @@ public class CatalogDiffEngine {
             processModifyResponses(errorMessage, responseList);
         }
 
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(prevType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
+        }
+
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         m_sb.append("delete ").append(prevType.getParent().getCatalogPath()).append(" ");
@@ -1341,6 +1398,10 @@ public class CatalogDiffEngine {
                 responseList = Collections.singletonList(response);
             }
             processModifyResponses(errorMessage, responseList);
+        }
+
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(newType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
         }
 
         // write the commands to make it so

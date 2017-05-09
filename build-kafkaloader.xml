@@ -1,0 +1,128 @@
+<?xml version="1.0" ?>
+<project default="default" name="VoltDB-KafkaLoader">
+
+<!-- GENERAL HELPER MACROS -->
+<macrodef name="envdefault">
+    <attribute name="prop" />
+    <attribute name="var" />
+    <attribute name="default" />
+    <sequential>
+        <condition property="@{prop}" value="${env.@{var}}" else="@{default}">
+            <isset property="env.@{var}" />
+        </condition>
+    </sequential>
+</macrodef>
+
+
+<macrodef name="invoke-javacKF">
+    <attribute name="srcdir"/>
+    <attribute name="destdir" default="${build.prod.dir}"/>
+    <attribute name="excludes" default=""/>
+    <attribute name="includes" default=""/>
+    <sequential>
+        <javac
+            srcdir="@{srcdir}"
+            destdir="@{destdir}"
+            excludes="@{excludes}"
+            includes="@{includes}"
+            encoding='UTF-8'
+            debug='true'
+            includeAntRuntime='false'>
+            <classpath refid="project.classpath" />
+        </javac>
+    </sequential>
+</macrodef>
+<tstamp/>
+
+<!-- make environment var foo available as env.foo -->
+<property environment="env"/>
+
+<!-- allow env.VOLTBUILD to override "build" property -->
+<envdefault prop="build" var="VOLTBUILD" default="release" />
+
+<property name='base.dir'                    location='.' />
+<property name='build.dir'                   location='obj/${build}' />
+<property name='build.prod.dir'              location='${build.dir}/prod' />
+<property name='build.client.dir'            location='${build.dir}/clientobj' />
+<property name='build.kfloader.dir'          location='${build.prod.dir}' />
+<property name='build.kfloadersrc.dir'       location='${build.dir}/kfloadersrc' />
+<property name='src.gpl.dir'                 location='src/frontend' />
+<property name='lib.dir'                     location='lib' />
+<property name='vendor.src.dir'              location='third_party/java/src' />
+<property name='vendor.lib.dir'              location='third_party/java/jars' />
+
+<condition property="os.mac">
+    <os family="mac"/>
+</condition>
+
+<fileset id="vendor.src.files" dir="${vendor.src.dir}"
+        includes="au/com/bytecode/opencsv_voltpatches/CSVParser.java"
+/>
+
+<path id='project.classpath'>
+    <pathelement location='${build.client.dir}' />
+    <pathelement location='${build.prod.dir}' />
+    <fileset dir='${vendor.lib.dir}'>
+        <include name='kafka-clients-0.10.2.1.jar' />
+    </fileset>
+    <pathelement path="${java.class.path}"/>
+</path>
+
+<fileset id="kafkaloader.src.files" dir="${src.gpl.dir}"
+        includes="org/voltdb/utils/KafkaLoader10.java "
+/>
+
+<!--
+***************************************
+PRIMARY ENTRY POINTS
+***************************************
+-->
+    
+<target name="default" depends="compile" description="Compile KafkaLoader10 class." />
+
+<!--
+***************************************
+CLEANING
+***************************************
+-->
+
+<target name='clean' description="Remove Kafka Loader artifacts">
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -f ${build.prod.dir}/org/voltdb/utils/KafkaLoader10*'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf {build.kfloadersrc.dir}'"/>
+  </exec>  
+</target>
+
+<!--
+***************************************
+STAGING SOURCE FILES
+***************************************
+-->
+
+<target name="stage_src" >
+  <!-- copy source files -->
+  <copy todir="${build.kfloadersrc.dir}">
+    <fileset refid="vendor.src.files"/>
+    <fileset refid="kafkaloader.src.files"/>
+  </copy>
+</target>
+
+<!--
+***************************************
+JAVA COMPILATION
+***************************************
+-->
+
+<target name="compile" description="Compile Kafka Loader sources" depends="stage_src">
+    <invoke-javacKF  srcdir="${build.kfloadersrc.dir}" />
+</target>
+
+<!--
+***************************************
+JAR is build using build-importers
+***************************************
+-->
+
+</project>
