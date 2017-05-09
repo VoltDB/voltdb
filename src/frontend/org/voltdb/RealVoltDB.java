@@ -140,7 +140,6 @@ import org.voltdb.settings.SettingsException;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -2963,11 +2962,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             "commands generated for an out-of date catalog. Expected catalog version: " +
                             expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
                 }
-
-                hostLog.info(String.format("Globally updating the current application catalog and deployment " +
-                            "(new hashes %s, %s).",
-                        Encoder.hexEncode(catalogBytesHash).substring(0, 10),
-                        Encoder.hexEncode(deploymentHash).substring(0, 10)));
 
                 // get old debugging info
                 SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
