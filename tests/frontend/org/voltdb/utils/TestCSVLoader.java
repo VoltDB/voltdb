@@ -1296,8 +1296,8 @@ public class TestCSVLoader {
     @Test
     public void testHeaderColumnWhitespace() throws Exception
     {
-    	// ENG-12324: csvloader --header doesn't work if header has spaces. This is essentially the same test as testHeaderColumnNumNotSame, but with some
-    	// strategically placed whitespace in the header.
+        // ENG-12324: csvloader --header doesn't work if header has spaces. This is essentially the same test as testHeaderColumnNumNotSame, but with some
+        // strategically placed whitespace in the header.
 
         String []myOptions = {
                 "-f" + path_csv,
