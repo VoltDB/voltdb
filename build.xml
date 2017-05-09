@@ -69,6 +69,7 @@
 <property name='build.prod.dbmonitor.dir.js' location='${build.prod.dir}/org/voltdb/dbmonitor/js' />
 <property name='build.test.dir'              location='${build.dir}/test' />
 <property name='build.testproc.dir'          location='${build.dir}/testprocs' />
+<property name='build.testfunc.dir'          location='${build.dir}/testfuncs' />
 <property name='build.client.dir'            location='${build.dir}/clientobj' />
 <property name='build.admin.dir'             location='${build.dir}/admin' />
 <property name='raw.dist.dir'                location='${build.dir}' />
@@ -79,6 +80,7 @@
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
 <property name='src.test.dir'                location='tests/frontend' />
 <property name='src.testproc.dir'            location='tests/testprocs' />
+<property name='src.testfunc.dir'            location='tests/testfuncs' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.ee.test.dir'             location='tests/ee' />
 <property name='src.dbmonitor.dir'           location='src/frontend/org/voltdb/dbmonitor' />
@@ -132,6 +134,7 @@
     <pathelement location='${build.client.dir}' />
     <pathelement location='${build.prod.dir}' />
     <pathelement location='${build.testproc.dir}' />
+    <pathelement location='${build.testfunc.dir}' />
     <pathelement location='${build.test.dir}' />
     <fileset dir='${lib.dir}'>
         <include name='*.jar' />
@@ -1289,13 +1292,14 @@ JAVA COMPILATION
     <mkdir dir='${build.prod.dir}' />
     <mkdir dir='${build.test.dir}' />
     <mkdir dir='${build.testproc.dir}' />
+    <mkdir dir='${build.testfunc.dir}' />
     <exec
         dir='${src.gpl.dir}/org/voltdb/utils'
         executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py'
         failonerror='true' />
     <depend
-        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${src.testproc.dir}:${vendor.src.dir}"
-        destdir="${build.prod.dir}:${build.test.dir}:${build.testproc.dir}"
+        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${src.testproc.dir}:${src.testfunc.dir}:${vendor.src.dir}"
+        destdir="${build.prod.dir}:${build.test.dir}:${build.testproc.dir}:${build.testfunc.dir}"
         cache="${depcache}">
         <classpath refid="project.classpath" />
     </depend>
@@ -1426,6 +1430,7 @@ JAVA COMPILATION
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.testproc.dir}" destdir='${build.testproc.dir}'/>
+    <invoke-javac srcdir="${src.testfunc.dir}" destdir='${build.testfunc.dir}'/>
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
     <invoke-javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
         excludes="org/voltdb/benchmark/tpcc/JDBCClient.java"/>

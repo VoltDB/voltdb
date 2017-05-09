@@ -144,7 +144,7 @@ public class VoltCompiler {
 
     private List<String> m_capturedDiagnosticDetail = null;
 
-    private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
+    private static VoltLogger compilerLog = new VoltLogger("COMPILER");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
 
@@ -387,6 +387,10 @@ public class VoltCompiler {
         final Feedback fb = new Feedback(Severity.ERROR, msg, m_currentFilename, lineNo);
         m_errors.add(fb);
         compilerLog.error(fb.getLogString());
+    }
+
+    public static void setVoltLogger(VoltLogger vl) {
+        compilerLog = vl;
     }
 
     /**
