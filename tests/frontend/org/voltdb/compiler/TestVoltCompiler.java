@@ -2320,7 +2320,7 @@ public class TestVoltCompiler extends TestCase {
         // Abstract class
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.AbstractUDFClass.run;");
         verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
-        assertTrue(isFeedbackPresent("Cannot define function using abstract class org.voltdb.compiler.functions.AbstractUDFClass", fbs));
+        assertTrue(isFeedbackPresent("Cannot define a function using an abstract class org.voltdb.compiler.functions.AbstractUDFClass", fbs));
 
         // Method not found
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.nonexistent;");

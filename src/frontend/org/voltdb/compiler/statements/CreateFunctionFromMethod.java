@@ -116,7 +116,7 @@ public class CreateFunctionFromMethod extends StatementProcessor {
 
         if (Modifier.isAbstract(funcClass.getModifiers())) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Cannot define function using abstract class %s",
+                    "Cannot define a function using an abstract class %s",
                     className));
         }
 
