@@ -116,7 +116,14 @@ public class TestCatalogDiffs extends TestCase {
         String commands = diff.commands();
         System.out.println("DIFF COMMANDS:");
         System.out.println(commands);
-        catOriginal.execute(commands);
+
+        // copy the catalog from orginal for tests
+        String catOriginalCmds = catOriginal.serialize();
+        Catalog catOriginalCopy = new Catalog();
+        catOriginalCopy.execute(catOriginalCmds);
+        // apply the diff commands
+        catOriginalCopy.execute(commands);
+
         assertTrue(diff.supported());
         assertEquals(0, diff.tablesThatMustBeEmpty().length);
         if (expectSnapshotIsolation != null) {
@@ -128,7 +135,7 @@ public class TestCatalogDiffs extends TestCase {
         if (expectApplyCatalogDiffToEE != null) {
             assertEquals(expectApplyCatalogDiffToEE.booleanValue(), diff.requiresCatalogDiffCmdsApplyToEE());
         }
-        String updatedOriginalSerialized = catOriginal.serialize();
+        String updatedOriginalSerialized = catOriginalCopy.serialize();
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
 
         String desc = diff.getDescriptionOfChanges();
