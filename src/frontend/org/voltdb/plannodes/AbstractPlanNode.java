@@ -764,7 +764,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param aeClass AbstractExpression class to search for
      * @param collection set to populate with expressions that this node has
      */
-    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
             Set<AbstractExpression> collected) {
         // Check the inlined plan nodes
         for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
@@ -1264,5 +1264,12 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     public void setOutputSchema(NodeSchema schema) {
         m_outputSchema = schema;
+    }
+
+    /**
+     * Traverse the plan node tree to allow a visitor interact with each node.
+     */
+    public void acceptVisitor(AbstractPlanNodeVisitor visitor) {
+        visitor.visitNode(this);
     }
 }

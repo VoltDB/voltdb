@@ -32,6 +32,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlannerTestCase;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlannerType;
 
@@ -60,8 +61,21 @@ public abstract class TestCalciteBase extends PlannerTestCase {
         System.out.println(calcitePlan.explainedPlan);
         CompiledPlan voltdbPlan = compileAdHocPlan(sql, true, true);
 
-        PlanNodeTree calcitePlanTree = new PlanNodeTree(calcitePlan.rootPlanGraph);
-        PlanNodeTree voltdbPlanTree = new PlanNodeTree(voltdbPlan.rootPlanGraph);
+        // Compare roots
+        comparePlanTree(calcitePlan.rootPlanGraph, voltdbPlan.rootPlanGraph, ignoreMap);
+        // Compare lower fragments if any
+        if (calcitePlan.subPlanGraph != null && voltdbPlan.subPlanGraph != null) {
+            comparePlanTree(calcitePlan.subPlanGraph, voltdbPlan.subPlanGraph, ignoreMap);
+        } else if  (calcitePlan.subPlanGraph != null || voltdbPlan.subPlanGraph != null) {
+            fail("Two-part MP plans mismatch");
+        }
+        // Compare CompiledPlan attributes
+        compareCompiledPlans(calcitePlan, voltdbPlan);
+    }
+
+    private void comparePlanTree(AbstractPlanNode calcitePlanNode, AbstractPlanNode voltdbPlanNode, Map<String, String> ignoreMap) {
+        PlanNodeTree calcitePlanTree = new PlanNodeTree(calcitePlanNode);
+        PlanNodeTree voltdbPlanTree = new PlanNodeTree(voltdbPlanNode);
 
         String calcitePlanTreeJSON = calcitePlanTree.toJSONString();
         String voltdbPlanTreeJSON = voltdbPlanTree.toJSONString();
@@ -75,6 +89,18 @@ public abstract class TestCalciteBase extends PlannerTestCase {
             System.out.println("Calcite: " + calcitePlanTreeJSON);
         }
         assertEquals(voltdbPlanTreeJSON, calcitePlanTreeJSON);
+    }
+
+    private void compareCompiledPlans(CompiledPlan calcitePlan, CompiledPlan voltdbPlan) {
+        // Compare LIMIT/OFFSET
+        assertEquals(voltdbPlan.hasLimitOrOffset(), calcitePlan.hasLimitOrOffset());
+        // Determinism
+//        assertEquals(voltdbPlan.hasDeterministicStatement(), calcitePlan.hasDeterministicStatement());
+        // Params
+        assertEquals(voltdbPlan.parameters.length, calcitePlan.parameters.length);
+        for (int i = 0; i < voltdbPlan.parameters.length; ++i) {
+            assertEquals(voltdbPlan.parameters[i].getParameterIndex(), calcitePlan.parameters[i].getParameterIndex());
+        }
     }
 
     protected void testPlan(String sql, PlannerType plannerType) {

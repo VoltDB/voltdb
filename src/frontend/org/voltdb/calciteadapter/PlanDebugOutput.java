@@ -83,7 +83,7 @@ public class PlanDebugOutput {
             sb.append("**** Calcite Error Message ****\n");
             sb.append(errMsg);
         }
-        sb.append("*****************************************\n\n");
+        sb.append("\n*****************************************\n\n");
 
         BuildDirectoryUtils.writeFile(BASE_DIR_NAME + dirName,
                                       fileName + "-calcite.txt",
