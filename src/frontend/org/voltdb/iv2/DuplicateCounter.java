@@ -53,7 +53,7 @@ public class DuplicateCounter
     protected VoltMessage m_lastResponse = null;
     protected VoltTable m_lastResultTables[] = null;
     // if any response shows the transaction aborted
-    boolean m_txnAbort = false;
+    boolean m_txnSucceed = false;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
     final VoltMessage m_openMessage;
@@ -135,14 +135,12 @@ public class DuplicateCounter
         return "UNKNOWN_PROCEDURE_NAME";
     }
 
-    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnAbort)
+    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnSucceed)
     {
         if (!rejoining) {
-            if (txnAbort == true) {
-                m_txnAbort = txnAbort;
-            }
             if (m_responseHashes == null) {
                 m_responseHashes = hashes;
+                m_txnSucceed = txnSucceed;
             }
             else if (!DeterminismHash.compareHashes(m_responseHashes, hashes)) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
@@ -151,7 +149,7 @@ public class DuplicateCounter
                 logRelevantMismatchInformation("HASH MISMATCH", hashes, message);
                 return MISMATCH;
             }
-            else if (m_txnAbort) {
+            else if (m_txnSucceed != txnSucceed) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " succeeded on one partition but failed on another partition."
                         + " Shutting down to preserve data integrity.");
