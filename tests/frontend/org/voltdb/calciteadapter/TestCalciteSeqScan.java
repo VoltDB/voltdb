@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.calcite.schema.SchemaPlus;
+import org.voltdb.types.PlannerType;
 
 public class TestCalciteSeqScan extends TestCalciteBase {
 
@@ -70,6 +71,12 @@ public class TestCalciteSeqScan extends TestCalciteBase {
         comparePlans(sql);
     }
 
+    public void testSeqScanWithFilterParam() throws Exception {
+        String sql;
+        sql = "select i from R1 where i = ? and v = ?";
+        comparePlans(sql);
+    }
+
     public void testSeqScanWithStringFilter() throws Exception {
         String sql;
         sql = "select i from R1 where v = 'FOO1'";
@@ -104,9 +111,26 @@ public class TestCalciteSeqScan extends TestCalciteBase {
         comparePlans(sql, ignores);
     }
 
+    public void testSeqScanWithLimitParam() throws Exception {
+        String sql;
+        sql = "select i from R1 limit ?";
+
+        Map<String, String> ignores = new HashMap<>();
+        // Inline nodes ids are swapped
+        String calciteProj = "\"ID\":4,\"PLAN_NODE_TYPE\":\"PROJECTION\"";
+        String voltProj = "\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\"";
+        ignores.put(calciteProj, voltProj);
+
+        String calciteLimit = "\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\"";
+        String voltLimit = "\"ID\":4,\"PLAN_NODE_TYPE\":\"LIMIT\"";
+        ignores.put(calciteLimit, voltLimit);
+
+        comparePlans(sql, ignores);
+    }
+
     public void testSeqScanWithFilterAndLimit() throws Exception {
         String sql;
-        sql = "select i from R1 where si > 3limit 5";
+        sql = "select i from R1 where si > 3 limit 5";
 
         Map<String, String> ignores = new HashMap<>();
         // Inline nodes ids are swapped

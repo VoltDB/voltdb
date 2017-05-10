@@ -25,6 +25,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexLocalRef;
@@ -41,12 +42,19 @@ import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 
 public class RexConverter {
+
+    private static int NEXT_PARAMETER_ID = 0;
+
+    public static void resetParameterIndex() {
+        NEXT_PARAMETER_ID = 0;
+    }
 
     private static class ConvertingVisitor extends RexVisitorImpl<AbstractExpression> {
 
@@ -79,6 +87,14 @@ public class RexConverter {
             TypeConverter.setType(tve, inputRef.getType());
             return tve;
           }
+
+        @Override
+        public ParameterValueExpression visitDynamicParam(RexDynamicParam inputParam) {
+            ParameterValueExpression pve = new ParameterValueExpression();
+            pve.setParameterIndex(NEXT_PARAMETER_ID++);
+            TypeConverter.setType(pve, inputParam.getType());
+            return pve;
+        }
 
         @Override
         public ConstantValueExpression visitLiteral(RexLiteral literal) {

@@ -23,6 +23,7 @@ import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -97,7 +98,9 @@ public class TypeConverter {
             } else {
                 size = rdt.getPrecision();
             }
-            ae.setValueSize(size);
+            if (!(ae instanceof ParameterValueExpression)) {
+                ae.setValueSize(size);
+            }
         }
     }
 }
