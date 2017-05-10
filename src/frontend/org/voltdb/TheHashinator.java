@@ -119,10 +119,10 @@ public abstract class TheHashinator {
     private static final AtomicReference<Pair<Long, ? extends TheHashinator>> instance =
             new AtomicReference<Pair<Long, ? extends TheHashinator>>();
 
-    // Set true once the current Hashinator does not match m_prestineHashinator
+    // Set true once the current Hashinator does not match m_pristineHashinator
     private static boolean m_elasticallyModified = false;
     // The initial Hashinator based strictly on the initial cluster partition count
-    protected static TheHashinator m_prestineHashinator;
+    protected static TheHashinator m_pristineHashinator;
 
     /**
      * Initialize TheHashinator with the specified implementation class and configuration.
@@ -130,7 +130,7 @@ public abstract class TheHashinator {
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
         TheHashinator hashinator = constructHashinator( hashinatorImplementation, config, false);
-        m_prestineHashinator = hashinator;
+        m_pristineHashinator = hashinator;
         m_cachedHashinators.put(0L, hashinator);
         instance.set(Pair.of(0L, hashinator));
     }
@@ -191,7 +191,7 @@ public abstract class TheHashinator {
     // but it must be declared protected to allow the required overriding.
     abstract protected int pHashToPartition(VoltType type, Object obj);
     abstract protected Set<Integer> pGetPartitions();
-    abstract protected boolean pIsPrestine();
+    abstract protected boolean pIsPristine();
     abstract public int getPartitionFromHashedToken(int hashedToken);
 
     /**
@@ -358,7 +358,7 @@ public abstract class TheHashinator {
                         Pair.of(version, existingHashinator);
                 if (instance.compareAndSet(snapshot, update)) {
                     if (!m_elasticallyModified) {
-                        if (!update.getSecond().pIsPrestine()) {
+                        if (!update.getSecond().pIsPristine()) {
                             // This is not a lock protected (atomic) but it should be fine because
                             // release() should only be called by the one thread that successfully
                             // updated the hashinator

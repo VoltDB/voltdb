@@ -107,7 +107,7 @@ public class LegacyHashinator extends TheHashinator {
     }
 
     @Override
-    public boolean pIsPrestine() {
+    public boolean pIsPristine() {
         return true;
     }
 

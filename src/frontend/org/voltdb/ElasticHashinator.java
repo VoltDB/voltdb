@@ -467,8 +467,8 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     @Override
-    public boolean pIsPrestine() {
-        return Arrays.equals(((ElasticHashinator)m_prestineHashinator).m_configBytes.get(), m_configBytes.get());
+    public boolean pIsPristine() {
+        return Arrays.equals(((ElasticHashinator)m_pristineHashinator).m_configBytes.get(), m_configBytes.get());
     }
 
     /**
