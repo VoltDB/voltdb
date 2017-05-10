@@ -59,9 +59,6 @@ $(document).ready(function () {
         $("#logOut").css('display', 'none');
     }
 
-    //search text clean up required for mozilla
-    $("#filterStoredProc").val('');
-
     //Prevent scrolling of page.
     $('#navSchema').on("click", function (e) {
         //Browser validation for IE version less than IE 11
@@ -264,32 +261,6 @@ $(document).ready(function () {
             }
         }
     });
-
-    // Filters Stored Procedures
-    $('#filterStoredProc').keyup(function () {
-        var that = this;
-        $.each($('.storeTbl tbody tr'),
-        function (i, val) {
-            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
-                $('.storeTbl tbody tr').eq(i).hide();
-            } else {
-                $('.storeTbl tbody tr').eq(i).show();
-            }
-        });
-    });
-
-    // Filters Database Tables
-//    $('#filterDatabaseTable').keyup(function () {
-//        var that = this;
-//        $.each($('.dbTbl tbody tr'),
-//        function (i, val) {
-//            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
-//                $('.dbTbl tbody tr').eq(i).hide();
-//            } else {
-//                $('.dbTbl tbody tr').eq(i).show();
-//            }
-//        });
-//    });
 
     var refreshCss = function () {
         //Enable Schema specific css only for Schema Tab.
