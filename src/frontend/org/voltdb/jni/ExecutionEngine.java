@@ -649,7 +649,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // reset context for progress updates
             m_startTime = 0;
             m_logDuration = INITIAL_LOG_DURATION;
-            if (stmts.length > 0) {
+            if (stmts != null && stmts.length > 0) {
                 m_sqlTexts = new String[stmts.length];
                 for (int i = 0; i < stmts.length; i++) {
                     m_sqlTexts[i] = stmts[i].getText();
