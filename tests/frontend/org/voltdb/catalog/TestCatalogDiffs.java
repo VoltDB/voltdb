@@ -27,8 +27,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import junit.framework.TestCase;
-
 import org.voltdb.TableHelper;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -40,6 +38,8 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestCatalogDiffs extends TestCase {
 
@@ -118,7 +118,7 @@ public class TestCatalogDiffs extends TestCase {
         String updatedOriginalSerialized = catOriginal.serialize();
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
 
-        String desc = diff.getDescriptionOfChanges();
+        String desc = diff.getDescriptionOfChanges(false);
 
         System.out.println("========================");
         System.out.println(desc);

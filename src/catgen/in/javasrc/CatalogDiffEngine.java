@@ -22,16 +22,16 @@
 package org.voltdb.catalog;
 
 import java.io.UnsupportedEncodingException;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.Arrays;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
@@ -1388,23 +1388,11 @@ public class CatalogDiffEngine {
      * This currently handles just the basics, but much of the plumbing is
      * in place to give a lot more detail, with a bit more work.
      */
-    public String getDescriptionOfChanges() {
+    public String getDescriptionOfChanges(boolean updatedClass) {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Catalog Difference Report\n");
         sb.append("=========================\n");
-        if (supported()) {
-            sb.append("  This change can occur while the database is running.\n");
-            if (requiresSnapshotIsolation()) {
-                sb.append("  This change must occur when no snapshot is running.\n");
-                sb.append("  If a snapshot is in progress, the system will wait \n" +
-                          "  until the snapshot is complete to make the changes.\n");
-            }
-        }
-        else {
-            sb.append("  Making this change requires stopping and restarting the database.\n");
-        }
-        sb.append("\n");
 
         boolean wroteChanges = false;
 
@@ -1422,7 +1410,7 @@ public class CatalogDiffEngine {
                 }
 
                 // check if export table
-                // this probably doesn't work due to the same kinds of problesm we have
+                // this probably doesn't work due to the same kinds of problems we have
                 // when identifying views. Tables just need a field that says if they
                 // are export tables or not... ugh. FIXME
                 for (Connector c : ((Database) table.getParent()).getConnectors()) {
@@ -1455,6 +1443,9 @@ public class CatalogDiffEngine {
         // DESCRIBE GROUP CHANGES
         wroteChanges |= basicMetaChangeDesc(sb, "GROUP CHANGES:", DiffClass.GROUP, null, null);
 
+        // DESCRIBE USER CHANGES
+        wroteChanges |= basicMetaChangeDesc(sb, "USER CHANGES:", DiffClass.USER, null, null);
+
         // DESCRIBE OTHER CHANGES
         CatalogChangeGroup group = m_changes.get(DiffClass.OTHER);
         if (group.groupChanges.size() > 0) {
@@ -1482,7 +1473,11 @@ public class CatalogDiffEngine {
         }
 
         if (!wroteChanges) {
-            sb.append("  No changes detected.\n");
+            if (updatedClass) {
+                sb.append("  Changes have been made to user code (procedures, supporting classes, etc).\n");
+            } else {
+                sb.append("  No changes detected.\n");
+            }
         }
 
         // trim the last newline
