@@ -33,6 +33,7 @@ import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
+import org.voltdb.SQLStmt;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
@@ -468,13 +469,20 @@ public class TestFragmentProgressUpdate extends TestCase {
                 fail("Invalid value for sqlTextExpectation");
             }
 
+            SQLStmt[] stmts = null;
+            if (sqlTexts != null) {
+                stmts = new SQLStmt[sqlTexts.length];
+                for (int i = 0; i < sqlTexts.length; i++) {
+                    stmts[i] = new SQLStmt(sqlTexts[i]);
+                }
+            }
             m_ee.executePlanFragments(
                     numFragsToExecute,
                     fragIds,
                     null,
                     paramSets,
                     null,
-                    null,
+                    stmts,
                     3, 3, 2, 42,
                     readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN, false);
             if (readOnly && timeout > 0) {
