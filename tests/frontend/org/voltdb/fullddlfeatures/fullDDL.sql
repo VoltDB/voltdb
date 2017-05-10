@@ -543,7 +543,7 @@ FROM CLASS
     org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 ;
 
-CREATE FUNCTION IntFunction FROM METHOD org.voltdb_testfuncs.IntFunction;
+CREATE FUNCTION IntFunction FROM METHOD org.voltdb_testfuncs.IntFunction.run;
 
 -- PARTITION TABLE
 -- basic

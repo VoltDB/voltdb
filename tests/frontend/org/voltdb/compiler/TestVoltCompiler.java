@@ -23,6 +23,10 @@
 
 package org.voltdb.compiler;
 
+import static org.mockito.Matchers.contains;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -39,6 +43,8 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
+import org.mockito.Mockito;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
@@ -2271,8 +2277,8 @@ public class TestVoltCompiler extends TestCase {
 
     public void testInvalidCreateFunctionDDL() throws Exception {
         ArrayList<Feedback> fbs;
+        // Test CREATE FUNCTION syntax
         String[] ddls = new String[] {
-                // Test CREATE FUNCTION syntax
                 "CREATE FUNCTION .func FROM METHOD class.method",
                 "CREATE FUNCTION func FROM METHOD class",
                 "CREATE FUNCTION func FROM METHOD .method",
@@ -2287,8 +2293,8 @@ public class TestVoltCompiler extends TestCase {
             assertTrue(isFeedbackPresent(String.format(expectedError, ddl), fbs));
         }
 
+        // Test identifiers
         String[][] ddlsAndInvalidIdentifiers = new String[][] {
-                // Test identifiers
                 {"CREATE FUNCTION 1nvalid FROM METHOD package.class.method", "1nvalid"},
                 {"CREATE FUNCTION func FROM METHOD 1nvalid.class.method", "1nvalid.class"},
                 {"CREATE FUNCTION func FROM METHOD package.1nvalid.method", "package.1nvalid"},
@@ -2300,6 +2306,53 @@ public class TestVoltCompiler extends TestCase {
             assertTrue(isFeedbackPresent(
                     String.format(expectedError, ddlAndInvalidIdentifier[0], ddlAndInvalidIdentifier[1]), fbs));
         }
+
+        // Test method validation
+        VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
+        VoltCompiler.setVoltLogger(mockedLogger);
+        String temporaryWarningMessage = "User-defined functions are not implemented yet.";
+
+        // Class not found
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.NonExistentClass.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Cannot load class for user-defined function: org.voltdb.compiler.functions.NonExistentClass", fbs));
+
+        // Abstract class
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.AbstractUDFClass.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Cannot define a function using an abstract class org.voltdb.compiler.functions.AbstractUDFClass", fbs));
+
+        // Method not found
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.nonexistent;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Cannot find the implementation method nonexistent for user-defined function afunc in class InvalidUDFLibrary", fbs));
+
+        // Invalid return type
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.runWithUnsupportedReturnType;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedReturnType has an unspported return type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType", fbs));
+
+        // Invalid parameter type
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.runWithUnsupportedParamType;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedParamType has an unspported parameter type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType at position 2", fbs));
+
+        // Multiple functions with the same name
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.dup;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Class InvalidUDFLibrary has multiple methods named dup. Only a single function method is supported.", fbs));
+
+        // The class contains some other invalid functions with the same name
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;", compiler);
+        assertTrue("A CREATE FUNCTION statement should be able to succeed, but it did not.", success);
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a non-public run() method."));
+        verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a void run() method."));
+        verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a static run() method."));
+        verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a non-public static void run() method."));
+
+        VoltCompiler.setVoltLogger(new VoltLogger("COMPILER"));
     }
 
     public void testInvalidCreateProcedureDDL() throws Exception {

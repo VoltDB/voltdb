@@ -1287,7 +1287,15 @@ public class CatalogDiffEngine {
             return true;
         }
 
-        if (suspect instanceof Statement || suspect instanceof PlanFragment) {
+        // Statement can be children of Table or MaterilizedViewInfo, which should apply to EE
+        // But if they are under Procedure, we can skip them.
+        if (suspect instanceof Statement && (suspect.getParent() instanceof Procedure == false)) {
+            return true;
+        }
+
+        // PlanFragment is a similar case like Statement
+        if (suspect instanceof PlanFragment && suspect.getParent() instanceof Statement &&
+                (suspect.getParent().getParent() instanceof Procedure == false)) {
             return true;
         }
 
