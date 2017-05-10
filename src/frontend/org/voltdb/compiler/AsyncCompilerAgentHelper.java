@@ -68,6 +68,7 @@ public class AsyncCompilerAgentHelper
             // or null if it still needs to be filled in.
             InMemoryJarfile newCatalogJar = null;
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
+            boolean updatedClass = false;
 
             String deploymentString = work.operationString;
             if ("@UpdateApplicationCatalog".equals(work.invocationName)) {
@@ -98,6 +99,7 @@ public class AsyncCompilerAgentHelper
                 // Real deploymentString should be the current deployment, just set it to null
                 // here and let it get filled in correctly later.
                 deploymentString = null;
+                updatedClass = true;
 
                 // mark it as non-schema change
                 retval.hasSchemaChange = false;
@@ -222,6 +224,7 @@ public class AsyncCompilerAgentHelper
             }
 
             String commands = diff.commands();
+            compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
