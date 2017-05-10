@@ -36,6 +36,7 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -118,18 +119,28 @@ public class ProcedureRunnerNT {
     /**
      * Complete the future when we get a traditional ProcedureCallback.
      */
-    class MyProcedureCallback implements ProcedureCallback {
-        final CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
+    class NTNestedProcedureCallback implements ProcedureCallback {
+        final CompletableFuture<ClientResponse> m_fut = new CompletableFuture<>();
+
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             // the future needs to be completed in the right executor service
             // so any follow on work will be in the right executor service
-            m_executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    fut.complete(clientResponse);
-                }
+            m_executorService.submit(() -> {
+                m_fut.complete(clientResponse);
             });
+        }
+
+        CompletableFuture<ClientResponse> fut() {
+            return m_fut;
+        }
+
+        String getHostnameOrIP() {
+            return m_ccxn.getHostnameOrIP();
+        }
+
+        long getConnectionId(long clientHandle) {
+            return m_ccxn.connectionId(m_clientHandle);
         }
     }
 
@@ -177,10 +188,10 @@ public class ProcedureRunnerNT {
      * Call a procedure (either txn or NT) and complete the returned future when done.
      */
     protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
-        MyProcedureCallback cb = new MyProcedureCallback();
-        boolean success = m_ntProcService.m_ich.callProcedure(m_user, isAdminConnection(), m_timeout, cb, true, null, procName, params);
+        NTNestedProcedureCallback cb = new NTNestedProcedureCallback();
+        boolean success = m_ntProcService.m_internalNTClientAdapter.callProcedure(m_user, isAdminConnection(), m_timeout, cb, procName, params);
         assert(success);
-        return cb.fut;
+        return cb.fut();
     }
 
     /**
@@ -287,6 +298,31 @@ public class ProcedureRunnerNT {
     }
 
     /**
+     * Send a response back to the proc caller. Refactored out of coreCall for both
+     * regular and exceptional paths.
+     */
+    private void completeCall(ClientResponseImpl response) {
+        // if we're keeping track, calculate result size
+        if (m_perCallStats.samplingProcedure()) {
+            m_perCallStats.setResultSize(response.getResults());
+        }
+        m_statsCollector.endProcedure(response.getStatus() == ClientResponse.USER_ABORT,
+                                      (response.getStatus() != ClientResponse.USER_ABORT) &&
+                                      (response.getStatus() != ClientResponse.SUCCESS),
+                                      m_perCallStats);
+
+        // send the response to the caller
+        // must be done as IRM to CI mailbox for backpressure accounting
+        response.setClientHandle(m_clientHandle);
+        InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(m_ciHandle,
+                                                                                       m_ccxn.connectionId(),
+                                                                                       response);
+        m_mailbox.deliver(irm);
+
+        m_ntProcService.handleNTProcEnd(ProcedureRunnerNT.this);
+    }
+
+    /**
      * Core Synchronous call to NT procedure run(..) method.
      * @return ClientResponseImpl non-null if done and null if there is an
      * async task still running.
@@ -326,61 +362,62 @@ public class ProcedureRunnerNT {
             try {
                 m_procedure.m_runner = this;
                 Object rawResult = m_procMethod.invoke(m_procedure, paramList);
+
                 if (rawResult instanceof CompletableFuture<?>) {
                     final CompletableFuture<?> fut = (CompletableFuture<?>) rawResult;
-                    fut.thenRun(new Runnable() {
-                        @Override
-                        public void run() {
-                            Object rawResult = null;
-                            ClientResponseImpl response = null;
+
+                    fut.thenRun(() -> {
+                        //
+                        // Happy path. No exceptions thrown. Procedure work is complete.
+                        //
+                        Object innerRawResult = null;
+                        ClientResponseImpl response = null;
+                        try {
+                            innerRawResult = fut.get();
+                        } catch (InterruptedException | ExecutionException e) {
+                            assert(false);
+                            // this is a bad place to be, but it's hard to know if it's crash bad...
+                            innerRawResult = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                    new VoltTable[0],
+                                    "Future returned from NTProc " + m_procedureName + " failed to complete.",
+                                    m_clientHandle);
+                        }
+
+                        if (innerRawResult instanceof ClientResponseImpl) {
+                            response = (ClientResponseImpl) innerRawResult;
+                        }
+                        else {
                             try {
-                                rawResult = fut.get();
-                            } catch (InterruptedException | ExecutionException e) {
+                                VoltTable[] r = ParameterConverter.getResultsFromRawResults(m_procedureName, innerRawResult);
+                                response = responseFromTableArray(r);
+                            } catch (Exception e) {
                                 // this is a bad place to be, but it's hard to know if it's crash bad...
-                                rawResult = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                response = new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                                         new VoltTable[0],
-                                        "Future returned from NTProc " + m_procedureName + " failed to complete.",
+                                        "Type " + innerRawResult.getClass().getName() +
+                                            " returned from NTProc \"" + m_procedureName +
+                                            "\" was not an acceptible VoltDB return type.",
                                         m_clientHandle);
                             }
-
-                            if (rawResult instanceof ClientResponseImpl) {
-                                response = (ClientResponseImpl) rawResult;
-                            }
-                            else {
-                                VoltTable[] results = null;
-                                try {
-                                    results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
-                                    response = responseFromTableArray(results);
-                                } catch (Exception e) {
-                                    // this is a bad place to be, but it's hard to know if it's crash bad...
-                                    response = new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                            new VoltTable[0],
-                                            "Type " + rawResult.getClass().getName() +
-                                                " returned from NTProc \"" + m_procedureName +
-                                                "\" was not an acceptible VoltDB return type.",
-                                            m_clientHandle);
-                                }
-                            }
-
-                            // if we're keeping track, calculate result size
-                            if (m_perCallStats.samplingProcedure()) {
-                                m_perCallStats.setResultSize(response.getResults());
-                            }
-                            m_statsCollector.endProcedure(response.getStatus() == ClientResponse.USER_ABORT,
-                                                          (response.getStatus() != ClientResponse.USER_ABORT) &&
-                                                          (response.getStatus() != ClientResponse.SUCCESS),
-                                                          m_perCallStats);
-
-                            // send the response to the caller
-                            // must be done as IRM to CI mailbox for backpressure accounting
-                            response.setClientHandle(m_clientHandle);
-                            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(m_ciHandle,
-                                                                                                           m_ccxn.connectionId(),
-                                                                                                           response);
-                            m_mailbox.deliver(irm);
-
-                            m_ntProcService.handleNTProcEnd(ProcedureRunnerNT.this);
                         }
+
+                        completeCall(response);
+                    })
+                    .exceptionally(e -> {
+                        //
+                        // Exception path. Some bit of async work threw something.
+                        //
+                        SerializableException se = null;
+                        if (e instanceof SerializableException) {
+                            se = (SerializableException) e;
+                        }
+
+                        String msg = "PROCEDURE " + m_procedureName + " THREW EXCEPTION: ";
+                        if (se != null) msg += se.getMessage();
+                        else msg += e.toString();
+                        m_statusCode = ClientResponse.GRACEFUL_FAILURE;
+                        completeCall(ProcedureRunner.getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, se));
+                        return null;
                     });
 
                     return null;

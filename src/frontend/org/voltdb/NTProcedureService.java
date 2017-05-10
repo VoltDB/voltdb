@@ -95,7 +95,7 @@ public class NTProcedureService {
     // A tracker of currently executing procedures by id, where id is a long that increments with each call
     Map<Long, ProcedureRunnerNT> m_outstanding = new ConcurrentHashMap<>();
     // This lets us respond over the network directly
-    final InternalConnectionHandler m_ich;
+    final LightweightNTClientResponseAdapter m_internalNTClientAdapter;
     // Mailbox for the client interface is used to send messages directly to other nodes (sysprocs only)
     final Mailbox m_mailbox;
     // We pause the service mid-catalog update for stats reasons
@@ -229,10 +229,14 @@ public class NTProcedureService {
 
     }
 
-    NTProcedureService(InternalConnectionHandler ich, Mailbox mailbox)
-    {
-        assert(ich != null);
-        m_ich = ich;
+    NTProcedureService(ClientInterface clientInterface, InvocationDispatcher dispatcher, Mailbox mailbox) {
+        assert(clientInterface != null);
+        assert(mailbox != null);
+
+        // create a specialized client response adapter for NT procs to use to call procedures
+        m_internalNTClientAdapter = new LightweightNTClientResponseAdapter(ClientInterface.NT_ADAPTER_CID, dispatcher);
+        clientInterface.bindAdapter(m_internalNTClientAdapter, null);
+
         m_mailbox = mailbox;
 
         m_sysProcs = loadSystemProcedures();

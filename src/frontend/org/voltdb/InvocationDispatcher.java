@@ -121,10 +121,9 @@ public final class InvocationDispatcher {
 
     private final NTProcedureService m_NTProcedureService;
 
-    InternalConnectionHandler m_internalConnectionHandler;
-
     public final static class Builder {
 
+        ClientInterface m_clientInterface;
         Cartographer m_cartographer;
         AtomicReference<CatalogContext> m_catalogContext;
         ConcurrentMap<Long, ClientInterfaceHandleManager> m_cihm;
@@ -133,7 +132,11 @@ public final class InvocationDispatcher {
         SnapshotDaemon m_snapshotDaemon;
         long m_plannerSiteId;
         long m_siteId;
-        InternalConnectionHandler m_ich;
+
+        public Builder clientInterface(ClientInterface clientInterface) {
+            m_clientInterface = checkNotNull(clientInterface, "given client interface is null");
+            return this;
+        }
 
         public Builder cartographer(Cartographer cartographer) {
             m_cartographer = checkNotNull(cartographer, "given cartographer is null");
@@ -175,13 +178,9 @@ public final class InvocationDispatcher {
             return this;
         }
 
-        public Builder internalConnectionHandler(InternalConnectionHandler ich) {
-            m_ich = checkNotNull(ich,"internal connection handler is null");;
-            return this;
-        }
-
         public InvocationDispatcher build() {
             return new InvocationDispatcher(
+                    m_clientInterface,
                     m_cartographer,
                     m_catalogContext,
                     m_cihm,
@@ -189,8 +188,7 @@ public final class InvocationDispatcher {
                     m_snapshotDaemon,
                     m_replicationRole,
                     m_plannerSiteId,
-                    m_siteId,
-                    m_ich
+                    m_siteId
                     );
         }
     }
@@ -200,6 +198,7 @@ public final class InvocationDispatcher {
     }
 
     private InvocationDispatcher(
+            ClientInterface clientInterface,
             Cartographer cartographer,
             AtomicReference<CatalogContext> catalogContext,
             ConcurrentMap<Long, ClientInterfaceHandleManager> cihm,
@@ -207,8 +206,7 @@ public final class InvocationDispatcher {
             SnapshotDaemon snapshotDaemon,
             ReplicationRole replicationRole,
             long plannerSiteId,
-            long siteId,
-            InternalConnectionHandler ich)
+            long siteId)
     {
         m_siteId = siteId;
         //m_plannerSiteId = plannerSiteId; TODO: Decide if this can be removed for realz
@@ -221,12 +219,11 @@ public final class InvocationDispatcher {
         m_cartographer = checkNotNull(cartographer, "given cartographer is null");
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
-        m_internalConnectionHandler = ich;
-
         // try to get the global default setting for read consistency, but fall back to SAFE
         m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
 
-        m_NTProcedureService = new NTProcedureService(m_internalConnectionHandler, m_mailbox);
+        m_NTProcedureService = new NTProcedureService(clientInterface, this, m_mailbox);
+
         // this kicks off the initial NT procedures being loaded
         notifyNTProcedureServiceOfCatalogUpdate();
     }
