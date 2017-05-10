@@ -18,7 +18,7 @@ fi
 # this might not work when the process command is extremely long
 for PROC in `$SUDO pgrep -f org.voltdb.VoltDB | xargs`
 do
-    logger -sp user.notice -t TESTKILL "User $USER $BUILD_TAG Killing `$SUDO ps -p $PROC -o pid=,user=,command=`"
+    logger -sp user.notice -t TESTKILL "User $USER $BUILD_TAG Killing `$SUDO ps -p $PROC -o pid= -o user= -o command=`"
     $SUDO kill -9 $PROC
 done
 
@@ -55,7 +55,7 @@ for PORT in $STANDARD_VOLTDB_PORTS
 do
     $GET_PORT_PROCESS_COMMAND
     if [ -n "$PROC" ]; then
-        logger -sp user.notice -t TESTKILL "User $USER Port $PORT $BUILD_TAG Killing ($KILL_PORT_PROCESS_COMMAND): `$SUDO ps -p $PROC -o pid=,user=,command=`"
+        logger -sp user.notice -t TESTKILL "User $USER Port $PORT $BUILD_TAG Killing ($KILL_PORT_PROCESS_COMMAND): `$SUDO ps -p $PROC -o pid= -o user= -o command=`"
         $KILL_PORT_PROCESS_COMMAND
     fi
 done
