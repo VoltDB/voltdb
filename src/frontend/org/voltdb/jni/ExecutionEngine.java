@@ -554,6 +554,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // reset context for progress updates
             m_startTime = 0;
             m_logDuration = INITIAL_LOG_DURATION;
+            m_sqlTexts = sqlTexts;
 
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);

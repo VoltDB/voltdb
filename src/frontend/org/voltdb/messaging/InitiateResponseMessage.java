@@ -19,7 +19,6 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -28,7 +27,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.iv2.DeterminismHash;
 
 /**
  * Message from an execution site to initiator with the final response for
@@ -273,10 +271,6 @@ public class InitiateResponseMessage extends VoltMessage {
             sb.append("\n  COMMIT");
         else
             sb.append("\n  ROLLBACK/ABORT, ");
-        int[] hashes = m_response.getHashes();
-        if (hashes != null) {
-            sb.append("\n RESPONSE HASH: ").append(DeterminismHash.description(hashes));
-        }
         sb.append("\n CLIENT RESPONSE: \n");
         sb.append(m_response.toJSONString());
 

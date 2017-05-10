@@ -431,8 +431,6 @@ public class MpScheduler extends Scheduler
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
-            } else if (result == DuplicateCounter.ABORT) {
-                VoltDB.crashLocalVoltDB("PARTIAL ROLLBACK/ABORT running every-site system procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
         }
