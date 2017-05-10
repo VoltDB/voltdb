@@ -29,7 +29,6 @@ import org.voltdb.calciteadapter.rel.VoltDBRel;
 import org.voltdb.calciteadapter.rules.VoltDBRules;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
@@ -59,6 +58,9 @@ public class CalcitePlanner {
 
 
     private static CompiledPlan calciteToVoltDBPlan(VoltDBRel rel, CompiledPlan compiledPlan) {
+
+        RexConverter.resetParameterIndex();
+
         AbstractPlanNode root = rel.toPlanNode();
         SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(root);
@@ -66,14 +68,18 @@ public class CalcitePlanner {
 
         compiledPlan.rootPlanGraph = root;
 
+        PostBuildVisitor postPlannerVisitor = new PostBuildVisitor();
+        root.acceptVisitor(postPlannerVisitor);
+
         compiledPlan.setReadOnly(true);
         compiledPlan.statementGuaranteesDeterminism(
-                false, // no limit or offset
-                true,  // is order deterministic
+                postPlannerVisitor.hasLimitOffset(), // no limit or offset
+                postPlannerVisitor.isOrderDeterministic(),  // is order deterministic
                 null); // no details on determinism
 
         compiledPlan.setStatementPartitioning(StatementPartitioning.forceSP());
-        compiledPlan.parameters = new ParameterValueExpression[0];
+
+        compiledPlan.parameters = postPlannerVisitor.getParameterValueExpressions();
 
         return compiledPlan;
     }
