@@ -189,8 +189,7 @@ public class ProcedureRunnerNT {
      */
     protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
         NTNestedProcedureCallback cb = new NTNestedProcedureCallback();
-        boolean success = m_ntProcService.m_internalNTClientAdapter.callProcedure(m_user, isAdminConnection(), m_timeout, cb, procName, params);
-        assert(success);
+        m_ntProcService.m_internalNTClientAdapter.callProcedure(m_user, isAdminConnection(), m_timeout, cb, procName, params);
         return cb.fut();
     }
 

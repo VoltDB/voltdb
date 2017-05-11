@@ -63,7 +63,7 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
 
     private final InvocationDispatcher m_dispatcher;
 
-    private boolean createTransaction(final InternalAdapterTaskAttributes kattrs,
+    private void createTransaction(final InternalAdapterTaskAttributes kattrs,
             final NTNestedProcedureCallback cb,
             final StoredProcedureInvocation task,
             final AuthSystem.AuthUser user)
@@ -72,7 +72,6 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
 
         final long handle = nextHandle();
         task.setClientHandle(handle);
-        //final InternalCallback cb = new InternalCallback(kattrs, task, proccb, user, handle);
 
         assert(m_callbacks.get(handle) == null);
         m_callbacks.put(handle, cb);
@@ -86,10 +85,7 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
             } finally {
                 m_callbacks.remove(handle);
             }
-            return r.getStatus() == ClientResponse.SUCCESS;
         }
-
-        return true;
     }
 
     /**
@@ -265,12 +261,12 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
      * Used to call a procedure from NTPRocedureRunner
      * Calls createTransaction with the proper params
      */
-    public boolean callProcedure(AuthUser user,
-                                 boolean isAdmin,
-                                 int timeout,
-                                 NTNestedProcedureCallback cb,
-                                 String procName,
-                                 Object[] args)
+    public void callProcedure(AuthUser user,
+                              boolean isAdmin,
+                              int timeout,
+                              NTNestedProcedureCallback cb,
+                              String procName,
+                              Object[] args)
     {
         // since we know the caller, this is safe
         assert(cb != null);
@@ -291,14 +287,16 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
         try {
             task = MiscUtils.roundTripForCL(task);
         } catch (Exception e) {
-            String fmt = "Cannot invoke procedure %s. failed to create task.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
-            return false;
+            String msg = String.format("Cannot invoke procedure %s. failed to create task.", procName);
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, msg);
+            ClientResponseImpl cri = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+            try {
+                cb.clientCallback(cri);
+            } catch (Exception e1) {
+                throw new IllegalStateException(e1);
+            }
         }
 
-        if (!createTransaction(kattrs, cb, task, user)) {
-            return false;
-        }
-        return true;
+        createTransaction(kattrs, cb, task, user);
     }
 }
