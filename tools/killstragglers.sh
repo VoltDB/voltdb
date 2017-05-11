@@ -49,6 +49,8 @@ if [[ "$OSTYPE" != darwin* ]] && type fuser > /dev/null 2>&1; then
 elif type lsof > /dev/null 2>&1; then
     GET_PORT_PROCESS_COMMAND=get_port_process_using_lsof
     KILL_PORT_PROCESS_COMMAND=kill_port_process_using_lsof
+else
+    echo "Unable to kill processes using VoltDB ports: neither fuser (-k) nor lsof is installed on this system."
 fi
 
 PROC=
