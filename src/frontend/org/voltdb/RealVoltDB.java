@@ -2933,6 +2933,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             long currentTxnUniqueId,
             byte[] deploymentBytes,
             byte[] deploymentHash,
+            boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange)
     {
         try {
@@ -3006,7 +3007,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
 
                 // 1. update the export manager.
-                ExportManager.instance().updateCatalog(m_catalogContext, diffCommands, partitions);
+                ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE, partitions);
 
                 // 1.1 Update the elastic join throughput settings
                 if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
