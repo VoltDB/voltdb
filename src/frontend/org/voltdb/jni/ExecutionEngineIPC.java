@@ -31,9 +31,9 @@ import java.util.logging.Logger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
-import org.voltdb.HybridCrc32;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SQLStmt;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
@@ -42,6 +42,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -930,8 +931,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
             final Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
+            SQLStmt[] stmts,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -953,8 +954,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     ParameterSet pset = (ParameterSet) params;
                     fser.writeParameterSet(pset);
                 }
-                if (isWriteFrag[i]) {
-                    writeCRC.updateFromPosition(paramStart, fser.getContainerNoFlip().b());
+                if (stmts != null && determinismHash != null && !stmts[i].isReadOnly()) {
+                    determinismHash.offerStatement(stmts[i], paramStart, fser.getContainerNoFlip().b());
                 }
             }
         } catch (final IOException exception) {
@@ -1008,15 +1009,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
+            SQLStmt[] stmts,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
             final long undoToken, boolean traceOn) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
-                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, isWriteFrag, writeCRC,
+                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, determinismHash, stmts,
                 txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
         if (m_perFragmentTimingEnabled) {

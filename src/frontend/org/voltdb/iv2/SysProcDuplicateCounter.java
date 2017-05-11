@@ -101,7 +101,10 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             tables.add(dep);
         }
 
-        return checkCommon(hash, message.isRecovering(), null, message);
+        // needs to be a three long array to work
+        int[] hashes = new int[] { (int) hash, 0, 0 };
+
+        return checkCommon(hashes, message.isRecovering(), null, message, false);
     }
 
     @Override

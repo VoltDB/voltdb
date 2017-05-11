@@ -30,24 +30,25 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
-import org.voltdb.HybridCrc32;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SQLStmt;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.iv2.TxnEgo;
-import org.voltdb.utils.VoltTrace;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * Wrapper for native Execution Engine library. There are two implementations,
@@ -632,9 +633,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
-            String[] sqlTexts,
+            DeterminismHash determinismHash,
+            SQLStmt[] stmts,
             long txnId,
             long spHandle,
             long lastCommittedSpHandle,
@@ -649,7 +649,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // reset context for progress updates
             m_startTime = 0;
             m_logDuration = INITIAL_LOG_DURATION;
-            m_sqlTexts = sqlTexts;
+            if (stmts != null && stmts.length > 0) {
+                m_sqlTexts = new String[stmts.length];
+                for (int i = 0; i < stmts.length; i++) {
+                    m_sqlTexts[i] = stmts[i].getText();
+                }
+            }
 
             if (traceOn) {
                 final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
@@ -661,7 +666,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             }
 
             FastDeserializer results = coreExecutePlanFragments(m_currentBatchIndex, numFragmentIds, planFragmentIds,
-                    inputDepIds, parameterSets, isWriteFrag, writeCRC, txnId, spHandle, lastCommittedSpHandle,
+                    inputDepIds, parameterSets, determinismHash, stmts, txnId, spHandle, lastCommittedSpHandle,
                     uniqueId, undoQuantumToken, traceOn);
 
             if (traceOn) {
@@ -693,8 +698,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
+            SQLStmt[] stmts,
             long txnId,
             long spHandle,
             long lastCommittedSpHandle,
