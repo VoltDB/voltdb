@@ -93,6 +93,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
+import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
@@ -131,6 +132,7 @@ import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -2992,7 +2994,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return CatalogUtil.getSnapshot(paths.getSnapshots(), voltDbRoot);
     }
 
-    public static void printDiagnosticInformation(CatalogContext context, String procName) {
+    public static void printDiagnosticInformation(CatalogContext context, String procName, LoadedProcedureSet procSet) {
         StringBuilder sb = new StringBuilder();
         final CatalogMap<Procedure> catalogProcedures = context.database.getProcedures();
         PureJavaCrc32C crc = new PureJavaCrc32C();
@@ -3006,19 +3008,43 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
                     int hash = (int) crc.getValue();
                     sb.append("Statement Hash: ").append(hash);
-                    sb.append(", Statement SQL: ").append(sqlText).append("\n");
+                    sb.append(", Statement SQL: ").append(sqlText);
+                    for (PlanFragment frag : stmt.getFragments()) {
+                        byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                        long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                        String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                        byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                        sb.append(", Plan Fragment Id:").append(planId);
+                        sb.append(", Plan Stmt Text:").append(stmtText);
+                        sb.append(", Json Plan:").append(new String(jsonPlan));
+                    }
+                    sb.append("\n");
                 }
             }
         }
-        sb.append("Default Procedures: ").append("\n");
+        sb.append("Default CRUD Procedures: ").append("\n");
         for (Entry<String, Procedure> pair : context.m_defaultProcs.m_defaultProcMap.entrySet()) {
             crc.reset();
             String sqlText = DefaultProcedureManager.sqlForDefaultProc(pair.getValue());
             crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
             int hash = (int) crc.getValue();
             sb.append("Statement Hash: ").append(hash);
-            sb.append(", Statement SQL: ").append(sqlText).append("\n");
+            sb.append(", Statement SQL: ").append(sqlText);
+            ProcedureRunner runner = procSet.getProcByName(pair.getValue().getTypeName());
+            for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
+                for (PlanFragment frag : stmt.getFragments()) {
+                    byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                    long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                    String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                    byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                    sb.append(", Plan Fragment Id:").append(planId);
+                    sb.append(", Plan Stmt Text:").append(stmtText);
+                    sb.append(", Json Plan:").append(new String(jsonPlan));
+                }
+            }
+            sb.append("\n");
         }
+
 
         hostLog.error(sb.toString());
     }
