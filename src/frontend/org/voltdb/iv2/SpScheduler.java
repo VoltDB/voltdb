@@ -1000,6 +1000,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                VoltDB.crashGlobalVoltDB("PARTIAL ROLLBACK/ABORT running multi-part procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
             return;
