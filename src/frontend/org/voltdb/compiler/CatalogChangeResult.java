@@ -33,6 +33,9 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public ProcedureInvocationType invocationType;
     public long originalTxnId;
     public long originalUniqueId;
+
+    // Should catalog diff commands apply to EE or not
+    public boolean requireCatalogDiffCmdsApplyToEE;
     // mark it false for UpdateClasses, in future may be marked false for deployment changes
     public boolean hasSchemaChange;
     // null or source version string if an automatic upgrade was done.
