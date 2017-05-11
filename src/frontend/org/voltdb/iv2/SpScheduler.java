@@ -38,6 +38,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
@@ -676,7 +677,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
+                RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                        counter.getStoredProcedureName());
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                        counter.getStoredProcedureName());
+                VoltDB.crashGlobalVoltDB("PARTIAL ROLLBACK/ABORT: transaction succeeded on one replica but failed on another replica.", true, null);
             }
         }
         else {
@@ -923,6 +930,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                VoltDB.crashGlobalVoltDB("PARTIAL ROLLBACK/ABORT running multi-part procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
             return;
