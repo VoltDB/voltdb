@@ -209,8 +209,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
      */
     public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
-        // note this will never require snapshot isolation because the MPI has no snapshot funtionality
-        m_executionSite.updateCatalog(diffCmds, context, csp, false, true);
+        // note this will never require snapshot isolation because the MPI has no snapshot functionality
+        // MPI does not have EE site, which means it does not need to apply EE catalog diffs.
+        m_executionSite.updateCatalog(diffCmds, context, csp, false, true, false);
         MpScheduler sched = (MpScheduler)m_scheduler;
         sched.updateCatalog(diffCmds, context, csp);
     }

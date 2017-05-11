@@ -39,13 +39,18 @@ public class DuplicateCounter
     static final int MISMATCH = 0;
     static final int DONE = 1;
     static final int WAITING = 2;
+    static final int ABORT = 3;
 
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
+    static final int[] ZERO_HASHES = new int[] { 0, 0, 0 };
+
     final long m_destinationId;
-    Long m_responseHash = null;
+    int[] m_responseHashes = null;
     protected VoltMessage m_lastResponse = null;
     protected VoltTable m_lastResultTables[] = null;
+    // if any response shows the transaction aborted
+    boolean m_txnSucceed = false;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
     private final String m_storedProcName;
@@ -85,37 +90,37 @@ public class DuplicateCounter
         }
     }
 
-    protected int checkCommon(long hash, boolean rejoining, VoltTable resultTables[], VoltMessage message)
+    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnSucceed)
     {
         if (!rejoining) {
-            if (m_responseHash == null) {
-                m_responseHash = Long.valueOf(hash);
+            if (m_responseHashes == null) {
+                m_responseHashes = hashes;
+                m_txnSucceed = txnSucceed;
             }
-            else if (!m_responseHash.equals(hash)) {
+            else if (!DeterminismHash.compareHashes(m_responseHashes, hashes)) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
                 String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
                         + "PREV MESSAGE: %s\n"
                         + "CURR MESSAGE: %s\n",
-                        hash, m_responseHash,
+                        hashes[0], m_responseHashes[0],
                         m_lastResponse.toString(), message.toString());
                 tmLog.error(msg);
                 return MISMATCH;
             }
-            /*
-             * Replicas will return a response to a write with no result tables
-             * always keep the local response which has the result tables
-             */
-//            if (m_lastResponse != null && resultTables != null) {
-//                if (m_lastResultTables.length < resultTables.length) {
-//                    m_lastResponse = message;
-//                    m_lastResultTables = resultTables;
-//                }
-//            } else {
-//                m_lastResponse = message;
-//                m_lastResultTables = resultTables;
-//            }
+            else if (m_txnSucceed != txnSucceed) {
+                tmLog.fatal("Stored procedure " + getStoredProcedureName()
+                        + " succeeded on one partition but failed on another partition."
+                        + " Shutting down to preserve data integrity.");
+                String msg = String.format("PARTIAL ROLLBACK/ABORT COMPARING: %d to %d\n"
+                        + "PREV MESSAGE: %s\n"
+                        + "CURR MESSAGE: %s\n",
+                        hashes[0], m_responseHashes[0],
+                        m_lastResponse.toString(), message.toString());
+                tmLog.error(msg);
+                return ABORT;
+            }
             m_lastResponse = message;
             m_lastResultTables = resultTables;
         }
@@ -144,17 +149,20 @@ public class DuplicateCounter
     {
         ClientResponseImpl r = message.getClientResponseData();
         // get the hash of sql run
-        long hash = 0;
-        Integer sqlHash = r.getHash();
-        if (sqlHash != null) {
-            hash = sqlHash.intValue();
+        int[] hashes = r.getHashes();
+
+        boolean txnAbort = true;
+        if (ClientResponseImpl.isTransactionallySuccessful(message.getClientResponseData().getStatus())) {
+            txnAbort = false;
         }
-        return checkCommon(hash, message.isRecovering(), r.getResults(), message);
+
+        return checkCommon(hashes, message.isRecovering(), r.getResults(), message, txnAbort);
     }
 
     int offer(FragmentResponseMessage message)
     {
-        return checkCommon(0, message.isRecovering(), null, message);
+        // No check on fragment message
+        return checkCommon(ZERO_HASHES, message.isRecovering(), null, message, false);
     }
 
     VoltMessage getLastResponse()

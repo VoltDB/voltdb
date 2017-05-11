@@ -22,16 +22,16 @@
 package org.voltdb.catalog;
 
 import java.io.UnsupportedEncodingException;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.Arrays;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
@@ -65,6 +65,8 @@ public class CatalogDiffEngine {
 
     // true if the difference is allowed in a running system
     private boolean m_supported;
+
+    private boolean m_requiresCatalogDiffCmdsApplyToEE = false;
 
     // true if table changes require the catalog change runs
     // while no snapshot is running
@@ -140,6 +142,10 @@ public class CatalogDiffEngine {
 
     public boolean supported() {
         return m_supported;
+    }
+
+    public boolean requiresCatalogDiffCmdsApplyToEE() {
+        return m_requiresCatalogDiffCmdsApplyToEE;
     }
 
     /**
@@ -983,6 +989,10 @@ public class CatalogDiffEngine {
             processModifyResponses(errorMessage, responseList);
         }
 
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(newType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
+        }
+
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         newType.writeCommandForField(m_sb, field, true);
@@ -996,6 +1006,56 @@ public class CatalogDiffEngine {
         }
         CatalogChangeGroup cgrp = m_changes.get(DiffClass.get(newType));
         cgrp.processChange(newType, prevType, field);
+    }
+
+    /**
+     * Our EE has a list of Catalog items that are in use, but Java catalog contains much more.
+     * Some of the catalog diff commands will only be useful to Java. So this function will
+     * decide whether the @param suspect catalog item will be used in EE or not.
+     * @param suspect
+     * @param prevType
+     * @param field
+     * @return true if the suspect catalog will be updated in EE, false otherwise.
+     */
+    protected static boolean checkCatalogDiffShouldApplyToEE(final CatalogType suspect)
+    {
+        // Warning:
+        // This check list should be consistent with catalog items defined in EE
+        // Once a new catalog type is added in EE, we should add it here.
+
+        if (suspect instanceof Cluster || suspect instanceof Database) {
+            return true;
+        }
+
+        if (suspect instanceof Table ||
+                suspect instanceof Column || suspect instanceof ColumnRef ||
+                suspect instanceof Index || suspect instanceof IndexRef ||
+                suspect instanceof Constraint || suspect instanceof ConstraintRef ||
+                suspect instanceof MaterializedViewInfo) {
+            return true;
+        }
+
+        // Statement can be children of Table or MaterilizedViewInfo, which should apply to EE
+        // But if they are under Procedure, we can skip them.
+        if (suspect instanceof Statement && (suspect.getParent() instanceof Procedure == false)) {
+            return true;
+        }
+        // PlanFragment is a similar case like Statement
+        if (suspect instanceof PlanFragment && suspect.getParent() instanceof Statement &&
+                (suspect.getParent().getParent() instanceof Procedure == false)) {
+            return true;
+        }
+
+        if (suspect instanceof Connector ||
+                suspect instanceof ConnectorProperty ||
+                suspect instanceof ConnectorTableInfo) {
+            // export table related change, should not skip EE
+            return true;
+        }
+
+        // The other changes in the catalog will not be applied to EE,
+        // including User, Group, Procedures or Statement under Procedures, etc
+        return false;
     }
 
     /**
@@ -1066,6 +1126,10 @@ public class CatalogDiffEngine {
             processModifyResponses(errorMessage, responseList);
         }
 
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(prevType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
+        }
+
         // write the commands to make it so
         // they will be ignored if the change is unsupported
         m_sb.append("delete ").append(prevType.getParent().getCatalogPath()).append(" ");
@@ -1096,6 +1160,10 @@ public class CatalogDiffEngine {
                 responseList = Arrays.<String[]>asList(response);
             }
             processModifyResponses(errorMessage, responseList);
+        }
+
+        if (! m_requiresCatalogDiffCmdsApplyToEE && checkCatalogDiffShouldApplyToEE(newType)) {
+            m_requiresCatalogDiffCmdsApplyToEE = true;
         }
 
         // write the commands to make it so
@@ -1388,23 +1456,11 @@ public class CatalogDiffEngine {
      * This currently handles just the basics, but much of the plumbing is
      * in place to give a lot more detail, with a bit more work.
      */
-    public String getDescriptionOfChanges() {
+    public String getDescriptionOfChanges(boolean updatedClass) {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Catalog Difference Report\n");
         sb.append("=========================\n");
-        if (supported()) {
-            sb.append("  This change can occur while the database is running.\n");
-            if (requiresSnapshotIsolation()) {
-                sb.append("  This change must occur when no snapshot is running.\n");
-                sb.append("  If a snapshot is in progress, the system will wait \n" +
-                          "  until the snapshot is complete to make the changes.\n");
-            }
-        }
-        else {
-            sb.append("  Making this change requires stopping and restarting the database.\n");
-        }
-        sb.append("\n");
 
         boolean wroteChanges = false;
 
@@ -1422,7 +1478,7 @@ public class CatalogDiffEngine {
                 }
 
                 // check if export table
-                // this probably doesn't work due to the same kinds of problesm we have
+                // this probably doesn't work due to the same kinds of problems we have
                 // when identifying views. Tables just need a field that says if they
                 // are export tables or not... ugh. FIXME
                 for (Connector c : ((Database) table.getParent()).getConnectors()) {
@@ -1455,6 +1511,9 @@ public class CatalogDiffEngine {
         // DESCRIBE GROUP CHANGES
         wroteChanges |= basicMetaChangeDesc(sb, "GROUP CHANGES:", DiffClass.GROUP, null, null);
 
+        // DESCRIBE USER CHANGES
+        wroteChanges |= basicMetaChangeDesc(sb, "USER CHANGES:", DiffClass.USER, null, null);
+
         // DESCRIBE OTHER CHANGES
         CatalogChangeGroup group = m_changes.get(DiffClass.OTHER);
         if (group.groupChanges.size() > 0) {
@@ -1482,7 +1541,11 @@ public class CatalogDiffEngine {
         }
 
         if (!wroteChanges) {
-            sb.append("  No changes detected.\n");
+            if (updatedClass) {
+                sb.append("  Changes have been made to user code (procedures, supporting classes, etc).\n");
+            } else {
+                sb.append("  No changes detected.\n");
+            }
         }
 
         // trim the last newline
