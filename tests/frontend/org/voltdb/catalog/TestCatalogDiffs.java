@@ -578,7 +578,6 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testModifyVarcharColumns() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        Catalog catOriginal, catUpdated;
         VoltProjectBuilder builder;
         String report;
 
@@ -586,29 +585,29 @@ public class TestCatalogDiffs extends TestCase {
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(5 BYTES) ) ;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar0.jar"));
-        catOriginal = catalogForJar(testDir + File.separator + "testVarchar0.jar");
+        Catalog cat1 = catalogForJar(testDir + File.separator + "testVarchar0.jar");
 
         // change from character to bytes
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(20 BYTES), v2 varchar(5 BYTES) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar1.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar1.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        Catalog cat2 = catalogForJar(testDir + File.separator + "testVarchar1.jar");
+        report = verifyDiff(cat1, cat2);
         assert(report.contains("Table A has been modified."));
 
         // size not satisfied if non-empty table
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(15 BYTES), v2 varchar(5 BYTES) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar2.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar2.jar");
-        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+        Catalog cat3 = catalogForJar(testDir + File.separator + "testVarchar2.jar");
+        verifyDiffIfEmptyTable(cat2, cat3);
 
         // inline character to not in line bytes.
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(100 BYTES), v2 varchar(5 BYTES) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar3.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar3.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        Catalog cat4 = catalogForJar(testDir + File.separator + "testVarchar3.jar");
+        report = verifyDiff(cat3, cat4);
         assert(report.contains("Table A has been modified."));
 
 
@@ -616,34 +615,34 @@ public class TestCatalogDiffs extends TestCase {
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(5 BYTES) ) ;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar0.jar"));
-        catOriginal = catalogForJar(testDir + File.separator + "testVarchar0.jar");
+        cat1 = catalogForJar(testDir + File.separator + "testVarchar0.jar");
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(5) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar4.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar4.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        cat2 = catalogForJar(testDir + File.separator + "testVarchar4.jar");
+        report = verifyDiff(cat1, cat2);
         assert(report.contains("Table A has been modified."));
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(15) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar5.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar5.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        cat3 = catalogForJar(testDir + File.separator + "testVarchar5.jar");
+        report = verifyDiff(cat2, cat3);
         assert(report.contains("Table A has been modified."));
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(150) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar6.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar6.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        cat4 = catalogForJar(testDir + File.separator + "testVarchar6.jar");
+        report = verifyDiff(cat3, cat4);
         assert(report.contains("Table A has been modified."));
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(3) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar6.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar6.jar");
-        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+        Catalog cat5 = catalogForJar(testDir + File.separator + "testVarchar6.jar");
+        verifyDiffIfEmptyTable(cat4, cat5);
     }
 
     public void testAddNonNullityRejected() throws IOException {
