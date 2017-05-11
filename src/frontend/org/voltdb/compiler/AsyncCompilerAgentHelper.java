@@ -20,13 +20,12 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.util.Map.Entry;
 
+import org.hsqldb_voltpatches.Database;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
@@ -35,6 +34,8 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
+
+import com.sun.org.apache.xml.internal.resolver.Catalog;
 
 public class AsyncCompilerAgentHelper
 {
@@ -69,6 +70,7 @@ public class AsyncCompilerAgentHelper
             // or null if it still needs to be filled in.
             InMemoryJarfile newCatalogJar = null;
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
+            boolean updatedClass = false;
 
             String deploymentString = work.operationString;
             if ("@UpdateApplicationCatalog".equals(work.invocationName)) {
@@ -99,6 +101,7 @@ public class AsyncCompilerAgentHelper
                 // Real deploymentString should be the current deployment, just set it to null
                 // here and let it get filled in correctly later.
                 deploymentString = null;
+                updatedClass = true;
 
                 // mark it as non-schema change
                 retval.hasSchemaChange = false;
@@ -200,6 +203,7 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = "The requested catalog change(s) are not supported:\n" + diff.errors();
                 return retval;
             }
+            compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
 
             retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
             // since diff commands can be stupidly big, compress them here
