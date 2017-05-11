@@ -96,7 +96,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -375,10 +374,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation,
-                long uniqueId, long spHandle)
+                long uniqueId, long spHandle, boolean requireCatalogDiffCmdsApplyToEE)
         {
             return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation,
-                    false, uniqueId, spHandle);
+                    false, uniqueId, spHandle, requireCatalogDiffCmdsApplyToEE);
         }
 
         @Override
@@ -1425,7 +1424,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI,
+            long uniqueId, long spHandle, boolean requireCatalogDiffCmdsApplyToEE)
     {
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
@@ -1437,9 +1437,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
-        diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
-        if (diffCmds.length() == 0) {
-            // empty diff cmds for the EE to apply, so skip the JNI call
+        if (requireCatalogDiffCmdsApplyToEE == false) {
+            // catalog changes do not require applying diff cmds to EE, so skip the JNI call for performance
             hostLog.info("Skipped applying diff commands on EE.");
             return true;
         }

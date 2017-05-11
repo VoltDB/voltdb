@@ -233,6 +233,7 @@ public class AsyncCompilerAgentHelper
             retval.reasonsForEmptyTables = diff.reasonsWhyTablesMustBeEmpty();
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
             retval.worksWithElastic = diff.worksWithElastic();
+            retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
         }
         catch (Exception e) {
             String msg = "Unexpected error in adhoc or catalog update: " + e.getClass() + ", " +

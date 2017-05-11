@@ -143,6 +143,7 @@ public interface VoltDBInterface
             long currentTxnTimestamp,
             byte[] deploymentBytes,
             byte[] deploymentHash,
+            boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange);
 
     /**

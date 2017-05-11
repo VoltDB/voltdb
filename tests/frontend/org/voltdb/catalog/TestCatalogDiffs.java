@@ -93,20 +93,37 @@ public class TestCatalogDiffs extends TestCase {
             Catalog catOriginal,
             Catalog catUpdated)
     {
-        return verifyDiff(catOriginal, catUpdated, null, null);
+        // expect to apply EE diff commands
+        return verifyDiff(catOriginal, catUpdated, null, null, true);
+    }
+
+    private String verifyDiff(
+            Catalog catOriginal,
+            Catalog catUpdated,
+            boolean expectApplyCatalogDiffToEE)
+    {
+        return verifyDiff(catOriginal, catUpdated, null, null, expectApplyCatalogDiffToEE);
     }
 
     private String verifyDiff(
             Catalog catOriginal,
             Catalog catUpdated,
             Boolean expectSnapshotIsolation,
-            Boolean worksWithElastic)
+            Boolean worksWithElastic,
+            Boolean expectApplyCatalogDiffToEE)
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
         String commands = diff.commands();
         System.out.println("DIFF COMMANDS:");
         System.out.println(commands);
-        catOriginal.execute(commands);
+
+        // copy the catalog from orginal for tests
+        String catOriginalCmds = catOriginal.serialize();
+        Catalog catOriginalCopy = new Catalog();
+        catOriginalCopy.execute(catOriginalCmds);
+        // apply the diff commands
+        catOriginalCopy.execute(commands);
+
         assertTrue(diff.supported());
         assertEquals(0, diff.tablesThatMustBeEmpty().length);
         if (expectSnapshotIsolation != null) {
@@ -115,7 +132,10 @@ public class TestCatalogDiffs extends TestCase {
         if (worksWithElastic != null) {
             assertEquals((boolean)worksWithElastic, diff.worksWithElastic());
         }
-        String updatedOriginalSerialized = catOriginal.serialize();
+        if (expectApplyCatalogDiffToEE != null) {
+            assertEquals(expectApplyCatalogDiffToEE.booleanValue(), diff.requiresCatalogDiffCmdsApplyToEE());
+        }
+        String updatedOriginalSerialized = catOriginalCopy.serialize();
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
 
         String desc = diff.getDescriptionOfChanges(false);
@@ -163,7 +183,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compile("expanded", EXPANDEDPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        String report = verifyDiff(catOriginal, catUpdated);
+        String report = verifyDiff(catOriginal, catUpdated, false);
         assertTrue(report.contains("Procedure slev added."));
     }
 
@@ -173,7 +193,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compile("conflict", CONFLICTPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        String report = verifyDiff(catOriginal, catUpdated);
+        String report = verifyDiff(catOriginal, catUpdated, false);
         assertTrue(report.contains("Procedure InsertNewOrder has been modified."));
     }
 
@@ -183,7 +203,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compile("fewer", FEWERPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        String report = verifyDiff(catOriginal, catUpdated);
+        String report = verifyDiff(catOriginal, catUpdated, false);
         assertTrue(report.contains("Procedure delivery dropped."));
     }
 
@@ -196,7 +216,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testAddGroupAndUser() throws IOException {
@@ -212,7 +232,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testModifyUser() throws IOException {
@@ -232,7 +252,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compileWithGroups(false, null, gi2, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testDeleteUser() throws IOException {
@@ -249,7 +269,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testDeleteGroupAndUser() throws IOException {
@@ -266,7 +286,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compileWithGroups(false, null, null, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testChangeUsersAssignedGroups() throws IOException {
@@ -287,7 +307,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testChangeSecurityEnabled() throws IOException {
@@ -306,7 +326,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compileWithGroups(true, "hash", gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        verifyDiff (catOriginal, catUpdated);
+        verifyDiff (catOriginal, catUpdated, false);
     }
 
     public void testChangeSecurityProvider() throws IOException {
@@ -325,7 +345,7 @@ public class TestCatalogDiffs extends TestCase {
         String updated = compileWithGroups(true, "kerberos", gi, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
-        verifyDiff (catOriginal, catUpdated);
+        verifyDiff (catOriginal, catUpdated, false);
     }
 
     public void testAdminStartupChange() throws IOException {
@@ -345,7 +365,7 @@ public class TestCatalogDiffs extends TestCase {
                 1, 1, 0, 1000, false, 0)); // setting adminstartup to false is the test
         Catalog catUpdated = catalogForJar(testDir + File.separator + "adminstartup2.jar");
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testDiffOfIdenticalCatalogs() throws IOException {
@@ -457,7 +477,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testaddtable2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testaddtable2.jar");
 
-        verifyDiff(catOriginal, catUpdated, false, null);
+        verifyDiff(catOriginal, catUpdated, false, null, true);
     }
 
     public void testDropTable() throws IOException {
@@ -476,7 +496,7 @@ public class TestCatalogDiffs extends TestCase {
         // Create a catalog with just table A
         Catalog catUpdated = getCatalogForTable("A", "droptable2");
 
-        verifyDiff(catOriginal, catUpdated, false, null);
+        verifyDiff(catOriginal, catUpdated, false, null, true);
     }
 
     public void testViewConversion() throws IOException {
@@ -517,7 +537,7 @@ public class TestCatalogDiffs extends TestCase {
     public void testAddTableColumn() throws IOException {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
-        verifyDiff(catOriginal, catUpdated, true, null);
+        verifyDiff(catOriginal, catUpdated, true, null, true);
 
         VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
@@ -529,7 +549,7 @@ public class TestCatalogDiffs extends TestCase {
     public void testRemoveTableColumn() throws IOException {
         Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumn2");
         Catalog catUpdated = getCatalogForTable("A", "removetablecolumn1");
-        verifyDiff(catOriginal, catUpdated, true, null);
+        verifyDiff(catOriginal, catUpdated, true, null, true);
 
         VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
@@ -544,14 +564,14 @@ public class TestCatalogDiffs extends TestCase {
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
         Catalog catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         Catalog catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiff(catOriginal, catUpdated, true, null);
+        verifyDiff(catOriginal, catUpdated, true, null, true);
 
         // even pass when crossing the inline/out-of-line boundary
         t1 = TableHelper.quickTable("(VARBINARY30)");
         t2 = TableHelper.quickTable("(VARBINARY70)");
         catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiff(catOriginal, catUpdated, true, null);
+        verifyDiff(catOriginal, catUpdated, true, null, true);
 
         // fail integer contraction if non-empty empty
         t1 = TableHelper.quickTable("(BIGINT)");
@@ -577,7 +597,6 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testModifyVarcharColumns() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        Catalog catOriginal, catUpdated;
         VoltProjectBuilder builder;
         String report;
 
@@ -585,29 +604,29 @@ public class TestCatalogDiffs extends TestCase {
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(5 BYTES) ) ;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar0.jar"));
-        catOriginal = catalogForJar(testDir + File.separator + "testVarchar0.jar");
+        Catalog cat1 = catalogForJar(testDir + File.separator + "testVarchar0.jar");
 
         // change from character to bytes
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(20 BYTES), v2 varchar(5 BYTES) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar1.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar1.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        Catalog cat2 = catalogForJar(testDir + File.separator + "testVarchar1.jar");
+        report = verifyDiff(cat1, cat2);
         assert(report.contains("Table A has been modified."));
 
         // size not satisfied if non-empty table
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(15 BYTES), v2 varchar(5 BYTES) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar2.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar2.jar");
-        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+        Catalog cat3 = catalogForJar(testDir + File.separator + "testVarchar2.jar");
+        verifyDiffIfEmptyTable(cat2, cat3);
 
         // inline character to not in line bytes.
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(100 BYTES), v2 varchar(5 BYTES) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar3.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar3.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        Catalog cat4 = catalogForJar(testDir + File.separator + "testVarchar3.jar");
+        report = verifyDiff(cat3, cat4);
         assert(report.contains("Table A has been modified."));
 
 
@@ -615,34 +634,34 @@ public class TestCatalogDiffs extends TestCase {
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(5 BYTES) ) ;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar0.jar"));
-        catOriginal = catalogForJar(testDir + File.separator + "testVarchar0.jar");
+        cat1 = catalogForJar(testDir + File.separator + "testVarchar0.jar");
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(5) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar4.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar4.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        cat2 = catalogForJar(testDir + File.separator + "testVarchar4.jar");
+        report = verifyDiff(cat1, cat2);
         assert(report.contains("Table A has been modified."));
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(15) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar5.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar5.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        cat3 = catalogForJar(testDir + File.separator + "testVarchar5.jar");
+        report = verifyDiff(cat2, cat3);
         assert(report.contains("Table A has been modified."));
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(150) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar6.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar6.jar");
-        report = verifyDiff(catOriginal, catUpdated);
+        cat4 = catalogForJar(testDir + File.separator + "testVarchar6.jar");
+        report = verifyDiff(cat3, cat4);
         assert(report.contains("Table A has been modified."));
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(3) );");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testVarchar6.jar"));
-        catUpdated = catalogForJar(testDir + File.separator + "testVarchar6.jar");
-        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+        Catalog cat5 = catalogForJar(testDir + File.separator + "testVarchar6.jar");
+        verifyDiffIfEmptyTable(cat4, cat5);
     }
 
     public void testAddNonNullityRejected() throws IOException {
@@ -706,7 +725,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar");
 
-        verifyDiff(catOriginal, catUpdated, false, null);
+        verifyDiff(catOriginal, catUpdated, false, null, true);
     }
 
     public void testAddUniqueNonCoveringTableIndexRejectedIfNotEmpty() throws IOException {
@@ -1231,7 +1250,7 @@ public class TestCatalogDiffs extends TestCase {
 
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
-        verifyDiff(catOriginal, catUpdated, null, true);
+        verifyDiff(catOriginal, catUpdated, null, true, false);
     }
 
     public void testChangeNotCompatibleWithElasticAddProcedure() throws IOException {
@@ -1245,7 +1264,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addStmtProcedure("another_procedure", "select * from A;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
-        verifyDiff(catOriginal, catUpdated, null, false);
+        verifyDiff(catOriginal, catUpdated, null, false, false);
     }
 
     public void testChangeNotCompatibleWithElasticAddTable() throws IOException {
@@ -1259,7 +1278,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE another_table (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
-        verifyDiff(catOriginal, catUpdated, null, false);
+        verifyDiff(catOriginal, catUpdated, null, false, true);
     }
 
     public void testEnableDROnEmptyTable() throws IOException {
