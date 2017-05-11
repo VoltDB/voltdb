@@ -575,7 +575,7 @@ public class ExportManager
         m_processorConfig = config;
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, String diffCommands, List<Integer> partitions)
+    public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -592,7 +592,7 @@ public class ExportManager
          * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
          * If anything changes in getDiffCommandsForEE or design changes pay attention to fix this.
          */
-        if (CatalogUtil.getDiffCommandsForEE(diffCommands).length() == 0) {
+        if (requireCatalogDiffCmdsApplyToEE == false) {
             exportLog.info("Skipped rolling generations as generation not created in EE.");
             return;
         }

@@ -202,7 +202,7 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = "The requested catalog change(s) are not supported:\n" + diff.errors();
                 return retval;
             }
-
+            // log the descriptive UAC changes
             compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
 
             // since diff commands can be stupidly big, compress them here
@@ -211,6 +211,7 @@ public class AsyncCompilerAgentHelper
             retval.reasonsForEmptyTables = diff.reasonsWhyTablesMustBeEmpty();
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
             retval.worksWithElastic = diff.worksWithElastic();
+            retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
         }
         catch (Exception e) {
             String msg = "Unexpected error in adhoc or catalog update: " + e.getClass() + ", " +
