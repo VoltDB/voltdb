@@ -51,6 +51,7 @@ elif type lsof > /dev/null 2>&1; then
     KILL_PORT_PROCESS_COMMAND=kill_port_process_using_lsof
 fi
 
+PROC=
 for PORT in $STANDARD_VOLTDB_PORTS
 do
     $GET_PORT_PROCESS_COMMAND
