@@ -42,6 +42,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
 
@@ -173,8 +174,8 @@ public class AsyncCompilerAgent {
         // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
         Boolean hasDDL = null;
         // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
-        SortedSet<String> conflictTables = new TreeSet<String>();
-        Set<String> createdTables = new HashSet<String>();
+        SortedSet<String> conflictTables = new TreeSet<>();
+        Set<String> createdTables = new HashSet<>();
         for (String stmt : w.sqlStatements) {
             // Simulate an unhandled exception? (ENG-7653)
             if (DEBUG_MODE.isTrue() && stmt.equals(DEBUG_EXCEPTION_DDL)) {
@@ -390,6 +391,23 @@ public class AsyncCompilerAgent {
                 partitioning = StatementPartitioning.forceSP();
             }
             try {
+                /*
+                 * We turn calls like
+                 *   (1) client.createProcedure("@SwapTables", "this", "that")
+                 * into adhoc work so that we can create a plan for it.  The SQL string here will be
+                 * "@SwapTables T1 T2".  But if we actually see a call like
+                 *   (2) client.callProcedure("@AdHoc", "@SwapTables T1 T2")
+                 * we fall into the same code path.  So, we will not be able to tell
+                 * line (1) from  line (2) above in the planner.  This is as it
+                 * should be, since the planner should not necessarily know
+                 * the secrets of its caller.  In case (1) above the work.invocationName
+                 * will be "@SwapTables" and in case (2) it will be "@AdHoc".  So
+                 * we throw an error here in case (2).
+                 */
+                if ( ! "@SwapTables".equals(work.invocationName)
+                        && sqlStatement.startsWith("@SwapTables ")) {
+                    throw new PlanningErrorException("Cannot call @SwapTables from an @AdHoc invocation.");
+                }
                 AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
                         work.explainMode != ExplainMode.NONE, work.userParamSet);
                 // The planning tool may have optimized for the single partition case

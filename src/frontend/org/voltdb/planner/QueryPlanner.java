@@ -155,6 +155,9 @@ public class QueryPlanner {
         // the normal @AdHoc and compiled stored procedures code paths would
         // be overkill at this point.
         // So we settle for this early return of a "forged" parser result.
+        //
+        // Note that we don't allow this from an @AdHoc compilation.  See
+        // ENG-12368.
         if (m_sql.startsWith("@SwapTables ")) {
             String[] swapTableArgs = m_sql.split(" ");
             m_xmlSQL = forgeVoltXMLForSwapTables(
@@ -232,7 +235,7 @@ public class QueryPlanner {
     public String parameterize() {
         m_paramzInfo = ParameterizationInfo.parameterize(m_xmlSQL);
 
-        Set<Integer> paramIds = new HashSet<Integer>();
+        Set<Integer> paramIds = new HashSet<>();
         ParameterizationInfo.findUserParametersRecursively(m_xmlSQL, paramIds);
         m_adhocUserParamsCount = paramIds.size();
 
