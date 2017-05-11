@@ -27,6 +27,12 @@ import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.parser.SQLLexer;
 
+/**
+ * A flavor of AdHoc that is only used in VoltDB tests. It allows you to force
+ * DQL or DML to be single-partition by including a single partition key object
+ * just after the sql statement (and before optional parameters).
+ *
+ */
 public class AdHocSpForTest extends AdHocNTBase {
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
         if (params.size() < 2) {
@@ -39,6 +45,7 @@ public class AdHocSpForTest extends AdHocNTBase {
         String sql = (String) paramArray[0];
         Object userPartitionKey = paramArray[1];
 
+        // get any user params from the end
         Object[] userParams = null;
         if (params.size() > 2) {
             userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);

@@ -48,6 +48,15 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
+/**
+ * Base class for non-transactional sysprocs UpdateApplicationCatalog, UpdateClasses and Promote.
+ * *ALSO* the base class for AdHocNTBase, which is the base class for AdHoc, AdHocSPForTest
+ * and SwapTables.
+ *
+ * Has the common code for figuring out what changes need to be passed onto the transactional
+ * UpdateCore procedure.
+ *
+ */
 public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     protected static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -138,8 +147,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             else if ("@AdHoc".equals(invocationName)) {
                 // work.adhocDDLStmts should be applied to the current catalog
                 try {
-                    newCatalogJar = addDDLToCatalog(context.catalog, oldJar,
-                            adhocDDLStmts, drRole == DrRoleType.XDCR);
+                    newCatalogJar = addDDLToCatalog(context.catalog, oldJar, adhocDDLStmts, drRole == DrRoleType.XDCR);
                 }
                 catch (VoltCompilerException vce) {
                     throw new PrepareDiffFailureException(ClientResponse.GRACEFUL_FAILURE, vce.getMessage());
@@ -361,12 +369,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return jarfile;
     }
 
+    /** Check if something should run based on admin/paused/internal status */
     protected boolean allowPausedModeWork(boolean internalCall, boolean adminConnection) {
         return (VoltDB.instance().getMode() != OperationMode.PAUSED ||
                 internalCall ||
                 adminConnection);
     }
 
+    /** Error generating shortcut method */
     protected CompletableFuture<ClientResponse> makeQuickResponse(byte statusCode, String msg) {
         ClientResponseImpl cri = new ClientResponseImpl(statusCode, new VoltTable[0], msg);
         CompletableFuture<ClientResponse> f = new CompletableFuture<>();

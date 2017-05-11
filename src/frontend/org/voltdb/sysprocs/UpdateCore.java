@@ -58,6 +58,14 @@ import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
 
+/**
+ * Formally "UpdateApplicationCatalog", this proc represents the transactional
+ * part of making schema/deployment changes to VoltDB.
+ *
+ * It's called by UpdateApplicationCatalog, UpdateClasses, Promote and by the
+ * restore planner.
+ *
+ */
 @ProcInfo(singlePartition = false)
 public class UpdateCore extends VoltSystemProcedure {
     static JavaClassForTest m_javaClass = new JavaClassForTest();

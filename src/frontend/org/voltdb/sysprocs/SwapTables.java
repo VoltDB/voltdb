@@ -26,6 +26,11 @@ import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 
+/**
+ * Non-transactional procedure that turns around and creates a SQL statement
+ * string "@SwapTables TableA TableB" and passes it on to AdHoc.
+ *
+ */
 public class SwapTables extends AdHocNTBase {
 
     public CompletableFuture<ClientResponse> run(String theTable, String otherTable) {

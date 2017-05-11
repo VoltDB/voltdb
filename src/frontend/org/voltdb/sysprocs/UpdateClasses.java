@@ -26,23 +26,18 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
+/**
+ * Non-transactional procedure to implement public @UpdateClasses system procedure.
+ *
+ */
 public class UpdateClasses extends UpdateApplicationBase {
 
     public CompletableFuture<ClientResponse> run(byte[] jarfileBytes, String classesToDeleteSelector) {
-        //
-        // InvocationDispatcher
-        //
-
         DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
-        // TODO: add hostname/user to NTSysprocProc API
-        // TODO: make this stuff real?
-        String invocationName = "@UpdateClasses";
-        boolean isPromotion = false;
         boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
-        boolean internalCall = false;
 
-        if (!allowPausedModeWork(internalCall, isAdminConnection())) {
+        if (!allowPausedModeWork(false, isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
@@ -59,12 +54,12 @@ public class UpdateClasses extends UpdateApplicationBase {
 
         CatalogChangeResult ccr = null;
         try {
-            ccr = prepareApplicationCatalogDiff(invocationName,
+            ccr = prepareApplicationCatalogDiff("@UpdateClasses",
                                                 jarfileBytes,
                                                 classesToDeleteSelector,
                                                 new String[0],
                                                 null,
-                                                isPromotion,
+                                                false, /* isPromotion */
                                                 drRole,
                                                 useDDLSchema,
                                                 false,

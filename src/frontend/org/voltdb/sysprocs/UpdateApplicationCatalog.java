@@ -26,23 +26,20 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
+/**
+ * Non-transactional procedure to implement public @UpdateApplicationCatalog system
+ * procedure.
+ *
+ */
 public class UpdateApplicationCatalog extends UpdateApplicationBase {
 
     public CompletableFuture<ClientResponse> run(byte[] catalogJarBytes, String deploymentString) {
         // catalogJarBytes if null, when passed along, will tell the
         // catalog change planner that we want to use the current catalog.
 
-        //
-        // InvocationDispatcher
-        //
-
         DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
-        // TODO: add hostname/user to NTSysprocProc API
-        // TODO: make this stuff real?
-        String invocationName = "@UpdateApplicationCatalog";
-        boolean isRestoring = isRestoring();
-        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema() && !isRestoring;
+        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema() && !isRestoring();
 
         if (!allowPausedModeWork(isRestoring(), isAdminConnection())) {
             return makeQuickResponse(
@@ -52,8 +49,7 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         // We have an @UAC.  Is it okay to run it?
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen
-        if (catalogJarBytes != null && useDDLSchema)
-        {
+        if (catalogJarBytes != null && useDDLSchema) {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
                     "Cluster is configured to use AdHoc DDL to change application schema. " +
@@ -62,12 +58,12 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
 
         CatalogChangeResult ccr = null;
         try {
-            ccr = prepareApplicationCatalogDiff(invocationName,
+            ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
                                                 catalogJarBytes,
                                                 deploymentString,
                                                 new String[0],
                                                 null,
-                                                false,
+                                                false, /* isPromotion */
                                                 drRole,
                                                 useDDLSchema,
                                                 false,
@@ -91,7 +87,8 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
         }
 
-        if (isRestoring) {
+        // This means no more @UAC calls when using DDL mode.
+        if (isRestoring()) {
             noteRestoreCompleted();
         }
 

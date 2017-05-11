@@ -44,6 +44,11 @@ import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
+/**
+ * Base class for non-transactional sysprocs AdHoc, AdHocSPForTest and SwapTables
+ *
+ *
+ */
 public abstract class AdHocNTBase extends UpdateApplicationBase {
 
     protected static final VoltLogger adhocLog = new VoltLogger("ADHOC");
@@ -71,38 +76,35 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Log ad hoc batch info
      * @param batch  planned statement batch
      */
-    /*private void logBatch(final
-                          final String sqlStatements,
+    private void logBatch(final CatalogContext context,
+                          final String[] sqlStatements,
                           final Object[] userParams,
                           final AdHocPlannedStmtBatch batch)
     {
-        final int numStmts = batch.work.getStatementCount();
-        final int numParams = batch.work.getParameterCount();
+        final int numStmts = sqlStatements.length;
+        final int numParams = userParams.length;
         final String readOnly = batch.readOnly ? "yes" : "no";
         final String singlePartition = batch.isSinglePartitionCompatible() ? "yes" : "no";
-        final String user = batch.work.user.m_name;
-        final CatalogContext context = (batch.work.catalogContext != null
-                                            ? batch.work.catalogContext
-                                            : VoltDB.instance().getCatalogContext());
+        final String user = getUsername();
         final String[] groupNames = context.authSystem.getGroupNamesForUser(user);
         final String groupList = StringUtils.join(groupNames, ',');
 
         adhocLog.debug(String.format(
             "=== statements=%d parameters=%d read-only=%s single-partition=%s user=%s groups=[%s]",
             numStmts, numParams, readOnly, singlePartition, user, groupList));
-        if (batch.work.sqlStatements != null) {
-            for (int i = 0; i < batch.work.sqlStatements.length; ++i) {
-                adhocLog.debug(String.format("Statement #%d: %s", i + 1, batch.work.sqlStatements[i]));
+        if (sqlStatements != null) {
+            for (int i = 0; i < sqlStatements.length; ++i) {
+                adhocLog.debug(String.format("Statement #%d: %s", i + 1, sqlStatements[i]));
             }
         }
-        if (batch.work.userParamSet != null) {
-            for (int i = 0; i < batch.work.userParamSet.length; ++i) {
-                Object value = batch.work.userParamSet[i];
+        if (userParams != null) {
+            for (int i = 0; i < userParams.length; ++i) {
+                Object value = userParams[i];
                 final String valueString = (value != null ? value.toString() : "NULL");
                 adhocLog.debug(String.format("Parameter #%d: %s", i + 1, valueString));
             }
         }
-    }*/
+    }
 
     public enum AdHocSQLMix {
         EMPTY,
@@ -111,6 +113,13 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         MIXED;
     }
 
+    /**
+     * Split a set of one or more semi-colon delimeted sql statements into a list.
+     * Store the list in validatedHomogeonousSQL.
+     * Return whether the SQL is empty, all dml or dql, all ddl, or an invalid mix (AdHocSQLMix)
+     *
+     * Used by the NT adhoc procs, but also by the experimental in-proc adhoc.
+     */
     public static AdHocSQLMix processAdHocSQLStmtTypes(String sql, List<String> validatedHomogeonousSQL) {
         assert(validatedHomogeonousSQL != null);
         assert(validatedHomogeonousSQL.size() == 0);
@@ -160,6 +169,10 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
     }
 
+    /**
+     * Compile a batch of one or more SQL statements into a set of plans.
+     * Parameters are valid iff there is exactly one DML/DQL statement.
+     */
     public static AdHocPlannedStatement compileAdHocSQL(CatalogContext context,
                                                         String sqlStatement,
                                                         boolean inferPartitioning,
@@ -229,6 +242,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
     }
 
+    /**
+     * Plan and execute a batch of DML/DQL sql. Any DDL has been filtered out at this point.
+     */
     protected CompletableFuture<ClientResponse> runNonDDLAdHoc(CatalogContext context,
                                                                List<String> sqlStatements,
                                                                boolean inferPartitioning,
@@ -294,10 +310,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                           partitionParamValue,
                                           userPartitionKey == null ? null : new Object[] { userPartitionKey });
 
-        // TODO: re-enable this
-        /*if (adhocLog.isDebugEnabled()) {
-            logBatch(plannedStmtBatch);
-        }*/
+        if (adhocLog.isDebugEnabled()) {
+            logBatch(context, stmts.toArray(new String[0]), userParamSet, plannedStmtBatch);
+        }
 
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
         if (traceLog != null) {
@@ -382,61 +397,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     }
 
     /**
-     * A simplified variant of compileAdHoc that translates a
-     * pseudo-statement generated internally from a system stored proc
-     * invocation into a multi-part EE statement plan.
-     * @param work
-     * @return
+     * Take a set of adhoc plans and pass them off to the right transactional
+     * adhoc variant.
      */
-    /*AsyncCompilerResult compileSysProcPlan(AdHocPlannerWork work) {
-        // record the catalog version the query is planned against to
-        // catch races vs. updateApplicationCatalog.
-        CatalogContext context = work.catalogContext;
-        if (context == null) {
-            context = VoltDB.instance().getCatalogContext();
-        }
-
-        final PlannerTool ptool = context.m_ptool;
-
-        List<String> errorMsgs = new ArrayList<>();
-        List<AdHocPlannedStatement> stmts = new ArrayList<>();
-        assert(work.sqlStatements != null);
-        assert(work.sqlStatements.length == 1);
-
-        String sqlStatement = work.sqlStatements[0];
-        StatementPartitioning partitioning = StatementPartitioning.forceMP();
-        try {
-            AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
-                    false, work.userParamSet);
-            stmts.add(result);
-        }
-        catch (Exception ex) {
-            errorMsgs.add("Unexpected System Stored Procedure Planning Error: " + ex);
-        }
-        catch (AssertionError ae) {
-            errorMsgs.add("Assertion Error in System Stored Procedure Planning: " + ae);
-        }
-
-        String errorSummary = null;
-        if ( ! errorMsgs.isEmpty()) {
-            errorSummary = StringUtils.join(errorMsgs, "\n");
-        }
-
-        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,
-                stmts, -1, null, null, errorSummary);
-
-        if (adhocLog.isDebugEnabled()) {
-            logBatch(plannedStmtBatch);
-        }
-
-        return plannedStmtBatch;
-    }*/
-
-
-
-
-
-
     private final CompletableFuture<ClientResponse> createAdHocTransaction(
             final AdHocPlannedStmtBatch plannedStmtBatch,
             final boolean isSwapTables)

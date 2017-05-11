@@ -27,6 +27,10 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
+/**
+ * Non-transactional procedure to implement public @Promote system procedure.
+ *
+ */
 public class Promote extends UpdateApplicationBase {
 
     public CompletableFuture<ClientResponse> run() {
@@ -37,14 +41,9 @@ public class Promote extends UpdateApplicationBase {
 
         DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
-        // TODO: add hostname/user to NTSysprocProc API
-        // TODO: make this stuff real?
-        String invocationName = "@UpdateApplicationCatalog";
-        boolean isPromotion = true;
         boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
-        boolean internalCall = false;
 
-        if (!allowPausedModeWork(internalCall, isAdminConnection())) {
+        if (!allowPausedModeWork(false, isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
@@ -52,12 +51,12 @@ public class Promote extends UpdateApplicationBase {
 
         CatalogChangeResult ccr = null;
         try {
-            ccr = prepareApplicationCatalogDiff(invocationName,
+            ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
                                                 null,
                                                 null,
                                                 new String[0],
                                                 null,
-                                                isPromotion,
+                                                true, /* isPromotion */
                                                 drRole,
                                                 useDDLSchema,
                                                 false,
