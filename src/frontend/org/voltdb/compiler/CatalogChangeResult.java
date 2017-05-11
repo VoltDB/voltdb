@@ -45,9 +45,11 @@ public class CatalogChangeResult {
     public String upgradedFromVersion;
     public byte[] deploymentHash;
     public boolean isForReplay;
+    // Should catalog diff commands apply to EE or not
+    public boolean requireCatalogDiffCmdsApplyToEE;
     // mark it false for UpdateClasses, in future may be marked false for deployment changes
     public boolean hasSchemaChange;
     public int expectedCatalogVersion = -1;
-    //This is set to true if schema change involves stream or connector changes or a view on stream is created or dropped.
+    // This is set to true if schema change involves stream or connector changes or a view on stream is created or dropped.
     public boolean requiresNewExportGeneration;
 }

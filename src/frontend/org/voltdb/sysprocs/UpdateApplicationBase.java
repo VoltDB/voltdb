@@ -261,6 +261,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             String commands = diff.commands();
             compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
 
+            retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
             retval.diffCommandsLength = commands.length();

@@ -57,7 +57,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -70,6 +69,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.FileAppender;
@@ -103,9 +103,12 @@ import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Deployment;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -122,9 +125,9 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
-import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
+import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
@@ -164,7 +167,6 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.LogKeys;
@@ -212,8 +214,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "</deployment>"
     };
 
-    private final VoltLogger hostLog = new VoltLogger("HOST");
-    private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
@@ -3293,6 +3295,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             long currentTxnUniqueId,
             byte[] deploymentBytes,
             byte[] deploymentHash,
+            boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration)
     {
@@ -3325,11 +3328,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             "commands generated for an out-of date catalog. Expected catalog version: " +
                             expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
                 }
-
-                hostLog.info(String.format("Globally updating the current application catalog and deployment " +
-                            "(new hashes %s, %s).",
-                        Encoder.hexEncode(catalogBytesHash).substring(0, 10),
-                        Encoder.hexEncode(deploymentHash).substring(0, 10)));
 
                 // get old debugging info
                 SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
@@ -3376,7 +3374,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
 
                 // 1. update the export manager.
-                ExportManager.instance().updateCatalog(m_catalogContext, diffCommands, requiresNewExportGeneration, partitions);
+                ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration, partitions);
 
                 // 1.1 Update the elastic join throughput settings
                 if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
@@ -3415,7 +3413,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // this after flushing the stats -- this will re-register
                 // the MPI statistics.
                 if (m_MPI != null) {
-                    m_MPI.updateCatalog(diffCommands, m_catalogContext, csp, requiresNewExportGeneration);
+                    m_MPI.updateCatalog(diffCommands, m_catalogContext, csp,
+                            requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
                 }
 
                 // Update catalog for import processor this should be just/stop start and updat partitions.
@@ -4482,5 +4481,36 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_consumerDRGateway.swapTables(swappedTables);
             }
         }
+    }
+
+    public static void printDiagnosticInformation(CatalogContext context, String procName) {
+        StringBuilder sb = new StringBuilder();
+        final CatalogMap<Procedure> catalogProcedures = context.database.getProcedures();
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        sb.append("Statements within " + procName + ": ").append("\n");
+        for (final Procedure proc : catalogProcedures) {
+            if (proc.getTypeName().equals(procName)) {
+                for (Statement stmt : proc.getStatements()) {
+                    // compute hash for determinism check
+                    crc.reset();
+                    String sqlText = stmt.getSqltext();
+                    crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+                    int hash = (int) crc.getValue();
+                    sb.append("Statement Hash: ").append(hash);
+                    sb.append(", Statement SQL: ").append(sqlText).append("\n");
+                }
+            }
+        }
+        sb.append("Default Procedures: ").append("\n");
+        for (Entry<String, Procedure> pair : context.m_defaultProcs.m_defaultProcMap.entrySet()) {
+            crc.reset();
+            String sqlText = DefaultProcedureManager.sqlForDefaultProc(pair.getValue());
+            crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+            int hash = (int) crc.getValue();
+            sb.append("Statement Hash: ").append(hash);
+            sb.append(", Statement SQL: ").append(sqlText).append("\n");
+        }
+
+        hostLog.error(sb.toString());
     }
 }

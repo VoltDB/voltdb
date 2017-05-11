@@ -413,14 +413,14 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // into polygons in their own right.  This means we need
         // to reverse them.
         //
-        List<GeographyValue> cheesyHoles = new ArrayList<GeographyValue>();
+        List<GeographyValue> cheesyHoles = new ArrayList<>();
         List<List<GeographyPointValue>> loops = cheesyPolygon.getRings();
         for (int idx = 1; idx < loops.size(); idx += 1) {
             List<GeographyPointValue> oneHole = loops.get(idx);
-            List<GeographyPointValue> rev = new ArrayList<GeographyPointValue>();
+            List<GeographyPointValue> rev = new ArrayList<>();
             rev.addAll(oneHole);
             Collections.reverse(rev);
-            List<List<GeographyPointValue>> holeLoops = new ArrayList<List<GeographyPointValue>>();
+            List<List<GeographyPointValue>> holeLoops = new ArrayList<>();
             holeLoops.add(rev);
             cheesyHoles.add(new GeographyValue(holeLoops));
         }
@@ -584,9 +584,9 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // shellMap.get(n) is the distance between the shell and exterior point pk == n.
         // cheeseMap.get(n) is the distance between the cheese and exterior point with pk == n.
         // indices has all the indices, so that we can iterate over them.
-        Map<Long, Double> shellMap = new HashMap<Long, Double>();
-        Map<Long, Double> cheeseMap = new HashMap<Long, Double>();
-        Set<Long> indices = new HashSet<Long>();
+        Map<Long, Double> shellMap = new HashMap<>();
+        Map<Long, Double> cheeseMap = new HashMap<>();
+        Set<Long> indices = new HashSet<>();
         while (vt.advanceRow()) {
             Long polyKey = vt.getLong(0);
             Long ptKey = vt.getLong(1);
@@ -918,6 +918,14 @@ public class TestGeographyValueQueries extends RegressionSuite {
         validateTableColumnOfScalarVarchar(client,
                 "select asText(poly) from tiny_polygon order by id",
                 new String[] {wktFourVerts, wktFiveVerts});
+
+        // Restore catalog changes:
+        cr = client.callProcedure("@AdHoc",
+                "truncate table tiny_polygon;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc",
+                "alter table tiny_polygon alter column poly geography(179) not null;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     static public junit.framework.Test suite() {

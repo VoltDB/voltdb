@@ -185,6 +185,7 @@ public class AdHoc extends AdHocNTBase {
                              ccr.requiresSnapshotIsolation ? 1 : 0,
                              ccr.worksWithElastic ? 1 : 0,
                              ccr.deploymentHash,
+                             ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                              ccr.hasSchemaChange ?  1 : 0,
                              ccr.requiresNewExportGeneration ? 1 : 0);
     }

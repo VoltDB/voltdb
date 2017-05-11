@@ -315,9 +315,9 @@ public class PlannerStatsCollector extends StatsSource {
         columns.add(new ColumnInfo("PARTITION_ID",  VoltType.INTEGER));
         columns.add(new ColumnInfo("CACHE1_LEVEL",  VoltType.INTEGER));
         columns.add(new ColumnInfo("CACHE2_LEVEL",  VoltType.INTEGER));
-        columns.add(new ColumnInfo("CACHE1_HITS",   VoltType.INTEGER));
-        columns.add(new ColumnInfo("CACHE2_HITS",   VoltType.INTEGER));
-        columns.add(new ColumnInfo("CACHE_MISSES",  VoltType.INTEGER));
+        columns.add(new ColumnInfo("CACHE1_HITS",   VoltType.BIGINT));
+        columns.add(new ColumnInfo("CACHE2_HITS",   VoltType.BIGINT));
+        columns.add(new ColumnInfo("CACHE_MISSES",  VoltType.BIGINT));
         columns.add(new ColumnInfo("PLAN_TIME_MIN", VoltType.BIGINT));
         columns.add(new ColumnInfo("PLAN_TIME_MAX", VoltType.BIGINT));
         columns.add(new ColumnInfo("PLAN_TIME_AVG", VoltType.BIGINT));

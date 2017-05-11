@@ -301,12 +301,13 @@ CREATE TABLE capp
 ) );
 PARTITION TABLE capp ON COLUMN p;
 
--- import table
+-- import table partitioned
 CREATE TABLE importp
 (
   ts         bigint             NOT NULL
 , cid        tinyint            NOT NULL
 , cnt        bigint             NOT NULL
+, rc         bigint             NOT NULL
 , CONSTRAINT PK_IMPORT_id_p PRIMARY KEY
   (
     cid
@@ -316,20 +317,47 @@ CREATE TABLE importp
 PARTITION TABLE importp ON COLUMN cid;
 CREATE INDEX P_IMPORTCIDINDEX ON importp (cid);
 
--- import table
+-- import table replicated
 CREATE TABLE importr
 (
   ts         bigint             NOT NULL
 , cid        tinyint            NOT NULL
 , cnt        bigint             NOT NULL
+, rc         bigint             NOT NULL
 , CONSTRAINT PK_IMPORT_id_r PRIMARY KEY
   (
     cid
   )
 , UNIQUE ( cid )
 );
-PARTITION TABLE importr ON COLUMN cid;
-CREATE INDEX R_IMPORTCIDINDEX ON importp (cid);
+CREATE INDEX R_IMPORTCIDINDEX ON importr (cid);
+
+-- import bitmap table partitioned
+CREATE TABLE importbp
+(
+  cid        tinyint            NOT NULL
+, seq        int                NOT NULL
+, bitmap     varbinary(1024)    NOT NULL
+, CONSTRAINT PK_IMPORT_id_bp PRIMARY KEY
+  (
+    cid, seq
+  )
+, UNIQUE ( cid, seq )
+);
+PARTITION TABLE importbp ON COLUMN cid;
+
+-- import bitmap table replicated
+CREATE TABLE importbr
+(
+  cid        tinyint            NOT NULL
+, seq        int                NOT NULL
+, bitmap     varbinary(1024)    NOT NULL
+, CONSTRAINT PK_IMPORT_id_br PRIMARY KEY
+  (
+    cid, seq
+  )
+, UNIQUE ( cid, seq )
+);
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -354,6 +382,7 @@ PARTITION PROCEDURE ReadSPInProcAdHoc ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMPInProcAdHoc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Replica;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Import;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
@@ -392,7 +421,7 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
 PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertP;
 PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
+PARTITION PROCEDURE ImportInsertP ON TABLE importbp COLUMN cid PARAMETER 3;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertR;
-PARTITION PROCEDURE ImportInsertR ON TABLE importr COLUMN cid PARAMETER 3;
 
 END_OF_BATCH

@@ -87,6 +87,7 @@ public class SQLParser extends SQLPatternFactory
             "SET" +                             // SET
             "\\s+.*\\z"                         // (end statement)
             );
+
     /**
      * Pattern: PARTITION PROCEDURE|TABLE ...
      *

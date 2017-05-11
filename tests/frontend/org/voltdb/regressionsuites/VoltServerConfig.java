@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
@@ -44,6 +45,12 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public abstract class VoltServerConfig {
 
     protected BackendTarget m_target = BackendTarget.NONE;
+
+    protected Catalog m_initialCatalog;
+
+    public Catalog getInitialCatalog() {
+        return m_initialCatalog;
+    }
 
     private static Set<VoltServerConfig> s_instanceSet= null;
 

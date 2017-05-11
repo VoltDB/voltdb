@@ -28,6 +28,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SQLStmt;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -319,14 +320,14 @@ public class FragmentTask extends TransactionTask
                 // set up the batch context for the fragment set
                 siteConnection.setBatch(m_fragmentMsg.getCurrentBatchIndex());
 
+                SQLStmt stmt = new SQLStmt(stmtText);
                 fragResult = siteConnection.executePlanFragments(
                         1,
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
-                        new boolean[] { false },    // FragmentTasks don't generate statement hashes
                         null,
-                        stmtText == null ? null : new String[] { stmtText },
+                        new SQLStmt[] { stmt },  // FragmentTasks don't generate statement hashes, this is just for long-running queries
                         m_txnState.txnId,
                         m_txnState.m_spHandle,
                         m_txnState.uniqueId,

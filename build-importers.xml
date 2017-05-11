@@ -5,7 +5,7 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
-    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, voltcsvformatter,kinesisstream"/>
+    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, voltcsvformatter, kinesisstream, kafkastream10"/>
 
     <resources id="default.imports.resource">
         <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
@@ -117,6 +117,16 @@
 	            </manifest>
 	        </jar>
 	 </target>
+
+    <target name="kafkastream10">
+        <!-- regular build will compile the required classes -->
+        <mkdir dir="${bundles.dir}" />
+        <jar destfile="${bundles.dir}/kafkastream10.jar" basedir="${build.prod.dir}">
+            <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="kafka-clients-0.10.2.1.jar" />
+            <zipgroupfileset dir="${base.dir}/lib/" includes="snappy-java-1.1.1.7.jar" />
+            <zipgroupfileset dir="${base.dir}/lib/" includes="lz4-1.2.0.jar" />
+        </jar>
+    </target>
 
     <!-- regular build compile will compile the classes -->
     <target name="osgibundle">

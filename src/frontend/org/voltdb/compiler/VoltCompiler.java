@@ -144,7 +144,7 @@ public class VoltCompiler {
 
     private List<String> m_capturedDiagnosticDetail = null;
 
-    private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
+    private static VoltLogger compilerLog = new VoltLogger("COMPILER");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
 
@@ -233,12 +233,12 @@ public class VoltCompiler {
             this.message = message;
         }
 
-        VoltCompilerException(final String message) {
+        public VoltCompilerException(final String message) {
             addErr(message);
             this.message = message;
         }
 
-        VoltCompilerException(String message, Throwable cause) {
+        public VoltCompilerException(String message, Throwable cause) {
             message += "\n   caused by:\n   " + cause.toString();
             addErr(message);
             this.message = message;
@@ -315,7 +315,7 @@ public class VoltCompiler {
             m_class = clazz;
         }
 
-        ProcedureDescriptor (final ArrayList<String> authGroups, final String className,
+        public ProcedureDescriptor (final ArrayList<String> authGroups, final String className,
                 final String singleStmt, final String joinOrder, final String partitionString,
                 boolean builtInStmt, Class<?> clazz)
         {
@@ -354,11 +354,11 @@ public class VoltCompiler {
         return (m_warnings.size() > 0) || hasErrors();
     }
 
-    void addInfo(final String msg) {
+    public void addInfo(final String msg) {
         addInfo(msg, NO_LINE_NUMBER);
     }
 
-    void addWarn(final String msg) {
+    public void addWarn(final String msg) {
         addWarn(msg, NO_LINE_NUMBER);
     }
 
@@ -377,7 +377,7 @@ public class VoltCompiler {
         }
     }
 
-    void addWarn(final String msg, final int lineNo) {
+    public void addWarn(final String msg, final int lineNo) {
         final Feedback fb = new Feedback(Severity.WARNING, msg, m_currentFilename, lineNo);
         m_warnings.add(fb);
         compilerLog.warn(fb.getLogString());
@@ -387,6 +387,10 @@ public class VoltCompiler {
         final Feedback fb = new Feedback(Severity.ERROR, msg, m_currentFilename, lineNo);
         m_errors.add(fb);
         compilerLog.error(fb.getLogString());
+    }
+
+    public static void setVoltLogger(VoltLogger vl) {
+        compilerLog = vl;
     }
 
     /**
@@ -1987,7 +1991,7 @@ public class VoltCompiler {
      * Note that a table changed in order to invalidate potential cached
      * statements that reference the changed table.
      */
-    void markTableAsDirty(String tableName) {
+    public void markTableAsDirty(String tableName) {
         m_dirtyTables.add(tableName.toLowerCase());
     }
 

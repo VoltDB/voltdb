@@ -766,6 +766,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         admin.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
         admin.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
         admin.callProcedure("@AdHoc", "DROP TABLE ddl_test1;");
+        admin.callProcedure("@AdHoc", "DROP PROCEDURE pause_test_proc;");
 
         try {
             resp = client.callProcedure("@UpdateLogging", m_loggingConfig);

@@ -61,7 +61,7 @@ public class PerPartitionTable {
     //Partitioned column type
     final VoltType m_partitionColumnType;
     //Table used to build up requests to the PartitionProcessor
-    VoltTable table;
+    VoltTable m_table;
     //Column information
     final VoltTable.ColumnInfo m_columnInfo[];
     //Column types
@@ -122,7 +122,7 @@ public class PerPartitionTable {
         m_partitionColumnType = firstLoader.m_partitionColumnType;
         m_tableName = tableName;
 
-        table = new VoltTable(m_columnInfo);
+        m_table = new VoltTable(m_columnInfo);
 
         m_es = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
     }
@@ -150,7 +150,7 @@ public class PerPartitionTable {
                 public void run() {
                     try {
                         while (m_partitionRowQueue.size() >= m_minBatchTriggerSize) {
-                            loadTable(buildTable(), table);
+                            loadTable(buildTable(), m_table);
                         }
                     } catch (Exception e) {
                         loaderLog.error("Failed to load batch", e);
@@ -169,7 +169,7 @@ public class PerPartitionTable {
         return m_es.submit(new Callable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
-                loadTable(buildTable(), table);
+                loadTable(buildTable(), m_table);
                 return true;
             }
         });
@@ -242,7 +242,7 @@ public class PerPartitionTable {
                 it.remove();
                 continue;
             }
-            table.addRow(row_args);
+            m_table.addRow(row_args);
         }
 
         return new PartitionProcedureCallback(buf);
