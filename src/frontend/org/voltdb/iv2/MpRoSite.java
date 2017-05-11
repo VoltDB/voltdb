@@ -32,7 +32,6 @@ import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
-import org.voltdb.HybridCrc32;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
@@ -40,6 +39,7 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SQLStmt;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.StatsSelector;
@@ -585,9 +585,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
-            String[] sqlTexts,
+            DeterminismHash determinismHash,
+            SQLStmt[] stmts,
             long txnId,
             long spHandle,
             long uniqueId,

@@ -25,8 +25,8 @@ import java.util.Random;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.HybridCrc32;
 import org.voltdb.ParameterSet;
+import org.voltdb.SQLStmt;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
@@ -34,6 +34,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 
 public class MockExecutionEngine extends ExecutionEngine {
@@ -52,8 +53,8 @@ public class MockExecutionEngine extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
-            final boolean[] isWriteFrag,
-            final HybridCrc32 writeCRC,
+            final DeterminismHash determinismHash,
+            final SQLStmt[] stmts,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
