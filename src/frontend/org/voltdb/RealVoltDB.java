@@ -3045,7 +3045,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             sb.append("\n");
         }
 
-
         hostLog.error(sb.toString());
     }
 }
