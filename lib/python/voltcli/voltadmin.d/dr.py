@@ -43,7 +43,6 @@ def reset(runner):
             runner.info('The previous command has stopped waiting... The cluster is in resetting DR phase.')
             runner.abort(actionMessage)
 
-
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
     description = 'DR control command.',
