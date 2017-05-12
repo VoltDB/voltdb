@@ -701,7 +701,7 @@ public final class InvocationDispatcher {
                 // adhoc explain process
                 proc = m_catalogContext.get().m_defaultProcs.checkForDefaultProcedure(procName);
                 if (proc != null) {
-                    String sql = m_catalogContext.get().m_defaultProcs.sqlForDefaultProc(proc);
+                    String sql = DefaultProcedureManager.sqlForDefaultProc(proc);
                     dispatchAdHocCommon(task, handler, ccxn, ExplainMode.EXPLAIN_DEFAULT_PROC, sql, new Object[0], null, user);
                     return null;
                 }
