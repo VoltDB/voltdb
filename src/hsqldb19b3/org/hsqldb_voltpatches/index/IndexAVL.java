@@ -1693,6 +1693,9 @@ public class IndexAVL implements Index {
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
         org.hsqldb_voltpatches.VoltXMLElement index = new org.hsqldb_voltpatches.VoltXMLElement("index");
 
+        // Add any expressions to the XML representation of the index,
+        // and compute a hash that will help uniquify the generated name,
+        // if a name was not provided.
         int exprHash = 0;
         if (exprs != null) {
             org.hsqldb_voltpatches.VoltXMLElement indexedExprs = new org.hsqldb_voltpatches.VoltXMLElement("exprs");

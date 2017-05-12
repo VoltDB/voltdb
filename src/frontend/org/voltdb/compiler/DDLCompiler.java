@@ -1219,6 +1219,9 @@ public class DDLCompiler {
 
             if (subNode.name.equals("indexes")) {
 
+                // Do the system indexes first, since we don't want to
+                // drop them: there are constraint objects in the catalog
+                // that refer to them.
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
