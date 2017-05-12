@@ -439,6 +439,11 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         m_executorContext->cleanupAllExecutors();
     }
     catch (const SerializableEEException &e) {
+
+        if (dynamic_cast<const SQLException*>(&e) != NULL) {
+            VOLT_ERROR("%s", debugForVarcharException().c_str());
+        }
+
         serializeException(e);
         resetExecutionMetadata();
         return ENGINE_ERRORCODE_ERROR;
@@ -1269,6 +1274,17 @@ std::string VoltDBEngine::debug(void) const
     }
 
     return output.str();
+}
+
+std::string VoltDBEngine::debugForVarcharException(void) const
+{
+    std::string result = "Current executor vector debug: ";
+    if (m_currExecutorVec != NULL) {
+        result += m_currExecutorVec->debug();
+    }
+
+    result += "\nEE cached plans:" + debug();
+    return result;
 }
 
 /**
