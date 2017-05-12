@@ -315,6 +315,32 @@ def check_dr_consumer(runner):
         lastValidationParamms = currentValidationParams.copy()
         time.sleep(1)
 
+def check_no_dr_consumer(runner):
+    runner.info('Completing resetting DR to all connected clusters...')
+    last_node_dispatcher = []
+    last_updated_time = time.time()
+    notify_interval = 10
+    while True:
+        resp = get_stats(runner, 'DRCONSUMERNODE')
+        node_dispatcher = [row[1:6] for row in resp.table(0).tuples()]
+        if not node_dispatcher:
+            runner.info('All connected clusters have been successfully reset.')
+            return
+        notify_interval -= 1
+        if notify_interval == 0:
+            notify_interval = 10
+            print_dr_consumer(runner, node_dispatcher)
+        last_updated_time = monitorStatisticsProgress(last_node_dispatcher, node_dispatcher, last_updated_time, runner, 'connected clusters',
+                                    msg="The cluster has not sent reset to all %s in last %d seconds. ")
+        last_node_dispatcher = node_dispatcher[:]
+        time.sleep(1)
+
+def print_dr_consumer(runner, node_dispatcher):
+    runner.info('The following dispatchers havn\'t been successfully reset:')
+    summaryline = "    Dispatcher on host: %s of host id % s for remote cluster %i."
+    for dispatcher in node_dispatcher:
+        runner.info(summaryline % (dispatcher[1], dispatcher[0], dispatcher[3]))
+
 def check_command_log(runner):
     runner.info('Completing outstanding Command Log transactions...')
     lastUpdatedTime = time.time()
@@ -344,7 +370,7 @@ def check_command_log(runner):
         lastValidationParamms = [outstandingByte, outstandingTxn]
         time.sleep(1)
 
-def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component):
+def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component, msg = "The cluster has not drained any transactions for %s in last %d seconds. There are outstanding transactions."):
     currentTime = time.time()
     timeout = runner.opts.timeout
     statsProgressed = True
@@ -361,8 +387,7 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
     timeSinceLastUpdate = currentTime - lastUpdatedTime
 
     #stats timeout
-    if timeSinceLastUpdate > timeout:
-         msg = "The cluster has not drained any transactions for %s in last %d seconds. There are outstanding transactions."
+    if timeout > 0 and timeSinceLastUpdate > timeout:
          raise StatisticsProcedureException( msg % (component, timeout), 1)
 
     #not timeout yet
