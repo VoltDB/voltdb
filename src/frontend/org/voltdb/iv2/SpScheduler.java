@@ -49,6 +49,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DebugMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -381,6 +382,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof DumpMessage) {
             handleDumpMessage();
+        } else if (message instanceof DebugMessage) {
+            handleDebugMessage((DebugMessage)message);
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -677,13 +680,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
+                if (m_isLeader && m_sendToHSIds.length > 0) {
+                    m_mailbox.send(m_sendToHSIds, new DebugMessage(counter.getStoredProcedureName()));
+                }
                 RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
                         counter.getStoredProcedureName(), m_procSet);
-                VoltDB.crashGlobalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
+                VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
             } else if (result == DuplicateCounter.ABORT) {
+                if (m_isLeader && m_sendToHSIds.length > 0) {
+                    m_mailbox.send(m_sendToHSIds, new DebugMessage(counter.getStoredProcedureName()));
+                }
                 RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
                         counter.getStoredProcedureName(), m_procSet);
-                VoltDB.crashGlobalVoltDB("PARTIAL ROLLBACK/ABORT: transaction succeeded on one replica but failed on another replica.", true, null);
+                VoltDB.crashLocalVoltDB("PARTIAL ROLLBACK/ABORT: transaction succeeded on one replica but failed on another replica.", true, null);
             }
         }
         else {
@@ -1007,6 +1016,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 hostLog.warn("\t" + who + ": " + e.getKey().toString() + ": " + e.getValue().toString());
             }
         }
+    }
+
+    public void handleDebugMessage(DebugMessage msg)
+    {
+        RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                msg.getProcName(), m_procSet);
+        VoltDB.crashGlobalVoltDB("HASH MISMATCH", true, null);
     }
 
     @Override

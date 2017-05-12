@@ -26,11 +26,13 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.compiler.Language;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -235,7 +237,7 @@ public class LoadedProcedureSet {
         if (pr == null) {
             Procedure catProc = m_defaultProcManager.checkForDefaultProcedure(procName);
             if (catProc != null) {
-                String sqlText = m_defaultProcManager.sqlForDefaultProc(catProc);
+                String sqlText = DefaultProcedureManager.sqlForDefaultProc(catProc);
                 Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
                 VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
                 pr = m_runnerFactory.create(voltProc, newCatProc, m_csp);
@@ -248,5 +250,41 @@ public class LoadedProcedureSet {
 
         // return what we got, hopefully not null
         return pr;
+    }
+
+    public ProcedureRunner getProcByNameForDebug(String procName, Database db)
+    {
+        // Check the procs from the catalog
+        ProcedureRunner pr = procs.get(procName);
+
+        // if not there, check the default proc cache
+        if (pr == null) {
+            pr = m_defaultProcCache.get(procName);
+        }
+
+        // if not in the cache, compile the full default proc and put it in the cache
+        if (pr == null) {
+            Procedure catProc = m_defaultProcManager.checkForDefaultProcedure(procName);
+            if (catProc != null) {
+                String sqlText = DefaultProcedureManager.sqlForDefaultProc(catProc);
+                Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
+                VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
+                pr = m_runnerFactory.create(voltProc, newCatProc, m_csp);
+                // this will ensure any created fragment tasks know to load the plans
+                // for this plan-on-the-fly procedure
+                pr.setProcNameToLoadForFragmentTasks(catProc.getTypeName());
+                m_defaultProcCache.put(procName, pr);
+                printDebugInformation(db, newCatProc, procName);
+            }
+        }
+
+        // return what we got, hopefully not null
+        return pr;
+    }
+
+    private void printDebugInformation(Database db, Procedure proc, String procName) {
+        String tableName = procName.split("\\.")[0];
+        hostLog.warn(CatalogUtil.printTable(db, tableName));
+        hostLog.warn(CatalogUtil.printProcedureDetail(proc));
     }
 }

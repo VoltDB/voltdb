@@ -88,6 +88,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
@@ -123,6 +124,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -2281,5 +2283,56 @@ public abstract class CatalogUtil {
             }
         }
         return exprsjson.isEmpty();
+    }
+
+    /*
+     * Print detailed table schema
+     *
+     * @param db  Catalog database
+     * @param tableName  table to be displayed
+     */
+    public static String printTable(Database db, String tableName) {
+        StringBuilder sb = new StringBuilder();
+        for (Table table : db.getTables()) {
+            if (table.getTypeName().equals(tableName)) {
+                sb.append("Table: " + tableName).append("\n");
+                for (Column col : table.getColumns()) {
+                    sb.append("Columns (" + col.getTypeName() + ")");
+                    sb.append(", Index:" + col.getIndex());
+                    sb.append(", Type:" + VoltType.get((byte)col.getType()));
+                    sb.append(", Size:" + col.getSize());
+                    sb.append(", Nullable:" + col.getNullable());
+                    sb.append(", Name:" + col.getName());
+                    sb.append(", Defaultvalue:" + col.getDefaultvalue());
+                    sb.append(", Defaulttype:" + col.getDefaulttype());
+                    sb.append(", Inbytes:" + col.getInbytes());
+                    sb.append("\n");
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /*
+     * Print procedure detail, such as statement text, frag id and json plan.
+     *
+     * @Param proc  Catalog procedure
+     */
+    public static String printProcedureDetail(Procedure proc) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Procedure:" + proc.getTypeName()).append("\n");
+        for (Statement stmt : proc.getStatements()) {
+            for (PlanFragment frag : stmt.getFragments()) {
+                byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                sb.append("Plan Stmt Text:").append(stmtText);
+                sb.append(", Plan Fragment Id:").append(planId);
+                sb.append(", Json Plan:").append(new String(jsonPlan));
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 }
