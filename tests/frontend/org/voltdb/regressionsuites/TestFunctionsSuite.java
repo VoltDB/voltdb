@@ -2697,11 +2697,14 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "REPEAT", 4611686018427387903L, 1);
         }
 
-        // Make sure that repeating an empty string a lot of times completes
-        // in a reasonable time.  It's tough to validate execution in a JUnit test,
-        // but trust me this would take a long time if the EE was being naive.
-        cr = client.callProcedure("@AdHoc", "select repeat('', 100000000000) from P1 limit 1");
+        // Make sure that repeat of an empty string doesn't take a long time
+        // This verifies the fix for ENG-12118
+        long startTime = System.nanoTime();
+        cr = client.callProcedure("@AdHoc", "select repeat('', 10000000000000) from P1 limit 1");
         assertContentOfTable(new Object[][] {{""}}, cr.getResults()[0]);
+        long elapsedNanos = System.nanoTime() - startTime;
+        // It should take less than a minute (much much less) to complete this query
+        assertTrue("Repeat with empty string took too long!", elapsedNanos < 1000000000L * 60L);
     }
 
     public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
