@@ -1679,6 +1679,15 @@ public class IndexAVL implements Index {
         return columnNameList;
     }
 
+    private static boolean isNameRequestingHashIndex(String name) {
+        String noCaseName = name.toLowerCase();
+
+        if (noCaseName.contains("hash") && !noCaseName.contains("tree"))
+            return true;
+
+        return false;
+    }
+
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
@@ -1690,7 +1699,7 @@ public class IndexAVL implements Index {
     @Override
     public VoltXMLElement voltGetIndexXML(Session session, String tableName,
             Map<String, VoltXMLElement> indexConstraintMapping)
-            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
+                    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
         org.hsqldb_voltpatches.VoltXMLElement index = new org.hsqldb_voltpatches.VoltXMLElement("index");
 
         // Add any expressions to the XML representation of the index,
@@ -1717,6 +1726,7 @@ public class IndexAVL implements Index {
 
         String hsqlIndexName = getName().name;
         String voltdbIndexName = null;
+        boolean isHashIndex = false;
 
         if (indexConstraintMapping.containsKey(hsqlIndexName)) {
             // This is an index backing a constraint.
@@ -1731,6 +1741,7 @@ public class IndexAVL implements Index {
                 String namePart = tableName;
                 if (! hsqlConstraintName.startsWith("SYS_")) {
                     // explicitly named constraint
+                    isHashIndex = isNameRequestingHashIndex(hsqlConstraintName);
                     namePart += "_" + hsqlConstraintName;
                 }
                 else {
@@ -1746,6 +1757,7 @@ public class IndexAVL implements Index {
 
                 String namePart = tableName;
                 if (! hsqlConstraintName.startsWith("SYS_")) {
+                    isHashIndex = isNameRequestingHashIndex(hsqlConstraintName);
                     namePart += "_" + hsqlConstraintName;
                 }
                 else {
@@ -1772,23 +1784,25 @@ public class IndexAVL implements Index {
         }
         else {
             // This is an index created via CREATE INDEX
+            isHashIndex = isNameRequestingHashIndex(hsqlIndexName);
             voltdbIndexName = hsqlIndexName;
         }
 
-      index.attributes.put("name", voltdbIndexName);
+        index.attributes.put("name", voltdbIndexName);
+        index.attributes.put("ishashindex", isHashIndex ? "true" : "false");
 
-      index.attributes.put("assumeunique", isAssumeUnique() ? "true" : "false");
-      index.attributes.put("unique", isUnique() ? "true" : "false");
+        index.attributes.put("assumeunique", isAssumeUnique() ? "true" : "false");
+        index.attributes.put("unique", isUnique() ? "true" : "false");
 
-      Object[] columnList = getColumnNameList().toArray();
-      index.attributes.put("columns", StringUtils.join(columnList, ","));
+        Object[] columnList = getColumnNameList().toArray();
+        index.attributes.put("columns", StringUtils.join(columnList, ","));
 
-      if (predicate != null) {
-          org.hsqldb_voltpatches.VoltXMLElement partialExpr = new org.hsqldb_voltpatches.VoltXMLElement("predicate");
-          index.children.add(partialExpr);
-          org.hsqldb_voltpatches.VoltXMLElement xml = predicate.voltGetExpressionXML(session, (Table) table);
-          partialExpr.children.add(xml);
-      }
+        if (predicate != null) {
+            org.hsqldb_voltpatches.VoltXMLElement partialExpr = new org.hsqldb_voltpatches.VoltXMLElement("predicate");
+            index.children.add(partialExpr);
+            org.hsqldb_voltpatches.VoltXMLElement xml = predicate.voltGetExpressionXML(session, (Table) table);
+            partialExpr.children.add(xml);
+        }
 
         return index;
     }
