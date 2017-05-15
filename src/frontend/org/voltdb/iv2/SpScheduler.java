@@ -1022,7 +1022,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
                 msg.getProcName(), m_procSet);
-        VoltDB.crashGlobalVoltDB("HASH MISMATCH", true, null);
+        VoltDB.crashLocalVoltDB("HASH MISMATCH", true, null);
     }
 
     @Override
