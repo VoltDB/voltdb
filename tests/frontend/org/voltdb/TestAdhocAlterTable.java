@@ -267,7 +267,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // single-column primary keys get cascaded automagically
             assertTrue(doesColumnExist("FOO", "PKCOL"));
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE"));
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO drop column PKCOL;");
@@ -276,7 +276,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Should be able to drop a single column backing a single column primary key.");
             }
             assertFalse(doesColumnExist("FOO", "PKCOL"));
-            assertFalse(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
+            assertFalse(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE"));
 
             // WEIRD: this seems like weird behavior to me still --izzy
             // Dropping a column used by a multi-column index drops the index
@@ -295,7 +295,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             // Can't drop a column used by a multi-column primary key
             assertTrue(doesColumnExist("BAZ", "PKCOL1"));
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE2"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_BAZ_PK_TREE2"));
             threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
@@ -308,7 +308,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             System.out.println("INDEXES: " + m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0]);
             assertTrue("Shouldn't be able to drop a column used by a multi-column primary key", threw);
             assertTrue(doesColumnExist("BAZ", "PKCOL1"));
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE2"));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_BAZ_PK_TREE2"));
 
             // Can't drop the last column in a table
             assertTrue(doesColumnExist("ONECOL", "SOLOCOL"));
@@ -451,8 +451,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertFalse(isColumnNullable("FOO", "ID"));
 
             // magic name for PK index
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
-            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE", true));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE", true));
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO add unique (ID);");
@@ -461,8 +461,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Shouldn't fail to add unique constraint to column with unique constraint");
             }
             // Unique constraint we added is redundant with existing constraint
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE"));
-            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_CONSTRAINT_IDX_PK_TREE", true));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_PK_FOO_PK_TREE", true));
 
             // Now, drop the PK constraint
             try {
@@ -473,8 +473,8 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("Shouldn't fail to drop primary key constraint");
             }
             // Now we create a new named index for the unique constraint.  C'est la vie.
-            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_CT_FOO_ID"));
-            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_CT_FOO_ID", true));
+            assertTrue(findIndexInSystemCatalogResults("VOLTDB_AUTOGEN_IDX_FOO_ID"));
+            assertTrue(verifyIndexUniqueness("VOLTDB_AUTOGEN_IDX_FOO_ID", true));
 
             // Can't add a PK constraint on the other column
             threw = false;
@@ -1486,6 +1486,57 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         finally {
             teardownSystem();
         }
+    }
+
+    @Test
+    public void testENG12384IndexNames() throws Exception {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "CREATE TABLE a ("
+                + "c_a varchar(20) NOT NULL, "
+                + "PRIMARY KEY (c_a)"
+                + ");"
+                + "PARTITION TABLE a ON COLUMN c_a;"
+                + "CREATE TABLE a_x ("
+                + "c_a varchar(10) NOT NULL, "
+                + "j varchar(60) NOT NULL, "
+                + "c_g_s varchar(10), "
+                + "PRIMARY KEY (c_a, j, c_g_s)"
+                + ");"
+                + "PARTITION TABLE a_x ON COLUMN c_a;"
+                + "CREATE PROCEDURE myproc AS DELETE FROM a WHERE c_a = ?;");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            // In this bug, the primary key index had a different name depending on whether
+            // it was created via CREATE TABLE or ALTER TABLE, but when the DDL is canonicalized
+            // it would ultimately choose the CREATE TABLE name, however there was a reference
+            // to the old ALTER TABLE name in the "indexesused" field for the stored procedure
+            // defined above.  This caused the catalog to become inconsistent with itself
+            // and wrought havoc.
+            checkAlterTableSucceed("ALTER TABLE a DROP PRIMARY KEY;");
+            checkAlterTableSucceed("ALTER TABLE a ADD CONSTRAINT a_pk PRIMARY KEY (c_a);");
+
+            // In the bug, the following statement would fail with a mysterious NPE
+            // (even though it was the previous statement that caused trouble)
+            checkAlterTableSucceed("ALTER TABLE a_x ALTER COLUMN c_a varchar(20) NOT NULL;");
+        }
+        finally {
+            teardownSystem();
+        }
+
     }
 
 }
