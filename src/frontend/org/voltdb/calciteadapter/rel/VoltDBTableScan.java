@@ -29,10 +29,12 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.calciteadapter.VoltDBConvention;
 import org.voltdb.calciteadapter.VoltDBTable;
@@ -52,9 +54,8 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
 
     public VoltDBTableScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable) {
-          super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
-          this.m_voltDBTable = voltDBTable;
-          m_program = RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory()));
+          this(cluster, table, voltDBTable,
+                  RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())));
     }
 
     protected VoltDBTableScan(RelOptCluster cluster, RelOptTable table,
@@ -70,19 +71,24 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
 
     public void setLimit(RexNode limit) {
         m_limit = limit;
-        digest = "ABC";
     }
 
+    /**
+     * The digest needs to be updated because Calcite considers any two nodes with the same digest
+     * to be identical.
+     */
     @Override
     protected String computeDigest() {
         String dg = super.computeDigest();
+        if (m_program != null) {
+            dg += "_program_" + m_program.toString();
+        }
         if (m_limit != null) {
-            dg += '_' + Integer.toString(getLimit());
+            dg += "_limit_" + Integer.toString(getLimit());
         }
         if (m_offset != null) {
-            dg += '_' + Integer.toString(getOffset());
+            dg += "_offset_" + Integer.toString(getOffset());
         }
-        digest = dg;
         return dg;
     }
 
@@ -168,22 +174,36 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
         if (m_program != null) {
             m_program.explainCalc(pw);
         }
-        //@TODO explain LIMIT/OFFSET
+        if (m_limit != null) {
+            pw.item("limit", m_limit);
+        }
+        if (m_offset != null) {
+            pw.item("offset", m_offset);
+        }
         return pw;
     }
 
-    public RelNode copy(RexProgram program) {
-        VoltDBTableScan newScan = new VoltDBTableScan(getCluster(), getTable(), m_voltDBTable, program);
+    public RelNode copy(RexProgram program, RexBuilder programRexBuilder) {
+        VoltDBTableScan newScan;
+        if (m_program == null) {
+            newScan = new VoltDBTableScan(getCluster(), getTable(), m_voltDBTable, program);
+        } else {
+            // Merge two programs program / m_program into a new merged program
+            RexProgram mergedProgram =
+                    RexProgramBuilder.mergePrograms(
+                            program,
+                            m_program,
+                            programRexBuilder);
+            assert(mergedProgram.getOutputRowType() == program.getOutputRowType());
+            newScan = new VoltDBTableScan(getCluster(), getTable(), m_voltDBTable, mergedProgram);
+        }
         newScan.m_limit = m_limit;
         newScan.m_offset = m_offset;
+
         return newScan;
     }
 
-    public RelNode copy() {
-        return copy((RexNode) null, (RexNode) null);
-    }
-
-    public RelNode copy(RexNode limit, RexNode offset) {
+    public RelNode copyWithLimitOffset(RexNode limit, RexNode offset) {
         // Do we need a deep copy including the inputs?
         VoltDBTableScan newScan = new VoltDBTableScan(getCluster(), getTable(), m_voltDBTable, m_program);
         newScan.m_limit = (limit == null) ? m_limit : limit;

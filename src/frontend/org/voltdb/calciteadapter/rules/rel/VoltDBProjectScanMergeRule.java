@@ -47,7 +47,7 @@ public class VoltDBProjectScanMergeRule extends RelOptRule {
         for (Pair<RexNode, String> item : proj.getNamedProjects()) {
             rpb.addProject(item.left, item.right);
         }
-        call.transformTo(scan.copy(rpb.getProgram()));
+        call.transformTo(scan.copy(rpb.getProgram(), rexBuilder));
     }
 
 }

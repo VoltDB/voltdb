@@ -34,6 +34,6 @@ public class VoltDBCalcScanMergeRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         LogicalCalc calc = call.rel(0);
         VoltDBTableScan scan = call.rel(1);
-        call.transformTo(scan.copy(calc.getProgram()));
+        call.transformTo(scan.copy(calc.getProgram(), calc.getCluster().getRexBuilder()));
     }
 }
