@@ -575,7 +575,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             if (remnant.hasRemaining() && remnant.remaining() <= 4 && remnant.getInt() < remnant.remaining()) {
-                throw new IOException("SSL Handshake remnant is not a valit VoltDB message: " + remnant);
+                throw new IOException("SSL Handshake remnant is not a valid VoltDB message: " + remnant);
             }
 
             /*
@@ -616,7 +616,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             } catch (IOException e) {
                 long opduration = EstTime.currentTimeMillis() - beforeRead;
-                if (opduration > (AUTH_TIMEOUT_MS - (AUTH_TIMEOUT_MS/20))) {
+                if (e instanceof MessagingChannel.EndOfStreamException){
+                    e = null;
+                } else if (opduration > (AUTH_TIMEOUT_MS - (AUTH_TIMEOUT_MS/20))) {
                     e = null;
                 }
                 try {
