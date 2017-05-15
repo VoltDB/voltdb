@@ -239,7 +239,7 @@ class Table {
     }
 
     virtual std::string tableType() const = 0;
-    virtual std::string debug();
+    virtual std::string debug(bool includeTuples = true);
 
     // ------------------------------------------------------------------
     // SERIALIZATION

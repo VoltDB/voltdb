@@ -1264,13 +1264,15 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
 std::string VoltDBEngine::debug(void) const
 {
     if ( ! m_plans) {
-        return "";
+        return "Empty cached plans";
     }
     PlanSet& plans = *m_plans;
     std::ostringstream output;
+    output << "cached plan size: " << plans.size() << std::endl;
 
+    // iterate the plans through insertion order
     BOOST_FOREACH (boost::shared_ptr<ExecutorVector> ev_guard, plans) {
-        ev_guard->debug();
+        output << ev_guard->debug();
     }
 
     return output.str();
@@ -1278,13 +1280,21 @@ std::string VoltDBEngine::debug(void) const
 
 std::string VoltDBEngine::debugForVarcharException(void) const
 {
-    std::string result = "Current executor vector debug: ";
+    std::ostringstream oss;
+    oss << "Current executor vector debug: ";
     if (m_currExecutorVec != NULL) {
-        result += m_currExecutorVec->debug();
+        oss << m_currExecutorVec->debug();
     }
 
-    result += "\nEE cached plans:" + debug();
-    return result;
+    // print table debug information
+    oss << "\nEE table debug information:\n";
+    for (std::map<std::string, Table*>::const_iterator iter = m_tablesByName.begin();
+            iter != m_tablesByName.end(); iter++) {
+        oss << "Table name: " << iter->first << ", debug info: "<< iter->second->debug(false) << std::endl;
+    }
+
+    oss << "\nEE cached plans:" + debug();
+    return oss.str();
 }
 
 /**

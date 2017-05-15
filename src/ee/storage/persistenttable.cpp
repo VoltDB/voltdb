@@ -1157,9 +1157,9 @@ std::string PersistentTable::tableType() const {
     return "PersistentTable";
 }
 
-std::string PersistentTable::debug() {
+std::string PersistentTable::debug(bool includeTuples) {
     std::ostringstream buffer;
-    buffer << Table::debug();
+    buffer << Table::debug(includeTuples);
     buffer << "\tINDEXES: " << m_indexes.size() << "\n";
 
     // Indexes

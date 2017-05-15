@@ -269,7 +269,7 @@ public class HashinatorLite {
     /**
      * Given an object, map it to a partition. DON'T EVER MAKE ME PUBLIC
      */
-    int hashToPartition(VoltType type, Object obj) {
+     int hashToPartition(VoltType type, Object obj) {
         if (m_type.equals(HashinatorLiteType.ELASTIC)) {
             return hashinateBytes(valueToBytes(obj));
         }
