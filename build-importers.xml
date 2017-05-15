@@ -121,7 +121,7 @@
     <target name="kafkastream10">
         <!-- regular build will compile the required classes -->
         <mkdir dir="${bundles.dir}" />
-        <jar destfile="${bundles.dir}/kafkastream10.jar" basedir="${build.prod.dir}">
+        <jar destfile="${bundles.dir}/kafkastream10.jar">
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="kafka-clients-0.10.2.1.jar" />
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="snappy-java-1.1.2.6.jar" />
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="lz4-1.3.0.jar" />
