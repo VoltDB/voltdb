@@ -404,12 +404,10 @@ public class AsyncCompilerAgent {
                  * will be "@SwapTables" and in case (2) it will be "@AdHoc".  So
                  * we throw an error here in case (2).
                  */
-                if ( ! "@SwapTables".equals(work.invocationName)
-                        && sqlStatement.startsWith("@SwapTables ")) {
-                    throw new PlanningErrorException("Cannot call @SwapTables from an @AdHoc invocation.");
-                }
+                boolean isSwapTables = "@SwapTables".equals(work.invocationName)
+                                         && sqlStatement.startsWith("@SwapTables ");
                 AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
-                        work.explainMode != ExplainMode.NONE, work.userParamSet);
+                        work.explainMode != ExplainMode.NONE, work.userParamSet, isSwapTables);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {
@@ -493,7 +491,7 @@ public class AsyncCompilerAgent {
         StatementPartitioning partitioning = StatementPartitioning.forceMP();
         try {
             AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
-                    false, work.userParamSet);
+                    false, work.userParamSet, false);
             stmts.add(result);
         }
         catch (Exception ex) {

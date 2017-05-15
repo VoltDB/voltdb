@@ -110,7 +110,7 @@ public class PlannerTool {
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
-        return planSql(sqlIn, infer, false, null);
+        return planSql(sqlIn, infer, false, null, false);
     }
 
     private void logException(Exception e, String fmtLabel) {
@@ -156,7 +156,7 @@ public class PlannerTool {
     }
 
     synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
-            boolean isExplainMode, final Object[] userParams) {
+            boolean isExplainMode, final Object[] userParams, boolean isSwapTables) {
 
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
@@ -208,7 +208,7 @@ public class PlannerTool {
             String[] extractedLiterals = null;
             String parsedToken = null;
             try {
-                planner.parse();
+                planner.parse(isSwapTables);
                 parsedToken = planner.parameterize();
 
                 // check the parameters count

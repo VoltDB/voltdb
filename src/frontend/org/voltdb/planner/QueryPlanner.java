@@ -137,8 +137,14 @@ public class QueryPlanner {
      * {@link this#plan(AbstractCostModel, String, String, String, String, int, ScalarValueHints[]) },
      * but splitting these two affords an opportunity to check a cache for a plan matching
      * the auto-parameterized parsed statement.
+     *
+     * If this cannot be @SwapTables and we get a swap tables call, then
+     * treat it like a normal SQL error. This might be a hack, maybe.  Could be.
      */
     public void parse() throws PlanningErrorException {
+        parse(false);
+    }
+    public void parse(boolean mightBeSwapTables) throws PlanningErrorException {
         // reset any error message
         m_recentErrorMsg = null;
 
@@ -158,7 +164,7 @@ public class QueryPlanner {
         //
         // Note that we don't allow this from an @AdHoc compilation.  See
         // ENG-12368.
-        if (m_sql.startsWith("@SwapTables ")) {
+        if (mightBeSwapTables && m_sql.startsWith("@SwapTables ")) {
             String[] swapTableArgs = m_sql.split(" ");
             m_xmlSQL = forgeVoltXMLForSwapTables(
                     swapTableArgs[1], swapTableArgs[2]);
