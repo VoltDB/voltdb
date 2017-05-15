@@ -2295,7 +2295,7 @@ public abstract class CatalogUtil {
         StringBuilder sb = new StringBuilder();
         for (Table table : db.getTables()) {
             if (table.getTypeName().equals(tableName)) {
-                sb.append("Table: " + tableName).append("\n");
+                sb.append("Table: " + tableName + "(relativeIndex:" + table.getRelativeIndex() + ")").append("\n");
                 for (Column col : table.getColumns()) {
                     sb.append("Columns (" + col.getTypeName() + ")");
                     sb.append(", Index:" + col.getIndex());
