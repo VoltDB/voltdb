@@ -26,6 +26,10 @@ import base64
 import os
 import sys
 import subprocess
+import ssl
+
+HTTP = 'http://'
+HTTPS = 'https://'
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
@@ -439,14 +443,23 @@ def writeCommands(file, subject, command):
         file.write(command)
         file.write('\n\n')
 
+# get deployment file through rest API
 def getCurrentDeploymentFile(runner, host):
-    # get deployment file through rest API
-    url = 'http://' + getHostnameOrIp(host) + ':' + str(host.httpport) + '/deployment/download/'
+    sslContext = None
+    if runner.opts.ssl_config is not None:
+        protocol = HTTPS
+        sslContext = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    else:
+        protocol = HTTP
+    url = protocol + getHostnameOrIp(host) + ':' + str(host.httpport) + '/deployment/download/'
     request = Request(url)
     base64string = base64.b64encode('%s:%s' % (runner.opts.username, runner.opts.password))
     request.add_header("Authorization", "Basic %s" % base64string)
     try:
-        response = urlopen(request)
+        if sslContext is None:
+            response = urlopen(request)
+        else:
+            response = urlopen(request, context=sslContext)
     except URLError, e:
         runner.abort("Failed to get deployment file from %s " % (getHostnameOrIp(host)))
 
