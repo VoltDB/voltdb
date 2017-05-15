@@ -608,25 +608,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 message.position(0);
                 message.get(todigest).position(4);
             }
-            long beforeRead = 0;
             try {
                 while (message == null) {
-                    beforeRead = EstTime.currentTimeMillis();
                     message = messagingChannel.readMessage();
                 }
             } catch (IOException e) {
-                long opduration = EstTime.currentTimeMillis() - beforeRead;
-                if (e instanceof MessagingChannel.EndOfStreamException){
-                    e = null;
-                } else if (opduration > (AUTH_TIMEOUT_MS - (AUTH_TIMEOUT_MS/20))) {
-                    e = null;
-                }
+                // Don't log a stack trace - assume a security probe sent a bad packet or the connection timed out.
                 try {
                     socket.close();
                 } catch (IOException e1) {
-                }
-                if (e != null) {
-                    throw e;
                 }
                 return null;
             }
