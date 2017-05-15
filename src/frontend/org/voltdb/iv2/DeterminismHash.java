@@ -83,12 +83,7 @@ public class DeterminismHash {
 
         m_inputCRC.update(m_hashCount);
         m_inputCRC.update(m_catalogVersion);
-        // no work done means 0 hash to convey that
-        if (m_hashCount == 0) {
-            retval[0] = 0;
-        } else {
-            retval[0] = (int) m_inputCRC.getValue();
-        }
+        retval[0] = (int) m_inputCRC.getValue();
         retval[1] = m_catalogVersion;
         retval[2] = m_hashCount;
         return retval;
