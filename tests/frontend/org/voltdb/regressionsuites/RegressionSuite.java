@@ -1117,6 +1117,17 @@ public class RegressionSuite extends TestCase {
                 actualTable.advanceRow());
     }
 
+    static protected void assertSuccessfulDML(Client client, String stmt) throws NoConnectionsException, IOException, ProcCallException {
+        assertSuccessfulDML(client, stmt, 1L);
+    }
+
+    static protected void assertSuccessfulDML(Client client, String stmt, long returnValue) throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable[] results = null;
+        results = client.callProcedure("@AdHoc", stmt).getResults();
+        assertEquals(1, results.length);
+        assertEquals(returnValue, results[0].asScalarLong());
+    }
+
     static protected void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {
         verifyProcFails(client, expectedPattern, "@AdHoc", stmt);
     }

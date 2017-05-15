@@ -292,7 +292,7 @@ create function IntFunction from method sqlcmdtest.IntFunction.run;
 Command succeeded.
 
 --- User-defined Functions -----------------------------------
-IntFunction         scalar function     sqlcmdtest.IntFunction.run                        
+intfunction         scalar function     sqlcmdtest.IntFunction.run                        
 
 
 --- Potential Procedure Classes ------------------------------

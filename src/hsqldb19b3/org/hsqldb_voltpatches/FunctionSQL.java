@@ -246,6 +246,7 @@ public class FunctionSQL extends Expression {
     }
 
     public static boolean isFunction(String token) {
+        token = token.toUpperCase();
         return isRegularFunction(token) || isValueFunction(token);
     }
 

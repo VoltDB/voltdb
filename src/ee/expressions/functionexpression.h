@@ -302,6 +302,9 @@ static const int FUNC_TRIM_LEADING_CHAR               = SQL_TRIM_VOLT_FUNC_OFFSE
 static const int FUNC_TRIM_TRAILING_CHAR              = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_TRAILING;
 static const int FUNC_TRIM_BOTH_CHAR                  = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_BOTH;
 
+static const int FUNC_VOLT_UDF_ID_START                = 1000000;
+#define IS_USER_DEFINED_ID(id) (FUNC_VOLT_UDF_ID_START <= (id))
+
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions
