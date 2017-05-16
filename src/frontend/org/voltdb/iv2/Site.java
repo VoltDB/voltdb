@@ -388,7 +388,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public Procedure ensureDefaultProcLoaded(String procName) {
-            ProcedureRunner runner = Site.this.m_loadedProcedures.getProcByName(procName);
+            Database db = getDatabase();
+            ProcedureRunner runner = Site.this.m_loadedProcedures.getProcByNameForDebug(procName, db);
             return runner.getCatalogProcedure();
         }
     };

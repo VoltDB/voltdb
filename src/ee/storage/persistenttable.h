@@ -320,7 +320,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // UTILITY
     // ------------------------------------------------------------------
     std::string tableType() const;
-    virtual std::string debug();
+    virtual std::string debug(bool includeTuples);
 
     /*
      * Find the block a tuple belongs to. Returns TBPtr(NULL) if no block is found.

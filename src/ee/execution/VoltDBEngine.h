@@ -245,6 +245,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Debug functions
         // -------------------------------------------------
         std::string debug(void) const;
+        std::string debugForVarcharException(void) const;
 
         /** DML executors call this to indicate how many tuples
          * have been modified */

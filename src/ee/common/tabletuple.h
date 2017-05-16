@@ -653,7 +653,16 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) const
     const bool isInBytes = columnInfo->inBytes;
     char *dataPtr = getWritableDataPtr(columnInfo);
     const int32_t columnLength = columnInfo->length;
-    value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes);
+
+    try {
+        value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes);
+    } catch (SQLException &ex) {
+        std::string errorMsg = ex.message()
+                            + "\nlength exceeding column info: " + columnInfo->debug()
+                            + "\ntuple schema info: " + m_schema->debug();
+
+        throw SQLException(ex.getSqlState(), errorMsg);
+    }
 }
 
 inline void TableTuple::setHiddenNValue(const int idx, voltdb::NValue value) const
@@ -696,8 +705,16 @@ inline void TableTuple::setNValueAllocateForObjectCopies(const int idx,
     char *dataPtr = getWritableDataPtr(columnInfo);
     const int32_t columnLength = columnInfo->length;
 
-    value.serializeToTupleStorageAllocateForObjects(dataPtr, isInlined,
-                                                    columnLength, isInBytes, dataPool);
+    try {
+        value.serializeToTupleStorageAllocateForObjects(dataPtr, isInlined,
+                                                        columnLength, isInBytes, dataPool);
+    } catch (SQLException &ex) {
+        std::string errorMsg = ex.message()
+                            + "\nlength exceeding column info: " + columnInfo->debug()
+                            + "\ntuple schema info: " + m_schema->debug();
+
+        throw SQLException(ex.getSqlState(), errorMsg);
+    }
 }
 
 /*
