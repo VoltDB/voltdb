@@ -420,6 +420,58 @@ public class VoltCompiler {
         return compileInternalToFile(jarOutputPath, null, null, ddlReaderList, null);
     }
 
+    /** Compiles a catalog from a user provided schema and (optional) jar file. */
+    public boolean compileFromSchemaAndClasses(
+            final File schemaPath,
+            final File classesJarPath,
+            final File catalogOutputPath)
+    {
+        if (schemaPath == null || !schemaPath.exists()) {
+            compilerLog.error("Cannot compile nonexistent or missing schema.");
+            return false;
+        }
+
+        List<VoltCompilerReader> ddlReaderList;
+        try {
+            ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+        }
+        catch (VoltCompilerException e) {
+            compilerLog.error("Unable to open schema file \"" + schemaPath + "\"", e);
+            return false;
+        }
+
+        InMemoryJarfile inMemoryUserJar = null;
+        ClassLoader originalClassLoader = m_classLoader;
+        try {
+            if (classesJarPath != null && classesJarPath.exists()) {
+                // Make user's classes available to the compiler and add all VoltDB artifacts to theirs (overwriting any existing VoltDB artifacts).
+                // This keeps all their resources because stored procedures may depend on them.
+                inMemoryUserJar = new InMemoryJarfile(classesJarPath);
+                m_classLoader = inMemoryUserJar.getLoader();
+            } else {
+                inMemoryUserJar = new InMemoryJarfile();
+            }
+            if (compileInternal(null, null, ddlReaderList, inMemoryUserJar) == null) {
+                return false;
+            }
+        } catch (IOException e) {
+            compilerLog.error("Could not load classes from user supplied jar file", e);
+            return false;
+        } finally {
+            m_classLoader = originalClassLoader;
+        }
+
+        try {
+            inMemoryUserJar.writeToFile(catalogOutputPath).run();
+            return true;
+        }
+        catch (final Exception e) {
+            e.printStackTrace();
+            addErr("Error writing catalog jar to disk: " + e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * Compile from DDL in a single string
      *
