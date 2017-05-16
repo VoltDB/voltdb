@@ -41,6 +41,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.Database;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
 import org.voltdb.utils.FixedDBBPool;
@@ -48,7 +49,6 @@ import org.voltdb.utils.FixedDBBPool;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.Multimap;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -181,7 +181,25 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     @Override
     public void initialize(int kfactor) throws JSONException, KeeperException, InterruptedException, ExecutionException
     {
-        VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker);
+        long maxWaitTime = 120; // 2 minute
+
+        while(maxWaitTime > 0) {
+            VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker);
+
+            if (m_messenger.getZK().exists(VoltZK.uacActiveBlocker, false) == null) {
+                return;
+            }
+
+            // uac zk blocker exists, rejoin node should wait to watch its stat
+            VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
+
+            REJOINLOG.info("Rejoin node is waiting 5 seconds for @UpdateApplicationCatalog to finish");
+            Thread.sleep(1000 * 5);
+            maxWaitTime -= 5;
+        }
+
+        VoltDB.crashLocalVoltDB("Rejoin node timed out waiting for @UpdateApplicationCatalog for 120 seconds, "
+                + "please retry node rejoin again later");
     }
 
     @Override
