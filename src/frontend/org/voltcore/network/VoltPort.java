@@ -36,7 +36,7 @@ public class VoltPort implements Connection
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
-    static final int MAX_MESSAGE_LENGTH = 52428800;
+    public static final int MAX_MESSAGE_LENGTH = 52428800;
 
     protected final NetworkDBBPool m_pool;
 

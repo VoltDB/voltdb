@@ -24,6 +24,8 @@ import java.nio.channels.SocketChannel;
 
 import javax.net.ssl.SSLEngine;
 
+import org.voltcore.network.VoltPort;
+
 /**
  * Wraps a SocketChannel, knows how to read and write VoltDB
  * protocol messages.  Does SSL encryption and decryption of messages
@@ -55,6 +57,12 @@ public class MessagingChannel {
         }
         lengthBuffer.flip();
         int len = lengthBuffer.getInt();
+        if (len <= 0) {
+            throw new IOException("Packet size is invalid");
+        }
+        if (len > VoltPort.MAX_MESSAGE_LENGTH) {
+            throw new IOException("Packet exceeds maximum allowed size");
+        }
         ByteBuffer message = ByteBuffer.allocate(len);
         while (message.hasRemaining()) {
             read = m_socketChannel.read(message);
