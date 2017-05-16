@@ -584,8 +584,6 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
     if (type != SWAP_TABLE) { // openTxn does this for SWAP_TABLE
         assert(!m_opened);
         ++m_openSequenceNumber;
-    } else {
-        assert(m_opened);
     }
 
     if (!m_enabled) {
