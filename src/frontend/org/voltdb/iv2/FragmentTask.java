@@ -320,7 +320,7 @@ public class FragmentTask extends TransactionTask
                 // set up the batch context for the fragment set
                 siteConnection.setBatch(m_fragmentMsg.getCurrentBatchIndex());
 
-                SQLStmt stmt = new SQLStmt(stmtText);
+                SQLStmt stmt = new SQLStmt(stmtText, null, false);
                 fragResult = siteConnection.executePlanFragments(
                         1,
                         new long[] { fragmentId },
