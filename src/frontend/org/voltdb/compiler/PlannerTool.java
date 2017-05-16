@@ -208,7 +208,11 @@ public class PlannerTool {
             String[] extractedLiterals = null;
             String parsedToken = null;
             try {
-                planner.parse(isSwapTables);
+                if (isSwapTables) {
+                    planner.planSwapTables();
+                } else {
+                    planner.parse();
+                }
                 parsedToken = planner.parameterize();
 
                 // check the parameters count

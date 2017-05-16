@@ -398,11 +398,8 @@ public class AsyncCompilerAgent {
                  * "@SwapTables T1 T2".  But if we actually see a call like
                  *   (2) client.callProcedure("@AdHoc", "@SwapTables T1 T2")
                  * we fall into the same code path.  So, we will not be able to tell
-                 * line (1) from  line (2) above in the planner.  This is as it
-                 * should be, since the planner should not necessarily know
-                 * the secrets of its caller.  In case (1) above the work.invocationName
-                 * will be "@SwapTables" and in case (2) it will be "@AdHoc".  So
-                 * we throw an error here in case (2).
+                 * line (1) from  line (2) above in the planner unless we tell
+                 * the planner.
                  */
                 boolean isSwapTables = "@SwapTables".equals(work.invocationName)
                                          && sqlStatement.startsWith("@SwapTables ");
