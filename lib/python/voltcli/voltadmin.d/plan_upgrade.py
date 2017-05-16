@@ -28,9 +28,6 @@ import sys
 import subprocess
 import ssl
 
-HTTP = 'http://'
-HTTPS = 'https://'
-
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
     description="Generate a checklist before performing online upgrade.",
@@ -446,11 +443,11 @@ def writeCommands(file, subject, command):
 # get deployment file through rest API
 def getCurrentDeploymentFile(runner, host):
     sslContext = None
-    if runner.opts.ssl_config is not None:
-        protocol = HTTPS
-        sslContext = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    if runner.opts.ssl_config is None:
+        protocol = "http://"
     else:
-        protocol = HTTP
+        protocol = "https://"
+        sslContext = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
     url = protocol + getHostnameOrIp(host) + ':' + str(host.httpport) + '/deployment/download/'
     request = Request(url)
     base64string = base64.b64encode('%s:%s' % (runner.opts.username, runner.opts.password))
