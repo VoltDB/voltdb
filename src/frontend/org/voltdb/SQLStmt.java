@@ -97,20 +97,9 @@ public class SQLStmt {
     }
 
     /**
-     * Construct a SQLStmt instance from a SQL statement.
-     * @param sqlText Valid VoltDB compliant SQL with question marks as parameter
-     * place holders.
-     * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
-     * @param computeCRC whether to ignore the computation of SQL text CRC.
-     */
-    public SQLStmt(String sqlText, String joinOrder, boolean computeCRC) {
-        this(canonicalizeStmt(sqlText).getBytes(Constants.UTF8ENCODING), joinOrder, computeCRC);
-    }
-
-    /**
      * Construct a SQLStmt instance from a byte array for internal use.
      */
-    private SQLStmt(byte[] sqlText, String joinOrder, boolean computeCRC) {
+    protected SQLStmt(byte[] sqlText, String joinOrder, boolean computeCRC) {
         this.sqlText = sqlText;
         this.joinOrder = joinOrder;
 
@@ -239,7 +228,7 @@ public class SQLStmt {
     // In SQL statement the input without ending with a semicolon is legitimate,
     // however in order to do a reverse look up (crc -> sql str), we'd like to
     // use the same statement to compute crc.
-    private static String canonicalizeStmt(String stmtStr) {
+    public static String canonicalizeStmt(String stmtStr) {
         // Cleanup whitespace newlines and adding semicolon for catalog compatibility
         stmtStr = stmtStr.replaceAll("\n", " ");
         stmtStr = stmtStr.trim();

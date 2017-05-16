@@ -29,6 +29,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SQLStmt;
+import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -320,7 +321,7 @@ public class FragmentTask extends TransactionTask
                 // set up the batch context for the fragment set
                 siteConnection.setBatch(m_fragmentMsg.getCurrentBatchIndex());
 
-                SQLStmt stmt = new SQLStmt(stmtText, null, false);
+                SQLStmt stmt = SQLStmtAdHocHelper.newInstance(stmtText, null, false);
                 fragResult = siteConnection.executePlanFragments(
                         1,
                         new long[] { fragmentId },
