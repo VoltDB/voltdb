@@ -91,6 +91,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                        int64_t uniqueId,
                                        int64_t timestamp,
                                        TableTuple &tuple,
+                                       std::vector<std::string> const& columnNames,
+                                       int partitionColumn,
                                        ExportTupleStream::Type type)
 {
     size_t rowHeaderSz = 0;
@@ -114,7 +116,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
-
+//    std::cout << "Hdr: " << rowHeaderSz << " TupleMax: " << tupleMaxLength << "\n";
+//    std::cout.flush();
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
@@ -135,18 +138,42 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     ExportSerializeOutput io(m_currBlock->mutableDataPtr() + rowHeaderSz,
                              m_currBlock->remaining() - rowHeaderSz);
 
+    //Write column Count
+    io.writeInt(METADATA_COL_CNT + columnNames.size());
+    //Write partition column index
+    io.writeInt(METADATA_COL_CNT + partitionColumn);
+    //Write column Names
+    io.writeTextString("VOLT_TRANSACTION_ID");
+    io.writeTextString("VOLT_EXPORT_TIMESTAMP");
+    io.writeTextString("VOLT_EXPORT_SEQUENCE_NUMBER");
+    io.writeTextString("VOLT_PARTITION_ID");
+    io.writeTextString("VOLT_SITE_ID");
+    io.writeTextString("VOLT_EXPORT_OPERATION");
+    //Treat column count as hash and only allow ADD/DROP column? What about width of columns?
+    for (int i = 0; i < columnNames.size(); i++) {
+        io.writeTextString(columnNames[i]);
+    }
+
     // write metadata columns
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(spHandle);
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(timestamp);
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(seqNo);
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(m_partitionId);
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(m_siteId);
 
     // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
+    io.writeEnumInSingleByte(VALUE_TYPE_TINYINT);
     io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
 
+    nullArray[0] = (uint8_t) (METADATA_COL_CNT + tuple.sizeInValues());
+    //Write partition column index
     // write the tuple's data
-    tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
+    tuple.serializeToExport(io, METADATA_COL_CNT, &nullArray[1], true);
 
     // write the row size in to the row header
     // rowlength does not include the 4 byte row header
@@ -173,10 +200,10 @@ ExportTupleStream::computeOffsets(TableTuple &tuple,
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
     // row header is 32-bit length of row plus null mask
-    *rowHeaderSz = sizeof (int32_t) + nullMaskLength;
+    *rowHeaderSz = sizeof (int32_t) + nullMaskLength + sizeof(uint8_t);
 
-    // metadata column width: 5 int64_ts plus CHAR(1).
-    size_t metadataSz = (sizeof (int64_t) * 5) + 1;
+    // metadata column width: 5 int64_ts plus CHAR(1) + 6 bytes for type.
+    size_t metadataSz = (sizeof (int64_t) * 5) + 6 + 1;
 
     // returns 0 if corrupt tuple detected
     size_t dataSz = tuple.maxExportSerializationSize();
@@ -184,7 +211,7 @@ ExportTupleStream::computeOffsets(TableTuple &tuple,
         throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
     }
 
-    return *rowHeaderSz + metadataSz + dataSz;
+    return *rowHeaderSz + metadataSz + tuple.sizeInValues() + dataSz;
 }
 
 void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {

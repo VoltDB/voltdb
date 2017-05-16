@@ -137,7 +137,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             ) throws IOException
             {
         checkNotNull( onDrain, "onDrain runnable is null");
-        m_format = ExportFormat.FOURDOTFOUR;
+        m_format = ExportFormat.SEVENDOTX;
         m_generation = generation;
         m_onDrain = new Runnable() {
             @Override
@@ -284,7 +284,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (jsObj.has("format")) {
                 m_format = ExportFormat.valueOf(jsObj.getString("format"));
             } else {
-                m_format = ExportFormat.FOURDOTFOUR;
+                m_format = ExportFormat.SEVENDOTX;
             }
 
             try {
@@ -384,7 +384,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             stringer.endObject();
         }
         stringer.endArray();
-        stringer.keySymbolValuePair("format", ExportFormat.FOURDOTFOUR.toString());
+        stringer.keySymbolValuePair("format", ExportFormat.SEVENDOTX.toString());
         stringer.keySymbolValuePair("partitionColumnName", m_partitionColumnName);
     }
 

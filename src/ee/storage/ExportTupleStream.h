@@ -70,6 +70,8 @@ public:
                        int64_t uniqueId,
                        int64_t timestamp,
                        TableTuple &tuple,
+                       std::vector<std::string> const& columnNames,
+                       int partitionColumn,
                        ExportTupleStream::Type type);
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);

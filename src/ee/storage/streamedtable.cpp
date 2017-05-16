@@ -148,6 +148,8 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       source,
+                                      getColumnNames(),
+                                      partitionColumn(),
                                       ExportTupleStream::INSERT);
         m_tupleCount++;
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
