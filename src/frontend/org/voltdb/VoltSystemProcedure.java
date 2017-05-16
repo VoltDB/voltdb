@@ -202,6 +202,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
         TransactionState txnState = m_runner.getTxnState();
 
+        int fragmentIndex = 0;
         for (SynthesizedPlanFragment pf : pfs) {
             assert (pf.parameters != null);
 
@@ -222,6 +223,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     pf.parameters,
                     false,
                     txnState.isForReplay());
+            task.setBatch(fragmentIndex++);
             if (pf.inputDepIds != null) {
                 for (int depId : pf.inputDepIds) {
                     task.addInputDepId(0, depId);

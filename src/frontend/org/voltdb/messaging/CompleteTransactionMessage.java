@@ -166,11 +166,11 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("COMPLETE_TRANSACTION (FROM COORD: ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
-        sb.append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(TxnEgo.txnIdToString(m_txnId) + "(" + m_txnId + ")");
         sb.append("\n SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
-
+        sb.append("\n  TRUNCATION HANDLE:" + getTruncationHandle());
         sb.append("\n  HASH: " + String.valueOf(m_hash));
 
         if (isRollback())
@@ -186,6 +186,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         if (isToLeader()) {
             sb.append("\n  SEND TO LEADER");
         }
+
         return sb.toString();
     }
 }

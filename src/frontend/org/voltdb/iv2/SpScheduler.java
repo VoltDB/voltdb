@@ -49,6 +49,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -136,7 +138,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
-
     private final TransactionTaskQueue m_pendingTasks;
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
@@ -233,6 +234,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
             }
         }
+
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
         // Update the list of remote replicas that we'll need to send to
@@ -863,21 +865,21 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
         if (tmLog.isDebugEnabled()) {
-            tmLog.info("[SpScheduler]local site:" + CoreUtils.hsIdToString(m_mailbox.getHSId())
-                 + "MSG:" + message + " isLeader:" + m_isLeader
-                    );
+            tmLog.info("[SpScheduler]Site:" + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " isLeader:" + m_isLeader
+                 + "\n" + message );
         }
         FragmentTaskMessage msg = message;
         long newSpHandle;
 
-        if (m_isLeader) {
+        //The site has been marked as non-leader. The follow-up batches or fragments are processed here
+        if (!message.toReplica() && (m_isLeader || (!m_isLeader && message.shouldHandleByOriginalLeader()))) {
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
             // before we start mucking with its state (SPHANDLE).  We need to revisit
             // all the messaging mess at some point.
             msg = new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             //Not going to use the timestamp from the new Ego because the multi-part timestamp is what should be used
-
+            msg.setHandleByOriginalLeader(message.shouldHandleByOriginalLeader());
             if (!message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
@@ -918,8 +920,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
                 replmsg.setToReplica(true);
-                m_mailbox.send(m_sendToHSIds,
-                        replmsg);
+                m_mailbox.send(m_sendToHSIds,replmsg);
                 DuplicateCounter counter;
                 /*
                  * Non-determinism should be impossible to happen with MP fragments.
@@ -1099,11 +1100,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    private boolean isFragmentMisrouted(FragmentResponseMessage message) {
+        SerializableException ex = message.getException();
+        if (ex != null && ex instanceof TransactionRestartException) {
+            return (((TransactionRestartException)ex).isMisrouted());
+        }
+        return false;
+    }
+
     // Eventually, the master for a partition set will need to be able to dedupe
     // FragmentResponses from its replicas.
     private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
-        final TransactionState txnState = m_outstandingTxns.get(message.getTxnId());
+        if (isFragmentMisrouted(message)){
+            m_mailbox.send(message.getDestinationSiteId(), message);
+            return;
+        }
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
 
         // Send the message to the duplicate counter, if any
@@ -1124,7 +1136,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 if (txn != null && txn.isDone()) {
-                    setRepairLogTruncationHandle(txn.m_spHandle);
+                    setRepairLogTruncationHandle(txn.m_spHandle, message.shouldHandleByOriginalLeader());
                 }
 
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
@@ -1560,7 +1572,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         return m_repairLogTruncationHandle;
     }
 
-    private void setRepairLogTruncationHandle(long newHandle)
+    private void setRepairLogTruncationHandle(long newHandle, boolean forceAdvance)
     {
         if (newHandle > m_repairLogTruncationHandle) {
             m_repairLogTruncationHandle = newHandle;
@@ -1568,7 +1580,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // We have to advance the local truncation point on the replica. It's important for
             // node promotion when there are no missing repair log transactions on the replica.
             // Because we still want to release the reads if no following writes will come to this replica.
-            if (! m_isLeader) {
+            if (! m_isLeader && !forceAdvance) {
                 return;
             }
             if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
@@ -1583,6 +1595,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         "to" + TxnEgo.txnIdToString(newHandle));
             }
         }
+    }
+
+    private void setRepairLogTruncationHandle(long newHandle)
+    {
+        setRepairLogTruncationHandle(newHandle, false);
     }
 
     /**
@@ -1623,5 +1640,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
             }
         });
+    }
+
+    public TransactionState getTransaction(long txnId) {
+        return m_outstandingTxns.get(txnId);
     }
 }

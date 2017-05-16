@@ -379,17 +379,4 @@ public class VoltZK {
         }
         return Long.parseLong(hsid);
     }
-
-    /**
-     * check if any nodes are processing Snapshot request
-     */
-    public static boolean isSnapshotInProgress(ZooKeeper zk) {
-        try {
-            List<String> keys = zk.getChildren(VoltZK.nodes_currently_snapshotting, false);
-            return !(keys.isEmpty());
-        } catch (KeeperException | InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to query nodes currently snapshotting", true, e);
-        }
-        return true;
-    }
 }

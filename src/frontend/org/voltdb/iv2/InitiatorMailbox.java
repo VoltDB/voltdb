@@ -365,6 +365,9 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
+        m_scheduler.m_isLeader = false;
+        m_repairLog.setLeaderState(false);
+
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
@@ -377,8 +380,7 @@ public class InitiatorMailbox implements Mailbox
             } catch (InterruptedException e) {
             }
         }
-        m_scheduler.m_isLeader = false;
-        m_repairLog.setLeaderState(false);
+
         if (tmLog.isDebugEnabled()) {
             tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
         }
@@ -401,22 +403,37 @@ public class InitiatorMailbox implements Mailbox
         return true;
     }
 
-    // After SPI migration has been requested, all the fragments which are sent to leader will be responded with
-    // restart transaction. MP writes will be restarted by re-adding it to transaction queue. MP reads will be restarted via
-    // client interface.
+    // After SPI migration has been requested, the fragments which are sent to leader site should be restarted.
     private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
         if (m_scheduler.isLeader() || message.toReplica()) {
             return false;
         }
-        FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
-        TransactionRestartException restart = new TransactionRestartException(
-                "Transaction being restarted due to SPI migration.", message.getTxnId());
-        restart.setMisrouted(true);
-        response.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
-        response.m_sourceHSId = getHSId();
-        Iv2Trace.logMisroutedFragmentTaskMessage(message, getHSId());
-        deliver(response);
-        return true;
+
+        boolean seenTheTxn = (((SpScheduler)m_scheduler).getTransaction(message.getTxnId()) != null);
+
+        // If a fragment is part of a transaction which have been see, do not restart.
+        if (message.getCurrentBatchIndex() == 0 && !seenTheTxn) {
+            FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
+            TransactionRestartException restart = new TransactionRestartException(
+                    "Transaction being restarted due to SPI migration.", message.getTxnId());
+            restart.setMisrouted(true);
+            response.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
+            response.m_sourceHSId = getHSId();
+            response.setPartitionId(m_partitionId);
+            Iv2Trace.logMisroutedFragmentTaskMessage(message, getHSId());
+            deliver(response);
+            return true;
+        }
+
+        // A transaction may have multiple batches or fragments. If the first batch or fragment has already been
+        // processed, the follow-up batches or fragments should also be processed on this site.
+        if (!m_scheduler.isLeader() && !message.toReplica() && seenTheTxn) {
+            message.setHandleByOriginalLeader(true);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()));
+            }
+        }
+        return false;
     }
 
     @Override
@@ -480,11 +497,6 @@ public class InitiatorMailbox implements Mailbox
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(CoreUtils.hsIdToString(getHSId())
-                    + " handling repair log request id " + req.getRequestId()
-                    + " for " + CoreUtils.hsIdToString(message.m_sourceHSId));
-        }
         for (Iv2RepairLogResponseMessage log : logs) {
             send(message.m_sourceHSId, log);
         }
@@ -510,20 +522,12 @@ public class InitiatorMailbox implements Mailbox
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[repairReplicasWithInternal.Iv2InitiateTaskMessage]:" + work
-                        + " repaire sites:" + CoreUtils.hsIdCollectionToString(needsRepair));
-            }
             m_scheduler.handleMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof FragmentTaskMessage) {
             // We need to get this into the repair log in case we've never seen it before.  Adding fragment
             // tasks to the repair log is safe; we'll never overwrite the first fragment if we've already seen it.
             m_repairLog.deliver(repairWork);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[repairReplicasWithInternal.FragmentTaskMessage]:" + repairWork
-                        + " repaire sites:" + CoreUtils.hsIdCollectionToString(needsRepair));
-            }
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
@@ -531,10 +535,6 @@ public class InitiatorMailbox implements Mailbox
             // ignore it, or we need to clean up, or we'll be restarting and it doesn't matter.  Make sure they
             // get into the repair log and then let them run their course.
             m_repairLog.deliver(repairWork);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[repairReplicasWithInternal.CompleteTransactionMessage]:" + repairWork
-                        + " repaire sites:" + CoreUtils.hsIdCollectionToString(needsRepair));
-            }
             m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
         else {

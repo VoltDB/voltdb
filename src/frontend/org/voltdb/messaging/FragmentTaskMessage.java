@@ -170,6 +170,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // indicate if the fragment is created on partition leader and sent to replicas.
     boolean m_toReplica = false;
 
+    // indicate that the fragment should be handled via original partition leader
+    // before spi migration if the first batch or fragment has been processed in a batched or
+    // multiple fragment transaction. m_currentBatchIndex > 0
+    boolean m_handleByOriginalLeader = false;
+
     public void setPerFragmentStatsRecording(boolean value) {
         m_perFragmentStatsRecording = value;
     }
@@ -669,6 +674,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         //for isForReplica
         msgsize += 1;
 
+        msgsize += 1; //m_handleByOriginalLeader
         msgsize += m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4;
 
         // Involved partitions
@@ -774,6 +780,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(m_taskType);
         buf.put(m_emptyForRestart ? (byte) 1 : (byte) 0);
         buf.put(m_toReplica ? (byte) 1 : (byte) 0);
+        buf.put(m_handleByOriginalLeader ? (byte) 1 : (byte) 0);
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
         if (m_procNameToLoad != null) {
@@ -910,6 +917,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_taskType = buf.get();
         m_emptyForRestart = buf.get() != 0;
         m_toReplica = buf.get() == 1;
+        m_handleByOriginalLeader = buf.get() == 1;
         boolean haveOutputDependencies = buf.get() != 0;
         boolean haveInputDependencies = buf.get() != 0;
         short procNameToLoadBytesLen = buf.getShort();
@@ -1056,9 +1064,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         sb.append("FRAGMENT_TASK (FROM ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
-        sb.append(") FOR TXN ").append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(") FOR TXN ").append(TxnEgo.txnIdToString(m_txnId)).append("(" + m_txnId + ")");
         sb.append(" FOR REPLAY ").append(isForReplay());
         sb.append(", SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
+        sb.append(", TRUNCATION HANDLE:" + getTruncationHandle());
         sb.append("\n");
         sb.append("THIS IS A ");
         sb.append(m_coordinatorTask ? "COORDINATOR" : "WORKER");
@@ -1088,6 +1097,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (m_toReplica)
             sb.append("\n  THIS IS SENT TO REPLICA");
 
+        if (m_handleByOriginalLeader) {
+            sb.append("\n  EXECUTE ON ORIGNAL LEADER");
+        }
         if (m_taskType == USER_PROC)
         {
             sb.append("\n  THIS IS A USER TASK");
@@ -1128,4 +1140,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_toReplica = toReplica;
     }
 
+    public void setHandleByOriginalLeader(boolean handleByOriginalLeader) {
+        m_handleByOriginalLeader = handleByOriginalLeader;
+    }
+
+    public boolean shouldHandleByOriginalLeader() {
+        return m_handleByOriginalLeader;
+    }
 }

@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -144,6 +143,7 @@ public class SysprocFragmentTask extends TransactionTask
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
         response.setRespBufferable(m_respBufferable);
+        response.setHandleByOriginalLeader(m_fragmentMsg.shouldHandleByOriginalLeader());
         m_initiator.deliver(response);
     }
 
