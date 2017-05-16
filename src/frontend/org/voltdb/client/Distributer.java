@@ -711,7 +711,7 @@ class Distributer {
                 m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip, stuff.ignoreBackpressure);
                 updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error, false);
                 response.setClientRoundtrip(deltaNanos);
-                assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
+                assert(response.getHashes() == null) : "A determinism hash snuck into the client wire protocol";
                 try {
                     cb.clientCallback(response);
                 } catch (Exception e) {

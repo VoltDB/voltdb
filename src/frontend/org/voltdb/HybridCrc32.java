@@ -26,6 +26,7 @@ public class HybridCrc32 extends PureJavaCrc32C {
     private static final int NATIVE_REDIRECT_SIZE = 150;
 
 
+    @Override
     public void update(byte[] b) {
         if (b.length > NATIVE_REDIRECT_SIZE) {
             CRC32 nativeCRC = new CRC32();
@@ -69,6 +70,7 @@ public class HybridCrc32 extends PureJavaCrc32C {
         crc = localCrc;
     }
 
+    @Override
     public void update(byte[] b, int off, int len) {
         if (len > NATIVE_REDIRECT_SIZE) {
             CRC32 nativeCRC = new CRC32();

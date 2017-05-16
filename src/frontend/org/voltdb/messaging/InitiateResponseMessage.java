@@ -29,6 +29,7 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.TxnEgo;
 
 /**
@@ -325,6 +326,10 @@ public class InitiateResponseMessage extends VoltMessage {
             sb.append("\n  COMMIT");
         else
             sb.append("\n  ROLLBACK/ABORT, ");
+        int[] hashes = m_response.getHashes();
+        if (hashes != null) {
+            sb.append("\n RESPONSE HASH: ").append(DeterminismHash.description(hashes));
+        }
         sb.append("\n CLIENT RESPONSE: \n");
         if (m_response == null) {
             // This is not going to happen in the real world, but only in the test cases

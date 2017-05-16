@@ -192,7 +192,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
 
     // Captures the use of NOW, without parentheses
     private static final Pattern nowQuery = Pattern.compile(
-            "(?<now>NOW)(?!\\s*\\()", Pattern.CASE_INSENSITIVE);
+            "\\b(?<now>NOW)\\b(?!\\s*\\()", Pattern.CASE_INSENSITIVE);
     // Modifies a query containing NOW, without parentheses, which PostgreSQL
     // does not support, and simply replaces it with NOW(), with parentheses,
     // which it does support.

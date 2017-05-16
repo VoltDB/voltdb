@@ -7,7 +7,7 @@
 #   -v :  run the "Voter" example app (with either version of VoltDB)
 
 # Build the jar file used by FullDdlSqlTest, to test CREATE PROCEDURE FROM CLASS
-jar cf fullddlfeatures.jar -C ../../../../obj/release/testprocs org/voltdb_testprocs/fullddlfeatures/testCreateProcFromClassProc.class
+jar cf fullddlfeatures.jar -C ../../../../obj/release/testprocs org/voltdb_testprocs/fullddlfeatures/testCreateProcFromClassProc.class -C ../../../../obj/release/testfuncs org/voltdb_testfuncs/IntFunction.class
 
 # Set default values - the default is to use the "community" version of VoltDB,
 # using the deployment.xml and ddl.sql files in this directory

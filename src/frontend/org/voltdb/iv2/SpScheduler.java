@@ -42,6 +42,7 @@ import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.Consistency;
 import org.voltdb.Consistency.ReadLevel;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
@@ -65,12 +66,12 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltTrace;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -777,7 +778,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             String finalTraceName = traceName;
             if (traceLog != null) {
                 traceLog.add(() -> VoltTrace.endAsync(finalTraceName, MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getClientInterfaceHandle()),
-                                                      "hash", message.getClientResponseData().getHash()));
+                                                      "hash", message.getClientResponseData().getHashes()[0]));
             }
 
             int result = counter.offer(message);
@@ -787,7 +788,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
+                RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                        counter.getStoredProcedureName());
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                        counter.getStoredProcedureName());
+                VoltDB.crashGlobalVoltDB("PARTIAL ROLLBACK/ABORT: transaction succeeded on one replica but failed on another replica.", true, null);
             }
         }
         else {
@@ -864,10 +871,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
-        if (tmLog.isDebugEnabled()) {
-            tmLog.info("[SpScheduler]Site:" + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " isLeader:" + m_isLeader
-                 + "\n" + message );
-        }
         FragmentTaskMessage msg = message;
         long newSpHandle;
 
@@ -1148,6 +1151,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                VoltDB.crashGlobalVoltDB("PARTIAL ROLLBACK/ABORT running multi-part procedure.", true, null);
             }
             // doing duplicate suppression: all done.
             return;
@@ -1182,11 +1187,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         CompleteTransactionMessage msg = message;
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
-
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("[SpScheduler] execution site:" + CoreUtils.hsIdToString(m_mailbox.getHSId())
-                  + "\n" + msg + "\ntransaction:" + (txn != null ? txn.getNotice() : "") + "\nleader:" + m_isLeader);
-        }
 
         // The site has not seen any fragments of the transaction yet
         if (!m_isLeader && txn == null) {

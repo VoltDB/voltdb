@@ -117,7 +117,8 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
         }
         m_adminPort = adminPort;
         m_paused = adminOnStartup;
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, 0);
+        m_initialCatalog = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, 0);
+        m_compiled = m_initialCatalog != null;
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 
@@ -133,7 +134,7 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
         // return just "localhost"
         if (m_server == null)
             return null;
-        ArrayList<String> listeners = new ArrayList<String>();
+        ArrayList<String> listeners = new ArrayList<>();
         listeners.add("localhost");
         return listeners;
     }

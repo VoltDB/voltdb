@@ -92,13 +92,13 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
-import org.voltdb.utils.VoltTrace;
 
 public final class InvocationDispatcher {
 
@@ -1713,6 +1713,7 @@ public final class InvocationDispatcher {
                           changeResult.requiresSnapshotIsolation ? 1 : 0,
                           changeResult.worksWithElastic ? 1 : 0,
                           changeResult.deploymentHash,
+                          changeResult.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                           changeResult.hasSchemaChange ? 1 : 0,
                           changeResult.requiresNewExportGeneration ? 1 : 0);
            task.clientHandle = changeResult.clientHandle;

@@ -72,7 +72,7 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='javaee-api-6.0.jar' />
     </fileset>
-	<fileset dir='${vendor.lib.dir}'>
+    <fileset dir='${vendor.lib.dir}'>
         <include name='javassist-3.20.0-GA.jar' />
     </fileset>
     <fileset dir='${lib.dir}'>
@@ -173,6 +173,7 @@
                   org/voltdb/VoltTypeException.java
                   "
 />
+
 
 <!--
 ***************************************

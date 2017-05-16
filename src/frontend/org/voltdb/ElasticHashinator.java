@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.lang.Thread.State;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -463,6 +464,11 @@ public class ElasticHashinator extends TheHashinator {
         }
 
         return ranges;
+    }
+
+    @Override
+    public boolean pIsPristine() {
+        return Arrays.equals(((ElasticHashinator)m_pristineHashinator).m_configBytes.get(), m_configBytes.get());
     }
 
     /**

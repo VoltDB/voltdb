@@ -39,13 +39,15 @@ class ImporterTest extends TestBase {
                 to VoltDBManagementCenterPage
                 expect: 'to be on VMC page'
                 at VoltDBManagementCenterPage
-
+                browser.driver.executeScript("localStorage.clear()")
                 when: 'click the Importer link (if needed)'
                 page.openImporterPage()
                 then: 'should be on Importer page'
                 at ImporterPage
 
                 isImporterTabVisible = true
+
+
                 break
             } catch (org.openqa.selenium.ElementNotVisibleException e) {
                 println("ElementNotVisibleException: Unable to Start the test")
@@ -87,29 +89,10 @@ class ImporterTest extends TestBase {
         println("Process only if Importer tab is present.")
         then:
         if(isImporterTabVisible){
-            if(isChartDisplayed()){
-                waitFor(10){ page.chartOutTransaction.isDisplayed() }
-                waitFor(10){ page.chartSuccessRate.isDisplayed() }
-                waitFor(10){ page.chartFailureRate.isDisplayed() }
-            } else {
-                waitFor(10){ noChartMsg.isDisplayed() }
-            }
-        } else {
-            println("Importer tab is not available.")
-        }
-    }
+            waitFor(10){ page.chartOutTransaction.isDisplayed() }
+            waitFor(10){ page.chartSuccessRate.isDisplayed() }
+            waitFor(10){ page.chartFailureRate.isDisplayed() }
 
-    def checkNoChartMsg(){
-        when:
-        println("Process only if Importer tab is present.")
-        then:
-        if(isImporterTabVisible){
-            if(!isChartDisplayed()) {
-                waitFor(10){ noChartMsg.isDisplayed() }
-                assert noChartMsg.jquery.html() == "\n" +
-                        "                            No data is available.\n" +
-                        "                        "
-            }
         } else {
             println("Importer tab is not available.")
         }
@@ -120,11 +103,9 @@ class ImporterTest extends TestBase {
         println("Process only if Importer tab is present")
         then:
         if(isImporterTabVisible){
-            if(isChartDisplayed()) {
-                waitFor(5){ chartOutsTransDownloadBtn.isDisplayed() }
-                waitFor(5){ chartSuccessDownloadBtn.isDisplayed() }
-                waitFor(5){ chartFailureDownloadBtn.isDisplayed() }
-            }
+            waitFor(5){ chartOutsTransDownloadBtn.isDisplayed() }
+            waitFor(5){ chartSuccessDownloadBtn.isDisplayed() }
+            waitFor(5){ chartFailureDownloadBtn.isDisplayed() }
         } else {
             println("Importer tab is not available.")
         }
@@ -157,43 +138,39 @@ class ImporterTest extends TestBase {
         println("Process only if Importer is present.")
         then:
         if(isImporterTabVisible) {
-            if(isChartDisplayed()) {
-                when:
-                count = 0
-                page.chooseGraphView("Seconds")
-                then:
-                while (count < 3) {
-                    count++
-                    try {
-                        waitFor(10) {
-                            $('#chartOutTransaction').isDisplayed()
-                        }
-                        waitFor(waitTime) {
-                            chartOutsTransMax.isDisplayed()
-                            chartOutsTransMin.isDisplayed()
-                        }
-                        stringMax = chartOutsTransMax.text()
-                        stringMin = chartOutsTransMin.text()
-
-                        break
-                    } catch (geb.waiting.WaitTimeoutException e) {
-                        println("WaitTimeoutException")
+            when:
+            count = 0
+            page.chooseGraphView("Seconds")
+            then:
+            while (count < 3) {
+                count++
+                try {
+                    waitFor(10) {
+                        $('#chartOutTransaction').isDisplayed()
                     }
-                }
+                    waitFor(waitTime) {
+                        chartOutsTransMax.isDisplayed()
+                        chartOutsTransMin.isDisplayed()
+                    }
+                    stringMax = chartOutsTransMax.text()
+                    stringMin = chartOutsTransMin.text()
 
-                String result = page.compareTime(stringMax, stringMin)
-
-                if (result.equals("seconds")) {
-                    println("The maximum value is " + stringMax)
-                    println("The minimum value is " + stringMin)
-                    println("The time is in " + result)
-                    assert true
-                } else {
-                    println("FAIL: It is not in seconds")
-                    assert false
+                    break
+                } catch (geb.waiting.WaitTimeoutException e) {
+                    println("WaitTimeoutException")
                 }
+            }
+
+            String result = page.compareTime(stringMax, stringMin)
+
+            if (result.equals("seconds")) {
+                println("The maximum value is " + stringMax)
+                println("The minimum value is " + stringMin)
+                println("The time is in " + result)
+                assert true
             } else {
-                waitFor(10){ noChartMsg.isDisplayed() }
+                println("FAIL: It is not in seconds")
+                assert false
             }
         } else {
             println("Importer tab is not available.")
@@ -208,48 +185,40 @@ class ImporterTest extends TestBase {
         println("Process only if DR is present")
         then:
         if(isImporterTabVisible) {
-            if(isChartDisplayed()) {
-                when:
-                page.importerGraphView.value("Minutes")
-                page.importerGraphView.value("Seconds")
-                page.importerGraphView.value("Minutes")
-                then:
-                count = 0
-                while (count < numberOfTrials) {
-                    count++
-                    try {
-                        waitFor(waitTime) {
-                            $('#chartOutTransaction').isDisplayed()
-                        }
-                        waitFor(waitTime) {
-                            chartOutsTransMax.isDisplayed()
-                            chartOutsTransMin.isDisplayed()
-                        }
-                        report 'hello'
-                        stringMax = chartOutsTransMax.text()
-                        stringMin = chartOutsTransMin.text()
-
-                        break
-                    } catch (geb.waiting.WaitTimeoutException e) {
-                        println("WaitTimeoutException")
+            when:
+            $('#importerGraphView').value("Minutes")
+            waitForTime(10);
+            then:
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    waitFor(waitTime) {
+                        $('#chartOutTransaction').isDisplayed()
                     }
-                }
+                    waitFor(waitTime) {
+                        chartOutsTransMax.isDisplayed()
+                        chartOutsTransMin.isDisplayed()
+                    }
+                    report 'hello'
+                    stringMax = chartOutsTransMax.text()
+                    stringMin = chartOutsTransMin.text()
 
-                String result = page.compareTime(stringMax, stringMin)
-                println(stringMax)
-                println(stringMin)
-                println(result)
-                if (result.toLowerCase().equals("minutes")) {
-                    println("The maximum value is " + stringMax)
-                    println("The minimum value is " + stringMin)
-                    println("The time is in " + result)
-                    assert true
-                } else {
-                    println("FAIL: It is not in minutes")
-                    assert false
+                    break
+                } catch (geb.waiting.WaitTimeoutException e) {
+                    println("WaitTimeoutException")
                 }
+            }
+
+            String result = page.compareTime(stringMax, stringMin)
+            if (result.toLowerCase().equals("minutes")) {
+                println("The maximum value is " + stringMax)
+                println("The minimum value is " + stringMin)
+                println("The time is in " + result)
+                assert true
             } else {
-                waitFor(10){ noChartMsg.isDisplayed() }
+                println("FAIL: It is not in minutes")
+                assert false
             }
         } else {
             println("Importer tab is not available.")
@@ -261,13 +230,14 @@ class ImporterTest extends TestBase {
         String stringMin
         int count = 0
         when:
-        println("Process only if Importer tab is present")
+        println("Process only if Importer tab is present.")
         then:
         if(isImporterTabVisible) {
             if(isChartDisplayed()) {
                 when:
                 count = 0
                 page.importerGraphView.value("Days")
+                waitForTime(10)
                 then:
                 count = 0
                 while (count < 3) {
@@ -288,6 +258,7 @@ class ImporterTest extends TestBase {
                         println("WaitTimeoutException")
                     }
                 }
+                println("stringMax: " + stringMax)
                 String monthMax = page.changeToMonth(stringMax)
                 String monthMin = page.changeToMonth(stringMin)
 
@@ -327,7 +298,7 @@ class ImporterTest extends TestBase {
         String stringMin
         int count = 0
         when:
-        println("Process only if Importer is present")
+        println("Process only if Importer is present.")
         then:
         if(isImporterTabVisible) {
             if(isChartDisplayed()) {
@@ -383,18 +354,18 @@ class ImporterTest extends TestBase {
         if(isImporterTabVisible) {
             if(isChartDisplayed()) {
                 when:
-                page.importerGraphView.value("Minutes")
-                page.importerGraphView.value("Seconds")
-                page.importerGraphView.value("Minutes")
+                page.chooseGraphView("Minutes")
+                driver.navigate().refresh();
+                waitForTime(5)
                 then:
                 count = 0
-                while (count < numberOfTrials) {
+                while (count < 3) {
                     count++
                     try {
-                        waitFor(waitTime) {
-                            $('#chartOutTransaction').isDisplayed()
+                        waitFor(20) {
+                            $('#chartSuccessRate').isDisplayed()
                         }
-                        waitFor(waitTime) {
+                        waitFor(5) {
                             chartSuccessRateMax.isDisplayed()
                             chartSuccessRateMin.isDisplayed()
                         }
@@ -407,11 +378,8 @@ class ImporterTest extends TestBase {
                         println("WaitTimeoutException")
                     }
                 }
-
                 String result = page.compareTime(stringMax, stringMin)
-                println(stringMax)
-                println(stringMin)
-                println(result)
+
                 if (result.toLowerCase().equals("minutes")) {
                     println("The maximum value is " + stringMax)
                     println("The minimum value is " + stringMin)
@@ -441,13 +409,14 @@ class ImporterTest extends TestBase {
                 when:
                 count = 0
                 page.importerGraphView.value("Days")
+                driver.navigate().refresh();
                 then:
                 count = 0
                 while (count < 3) {
                     count++
                     try {
                         waitFor(waitTime) {
-                            $('#chartOutTransaction').isDisplayed()
+                            $('#chartSuccessRate').isDisplayed()
                         }
                         waitFor(waitTime) {
                             chartSuccessRateMax.isDisplayed()
@@ -560,15 +529,15 @@ class ImporterTest extends TestBase {
             if(isChartDisplayed()) {
                 when:
                 page.importerGraphView.value("Minutes")
-                page.importerGraphView.value("Seconds")
-                page.importerGraphView.value("Minutes")
+                driver.navigate().refresh();
+                waitForTime(5)
                 then:
                 count = 0
                 while (count < numberOfTrials) {
                     count++
                     try {
                         waitFor(waitTime) {
-                            $('#chartOutTransaction').isDisplayed()
+                            $('#chartFailureRate').isDisplayed()
                         }
                         waitFor(waitTime) {
                             chartFailureRateMax.isDisplayed()
@@ -613,61 +582,51 @@ class ImporterTest extends TestBase {
         println("Process only if Importer tab is present")
         then:
         if(isImporterTabVisible) {
-            if(isChartDisplayed()) {
-                when:
-                count = 0
-                page.importerGraphView.value("Days")
-                then:
-                count = 0
-                while (count < 3) {
-                    count++
-                    try {
-                        waitFor(waitTime) {
-                            $('#chartOutTransaction').isDisplayed()
-                        }
-                        waitFor(waitTime) {
-                            chartFailureRateMax.isDisplayed()
-                            chartSuccessRateMin.isDisplayed()
-                        }
-                        stringMax = chartFailureRateMax.text()
-                        stringMin = chartFailureRateMin.text()
+            when:
+            page.chooseGraphView("Days")
+            driver.navigate().refresh();
+            waitForTime(6)
+            then:
+            waitFor(20) {
+                $('#chartFailureRate').isDisplayed()
+            }
 
-                        break
-                    } catch (geb.waiting.WaitTimeoutException e) {
-                        println("WaitTimeoutException")
-                    }
-                }
-                String monthMax = page.changeToMonth(stringMax)
-                String monthMin = page.changeToMonth(stringMin)
+            waitFor(waitTime) {
+                chartFailureRateMax.isDisplayed()
+                chartFailureRateMin.isDisplayed()
+            }
+            stringMax = chartFailureRateMax.text()
+            stringMin = chartFailureRateMin.text()
 
-                String dateMax = page.changeToDate(stringMax)
-                String dateMin = page.changeToDate(stringMin)
 
-                int intDateMax = Integer.parseInt(dateMax)
-                int intDateMin = Integer.parseInt(dateMin)
+            String monthMax = page.changeToMonth(stringMax)
+            String monthMin = page.changeToMonth(stringMin)
 
-                if(monthMax.equals(monthMin)) {
-                    if(intDateMax > intDateMin) {
-                        println("The maximum value is " + stringMax)
-                        println("The minimum value is " + stringMin)
-                        println("The time is in Days")
-                    }
-                    else {
-                        println("FAIL: Date of Max is less than that of date of Min for same month")
-                        assert false
-                    }
+            String dateMax = page.changeToDate(stringMax)
+            String dateMin = page.changeToDate(stringMin)
+
+            int intDateMax = Integer.parseInt(dateMax)
+            int intDateMin = Integer.parseInt(dateMin)
+
+            if(monthMax.equals(monthMin)) {
+                if(intDateMax > intDateMin) {
+                    println("The maximum value is " + stringMax)
+                    println("The minimum value is " + stringMin)
+                    println("The time is in Days")
                 }
                 else {
-                    if (intDateMax < intDateMin) {
-                        println("Success")
-                    }
-                    else {
-                        println("FAIL: Date of Max is more than that of date of Min for new month")
-                        assert false
-                    }
+                    println("FAIL: Date of Max is less than that of date of Min for same month")
+                    assert false
                 }
-            } else {
-                waitFor(10){ noChartMsg.isDisplayed() }
+            }
+            else {
+                if (intDateMax < intDateMin) {
+                    println("Success")
+                }
+                else {
+                    println("FAIL: Date of Max is more than that of date of Min for new month")
+                    assert false
+                }
             }
         } else {
             println("Importer tab is not available.")

@@ -1293,6 +1293,79 @@ public class TestCSVLoader {
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
+    @Test
+    public void testHeaderColumnWhitespace1() throws Exception
+    {
+        // ENG-12324: csvloader --header doesn't work if header has spaces. This is essentially the same test as testHeaderColumnNumNotSame, but with some
+        // strategically placed whitespace in the header.
+
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "  clm_integer, clm_tinyint,clm_smallint,  clm_bigint  ,clm_string,clm_decimal,clm_float  , clm_timestamp,clm_point ,clm_geography",
+                "1 ,1,1,11111111,first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+                "2,2,2,222222,second,3.30,NULL,"+currentTime+",POINT(2 2),\"POLYGON((0 0, 2 0, 0 2, 0 0))\"",
+                "3,3,3,333333, third ,NULL, 3.33,"+currentTime+",POINT(3 3),\"POLYGON((0 0, 3 0, 0 3, 0 0))\"",
+                "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime+",POINT(4 4),\"POLYGON((0 0, 4 0, 0 4, 0 0))\"",
+                "5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime+",POINT(5 5),\"POLYGON((0 0, 5 0, 0 5, 0 0))\"",
+                "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime+",POINT(6 6),\"POLYGON((0 0, 6 0, 0 6, 0 0))\"",
+                "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime+",POINT(7 7),\"POLYGON((0 0, 7 0, 0 7, 0 0))\"",
+                "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 8 0, 0 8, 0 0))\"",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 8;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testHeaderColumnWhitespace2() throws Exception
+    {
+        // ENG-12324: csvloader --header doesn't work if header has spaces. This is essentially the same test as testHeaderColumnNumNotSame, but with some
+        // strategically placed whitespace in the header.
+
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "  clm_integer, clm_tinyint,clm_smallint,  clm_bigint  ,clm_string,clm_decimal,clm_float  , clm_timestamp,clm_point ,clm_geography",
+                "1 ,1,1,11111111,first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\",garbage",
+                "2,2,2,222222,second,3.30,NULL,"+currentTime+",POINT(2 2),\"POLYGON((0 0, 2 0, 0 2, 0 0))\"",
+                "3,3,3,333333, third ,NULL, 3.33,"+currentTime+",POINT(3 3),\"POLYGON((0 0, 3 0, 0 3, 0 0))\"",
+                "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime+",POINT(4 4),\"POLYGON((0 0, 4 0, 0 4, 0 0))\"",
+                "5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime+",POINT(5 5),\"POLYGON((0 0, 5 0, 0 5, 0 0))\"",
+                "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime+",POINT(6 6),\"POLYGON((0 0, 6 0, 0 6, 0 0))\"",
+                "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime+",POINT(7 7),\"POLYGON((0 0, 7 0, 0 7, 0 0))\"",
+                "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 8 0, 0 8, 0 0))\"",
+        };
+        int invalidLineCnt = 1;
+        int validLineCnt = 7;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
             int validLineCnt) throws Exception {
         test_Interface(my_options, my_data, invalidLineCnt, validLineCnt, 0, new String[0]);

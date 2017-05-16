@@ -46,7 +46,6 @@ import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
-import org.voltdb.HybridCrc32;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
@@ -56,6 +55,7 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SQLStmt;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
@@ -101,15 +101,14 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import vanilla.java.affinity.impl.PosixJNAAffinity;
-
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -395,10 +394,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation,
-                long uniqueId, long spHandle, boolean requiresNewExportGeneration)
+                long uniqueId, long spHandle,
+                boolean requireCatalogDiffCmdsApplyToEE,
+                boolean requiresNewExportGeneration)
         {
             return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation,
-                    false, uniqueId, spHandle, requiresNewExportGeneration);
+                    false, uniqueId, spHandle,
+                    requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
         }
 
         @Override
@@ -1460,9 +1462,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
-            String[] sqlTexts,
+            DeterminismHash determinismHash,
+            SQLStmt[] stmts,
             long txnId,
             long spHandle,
             long uniqueId,
@@ -1475,9 +1476,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
-                isWriteFrag,
-                writeCRC,
-                sqlTexts,
+                determinismHash,
+                stmts,
                 txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
@@ -1500,7 +1500,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle, boolean requiresNewExportGeneration)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle,
+            boolean requireCatalogDiffCmdsApplyToEE,
+            boolean requiresNewExportGeneration)
     {
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
@@ -1512,14 +1514,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
-        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
-
-        diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
-        if (diffCmds.length() == 0) {
+        if (requireCatalogDiffCmdsApplyToEE == false) {
             // empty diff cmds for the EE to apply, so skip the JNI call
             hostLog.info("Skipped applying diff commands on EE.");
             return true;
         }
+
+        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
 
         boolean DRCatalogChange = false;
         for (Table t : tables) {

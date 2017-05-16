@@ -37,17 +37,21 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
 
 
-public class ImportInsertR extends VoltProcedure {
-    public final SQLStmt select = new SQLStmt("SELECT ts,cid,cnt FROM importr WHERE cid=? ORDER BY 1,2,3");
-    public final SQLStmt insert = new SQLStmt("INSERT INTO importr (ts,cid,cnt) values (?,?,?)");
-    public final SQLStmt update = new SQLStmt("UPDATE importr set ts=?,cnt=? where cid=?");
+public class ImportInsertR extends ImportBaseProc {
 
-    public long run(     long txnid
+    public final SQLStmt select_r = new SQLStmt("SELECT ts,cid,cnt FROM importr WHERE cid=? ORDER BY 1,2,3");
+    public final SQLStmt insert_r = new SQLStmt("INSERT INTO importr (ts,cid,cnt,rc) values (?,?,?,?)");
+    public final SQLStmt update_r = new SQLStmt("UPDATE importr set ts=?,cnt=?,rc=rc+1 where cid=?");
+
+    public final SQLStmt select_bitmap_r = new SQLStmt("SELECT bitmap FROM importbr WHERE cid=? and seq=?");
+    //public final SQLStmt upsert_bitmap_r = new SQLStmt("UPSERT INTO importbr (cid,seq,bitmap) values (?,?,?)");
+    public final SQLStmt insert_bitmap_r = new SQLStmt("INSERT INTO importbr (cid,seq,bitmap) values (?,?,?)");
+    public final SQLStmt update_bitmap_r = new SQLStmt("UPDATE importbr set bitmap=? where cid=? and seq=?");
+
+    public VoltTable[] run(long txnid
                         ,long prevtxnid
                         ,long ts
                         ,byte cid
@@ -58,26 +62,7 @@ public class ImportInsertR extends VoltProcedure {
                         ,long adhocjmp
                         ,byte[] value) {
 
-        voltQueueSQL(select, cid);
-        VoltTable[] results = voltExecuteSQL();
-        VoltTable data = results[0];
-        int rowCount = data.getRowCount();
-        if (rowCount != 0) {
-            if (rowCount != 1)
-                throw new VoltAbortException(getClass().getName() + "should get only one row per cid");
-            VoltTableRow row = data.fetchRow(0);
-            long fcid = row.getLong("cid");
-            if (fcid != cid)
-                throw new VoltAbortException(getClass().getName() +
-                        " serious error expected cid " + cid + " != fetched cid: "+ fcid);
-            long mts = Math.max(row.getLong("ts"), ts);
-            long mcnt = Math.max(row.getLong("cnt"), cnt);
-            voltQueueSQL(update, mts, mcnt, cid);
-        } else {
-            voltQueueSQL(insert, ts, cid, cnt);
-        }
-        voltExecuteSQL(true);
-        return 0;
+        return doWork(select_r, update_r, insert_r, select_bitmap_r, update_bitmap_r, insert_bitmap_r, cid, ts, cnt);
     }
 }
 

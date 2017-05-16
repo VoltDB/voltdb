@@ -521,7 +521,7 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1} from Table{T1} on master"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1} from Table{T1} on master"));
     }
 
     @Test
@@ -535,7 +535,7 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1} from Table{T1} on replica"));
+        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1} from Table{T1} on replica"));
     }
 
     @Test
@@ -549,8 +549,7 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1_C2} from Table{T1} on master"));
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1} from Table{T1} on replica"));
+        assertTrue(diff.errors().contains("Missing ColumnRef{C2} from Index{VOLTDB_AUTOGEN_IDX_PK_T1} on master"));
     }
 
     @Test
@@ -564,8 +563,7 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1_C2} from Table{T1} on replica"));
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1} from Table{T1} on master"));
+        assertTrue(diff.errors().contains("Missing ColumnRef{C2} from Index{VOLTDB_AUTOGEN_IDX_PK_T1} on replica"));
     }
 
     @Test
@@ -579,8 +577,8 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C1_C2} from Table{T1} on replica"));
-        assertTrue(diff.errors().contains("Missing Index{VOLTDB_AUTOGEN_IDX_PK_T1_C2_C1} from Table{T1} on master"));
+        assertTrue(diff.errors().contains("Incompatible schema between master and replica: field index in schema object ColumnRef{C1}"));
+        assertTrue(diff.errors().contains("Incompatible schema between master and replica: field index in schema object ColumnRef{C2}"));
     }
 
     @Test

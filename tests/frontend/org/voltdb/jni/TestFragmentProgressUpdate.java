@@ -29,12 +29,11 @@ import static org.mockito.Mockito.verify;
 
 import java.util.Arrays;
 
-import junit.framework.TestCase;
-
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
+import org.voltdb.SQLStmt;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
@@ -50,6 +49,8 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+
+import junit.framework.TestCase;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
@@ -132,9 +133,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
-                new String[] { selectStmt.getSqltext() },
+                null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
@@ -187,9 +187,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
-                new String[] { selectStmt.getSqltext() },
+                null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
 
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
@@ -225,9 +224,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(deleteBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
-                new String[] { deleteStmt.getSqltext() },
+                null,
                 3, 3, 2, 42, WRITE_TOKEN, false);
 
         // populate plan cache
@@ -242,9 +240,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
-                new String[] { selectStmt.getSqltext() },
+                null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         assertTrue(m_ee.m_callsFromEE > 2);
         // here the m_lastTuplesAccessed is just the same as threshold, since we start a new fragment
@@ -299,9 +296,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
-                new String[] { selectStmt.getSqltext() },
+                null,
                 3, 3, 2, 42, READ_ONLY_TOKEN, false);
 
         // If want to see the stats, please uncomment the following line.
@@ -439,8 +435,6 @@ public class TestFragmentProgressUpdate extends TestCase {
         long[] fragIds = new long[numFragsToExecute];
         ParameterSet[] paramSets = new ParameterSet[numFragsToExecute];
         String[] sqlTexts = new String[numFragsToExecute];
-        boolean[] writeFrags = new boolean[numFragsToExecute];
-        for (boolean writeFrag : writeFrags) { writeFrag = false; }
         createExecutionEngineInputs(stmtName, fragIds, paramSets, sqlTexts);
 
         // Replace the normal logger with a mocked one, so we can verify the message
@@ -475,14 +469,20 @@ public class TestFragmentProgressUpdate extends TestCase {
                 fail("Invalid value for sqlTextExpectation");
             }
 
+            SQLStmt[] stmts = null;
+            if (sqlTexts != null) {
+                stmts = new SQLStmt[sqlTexts.length];
+                for (int i = 0; i < sqlTexts.length; i++) {
+                    stmts[i] = new SQLStmt(sqlTexts[i]);
+                }
+            }
             m_ee.executePlanFragments(
                     numFragsToExecute,
                     fragIds,
                     null,
                     paramSets,
-                    writeFrags,
                     null,
-                    sqlTexts,
+                    stmts,
                     3, 3, 2, 42,
                     readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN, false);
             if (readOnly && timeout > 0) {

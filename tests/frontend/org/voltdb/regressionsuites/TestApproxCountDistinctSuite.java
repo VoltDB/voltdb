@@ -30,6 +30,7 @@ import java.util.Random;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 
@@ -233,6 +234,10 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 assertFalse(vt.advanceRow());
             }
         }
+
+        // ENG-12466
+        ClientResponse cr = client.callProcedure("@AdHoc", "SELECT ALL APPROX_COUNT_DISTINCT(bi) C1, COUNT(bi) AS C1 FROM p;");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
     }
 
     /**
