@@ -772,11 +772,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
-                        counter.getStoredProcedureName());
+                        counter.getStoredProcedureName(), m_procSet);
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
             } else if (result == DuplicateCounter.ABORT) {
                 RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
-                        counter.getStoredProcedureName());
+                        counter.getStoredProcedureName(), m_procSet);
                 VoltDB.crashGlobalVoltDB("PARTIAL ROLLBACK/ABORT: transaction succeeded on one replica but failed on another replica.", true, null);
             }
         }
