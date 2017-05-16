@@ -52,11 +52,14 @@ public class MessagingChannel {
         for (int i = 0; i < 4 && lengthBuffer.hasRemaining(); i++) {
             read = m_socketChannel.read(lengthBuffer);
             if (read == -1) {
-                throw new IOException("End of stream while reading message length");
+                throw new IOException("Failed to read message length");
             }
         }
         lengthBuffer.flip();
         int len = lengthBuffer.getInt();
+        if (len <= 0) {
+            throw new IOException("Packet size is invalid");
+        }
         if (len > VoltPort.MAX_MESSAGE_LENGTH) {
             throw new IOException("Packet exceeds maximum allowed size");
         }
@@ -64,7 +67,7 @@ public class MessagingChannel {
         while (message.hasRemaining()) {
             read = m_socketChannel.read(message);
             if (read == -1) {
-                throw new IOException("End of stream while reading message");
+                throw new IOException("Failed to read message");
             }
         }
         message.flip();
