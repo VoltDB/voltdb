@@ -68,6 +68,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.utils.CatalogSchemaTools;
@@ -958,7 +959,7 @@ public class VoltCompiler {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
 
-            ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
+            ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs); // NEEDSWORK: Adapt this
         }
 
         m_dirtyTables.clear();
@@ -972,7 +973,10 @@ public class VoltCompiler {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-                ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+                // NEEDSWORK: Need to plumb through some configuration that tells us to use the filtering loader.
+                SQLParser.FileInfo fi = new SQLParser.FileInfo(schemaReader.getPath());
+                ddlcompiler.loadSchemaWithFiltering(schemaReader, db, whichProcs, fi);
+                //ddlcompiler.loadSchema(schemaReader, db, whichProcs);
             }
             finally {
                 m_currentFilename = origFilename;
