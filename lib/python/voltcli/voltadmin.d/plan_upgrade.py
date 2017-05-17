@@ -26,7 +26,12 @@ import base64
 import os
 import sys
 import subprocess
-import ssl
+try:
+    import ssl
+    ssl_available = True
+except ImportError, e:
+    ssl_available = False
+    ssl_exception = e
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
@@ -447,7 +452,17 @@ def getCurrentDeploymentFile(runner, host):
         protocol = "http://"
     else:
         protocol = "https://"
-        sslContext = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+        tlsv = None
+        try:
+            tlsv = ssl.PROTOCOL_TLSv1_2
+        except AttributeError, e:
+            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
+            tlsv = ssl.PROTOCOL_TLSv1
+        if ssl_available:
+            sslContext = ssl.SSLContext(tlsv)
+        else:
+            print "ERROR: To use SSL functionality please Install the Python ssl module."
+            raise ssl_exception
     url = protocol + getHostnameOrIp(host) + ':' + str(host.httpport) + '/deployment/download/'
     request = Request(url)
     base64string = base64.b64encode('%s:%s' % (runner.opts.username, runner.opts.password))
