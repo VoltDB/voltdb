@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -181,9 +182,11 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     @Override
     public void initialize(int kfactor) throws JSONException, KeeperException, InterruptedException, ExecutionException
     {
-        long maxWaitTime = 120; // 2 minute
+        final long maxWaitTime = TimeUnit.MINUTES.toSeconds(60); // 60 minutes
+        long remainingWaitTime = maxWaitTime;
+        final long retryInterval = 10; // 10 seconds
 
-        while(maxWaitTime > 0) {
+        while(remainingWaitTime > 0) {
             VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker);
 
             if (m_messenger.getZK().exists(VoltZK.uacActiveBlocker, false) == null) {
@@ -193,13 +196,15 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             // uac zk blocker exists, rejoin node should wait to watch its stat
             VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
 
-            REJOINLOG.info("Rejoin node is waiting 5 seconds for @UpdateApplicationCatalog to finish");
-            Thread.sleep(1000 * 5);
-            maxWaitTime -= 5;
+            REJOINLOG.info(String.format("Rejoin node is waiting %d seconds for @UpdateApplicationCatalog to finish",
+                    retryInterval));
+            Thread.sleep(TimeUnit.SECONDS.toMillis(retryInterval));
+
+            remainingWaitTime -= retryInterval;
         }
 
-        VoltDB.crashLocalVoltDB("Rejoin node timed out waiting for @UpdateApplicationCatalog for 120 seconds, "
-                + "please retry node rejoin again later");
+        VoltDB.crashLocalVoltDB("Rejoin node is timed out " + maxWaitTime + " seconds waiting for @UpdateApplicationCatalog, "
+                + "please retry node rejoin later manually.");
     }
 
     @Override
