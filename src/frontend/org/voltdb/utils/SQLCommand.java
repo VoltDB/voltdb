@@ -684,7 +684,7 @@ public class SQLCommand
                     // numbers (in a batch), we should at least append a newline.
                     // Whether to echo comments or blank lines from a batch is
                     // a grey area.
-                    if (batch != null ); { // && callback == null) {
+                    if (batch != null && callback == null) {
                         statement.append(line).append("\n");
                     }
                     continue;
