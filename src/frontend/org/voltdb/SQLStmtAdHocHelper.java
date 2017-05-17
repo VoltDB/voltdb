@@ -58,14 +58,14 @@ public class SQLStmtAdHocHelper {
     }
 
     /**
-     * Construct a SQLStmt instance from a SQL statement.
+     * Construct a raw SQLStmt instance from a SQL statement, call it raw because it
+     * only contains the SQL text, it doesn't compute the SQL text CRC or byte array
+     * representation of the SQL text.
      * @param sqlText Valid VoltDB compliant SQL with question marks as parameter
      * place holders.
-     * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
-     * @param computeCRC whether to ignore the computation of SQL text CRC.
      */
-    public static SQLStmt newInstance(String sqlText, String joinOrder, boolean computeCRC) {
-        return new SQLStmt(SQLStmt.canonicalizeStmt(sqlText).getBytes(Constants.UTF8ENCODING), joinOrder, computeCRC);
+    public static SQLStmt newRawInstance(String sqlText) {
+        return new SQLStmt(null, null, sqlText, false);
     }
 
     public static byte[] getSQLBytes(SQLStmt sqlStmt) {
