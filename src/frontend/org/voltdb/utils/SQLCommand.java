@@ -633,12 +633,11 @@ public class SQLCommand
 
         String delimiter = (fileInfo.getOption() == FileOption.INLINEBATCH) ?
                 fileInfo.getDelimiter() : null;
-        int batchStartLineNumber = 0;
 
         while (true) {
 
             String line = reader.readBatchLine();
-            batchStartLineNumber = reader.getLineNumber();
+
             if (delimiter != null) {
                 if (line == null) {
                     // We only print this nice message if the inline batch is
@@ -702,7 +701,6 @@ public class SQLCommand
                     // Execute the file content or fail to but only set m_returningToPromptAfterError
                     // if the intent is to cause a recursive failure, stopOrContinue decided to stop.
                     executeScriptFile(nestedFileInfo, reader, callback);
-                    batchStartLineNumber = reader.getLineNumber();
                     if (m_returningToPromptAfterError) {
                         // The recursive readScriptFile stopped because of an error.
                         // Escape to the outermost readScriptFile caller so it can exit or
