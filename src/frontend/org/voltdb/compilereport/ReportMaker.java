@@ -211,7 +211,7 @@ public class ReportMaker {
         }
         else {
             if (isExportTable) {
-                tag(sb, "inverse", "Export Table");
+                tag(sb, "inverse", "Export Streams");
             } else {
                 tag(sb, null, "Table");
             }
