@@ -198,7 +198,11 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
             REJOINLOG.info(String.format("Rejoin node is waiting %d seconds for @UpdateApplicationCatalog to finish",
                     retryInterval));
-            Thread.sleep(TimeUnit.SECONDS.toMillis(retryInterval));
+
+            try {
+                Thread.sleep(TimeUnit.SECONDS.toMillis(retryInterval));
+            } catch (InterruptedException ignoreIt) {
+            }
 
             remainingWaitTime -= retryInterval;
         }
