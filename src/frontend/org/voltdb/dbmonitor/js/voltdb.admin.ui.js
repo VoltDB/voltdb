@@ -2888,7 +2888,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
             var content = '';
             if (voltDbRenderer.exportTablesArray.length == 0) {
-                $("#exportPopup").html("No Export tables available.");
+                $("#exportPopup").html("No Export streams available.");
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
