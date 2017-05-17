@@ -56,6 +56,10 @@ public:
         extendBufferChain(0);
     }
 
+    inline size_t getTextStringSerializedSize(const std::string &value) {
+        return value.length() + sizeof(int32_t);
+    }
+
     int64_t allocatedByteCount() const {
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
                 ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature);

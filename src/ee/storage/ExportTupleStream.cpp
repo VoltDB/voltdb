@@ -121,9 +121,22 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
-
-    if (m_currBlock->remaining() < tupleMaxLength) {
-        extendBufferChain(tupleMaxLength);
+    //Compute column names size
+    size_t colNamesLength = 0;
+    colNamesLength += getTextStringSerializedSize("VOLT_TRANSACTION_ID");
+    colNamesLength += getTextStringSerializedSize("VOLT_EXPORT_TIMESTAMP");
+    colNamesLength += getTextStringSerializedSize("VOLT_EXPORT_SEQUENCE_NUMBER");
+    colNamesLength += getTextStringSerializedSize("VOLT_PARTITION_ID");
+    colNamesLength += getTextStringSerializedSize("VOLT_SITE_ID");
+    colNamesLength += getTextStringSerializedSize("VOLT_EXPORT_OPERATION");
+    //Treat column count as hash and only allow ADD/DROP column? What about width of columns?
+    for (int i = 0; i < columnNames.size(); i++) {
+        colNamesLength += getTextStringSerializedSize(columnNames[i]);
+    }
+    // include type byte
+    colNamesLength += METADATA_COL_CNT + columnNames.size();
+    if (m_currBlock->remaining() < (tupleMaxLength + colNamesLength)) {
+        extendBufferChain(tupleMaxLength + colNamesLength);
     }
 
     // initialize the full row header to 0. This also
