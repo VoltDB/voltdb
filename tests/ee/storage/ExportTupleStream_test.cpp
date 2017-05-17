@@ -71,6 +71,7 @@ public:
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             columnAllowNull.push_back(false);
+            m_columnNames.push_back(std::to_string(i));
         }
         m_schema =
           TupleSchema::createTupleSchemaForTest(columnTypes,
@@ -104,6 +105,8 @@ public:
         // append into the buffer
         m_wrapper->appendTuple(lastCommittedTxnId,
                                currentTxnId, 1, 1, 1, *m_tuple,
+                                m_columnNames,
+                                1,
                                ExportTupleStream::INSERT);
     }
 
@@ -122,6 +125,7 @@ protected:
     DummyTopend m_topend;
     Pool m_pool;
     UndoQuantum* m_quantum;
+    std::vector<std::string> m_columnNames;
     boost::scoped_ptr<ExecutorContext> m_context;
 
 };
