@@ -1400,7 +1400,6 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
     io.writeLong(hash2);
     ByteArray payload(io.data(), io.size());
 
-    quiesce(lastCommittedSpHandle);
     if (m_executorContext->drStream()->drStreamStarted()) {
         m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
                 spHandle, uniqueId, payload);

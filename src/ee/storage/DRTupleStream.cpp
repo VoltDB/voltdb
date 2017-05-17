@@ -612,7 +612,9 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
 void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
         int64_t uniqueId, ByteArray payloads)
 {
-    if (type == SWAP_TABLE) { // openTxn does this for SWAP_TABLE
+    // SWAP_TABLE should skip incrementing m_openSequenceNumber, openTransactionCommon and commitTransactionCommon
+    // since first two will be handled in checkTransactionForDR() and last one in endTransaction() respectively
+    if (type == SWAP_TABLE) {
         assert(m_opened);
         if (!m_enabled) {
             return;
