@@ -30,6 +30,7 @@
 #include "common/TupleSchemaBuilder.h"
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
+#include "common/UniqueId.hpp"
 
 #include "execution/VoltDBEngine.h"
 
@@ -52,6 +53,7 @@ using voltdb::Table;
 using voltdb::TableFactory;
 using voltdb::TableTuple;
 using voltdb::TupleSchemaBuilder;
+using voltdb::UniqueId;
 using voltdb::VALUE_TYPE_BIGINT;
 using voltdb::VALUE_TYPE_VARCHAR;
 using voltdb::ValueFactory;
@@ -86,14 +88,15 @@ protected:
 
     // Calling this will bump the unique ID in the executor context
     // and create a new DR timestamp value.
-    void beginWork() {
+    void beginWork(bool isSp = true) {
         ExecutorContext::getExecutorContext()->setupForPlanFragments(
             m_engine->getCurrentUndoQuantum(),
             0,  // txn id
             0,  // sp handle
             0,  // last committed sp handle
-            m_uniqueId,
+            isSp ? m_uniqueId : (m_uniqueId | UniqueId::MP_INIT_PID),
             false);
+        ExecutorContext::getExecutorContext()->checkTransactionForDR();
         // DR timestamp discards the low 14 bits of the unique ID,
         // so we must increment by this amount to produce a new DR
         // timestamp next time around.
@@ -116,6 +119,7 @@ protected:
         static const std::string payload(
             "add / clusters cluster\n"
             "set /clusters#cluster localepoch 1199145600\n"
+            "set /clusters#cluster drProducerEnabled false\n"
             "set /clusters#cluster drRole \"xdcr\"\n"
             "add /clusters#cluster databases database\n"
             "set /clusters#cluster/databases#database schema \"eJwDAAAAAAE=\"\n"
@@ -404,7 +408,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     // Swap empty tables.
     //
 
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
@@ -434,7 +438,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     const int tuplesToInsert = 10;
 
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
@@ -470,7 +474,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     // Swap with data in both tables.
     //
 
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
@@ -504,7 +508,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
 
     // swap and then undo to swap back.
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
@@ -527,7 +531,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     rollback();
 
-    beginWork();
+    beginWork(false);
 
     namedTable = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_EQ(namedTable, dupTable);
@@ -568,7 +572,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     rollback();
 
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
@@ -614,7 +618,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     // Test TRUNCATE and swap in the same committed transaction.
     //
 
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
@@ -655,7 +659,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     // Test TRUNCATE and swap in the same aborted transaction.
     //
 
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
@@ -687,7 +691,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     // Test WRITES and swaps in the same aborted transaction.
     //
 
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
@@ -727,7 +731,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     // Test WRITES and swaps in the same committed transaction.
     //
 
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
@@ -775,7 +779,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
     // After the commit, re-assert the same counts.
     validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert*5);
 
-    beginWork();
+    beginWork(false);
     table = engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();

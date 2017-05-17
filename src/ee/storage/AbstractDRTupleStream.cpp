@@ -88,6 +88,9 @@ void
 AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,
                                      int64_t lastCommittedSpHandle)
 {
+    if (!m_enabled) {
+        return;
+    }
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (m_flushInterval > 0 && timeInMillis - m_lastFlush > m_flushInterval)) {
         int64_t currentSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);

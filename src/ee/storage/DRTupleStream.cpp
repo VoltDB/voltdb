@@ -583,8 +583,11 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
 // an exception and rollback.
 bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso)
 {
-    if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
-           && m_opened) {
+    if (sb == NULL) {
+        return false;
+    }
+    if (m_opened) {
+        assert(sb->hasDRBeginTxn());       /* this block contains a DR begin txn */
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
         size_t spaceNeeded = m_headerSpace + partialTxnLength + minLength;
         if (spaceNeeded > m_secondaryCapacity) {
@@ -603,28 +606,30 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
         }
         return true;
     }
-    assert(!m_opened);
     return false;
 }
 
 void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
         int64_t uniqueId, ByteArray payloads)
 {
-    if (type != SWAP_TABLE) { // openTxn does this for SWAP_TABLE
+    if (type == SWAP_TABLE) { // openTxn does this for SWAP_TABLE
+        assert(m_opened);
+        if (!m_enabled) {
+            return;
+        }
+    } else {
         assert(!m_opened);
         ++m_openSequenceNumber;
-    }
-
-    if (!m_enabled) {
-        if (UniqueId::isMpUniqueId(uniqueId)) {
-            m_lastCommittedMpUniqueId = uniqueId;
-        } else {
-            m_lastCommittedSpUniqueId = uniqueId;
+        if (!m_enabled) {
+            if (UniqueId::isMpUniqueId(uniqueId)) {
+                m_lastCommittedMpUniqueId = uniqueId;
+            } else {
+                m_lastCommittedSpUniqueId = uniqueId;
+            }
+            openTransactionCommon(spHandle, uniqueId);
+            commitTransactionCommon();
+            return;
         }
-
-        openTransactionCommon(spHandle, uniqueId);
-        commitTransactionCommon();
-        return;
     }
 
     switch (type) {
