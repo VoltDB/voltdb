@@ -809,7 +809,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = null;
 
                 if (m_drainTraceForDebug != null) {
-                    VoltDB.crashLocalVoltDB("Rolling generation " + m_generation + " before it is fully drained. " +
+                    //Making this an ERROR. Looks like this is happening when ackImpl initiates drains and pollImpl is submitted to execute.
+                    exportLog.error("Rolling generation " + m_generation + " before it is fully drained. " +
                                             "Drain was called from " + Throwables.getStackTraceAsString(m_drainTraceForDebug));
                 }
             }

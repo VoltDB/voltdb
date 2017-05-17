@@ -93,21 +93,23 @@ public class SQLStmt {
      * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
-        this(canonicalizeStmt(sqlText).getBytes(Constants.UTF8ENCODING), joinOrder);
+        this(canonicalizeStmt(sqlText).getBytes(Constants.UTF8ENCODING), joinOrder, true);
     }
 
     /**
      * Construct a SQLStmt instance from a byte array for internal use.
      */
-    private SQLStmt(byte[] sqlText, String joinOrder) {
+    protected SQLStmt(byte[] sqlText, String joinOrder, boolean computeCRC) {
         this.sqlText = sqlText;
         this.joinOrder = joinOrder;
 
-        // create a hash for determinism purposes
-        PureJavaCrc32C crc = new PureJavaCrc32C();
-        crc.update(sqlText);
-        // this will sometimes go negative in the cast, but should be 1-1
-        this.sqlCRC = (int) crc.getValue();
+        if (computeCRC) {
+            // create a hash for determinism purposes
+            PureJavaCrc32C crc = new PureJavaCrc32C();
+            crc.update(sqlText);
+            // this will sometimes go negative in the cast, but should be 1-1
+            this.sqlCRC = (int) crc.getValue();
+        }
 
         inCatalog = true;
     }
@@ -166,7 +168,7 @@ public class SQLStmt {
                                   boolean isReadOnly,
                                   VoltType[] params,
                                   SiteProcedureConnection site) {
-        SQLStmt stmt = new SQLStmt(sqlText, null);
+        SQLStmt stmt = new SQLStmt(sqlText, null, true);
 
         stmt.aggregator = new SQLStmt.Frag(aggFragId, aggPlanHash, isAggTransactional);
 
@@ -226,7 +228,7 @@ public class SQLStmt {
     // In SQL statement the input without ending with a semicolon is legitimate,
     // however in order to do a reverse look up (crc -> sql str), we'd like to
     // use the same statement to compute crc.
-    private static String canonicalizeStmt(String stmtStr) {
+    public static String canonicalizeStmt(String stmtStr) {
         // Cleanup whitespace newlines and adding semicolon for catalog compatibility
         stmtStr = stmtStr.replaceAll("\n", " ");
         stmtStr = stmtStr.trim();
