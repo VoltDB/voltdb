@@ -53,6 +53,9 @@ public:
 
     bool insertTuple(TableTuple& tuple);
 
+    // To unpin the last written block when all inserts are complete.
+    void finishInserts();
+
     size_t allocatedBlockCount() const {
         return m_blockIds.size();
     }
@@ -77,11 +80,15 @@ public:
         return m_numTuples;
     }
 
+    virtual ~LargeTempTable();
+
 protected:
 
     LargeTempTable();
 
 private:
+
+    bool m_insertsFinished;
 
     TableIterator m_iter;
 

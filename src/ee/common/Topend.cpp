@@ -146,4 +146,12 @@ namespace voltdb {
         return "";
     }
 
+    bool DummyTopend::storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        return false;
+    }
+
+    LargeTempTableBlock* DummyTopend::loadLargeTempTableBlock(int64_t blockId) {
+        return NULL;
+    }
+
 }

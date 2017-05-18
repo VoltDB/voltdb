@@ -50,6 +50,12 @@ namespace voltdb {
 
         int64_t getAllocatedMemory() const;
 
+        std::unique_ptr<Pool> releasePool();
+
+        TBPtr releaseBlock();
+
+        virtual ~LargeTempTableBlock();
+
     private:
 
         std::unique_ptr<Pool> m_pool;

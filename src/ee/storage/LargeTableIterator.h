@@ -54,6 +54,8 @@ public:
     inline bool next(TableTuple& out);
     bool hasNext() const;
 
+    inline virtual ~LargeTableIterator();
+
 protected:
  LargeTableIterator(Table* table, std::vector<int64_t>::iterator start)
      : m_tupleLength(table->m_tupleLength)
@@ -117,6 +119,12 @@ bool LargeTableIterator::next(TableTuple& out) {
     return false;
 }
 
+LargeTableIterator::~LargeTableIterator() {
+    if (m_currBlock != NULL) {
+        LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        lttCache->unpinBlock(m_currBlockId);
+    }
+ }
 
 } // namespace voltdb
 

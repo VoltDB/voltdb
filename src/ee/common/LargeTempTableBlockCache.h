@@ -56,6 +56,19 @@ namespace voltdb {
         void releaseBlock(int64_t blockId);
 
         void increaseAllocatedMemory(int64_t numBytes);
+        void decreaseAllocatedMemory(int64_t numBytes);
+
+        size_t numPinnedEntries() const {
+            return m_pinnedEntries.size();
+        }
+
+        size_t allocatedBlockCount() const {
+            return m_liveEntries.size() + m_storedEntries.size();
+        }
+
+        int64_t allocatedMemory() const {
+            return m_totalAllocatedBytes;
+        }
 
     private:
 
@@ -71,12 +84,17 @@ namespace voltdb {
             return nextId;
         }
 
+        bool storeABlock();
+
+        bool loadBlock(int64_t blockId);
+
         std::vector<std::unique_ptr<LargeTempTableBlock>> m_cache;
 
         /* std::vector<LargeTempTableBlock*> m_emptyEntries; */
 
         std::map<int64_t, LargeTempTableBlock*> m_liveEntries;
-
+        std::set<int64_t> m_pinnedEntries;
+        std::map<int64_t, int64_t> m_storedEntries;
         /* std::list<int64_t> m_unpinnedEntries; */
 
         int64_t m_nextId;

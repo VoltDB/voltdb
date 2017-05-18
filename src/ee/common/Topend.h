@@ -31,6 +31,7 @@ namespace voltdb {
 class Table;
 class Pool;
 class StreamBlock;
+class LargeTempTableBlock;
 
 /*
  * Topend abstracts the EE's calling interface to Java to
@@ -79,6 +80,10 @@ class Topend {
     /** Calls the java method in org.voltdb.utils.Encoder */
     virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
 
+    virtual bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) = 0;
+
+    virtual LargeTempTableBlock* loadLargeTempTableBlock(int64_t blockId) = 0;
+
     virtual ~Topend()
     {
     }
@@ -117,6 +122,12 @@ public:
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
+
+    virtual bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block);
+
+    virtual LargeTempTableBlock* loadLargeTempTableBlock(int64_t blockId);
+
+
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;

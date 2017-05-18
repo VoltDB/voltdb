@@ -31,6 +31,7 @@ namespace voltdb {
 
     LargeTempTable::LargeTempTable()
         : Table(BLOCKSIZE)
+        , m_insertsFinished(false)
         , m_iter(this)
         , m_blockForWriting(nullptr)
         , m_blockIds()
@@ -39,6 +40,7 @@ namespace voltdb {
 
 bool LargeTempTable::insertTuple(TableTuple& source) {
     TableTuple target(m_schema);
+    assert(! m_insertsFinished);
 
     if (m_blockForWriting == nullptr || !m_blockForWriting->hasFreeTuples()) {
         LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
@@ -60,8 +62,31 @@ bool LargeTempTable::insertTuple(TableTuple& source) {
     return true;
 }
 
+void LargeTempTable::finishInserts() {
+    assert(! m_insertsFinished);
+    m_insertsFinished = true;
+
+    if (m_blockIds.empty()) {
+        return;
+    }
+
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    lttBlockCache->unpinBlock(m_blockIds.back());
+}
+
 LargeTableIterator LargeTempTable::largeIterator() {
     return LargeTableIterator(this, m_blockIds.begin());
 }
+
+    LargeTempTable::~LargeTempTable() {
+        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        if (! m_insertsFinished) {
+            finishInserts();
+        }
+
+        BOOST_FOREACH(int64_t blockId, m_blockIds) {
+            lttBlockCache->releaseBlock(blockId);
+        }
+    }
 
 } // namespace voltdb

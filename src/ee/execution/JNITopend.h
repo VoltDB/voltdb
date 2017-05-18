@@ -61,6 +61,17 @@ public:
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
+    bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        throw std::logic_error("unimplemented!");
+        return false;
+    }
+
+    LargeTempTableBlock* loadLargeTempTableBlock(int64_t blockId) {
+        throw std::logic_error("unimplemented!");
+        return NULL;
+    }
+
+
 private:
     JNIEnv *m_jniEnv;
 

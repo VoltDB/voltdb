@@ -168,8 +168,40 @@ protected:
 };
 
 
+class LTTTopend : public voltdb::DummyTopend {
+public:
+
+    bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        m_map.emplace(std::make_pair(blockId, StoredBlock(block->releasePool(), block->releaseBlock())));
+        return true;
+    }
+
+    LargeTempTableBlock* loadLargeTempTableBlock(int64_t blockId) {
+        return NULL;
+    }
+
+private:
+
+    struct StoredBlock {
+        StoredBlock(std::unique_ptr<Pool> pool, TBPtr tbp)
+            : m_pool(pool.release())
+            , m_tbp(tbp)
+        {
+        }
+
+    private:
+        std::unique_ptr<Pool> m_pool;
+        TBPtr m_tbp;
+    };
+
+    std::map<int64_t, StoredBlock> m_map;
+};
+
 
 TEST_F(LargeTempTableTest, Basic) {
+
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+
     TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
                                       VALUE_TYPE_DOUBLE,
                                       std::make_pair(VALUE_TYPE_VARCHAR, 128));
@@ -190,25 +222,41 @@ TEST_F(LargeTempTableTest, Basic) {
     std::vector<double> floatVals{3.14, 6.28, 7.77};
     std::vector<std::string> textVals{"foo", "bar", "baz"};
 
+    ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
     for (int i = 0; i < pkVals.size(); ++i) {
         setTupleValues(&tuple, pkVals[i], floatVals[i], textVals[i]);
         ltt->insertTuple(tuple);
     }
 
-    LargeTableIterator iter = ltt->largeIterator();
-    TableTuple iterTuple(ltt->schema());
-    int i = 0;
-    while (iter.next(iterTuple)) {
-        assertTupleValuesEqual(&iterTuple, pkVals[i], floatVals[i], textVals[i]);
-        ++i;
+    ASSERT_EQ(1, lttBlockCache->numPinnedEntries());
+
+    ltt->finishInserts();
+
+    ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
+
+    {
+        LargeTableIterator iter = ltt->largeIterator();
+        TableTuple iterTuple(ltt->schema());
+        int i = 0;
+        while (iter.next(iterTuple)) {
+            assertTupleValuesEqual(&iterTuple, pkVals[i], floatVals[i], textVals[i]);
+            ++i;
+        }
+
+        ASSERT_EQ(pkVals.size(), i);
     }
 
-    ASSERT_EQ(pkVals.size(), i);
+
 
     ltt->decrementRefcount();
+
+    ASSERT_EQ(0, lttBlockCache->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 }
 
 TEST_F(LargeTempTableTest, MultiBlock) {
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    ASSERT_EQ(0, lttBlockCache->allocatedBlockCount());
 
     TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
                                       VALUE_TYPE_DOUBLE,
@@ -242,6 +290,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 
     StandAloneTupleStorage tupleWrapper(schema);
     TableTuple tuple = tupleWrapper.tuple();
+    ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     for (int i = 0; i < 500; ++i) {
         std::string text(15, 'a' + (i % 26));
@@ -260,35 +309,46 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         ltt->insertTuple(tuple);
     }
 
-    ASSERT_EQ(2, ltt->allocatedBlockCount());
+    ASSERT_EQ(1, lttBlockCache->numPinnedEntries());
 
-    LargeTableIterator iter = ltt->largeIterator();
-    TableTuple iterTuple(ltt->schema());
-    int i = 0;
-    while (iter.next(iterTuple)) {
-        std::string text(15, 'a' + (i % 26));
-        assertTupleValuesEqual(&iterTuple,
-                               i,
-                               0.5 * i,
-                               0.5 * i + 1,
-                               0.5 * i + 2,
-                               toDecimal(0.5 * i),
-                               toDecimal(0.5 * i + 1),
-                               toDecimal(0.5 * i + 2),
-                               text,
-                               text,
-                               text);
-        ++i;
+    ltt->finishInserts();
+
+    ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
+
+    ASSERT_EQ(2, ltt->allocatedBlockCount());
+    {
+        LargeTableIterator iter = ltt->largeIterator();
+        TableTuple iterTuple(ltt->schema());
+        int i = 0;
+        while (iter.next(iterTuple)) {
+            std::string text(15, 'a' + (i % 26));
+            assertTupleValuesEqual(&iterTuple,
+                                   i,
+                                   0.5 * i,
+                                   0.5 * i + 1,
+                                   0.5 * i + 2,
+                                   toDecimal(0.5 * i),
+                                   toDecimal(0.5 * i + 1),
+                                   toDecimal(0.5 * i + 2),
+                                   text,
+                                   text,
+                                   text);
+            ++i;
+        }
+
+        ASSERT_EQ(500, i);
     }
 
-    ASSERT_EQ(500, i);
-
     ltt->decrementRefcount();
+
+    ASSERT_EQ(0, lttBlockCache->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 }
 
 TEST_F(LargeTempTableTest, OverflowCache) {
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 131072;
+    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 400000;
     TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
                                       VALUE_TYPE_DOUBLE,
                                       VALUE_TYPE_DOUBLE,
@@ -321,8 +381,10 @@ TEST_F(LargeTempTableTest, OverflowCache) {
 
     StandAloneTupleStorage tupleWrapper(schema);
     TableTuple tuple = tupleWrapper.tuple();
+    ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
-    for (int i = 0; i < 500; ++i) {
+
+    for (int i = 0; i < 1500; ++i) {
         std::string text(15, 'a' + (i % 26));
         setTupleValues(&tuple,
                        i,
@@ -339,31 +401,44 @@ TEST_F(LargeTempTableTest, OverflowCache) {
         ltt->insertTuple(tuple);
     }
 
-    ASSERT_EQ(2, ltt->allocatedBlockCount());
+    ASSERT_EQ(1, lttBlockCache->numPinnedEntries());
 
-    LargeTableIterator iter = ltt->largeIterator();
-    TableTuple iterTuple(ltt->schema());
-    int i = 0;
-    while (iter.next(iterTuple)) {
-        std::string text(15, 'a' + (i % 26));
-        assertTupleValuesEqual(&iterTuple,
-                               i,
-                               0.5 * i,
-                               0.5 * i + 1,
-                               0.5 * i + 2,
-                               toDecimal(0.5 * i),
-                               toDecimal(0.5 * i + 1),
-                               toDecimal(0.5 * i + 2),
-                               text,
-                               text,
-                               text);
-        ++i;
+    // Notify that we're done inserting so last block can be
+    // unpinned.
+    ltt->finishInserts();
+
+    ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
+
+    std::cout << "block count: " << ltt->allocatedBlockCount() << std::endl;
+    ASSERT_EQ(4, ltt->allocatedBlockCount());
+
+    {
+        LargeTableIterator iter = ltt->largeIterator();
+        TableTuple iterTuple(ltt->schema());
+        int i = 0;
+        while (iter.next(iterTuple)) {
+            std::string text(15, 'a' + (i % 26));
+            assertTupleValuesEqual(&iterTuple,
+                                   i,
+                                   0.5 * i,
+                                   0.5 * i + 1,
+                                   0.5 * i + 2,
+                                   toDecimal(0.5 * i),
+                                   toDecimal(0.5 * i + 1),
+                                   toDecimal(0.5 * i + 2),
+                                   text,
+                                   text,
+                                   text);
+            ++i;
+        }
+
+        ASSERT_EQ(500, i);
     }
-
-    ASSERT_EQ(500, i);
 
     ltt->decrementRefcount();
 
+    ASSERT_EQ(0, lttBlockCache->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 }
 
 int main() {
@@ -373,12 +448,12 @@ int main() {
     ThreadLocalPool tlPool;
     boost::scoped_ptr<voltdb::Pool> testPool(new voltdb::Pool());
     voltdb::UndoQuantum* wantNoQuantum = NULL;
-    voltdb::Topend* topless = NULL;
+    std::unique_ptr<voltdb::Topend> topend(new LTTTopend());
     boost::scoped_ptr<voltdb::ExecutorContext>
         executorContext(new voltdb::ExecutorContext(0,              // siteId
                                                     0,              // partitionId
                                                     wantNoQuantum,  // undoQuantum
-                                                    topless,        // topend
+                                                    topend.get(),   // topend
                                                     testPool.get(), // tempStringPool
                                                     NULL,           // engine
                                                     "",             // hostname

@@ -21,20 +21,18 @@
 
 #include "LargeTempTableBlockCache.h"
 
+#include "common/Topend.h"
+#include "common/executorcontext.hpp"
+
 namespace voltdb {
 
     LargeTempTableBlockCache::LargeTempTableBlockCache()
         : m_cache()
-          //, m_emptyEntries(NUM_CACHE_ENTRIES)
         , m_liveEntries()
+        , m_pinnedEntries()
+        , m_storedEntries()
         , m_totalAllocatedBytes(0)
-        // , m_unpinnedEntries()
     {
-        // At initialization, all cache entries are empty.
-        // auto cacheIt = m_cache.begin();
-        // for (; cacheIt != m_cache.end(); ++cacheIt) {
-        //     m_emptyEntries.push_back(&(*cacheIt));
-        // }
     }
 
     std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock(LargeTempTable* ltt) {
@@ -43,45 +41,110 @@ namespace voltdb {
         m_cache.emplace_back(new LargeTempTableBlock(ltt));
         LargeTempTableBlock *emptyBlock = m_cache.back().get();
         m_liveEntries[id] = emptyBlock;
-
-        increaseAllocatedMemory(emptyBlock->getAllocatedMemory());
+        m_pinnedEntries.insert(id);
 
         return std::make_pair(id, emptyBlock);
     }
 
+    bool LargeTempTableBlockCache::loadBlock(int64_t blockId) {
+        Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
+        LargeTempTableBlock* block = topend->loadLargeTempTableBlock(blockId);
+
+        if (block == NULL) {
+            return false;
+        }
+
+        m_cache.emplace_back(block);
+        m_liveEntries[blockId] = block;
+
+        // callee will pin the block.
+
+        return true;
+    }
+
     LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
+        if (m_liveEntries.find(blockId) == std::end(m_liveEntries)) {
+            bool rc = loadBlock(blockId);
+            assert(rc);
+        }
+
         assert(m_liveEntries.find(blockId) != std::end(m_liveEntries));
-
-        // return *(m_liveEntries.find(blockId));
-
-        // // If it's in the unpinned entries list, remove it
-        // auto unpinnedIt = m_unpinnedEntries.begin();
-        // for (; unpinnedIt != m_unpinnedEntries.end(); ++unpinnedIt) {
-        //     if (*unpinnedIt == blockId) {
-        //         m_unpinnedEntries.erase(unpinnedIt);
-        //         break;
-        //     }
-        // }
+        assert(m_pinnedEntries.find(blockId) == m_pinnedEntries.end());
+        m_pinnedEntries.insert(blockId);
 
         return m_liveEntries[blockId];
     }
 
     void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
-        //m_unpinnedEntries.push_front(blockId);
+        assert(m_pinnedEntries.find(blockId) != m_pinnedEntries.end());
+        m_pinnedEntries.erase(blockId);
     }
 
     void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
-        //assert(false);
+        assert(m_pinnedEntries.find(blockId) == m_pinnedEntries.end());
+        assert(m_liveEntries.find(blockId) != m_liveEntries.end());
+
+        auto liveIt = m_liveEntries.find(blockId);
+        LargeTempTableBlock* block = liveIt->second;
+        m_liveEntries.erase(blockId);
+
+        auto cacheIt = m_cache.begin();
+        for (; cacheIt != m_cache.end(); ++cacheIt) {
+            if (cacheIt->get() == block) {
+                m_cache.erase(cacheIt);
+                break;
+            }
+        }
+    }
+
+    bool LargeTempTableBlockCache::storeABlock() {
+        // Just store the first unpinned block that we can find.
+        auto liveIt = m_liveEntries.begin();
+        for (; liveIt != m_liveEntries.end(); ++liveIt) {
+            if (m_pinnedEntries.find(liveIt->first) == m_pinnedEntries.end()) {
+                Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
+                int64_t blockId = liveIt->first;
+                LargeTempTableBlock *block = liveIt->second;
+
+                m_storedEntries[blockId] = block->getAllocatedMemory();
+                topend->storeLargeTempTableBlock(blockId, block);
+
+                m_liveEntries.erase(blockId);
+                auto cacheIt = m_cache.begin();
+                for (; cacheIt != m_cache.end(); ++cacheIt) {
+                    if (cacheIt->get() == block) {
+                        m_cache.erase(cacheIt);
+                        break;
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     void LargeTempTableBlockCache::increaseAllocatedMemory(int64_t numBytes) {
         m_totalAllocatedBytes += numBytes;
 
         if (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
-            std::cout << "overflow!!! " << m_totalAllocatedBytes << std::endl;
-            // if we are now overfull, expunge a block.
-            assert(false);
+            // Okay, we've increased the memory footprint over the size of the
+            // cache.  Clear out some space.
+            while (m_totalAllocatedBytes > CACHE_SIZE_IN_BYTES()) {
+                int64_t bytesBefore = m_totalAllocatedBytes;
+                if (!storeABlock()) {
+                    throw std::logic_error("could not store a block to make space");
+                }
+
+                assert(bytesBefore > m_totalAllocatedBytes);
+            }
         }
 
+    }
+
+    void LargeTempTableBlockCache::decreaseAllocatedMemory(int64_t numBytes) {
+        assert(numBytes <= m_totalAllocatedBytes);
+        m_totalAllocatedBytes -= numBytes;
     }
 }
