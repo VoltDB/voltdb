@@ -58,6 +58,15 @@ public class TestCalciteExpressions extends TestCalciteBase {
         comparePlans(sql, ignores);
     }
 
+    public void testBinaryIntExpr() throws Exception {
+        String sql;
+        sql = "select 5 + i from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
+    }
+
     public void testConstIntExpr() throws Exception {
         String sql;
         sql = "select 5 from R1";
@@ -72,6 +81,20 @@ public class TestCalciteExpressions extends TestCalciteBase {
         sql = "select 5.1 from R1";
         // VoltDB does not support NUMERIC consts in display const expressions
         testPlan(sql, PlannerType.CALCITE);
+    }
+
+    // VARBINARY
+    public void testVarbinaryExpr() throws Exception {
+        String sql;
+        sql = "select vb from RTYPES";
+        comparePlans(sql);
+    }
+
+    // VARCHAR
+    public void testVarcharExpr() throws Exception {
+        String sql;
+        sql = "select vc from RTYPES";
+        comparePlans(sql);
     }
 
     // Strings

@@ -29,9 +29,11 @@ import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.voltdb.calciteadapter.rules.convert.VoltDBJoinRule;
 import org.voltdb.calciteadapter.rules.convert.VoltDBProjectRule;
+import org.voltdb.calciteadapter.rules.convert.VoltDBSortRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcJoinMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendPullUpRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBFilterScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBJoinSendPullUpRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSortScanMergeRule;
@@ -59,13 +61,15 @@ public class VoltDBRules {
                 FilterJoinRule.JOIN
 
                 , VoltDBCalcScanMergeRule.INSTANCE
-                , VoltDBProjectRule.INSTANCE
-                , VoltDBJoinRule.INSTANCE
                 , VoltDBCalcJoinMergeRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
                 , VoltDBSortScanMergeRule.INSTANCE  // Inline LIMIT/OFFSET
-//                , VoltDBDistributedScanRule.INSTANCE
+//                , VoltDBFilterScanMergeRule.INSTANCE
 
+                // Convert rules
+                , VoltDBProjectRule.INSTANCE
+                , VoltDBJoinRule.INSTANCE
+                , VoltDBSortRule.INSTANCE
                 );
 
         // Pull up the send nodes as high as possible

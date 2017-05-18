@@ -17,12 +17,9 @@
 
 package org.voltdb.calciteadapter.rules.rel;
 
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.calciteadapter.rel.VoltDBTableScan;
@@ -32,36 +29,25 @@ public class VoltDBSortScanMergeRule extends RelOptRule {
     public static final VoltDBSortScanMergeRule INSTANCE = new VoltDBSortScanMergeRule();
 
     private VoltDBSortScanMergeRule() {
-        super(operand(LogicalSort.class, operand(VoltDBTableScan.class, none())));
+        super(operand(Sort.class, operand(VoltDBTableScan.class, none())));
     }
 
     @Override
     public boolean matches(RelOptRuleCall call) {
-        LogicalSort sort = call.rel(0);
+        Sort sort = call.rel(0);
         return (sort.offset != null || sort.fetch != null);
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        LogicalSort sort = call.rel(0);
+        Sort sort = call.rel(0);
         VoltDBTableScan scan = call.rel(1);
 
         RexNode offset = sort.offset;
         RexNode fetch = sort.fetch;
 
-        // @TODO copy doesn't work????
-        VoltDBTableScan newScan = (VoltDBTableScan) scan.copy(fetch, offset);
-        List<RelFieldCollation> collations = sort.collation.getFieldCollations();
-        if (collations == null || collations.isEmpty()) {
-            // Has only LIMIT/OFFSET
-            newScan.setLimit(fetch);
-            newScan.setOffset(offset);
-            call.transformTo(newScan);
-        } else {
-            // sort.copy
-            // @TODO Deal with ORDER BY
-        }
-
-//        call.transformTo(scan.copy(calc.getProgram()));
+        // @TODO need to add collations
+        VoltDBTableScan newScan = (VoltDBTableScan) scan.copyWithLimitOffset(fetch, offset);
+        call.transformTo(newScan);
     }
 }

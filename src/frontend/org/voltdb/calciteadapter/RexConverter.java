@@ -36,6 +36,7 @@ import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
 import org.hsqldb_voltpatches.FunctionCustom;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
@@ -47,6 +48,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.utils.CatalogUtil;
 
 public class RexConverter {
 
@@ -60,7 +62,9 @@ public class RexConverter {
 
         public static final ConvertingVisitor INSTANCE = new ConvertingVisitor();
 
-        int m_numLhsFieldsForJoin = -1;
+        private int m_numLhsFieldsForJoin = -1;
+        private VoltDBTable m_table;
+        private  List<Column> m_columns;
 
         protected ConvertingVisitor() {
             super(false);
@@ -69,6 +73,12 @@ public class RexConverter {
         public ConvertingVisitor(int numLhsFields) {
             super(false);
             m_numLhsFieldsForJoin = numLhsFields;
+        }
+
+        public ConvertingVisitor(VoltDBTable table) {
+            super(false);
+            m_table = table;
+            m_columns = CatalogUtil.getSortedCatalogItems(m_table.getCatTable().getColumns(), "index");
         }
 
         @Override
@@ -84,7 +94,16 @@ public class RexConverter {
 
             TupleValueExpression tve = new TupleValueExpression("", "", "", "", index, index);
             tve.setTableIndex(tableIndex);
-            TypeConverter.setType(tve, inputRef.getType());
+            if (m_table != null) {
+                // We know the table and column's index
+                assert (m_columns != null);
+                String name = m_columns.get(index).getName();
+                Column column = m_table.getCatTable().getColumns().getExact(name);
+                TypeConverter.setType(tve, column);
+            } else {
+                // Use Calcite to set TVE type and size
+                TypeConverter.setType(tve, inputRef.getType());
+            }
             return tve;
           }
 
@@ -271,14 +290,15 @@ public class RexConverter {
 
     }
 
-    public static NodeSchema convertToVoltDBNodeSchema(RexProgram program) {
+    public static NodeSchema convertToVoltDBNodeSchema(RexProgram program, VoltDBTable table) {
         NodeSchema newNodeSchema = new NodeSchema();
         int i = 0;
 
+        ConvertingVisitor convertingVisitor = new ConvertingVisitor(table);
         for (Pair<RexLocalRef, String> item : program.getNamedProjects()) {
             String name = item.right;
             RexNode rexNode = program.expandLocalRef(item.left);
-            AbstractExpression ae = rexNode.accept(ConvertingVisitor.INSTANCE);
+            AbstractExpression ae = rexNode.accept(convertingVisitor);
             assert (ae != null);
 
             newNodeSchema.addColumn(new SchemaColumn("", "", "", name, ae, i));

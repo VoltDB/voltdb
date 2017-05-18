@@ -18,6 +18,11 @@ create table R3 (
     pk integer,
     vc varchar(256));
 
+create table RTYPES (
+    i integer,
+    vb VARBINARY(1024),
+    vc varchar(256));
+
 create table P1 (
     i integer not null,
     si smallint,

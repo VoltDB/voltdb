@@ -20,6 +20,7 @@ package org.voltdb.calciteadapter;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
@@ -86,6 +87,16 @@ public class TypeConverter {
 
     public static void setType(AbstractExpression ae, RelDataType rdt) {
         VoltType vt = sqlTypeNameToVoltType(rdt.getSqlTypeName());
+        setAbstractExpressionTypeAndSize(ae, vt, rdt.getPrecision());
+    }
+
+    public static void setType(AbstractExpression ae, Column column) {
+        assert(column != null);
+        VoltType vt = VoltType.get((byte)column.getType());
+        setAbstractExpressionTypeAndSize(ae, vt, column.getSize());
+    }
+
+    private static void setAbstractExpressionTypeAndSize(AbstractExpression ae, VoltType vt, int columnSize) {
         ae.setValueType(vt);
 
         if (vt.isVariableLength()) {
@@ -96,11 +107,12 @@ public class TypeConverter {
                     (vt != VoltType.NULL) && (vt != VoltType.NUMERIC)) {
                 size = vt.getMaxLengthInBytes();
             } else {
-                size = rdt.getPrecision();
+                size = columnSize;
             }
             if (!(ae instanceof ParameterValueExpression)) {
                 ae.setValueSize(size);
             }
         }
     }
+
 }
