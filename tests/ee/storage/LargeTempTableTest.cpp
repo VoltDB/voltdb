@@ -176,17 +176,39 @@ public:
         return true;
     }
 
-    LargeTempTableBlock* loadLargeTempTableBlock(int64_t blockId) {
-        return NULL;
+    std::unique_ptr<LargeTempTableBlock> loadLargeTempTableBlock(int64_t blockId) {
+        auto it = m_map.find(blockId);
+        std::unique_ptr<LargeTempTableBlock> block = it->second.toLargeTempTableBlock();
+        m_map.erase(blockId);
+        return block;
+    }
+
+    bool releaseLargeTempTableBlock(int64_t blockId) {
+        auto it = m_map.find(blockId);
+        if (it == m_map.end()) {
+            assert(false);
+            return false;
+        }
+
+        m_map.erase(blockId);
+        return true;
+    }
+
+    size_t storedBlockCount() const {
+        return m_map.size();
     }
 
 private:
 
     struct StoredBlock {
         StoredBlock(std::unique_ptr<Pool> pool, TBPtr tbp)
-            : m_pool(pool.release())
+            : m_pool(std::move(pool))
             , m_tbp(tbp)
         {
+        }
+
+        std::unique_ptr<LargeTempTableBlock> toLargeTempTableBlock() {
+            return std::unique_ptr<LargeTempTableBlock>(new LargeTempTableBlock(std::move(m_pool), m_tbp));
         }
 
     private:
@@ -250,13 +272,13 @@ TEST_F(LargeTempTableTest, Basic) {
 
     ltt->decrementRefcount();
 
-    ASSERT_EQ(0, lttBlockCache->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 }
 
 TEST_F(LargeTempTableTest, MultiBlock) {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    ASSERT_EQ(0, lttBlockCache->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->totalBlockCount());
 
     TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
                                       VALUE_TYPE_DOUBLE,
@@ -314,8 +336,8 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     ltt->finishInserts();
 
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
-
     ASSERT_EQ(2, ltt->allocatedBlockCount());
+
     {
         LargeTableIterator iter = ltt->largeIterator();
         TableTuple iterTuple(ltt->schema());
@@ -341,14 +363,14 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 
     ltt->decrementRefcount();
 
-    ASSERT_EQ(0, lttBlockCache->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 }
 
 TEST_F(LargeTempTableTest, OverflowCache) {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 400000;
+    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 800000;
     TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
                                       VALUE_TYPE_DOUBLE,
                                       VALUE_TYPE_DOUBLE,
@@ -409,8 +431,9 @@ TEST_F(LargeTempTableTest, OverflowCache) {
 
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
-    std::cout << "block count: " << ltt->allocatedBlockCount() << std::endl;
-    ASSERT_EQ(4, ltt->allocatedBlockCount());
+    // The table uses 4 blocks, but only 2 at a time can be cached.
+    ASSERT_EQ(4, lttBlockCache->totalBlockCount());
+    ASSERT_EQ(2, lttBlockCache->residentBlockCount());
 
     {
         LargeTableIterator iter = ltt->largeIterator();
@@ -432,13 +455,16 @@ TEST_F(LargeTempTableTest, OverflowCache) {
             ++i;
         }
 
-        ASSERT_EQ(500, i);
+        ASSERT_EQ(1500, i);
     }
 
     ltt->decrementRefcount();
 
-    ASSERT_EQ(0, lttBlockCache->allocatedBlockCount());
+    ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
+
+    LTTTopend* topend = static_cast<LTTTopend*>(ExecutorContext::getExecutorContext()->getTopend());
+    ASSERT_EQ(0, topend->storedBlockCount());
 }
 
 int main() {

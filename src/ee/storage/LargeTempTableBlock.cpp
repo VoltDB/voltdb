@@ -33,6 +33,16 @@ namespace voltdb {
         lttBlockCache->increaseAllocatedMemory(getAllocatedMemory());
     }
 
+    LargeTempTableBlock::LargeTempTableBlock(std::unique_ptr<Pool> pool, TBPtr tbp)
+        : m_pool(std::move(pool))
+        , m_tupleBlockPointer(tbp)
+    {
+        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        lttBlockCache->increaseAllocatedMemory(getAllocatedMemory());
+    }
+
+
+
     bool LargeTempTableBlock::hasFreeTuples() const {
         return m_tupleBlockPointer->hasFreeTuples();
     }

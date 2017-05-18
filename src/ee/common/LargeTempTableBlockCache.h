@@ -62,7 +62,11 @@ namespace voltdb {
             return m_pinnedEntries.size();
         }
 
-        size_t allocatedBlockCount() const {
+        size_t residentBlockCount() const {
+            return m_liveEntries.size();
+        }
+
+        size_t totalBlockCount() const {
             return m_liveEntries.size() + m_storedEntries.size();
         }
 

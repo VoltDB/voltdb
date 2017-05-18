@@ -82,7 +82,9 @@ class Topend {
 
     virtual bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) = 0;
 
-    virtual LargeTempTableBlock* loadLargeTempTableBlock(int64_t blockId) = 0;
+    virtual std::unique_ptr<LargeTempTableBlock> loadLargeTempTableBlock(int64_t blockId) = 0;
+
+    virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
 
     virtual ~Topend()
     {
@@ -125,9 +127,9 @@ public:
 
     virtual bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block);
 
-    virtual LargeTempTableBlock* loadLargeTempTableBlock(int64_t blockId);
+    virtual std::unique_ptr<LargeTempTableBlock> loadLargeTempTableBlock(int64_t blockId);
 
-
+    virtual bool releaseLargeTempTableBlock(int64_t blockId);
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;

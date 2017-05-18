@@ -49,16 +49,17 @@ namespace voltdb {
 
     bool LargeTempTableBlockCache::loadBlock(int64_t blockId) {
         Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-        LargeTempTableBlock* block = topend->loadLargeTempTableBlock(blockId);
+        std::unique_ptr<LargeTempTableBlock> block = topend->loadLargeTempTableBlock(blockId);
 
         if (block == NULL) {
             return false;
         }
 
-        m_cache.emplace_back(block);
-        m_liveEntries[blockId] = block;
+        m_liveEntries[blockId] = block.get();
+        m_cache.emplace_back(std::move(block));
 
-        // callee will pin the block.
+        assert(m_storedEntries.find(blockId) != m_storedEntries.end());
+        m_storedEntries.erase(blockId);
 
         return true;
     }
@@ -82,20 +83,27 @@ namespace voltdb {
     }
 
     void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
-        assert(m_pinnedEntries.find(blockId) == m_pinnedEntries.end());
-        assert(m_liveEntries.find(blockId) != m_liveEntries.end());
 
         auto liveIt = m_liveEntries.find(blockId);
-        LargeTempTableBlock* block = liveIt->second;
-        m_liveEntries.erase(blockId);
+        if (liveIt != m_liveEntries.end()) {
+            LargeTempTableBlock* block = liveIt->second;
+            m_liveEntries.erase(blockId);
 
-        auto cacheIt = m_cache.begin();
-        for (; cacheIt != m_cache.end(); ++cacheIt) {
-            if (cacheIt->get() == block) {
-                m_cache.erase(cacheIt);
-                break;
+            auto cacheIt = m_cache.begin();
+            for (; cacheIt != m_cache.end(); ++cacheIt) {
+                if (cacheIt->get() == block) {
+                    m_cache.erase(cacheIt);
+                    break;
+                }
             }
         }
+        else {
+            // This block was stored out to the topend..
+            Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
+            topend->releaseLargeTempTableBlock(blockId);
+            m_storedEntries.erase(blockId);
+        }
+
     }
 
     bool LargeTempTableBlockCache::storeABlock() {

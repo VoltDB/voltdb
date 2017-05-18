@@ -36,6 +36,8 @@ namespace voltdb {
     public:
         LargeTempTableBlock(LargeTempTable* ltt);
 
+        LargeTempTableBlock(std::unique_ptr<Pool> pool, TBPtr tbp);
+
         bool hasFreeTuples() const;
 
         void insertTuple(const TableTuple& source);
