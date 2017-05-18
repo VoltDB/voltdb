@@ -59,6 +59,10 @@ public class VoltDBTable implements TranslatableTable {
             rdt = typeFactory.createSqlType(sqlTypeName, prec);
             //rdt = typeFactory.createTypeWithCharsetAndCollation(rdt, Charset.forName("UTF-8"), SqlCollation.IMPLICIT);
             break;
+        case VARBINARY:
+            // The default precision for VARBINARY and VARCHAR (STRING) is not specified.
+            rdt = typeFactory.createSqlType(sqlTypeName, prec);
+            break;
             default:
                 rdt = typeFactory.createSqlType(sqlTypeName);
         }

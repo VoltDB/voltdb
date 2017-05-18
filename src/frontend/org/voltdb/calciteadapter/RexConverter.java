@@ -63,8 +63,6 @@ public class RexConverter {
         public static final ConvertingVisitor INSTANCE = new ConvertingVisitor();
 
         private int m_numLhsFieldsForJoin = -1;
-        private VoltDBTable m_table;
-        private  List<Column> m_columns;
 
         protected ConvertingVisitor() {
             super(false);
@@ -73,12 +71,6 @@ public class RexConverter {
         public ConvertingVisitor(int numLhsFields) {
             super(false);
             m_numLhsFieldsForJoin = numLhsFields;
-        }
-
-        public ConvertingVisitor(VoltDBTable table) {
-            super(false);
-            m_table = table;
-            m_columns = CatalogUtil.getSortedCatalogItems(m_table.getCatTable().getColumns(), "index");
         }
 
         @Override
@@ -94,16 +86,7 @@ public class RexConverter {
 
             TupleValueExpression tve = new TupleValueExpression("", "", "", "", index, index);
             tve.setTableIndex(tableIndex);
-            if (m_table != null) {
-                // We know the table and column's index
-                assert (m_columns != null);
-                String name = m_columns.get(index).getName();
-                Column column = m_table.getCatTable().getColumns().getExact(name);
-                TypeConverter.setType(tve, column);
-            } else {
-                // Use Calcite to set TVE type and size
-                TypeConverter.setType(tve, inputRef.getType());
-            }
+            TypeConverter.setType(tve, inputRef.getType());
             return tve;
           }
 
@@ -290,15 +273,14 @@ public class RexConverter {
 
     }
 
-    public static NodeSchema convertToVoltDBNodeSchema(RexProgram program, VoltDBTable table) {
+    public static NodeSchema convertToVoltDBNodeSchema(RexProgram program) {
         NodeSchema newNodeSchema = new NodeSchema();
         int i = 0;
 
-        ConvertingVisitor convertingVisitor = new ConvertingVisitor(table);
         for (Pair<RexLocalRef, String> item : program.getNamedProjects()) {
             String name = item.right;
             RexNode rexNode = program.expandLocalRef(item.left);
-            AbstractExpression ae = rexNode.accept(convertingVisitor);
+            AbstractExpression ae = rexNode.accept(ConvertingVisitor.INSTANCE);
             assert (ae != null);
 
             newNodeSchema.addColumn(new SchemaColumn("", "", "", name, ae, i));
