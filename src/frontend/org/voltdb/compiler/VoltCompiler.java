@@ -959,7 +959,8 @@ public class VoltCompiler {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
 
-            ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs); // NEEDSWORK: Adapt this
+            SQLParser.FileInfo fi = new SQLParser.FileInfo(cannonicalDDLIfAny.getPath());
+            ddlcompiler.loadSchemaWithFiltering(cannonicalDDLIfAny, db, whichProcs, fi);
         }
 
         m_dirtyTables.clear();
@@ -973,10 +974,8 @@ public class VoltCompiler {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-                // NEEDSWORK: Need to plumb through some configuration that tells us to use the filtering loader.
                 SQLParser.FileInfo fi = new SQLParser.FileInfo(schemaReader.getPath());
                 ddlcompiler.loadSchemaWithFiltering(schemaReader, db, whichProcs, fi);
-                //ddlcompiler.loadSchema(schemaReader, db, whichProcs);
             }
             finally {
                 m_currentFilename = origFilename;
