@@ -559,8 +559,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                             "configuration.  Please make such changes synchronously from a single " +
                             "connection to the cluster.";
                     log.warn(errmsg);
-
-                    VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
                     throw new VoltAbortException(errmsg);
                 }
             }
@@ -598,8 +596,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
                         catalogStuff.deploymentBytes);
-
-                VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
                 // hopefully this will throw a SpecifiedException if the fragment threw one
                 throw vae;
                 // If there is a cluster failure after this point, we will re-run

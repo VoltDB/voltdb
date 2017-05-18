@@ -196,7 +196,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             // uac zk blocker exists, rejoin node should wait to watch its stat
             VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
 
-            REJOINLOG.info(String.format("Rejoin node is waiting %d seconds for @UpdateApplicationCatalog to finish",
+            REJOINLOG.info(String.format("Rejoin node will wait %d seconds for @UpdateApplicationCatalog to finish",
                     retryInterval));
 
             try {
