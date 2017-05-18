@@ -2012,7 +2012,16 @@ public class DDLCompiler {
 
     private void executeStatement(final Database db, final DdlProceduresToLoad whichProcs, DDLStatement stmt) throws VoltCompilerException {
 
-        boolean processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
+        boolean processed = false;
+
+        try {
+            processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
+        }
+        catch (VoltCompilerException e) {
+            // Reformat the message thrown by VoltDB DDL processing to have a line number.
+            String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
+            throw m_compiler.new VoltCompilerException(msg);
+        }
 
         if (! processed) {
             try {
