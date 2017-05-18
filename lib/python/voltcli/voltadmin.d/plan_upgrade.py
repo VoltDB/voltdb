@@ -26,6 +26,12 @@ import base64
 import os
 import sys
 import subprocess
+try:
+    import ssl
+    ssl_available = True
+except ImportError, e:
+    ssl_available = False
+    ssl_exception = e
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
@@ -439,14 +445,33 @@ def writeCommands(file, subject, command):
         file.write(command)
         file.write('\n\n')
 
+# get deployment file through rest API
 def getCurrentDeploymentFile(runner, host):
-    # get deployment file through rest API
-    url = 'http://' + getHostnameOrIp(host) + ':' + str(host.httpport) + '/deployment/download/'
+    sslContext = None
+    if runner.opts.ssl_config is None:
+        protocol = "http://"
+    else:
+        protocol = "https://"
+        tlsv = None
+        try:
+            tlsv = ssl.PROTOCOL_TLSv1_2
+        except AttributeError, e:
+            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
+            tlsv = ssl.PROTOCOL_TLSv1
+        if ssl_available:
+            sslContext = ssl.SSLContext(tlsv)
+        else:
+            print "ERROR: To use SSL functionality please Install the Python ssl module."
+            raise ssl_exception
+    url = protocol + getHostnameOrIp(host) + ':' + str(host.httpport) + '/deployment/download/'
     request = Request(url)
     base64string = base64.b64encode('%s:%s' % (runner.opts.username, runner.opts.password))
     request.add_header("Authorization", "Basic %s" % base64string)
     try:
-        response = urlopen(request)
+        if sslContext is None:
+            response = urlopen(request)
+        else:
+            response = urlopen(request, context=sslContext)
     except URLError, e:
         runner.abort("Failed to get deployment file from %s " % (getHostnameOrIp(host)))
 
