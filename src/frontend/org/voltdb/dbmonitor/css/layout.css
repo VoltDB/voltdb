@@ -3607,7 +3607,7 @@ label.errorTimeOut {
     border: none;
 }
 .queryWrapper {
-    height: calc(100% - 85px)
+    height: calc(100% - 96px)
 }
 .verticalWrapper {
     height: 90%;
