@@ -27,8 +27,16 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
+// This procedure is something like the one
 public class TestProcedure extends VoltProcedure {
+    // addSQLStmt.jar
     public SQLStmt sql = new SQLStmt("select pid, city from TT where pid = ?");
+
+    // addSQLStmtNew.jar
+    // public SQLStmt sql = new SQLStmt("select lower(pid), lower(?) from TT where pid = ?");
+
+    // addSQLStmtInvalid.jar
+    // public SQLStmt sql = new SQLStmt("select pid from TT_Invalid where pid = ?");
 
     public long run(String pid, String city) {
         voltQueueSQL(sql, pid);
