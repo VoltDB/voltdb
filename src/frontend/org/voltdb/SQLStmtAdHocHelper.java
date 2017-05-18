@@ -57,17 +57,6 @@ public class SQLStmtAdHocHelper {
                 isReplicatedTableDML, isReadOnly, params, site);
     }
 
-    /**
-     * Construct a raw SQLStmt instance from a SQL statement, call it raw because it
-     * only contains the SQL text, it doesn't compute the SQL text CRC or byte array
-     * representation of the SQL text.
-     * @param sqlText Valid VoltDB compliant SQL with question marks as parameter
-     * place holders.
-     */
-    public static SQLStmt newRawInstance(String sqlText) {
-        return new SQLStmt(null, null, sqlText, false);
-    }
-
     public static byte[] getSQLBytes(SQLStmt sqlStmt) {
         if (sqlStmt.sqlText == null) {
             sqlStmt.sqlText = sqlStmt.sqlTextStr.getBytes(Constants.UTF8ENCODING);
