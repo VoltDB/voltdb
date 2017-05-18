@@ -31,6 +31,7 @@ namespace voltdb {
         , m_liveEntries()
         , m_pinnedEntries()
         , m_storedEntries()
+        , m_nextId(0)
         , m_totalAllocatedBytes(0)
     {
     }
