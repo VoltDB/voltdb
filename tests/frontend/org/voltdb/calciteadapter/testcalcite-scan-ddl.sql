@@ -19,7 +19,13 @@ create table R3 (
     vc varchar(256));
 
 create table RTYPES (
+    bi bigint,
+    d decimal,
+    f float,
     i integer,
+    si smallint,
+    ti tinyint,
+    ts timestamp,
     vb VARBINARY(1024),
     vc varchar(256));
 

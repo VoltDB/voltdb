@@ -45,6 +45,69 @@ public class TestCalciteExpressions extends TestCalciteBase {
         super.tearDown();
     }
 
+    // VARBINARY
+    public void testVarbinaryExpr() throws Exception {
+        String sql;
+        sql = "select vb from RTYPES";
+        comparePlans(sql);
+    }
+
+    // VARCHAR
+    public void testVarcharExpr() throws Exception {
+        String sql;
+        sql = "select vc from RTYPES";
+        comparePlans(sql);
+    }
+
+    // TMESTAMP
+    public void testTimestampExpr() throws Exception {
+        String sql;
+        sql = "select ts from RTYPES";
+        comparePlans(sql);
+    }
+
+    // DECIMAL
+    public void testDecimalExpr() throws Exception {
+        String sql;
+        sql = "select d from RTYPES";
+        comparePlans(sql);
+    }
+
+    // FLOAT
+    public void testFloatExpr() throws Exception {
+        String sql;
+        sql = "select f from RTYPES";
+        comparePlans(sql);
+    }
+
+    // BIGINT
+    public void testBigintExpr() throws Exception {
+        String sql;
+        sql = "select bi from RTYPES";
+        comparePlans(sql);
+    }
+
+    // BIGINT
+    public void testSmallintExpr() throws Exception {
+        String sql;
+        sql = "select si from RTYPES";
+        comparePlans(sql);
+    }
+
+    // TINYINT
+    public void testTinyintExpr() throws Exception {
+        String sql;
+        sql = "select ti from RTYPES";
+        comparePlans(sql);
+    }
+
+    // INTEGER
+    public void testIntegerExpr() throws Exception {
+        String sql;
+        sql = "select i from RTYPES";
+        comparePlans(sql);
+    }
+
     public void testConstBinaryIntExpr() throws Exception {
         String sql;
         sql = "select 5 + 5 from R1";
@@ -81,20 +144,6 @@ public class TestCalciteExpressions extends TestCalciteBase {
         sql = "select 5.1 from R1";
         // VoltDB does not support NUMERIC consts in display const expressions
         testPlan(sql, PlannerType.CALCITE);
-    }
-
-    // VARBINARY
-    public void testVarbinaryExpr() throws Exception {
-        String sql;
-        sql = "select vb from RTYPES";
-        comparePlans(sql);
-    }
-
-    // VARCHAR
-    public void testVarcharExpr() throws Exception {
-        String sql;
-        sql = "select vc from RTYPES";
-        comparePlans(sql);
     }
 
     // Strings
