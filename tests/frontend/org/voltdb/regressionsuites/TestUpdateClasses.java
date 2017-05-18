@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.File;
 import java.io.IOException;
 
+import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
