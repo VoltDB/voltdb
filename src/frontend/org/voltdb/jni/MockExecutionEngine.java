@@ -26,7 +26,6 @@ import java.util.Random;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
-import org.voltdb.SQLStmt;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
@@ -54,7 +53,8 @@ public class MockExecutionEngine extends ExecutionEngine {
             final long[] inputDepIds,
             final Object[] parameterSets,
             final DeterminismHash determinismHash,
-            final SQLStmt[] stmts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,

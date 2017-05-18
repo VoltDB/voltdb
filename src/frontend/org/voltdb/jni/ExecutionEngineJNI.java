@@ -27,7 +27,6 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SQLStmt;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
@@ -349,7 +348,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long[] inputDepIds,
             final Object[] parameterSets,
             DeterminismHash determinismHash,
-            SQLStmt[] stmts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -400,8 +400,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 }
             }
             // determinismHash can be null in FragmentTask.processFragmentTask() and many tests
-            if (stmts != null && determinismHash != null && !stmts[i].isReadOnly()){
-                determinismHash.offerStatement(stmts[i], paramStart, m_psetBuffer);
+            if (determinismHash != null && isWriteFrags[i]){
+                determinismHash.offerStatement(sqlCRCs[i], paramStart, m_psetBuffer);
             }
         }
         // checkMaxFsSize();

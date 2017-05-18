@@ -198,6 +198,8 @@ public class TestTwoSitePlans extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
+                new String[] { selectStmt.getSqltext() },
+                null,
                 null,
                 1,
                 1,
@@ -216,6 +218,8 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
                 new ParameterSet[] { params },
+                null,
+                new String[] { selectStmt.getSqltext() },
                 null,
                 null,
                 2,
@@ -240,6 +244,8 @@ public class TestTwoSitePlans extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
+                new String[] { selectStmt.getSqltext() },
+                null,
                 null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         VoltTable dependency1 = null;
@@ -259,6 +265,8 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                null,
+                new String[] { selectStmt.getSqltext() },
                 null,
                 null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
@@ -282,6 +290,8 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
                 new long[] { outDepId },
                 new ParameterSet[] { params },
+                null,
+                new String[] { selectStmt.getSqltext() },
                 null,
                 null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);

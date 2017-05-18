@@ -93,24 +93,21 @@ public class SQLStmt {
      * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
-        this(canonicalizeStmt(sqlText).getBytes(Constants.UTF8ENCODING), joinOrder, null, true);
+        this(canonicalizeStmt(sqlText).getBytes(Constants.UTF8ENCODING), joinOrder);
     }
 
     /**
      * Construct a SQLStmt instance from a byte array for internal use.
      */
-    protected SQLStmt(byte[] sqlText, String joinOrder, String sqlTextString, boolean computeCRC) {
+    protected SQLStmt(byte[] sqlText, String joinOrder) {
         this.sqlText = sqlText;
         this.joinOrder = joinOrder;
-        this.sqlTextStr = sqlTextString == null? null : sqlTextString;
 
-        if (computeCRC) {
-            // create a hash for determinism purposes
-            PureJavaCrc32C crc = new PureJavaCrc32C();
-            crc.update(sqlText);
-            // this will sometimes go negative in the cast, but should be 1-1
-            this.sqlCRC = (int) crc.getValue();
-        }
+        // create a hash for determinism purposes
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        crc.update(sqlText);
+        // this will sometimes go negative in the cast, but should be 1-1
+        this.sqlCRC = (int) crc.getValue();
 
         inCatalog = true;
     }
@@ -169,7 +166,7 @@ public class SQLStmt {
                                   boolean isReadOnly,
                                   VoltType[] params,
                                   SiteProcedureConnection site) {
-        SQLStmt stmt = new SQLStmt(sqlText, null, null, true);
+        SQLStmt stmt = new SQLStmt(sqlText, null);
 
         stmt.aggregator = new SQLStmt.Frag(aggFragId, aggPlanHash, isAggTransactional);
 
