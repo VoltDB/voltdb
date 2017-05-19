@@ -1542,7 +1542,8 @@ public class TestVoltCompiler extends TestCase {
     private boolean compileInitDDL(boolean isInit, String ddl, VoltCompiler compiler) {
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         String schemaPath = schemaFile.getPath();
-        return compiler.compileFromDDL(isInit, testout_jar, schemaPath);
+        compiler.setInitializeDDLWithFiltering(isInit);
+        return compiler.compileFromDDL(testout_jar, schemaPath);
     }
 
     private void checkCompilerErrorMessages(String expectedError, VoltCompiler compiler, boolean success) {
