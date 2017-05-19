@@ -62,6 +62,11 @@ public:
                                     "localhost", 2, NULL, NULL, 0))
     {
         srand(0);
+        m_columnNames.push_back("0");
+        m_columnNames.push_back("1");
+        m_columnNames.push_back("2");
+        m_columnNames.push_back("3");
+        m_columnNames.push_back("4");
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;
@@ -71,7 +76,6 @@ public:
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             columnAllowNull.push_back(false);
-            m_columnNames.push_back(std::to_string(i));
         }
         m_schema =
           TupleSchema::createTupleSchemaForTest(columnTypes,
