@@ -91,6 +91,24 @@ public class TestVoltCompiler extends TestCase {
         tjar.delete();
     }
 
+    public void testDDLFiltering() throws Exception {
+
+        String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +
+                     "-- This comment is inside a batch\n" +
+                     "DROP PROCEDURE Initialize                     IF EXISTS;\n" +
+                     "DROP PROCEDURE Results                         IF EXISTS;\n" +
+                     "\n" +
+                     "END_OF_DROP_BATCH\n" +
+                     "-- This command cannot be part of a DDL batch.\n" +
+                     "LOAD CLASSES voter-procs.jar\n";
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertTrue(success);
+
+        success = compileInitDDL(false, ddl, compiler);
+        assertFalse(success);
+    }
+
     public void testBrokenLineParsing() throws IOException {
         String schema =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
@@ -1490,6 +1508,12 @@ public class TestVoltCompiler extends TestCase {
         String schemaPath = schemaFile.getPath();
 
         return compiler.compileFromDDL(testout_jar, schemaPath);
+    }
+
+    private boolean compileInitDDL(boolean isInit, String ddl, VoltCompiler compiler) {
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
+        String schemaPath = schemaFile.getPath();
+        return compiler.compileFromDDL(isInit, testout_jar, schemaPath);
     }
 
     private void checkCompilerErrorMessages(String expectedError, VoltCompiler compiler, boolean success) {
