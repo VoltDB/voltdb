@@ -109,6 +109,35 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
+    public void testDDLFilteringNoEndBatch() throws Exception {
+
+        String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +
+                     "-- This comment is inside a batch\n" +
+                     "DROP PROCEDURE Initialize                     IF EXISTS;\n" +
+                     "DROP PROCEDURE Results                         IF EXISTS;\n" +
+                     "\n";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertFalse(success);
+    }
+
+    public void testDDLFilteringCaseInsensitve() throws Exception {
+
+        String ddl = "FiLe -inlinebatch END_OF_DROP_BATCH\n" +
+                     "-- This comment is inside a batch\n" +
+                     "DROP PROCEDURE Initialize                     IF EXISTS;\n" +
+                     "DROP PROCEDURE Results                         IF EXISTS;\n" +
+                     "\n" +
+                     "END_OF_DROP_BATCH\n" +
+                     "-- This command cannot be part of a DDL batch.\n" +
+                     "Load Classes voter-procs.jar\n";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertTrue(success);
+    }
+
     public void testBrokenLineParsing() throws IOException {
         String schema =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +

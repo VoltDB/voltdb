@@ -339,7 +339,7 @@ public class DDLCompiler {
             private void doExecuteStatement(String statement, int lineNum) throws VoltCompiler.VoltCompilerException {
 
                 // Filter out any statements that we don't want to deal with
-                if (statement.startsWith("LOAD")) {
+                if (statement.toUpperCase().startsWith("LOAD")) {
                     return;
                 }
 
