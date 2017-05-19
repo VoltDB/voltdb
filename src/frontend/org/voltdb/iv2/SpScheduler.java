@@ -517,7 +517,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.isForReplay());
 
             msg.setSpHandle(newSpHandle);
-
+            message.setSpHandle(newSpHandle);
             // Also, if this is a vanilla single-part procedure, make the TXNID
             // be the SpHandle (for now)
             // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
@@ -895,6 +895,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             msg.setSpHandle(newSpHandle);
+            message.setSpHandle(newSpHandle);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
                 //Trigger reserialization so the new handle is used
@@ -1205,6 +1206,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg.setSpHandle(getCurrentTxnId());
             msg.setToLeader(false);
             msg.setAckRequestedFromSender(true);
+            message.setSpHandle(msg.getSpHandle());
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }

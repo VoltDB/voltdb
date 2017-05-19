@@ -334,11 +334,10 @@ public class InitiatorMailbox implements Mailbox
                 return;
             }
         }
-
-        m_repairLog.deliver(message);
         if (canDeliver) {
             m_scheduler.deliver(message);
         }
+        m_repairLog.deliver(message);
     }
 
     // If @BalanceSPI comes in, set up new partition leader selection and
