@@ -55,7 +55,6 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
-import org.voltdb.SQLStmt;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
@@ -1458,7 +1457,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long[] inputDepIds,
             Object[] parameterSets,
             DeterminismHash determinismHash,
-            SQLStmt[] stmts,
+            String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,
@@ -1472,7 +1473,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 inputDepIds,
                 parameterSets,
                 determinismHash,
-                stmts,
+                sqlTexts,
+                isWriteFrags,
+                sqlCRCs,
                 txnId,
                 spHandle,
                 m_lastCommittedSpHandle,

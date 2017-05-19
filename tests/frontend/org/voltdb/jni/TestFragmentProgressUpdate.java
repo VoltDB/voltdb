@@ -33,7 +33,6 @@ import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
-import org.voltdb.SQLStmt;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
@@ -134,6 +133,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
+                new String[] { selectStmt.getSqltext() },
+                null,
                 null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
@@ -188,6 +189,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
+                new String[] { selectStmt.getSqltext() },
+                null,
                 null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
 
@@ -225,6 +228,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 null,
+                new String[] { selectStmt.getSqltext() },
+                null,
                 null,
                 3, 3, 2, 42, WRITE_TOKEN, false);
 
@@ -240,6 +245,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                null,
+                new String[] { selectStmt.getSqltext() },
                 null,
                 null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
@@ -296,6 +303,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                null,
+                new String[] { selectStmt.getSqltext() },
                 null,
                 null,
                 3, 3, 2, 42, READ_ONLY_TOKEN, false);
@@ -435,6 +444,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         long[] fragIds = new long[numFragsToExecute];
         ParameterSet[] paramSets = new ParameterSet[numFragsToExecute];
         String[] sqlTexts = new String[numFragsToExecute];
+        boolean[] writeFrags = new boolean[numFragsToExecute];
+        for (boolean writeFrag : writeFrags) { writeFrag = false; }
         createExecutionEngineInputs(stmtName, fragIds, paramSets, sqlTexts);
 
         // Replace the normal logger with a mocked one, so we can verify the message
@@ -469,20 +480,15 @@ public class TestFragmentProgressUpdate extends TestCase {
                 fail("Invalid value for sqlTextExpectation");
             }
 
-            SQLStmt[] stmts = null;
-            if (sqlTexts != null) {
-                stmts = new SQLStmt[sqlTexts.length];
-                for (int i = 0; i < sqlTexts.length; i++) {
-                    stmts[i] = new SQLStmt(sqlTexts[i]);
-                }
-            }
             m_ee.executePlanFragments(
                     numFragsToExecute,
                     fragIds,
                     null,
                     paramSets,
                     null,
-                    stmts,
+                    sqlTexts,
+                    writeFrags,
+                    null,
                     3, 3, 2, 42,
                     readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN, false);
             if (readOnly && timeout > 0) {
