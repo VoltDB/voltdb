@@ -122,7 +122,6 @@ public class SQLCommand
     private static void executeDDLBatch(String batchFileName, String statements, int batchEndLineNumber, DDLParserCallback callback) {
 
         try {
-
             if (callback != null) {
                 callback.batch(statements, batchEndLineNumber);
                 return;
@@ -623,7 +622,6 @@ public class SQLCommand
 
     public static void executeScriptFromReader(FileInfo fileInfo, SQLCommandLineReader reader, DDLParserCallback callback)
             throws Exception {
-
         StringBuilder statement = new StringBuilder();
         // non-interactive modes need to be more careful about discarding blank lines to
         // keep from throwing off diagnostic line numbers. So "statement" may be non-empty even

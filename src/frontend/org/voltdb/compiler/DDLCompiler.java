@@ -344,7 +344,7 @@ public class DDLCompiler {
                 }
 
                 DDLStatement stmt = new DDLStatement(statement, lineNum);
-                executeStatement(db, whichProcs, stmt);
+                processVoltDBStatements(db, whichProcs, stmt);
             }
         };
 
@@ -381,7 +381,7 @@ public class DDLCompiler {
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
-            executeStatement(db, whichProcs, stmt);
+            processVoltDBStatements(db, whichProcs, stmt);
             stmt = getNextStatement(reader, m_compiler);
         }
 
@@ -2010,7 +2010,7 @@ public class DDLCompiler {
             m_mvProcessor.processMaterializedViewWarnings(db, m_matViewMap);
     }
 
-    private void executeStatement(final Database db, final DdlProceduresToLoad whichProcs, DDLStatement stmt) throws VoltCompilerException {
+    private void processVoltDBStatements(final Database db, final DdlProceduresToLoad whichProcs, DDLStatement stmt) throws VoltCompilerException {
 
         boolean processed = false;
 
