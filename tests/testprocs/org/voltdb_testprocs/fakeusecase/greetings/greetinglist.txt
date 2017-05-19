@@ -1,0 +1,8 @@
+English,Hello,Hello
+Spanish,Hola,Hola
+French,Bonjour,Bonjour
+Italian,Ciao,Ciao
+Simplified Chinese,Ni Hau,你好
+Japanese,Konnichiwa,こんにちは
+Hindi,Namaste,नमस्ते
+Arabic,Marhabaan,مرحبا
