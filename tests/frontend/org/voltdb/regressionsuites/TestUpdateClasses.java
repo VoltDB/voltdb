@@ -860,6 +860,22 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             startSystem(config);
 
             ClientResponse resp;
+
+            // Testing system can load jar file from class path, but not the internal class files
+            try {
+                resp = m_client.callProcedure("TestProcedure", "12345", "boston");
+                fail("TestProcedure is not loaded");
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("Procedure TestProcedure was not found"));
+            }
+
+            try {
+                Class.forName("voter.TestProcedure");
+                fail("Should not load the class file from the jar file on disk automatically");
+            } catch (ClassNotFoundException e) {
+                assertTrue(e.getMessage().contains("voter.TestProcedure"));
+            }
+
             InMemoryJarfile boom = new InMemoryJarfile(TestProcedure.class.getResource("addSQLStmt.jar"));
             resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
@@ -885,7 +901,8 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
                 resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
                 fail("Invalid SQLStmt should fail during UpdateClasses");
             } catch (ProcCallException e) {
-                System.out.println(e.getMessage());
+                assertTrue(e.getMessage().contains("Failed to plan for statement"));
+                assertTrue(e.getMessage().contains("user lacks privilege or object not found: TT_INVALID_QUERY"));
             }
         }
         finally {
