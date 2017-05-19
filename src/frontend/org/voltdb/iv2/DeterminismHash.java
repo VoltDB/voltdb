@@ -21,8 +21,6 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.HybridCrc32;
-import org.voltdb.SQLStmt;
-import org.voltdb.SQLStmtAdHocHelper;
 
 /**
  * This class expands the determinism hash with an array
@@ -93,8 +91,7 @@ public class DeterminismHash {
      * Update the overall hash. Add a pair of ints to the array
      * if the size isn't too large.
      */
-    public void offerStatement(SQLStmt stmt, int offset, ByteBuffer psetBuffer) {
-        int stmtHash = SQLStmtAdHocHelper.getHash(stmt);
+    public void offerStatement(int stmtHash, int offset, ByteBuffer psetBuffer) {
         m_inputCRC.update(stmtHash);
         m_inputCRC.updateFromPosition(offset, psetBuffer);
 

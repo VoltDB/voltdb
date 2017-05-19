@@ -519,90 +519,102 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
         }
 
-        // Pull the current catalog and deployment version and hash info.  Validate that we're either:
-        // (a) starting a new, valid catalog or deployment update
-        // (b) restarting a valid catalog or deployment update
-        // otherwise, we can bomb out early.  This should guarantee that we only
-        // ever write valid catalog and deployment state to ZK.
-        CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
-        // New update?
-        if (catalogStuff.version == expectedCatalogVersion) {
-            if (log.isInfoEnabled()) {
-                log.info("New catalog update from: " + catalogStuff.toString());
-                log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
-                        ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
-            }
+        // write uac blocker zk node
+        VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker);
+        // check rejoin blocker node
+        if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
+            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
         }
-        // restart?
-        else {
-            if (catalogStuff.version == (expectedCatalogVersion + 1) &&
-                    Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
-                    Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)) {
-                if (log.isInfoEnabled()) {
-                    log.info("Restarting catalog update: " + catalogStuff.toString());
-                }
-            }
-            else {
-                String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
-                        "against one version of the cluster configuration but that version was " +
-                        "no longer live when attempting to apply the change.  This is likely " +
-                        "the result of multiple concurrent attempts to change the cluster " +
-                        "configuration.  Please make such changes synchronously from a single " +
-                        "connection to the cluster.";
-                log.warn(errmsg);
-                throw new VoltAbortException(errmsg);
-            }
-        }
-
-        byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
-        // update the global version. only one site per node will accomplish this.
-        // others will see there is no work to do and gracefully continue.
-        // then update data at the local site.
-        CatalogUtil.updateCatalogToZK(
-                zk,
-                expectedCatalogVersion + 1,
-                DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
-                getUniqueId(),
-                catalogBytes,
-                catalogHash,
-                deploymentBytes);
 
         try {
-            performCatalogVerifyWork(
-                    expectedCatalogVersion,
-                    tablesThatMustBeEmpty,
-                    reasonsForEmptyTables,
-                    requiresSnapshotIsolation);
-        }
-        catch (VoltAbortException vae) {
-            // If there is a cluster failure before this point, we will re-run
-            // the transaction with the same input args and the new state,
-            // which we will recognize as a restart and do the right thing.
-            log.debug("Catalog update cannot be applied.  Rolling back ZK state");
+            // Pull the current catalog and deployment version and hash info.  Validate that we're either:
+            // (a) starting a new, valid catalog or deployment update
+            // (b) restarting a valid catalog or deployment update
+            // otherwise, we can bomb out early.  This should guarantee that we only
+            // ever write valid catalog and deployment state to ZK.
+            CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+            // New update?
+            if (catalogStuff.version == expectedCatalogVersion) {
+                if (log.isInfoEnabled()) {
+                    log.info("New catalog update from: " + catalogStuff.toString());
+                    log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
+                            ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
+                }
+            }
+            // restart?
+            else {
+                if (catalogStuff.version == (expectedCatalogVersion + 1) &&
+                        Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
+                        Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)) {
+                    if (log.isInfoEnabled()) {
+                        log.info("Restarting catalog update: " + catalogStuff.toString());
+                    }
+                }
+                else {
+                    String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
+                            "against one version of the cluster configuration but that version was " +
+                            "no longer live when attempting to apply the change.  This is likely " +
+                            "the result of multiple concurrent attempts to change the cluster " +
+                            "configuration.  Please make such changes synchronously from a single " +
+                            "connection to the cluster.";
+                    log.warn(errmsg);
+                    throw new VoltAbortException(errmsg);
+                }
+            }
+
+            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
+            // update the global version. only one site per node will accomplish this.
+            // others will see there is no work to do and gracefully continue.
+            // then update data at the local site.
             CatalogUtil.updateCatalogToZK(
                     zk,
-                    catalogStuff.version,
-                    catalogStuff.txnId,
-                    catalogStuff.uniqueId,
-                    catalogStuff.catalogBytes,
-                    catalogStuff.getCatalogHash(),
-                    catalogStuff.deploymentBytes);
+                    expectedCatalogVersion + 1,
+                    DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
+                    getUniqueId(),
+                    catalogBytes,
+                    catalogHash,
+                    deploymentBytes);
 
-            // hopefully this will throw a SpecifiedException if the fragment threw one
-            throw vae;
-            // If there is a cluster failure after this point, we will re-run
-            // the transaction with the same input args and the old state,
-            // which will look like a new UAC transaction.  If there is no
-            // cluster failure, we leave the ZK state consistent with the
-            // catalog state which we entered here with.
+            try {
+                performCatalogVerifyWork(
+                        expectedCatalogVersion,
+                        tablesThatMustBeEmpty,
+                        reasonsForEmptyTables,
+                        requiresSnapshotIsolation);
+            }
+            catch (VoltAbortException vae) {
+                // If there is a cluster failure before this point, we will re-run
+                // the transaction with the same input args and the new state,
+                // which we will recognize as a restart and do the right thing.
+                log.debug("Catalog update cannot be applied.  Rolling back ZK state");
+                CatalogUtil.updateCatalogToZK(
+                        zk,
+                        catalogStuff.version,
+                        catalogStuff.txnId,
+                        catalogStuff.uniqueId,
+                        catalogStuff.catalogBytes,
+                        catalogStuff.getCatalogHash(),
+                        catalogStuff.deploymentBytes);
+                // hopefully this will throw a SpecifiedException if the fragment threw one
+                throw vae;
+                // If there is a cluster failure after this point, we will re-run
+                // the transaction with the same input args and the old state,
+                // which will look like a new UAC transaction.  If there is no
+                // cluster failure, we leave the ZK state consistent with the
+                // catalog state which we entered here with.
+            }
+
+            performCatalogUpdateWork(
+                    catalogDiffCommands,
+                    expectedCatalogVersion,
+                    requiresSnapshotIsolation,
+                    requireCatalogDiffCmdsApplyToEE,
+                    hasSchemaChange, requiresNewExportGeneration);
+        } finally {
+            // remove the uac blocker when exits
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
         }
-
-        performCatalogUpdateWork(
-                catalogDiffCommands,
-                expectedCatalogVersion,
-                requiresSnapshotIsolation,
-                requireCatalogDiffCmdsApplyToEE,
-                hasSchemaChange, requiresNewExportGeneration);
 
         // This is when the UpdateApplicationCatalog really ends in the blocking path
         log.info(String.format("Globally updating the current application catalog and deployment " +

@@ -39,7 +39,6 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
-import org.voltdb.SQLStmt;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.StatsSelector;
@@ -586,7 +585,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long[] inputDepIds,
             Object[] parameterSets,
             DeterminismHash determinismHash,
-            SQLStmt[] stmts,
+            String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,

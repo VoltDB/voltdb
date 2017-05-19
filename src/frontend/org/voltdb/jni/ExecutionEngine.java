@@ -33,7 +33,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SQLStmt;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -634,7 +633,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] inputDepIds,
             Object[] parameterSets,
             DeterminismHash determinismHash,
-            SQLStmt[] stmts,
+            String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long lastCommittedSpHandle,
@@ -649,12 +650,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // reset context for progress updates
             m_startTime = 0;
             m_logDuration = INITIAL_LOG_DURATION;
-            if (stmts != null && stmts.length > 0) {
-                m_sqlTexts = new String[stmts.length];
-                for (int i = 0; i < stmts.length; i++) {
-                    m_sqlTexts[i] = stmts[i].getText();
-                }
-            }
+            m_sqlTexts = sqlTexts;
 
             if (traceOn) {
                 final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
@@ -666,7 +662,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             }
 
             FastDeserializer results = coreExecutePlanFragments(m_currentBatchIndex, numFragmentIds, planFragmentIds,
-                    inputDepIds, parameterSets, determinismHash, stmts, txnId, spHandle, lastCommittedSpHandle,
+                    inputDepIds, parameterSets, determinismHash, isWriteFrags, sqlCRCs, txnId, spHandle, lastCommittedSpHandle,
                     uniqueId, undoQuantumToken, traceOn);
 
             if (traceOn) {
@@ -699,7 +695,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] inputDepIds,
             Object[] parameterSets,
             DeterminismHash determinismHash,
-            SQLStmt[] stmts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long lastCommittedSpHandle,
