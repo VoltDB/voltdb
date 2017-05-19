@@ -128,7 +128,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 assertTrue(pce.getMessage(),
-                        pce.getMessage().contains("Cannot load class for procedure org.voltdb_testprocs.updateclasses.testImportProc"));
+                        pce.getMessage().contains("Cannot load class for procedure: org.voltdb_testprocs.updateclasses.testImportProc"));
             }
 
             // Make sure we didn't purge anything (even the extra dependency)

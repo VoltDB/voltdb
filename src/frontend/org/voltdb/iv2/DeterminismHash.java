@@ -21,8 +21,6 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.HybridCrc32;
-import org.voltdb.SQLStmt;
-import org.voltdb.SQLStmtAdHocHelper;
 
 /**
  * This class expands the determinism hash with an array
@@ -65,7 +63,6 @@ public class DeterminismHash {
     final int[] m_hashes = new int[MAX_HASHES_COUNT + HEADER_OFFSET];
 
     protected final HybridCrc32 m_inputCRC = new HybridCrc32();
-    protected final HybridCrc32 m_stmtParamCRC = new HybridCrc32();
 
     public void reset(int catalogVersion) {
         m_catalogVersion = catalogVersion;
@@ -84,12 +81,7 @@ public class DeterminismHash {
 
         m_inputCRC.update(m_hashCount);
         m_inputCRC.update(m_catalogVersion);
-        // no work done means 0 hash to convey that
-        if (m_hashCount == 0) {
-            retval[0] = 0;
-        } else {
-            retval[0] = (int) m_inputCRC.getValue();
-        }
+        retval[0] = (int) m_inputCRC.getValue();
         retval[1] = m_catalogVersion;
         retval[2] = m_hashCount;
         return retval;
@@ -99,20 +91,13 @@ public class DeterminismHash {
      * Update the overall hash. Add a pair of ints to the array
      * if the size isn't too large.
      */
-    public void offerStatement(SQLStmt stmt, int offset, ByteBuffer psetBuffer) {
-        int stmtHash = SQLStmtAdHocHelper.getHash(stmt);
+    public void offerStatement(int stmtHash, int offset, ByteBuffer psetBuffer) {
         m_inputCRC.update(stmtHash);
+        m_inputCRC.updateFromPosition(offset, psetBuffer);
 
         if (m_hashCount < MAX_HASHES_COUNT) {
-            m_stmtParamCRC.reset();
-            m_stmtParamCRC.updateFromPosition(offset, psetBuffer);
-
-            int perStmtCRC = (int) m_stmtParamCRC.getValue();
             m_hashes[m_hashCount] = stmtHash;
-            m_hashes[m_hashCount + 1] = perStmtCRC;
-            m_inputCRC.update(perStmtCRC);
-        } else {
-            m_inputCRC.updateFromPosition(offset, psetBuffer);
+            m_hashes[m_hashCount + 1] = (int) m_inputCRC.getValue();
         }
         m_hashCount += 2;
     }
