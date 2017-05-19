@@ -32,6 +32,16 @@ namespace voltdb {
 
     class LargeTempTable;
 
+    /**
+     * A LargeTempTableBlock contains a normal tuple block
+     * and also a separate pool which contains all the
+     * variable-length data in the block.  If we need to
+     * store this block to make room for other data,
+     * the pool gets stored with the fixed-size data.
+     *
+     * Block size is 128k
+     * Pool chunk size is 32k
+     */
     class LargeTempTableBlock {
     public:
         LargeTempTableBlock(LargeTempTable* ltt);

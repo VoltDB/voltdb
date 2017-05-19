@@ -314,7 +314,8 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     TableTuple tuple = tupleWrapper.tuple();
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
-    for (int i = 0; i < 500; ++i) {
+    const int NUM_TUPLES = 500;
+    for (int i = 0; i < NUM_TUPLES; ++i) {
         std::string text(15, 'a' + (i % 26));
         setTupleValues(&tuple,
                        i,
@@ -336,7 +337,12 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     ltt->finishInserts();
 
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
+
+#ifndef MEMCHECK
     ASSERT_EQ(2, ltt->allocatedBlockCount());
+#else
+    ASSERT_EQ(NUM_TUPLES, ltt->allocatedBlockCount());
+#endif
 
     {
         LargeTableIterator iter = ltt->largeIterator();
@@ -370,7 +376,12 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 TEST_F(LargeTempTableTest, OverflowCache) {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 800000;
+#ifndef MEMCHECK
+    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 400000;
+#else
+    voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 80000;
+#endif
+
     TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
                                       VALUE_TYPE_DOUBLE,
                                       VALUE_TYPE_DOUBLE,
@@ -405,8 +416,8 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     TableTuple tuple = tupleWrapper.tuple();
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
-
-    for (int i = 0; i < 1500; ++i) {
+    const int NUM_TUPLES = 1500;
+    for (int i = 0; i < NUM_TUPLES; ++i) {
         std::string text(15, 'a' + (i % 26));
         setTupleValues(&tuple,
                        i,
@@ -431,9 +442,14 @@ TEST_F(LargeTempTableTest, OverflowCache) {
 
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
+#ifndef MEMCHECK
     // The table uses 4 blocks, but only 2 at a time can be cached.
     ASSERT_EQ(4, lttBlockCache->totalBlockCount());
     ASSERT_EQ(2, lttBlockCache->residentBlockCount());
+#else
+    ASSERT_EQ(NUM_TUPLES, lttBlockCache->totalBlockCount());
+    ASSERT_EQ(303, lttBlockCache->residentBlockCount());
+#endif
 
     {
         LargeTableIterator iter = ltt->largeIterator();
@@ -455,7 +471,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
             ++i;
         }
 
-        ASSERT_EQ(1500, i);
+        ASSERT_EQ(NUM_TUPLES, i);
     }
 
     ltt->decrementRefcount();
