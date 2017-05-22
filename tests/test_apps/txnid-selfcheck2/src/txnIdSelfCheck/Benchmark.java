@@ -705,13 +705,13 @@ public class Benchmark {
         if (!(config.disabledThreads.contains("partLoadlt") || config.disabledThreads.contains("Loadlt"))) {
             partLoadlt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
-            // XXX temporary partLoadlt.start();
+            partLoadlt.start();
         }
         replLoadlt = null;
         if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replLoadlt") || config.disabledThreads.contains("Loadlt"))) {
             replLoadlt = new LoadTableLoader(client, "loadmp",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
-            // XXX temporary replLoadlt.start();
+            replLoadlt.start();
         }
         if (!config.disabledThreads.contains("readThread")) {
             readThread = new ReadThread(client, config.threads, config.threadoffset,
