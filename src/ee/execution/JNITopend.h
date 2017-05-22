@@ -66,14 +66,14 @@ public:
         return false;
     }
 
-    std::unique_ptr<LargeTempTableBlock> loadLargeTempTableBlock(int64_t blockId) {
+    bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
         throw std::logic_error("unimplemented!");
-        return NULL;
+        return false;;
     }
 
     bool releaseLargeTempTableBlock(int64_t blockId) {
         throw std::logic_error("unimplemented!");
-        return NULL;
+        return false;
     }
 
 

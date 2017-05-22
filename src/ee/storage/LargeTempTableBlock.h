@@ -44,9 +44,13 @@ namespace voltdb {
      */
     class LargeTempTableBlock {
     public:
-        LargeTempTableBlock(LargeTempTable* ltt);
+        LargeTempTableBlock(int64_t id, LargeTempTable* ltt);
 
-        LargeTempTableBlock(std::unique_ptr<Pool> pool, TBPtr tbp);
+        LargeTempTableBlock(int64_t id, std::unique_ptr<Pool> pool, TBPtr tbp);
+
+        int64_t id() const {
+            return m_id;
+        }
 
         bool hasFreeTuples() const;
 
@@ -62,16 +66,45 @@ namespace voltdb {
 
         int64_t getAllocatedMemory() const;
 
+        TBPtr releaseBlock();
         std::unique_ptr<Pool> releasePool();
 
-        TBPtr releaseBlock();
+        void setBlock(TBPtr block);
+        void setPool(std::unique_ptr<Pool> pool);
 
         virtual ~LargeTempTableBlock();
 
+        bool isPinned() const {
+            return m_isPinned;
+        }
+
+        void pin() {
+            assert(!m_isPinned);
+            m_isPinned = true;
+        }
+
+        void unpin() {
+            assert(m_isPinned);
+            m_isPinned = false;
+        }
+
+        bool isResident() const {
+            if (m_tupleBlockPointer.get() == NULL) {
+                assert(m_pool.get() == NULL);
+                return false;
+            }
+            else {
+                assert(m_pool.get() != NULL);
+                return true;
+            }
+        }
+
     private:
 
+        int64_t m_id;
         std::unique_ptr<Pool> m_pool;
         TBPtr m_tupleBlockPointer;
+        bool m_isPinned;
     };
 } // end namespace voltdb
 

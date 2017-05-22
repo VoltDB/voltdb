@@ -82,7 +82,7 @@ class Topend {
 
     virtual bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) = 0;
 
-    virtual std::unique_ptr<LargeTempTableBlock> loadLargeTempTableBlock(int64_t blockId) = 0;
+    virtual bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) = 0;
 
     virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
 
@@ -127,7 +127,7 @@ public:
 
     virtual bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block);
 
-    virtual std::unique_ptr<LargeTempTableBlock> loadLargeTempTableBlock(int64_t blockId);
+    virtual bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block);
 
     virtual bool releaseLargeTempTableBlock(int64_t blockId);
 

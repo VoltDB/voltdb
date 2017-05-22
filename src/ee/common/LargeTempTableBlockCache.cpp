@@ -27,10 +27,8 @@
 namespace voltdb {
 
     LargeTempTableBlockCache::LargeTempTableBlockCache()
-        : m_cache()
-        , m_liveEntries()
-        , m_pinnedEntries()
-        , m_storedEntries()
+        : m_blockList()
+        , m_idToBlockMap()
         , m_nextId(0)
         , m_totalAllocatedBytes(0)
     {
@@ -39,97 +37,58 @@ namespace voltdb {
     std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock(LargeTempTable* ltt) {
         int64_t id = getNextId();
 
-        m_cache.emplace_back(new LargeTempTableBlock(ltt));
-        LargeTempTableBlock *emptyBlock = m_cache.back().get();
-        m_liveEntries[id] = emptyBlock;
-        m_pinnedEntries.insert(id);
+        m_blockList.emplace_front(new LargeTempTableBlock(id, ltt));
+        auto it = m_blockList.begin();
+        m_idToBlockMap[id] = it;
+        (*it)->pin();
 
-        return std::make_pair(id, emptyBlock);
-    }
-
-    bool LargeTempTableBlockCache::loadBlock(int64_t blockId) {
-        Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-        std::unique_ptr<LargeTempTableBlock> block = topend->loadLargeTempTableBlock(blockId);
-
-        if (block == NULL) {
-            return false;
-        }
-
-        m_liveEntries[blockId] = block.get();
-        m_cache.emplace_back(std::move(block));
-
-        assert(m_storedEntries.find(blockId) != m_storedEntries.end());
-        m_storedEntries.erase(blockId);
-
-        return true;
+        return std::make_pair(id, m_blockList.front().get());
     }
 
     LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
-        if (m_liveEntries.find(blockId) == std::end(m_liveEntries)) {
-            bool rc = loadBlock(blockId);
+        LargeTempTableBlock *block = m_idToBlockMap[blockId]->get();
+        if (! block->isResident()) {
+            Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
+            bool rc = topend->loadLargeTempTableBlock(block->id(), block);
             assert(rc);
         }
+        block->pin();
 
-        assert(m_liveEntries.find(blockId) != std::end(m_liveEntries));
-        assert(m_pinnedEntries.find(blockId) == m_pinnedEntries.end());
-        m_pinnedEntries.insert(blockId);
+        // Also need to move it to the front of the queue.
 
-        return m_liveEntries[blockId];
+        return block;
     }
 
     void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
-        assert(m_pinnedEntries.find(blockId) != m_pinnedEntries.end());
-        m_pinnedEntries.erase(blockId);
+        (*m_idToBlockMap[blockId])->unpin();
     }
 
     void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
-
-        auto liveIt = m_liveEntries.find(blockId);
-        if (liveIt != m_liveEntries.end()) {
-            LargeTempTableBlock* block = liveIt->second;
-            m_liveEntries.erase(blockId);
-
-            auto cacheIt = m_cache.begin();
-            for (; cacheIt != m_cache.end(); ++cacheIt) {
-                if (cacheIt->get() == block) {
-                    m_cache.erase(cacheIt);
-                    break;
-                }
-            }
-        }
-        else {
-            // This block was stored out to the topend..
+        auto it = m_idToBlockMap[blockId];
+        if (! (*it)->isResident()) {
             Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-            topend->releaseLargeTempTableBlock(blockId);
-            m_storedEntries.erase(blockId);
+            bool rc = topend->releaseLargeTempTableBlock(blockId);
+            assert(rc);
         }
 
+        m_idToBlockMap.erase(blockId);
+        m_blockList.erase(it);
     }
 
     bool LargeTempTableBlockCache::storeABlock() {
-        // Just store the first unpinned block that we can find.
-        auto liveIt = m_liveEntries.begin();
-        for (; liveIt != m_liveEntries.end(); ++liveIt) {
-            if (m_pinnedEntries.find(liveIt->first) == m_pinnedEntries.end()) {
+        // Start at the end of the list
+
+        auto it = m_blockList.end();
+        do {
+            --it;
+            LargeTempTableBlock *block = it->get();
+            if (!block->isPinned() && block->isResident()) {
                 Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-                int64_t blockId = liveIt->first;
-                LargeTempTableBlock *block = liveIt->second;
-
-                m_storedEntries[blockId] = block->getAllocatedMemory();
-                topend->storeLargeTempTableBlock(blockId, block);
-
-                m_liveEntries.erase(blockId);
-                auto cacheIt = m_cache.begin();
-                for (; cacheIt != m_cache.end(); ++cacheIt) {
-                    if (cacheIt->get() == block) {
-                        m_cache.erase(cacheIt);
-                        break;
-                    }
-                }
-
-                return true;
+                return topend->storeLargeTempTableBlock(block->id(), block);
             }
+
         }
+        while (it != m_blockList.begin());
 
         return false;
     }

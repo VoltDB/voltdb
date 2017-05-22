@@ -150,8 +150,8 @@ namespace voltdb {
         return false;
     }
 
-    std::unique_ptr<LargeTempTableBlock> DummyTopend::loadLargeTempTableBlock(int64_t blockId) {
-        return NULL;
+    bool DummyTopend::loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        return false;
     }
 
     bool DummyTopend::releaseLargeTempTableBlock(int64_t blockId) {

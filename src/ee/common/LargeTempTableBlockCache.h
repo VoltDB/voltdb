@@ -59,15 +59,29 @@ namespace voltdb {
         void decreaseAllocatedMemory(int64_t numBytes);
 
         size_t numPinnedEntries() const {
-            return m_pinnedEntries.size();
+            size_t cnt = 0;
+            BOOST_FOREACH(auto &block, m_blockList) {
+                if (block->isPinned()) {
+                    ++cnt;
+                }
+            }
+
+            return cnt;
         }
 
         size_t residentBlockCount() const {
-            return m_liveEntries.size();
+            size_t count = 0;
+            BOOST_FOREACH(auto &block, m_blockList) {
+                if (block->isResident()) {
+                    ++count;
+                }
+            }
+
+            return count;
         }
 
         size_t totalBlockCount() const {
-            return m_liveEntries.size() + m_storedEntries.size();
+            return m_blockList.size();
         }
 
         int64_t allocatedMemory() const {
@@ -90,16 +104,13 @@ namespace voltdb {
 
         bool storeABlock();
 
-        bool loadBlock(int64_t blockId);
+        typedef std::list<std::unique_ptr<LargeTempTableBlock>> BlockList;
 
-        std::vector<std::unique_ptr<LargeTempTableBlock>> m_cache;
-
-        /* std::vector<LargeTempTableBlock*> m_emptyEntries; */
-
-        std::map<int64_t, LargeTempTableBlock*> m_liveEntries;
-        std::set<int64_t> m_pinnedEntries;
-        std::map<int64_t, int64_t> m_storedEntries;
-        /* std::list<int64_t> m_unpinnedEntries; */
+        // The front of the block list are the most recently used blocks.
+        // The tail will be the least recently used blocks.
+        // The tail of the list should have no pinned blocks.
+        BlockList m_blockList;
+        std::map<int64_t, BlockList::iterator> m_idToBlockMap;
 
         int64_t m_nextId;
         int64_t m_totalAllocatedBytes;

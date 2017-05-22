@@ -176,11 +176,12 @@ public:
         return true;
     }
 
-    std::unique_ptr<LargeTempTableBlock> loadLargeTempTableBlock(int64_t blockId) {
+    bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
         auto it = m_map.find(blockId);
-        std::unique_ptr<LargeTempTableBlock> block = it->second.toLargeTempTableBlock();
-        m_map.erase(blockId);
-        return block;
+        StoredBlock &sb = it->second;
+        block->setBlock(sb.releaseBlock());
+        block->setPool(sb.releasePool());
+        return true;
     }
 
     bool releaseLargeTempTableBlock(int64_t blockId) {
@@ -207,8 +208,16 @@ private:
         {
         }
 
-        std::unique_ptr<LargeTempTableBlock> toLargeTempTableBlock() {
-            return std::unique_ptr<LargeTempTableBlock>(new LargeTempTableBlock(std::move(m_pool), m_tbp));
+        TBPtr releaseBlock() {
+            TBPtr ret;
+            ret.swap(m_tbp);
+            return ret;
+        }
+
+        std::unique_ptr<Pool> releasePool() {
+            std::unique_ptr<Pool> p;
+            p.swap(m_pool);
+            return p;
         }
 
     private:

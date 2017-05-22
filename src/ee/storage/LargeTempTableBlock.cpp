@@ -24,17 +24,19 @@
 
 namespace voltdb {
 
-    LargeTempTableBlock::LargeTempTableBlock(LargeTempTable *ltt)
-        : m_pool(new Pool(ltt->getTableAllocationSize() / 4, 1))
+    LargeTempTableBlock::LargeTempTableBlock(int64_t id, LargeTempTable *ltt)
+        : m_id(id)
+        , m_pool(new Pool(ltt->getTableAllocationSize() / 4, 1))
         , m_tupleBlockPointer(new TupleBlock(ltt, TBBucketPtr()))
-
+        , m_isPinned(false)
     {
         LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
         lttBlockCache->increaseAllocatedMemory(getAllocatedMemory());
     }
 
-    LargeTempTableBlock::LargeTempTableBlock(std::unique_ptr<Pool> pool, TBPtr tbp)
-        : m_pool(std::move(pool))
+    LargeTempTableBlock::LargeTempTableBlock(int64_t id, std::unique_ptr<Pool> pool, TBPtr tbp)
+        : m_id(id)
+        , m_pool(std::move(pool))
         , m_tupleBlockPointer(tbp)
     {
         LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
@@ -65,10 +67,10 @@ namespace voltdb {
     }
 
     int64_t LargeTempTableBlock::getAllocatedMemory() const {
+        if (isResident())
+            return m_pool->getAllocatedMemory() + m_tupleBlockPointer->getAllocatedMemory();
 
-        return
-            (m_pool.get() ? m_pool->getAllocatedMemory() : 0)
-            + (m_tupleBlockPointer.get() ? m_tupleBlockPointer->getAllocatedMemory() : 0);
+        return 0;
     }
 
     LargeTempTableBlock::~LargeTempTableBlock() {
@@ -77,6 +79,7 @@ namespace voltdb {
     }
 
     std::unique_ptr<Pool> LargeTempTableBlock::releasePool() {
+        assert(m_pool.get() != NULL);
         LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
         lttBlockCache->decreaseAllocatedMemory(m_pool->getAllocatedMemory());
 
@@ -87,6 +90,7 @@ namespace voltdb {
     }
 
     TBPtr LargeTempTableBlock::releaseBlock() {
+        assert(m_tupleBlockPointer.get() != NULL);
         LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
         lttBlockCache->decreaseAllocatedMemory(m_tupleBlockPointer->getAllocatedMemory());
 
@@ -94,5 +98,20 @@ namespace voltdb {
         blockPtr.swap(m_tupleBlockPointer);
 
         return blockPtr;
+    }
+
+    void LargeTempTableBlock::setBlock(TBPtr block) {
+        assert(m_tupleBlockPointer.get() == NULL);
+        block.swap(m_tupleBlockPointer);
+        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        lttBlockCache->increaseAllocatedMemory(m_tupleBlockPointer->getAllocatedMemory());
+
+    }
+
+    void LargeTempTableBlock::setPool(std::unique_ptr<Pool> pool) {
+        assert(m_pool.get() == NULL);
+        pool.swap(m_pool);
+        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        lttBlockCache->increaseAllocatedMemory(m_pool->getAllocatedMemory());
     }
 }
