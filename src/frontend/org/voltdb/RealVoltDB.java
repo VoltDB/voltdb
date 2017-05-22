@@ -798,7 +798,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (config.m_isEnterprise) {
                     if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
                     if (m_licenseApi.isPro()) edition = "Pro Edition";
-                    if (m_licenseApi.isTrial()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isEnterpriseTrial()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isProTrial()) edition = "Pro Edition";
                     if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
                 }
 
@@ -1095,7 +1096,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
                 JSONObject jo = new JSONObject();
-                jo.put("trial", m_licenseApi.isTrial());
+                jo.put("trial", m_licenseApi.isAnyKindOfTrial());
                 jo.put("hostcount",m_licenseApi.maxHostcount());
                 jo.put("commandlogging", m_licenseApi.isCommandLoggingAllowed());
                 jo.put("wanreplication", m_licenseApi.isDrReplicationAllowed());
