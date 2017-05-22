@@ -519,7 +519,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.isForReplay());
 
             msg.setSpHandle(newSpHandle);
-            m_repairLog.deliver(msg);
+           logRepair(msg);
             // Also, if this is a vanilla single-part procedure, make the TXNID
             // be the SpHandle (for now)
             // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
@@ -572,7 +572,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else {
             setMaxSeenTxnId(msg.getSpHandle());
             newSpHandle = msg.getSpHandle();
-            m_repairLog.deliver(msg);
+           logRepair(msg);
             // Don't update the uniqueID if this is a run-everywhere txn, because it has an MPI unique ID.
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(msg.getUniqueId()) == m_partitionId) {
                 m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(msg.getUniqueId());
@@ -896,7 +896,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             msg.setSpHandle(newSpHandle);
-            m_repairLog.deliver(msg);
+           logRepair(msg);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
                 //Trigger reserialization so the new handle is used
@@ -950,7 +950,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         else {
-            m_repairLog.deliver(msg);
+           logRepair(msg);
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
         }
@@ -1202,7 +1202,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // correctly
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
-            m_repairLog.deliver(msg);
+           logRepair(msg);
             msg.setToLeader(false);
             msg.setAckRequestedFromSender(true);
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
@@ -1639,5 +1639,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public TransactionState getTransaction(long txnId) {
         return m_outstandingTxns.get(txnId);
+    }
+
+    private void logRepair(VoltMessage message) {
+        if (m_repairLog != null) {
+            m_repairLog.deliver(message);
+        }
     }
 }
