@@ -336,8 +336,9 @@ public class InitiatorMailbox implements Mailbox
         }
         if (canDeliver) {
             m_scheduler.deliver(message);
+        } else {
+            m_repairLog.deliver(message);
         }
-        m_repairLog.deliver(message);
     }
 
     // If @BalanceSPI comes in, set up new partition leader selection and

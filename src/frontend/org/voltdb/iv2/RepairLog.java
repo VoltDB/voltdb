@@ -161,6 +161,12 @@ public class RepairLog
 
             m_lastSpHandle = m.getSpHandle();
             truncate(m.getTruncationHandle(), IS_SP);
+
+          //Cann't repair SPI balance
+            if ("@BalanceSPI".equalsIgnoreCase(m.getStoredProcedureName())) {
+                return;
+            }
+
             m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
         } else if (msg instanceof FragmentTaskMessage) {
             final FragmentTaskMessage m = (FragmentTaskMessage) msg;

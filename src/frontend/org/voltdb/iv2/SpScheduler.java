@@ -168,6 +168,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // the max schedule transaction sphandle, multi-fragments mp txn counts one
     long m_maxScheduledTxnSpHandle = Long.MIN_VALUE;
 
+    protected RepairLog m_repairLog;
+
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
@@ -517,7 +519,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.isForReplay());
 
             msg.setSpHandle(newSpHandle);
-            message.setSpHandle(newSpHandle);
+            m_repairLog.deliver(msg);
             // Also, if this is a vanilla single-part procedure, make the TXNID
             // be the SpHandle (for now)
             // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
@@ -570,7 +572,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else {
             setMaxSeenTxnId(msg.getSpHandle());
             newSpHandle = msg.getSpHandle();
-
+            m_repairLog.deliver(msg);
             // Don't update the uniqueID if this is a run-everywhere txn, because it has an MPI unique ID.
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(msg.getUniqueId()) == m_partitionId) {
                 m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(msg.getUniqueId());
@@ -873,7 +875,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         FragmentTaskMessage msg = message;
         long newSpHandle;
-
         //The site has been marked as non-leader. The follow-up batches or fragments are processed here
         if (!message.toReplica() && (m_isLeader || (!m_isLeader && message.shouldHandleByOriginalLeader()))) {
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
@@ -895,7 +896,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             msg.setSpHandle(newSpHandle);
-            message.setSpHandle(newSpHandle);
+            m_repairLog.deliver(msg);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
                 //Trigger reserialization so the new handle is used
@@ -949,10 +950,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         else {
-            if (tmLog.isDebugEnabled() && TxnEgo.getSequence(msg.getSpHandle())< TxnEgo.SEQUENCE_ZERO) {
-                tmLog.debug("INVALID SEQUENCE[handleFragmentTaskMessage]:" + msg + "\nisLeader:" + m_isLeader);
-            }
-
+            m_repairLog.deliver(msg);
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
         }
@@ -1204,18 +1202,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // correctly
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
+            m_repairLog.deliver(msg);
             msg.setToLeader(false);
             msg.setAckRequestedFromSender(true);
-            message.setSpHandle(msg.getSpHandle());
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
         } else {
-            if (tmLog.isDebugEnabled() && TxnEgo.getSequence(msg.getSpHandle())< TxnEgo.SEQUENCE_ZERO) {
-                tmLog.debug("INVALID SEQUENCE: site " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                        " MSG:" + msg + "\nTxn:" + (txn != null ? txn.getNotice() : "") +
-                        "\nisLeader:" + m_isLeader);
-            }
             if(!m_isLeader && message.isToLeader()) {
                 setMaxSeenTxnId(msg.getSpHandle());
             }
