@@ -500,7 +500,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.isForReplay());
 
             msg.setSpHandle(newSpHandle);
-            m_repairLog.deliver(msg);
+            logRepair(msg);
             // Also, if this is a vanilla single-part procedure, make the TXNID
             // be the SpHandle (for now)
             // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
@@ -552,7 +552,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else {
             setMaxSeenTxnId(msg.getSpHandle());
             newSpHandle = msg.getSpHandle();
-            m_repairLog.deliver(msg);
+            logRepair(msg);
             // Don't update the uniqueID if this is a run-everywhere txn, because it has an MPI unique ID.
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(msg.getUniqueId()) == m_partitionId) {
                 m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(msg.getUniqueId());
@@ -876,7 +876,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             msg.setSpHandle(newSpHandle);
-            m_repairLog.deliver(msg);
+            logRepair(msg);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
                 //Trigger reserialization so the new handle is used
@@ -931,7 +931,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else {
             newSpHandle = msg.getSpHandle();
-            m_repairLog.deliver(msg);
+            logRepair(msg);
             setMaxSeenTxnId(newSpHandle);
         }
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
@@ -1167,7 +1167,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         } else {
             setMaxSeenTxnId(msg.getSpHandle());
         }
-        m_repairLog.deliver(msg);
+        logRepair(msg);
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for
@@ -1567,5 +1567,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
             }
         });
+    }
+
+    private void logRepair(VoltMessage message) {
+
+        //null check for unit test
+        if (m_repairLog != null) {
+            m_repairLog.deliver(message);
+        }
     }
 }
