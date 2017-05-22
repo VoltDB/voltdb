@@ -246,9 +246,7 @@ public class LeaderAppointer implements Promotable
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 try {
                     if (currentLeaders.size() == getInitialPartitionCount()) {
-                        if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
-                        }
+                       tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
                         m_state.set(AppointerState.DONE);
                         m_MPI.acceptPromotion();
                         m_startupLatch.set(null);
@@ -258,14 +256,11 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
                 }
             }
-            Set<Integer> liveHosts = Sets.newHashSet();
-            if (m_messenger != null){
-                liveHosts = m_messenger.getLiveHostIds();
-            }
+            Set<Integer> liveHosts = m_messenger.getLiveHostIds();
             Map<Integer, Host> hostLeaderMap = Maps.newHashMap();
             for (Long site: currentLeaders) {
                 //filter our dead hosts
-                int hostId =  CoreUtils.getHostIdFromHSId(site);
+                int hostId = CoreUtils.getHostIdFromHSId(site);
                 if (liveHosts.contains(hostId)) {
                     Host host = hostLeaderMap.get(hostId);
                     if (host == null) {
@@ -744,17 +739,14 @@ public class LeaderAppointer implements Promotable
      * @return the new host id
      */
     private int findHostForPartitionLeader(int partitionId, List<Long> replicas){
-        int newMasterHost = -1;
         Set<Integer> candidateHost = Sets.newHashSet();
         for (Long site : replicas) {
             candidateHost.add(CoreUtils.getHostIdFromHSId(site));
         }
 
         ImmutableSortedMap<Integer, Host> masterCountByHost = m_hostInfoMap.get();
-        Set<Integer> liveHosts = Sets.newHashSet();
-        if (m_messenger != null){
-            liveHosts = m_messenger.getLiveHostIds();
-        }
+        Set<Integer> liveHosts = m_messenger.getLiveHostIds();
+
         //check newly joined hosts.If a newly joined host has the replica,
         //put the master on it since a newly joined host does not have masters on it
         for (Integer hostId : liveHosts) {
@@ -787,6 +779,6 @@ public class LeaderAppointer implements Promotable
                 return host.id;
             }
         }
-        return newMasterHost;
+        return -1;
     }
 }
