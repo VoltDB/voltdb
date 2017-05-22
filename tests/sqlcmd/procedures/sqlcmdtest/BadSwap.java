@@ -21,31 +21,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package txnIdSelfCheck.procedures;
+package sqlcmdtest;
 
-import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.SQLStmt;
 
-public class DeleteLoadPartitionedBase extends VoltProcedure {
+public class BadSwap extends VoltProcedure {
 
-    public long doWork(SQLStmt delete, SQLStmt deletecp, long cid) {
-
-        voltQueueSQL(delete, cid);
-        VoltTable[] results = voltExecuteSQL();
-        long del = results[0].asScalarLong();
-        if (del != 1)
-            throw new VoltAbortException("base table incorrect number of deleted rows=" + del + " for cid=" + cid);
-        voltQueueSQL(deletecp, cid);
-        results = voltExecuteSQL();
-        long delcp = results[0].asScalarLong();
-        if (delcp != 1)
-            throw new VoltAbortException("cpy table incorrect number of deleted rows=" + delcp + " for cid=" + cid);
-        return (del>0?2:0) + (delcp>0?1:0);  // the result is a 2 bit bitmap
-    }
-
-    public long run() {
-        return 0; // never called in base procedure
+    public final SQLStmt badswap = new SQLStmt("@SwapTables t1 t2");
+    public VoltTable[] run() throws VoltAbortException {
+        return new VoltTable[] {};
     }
 
 }

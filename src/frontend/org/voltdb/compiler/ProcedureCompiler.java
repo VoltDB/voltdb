@@ -236,7 +236,7 @@ public abstract class ProcedureCompiler {
         }
         assert(info != null);
 
-        // make sure multi-partition implies no partitoning info
+        // make sure multi-partition implies no partitioning info
         if (info.singlePartition == false) {
             if ((info.partitionInfo != null) && (info.partitionInfo.length() > 0)) {
                 String msg = "Procedure: " + shortName + " is annotated as multi-partition";
