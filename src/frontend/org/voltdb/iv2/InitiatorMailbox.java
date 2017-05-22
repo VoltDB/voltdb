@@ -307,9 +307,12 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
-        m_repairLog.deliver(message);
+
         if (canDeliver) {
+            //Repair log will be handled with updated sp handle in Scheduler in this case
             m_scheduler.deliver(message);
+        } else {
+            m_repairLog.deliver(message);
         }
     }
 
