@@ -1733,50 +1733,43 @@ public class IndexAVL implements Index {
             VoltXMLElement constraintXml = indexConstraintMapping.get(hsqlIndexName);
             indexConstraintMapping.remove(hsqlIndexName);
 
+            boolean isAutoName = constraintXml.attributes.get("nameisauto").equals("true");
+
             // This is either a [ASSUME]UNIQUE constraint or a PK.
             String constraintType = constraintXml.attributes.get("constrainttype");
             String hsqlConstraintName = constraintXml.attributes.get("name");
 
-            if (constraintType.equals("PRIMARY_KEY")) {
-                String namePart = tableName;
-                if (! hsqlConstraintName.startsWith("SYS_")) {
-                    // explicitly named constraint
-                    isHashIndex = isNameRequestingHashIndex(hsqlConstraintName);
-                    namePart += "_" + hsqlConstraintName;
-                }
-                else {
-                    // unnamed constraint:
-                    // Also update the constraint name to use the VoltDB prefix.
-                    String voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + "_PK_" + tableName;
-                    constraintXml.attributes.put("name", voltdbConstraintName);
-                }
-
-                voltdbIndexName = HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX + namePart;
+            if (!isAutoName) {
+                voltdbIndexName = HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + hsqlConstraintName;
             }
-            else { // UNIQUE or ASSUMEUNIQUE constraint
-
-                String namePart = tableName;
-                if (! hsqlConstraintName.startsWith("SYS_")) {
-                    isHashIndex = isNameRequestingHashIndex(hsqlConstraintName);
-                    namePart += "_" + hsqlConstraintName;
+            else {
+                String prefix = null;
+                boolean isPrimaryKey = constraintType.equals("PRIMARY_KEY");
+                if (isPrimaryKey) {
+                    prefix = HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX;
                 }
                 else {
-                    // Unnamed constraint
-                    // Index name will be
-                    //  constraint index prefix + tablename + columns delimited by underbars
-                    namePart += "_" + StringUtils.join(getColumnNameList().toArray(), "_");
-
-                    // If this is an expression index add the expr hash to
-                    // help uniquify the name.
-                    if (exprs != null) {
-                        namePart += "_" + java.lang.Math.abs(exprHash % 100000);
-                    }
-
-                    String voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + namePart;
-                    constraintXml.attributes.put("name", voltdbConstraintName);
+                    prefix = HSQLInterface.AUTO_GEN_UNIQUE_IDX_PREFIX;
                 }
 
-                voltdbIndexName = HSQLInterface.AUTO_GEN_IDX_PREFIX + namePart;
+                String namePart = tableName + "_" + StringUtils.join(getColumnNameList().toArray(), "_");
+                if (exprs != null) {
+                    namePart += "_" + java.lang.Math.abs(exprHash % 100000);
+                }
+
+                voltdbIndexName = prefix + namePart;
+
+                // Also name the constraint here based on our naming scheme.
+                String voltdbConstraintName = null;
+                if (isPrimaryKey) {
+                    voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + "_PK_" + namePart;
+                }
+                else {
+                    voltdbConstraintName = HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX + "_CT_" + namePart;
+
+                }
+
+                constraintXml.attributes.put("name", voltdbConstraintName);
             }
 
             // Update the index name in the constraint.
