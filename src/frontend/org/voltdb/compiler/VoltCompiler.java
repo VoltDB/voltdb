@@ -1024,8 +1024,8 @@ public class VoltCompiler {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-                SQLParser.FileInfo fi = new SQLParser.FileInfo(schemaReader.getPath());
                 if (m_initClasses) {
+                    SQLParser.FileInfo fi = new SQLParser.FileInfo(schemaReader.getPath());
                     ddlcompiler.loadSchemaWithFiltering(schemaReader, db, whichProcs, fi);
                 }
                 else {

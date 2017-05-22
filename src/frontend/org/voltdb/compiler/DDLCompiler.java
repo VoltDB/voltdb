@@ -354,13 +354,14 @@ public class DDLCompiler {
         catch (Exception e) {
             throw m_compiler.new VoltCompilerException(e);
         }
-
-        try {
-            // NEEDSWORK (ENG-12255): This really should be done outside the loop, by the caller. The exception propagation, at this point, is pretty messy, and
-            // changing it would be a pretty big effort that's really not relevant to this ticket. Fix this sometime.
-            reader.close();
-        } catch (IOException e) {
-            throw m_compiler.new VoltCompilerException("Error closing schema file");
+        finally {
+            try {
+                // NEEDSWORK (ENG-12255): This really should be done outside the loop, by the caller. The exception propagation, at this point, is pretty messy, and
+                // changing it would be a pretty big effort that's really not relevant to this ticket. Fix this sometime.
+                reader.close();
+            } catch (IOException e) {
+                throw m_compiler.new VoltCompilerException("Error closing schema file");
+            }
         }
 
         // process extra classes

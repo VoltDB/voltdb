@@ -119,7 +119,7 @@ public class SQLCommand
         return response;
     }
 
-    private static void executeDDLBatch(String batchFileName, String statements, int batchEndLineNumber, DDLParserCallback callback) {
+    private static void executeDDLBatch(String batchFileName, String statements, DDLParserCallback callback, int batchEndLineNumber) {
 
         try {
             if (callback != null) {
@@ -579,6 +579,8 @@ public class SQLCommand
         SQLCommandLineReader reader = null;
 
         if ( ! m_interactive && callback == null) {
+            // We have to check for the callback to avoid spewing to System.out in the "init --classes" filtering codepath.
+            // Better logging/output handling in general would be nice to have here.
             System.out.println();
             System.out.println(fileInfo.toString());
         }
@@ -668,7 +670,7 @@ public class SQLCommand
                         // For now, treat the final semicolon as optional and
                         // assume that we are not just adding a partial statement to the batch.
                         batch.append(statement);
-                        executeDDLBatch(fileInfo.getFilePath(), batch.toString(), reader.getLineNumber(), callback);
+                        executeDDLBatch(fileInfo.getFilePath(), batch.toString(), callback, reader.getLineNumber());
                     }
                 }
                 return;
