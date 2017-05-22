@@ -255,6 +255,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals("View creation on empty tables should always succeed.",
                      ClientResponse.SUCCESS, cr.getStatus());
+        dropView(client, viewName);
     }
 
     public void testDropView() throws Exception {
@@ -313,6 +314,12 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("@AdHoc", "drop view T_ENG_11497_2_VIEW;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop table T_ENG_11497_1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop table T_ENG_11497_2;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 

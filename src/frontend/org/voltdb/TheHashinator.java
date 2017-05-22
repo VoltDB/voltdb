@@ -119,12 +119,18 @@ public abstract class TheHashinator {
     private static final AtomicReference<Pair<Long, ? extends TheHashinator>> instance =
             new AtomicReference<Pair<Long, ? extends TheHashinator>>();
 
+    // Set true once the current Hashinator does not match m_pristineHashinator
+    private static boolean m_elasticallyModified = false;
+    // The initial Hashinator based strictly on the initial cluster partition count
+    protected static TheHashinator m_pristineHashinator;
+
     /**
      * Initialize TheHashinator with the specified implementation class and configuration.
      * The starting version number will be 0.
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
         TheHashinator hashinator = constructHashinator( hashinatorImplementation, config, false);
+        m_pristineHashinator = hashinator;
         m_cachedHashinators.put(0L, hashinator);
         instance.set(Pair.of(0L, hashinator));
     }
@@ -185,8 +191,16 @@ public abstract class TheHashinator {
     // but it must be declared protected to allow the required overriding.
     abstract protected int pHashToPartition(VoltType type, Object obj);
     abstract protected Set<Integer> pGetPartitions();
+    abstract protected boolean pIsPristine();
     abstract public int getPartitionFromHashedToken(int hashedToken);
 
+    /**
+     * Helper method to check of the Hashinator has ever been modified
+     * @return  true if modified (due to an elastic join)
+     */
+    static public boolean clusterHasBeenElasticallyJoined() {
+        return m_elasticallyModified;
+    }
 
     static public int getPartitionFromToken(int hashedToken) {
         return instance.get().getSecond().getPartitionFromHashedToken(hashedToken);
@@ -343,6 +357,17 @@ public abstract class TheHashinator {
                 final Pair<Long, ? extends TheHashinator> update =
                         Pair.of(version, existingHashinator);
                 if (instance.compareAndSet(snapshot, update)) {
+                    if (!m_elasticallyModified) {
+                        if (!update.getSecond().pIsPristine()) {
+                            // This is not a lock protected (atomic) but it should be fine because
+                            // release() should only be called by the one thread that successfully
+                            // updated the hashinator
+                            hostLogger.debug("The Hashinator has been elastically modified. " +
+                                    "This cluster can no longer operate in DR same-size-cluster mode.");
+                            m_elasticallyModified = true;
+                        }
+                    }
+                    // Note: Only undo is ever called and only from a failure in @BalancePartitions
                     return Pair.of(new UndoAction() {
                         @Override
                         public void release() {}

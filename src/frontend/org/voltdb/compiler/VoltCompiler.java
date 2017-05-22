@@ -144,7 +144,7 @@ public class VoltCompiler {
 
     private List<String> m_capturedDiagnosticDetail = null;
 
-    private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
+    private static VoltLogger compilerLog = new VoltLogger("COMPILER");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
 
@@ -389,6 +389,10 @@ public class VoltCompiler {
         compilerLog.error(fb.getLogString());
     }
 
+    public static void setVoltLogger(VoltLogger vl) {
+        compilerLog = vl;
+    }
+
     /**
      * Compile from a set of DDL files.
      *
@@ -414,6 +418,58 @@ public class VoltCompiler {
             return false;
         }
         return compileInternalToFile(jarOutputPath, null, null, ddlReaderList, null);
+    }
+
+    /** Compiles a catalog from a user provided schema and (optional) jar file. */
+    public boolean compileFromSchemaAndClasses(
+            final File schemaPath,
+            final File classesJarPath,
+            final File catalogOutputPath)
+    {
+        if (schemaPath == null || !schemaPath.exists()) {
+            compilerLog.error("Cannot compile nonexistent or missing schema.");
+            return false;
+        }
+
+        List<VoltCompilerReader> ddlReaderList;
+        try {
+            ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+        }
+        catch (VoltCompilerException e) {
+            compilerLog.error("Unable to open schema file \"" + schemaPath + "\"", e);
+            return false;
+        }
+
+        InMemoryJarfile inMemoryUserJar = null;
+        ClassLoader originalClassLoader = m_classLoader;
+        try {
+            if (classesJarPath != null && classesJarPath.exists()) {
+                // Make user's classes available to the compiler and add all VoltDB artifacts to theirs (overwriting any existing VoltDB artifacts).
+                // This keeps all their resources because stored procedures may depend on them.
+                inMemoryUserJar = new InMemoryJarfile(classesJarPath);
+                m_classLoader = inMemoryUserJar.getLoader();
+            } else {
+                inMemoryUserJar = new InMemoryJarfile();
+            }
+            if (compileInternal(null, null, ddlReaderList, inMemoryUserJar) == null) {
+                return false;
+            }
+        } catch (IOException e) {
+            compilerLog.error("Could not load classes from user supplied jar file", e);
+            return false;
+        } finally {
+            m_classLoader = originalClassLoader;
+        }
+
+        try {
+            inMemoryUserJar.writeToFile(catalogOutputPath).run();
+            return true;
+        }
+        catch (final Exception e) {
+            e.printStackTrace();
+            addErr("Error writing catalog jar to disk: " + e.getMessage());
+            return false;
+        }
     }
 
     /**

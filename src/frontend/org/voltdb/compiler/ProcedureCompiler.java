@@ -92,7 +92,7 @@ public abstract class ProcedureCompiler {
                                                         boolean withPrivate)
                                                                 throws VoltCompilerException
     {
-        Map<String, SQLStmt> retval = new HashMap<String, SQLStmt>();
+        Map<String, SQLStmt> retval = new HashMap<>();
 
         Field[] fields = procClass.getDeclaredFields();
         for (Field f : fields) {
@@ -153,7 +153,7 @@ public abstract class ProcedureCompiler {
      * @param className fully qualified (or not) class name
      * @return short name of the class (no package)
      */
-    static String deriveShortProcedureName( String className) {
+    public static String deriveShortProcedureName( String className) {
         if( className == null || className.trim().isEmpty()) {
             return null;
         }
@@ -236,7 +236,7 @@ public abstract class ProcedureCompiler {
         }
         assert(info != null);
 
-        // make sure multi-partition implies no partitoning info
+        // make sure multi-partition implies no partitioning info
         if (info.singlePartition == false) {
             if ((info.partitionInfo != null) && (info.partitionInfo.length() > 0)) {
                 String msg = "Procedure: " + shortName + " is annotated as multi-partition";

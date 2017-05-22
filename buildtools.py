@@ -578,7 +578,7 @@ def buildMakefile(CTX):
     cleanobjs += ["prod/voltdbipc"]
     makefile.write('\n')
     makefile.write('\n')
-    
+
     makefile.write("objects/volt.a: %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
@@ -652,9 +652,9 @@ def buildMakefile(CTX):
     # build the generated tests.
     buildGeneratedTests(CTX, makefile, all_gen_tests)
     makefile.write("\n")
-    
+
     # A target for all the tests.  This is what buildtools.py eventually uses.
-    makefile.write("#\n# A target for all the tests.  This is what buildtools.py eventually uses.\n#\n") 
+    makefile.write("#\n# A target for all the tests.  This is what buildtools.py eventually uses.\n#\n")
     makefile.write(".PHONY: test\n")
     makefile.write("test: \\\n")
     for test in tests:

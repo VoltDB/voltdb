@@ -18,6 +18,7 @@ import time
 import signal
 from voltcli import checkstats
 from voltcli.checkstats import StatisticsProcedureException
+from voltcli import utility
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -36,6 +37,12 @@ def shutdown(runner):
     shutdown_params = []
     columns = []
     zk_pause_txnid = 0
+
+    communityVersion = isCommunityVersion(runner)
+
+    if runner.opts.save and communityVersion:
+        utility.warning("Snapshots not supported in the community edition. The --save option is being ignored.")
+
     runner.info('Cluster shutdown in progress.')
     if not runner.opts.forcing:
         stateMessage = 'The cluster shutdown process has stopped. The cluster is still in a paused state.'
@@ -47,15 +54,21 @@ def shutdown(runner):
                 runner.abort('The preparation for shutdown failed with status: %d' % resp.response.statusString)
             zk_pause_txnid = resp.table(0).tuple(0).column_integer(0)
             runner.info('The cluster is paused prior to shutdown.')
-            runner.info('Writing out all queued export data...')
-            status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
-            if status <> 0:
-                runner.abort('The cluster has failed to be quiesce with status: %d' % status)
+
+            if not communityVersion:
+                runner.info('Writing out all queued export data...')
+                status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
+                if status <> 0:
+                    runner.abort('The cluster has failed to be quiesce with status: %d' % status)
+
             checkstats.check_clients(runner)
             checkstats.check_importer(runner)
-            checkstats.check_command_log(runner)
-            runner.info('All transactions have been made durable.')
-            if runner.opts.save:
+
+            if not communityVersion:
+                checkstats.check_command_log(runner)
+                runner.info('All transactions have been made durable.')
+
+            if (not communityVersion) and runner.opts.save:
                actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown --save".'
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
                shutdown_params =  [zk_pause_txnid]
@@ -78,3 +91,11 @@ def shutdown(runner):
             runner.abort(actionMessage)
     response = runner.call_proc('@Shutdown', columns, shutdown_params, check_status = False)
     print response
+
+
+def isCommunityVersion(runner):
+    response = runner.call_proc('@SystemInformation', [VOLT.FastSerializer.VOLTTYPE_STRING], ['OVERVIEW'])
+    for tuple in response.table(0).tuples():
+        if tuple[1] == "LICENSE":
+            return False
+    return True

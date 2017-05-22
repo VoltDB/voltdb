@@ -581,9 +581,8 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
 void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
         int64_t uniqueId, ByteArray payloads)
 {
-    assert(!m_opened);
-
     if (type != SWAP_TABLE) { // openTxn does this for SWAP_TABLE
+        assert(!m_opened);
         ++m_openSequenceNumber;
     }
 

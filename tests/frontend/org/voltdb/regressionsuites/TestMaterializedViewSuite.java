@@ -1472,14 +1472,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1L, results[0].asScalarLong());
     }
 
-    private void insertRowAdHoc(Client client, String stmt) throws IOException, ProcCallException
-    {
-        VoltTable[] results = null;
-        results = client.callProcedure("@AdHoc", stmt).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].asScalarLong());
-    }
-
     private void deleteRow(Client client, Object... parameters) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
@@ -1659,7 +1651,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             System.out.println("Now testing altering the source table of a view.");
             // 3.1 add column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;" +
+                client.callProcedure("@AdHoc",
+                        "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;" +
                         "ALTER TABLE WAS_ORDERITEMS ADD COLUMN x FLOAT;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1668,7 +1661,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.2 drop column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;" +
+                client.callProcedure("@AdHoc",
+                        "ALTER TABLE ORDERITEMS DROP COLUMN x;" +
                         "ALTER TABLE WAS_ORDERITEMS DROP COLUMN x;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1677,7 +1671,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.3 alter column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);" +
+                client.callProcedure("@AdHoc",
+                        "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);" +
                         "ALTER TABLE WAS_CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1753,6 +1748,20 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             deleteRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
         }
+
+        // Restore catalog changes:
+        try {
+            client.callProcedure("@AdHoc",
+                    "TRUNCATE TABLE CUSTOMERS;" +
+                    "TRUNCATE TABLE WAS_CUSTOMERS;");
+            client.callProcedure("@AdHoc",
+                    "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(50);" +
+                    "ALTER TABLE WAS_CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(50);");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Should be able to alter column in a view source table.");
+        }
+        verifyViewOnJoinQueryResult(client);
     }
 
     private void truncateSourceTables(Client client, int rollback,
@@ -1806,7 +1815,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.537664 39.913775)'));"  // region 3
         };
         for (String insert : inserts) {
-            insertRowAdHoc(client, insert);
+            assertSuccessfulDML(client, insert);
         }
         VoltTable vresult = client.callProcedure("@AdHoc", "SELECT * FROM REGIONAL_TAXI_COUNT ORDER BY 1;").getResults()[0];
         assertContentOfTable(new Object[][]{{1, 1}, {3, 2}, {5, 1}, {6, 1}}, vresult);
@@ -2236,6 +2245,16 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc",
                 "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
             assertContentOfTable(new Object[][] {}, vt);
+
+            // Restore catalog changes:
+            try {
+                client.callProcedure("@AdHoc",
+                    "DROP INDEX I_ENG_11203_JOIN;" +
+                    "DROP INDEX I_ENG_11203_SINGLE;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop indexes on the joined table views V_ENG_11203_JOIN and V_ENG_11203_SINGLE.");
+            }
         }
     }
 
@@ -2249,9 +2268,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         String bugTrigger = "UPDATE T1_ENG_11314 SET C2=64, C3=1024 WHERE G1=2;";
         Object[][] viewContent = { {0, 2, 0, 0, 1024, 64, 0, 0, 0, 0, 0, 0, "abc", "def"} };
         // -1- Insert data
-        insertRowAdHoc(client, insertT1[0]);
-        insertRowAdHoc(client, insertT1[1]);
-        insertRowAdHoc(client, insertT2);
+        assertSuccessfulDML(client, insertT1[0]);
+        assertSuccessfulDML(client, insertT1[1]);
+        assertSuccessfulDML(client, insertT2);
         // -2- Test if the UPDATE statement will trigger an error on single table view V1:
         client.callProcedure("@AdHoc", bugTrigger);
         // -3- Verify view contents

@@ -177,6 +177,8 @@ public class Benchmark {
 
         @Option(desc = "Allow disabling different threads for testing specific functionality. ")
         String disabledthreads = "none";
+        //threads: "clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt"
+        // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
         ArrayList<String> disabledThreads = null;
 
         @Option(desc = "Enable topology awareness")
@@ -635,13 +637,13 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
 
         // Big Partitioned Loader
-        if (!config.disabledThreads.contains("partBiglt")) {
+        if (!(config.disabledThreads.contains("partBiglt") || config.disabledThreads.contains("Biglt"))) {
             partBiglt = new BigTableLoader(client, "bigp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
             partBiglt.start();
         }
         replBiglt = null;
-        if (config.mpratio > 0.0 && !config.disabledThreads.contains("replBiglt")) {
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replBiglt") || config.disabledThreads.contains("Biglt"))) {
             replBiglt = new BigTableLoader(client, "bigr",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
             replBiglt.start();
@@ -677,40 +679,39 @@ public class Benchmark {
                 t.start();
             }
         }
-
-        if (!config.disabledThreads.contains("partTrunclt")) {
+        if (!(config.disabledThreads.contains("partTrunclt") || config.disabledThreads.contains("Trunclt"))) {
             partTrunclt = new TruncateTableLoader(client, "trup",
                     (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio, config.swapratio);
             partTrunclt.start();
         }
         replTrunclt = null;
-        if (config.mpratio > 0.0 && !config.disabledThreads.contains("replTrunclt")) {
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replTrunclt") || config.disabledThreads.contains("Trunclt"))) {
             replTrunclt = new TruncateTableLoader(client, "trur",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio, config.swapratio);
             replTrunclt.start();
         }
 
-        if (!config.disabledThreads.contains("partCappedlt")) {
+        if (!(config.disabledThreads.contains("partCappedlt") || config.disabledThreads.contains("Cappedlt"))) {
             partCappedlt = new CappedTableLoader(client, "capp", // more
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
             partCappedlt.start();
         }
-        if (config.mpratio > 0.0 && !config.disabledThreads.contains("replCappedlt")) {
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replCappedlt") || config.disabledThreads.contains("Cappedlt"))) {
             replCappedlt = new CappedTableLoader(client, "capr", // more
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
             replCappedlt.start();
         }
 
-        if (!config.disabledThreads.contains("partLoadlt")) {
+        if (!(config.disabledThreads.contains("partLoadlt") || config.disabledThreads.contains("Loadlt"))) {
             partLoadlt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
-            // XXX temporary partLoadlt.start();
+            partLoadlt.start();
         }
         replLoadlt = null;
-        if (config.mpratio > 0.0 && !config.disabledThreads.contains("replLoadlt")) {
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replLoadlt") || config.disabledThreads.contains("Loadlt"))) {
             replLoadlt = new LoadTableLoader(client, "loadmp",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
-            // XXX temporary replLoadlt.start();
+            replLoadlt.start();
         }
         if (!config.disabledThreads.contains("readThread")) {
             readThread = new ReadThread(client, config.threads, config.threadoffset,

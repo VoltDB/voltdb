@@ -2564,6 +2564,7 @@ public class PlanAssembler {
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             "", col.alias,
                             rootExpr, outputColumnIndex);
+                    tve.setDifferentiator(col.differentiator);
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);

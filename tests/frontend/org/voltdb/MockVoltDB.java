@@ -492,7 +492,8 @@ public class MockVoltDB implements VoltDBInterface
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
             long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
-            byte[] deploymentHash, boolean hasSchemaChange, boolean requiresNewExportGeneration)
+            byte[] deploymentHash, boolean requireCatalogDiffCmdsApplyToEE,
+            boolean hasSchemaChange, boolean requiresNewExportGeneration)
     {
         throw new UnsupportedOperationException("unimplemented");
     }

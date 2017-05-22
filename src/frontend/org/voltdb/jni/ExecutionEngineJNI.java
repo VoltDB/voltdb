@@ -25,7 +25,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.HybridCrc32;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -35,6 +34,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
@@ -347,8 +347,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -398,8 +399,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                                                pset.toJSONString(), exception);
                 }
             }
-            if (isWriteFrag[i]) {
-                writeCRC.updateFromPosition(paramStart, m_psetBuffer);
+            // determinismHash can be null in FragmentTask.processFragmentTask() and many tests
+            if (determinismHash != null && isWriteFrags[i]){
+                determinismHash.offerStatement(sqlCRCs[i], paramStart, m_psetBuffer);
             }
         }
         // checkMaxFsSize();

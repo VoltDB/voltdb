@@ -475,6 +475,14 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc", "select dept from capped3_limit_exec_complex order by dept asc").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {5, 6, 8});
+
+        // Restore the constraint's delete statement to default
+        // so that it won't affect the other tests in the suite.
+        cr = client.callProcedure("@AdHoc",
+                "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX "
+                + "ADD LIMIT PARTITION ROWS 3 "
+                + "EXECUTE (DELETE FROM capped3_limit_exec_complex WHERE may_be_purged = 1 AND relevance IN ('irrelevant', 'worthless', 'moot') AND priority < 16384)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
 

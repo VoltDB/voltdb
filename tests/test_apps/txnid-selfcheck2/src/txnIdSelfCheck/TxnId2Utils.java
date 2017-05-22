@@ -40,12 +40,12 @@ public enum TxnId2Utils {;
     }
 
     static boolean isConnectionTransactionOrCatalogIssue(String statusString) {
-        return /*cr.getStatus() == ClientResponse.USER_ABORT && */
-                statusString.matches("(?s).*AdHoc transaction -?[0-9]+ wasn.t planned against the current catalog version.*") ||
+        return statusString.matches("(?s).*AdHoc transaction -?[0-9]+ wasn.t planned against the current catalog version.*") ||
                 statusString.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
                 statusString.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
                 statusString.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
-                statusString.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*");
+                statusString.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*") ||
+                statusString.matches("(?s).*Ad Hoc Planner task queue is full.*");
     }
 
     static boolean isServerUnavailableIssue(String statusString) {

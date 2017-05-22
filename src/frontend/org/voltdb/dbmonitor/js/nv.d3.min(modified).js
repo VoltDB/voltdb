@@ -654,7 +654,7 @@
                         if(chartContainer == "chartOutTransaction")
                             unit = 'Transactions'
                         else
-                            unit = "Rate/s"
+                            unit = "Transactions/s"
                     }
                     else {
                         unit = '%';
