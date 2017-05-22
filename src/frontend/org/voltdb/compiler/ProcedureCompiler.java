@@ -92,7 +92,7 @@ public abstract class ProcedureCompiler {
                                                         boolean withPrivate)
                                                                 throws VoltCompilerException
     {
-        Map<String, SQLStmt> retval = new HashMap<String, SQLStmt>();
+        Map<String, SQLStmt> retval = new HashMap<>();
 
         Field[] fields = procClass.getDeclaredFields();
         for (Field f : fields) {
@@ -153,7 +153,7 @@ public abstract class ProcedureCompiler {
      * @param className fully qualified (or not) class name
      * @return short name of the class (no package)
      */
-    static String deriveShortProcedureName( String className) {
+    public static String deriveShortProcedureName( String className) {
         if( className == null || className.trim().isEmpty()) {
             return null;
         }

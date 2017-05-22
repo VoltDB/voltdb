@@ -25,6 +25,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.LoadedProcedureSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
@@ -78,6 +79,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
+    protected LoadedProcedureSet m_procSet;
 
     // helper class to put command log work in order
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
@@ -160,6 +162,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
         // Durability Listeners should never be assigned to the MP Scheduler
         assert false;
+    }
+
+    public void setProcedureSet(LoadedProcedureSet procSet) {
+        m_procSet = procSet;
     }
 
     /**

@@ -27,8 +27,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
-import junit.framework.TestCase;
-
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -49,6 +47,8 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
+
+import junit.framework.TestCase;
 
 public class TestTwoSitePlans extends TestCase {
 
@@ -197,9 +197,10 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
                 new String[] { selectStmt.getSqltext() },
+                null,
+                null,
                 1,
                 1,
                 0,
@@ -217,9 +218,10 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
-                new String[] { insertStmt.getSqltext() },
+                new String[] { selectStmt.getSqltext() },
+                null,
+                null,
                 2,
                 2,
                 1,
@@ -241,9 +243,10 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
                 new String[] { selectStmt.getSqltext() },
+                null,
+                null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         VoltTable dependency1 = null;
         try {
@@ -262,9 +265,10 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
                 new String[] { selectStmt.getSqltext() },
+                null,
+                null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         VoltTable dependency2 = null;
         try {
@@ -286,9 +290,10 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
                 new long[] { outDepId },
                 new ParameterSet[] { params },
-                new boolean[] { false },
                 null,
                 new String[] { selectStmt.getSqltext() },
+                null,
+                null,
                 3, 3, 2, 42, Long.MAX_VALUE, false);
 
         // The underlying buffers are being reused

@@ -43,6 +43,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.LinkedListMultimap;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
@@ -81,7 +82,7 @@ public class AbstractTopology {
     public static class Partition implements Comparable<Partition>{
         public final int id;
         public final int k;
-        public final int leaderHostId;
+        public int leaderHostId;
         public final ImmutableSortedSet<Integer> hostIds;
 
         private Partition(int id, int k, int leaderHostId, Collection<Integer> hostIds) {
@@ -203,6 +204,16 @@ public class AbstractTopology {
 
         public void markHostMissing(boolean isMissing) {
             this.isMissing = isMissing;
+        }
+
+        public int getleaderCount() {
+            int leaders = 0;
+            for( Partition p : partitions) {
+                if (p.leaderHostId == id) {
+                    leaders++;
+                }
+            }
+            return leaders;
         }
 
         @Override
@@ -1373,7 +1384,7 @@ public class AbstractTopology {
     }
 
     /**
-     * reassign partition leaders from the hosts to other hosts.
+     * reassign partition leaders from the missing hosts to other hosts.
      * @param topology current topology
      * @param missingHosts The hosts on which partition leaders will be reassigned.
      * @return new AbstractTopology
@@ -1403,17 +1414,26 @@ public class AbstractTopology {
                 mutableHost.partitions.add(mp);
             }
             int leaderId = partition.leaderHostId;
-            if (missingHosts.contains(partition.leaderHostId)) {
-                //find the first non-missing host that has the partition
+            if (missingHosts.contains(leaderId)) {
+                List<Host> perspectiveHosts = Lists.newArrayList();
                 for (Host host : topology.hostsById.values()) {
                     if (!missingHosts.contains(host.id)) {
-                        List<Integer> list = topology.getPartitionIdList(host.id);
-                        if (list.contains(partition.id)) {
-                            leaderId = host.id;
-                            break;
+                        List<Integer> partitionListOnNonMissingHost = topology.getPartitionIdList(host.id);
+                        if (partitionListOnNonMissingHost.contains(partition.id)) {
+                            perspectiveHosts.add(host);
                         }
                     }
                 }
+
+                //Place the partition master to a node which hosts the partition and has the least masters.
+                assert(!perspectiveHosts.isEmpty());
+                if (perspectiveHosts.size() > 1) {
+                    perspectiveHosts.sort((Host a, Host b) -> {
+                        return (a.getleaderCount() - b.getleaderCount());
+                    });
+                }
+                leaderId = perspectiveHosts.get(0).id;
+                partition.leaderHostId = leaderId;
             }
             mp.leader = mutableHostMap.get(leaderId);
         }

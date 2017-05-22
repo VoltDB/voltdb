@@ -46,7 +46,6 @@ import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
-import org.voltdb.HybridCrc32;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
@@ -1457,9 +1456,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
             String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,
@@ -1472,9 +1472,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
-                isWriteFrag,
-                writeCRC,
+                determinismHash,
                 sqlTexts,
+                isWriteFrags,
+                sqlCRCs,
                 txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
