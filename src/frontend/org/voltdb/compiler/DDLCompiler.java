@@ -2015,6 +2015,8 @@ public class DDLCompiler {
         boolean processed = false;
 
         try {
+            // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
+            // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
             processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
         }
         catch (VoltCompilerException e) {
