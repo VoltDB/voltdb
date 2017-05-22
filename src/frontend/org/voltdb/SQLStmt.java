@@ -99,7 +99,7 @@ public class SQLStmt {
     /**
      * Construct a SQLStmt instance from a byte array for internal use.
      */
-    private SQLStmt(byte[] sqlText, String joinOrder) {
+    protected SQLStmt(byte[] sqlText, String joinOrder) {
         this.sqlText = sqlText;
         this.joinOrder = joinOrder;
 
@@ -226,7 +226,7 @@ public class SQLStmt {
     // In SQL statement the input without ending with a semicolon is legitimate,
     // however in order to do a reverse look up (crc -> sql str), we'd like to
     // use the same statement to compute crc.
-    private static String canonicalizeStmt(String stmtStr) {
+    public static String canonicalizeStmt(String stmtStr) {
         // Cleanup whitespace newlines and adding semicolon for catalog compatibility
         stmtStr = stmtStr.replaceAll("\n", " ");
         stmtStr = stmtStr.trim();

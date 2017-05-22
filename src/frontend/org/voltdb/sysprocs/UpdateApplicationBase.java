@@ -31,8 +31,6 @@ import org.voltdb.VoltNTSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.CatalogChangeResult;
@@ -41,7 +39,6 @@ import org.voltdb.compiler.ClassMatcher;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compiler.VoltCompilerUtils;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CatalogUtil;
@@ -314,9 +311,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     /**
      * @return NUll if no classes changed, otherwise return the update jar file.
      * @throws ClassNotFoundException
+     * @throws IOException
      */
-    protected static InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
-            InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException
+    private static InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
+            InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException, IOException
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
@@ -356,17 +354,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return null;
         }
 
-        compilerLog.info("Checking java classes available to stored procedures");
-        // TODO: check the jar classes on all nodes
-        Database db = VoltCompiler.getCatalogDatabase(catalog);
-        for (Procedure proc: db.getProcedures()) {
-            // single statement procedure does not need to check class loading
-            if (proc.getHasjava() == false) continue;
+        compilerLog.info("Updating java classes available to stored procedures");
+        VoltCompiler compiler = new VoltCompiler(isXDCR);
+        compiler.compileInMemoryJarfile(jarfile);
 
-            if (! VoltCompilerUtils.containsClassName(jarfile, proc.getClassname())) {
-                throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
-            }
-        }
         return jarfile;
     }
 

@@ -655,6 +655,7 @@ public class LocalCluster extends VoltServerConfig {
         if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
             assert(m_modeOverrides[hostId] != null);
             cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
+            cmdln.m_isPaused = true;
         }
 
         if ((m_sitesperhostOverrides != null) && (m_sitesperhostOverrides.size() > hostId)) {
