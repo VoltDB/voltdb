@@ -2864,7 +2864,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
             var content = '';
             if (voltDbRenderer.drTablesArray.length == 0) {
-                $("#drPopup").html("No DR tables available.");
+                $("#drPopup").html("<span style='font-size: 14px'>No DR tables available.</span>");
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='drTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.drTablesArray.length - 1; i++) {
@@ -2888,7 +2888,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
             var content = '';
             if (voltDbRenderer.exportTablesArray.length == 0) {
-                $("#exportPopup").html("No Export streams available.");
+                $("#exportPopup").html("<span style='font-size: 14px'>No export streams available.</span>");
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
