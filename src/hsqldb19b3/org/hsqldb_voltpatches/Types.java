@@ -574,6 +574,10 @@ public class Types {
         javaTypeNumbers.put("java.lang.Object", Types.OTHER);
         javaTypeNumbers.put("java.lang.Void", Types.SQL_ALL_TYPES);
 
+        javaTypeNumbers.put("org.voltdb.types.GeographyPointValue", Types.VOLT_GEOGRAPHY_POINT);
+        javaTypeNumbers.put("org.voltdb.types.GeographyValue", Types.VOLT_GEOGRAPHY);
+        javaTypeNumbers.put("org.voltdb.types.TimestampType", Types.SQL_TIMESTAMP);
+
         //
         illegalParameterClasses = new org.hsqldb_voltpatches.lib.HashSet();
 

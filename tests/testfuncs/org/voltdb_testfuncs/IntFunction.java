@@ -25,11 +25,16 @@ package org.voltdb_testfuncs;
 
 public class IntFunction {
 
-    public Integer run(Integer arg0) {
-        if (arg0 == null) {
-            return null;
-        }
-        return 10;
+    public int constantIntFunction() {
+        return 0;
+    }
+
+    public Integer unaryIntFunction(Integer arg0) {
+        return 1;
+    }
+
+    public Integer generalIntFunction(int arg0, Integer arg1) {
+        return 2;
     }
 
 }
