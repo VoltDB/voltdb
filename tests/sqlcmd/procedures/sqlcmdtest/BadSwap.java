@@ -21,8 +21,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-/**
- * A fake use case intended for use verifying that 'voltdb init --classes' works with non-trivial use cases.
- * The theme is querying translations for 'Hello' in different languages.
- */
-package org.voltdb_testprocs.fakeusecase.greetings;
+package sqlcmdtest;
+
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.SQLStmt;
+
+public class BadSwap extends VoltProcedure {
+
+    public final SQLStmt badswap = new SQLStmt("@SwapTables t1 t2");
+    public VoltTable[] run() throws VoltAbortException {
+        return new VoltTable[] {};
+    }
+
+}
