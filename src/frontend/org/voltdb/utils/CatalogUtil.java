@@ -39,6 +39,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.SortedMap;
@@ -1302,6 +1303,21 @@ public abstract class CatalogUtil {
 
         public FormatterBuilder getFormatterBuilder() {
             return m_formatterBuilder;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(m_moduleProps, m_formatterBuilder);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof ImportConfiguration)) {
+                return false;
+            }
+            ImportConfiguration other = (ImportConfiguration) o;
+            return m_moduleProps.equals(other.m_moduleProps)
+                && m_formatterBuilder.equals(other.m_formatterBuilder);
         }
     }
 

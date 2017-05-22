@@ -20,8 +20,10 @@ package org.voltdb.importer;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.osgi.framework.BundleException;
@@ -107,6 +109,27 @@ public class ImportManager implements ChannelChangeCallback {
         em.create(myHostId, catalogContext);
     }
 
+    private void setupFormatterFactoryForConfig(Map<String, ImportConfiguration> processorConfig) {
+        for (ImportConfiguration config : processorConfig.values()) {
+            Properties prop = config.getformatterProperties();
+            String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+            try {
+                AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
+                if (formatterFactory == null) {
+                    URI moduleURI = URI.create(module);
+                    formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
+                    if (formatterFactory == null) {
+                        VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                    }
+                    m_formatterFactories.put(module, formatterFactory);
+                }
+                config.setFormatterFactory(formatterFactory);
+            } catch(Throwable t) {
+                VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
+            }
+        }
+    }
+
     /**
      * This creates a import connector from configuration provided.
      * @param myHostId
@@ -127,24 +150,7 @@ public class ImportManager implements ChannelChangeCallback {
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             m_formatterFactories.clear();
 
-            for (ImportConfiguration config : m_processorConfig.values()) {
-                Properties prop = config.getformatterProperties();
-                String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
-                try {
-                    AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
-                    if (formatterFactory == null) {
-                        URI moduleURI = URI.create(module);
-                        formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
-                        if (formatterFactory == null) {
-                            VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
-                        }
-                        m_formatterFactories.put(module, formatterFactory);
-                    }
-                    config.setFormatterFactory(formatterFactory);
-                } catch(Throwable t) {
-                    VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
-                }
-            }
+            setupFormatterFactoryForConfig(m_processorConfig);
 
             newProcessor.setProcessorConfig(catalogContext, m_processorConfig);
             m_processor.set(newProcessor);
@@ -192,8 +198,14 @@ public class ImportManager implements ChannelChangeCallback {
         m_self.start(catalogContext, messenger);
     }
 
-    public void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
-        restart(catalogContext, messenger);
+    public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
+        Map<String, ImportConfiguration> oldImportConfig = m_processorConfig;
+        Map<String, ImportConfiguration> newImportConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
+        setupFormatterFactoryForConfig(newImportConfig);
+
+        if (!oldImportConfig.equals(newImportConfig)) {
+            restart(catalogContext, messenger);
+        }
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
