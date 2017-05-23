@@ -54,6 +54,8 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             "sqltext", "querytype", "readonly", "singlepartition", "replicatedtabledml", "iscontentdeterministic", "isorderdeterministic", "nondeterminismdetail",
             "cost", "seqscancount", "explainplan", "tablesread", "tablesupdated", "indexesused", "cachekeyprefix"
             );
+
+
     public DRCatalogDiffEngine(Catalog localCatalog, Catalog remoteCatalog) {
         super(localCatalog, remoteCatalog);
     }
@@ -103,10 +105,18 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
 
     @Override
     protected String checkAddDropWhitelist(final CatalogType suspect, final ChangeType changeType) {
+        // Only on remote
         if (ChangeType.ADDITION == changeType && suspect instanceof Table) {
             assert ((Boolean)suspect.getField("isDRed"));
             return "Missing DR table " + suspect.getTypeName() + " on replica cluster";
         }
+
+        // Only on local. We care only if it is XDCR.
+        if (ChangeType.DELETION == changeType && suspect instanceof Table && isXDCR()) {
+            assert ((Boolean)suspect.getField("isDRed"));
+            return "Missing DR table " + suspect.getTypeName() + " on master cluster";
+        }
+
         if (suspect instanceof Column || isUniqueIndex(suspect) || isUniqueIndexColumn(suspect)) {
             return "Missing " + suspect + " from " + suspect.getParent() + " on " + (ChangeType.ADDITION == changeType ? "replica" : "master");
         }

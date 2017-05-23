@@ -103,6 +103,10 @@ public class TestDRCatalogDiffs {
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertTrue(diff.errors(), diff.supported());
+
+        // Not supported in XDCR mode
+        diff = runCatalogDiff(masterSchema, true, replicaSchema, true);
+        assertFalse(diff.supported());
     }
 
     @Test
@@ -118,6 +122,10 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T2;";
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertTrue(diff.errors(), diff.supported());
+
+        // Not supported in XDCR mode
+        diff = runCatalogDiff(masterSchema, true, replicaSchema, true);
+        assertFalse(diff.supported());
     }
 
     @Test

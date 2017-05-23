@@ -159,6 +159,11 @@ public class CatalogDiffEngine {
     private final Map<String, CatalogMap<Index>> m_originalIndexesByTable = new HashMap<>();
     private final Map<String, CatalogMap<Index>> m_newIndexesByTable = new HashMap<>();
 
+    // Since we find out if it is compatible in the ctor, this cannot be set in DRCatalogDiffEngine class.
+    // By the time it is set in that class, which will be after call to super(),
+    // compatiblity would already be calculated and it too late to set this.
+    private final boolean m_isXDCR;
+
     /**
      * Instantiate a new diff. The resulting object can return the text
      * of the difference and report whether the difference is allowed in a
@@ -167,6 +172,7 @@ public class CatalogDiffEngine {
      * @param next Tip of the new catalog.
      */
     public CatalogDiffEngine(Catalog prev, Catalog next, boolean forceVerbose) {
+        m_isXDCR = prev.getClusters().get("cluster").getDrrole().equals(DrRoleType.XDCR.value());
         m_supported = true;
         if (forceVerbose) {
             m_triggeredVerbosity = true;
@@ -202,6 +208,10 @@ public class CatalogDiffEngine {
 
     public CatalogDiffEngine(Catalog prev, Catalog next) {
         this(prev, next, false);
+    }
+
+    public boolean isXDCR() {
+        return m_isXDCR;
     }
 
     public String commands() {
@@ -1352,10 +1362,10 @@ public class CatalogDiffEngine {
     /**
      * Add a deletion
      */
-    private void writeDeletion(CatalogType prevType, CatalogType newlyChildlessParent, String mapName, String name)
+    private void writeDeletion(CatalogType prevType, CatalogType newlyChildlessParent, String mapName)
     {
         // Don't write deletions if the field can be ignored
-        if (checkDeleteIgnoreList(prevType, newlyChildlessParent, mapName, name)) {
+        if (checkDeleteIgnoreList(prevType, newlyChildlessParent, mapName, prevType.getTypeName())) {
             return;
         }
 
@@ -1378,12 +1388,16 @@ public class CatalogDiffEngine {
 
         // write the commands to make it so
         // they will be ignored if the change is unsupported
-        m_sb.append("delete ").append(prevType.getParent().getCatalogPath()).append(" ");
-        m_sb.append(mapName).append(" ").append(name).append("\n");
+        m_sb.append(getDeleteDiffStatement(prevType, mapName));
 
         // add it to the set of deletions to later compute descriptive text
         CatalogChangeGroup cgrp = m_changes.get(DiffClass.get(prevType));
         cgrp.processDeletion(prevType, newlyChildlessParent);
+    }
+
+    public static String getDeleteDiffStatement(CatalogType toDelete, String parentName) {
+        return "delete " + toDelete.getParent().getCatalogPath() + " " +
+            parentName + " " + toDelete.getTypeName() + "\n";
     }
 
     /**
@@ -1590,7 +1604,7 @@ public class CatalogDiffEngine {
             String name = prevType.getTypeName();
             CatalogType newType = newMap.get(name);
             if (newType == null) {
-                writeDeletion(prevType, newMap.m_parent, mapName, name);
+                writeDeletion(prevType, newMap.m_parent, mapName);
                 continue;
             }
 
