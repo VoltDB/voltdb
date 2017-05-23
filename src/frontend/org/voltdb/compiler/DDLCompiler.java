@@ -1684,7 +1684,7 @@ public class DDLCompiler {
         }
         else if (isHashIndex) {
             // warn user that hash index will be deprecatedß
-            compiler.addWarn("Warning: hash indexes are deprecated. In a future release, VoltDB will only support tree indexes, even if the index name contains the string \"hash\"");
+            compiler.addWarn("Hash indexes are deprecated. In a future release, VoltDB will only support tree indexes, even if the index name contains the string \"hash\"");
 
             // If the column type is not an integer, we cannot
             // make the index a hash.
