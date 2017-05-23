@@ -476,7 +476,7 @@ public class TestVoltCompiler extends TestCase {
         // Check warnings
         assertEquals(1, compiler.m_warnings.size());
         String warningMsg = compiler.m_warnings.get(0).getMessage();
-        String expectedMsg = "Warning: Hash index is deprecated!";
+        String expectedMsg = "Warning: hash indexes are deprecated. In a future release, VoltDB will only support tree indexes, even if the index name contains the string \"hash\"";
         assertEquals(expectedMsg, warningMsg);
     }
 
