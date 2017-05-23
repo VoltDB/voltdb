@@ -580,7 +580,8 @@ public class SQLCommand
 
         if ( ! m_interactive && callback == null) {
             // We have to check for the callback to avoid spewing to System.out in the "init --classes" filtering codepath.
-            // Better logging/output handling in general would be nice to have here.
+            // Better logging/output handling in general would be nice to have here -- output on System.out will be consumed
+            // by the test generators (build_eemakefield) and cause build failures.
             System.out.println();
             System.out.println(fileInfo.toString());
         }
