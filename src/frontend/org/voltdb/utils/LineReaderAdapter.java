@@ -45,7 +45,7 @@ public class LineReaderAdapter implements SQLCommandLineReader {
         return m_reader.readLine();
     }
 
-    void close() {
+    public void close() {
         try {
             m_reader.close();
         } catch (IOException e) { }
