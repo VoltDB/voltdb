@@ -163,6 +163,8 @@ public class ImportManager implements ChannelChangeCallback {
             if (!m_configsForProcessor.isEmpty()) {
                 newProcessor.setProcessorConfig(m_configsForProcessor, m_loadedBundles);
                 m_processor.set(newProcessor);
+            } else {
+                m_processor.set(null);
             }
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);

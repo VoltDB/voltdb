@@ -161,6 +161,7 @@ public class ImportProcessor implements ImportDataProcessor {
         Properties properties = config.getmoduleProperties();
 
         String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
+        assert(module != null);
         String attrs[] = module.split("\\|");
         String bundleJar = attrs[1];
 
