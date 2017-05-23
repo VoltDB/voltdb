@@ -29,6 +29,7 @@ import static com.google_voltpatches.common.base.Predicates.not;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
@@ -53,6 +54,7 @@ import junit.framework.TestCase;
 public class TestFuzzMeshArbiter extends TestCase
 {
     public static VoltLogger m_fuzzLog = new VoltLogger("FUZZ");
+    public static VoltLogger m_rejoinLog = new VoltLogger("REJOIN");
 
     FakeMesh m_fakeMesh;
     Map<Long, MiniNode> m_nodes;
@@ -77,16 +79,17 @@ public class TestFuzzMeshArbiter extends TestCase
         m_fakeMesh = new FakeMesh();
         m_fakeMesh.start();
         m_nodes = new HashMap<Long, MiniNode>();
-        Map<Long, Long> seedMap = new HashMap<Long, Long>();
+        Set<Long> HSIds = new LinkedHashSet<Long>();
         for (int i = 0; i < nodeCount; i++) {
             long HSId = getHSId(i);
-            m_nodes.put(HSId, null);
-            seedMap.put(HSId, seeds[i]);
+            HSIds.add(HSId);
         }
-        Set<Long> HSIds = m_nodes.keySet();
-        for (long HSId : HSIds) {
-            m_nodes.put(HSId, new MiniNode(HSId, HSIds, m_fakeMesh, seedMap.get(HSId)));
-            m_nodes.get(HSId).start();
+        int i = 0;
+        for (long hsId : HSIds) {
+            MiniNode node = new MiniNode(hsId, HSIds, m_fakeMesh, seeds[i]);
+            m_nodes.put(hsId, node);
+            node.start();
+            i++;
         }
     }
 
@@ -138,6 +141,7 @@ public class TestFuzzMeshArbiter extends TestCase
 
     public void testNodeFail() throws InterruptedException
     {
+        m_rejoinLog.info("testNodeFail");
         // Fill the array if you want to use specific per-site random seed to reproduce an issue.
         // 0L means don't use predefined random seed for the site
         long[] seeds = new long[] {0L, 0L, 0L, 0L};
@@ -154,6 +158,7 @@ public class TestFuzzMeshArbiter extends TestCase
 
     public void testLinkFail() throws InterruptedException
     {
+        m_rejoinLog.info("testLinkFail");
         // Fill the array if you want to use specific per-site random seed to reproduce an issue.
         // 0L means don't use predefined random seed for the site
         long[] seeds = new long[] {0L, 0L, 0L};
@@ -169,6 +174,7 @@ public class TestFuzzMeshArbiter extends TestCase
     }
 
     public void testUnidirectionalLinkFailure() throws InterruptedException {
+        m_rejoinLog.info("testUnidirectionalLinkFailure");
         // Fill the array if you want to use specific per-site random seed to reproduce an issue.
         // 0L means don't use predefined random seed for the site
         long[] seeds = new long[] {0L, 0L, 0L, 0L, 0L};
@@ -537,6 +543,7 @@ public class TestFuzzMeshArbiter extends TestCase
     }
 
     public void testSimpleJoin() throws InterruptedException {
+        m_rejoinLog.info("testSimpleJoin");
         // Fill the array if you want to use specific per-site random seed to reproduce an issue.
         // 0L means don't use predefined random seed for the site
         long[] seeds = new long[] {0L, 0L, 0L, 0L, 0L};
@@ -572,6 +579,7 @@ public class TestFuzzMeshArbiter extends TestCase
 
     public void testFuzz() throws InterruptedException
     {
+        m_rejoinLog.info("testFuzz");
         // Fill the array if you want to use specific per-site random seed to reproduce an issue.
         // 0L means don't use predefined random seed for the site
         long[] seeds = new long[] {
@@ -585,7 +593,7 @@ public class TestFuzzMeshArbiter extends TestCase
             Thread.sleep(50);
         }
         long seed = System.currentTimeMillis();
-        System.out.println("Fuzz State Seed: " + seed);
+        m_rejoinLog.info("Fuzz State Seed: " + seed);
         FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
 
         for (int i = 0; i < 5; i++) {
@@ -616,6 +624,7 @@ public class TestFuzzMeshArbiter extends TestCase
     }
 
     public void thereBeDragonsHeretestNastyFuzz() throws InterruptedException {
+        m_rejoinLog.info("thereBeDragonsHeretestNastyFuzz");
         final int clusterSize = 40;
         final int killSize = 16;
         // Fill the array if you want to use specific per-site random seed to reproduce an issue.
@@ -635,7 +644,7 @@ public class TestFuzzMeshArbiter extends TestCase
             Thread.sleep(50);
         }
         long seed = System.currentTimeMillis();
-        System.out.println("Fuzz State Seed: " + seed);
+        m_rejoinLog.info("Fuzz State Seed: " + seed);
         FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
         int nextid = clusterSize;
         for (int i = 0; i < 20; ++i) {
