@@ -208,12 +208,15 @@ public class ImportManager implements ChannelChangeCallback {
         }
 
         boolean missingProceduresAreAvailable = false;
-        for (String missingProcedure : m_processor.get().getMissingProcedures()) {
-            // NOTE: if a default procedure can satisfy requirements, it will never be added to the missing list.
-            if (catalogContext.procedures.get(missingProcedure) != null) {
-                importLog.info("Missing procedure " + missingProcedure + " (possibly others) became available. Importers will be restarted.");
-                missingProceduresAreAvailable = true;
-                break;
+        ImportDataProcessor currentProcessor = m_processor.get();
+        if (currentProcessor != null) {
+            for (String missingProcedure : currentProcessor.getMissingProcedures()) {
+                // NOTE: if a default procedure can satisfy requirements, it will never be added to the missing list.
+                if (catalogContext.procedures.get(missingProcedure) != null) {
+                    importLog.info("Missing procedure " + missingProcedure + " (possibly others) became available. Importers will be restarted.");
+                    missingProceduresAreAvailable = true;
+                    break;
+                }
             }
         }
         if (importConfigChanged || missingProceduresAreAvailable) {
