@@ -18,11 +18,7 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +48,7 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
     private final String m_clusterTag;
+    private final Set<String> m_missingProcedures = new HashSet<>();
 
     public ImportProcessor(
             int myHostId,
@@ -238,6 +235,7 @@ public class ImportProcessor implements ImportDataProcessor {
             }
 
             if (catProc == null) {
+                m_missingProcedures.add(procedure);
                 m_logger.info("Importer " + cname + " Procedure " + procedure + " is missing will disable this importer until the procedure becomes available.");
                 continue;
             }
@@ -247,4 +245,8 @@ public class ImportProcessor implements ImportDataProcessor {
         m_logger.info("Import Processor is configured. Configured Importers: " + configuredImporters);
     }
 
+    @Override
+    public Set<String> getMissingProcedures() {
+        return m_missingProcedures;
+    }
 }

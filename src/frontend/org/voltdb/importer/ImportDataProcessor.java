@@ -19,6 +19,7 @@ package org.voltdb.importer;
 
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
@@ -56,4 +57,10 @@ public interface ImportDataProcessor  {
 
     public int getPartitionsCount();
 
+    /**
+     * Determine what procedures, if any, are needed but not available for the importers to use.
+     * Don't call this at the same time as {@link #setProcessorConfig} or modify the returned set.
+     * @return non-null, possibly empty set of all missing procedures
+     */
+    public Set<String> getMissingProcedures();
 }
