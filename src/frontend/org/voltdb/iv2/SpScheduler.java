@@ -166,7 +166,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     long m_lastSentTruncationHandle = Long.MIN_VALUE;
     // the max schedule transaction sphandle, multi-fragments mp txn counts one
     long m_maxScheduledTxnSpHandle = Long.MIN_VALUE;
+
+    //The RepairLog is the same instance as the one initialized in InitiatorMailbox.
+    //Iv2IniatiateTaskMessage, FragmentTaskMessage and CompleteTransactionMessage
+    //are to be added to the repair log when these messages get updated transaction ids.
     protected RepairLog m_repairLog;
+
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
