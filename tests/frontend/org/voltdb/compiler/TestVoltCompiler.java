@@ -463,7 +463,7 @@ public class TestVoltCompiler extends TestCase {
         Column var = db.getTables().get("BOOKS").getColumns().get("TITLE");
         assertTrue(var.getInbytes());
     }
-    
+
     public void testDDLWithHashDeprecatedWarning() {
         String schema1 =
             "create table test (dummy int); " +
