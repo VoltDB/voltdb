@@ -159,7 +159,7 @@ public class VoltCompiler {
     private final boolean m_isXDCR;
 
     // Whether or not to use SQLCommand as a pre-processor for DDL (in voltdb init --classes). Default is false.
-    private boolean m_initClasses = false;
+    private boolean m_filterWithSQLCommand = false;
 
     /**
      * Represents output from a compile. This works similarly to Log4j; there
@@ -1024,7 +1024,7 @@ public class VoltCompiler {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-                if (m_initClasses) {
+                if (m_filterWithSQLCommand) {
                     SQLParser.FileInfo fi = new SQLParser.FileInfo(schemaReader.getPath());
                     ddlcompiler.loadSchemaWithFiltering(schemaReader, db, whichProcs, fi);
                 }
@@ -1714,7 +1714,7 @@ public class VoltCompiler {
     }
 
     public void setInitializeDDLWithFiltering(boolean flag) {
-        m_initClasses = flag;
+        m_filterWithSQLCommand = flag;
     }
 
     /**
