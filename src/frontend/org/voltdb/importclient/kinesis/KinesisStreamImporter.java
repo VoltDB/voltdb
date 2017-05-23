@@ -135,7 +135,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
     private class StreamConsumer implements IRecordProcessor {
 
-        private String m_shardId = new String("");
+        private String m_shardId = new String("unknown");
         private Formatter m_formatter;
         Gap m_gapTracker = new Gap(Integer.getInteger("KINESIS_IMPORT_GAP_LEAD", 32768));
         private BigInteger m_lastFetchCommittedSequenceNumber = BigInteger.ZERO;
@@ -212,8 +212,7 @@ public class KinesisStreamImporter extends AbstractImporter {
         public void shutdown(ShutdownInput shutDownInput) {
 
             if (isDebugEnabled()) {
-                debug(null, "shard ID: " + (m_shardId.trim().isEmpty()? "unknown" : m_shardId)
-                        + ", shutdown reason: " + shutDownInput.getShutdownReason().name());
+                debug(null, "shard ID: " + m_shardId + ", shutdown reason: " + shutDownInput.getShutdownReason().name());
             }
 
             if (ShutdownReason.TERMINATE.equals(shutDownInput.getShutdownReason())) {

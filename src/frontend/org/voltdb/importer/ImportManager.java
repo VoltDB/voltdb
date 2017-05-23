@@ -182,7 +182,7 @@ public class ImportManager implements ChannelChangeCallback {
 
             String importBundleJar = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
             Preconditions.checkNotNull(importBundleJar,
-                    "Import source is undefined or custom export plugin class missing.");
+                    "Import source is undefined or custom import plugin class missing.");
             String procedure = properties.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
             //TODO: If processors is a list dont start till all procedures exists.
             Procedure catProc = catalogContext.procedures.get(procedure);
