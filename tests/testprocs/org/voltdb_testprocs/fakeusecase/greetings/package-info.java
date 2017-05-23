@@ -21,20 +21,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testfuncs;
-
-public class IntFunction {
-
-    public int constantIntFunction() {
-        return 0;
-    }
-
-    public Integer unaryIntFunction(Integer arg0) {
-        return 1;
-    }
-
-    public Integer generalIntFunction(int arg0, Integer arg1) {
-        return 2;
-    }
-
-}
+/**
+ * A fake use case intended for use verifying that 'voltdb init --classes' works with non-trivial use cases.
+ * The theme is querying translations for 'Hello' in different languages.
+ */
+package org.voltdb_testprocs.fakeusecase.greetings;

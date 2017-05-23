@@ -31,6 +31,9 @@ show classes;
 
 exec Trivial;
 
+echoerror Expect to fail because we can't call "@SwapClasses" as a SQLStmt.
+create procedure from class sqlcmdtest.BadSwap;
+
 echoerror Expect to fail because of failure to "redefine" the Trivial proc with its
 echoerror     underlying class removed. The error message could be better here.
 remove classes sqlcmdtest.*;
@@ -117,4 +120,16 @@ remove classes sqlcmdtest.*;
 
 show classes;
 
+create table swap1 (
+  id integer
+);
+create table swap2 (
+  id integer
+);
+echoerror Expect to fail because we can't create a single statement procedure with @SwapTables.
+create procedure badswap as @SwapTables swap2 swap1;
+
+drop table swap1 if exists;
+drop table swap2 if exists;
+drop table badswap if exists;
 

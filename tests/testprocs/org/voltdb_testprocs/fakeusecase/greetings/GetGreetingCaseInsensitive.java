@@ -21,20 +21,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testfuncs;
+package org.voltdb_testprocs.fakeusecase.greetings;
 
-public class IntFunction {
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltTable;
 
-    public int constantIntFunction() {
-        return 0;
+/** A class which depends on a base class. */
+public class GetGreetingCaseInsensitive extends GetGreetingBase {
+
+    protected static final SQLStmt SELECT_BY_LANGUAGE_STATEMENT = new SQLStmt("SELECT * FROM greetings WHERE LOWER(language) = ?");
+
+    /** Gets the greeting which matches the specified language exactly */
+    public VoltTable[] run(String language) {
+        voltQueueSQL(SELECT_BY_LANGUAGE_STATEMENT, EXPECT_ZERO_OR_ONE_ROW, language.toLowerCase());
+        VoltTable[] results = voltExecuteSQL();
+        incrementCounterIfNeeded(results, true);
+        return results;
     }
-
-    public Integer unaryIntFunction(Integer arg0) {
-        return 1;
-    }
-
-    public Integer generalIntFunction(int arg0, Integer arg1) {
-        return 2;
-    }
-
 }

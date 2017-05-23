@@ -21,20 +21,26 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testfuncs;
+package org.voltdb_testprocs.updateclasses.jars;
 
-public class IntFunction {
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-    public int constantIntFunction() {
-        return 0;
+// This procedure is something like the one
+public class TestProcedure extends VoltProcedure {
+    // addSQLStmt.jar
+    public SQLStmt sql = new SQLStmt("select pid, city from TT where pid = ?");
+
+    // addSQLStmtNew.jar
+    // public SQLStmt sql = new SQLStmt("select lower(pid), lower(?) from TT where pid = ?");
+
+    // addSQLStmtInvalid.jar
+    // public SQLStmt sql = new SQLStmt("select pid from TT_Invalid where pid = ?");
+
+    public long run(String pid, String city) {
+        voltQueueSQL(sql, pid);
+        VoltTable vt = voltExecuteSQL()[0];
+        return vt.getRowCount();
     }
-
-    public Integer unaryIntFunction(Integer arg0) {
-        return 1;
-    }
-
-    public Integer generalIntFunction(int arg0, Integer arg1) {
-        return 2;
-    }
-
 }

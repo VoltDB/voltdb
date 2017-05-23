@@ -1379,6 +1379,15 @@ JAVA COMPILATION
             <include name="**/*.sql"/>
         </fileset>
     </copy>
+	<!-- put the jar file to client class path in order to be found with class.getResource().
+	     The client will only get the jar file with getResource() but not automatically load 
+	     the classes from the jar.
+	 -->
+    <copy flatten='false' todir='${build.testproc.dir}'>
+        <fileset dir="${src.testproc.dir}">
+            <include name="**/*jar"/>
+        </fileset>
+    </copy>
 
     <!-- Compressed resources for tests -->
     <copy flatten='false' todir='${build.test.dir}'>

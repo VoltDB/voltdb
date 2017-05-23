@@ -26,10 +26,13 @@ package txnIdSelfCheck;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 
 class BenchmarkThread extends Thread {
 
     VoltLogger log;
+    boolean m_slowFlight = false;
+    int slowDownDelayMs = 1000;
 
     BenchmarkThread() {
         super();

@@ -21,20 +21,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testfuncs;
+package sqlcmdtest;
 
-public class IntFunction {
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.SQLStmt;
 
-    public int constantIntFunction() {
-        return 0;
-    }
+public class BadSwap extends VoltProcedure {
 
-    public Integer unaryIntFunction(Integer arg0) {
-        return 1;
-    }
-
-    public Integer generalIntFunction(int arg0, Integer arg1) {
-        return 2;
+    public final SQLStmt badswap = new SQLStmt("@SwapTables t1 t2");
+    public VoltTable[] run() throws VoltAbortException {
+        return new VoltTable[] {};
     }
 
 }

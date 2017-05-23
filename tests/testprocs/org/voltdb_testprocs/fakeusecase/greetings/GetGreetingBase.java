@@ -21,20 +21,25 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testfuncs;
+package org.voltdb_testprocs.fakeusecase.greetings;
 
-public class IntFunction {
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-    public int constantIntFunction() {
-        return 0;
+/** A base class with no external dependencies. */
+public class GetGreetingBase extends VoltProcedure {
+
+    protected static final SQLStmt SELECT_BY_LANGUAGE_STATEMENT = new SQLStmt("SELECT * FROM greetings WHERE language = ?");
+    protected static final SQLStmt INCREMENT_STATS_STATEMENT = new SQLStmt("UPDATE greetings SET querycount = querycount + 1 WHERE language = ?");
+
+    protected void incrementCounterIfNeeded(VoltTable[] resultsFromSelect, boolean thisIsLast) {
+        if (resultsFromSelect.length > 0 && resultsFromSelect[0].getRowCount() > 0) {
+            resultsFromSelect[0].advanceRow();
+            // Fetch language again because, in derived classes, it may be different than the argument passed in.
+            String language = resultsFromSelect[0].getString("language");
+            voltQueueSQL(INCREMENT_STATS_STATEMENT, EXPECT_EMPTY, language);
+            voltExecuteSQL(thisIsLast);
+        }
     }
-
-    public Integer unaryIntFunction(Integer arg0) {
-        return 1;
-    }
-
-    public Integer generalIntFunction(int arg0, Integer arg1) {
-        return 2;
-    }
-
 }

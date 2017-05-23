@@ -3961,7 +3961,7 @@ public class ParserDQL extends ParserBase {
         if (isUndelimitedSimpleName()) {
             // A VoltDB extension to augment the standard sql function set.
             FunctionSQL function;
-            function = FunctionForVoltDB.newVoltDBFunction(name, token.tokenType);
+            function = FunctionForVoltDB.newVoltDBFunction(name);
             if (function == null) {
                 // These seem to be JDBC ("Open Group"?) aliases and extensions to the standard sql functions.
                 function = FunctionCustom.newCustomFunction(token.tokenString, token.tokenType);
