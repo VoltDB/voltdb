@@ -112,16 +112,6 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements InlinableSc
     }
 
     @Override
-    public String getUpdatedTable() {
-        AbstractPlanNode abstractInsertNode = getInlinePlanNode(PlanNodeType.INSERT);
-        if (abstractInsertNode == null) {
-            return null;
-        }
-        InsertPlanNode ipn = (InsertPlanNode)abstractInsertNode;
-        return ipn.getUpdatedTable();
-    }
-
-    @Override
     protected String explainPlanForNode(String indent) {
         String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
         if (m_targetTableAlias != null && !m_targetTableAlias.equals(tableName)) {

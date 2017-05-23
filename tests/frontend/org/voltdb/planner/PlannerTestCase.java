@@ -27,6 +27,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.EmptyStackException;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
@@ -527,6 +528,9 @@ public class PlannerTestCase extends TestCase {
             System.out.printf("      Node type %s\n", root.getPlanNodeType());
             for (int idx = 1; idx < root.getChildCount(); idx += 1) {
                 System.out.printf("        Child %d: %s\n", idx, root.getChild(idx).getPlanNodeType());
+            }
+            for (Entry<PlanNodeType, AbstractPlanNode> entry : root.getInlinePlanNodes().entrySet()) {
+                System.out.printf("        Inline %s\n", entry.getKey());
             }
         }
     }

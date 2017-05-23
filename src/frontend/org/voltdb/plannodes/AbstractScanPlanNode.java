@@ -530,4 +530,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_differentiatorMap = new HashMap<>(diffMap);
     }
 
+    @Override
+    public String getUpdatedTable() {
+        InsertPlanNode ipn = (InsertPlanNode)getInlinePlanNode(PlanNodeType.INSERT);
+        if (ipn == null) {
+            return null;
+        }
+        return ipn.getUpdatedTable();
+    }
+
 }
