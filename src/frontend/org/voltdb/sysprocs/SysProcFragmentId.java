@@ -202,9 +202,9 @@ public class SysProcFragmentId
     public static final long PF_postResetDRSingle = 286;
     public static final long PF_postResetDRSingleAggregate = 287;
 
-    // @ResetDRSelf
-    public static final long PF_ResetDRSelf = 288;
-    public static final long PF_ResetDRSelfAggregate = 289;
+    // @DropDRSelf
+    public static final long PF_DropDRSelf = 288;
+    public static final long PF_DropDRSelfAggregate = 289;
 
     // @ExecuteTask
     public static final long PF_executeTask = 290;

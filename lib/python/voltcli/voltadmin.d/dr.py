@@ -64,7 +64,7 @@ def drop(runner):
     ),
     modifiers = (
             VOLT.Modifier('reset', reset, 'reset one/all remote dr cluster(s).'),
-            VOLT.Modifier('drop', drop, 'gracefully dropping current cluster off the mesh, inform all its connected cluster(s) to reset it.'),
+            VOLT.Modifier('drop', drop, 'gracefully drop current cluster off the mesh, inform all its connected cluster(s) to reset it.'),
     )
 )
 
@@ -78,5 +78,5 @@ def dr(runner):
     if runner.opts.modifier == "drop" and (runner.opts.forcing or runner.opts.clusterId >=0 or runner.opts.resetAll):
         runner.abort_with_help('You cannot specify either --force, --cluster or --all for drop.')
     if runner.opts.timeout < 0:
-        runner.abort_with_help('The timeout value must be more than zero seconds.')
+        runner.abort_with_help('The timeout value must be non-negative seconds.')
     runner.go()

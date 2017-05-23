@@ -324,7 +324,7 @@ def check_no_dr_consumer(runner):
         resp = get_stats(runner, 'DRCONSUMERNODE')
         node_dispatcher = [row[1:6] for row in resp.table(0).tuples()]
         if not node_dispatcher:
-            runner.info('All connected clusters have been successfully reset. Safe to Shutdown....')
+            runner.info('All connected clusters have been successfully reset. Safe to shutdown...')
             return
         notify_interval -= 1
         if notify_interval == 0:
@@ -336,7 +336,7 @@ def check_no_dr_consumer(runner):
         time.sleep(1)
 
 def print_dr_consumer(runner, node_dispatcher):
-    runner.info('The following dispatchers haven\'t been successfully received acknowledgment of reset:')
+    runner.info('The following dispatchers haven\'t successfully received acknowledgment of reset:')
     summaryline = "    Dispatcher on host id % s for remote cluster %i."
     for dispatcher in node_dispatcher:
         runner.info(summaryline % (dispatcher[0], dispatcher[3]))
