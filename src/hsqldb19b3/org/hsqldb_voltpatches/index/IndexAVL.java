@@ -1740,6 +1740,7 @@ public class IndexAVL implements Index {
             String hsqlConstraintName = constraintXml.attributes.get("name");
 
             if (!isAutoName) {
+                isHashIndex = isNameRequestingHashIndex(hsqlConstraintName);
                 voltdbIndexName = HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + hsqlConstraintName;
             }
             else {
