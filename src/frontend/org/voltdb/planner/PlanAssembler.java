@@ -1679,16 +1679,16 @@ public class PlanAssembler {
             retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
         }
         else {
-            SeqScanPlanNode seqScan
-              = (retval.rootPlanGraph instanceof SeqScanPlanNode)
-                    ? ((SeqScanPlanNode)retval.rootPlanGraph)
+            InlinableScanPlanNode planNode
+              = (retval.rootPlanGraph instanceof InlinableScanPlanNode)
+                    ? ((InlinableScanPlanNode)retval.rootPlanGraph)
                     : null;
             // If we have a sequential scan node without an inline aggregate
             // node, then we can inline the insert node.
-            if (seqScan != null
-                    && (AggregatePlanNode.getInlineAggregationNode(seqScan) == null)) {
-                seqScan.addInlinePlanNode(insertNode);
-                root = seqScan;
+            if (planNode != null
+                    && ( ! planNode.hasInlineAggregateNode())) {
+                planNode.addInlinePlanNode(insertNode);
+                root = planNode.getAbstractNode();
             } else {
                 // Otherwise just make it out-of-line.
                 insertNode.addAndLinkChild(retval.rootPlanGraph);
