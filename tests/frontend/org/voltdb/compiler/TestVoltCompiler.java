@@ -463,6 +463,22 @@ public class TestVoltCompiler extends TestCase {
         Column var = db.getTables().get("BOOKS").getColumns().get("TITLE");
         assertTrue(var.getInbytes());
     }
+    
+    public void testDDLWithHashDeprecatedWarning() {
+        String schema1 =
+            "create table test (dummy int); " +
+            "create index hashidx on test(dummy);";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema1, compiler);
+        assertTrue(success);
+
+        // Check warnings
+        assertEquals(1, compiler.m_warnings.size());
+        String warningMsg = compiler.m_warnings.get(0).getMessage();
+        String expectedMsg = "Warning: Hash index is deprecated!";
+        assertEquals(expectedMsg, warningMsg);
+    }
 
     public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
         int length = VoltType.MAX_VALUE_LENGTH + 10;
