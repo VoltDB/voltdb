@@ -212,7 +212,7 @@ ExportTupleStream::computeOffsets(TableTuple &tuple,
     int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
-    // row header is 32-bit length of row plus null mask
+    // row header is 32-bit length of row plus null mask + sizeof(uint8_t) for columncount
     *rowHeaderSz = sizeof (int32_t) + nullMaskLength + sizeof(uint8_t);
 
     // metadata column width: 5 int64_ts plus CHAR(1) + 6 bytes for type.
@@ -226,6 +226,29 @@ ExportTupleStream::computeOffsets(TableTuple &tuple,
 
     return *rowHeaderSz + metadataSz + tuple.sizeInValues() + dataSz;
 }
+
+//size_t
+//ExportTupleStream::computeOffsets(TableTuple &tuple,
+//                                   size_t *rowHeaderSz)
+//{
+//    // round-up columncount to next multiple of 8 and divide by 8
+//    int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
+//    int nullMaskLength = ((columnCount + 7) & -8) >> 3;
+//
+//    // row header is 32-bit length of row plus null mask
+//    *rowHeaderSz = sizeof (int32_t) + nullMaskLength;
+//
+//    // metadata column width: 5 int64_ts plus CHAR(1).
+//    size_t metadataSz = (sizeof (int64_t) * 5) + 1;
+//
+//    // returns 0 if corrupt tuple detected
+//    size_t dataSz = tuple.maxExportSerializationSize();
+//    if (dataSz == 0) {
+//        throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
+//    }
+//
+//    return *rowHeaderSz + metadataSz + dataSz;
+//}
 
 void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
