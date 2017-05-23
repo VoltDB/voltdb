@@ -1683,6 +1683,9 @@ public class DDLCompiler {
             index.setType(IndexType.COVERING_CELL_INDEX.getValue());
         }
         else if (isHashIndex) {
+        	// warn user that hash index is deprecated
+        	compiler.addWarn("Warning: Hash index is deprecated!");
+        	
             // If the column type is not an integer, we cannot
             // make the index a hash.
             if (has_nonint_col) {
