@@ -1395,7 +1395,7 @@ public class SQLParser extends SQLPatternFactory
      * @param statement  statement to parse
      * @return           File object or NULL if statement wasn't recognized
      */
-    public static FileInfo parseFileStatement(FileInfo parentContext, String statement)
+    public static List<FileInfo> parseFileStatement(FileInfo parentContext, String statement)
     {
         Matcher fileMatcher = FileToken.matcher(statement);
 
@@ -1408,6 +1408,8 @@ public class SQLParser extends SQLPatternFactory
 
         String remainder = statement.substring(fileMatcher.end(), statement.length());
 
+        List<FileInfo> filesInfo = new ArrayList<FileInfo>();
+
         Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
         if (inlineBatchMatcher.lookingAt()) {
             remainder = remainder.substring(inlineBatchMatcher.end(), remainder.length());
@@ -1417,7 +1419,8 @@ public class SQLParser extends SQLPatternFactory
             // all of the remainder, not just beginning
             if (delimiterMatcher.matches()) {
                 String delimiter = delimiterMatcher.group(1);
-                return new FileInfo(parentContext, FileOption.INLINEBATCH, delimiter);
+                filesInfo.add(new FileInfo(parentContext, FileOption.INLINEBATCH, delimiter));
+                return filesInfo;
             }
 
             throw new SQLParser.Exception(
@@ -1433,7 +1436,7 @@ public class SQLParser extends SQLPatternFactory
         }
 
         Matcher filenameMatcher = FilenameToken.matcher(remainder);
-        String filename = null;
+        //String filename = null;
 
         // remove spaces before and after filenames
         remainder = remainder.trim();
@@ -1452,7 +1455,7 @@ public class SQLParser extends SQLPatternFactory
 
         // If no filename, or a filename of only spaces, then throw an error.
         if (filenames.length == 1 && filenames[0].length() == 0) {
-        	String msg = String.format("Did not find valid file name in \"file%s\" command.",
+            String msg = String.format("Did not find valid file name in \"file%s\" command.",
                     option == FileOption.BATCH ? " -batch" : "");
             throw new SQLParser.Exception(msg);
         }
@@ -1462,19 +1465,28 @@ public class SQLParser extends SQLPatternFactory
             throw new SQLParser.Exception(msg);
         }*/
 
-        filename = filenames[0];
+        for (String filename: filenames) {
+            if (filename.startsWith("~")) {
+                filename = filename.replaceFirst("~", System.getProperty("user.home"));
+            }
+            filesInfo.add(new FileInfo(parentContext, option, filename));
+        }
+
+        return filesInfo;
+        /*filename = filenames[0];
         if (filename.startsWith("~")) {
             filename = filename.replaceFirst("~", System.getProperty("user.home"));
         }
 
-        return new FileInfo(parentContext, option, filename);
+        return new FileInfo(parentContext, option, filename);*/
+
     }
     /**
      * Parse FILE statement for interactive sqlcmd (or simple tests).
      * @param statement  statement to parse
      * @return           File object or NULL if statement wasn't recognized
      */
-    public static FileInfo parseFileStatement(String statement)
+    public static List<FileInfo> parseFileStatement(String statement)
     {
         // There is no parent file context to reference.
         return parseFileStatement(null, statement);

@@ -275,16 +275,18 @@ public class SQLCommand
                 }
 
                 // If the line is a FILE command - execute the content of the file
-                FileInfo fileInfo = null;
+                List<FileInfo> filesInfo = null;
                 try {
-                    fileInfo = SQLParser.parseFileStatement(line);
+                    filesInfo = SQLParser.parseFileStatement(line);
                 }
                 catch (SQLParser.Exception e) {
                     stopOrContinue(e);
                     continue;
                 }
-                if (fileInfo != null) {
-                    executeScriptFile(fileInfo, interactiveReader);
+                if (filesInfo.size() != 0) {
+                	for (FileInfo fileInfo: filesInfo) {
+                		executeScriptFile(fileInfo, interactiveReader);
+                	}
                     if (m_returningToPromptAfterError) {
                         // executeScriptFile stopped because of an error. Wipe the slate clean.
                         m_returningToPromptAfterError = false;
@@ -699,8 +701,10 @@ public class SQLCommand
                     continue;
                 }
                 // Recursively process FILE commands, any failure will cause a recursive failure
-                FileInfo nestedFileInfo = SQLParser.parseFileStatement(fileInfo, line);
-                if (nestedFileInfo != null) {
+                List<FileInfo> nestedFilesInfo = SQLParser.parseFileStatement(fileInfo, line);
+
+                //if (nestedFileInfo != null) {
+                if (nestedFilesInfo.size() != 0) {
                     // Guards must be added for FILE Batch containing batches.
                     if (batch != null) {
                         stopOrContinue(new RuntimeException(
@@ -710,7 +714,9 @@ public class SQLCommand
 
                     // Execute the file content or fail to but only set m_returningToPromptAfterError
                     // if the intent is to cause a recursive failure, stopOrContinue decided to stop.
-                    executeScriptFile(nestedFileInfo, reader);
+                    for (FileInfo nestedFileInfo: nestedFilesInfo) {
+                        executeScriptFile(nestedFileInfo, reader);
+                    }
                     if (m_returningToPromptAfterError) {
                         // The recursive readScriptFile stopped because of an error.
                         // Escape to the outermost readScriptFile caller so it can exit or
