@@ -209,6 +209,14 @@ public class TestSQLParser extends TestCase {
         assertFalse(fi.isBatch());
         assertEquals("foo.sql", fi.getFile().getName());
 
+       // Plain file directive with spaces in quotes
+        fis = SQLParser.parseFileStatement("  file 'test foo.sql';");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
+        assertEquals(FileOption.PLAIN, fi.getOption());
+        assertEquals("test foo.sql", fi.getFile().getName());
+        assertFalse(fi.isBatch());
+
         // file -batch directive
         fis = SQLParser.parseFileStatement("file -batch myddl.sql");
         fi = fis.get(0);
@@ -216,6 +224,20 @@ public class TestSQLParser extends TestCase {
         assertEquals(FileOption.BATCH, fi.getOption());
         assertEquals("myddl.sql", fi.getFile().getName());
         assertTrue(fi.isBatch());
+
+        // file -batch directive
+        fis = SQLParser.parseFileStatement("file -batch myddl.sql \"quote sample.sql\" 'space file.sql'");
+        fi = fis.get(0);
+        assertEquals(3, fis.size());
+        assertEquals(FileOption.BATCH, fi.getOption());
+        assertEquals(FileOption.BATCH, fis.get(1).getOption());
+        assertEquals(FileOption.BATCH, fis.get(2).getOption());
+        assertEquals("myddl.sql", fi.getFile().getName());
+        assertEquals("quote sample.sql", fis.get(1).getFile().getName());
+        assertEquals("space file.sql", fis.get(2).getFile().getName());
+        assertTrue(fi.isBatch());
+        assertTrue(fis.get(1).isBatch());
+        assertTrue(fis.get(2).isBatch());
 
         // Plain file directive
         // quotes and trailing whitespace.
