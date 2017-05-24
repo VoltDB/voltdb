@@ -41,6 +41,11 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
 
         boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema() && !isRestoring();
 
+        // normalize empty string and null
+        if ((catalogJarBytes != null) && (catalogJarBytes.length == 0)) {
+            catalogJarBytes = null;
+        }
+
         if (!allowPausedModeWork(isRestoring(), isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
@@ -49,6 +54,7 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         // We have an @UAC.  Is it okay to run it?
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen
+
         if (catalogJarBytes != null && useDDLSchema) {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
