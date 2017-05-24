@@ -153,10 +153,9 @@ final public class TestInitStartAction {
 
         File deplFH = new VoltFile(new VoltFile(new VoltFile(rootDH, "voltdbroot"), "config"), "deployment.xml");
         Configuration c1 = new Configuration(
-                new String[]{"initialize", "voltdbroot", rootDH.getPath(), "deployment", legacyDeploymentFH.getPath()});
+                new String[]{"initialize", "voltdbroot", rootDH.getPath(), "force", "deployment", legacyDeploymentFH.getPath()});
         ServerThread server = new ServerThread(c1);
         server.setUncaughtExceptionHandler(handleUncaught);
-        c1.m_forceVoltdbCreate = false;
 
         server.start();
         server.join();
