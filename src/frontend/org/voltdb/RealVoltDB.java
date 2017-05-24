@@ -2643,8 +2643,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
             return new ReadDeploymentResults(deploymentBytes, deployment);
+        } catch (SettingsException e) {
+            consoleLog.info("FATAL ERROR: " + e.getMessage());
+            throw new RuntimeException(e);
         } catch (Exception e) {
-        	consoleLog.info("FATAL ERROR: " + e.getMessage());
             throw new RuntimeException(e);
         }
     }
