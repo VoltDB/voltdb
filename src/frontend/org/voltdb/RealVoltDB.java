@@ -2644,8 +2644,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             return new ReadDeploymentResults(deploymentBytes, deployment);
         } catch (Exception e) {
-        	consoleLog.info("FATAL ERROR: Unable to parse path.properties file." + 
-        					" Please check your properties file.");
+        	consoleLog.info("FATAL ERROR: " + e.getMessage());
             throw new RuntimeException(e);
         }
     }

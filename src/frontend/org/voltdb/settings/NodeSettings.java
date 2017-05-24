@@ -183,6 +183,11 @@ public interface NodeSettings extends Settings {
     default Properties asProperties() {
         ImmutableMap.Builder<String, String> mb = ImmutableMap.builder();
         try {
+            // Check if the VoltDBRoot exists
+        	if (getVoltDBRoot() == null) {
+        	    throw new SettingsException("Missing VoltDB root " + 
+        	                                "information in properties file!");
+        	}
             mb.put(VOLTDBROOT_PATH_KEY, getVoltDBRoot().getCanonicalPath());
             for (Map.Entry<String, File> e: getManagedArtifactPaths().entrySet()) {
                 mb.put(e.getKey(), e.getValue().getCanonicalPath());
