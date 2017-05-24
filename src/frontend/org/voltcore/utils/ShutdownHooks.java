@@ -129,7 +129,11 @@ public class ShutdownHooks
     private synchronized void runHooks()
     {
         if (m_iAmAServer && !m_crashing && ShutdownHooks.m_crashMessage) {
-            new VoltLogger("CONSOLE").warn("The VoltDB server will shut down due to a control-C or other JVM exit.");
+            VoltLogger voltLogger = new VoltLogger("CONSOLE");
+            voltLogger.warn("******************************************************************************************");
+            voltLogger.warn("********* The VoltDB server will shut down due to a control-C or other JVM exit. *********");
+            voltLogger.warn("******************************************************************************************");
+            voltLogger.warn("\n");
         }
         for (Entry<Integer, List<ShutdownTask>> tasks : m_shutdownTasks.entrySet()) {
             for (ShutdownTask task : tasks.getValue()) {
