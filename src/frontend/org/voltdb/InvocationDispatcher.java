@@ -315,6 +315,19 @@ public final class InvocationDispatcher {
             OverrideCheck bypass,
             boolean ntPriority)
     {
+        /*
+         * When a user issues a shutdown command to the cluster, the detailed information
+         * should be printed out properly.
+         *
+         * WARNING: HARDCODING
+         */
+        if (task.getProcName().equals("@PrepareShutdown")) {
+            VoltLogger vLogger = new VoltLogger("CONSOLE");
+            vLogger.info("=================================================================");
+            vLogger.info("Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.");
+            vLogger.info("=================================================================\n");
+        }
+
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
