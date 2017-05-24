@@ -284,9 +284,9 @@ public class SQLCommand
                     continue;
                 }
                 if (filesInfo.size() != 0) {
-                	for (FileInfo fileInfo: filesInfo) {
-                		executeScriptFile(fileInfo, interactiveReader);
-                	}
+                    for (FileInfo fileInfo: filesInfo) {
+                        executeScriptFile(fileInfo, interactiveReader);
+                    }
                     if (m_returningToPromptAfterError) {
                         // executeScriptFile stopped because of an error. Wipe the slate clean.
                         m_returningToPromptAfterError = false;
