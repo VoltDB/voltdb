@@ -82,8 +82,7 @@ public class Shutdown extends VoltSystemProcedure {
                 VoltLogger voltLogger = new VoltLogger("HOST");
                 voltLogger.warn("******************************************************************************************");
                 voltLogger.warn("** VoltDB shutdown operation requested and in progress. Cluster will terminate shortly. **");
-                voltLogger.warn("******************************************************************************************");
-                voltLogger.warn("\n");
+                voltLogger.warn("******************************************************************************************\n");
             }
             VoltTable rslt = new VoltTable(new ColumnInfo[] { new ColumnInfo("HA", VoltType.STRING) });
             return new DependencyPair.TableDependencyPair(DEP_shutdownSync, rslt);
@@ -108,8 +107,7 @@ public class Shutdown extends VoltSystemProcedure {
                         VoltLogger voltLogger = new VoltLogger("HOST");
                         voltLogger.warn("******************************************************************************************");
                         voltLogger.warn("**************** VoltDB shutting down as requested by @Shutdown command. *****************");
-                        voltLogger.warn("******************************************************************************************");
-                        voltLogger.warn("\n");
+                        voltLogger.warn("******************************************************************************************\n");
                         System.exit(0);
                     }
                     else {
