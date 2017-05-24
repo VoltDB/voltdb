@@ -29,12 +29,11 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.aeonbits.owner.Config.Sources;
+import org.aeonbits.owner.ConfigFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
-
-import org.aeonbits.owner.Config.Sources;
-import org.aeonbits.owner.ConfigFactory;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -184,10 +183,10 @@ public interface NodeSettings extends Settings {
         ImmutableMap.Builder<String, String> mb = ImmutableMap.builder();
         try {
             // Check if the VoltDBRoot exists
-        	if (getVoltDBRoot() == null) {
-        	    throw new SettingsException("Missing VoltDB root " + 
+            if (getVoltDBRoot() == null) {
+                throw new SettingsException("Missing VoltDB root " +
         	                                "information in properties file!");
-        	}
+            }
             mb.put(VOLTDBROOT_PATH_KEY, getVoltDBRoot().getCanonicalPath());
             for (Map.Entry<String, File> e: getManagedArtifactPaths().entrySet()) {
                 mb.put(e.getKey(), e.getValue().getCanonicalPath());
