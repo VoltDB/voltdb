@@ -203,9 +203,6 @@ public class ImportManager implements ChannelChangeCallback {
         Map<String, ImportConfiguration> newImportConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
         setupFormatterFactoryForConfig(newImportConfig);
         final boolean importConfigChanged = !oldImportConfig.equals(newImportConfig);
-        if (importConfigChanged) {
-            importLog.info("Import configuration changed.");
-        }
 
         boolean procedureAvailabilityChanged = false;
         ImportDataProcessor currentProcessor = m_processor.get();
@@ -216,14 +213,12 @@ public class ImportManager implements ChannelChangeCallback {
                 boolean procedureAvailableBefore = procedureStatus.getValue();
                 boolean procedureAvailableNow = catalogContext.procedures.get(procedureToCheck) != null;
                 if (procedureAvailableBefore != procedureAvailableNow) {
-                    String availabilityMsg = procedureAvailableNow ? " became available." : " was removed.";
-                    importLog.info("Procedure " + procedureToCheck + availabilityMsg);
                     procedureAvailabilityChanged = true;
+                    break;
                 }
             }
         }
         if (importConfigChanged || procedureAvailabilityChanged) {
-            importLog.info("Restarting importers.");
             restart(catalogContext, messenger);
         }
     }
