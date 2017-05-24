@@ -1455,11 +1455,6 @@ public class SQLParser extends SQLPatternFactory
         }*/
 
         // If no filename, or a filename of only spaces, then throw an error.
-        if (filenames.length == 1 && filenames[0].length() == 0) {
-            String msg = String.format("Did not find valid file name in \"file%s\" command.",
-                    option == FileOption.BATCH ? " -batch" : "");
-            throw new SQLParser.Exception(msg);
-        }
         /*if (filename == null || filename.length() == 0) {
             String msg = String.format("Did not find valid file name in \"file%s\" command.",
                     option == FileOption.BATCH ? " -batch" : "");
@@ -1482,6 +1477,13 @@ public class SQLParser extends SQLPatternFactory
                 }
                 filesInfo.add(new FileInfo(parentContext, option, filename));
             }
+        }
+
+     // If no filename, or a filename of only spaces, then throw an error.
+        if ( filesInfo.size() == 0 ) { //  filenames.length == 1 && filenames[0].length() == 0) {
+            String msg = String.format("Did not find valid file name in \"file%s\" command.",
+                    option == FileOption.BATCH ? " -batch" : "");
+            throw new SQLParser.Exception(msg);
         }
 
         return filesInfo;
