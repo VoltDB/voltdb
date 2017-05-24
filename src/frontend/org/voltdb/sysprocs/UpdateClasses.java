@@ -67,7 +67,7 @@ public class UpdateClasses extends UpdateApplicationBase {
                                                 getUsername());
         }
         catch (PrepareDiffFailureException pe) {
-            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
+            hostLog.info("A request to update the loaded classes has been rejected. More info returned to client.");
             return makeQuickResponse(pe.statusCode, pe.getMessage());
         }
 

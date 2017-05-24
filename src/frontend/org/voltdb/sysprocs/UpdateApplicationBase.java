@@ -362,14 +362,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     }
 
     /** Check if something should run based on admin/paused/internal status */
-    protected boolean allowPausedModeWork(boolean internalCall, boolean adminConnection) {
+    static protected boolean allowPausedModeWork(boolean internalCall, boolean adminConnection) {
         return (VoltDB.instance().getMode() != OperationMode.PAUSED ||
                 internalCall ||
                 adminConnection);
     }
 
     /** Error generating shortcut method */
-    protected CompletableFuture<ClientResponse> makeQuickResponse(byte statusCode, String msg) {
+    static protected CompletableFuture<ClientResponse> makeQuickResponse(byte statusCode, String msg) {
         ClientResponseImpl cri = new ClientResponseImpl(statusCode, new VoltTable[0], msg);
         CompletableFuture<ClientResponse> f = new CompletableFuture<>();
         f.complete(cri);

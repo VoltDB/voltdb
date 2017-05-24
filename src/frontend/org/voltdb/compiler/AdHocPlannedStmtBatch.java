@@ -37,8 +37,6 @@ import org.voltdb.plannodes.SendPlanNode;
 /**
  * Holds a batch of planned SQL statements.
  *
- * Both AdHocPlannedStmtBatch and AdHocPlannedStatement are derived from
- * AsyncCompilerResult. So there's some data redundancy, e.g. clientData.
  */
 public class AdHocPlannedStmtBatch implements Cloneable {
 

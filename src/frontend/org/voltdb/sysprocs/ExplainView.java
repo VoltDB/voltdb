@@ -48,6 +48,7 @@ public class ExplainView extends AdHocNTBase {
         int size = viewNames.size();
         VoltTable[] vt = new VoltTable[size];
         CatalogMap<Table> tables = context.database.getTables();
+
         for (int i = 0; i < size; i++) {
             String viewName = viewNames.get(i);
 
@@ -72,16 +73,11 @@ public class ExplainView extends AdHocNTBase {
             }
         }
 
-        ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                        null,
-                        vt,
-                        null);
-
-        // TODO: check if I need this
-        //response.setClientHandle( task.clientHandle );
+        ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                                                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                                                             null,
+                                                             vt,
+                                                             null);
 
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);

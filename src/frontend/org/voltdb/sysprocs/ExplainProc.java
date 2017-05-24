@@ -48,8 +48,9 @@ public class ExplainProc extends AdHocNTBase {
          */
         List<String> procNames = SQLLexer.splitStatements(procedureNames);
         int size = procNames.size();
-        VoltTable[] vt = new VoltTable[ size ];
-        for( int i=0; i<size; i++ ) {
+        VoltTable[] vt = new VoltTable[size];
+
+        for (int i = 0; i < size; i++) {
             String procName = procNames.get(i);
 
             // look in the catalog
@@ -75,21 +76,19 @@ public class ExplainProc extends AdHocNTBase {
                         "Procedure " + procName + " not in catalog");
             }
 
-            vt[i] = new VoltTable(new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
-                                  new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo("SQL_STATEMENT", VoltType.STRING),
+                                  new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
 
             for(Statement stmt : proc.getStatements()) {
-                vt[i].addRow( stmt.getSqltext(), Encoder.hexDecodeToString( stmt.getExplainplan() ) );
+                vt[i].addRow(stmt.getSqltext(), Encoder.hexDecodeToString(stmt.getExplainplan()));
             }
         }
 
-        ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                        null,
-                        vt,
-                        null);
+        ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                                                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                                                             null,
+                                                             vt,
+                                                             null);
 
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         fut.complete(response);

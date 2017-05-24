@@ -77,7 +77,6 @@ import org.voltdb.utils.VoltTrace;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 
 public final class InvocationDispatcher {
 
@@ -210,7 +209,6 @@ public final class InvocationDispatcher {
             long siteId)
     {
         m_siteId = siteId;
-        //m_plannerSiteId = plannerSiteId; TODO: Decide if this can be removed for realz
         m_mailbox = checkNotNull(mailbox, "given mailbox is null");
         m_catalogContext = checkNotNull(catalogContext, "given catalog context is null");
         m_cihm = checkNotNull(cihm, "given client interface handler manager lookup map is null");
@@ -739,7 +737,6 @@ public final class InvocationDispatcher {
         // do at the top of this method won't release any backpressure accounting.
 
         // actually kick off the NT proc
-        ParameterSet paramSet = task.getParams();
         m_NTProcedureService.callProcedureNT(handle,
                                              user,
                                              ccxn,

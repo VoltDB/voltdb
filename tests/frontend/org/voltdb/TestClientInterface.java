@@ -412,56 +412,6 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testPausedModeAdHoc() throws IOException {
-        runPausedModeAdHoc(false);
-    }
-
-    @Test
-    public void testPausedModeAdHocAdmin() throws IOException {
-        when(m_handler.isAdmin()).thenReturn(true);
-        runPausedModeAdHoc(true);
-        when(m_handler.isAdmin()).thenReturn(false);
-    }
-
-    private void runPausedModeAdHoc(boolean isAdmin) throws IOException {
-        // pause the node
-        /*when(m_volt.getMode()).thenReturn(OperationMode.PAUSED);
-
-        responses.clear();
-        String query = "select * from A";
-        ByteBuffer msg = createMsg("@AdHoc", query);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNull(resp);
-        // fake plan
-        AdHocPlannedStmtBatch plannedStmt =
-                AdHocPlannedStmtBatch.mockStatementBatch(0, query, null, new VoltType[] { }, null, -1, m_context.getCatalogHash());
-        plannedStmt.clientData = m_cxn;
-        m_ci.getDispatcher().processFinishedCompilerWork(plannedStmt).run();
-        assertEquals(0, responses.size());
-
-        query = "insert into A values (10)";
-        msg = createMsg("@AdHoc", query);
-        resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNull(resp);
-        plannedStmt =
-                AdHocPlannedStmtBatch.mockStatementBatch(0, query, null, new VoltType[] { }, null, -1, m_context.getCatalogHash(), false, isAdmin);
-        plannedStmt.clientData = m_cxn;
-        m_ci.getDispatcher().processFinishedCompilerWork(plannedStmt).run();
-        if (isAdmin) {
-            assertEquals(0, responses.size());
-        } else {
-            assertEquals(1, responses.size());
-            ByteBuffer buf = responses.remove();
-            resp = new ClientResponseImpl();
-            buf.position(4);
-            resp.initFromBuffer(buf);
-            assertEquals(ClientResponse.SERVER_UNAVAILABLE, resp.getStatus());
-        }
-
-        when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);*/
-    }
-
-    @Test
     public void testInvalidProcedure() throws IOException {
         ByteBuffer msg = createMsg("hellooooo", 1);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);

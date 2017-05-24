@@ -29,15 +29,12 @@ import org.voltdb.sysprocs.AdHocNTBase.AdHocSQLMix;
 /*
  * Wrapper around a planner tied to a specific catalog version. This planner
  * is specifically configured to generate plans from within a stored procedure
- * so it will give a slightly different set of config to the planner
- * via AdHocPlannerWork
+ * so it will give a slightly different set of config to the planner.
  */
 public class CatalogSpecificPlanner {
-    //private final AsyncCompilerAgent m_agent;
     private final CatalogContext m_catalogContext;
 
-    public CatalogSpecificPlanner(/*AsyncCompilerAgent agent,*/ CatalogContext context) {
-        //m_agent = agent;
+    public CatalogSpecificPlanner(CatalogContext context) {
         m_catalogContext = context;
     }
 
@@ -57,7 +54,7 @@ public class CatalogSpecificPlanner {
         }
 
         if (sqlStatements.size() != 1) {
-            throw new AdHocPlanningException("One statement only in stored procedures.");
+            throw new AdHocPlanningException("Only one statement is allowed in stored procedure, but received " + sqlStatements.size());
         }
 
         sql = sqlStatements.get(0);

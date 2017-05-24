@@ -1246,7 +1246,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             /*
              * Construct an adhoc planner for the initial catalog
              */
-            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(/*m_asyncCompilerAgent,*/ m_catalogContext);
+            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_catalogContext);
 
             // Initialize stats
             m_ioStats = new IOStats();

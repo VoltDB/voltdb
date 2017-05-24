@@ -66,8 +66,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
         catch (IOException e) {};
     }
 
-    //@Test
-    /*public void testProcedureAdhoc() throws Exception {
+    @Test
+    public void testProcedureAdhoc() throws Exception {
         VoltDB.Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);
 
@@ -215,7 +215,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // no clue how helpful this is
             System.gc();
         }
-    }*/
+    }
 
     @Test
     public void testSP() throws Exception {

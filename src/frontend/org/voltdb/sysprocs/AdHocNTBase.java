@@ -114,7 +114,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     }
 
     /**
-     * Split a set of one or more semi-colon delimeted sql statements into a list.
+     * Split a set of one or more semi-colon delimited sql statements into a list.
      * Store the list in validatedHomogeonousSQL.
      * Return whether the SQL is empty, all dml or dql, all ddl, or an invalid mix (AdHocSQLMix)
      *
@@ -336,7 +336,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
     }
 
-    CompletableFuture<ClientResponse> processExplainPlannedStmtBatch(AdHocPlannedStmtBatch planBatch) {
+    static CompletableFuture<ClientResponse> processExplainPlannedStmtBatch(AdHocPlannedStmtBatch planBatch) {
         /**
          * Take the response from the async ad hoc planning process and put the explain
          * plan in a table with the right format.
@@ -369,7 +369,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * path using ad hoc planning and all. Take the result from that async
      * process and format it like other explains for procedures.
      */
-    CompletableFuture<ClientResponse> processExplainDefaultProc(AdHocPlannedStmtBatch planBatch) {
+    static CompletableFuture<ClientResponse> processExplainDefaultProc(AdHocPlannedStmtBatch planBatch) {
         Database db = VoltDB.instance().getCatalogContext().database;
 
         // there better be one statement if this is really sql
