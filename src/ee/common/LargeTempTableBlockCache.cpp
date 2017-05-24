@@ -51,10 +51,14 @@ namespace voltdb {
             Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
             bool rc = topend->loadLargeTempTableBlock(block->id(), block);
             assert(rc);
+            assert (block->isPinned());
         }
-        block->pin();
+        else {
+            block->pin();
+        }
 
         // Also need to move it to the front of the queue.
+
 
         return block;
     }
