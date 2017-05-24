@@ -105,7 +105,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         }
         m_isTransactional = isTransactional;
 
-        // check if this proc is UpdateApplicationCatalog for 100% sampling rate
+        // check if this proc is UpdateCore for 100% sampling rate
         m_isUAC = (m_procName != null) && (m_procName.startsWith(UpdateCore.class.getName()));
     }
 
@@ -450,7 +450,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
      * @return true if this procedure statistics should be reset
      */
     public boolean resetAfterCatalogChange() {
-        // UpdateApplicationCatalog system procedure statistics should be kept
+        // UpdateCore system procedure statistics should be kept
         if (m_isUAC) {
             return false;
         }
