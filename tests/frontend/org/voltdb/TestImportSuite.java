@@ -178,12 +178,17 @@ public class TestImportSuite extends RegressionSuite {
         }
     }
 
-    private void pushDataToImporters(int count, int loops) throws Exception {
+    private CountDownLatch asyncPushDataToImporters(int count, int loops) throws Exception {
         CountDownLatch latch = new CountDownLatch(2*loops);
         for (int i=0; i<loops; i++) {
             (new SocketDataPusher("localhost", 7001, count, latch, '\t')).start();
             (new Log4jDataPusher(count, latch, ',')).start();
         }
+        return latch;
+    }
+
+    private void pushDataToImporters(int count, int loops) throws Exception {
+        CountDownLatch latch = asyncPushDataToImporters(count, loops);
         latch.await();
     }
 
@@ -260,13 +265,17 @@ public class TestImportSuite extends RegressionSuite {
         }
     }
 
-    public void testImportSimpleData() throws Exception {
-        System.out.println("testImportSimpleData");
-        Client client = getClient();
+    private void waitForHashinator(Client client) throws InterruptedException {
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
         }
+    }
+
+    public void testImportSimpleData() throws Exception {
+        System.out.println("testImportSimpleData");
+        Client client = getClient();
+        waitForHashinator(client);
 
         pushDataToImporters(100, 1);
         verifyData(client, 100);
@@ -276,10 +285,7 @@ public class TestImportSuite extends RegressionSuite {
     public void testImportMultipleTimes() throws Exception {
         System.out.println("testImportUpdateApplicationCatalog");
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
+        waitForHashinator(client);
 
         pushDataToImporters(100, 1);
         verifyData(client, 100);
@@ -295,10 +301,7 @@ public class TestImportSuite extends RegressionSuite {
     public void testImportMultipleClientsInParallel() throws Exception {
         System.out.println("testImportMultipleClientsInParallel");
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
+        waitForHashinator(client);
 
         pushDataToImporters(100, 2);
         verifyData(client, 100*2);
@@ -308,10 +311,7 @@ public class TestImportSuite extends RegressionSuite {
     public void testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing() throws Exception {
         System.out.println("testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing");
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
+        waitForHashinator(client);
 
         pushDataToImporters(1000, 3);
         verifyData(client, 3000);
@@ -325,6 +325,53 @@ public class TestImportSuite extends RegressionSuite {
 
         client.close();
     }
+
+    /** Verify that importer can withstand unrelated UACs without restarting.
+     * We don't expect the importers to be restarted during this test, but can't verify that directly here.
+     */
+    public void testImportUnrelatedUACWhilePushing() throws Exception {
+        System.out.println("testImportUnrelatedUpdateApplicationCatalogWhilePushing");
+        Client client = getClient();
+        waitForHashinator(client);
+
+        // Count was chosen to keep importers busy during all UACs without making the test take much longer than necessary.
+        CountDownLatch dataGenerationAwaiter = asyncPushDataToImporters(4000, 3);
+
+        ClientResponse response = client.callProcedure("@AdHoc", "create table nudge(id integer);");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        Thread.sleep(200);
+
+        response = client.callProcedure("@AdHoc", "create procedure NudgeThatDB as INSERT INTO nudge VALUES (?);");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        Thread.sleep(1000);
+
+        response = client.callProcedure("@AdHoc", "drop procedure NudgeThatDB;");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        Thread.sleep(200);
+
+        response = client.callProcedure("@AdHoc", "drop table nudge;");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        dataGenerationAwaiter.await();
+        verifyData(client, 12000);
+        client.close();
+    }
+
+    /** Verify that importer handles importer-related UACs by restarting */
+    /*
+    public void testImportMissingProcedureWhilePushing() throws Exception {
+        // TODO - in this test, add and remove procedures and extraneous importers.
+        // Verify that no rows are lost at all, but no data appears when the procedure is missing.
+    }
+
+    public void testImportModifyProcedureAndTableWhilePushing() throws Exception {
+        // TODO - in this test, switch the procedure and table while DB is running.
+        // Verify that no rows are lost at all (new proc and table must be valid for this to work).
+    }
+    */
 
     /**
      * Connect to a single server with retry. Limited exponential backoff.
