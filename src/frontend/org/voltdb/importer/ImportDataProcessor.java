@@ -58,9 +58,10 @@ public interface ImportDataProcessor  {
     public int getPartitionsCount();
 
     /**
-     * Determine what procedures, if any, are needed but not available for the importers to use.
-     * Don't call this at the same time as {@link #setProcessorConfig} or modify the returned set.
-     * @return non-null, possibly empty set of all missing procedures
+     * Determine what procedures, if any, are needed by the importers and whether or not they are currently available.
+     * This is used to detect when a procedure importers rely on has become available or unavailable.
+     * Don't call this at the same time as {@link #setProcessorConfig} or modify the returned map.
+     * @return non-null, possibly empty map
      */
-    public Set<String> getMissingProcedures();
+    public Map<String, Boolean> getUtilizedProcedures();
 }

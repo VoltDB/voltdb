@@ -48,7 +48,7 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
     private final String m_clusterTag;
-    private final Set<String> m_missingProcedures = new HashSet<>();
+    private final Map<String, Boolean> m_proceduresUsedByImporters = new HashMap<>();
 
     public ImportProcessor(
             int myHostId,
@@ -221,6 +221,7 @@ public class ImportProcessor implements ImportDataProcessor {
     @Override
     public void setProcessorConfig(CatalogContext catalogContext, Map<String, ImportConfiguration> config) {
         List<String> configuredImporters = new ArrayList<String>();
+        m_proceduresUsedByImporters.clear();
         for (String cname : config.keySet()) {
             ImportConfiguration iConfig = config.get(cname);
             Properties properties = iConfig.getmoduleProperties();
@@ -230,12 +231,15 @@ public class ImportProcessor implements ImportDataProcessor {
             String procedure = properties.getProperty(IMPORT_PROCEDURE);
             //TODO: If processors is a list dont start till all procedures exists.
             Procedure catProc = catalogContext.procedures.get(procedure);
+            boolean defaultIsUsed = false;
             if (catProc == null) {
                 catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
+                defaultIsUsed = (catProc != null);
             }
-
+            if (!defaultIsUsed) {
+                m_proceduresUsedByImporters.put(procedure, (catProc != null));
+            }
             if (catProc == null) {
-                m_missingProcedures.add(procedure);
                 m_logger.info("Importer " + cname + " Procedure " + procedure + " is missing will disable this importer until the procedure becomes available.");
                 continue;
             }
@@ -246,7 +250,7 @@ public class ImportProcessor implements ImportDataProcessor {
     }
 
     @Override
-    public Set<String> getMissingProcedures() {
-        return m_missingProcedures;
+    public Map<String, Boolean> getUtilizedProcedures() {
+        return m_proceduresUsedByImporters;
     }
 }

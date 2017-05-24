@@ -204,22 +204,26 @@ public class ImportManager implements ChannelChangeCallback {
         setupFormatterFactoryForConfig(newImportConfig);
         final boolean importConfigChanged = !oldImportConfig.equals(newImportConfig);
         if (importConfigChanged) {
-            importLog.info("Import configuration changed. Importers will be restarted.");
+            importLog.info("Import configuration changed.");
         }
 
-        boolean missingProceduresAreAvailable = false;
+        boolean procedureAvailabilityChanged = false;
         ImportDataProcessor currentProcessor = m_processor.get();
         if (currentProcessor != null) {
-            for (String missingProcedure : currentProcessor.getMissingProcedures()) {
-                // NOTE: if a default procedure can satisfy requirements, it will never be added to the missing list.
-                if (catalogContext.procedures.get(missingProcedure) != null) {
-                    importLog.info("Missing procedure " + missingProcedure + " (possibly others) became available. Importers will be restarted.");
-                    missingProceduresAreAvailable = true;
-                    break;
+            for (Map.Entry<String, Boolean> procedureStatus : currentProcessor.getUtilizedProcedures().entrySet()) {
+                // NOTE: default procedures are not tracked since it's assumed they cannot be added or removed.
+                String procedureToCheck = procedureStatus.getKey();
+                boolean procedureAvailableBefore = procedureStatus.getValue();
+                boolean procedureAvailableNow = catalogContext.procedures.get(procedureToCheck) != null;
+                if (procedureAvailableBefore != procedureAvailableNow) {
+                    String availabilityMsg = procedureAvailableNow ? " became available." : " was removed.";
+                    importLog.info("Procedure " + procedureToCheck + availabilityMsg);
+                    procedureAvailabilityChanged = true;
                 }
             }
         }
-        if (importConfigChanged || missingProceduresAreAvailable) {
+        if (importConfigChanged || procedureAvailabilityChanged) {
+            importLog.info("Restarting importers.");
             restart(catalogContext, messenger);
         }
     }
