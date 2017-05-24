@@ -145,14 +145,17 @@ public class LoadTableLoader extends BenchmarkThread {
         final BlockingQueue<Long> outQueue;
         final BlockingQueue<Long> unkQueue;
         long[] opCount;
+        byte source;
 
-        InsertCallback(CountDownLatch latch, long p, byte shouldCopy, BlockingQueue<Long> outQueue, BlockingQueue<Long> unkQueue, long[] opCount) {
+        InsertCallback(CountDownLatch latch, long p, byte shouldCopy, BlockingQueue<Long> outQueue,
+                       BlockingQueue<Long> unkQueue, long[] opCount, byte source) {
             this.latch = latch;
             this.p = p;
             this.shouldCopy = shouldCopy;
             this.outQueue = outQueue;
             this.unkQueue = unkQueue;
             this.opCount = opCount;
+            this.source = source;
         }
 
         @Override
@@ -165,7 +168,9 @@ public class LoadTableLoader extends BenchmarkThread {
                     && status != ClientResponse.SERVER_UNAVAILABLE
                     && status != ClientResponse.RESPONSE_UNKNOWN) {
                 // log what happened status will be logged in json error log.
-                hardStop("LoadTableLoader failed to insert into table " + m_tableName + " and this shoudn't happen. Exiting.", clientResponse);
+                hardStop("LoadTableLoader failed to insert into table " + m_tableName
+                        + " and this shoudn't happen, source "
+                        + source + ". Exiting.", clientResponse);
             }
             if (status == ClientResponse.RESPONSE_UNKNOWN
                     || status == ClientResponse.CONNECTION_LOST
@@ -174,7 +179,8 @@ public class LoadTableLoader extends BenchmarkThread {
             //Connection loss node failure will come down here along with user aborts from procedure.
             else if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.warn("LoadTableLoader ungracefully failed to insert into table " + m_tableName + " lcid: " + p);
+                log.warn("LoadTableLoader ungracefully failed to insert into table " + m_tableName + " lcid: " + p
+                        + " source " + source);
                 log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 if (status == ClientResponse.SERVER_UNAVAILABLE)
                     setSlowFlight();
@@ -210,7 +216,8 @@ public class LoadTableLoader extends BenchmarkThread {
                     && status != ClientResponse.SERVER_UNAVAILABLE
                     && status != ClientResponse.RESPONSE_UNKNOWN) {
                 // log what happened
-                hardStop("LoadTableLoader gracefully failed to copy from table " + m_tableName + " and this shoudn't happen. Exiting.", clientResponse);
+                hardStop("LoadTableLoader gracefully failed to copy from table " + m_tableName
+                        + " and this shoudn't happen. Exiting.", clientResponse);
             }
             if (status == ClientResponse.RESPONSE_UNKNOWN
                     || status == ClientResponse.CONNECTION_LOST
@@ -242,9 +249,11 @@ public class LoadTableLoader extends BenchmarkThread {
         final BlockingQueue<Long> unkQueue;
         final BlockingQueue<Long> cpyUnkQueue;
         final BlockingQueue<Long> delUnkQueue;
+        final byte source;
 
         DeleteCallback(CountDownLatch latch, long lcid, BlockingQueue<Long> wrkQueue, BlockingQueue<Long> unkQueue,
-                       BlockingQueue<Long> cpyUnkQueue, BlockingQueue<Long> delUnkQueue, int expected_delete) {
+                       BlockingQueue<Long> cpyUnkQueue, BlockingQueue<Long> delUnkQueue, int expected_delete,
+                       byte source) {
             this.latch = latch;
             this.lcid = lcid;
             this.wrkQueue = wrkQueue;
@@ -252,6 +261,7 @@ public class LoadTableLoader extends BenchmarkThread {
             this.cpyUnkQueue = cpyUnkQueue;
             this.delUnkQueue = delUnkQueue;
             this.expected_delete = expected_delete;
+            this.source = source;
         }
 
         @Override
@@ -264,7 +274,8 @@ public class LoadTableLoader extends BenchmarkThread {
                     && status != ClientResponse.SERVER_UNAVAILABLE
                     && status != ClientResponse.RESPONSE_UNKNOWN) {
                 // log what happened
-                hardStop("LoadTableLoader gracefully failed to delete from table " + m_tableName + " and this shoudn't happen. Exiting.", clientResponse);
+                hardStop("LoadTableLoader gracefully failed to delete from table " + m_tableName
+                        + " and this shoudn't happen. " + source + " Exiting.", clientResponse);
             }
             if (status == ClientResponse.RESPONSE_UNKNOWN
                     || status == ClientResponse.CONNECTION_LOST
@@ -272,7 +283,8 @@ public class LoadTableLoader extends BenchmarkThread {
                 delUnkQueue.add(lcid);
             else if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.warn("LoadTableLoader ungracefully failed to delete from table " + m_tableName + " lcid " + lcid);
+                log.warn("LoadTableLoader ungracefully failed to delete from table " + m_tableName
+                            + " lcid " + lcid + " source " + source);
                 log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 wrkQueue.add(lcid);
                 if (status == ClientResponse.SERVER_UNAVAILABLE)
@@ -287,24 +299,28 @@ public class LoadTableLoader extends BenchmarkThread {
                        with any certainty, so we can't check its presence or absence and assert a test failure at delete time,
                        but we try to delete anyway to clean up the tables.
                      */
-                    // response is bit 30 - delete from copy
-                    // bit 31 - delete from source
                     long cnt = clientResponse.getResults()[0].asScalarLong();
-                    int mask = 3;
-                    if (unkQueue != null) {
-                        if (unkQueue.contains(lcid)) {
-                            mask &= 2;
-                            unkQueue.remove(lcid);
+                    int mask = Integer.MAX_VALUE;
+                    if (source == 2) {
+                        // response is: bit 30 - delete from cpload(p|mp)
+                        //              bit 31 - delete from load(p|mp)
+                        if (unkQueue != null) {
+                            if (unkQueue.contains(lcid)) {
+                                mask &= 3 - 1;
+                                unkQueue.remove(lcid);
+                            }
                         }
-                    }
-                    if (cpyUnkQueue != null) {
-                        if (cpyUnkQueue.contains(lcid)) {
-                            mask &= 1;
-                            cpyUnkQueue.remove(lcid);
+                        if (cpyUnkQueue != null) {
+                            if (cpyUnkQueue.contains(lcid)) {
+                                mask &= 3 - 2;
+                                cpyUnkQueue.remove(lcid);
+                            }
                         }
                     }
                     if ((cnt & mask) != (expected_delete & mask)) {
-                        hardStop("LoadTableLoader ungracefully failed to delete lcid " + lcid + " from " + m_tableName + " count=" + cnt + " Expected: " + expected_delete + " mask " + mask);
+                        hardStop("LoadTableLoader ungracefully failed to delete lcid " + lcid + " from "
+                                + m_tableName + " count=" + cnt + " Expected: " + expected_delete + " mask " + mask
+                                + " source " + source);
                     }
                 }
             }
@@ -339,65 +355,69 @@ public class LoadTableLoader extends BenchmarkThread {
             try {
                 log.info("Starting Copy Delete Task for table: " + m_tableName);
                 while (m_shouldContinue.get()) {
-                    List<Long> workList = new ArrayList<Long>();
-                    cpyQueue.drainTo(workList, 10);
-                    if (workList.size() == 0) {
+                    if (cpyQueue.size() + cpDelQueue.size() == 0) {
                         Thread.sleep(1000);
                         continue;
                     }
-                    //log.info("from copyqueue to copy: " + workList.toString());
-                    log.debug("WorkList Size: " + workList.size());
-                    CountDownLatch clatch = new CountDownLatch(workList.size());
-                    boolean success;
-                    for (Long lcid : workList) {
-                        try {
-                            /* copy proc can use select then insert (0) or insert into select from (1)
-                               the random variable determines which one is used.
-                             */
-                            success = client.callProcedure(new InsertCopyCallback(clatch, lcid), m_cpprocName, lcid, r2.nextInt(2));
-                            if (!success) {
-                                hardStop("Failed to copy upsert for: " + lcid);
+                    List<Long> workList = new ArrayList<Long>();
+                    cpyQueue.drainTo(workList, 10);
+                    if (workList.size() > 0) {
+                        log.info("from copyqueue to copy: " + workList.toString());
+                        log.debug("WorkList Size: " + workList.size());
+                        CountDownLatch clatch = new CountDownLatch(workList.size());
+                        boolean success;
+                        for (Long lcid : workList) {
+                            try {
+                                /* copy proc can use select then insert (0) or insert into select from (1)
+                                   the random variable determines which one is used.
+                                 */
+                                success = client.callProcedure(new InsertCopyCallback(clatch, lcid), m_cpprocName, lcid, r2.nextInt(2));
+                                if (!success) {
+                                    hardStop("Failed to copy upsert for: " + lcid);
+                                }
+                            } catch (NoConnectionsException e) {
+                                cpyQueue.add(lcid);
+                                setSlowFlight();
+                            } catch (Exception e) {
+                                // on exception, log and end the thread, but don't kill the process
+                                hardStop("CopyAndDeleteDataTask Copy failed a procedure call for table " + m_tableName
+                                        + " and the thread will now stop.", e);
                             }
+                            if (m_slowFlight)
+                                Thread.sleep(slowDownDelayMs);
                         }
-                        catch (NoConnectionsException e) {
-                            cpyQueue.add(lcid);
-                            setSlowFlight();
-                        }
-                        catch (Exception e) {
-                            // on exception, log and end the thread, but don't kill the process
-                            hardStop("CopyAndDeleteDataTask Copy failed a procedure call for table " + m_tableName
-                                    + " and the thread will now stop.", e);
-                        }
-                        if (m_slowFlight)
-                            Thread.sleep(slowDownDelayMs);
+                        clatch.await();
+                        // nb. these could be separate threads
+                        workList.clear();
                     }
-                    clatch.await();
-                    // nb. these could be separate threads
-                    workList.clear();
+
                     cpDelQueue.drainTo(workList, 10);
-                    CountDownLatch dlatch = new CountDownLatch(workList.size());
-                    for (Long lcid: workList) {
-                        try {
-                            success = client.callProcedure(new DeleteCallback(dlatch, lcid, cpDelQueue, unkQueue, cpyUnkQueue, delUnkQueue, 3), m_delprocName, lcid);
-                            if (!success) {
-                                hardStop("Failed to delete (copy) for: " + lcid);
+                    if (workList.size() > 0) {
+                        log.info("from copydeleteq to delete: " + workList.toString());
+                        CountDownLatch dlatch = new CountDownLatch(workList.size());
+                        boolean success;
+                        for (Long lcid : workList) {
+                            try {
+                                success = client.callProcedure(new DeleteCallback(dlatch, lcid, cpDelQueue, unkQueue,
+                                        cpyUnkQueue, delUnkQueue, 3, (byte) 2), m_delprocName, lcid);
+                                if (!success) {
+                                    hardStop("Failed to delete (copy) for: " + lcid);
+                                }
+                            } catch (NoConnectionsException e) {
+                                cpDelQueue.add(lcid);
+                                setSlowFlight();
+                            } catch (Exception e) {
+                                // on exception, log and end the thread, but don't kill the process
+                                hardStop("CopyAndDeleteDataTask Delete failed a procedure call for table " + m_tableName
+                                        + " and the thread will now stop.", e);
                             }
+                            if (m_slowFlight)
+                                Thread.sleep(slowDownDelayMs);
                         }
-                        catch (NoConnectionsException e) {
-                            cpDelQueue.add(lcid);
-                            setSlowFlight();
-                        }
-                        catch (Exception e) {
-                            // on exception, log and end the thread, but don't kill the process
-                            hardStop("CopyAndDeleteDataTask Delete failed a procedure call for table " + m_tableName
-                                    + " and the thread will now stop.", e);
-                        }
-                        if (m_slowFlight)
-                            Thread.sleep(slowDownDelayMs);
+                        dlatch.await();
+                        m_copyDeleteDoneCount += workList.size();
+                        workList.clear();
                     }
-                    dlatch.await();
-                    m_copyDeleteDoneCount += workList.size();
-                    workList.clear();
                 }
             }
             catch (Exception e) {
@@ -416,12 +436,12 @@ public class LoadTableLoader extends BenchmarkThread {
 
         CopyAndDeleteDataTask cdtask = new CopyAndDeleteDataTask();
         cdtask.start();
-        long p = 0;
+        long p;
         List<Long> cidList = new ArrayList<Long>(batchSize);
         List<Long> timeList = new ArrayList<Long>(batchSize);
         try {
             // pick up where we left off
-            ClientResponse cr = TxnId2Utils.doAdHoc(client, "select nvl(max(cid),0) from " + m_tableName + ";");
+            ClientResponse cr = TxnId2Utils.doAdHoc(client, "select nvl(max(cid)+1,0) from " + m_tableName + ";");
             p = cr.getResults()[0].asScalarLong();
 
             while (m_shouldContinue.get()) {
@@ -455,22 +475,21 @@ public class LoadTableLoader extends BenchmarkThread {
                     try {
                         if (!m_isMP) {
                             Object rpartitionParam
-                                    = VoltType.valueToBytes(m_table.fetchRow(0).get(
-                                    m_partitionedColumnIndex, VoltType.BIGINT));
+                                    = VoltType.valueToBytes(m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.BIGINT));
                             if (upsertHitMode != 0) {// for test upsert an existing row, insert it and then upsert same row again.
                                 // only insert
-                                success = client.callProcedure(new InsertCallback(latch, p, shouldCopy, wrkQueue, unkQueue, loadTxnCount), m_procName, rpartitionParam, m_tableName, (byte) 0, m_table);
+                                success = client.callProcedure(new InsertCallback(latch, p, shouldCopy, wrkQueue, unkQueue, loadTxnCount, (byte)1), m_procName, rpartitionParam, m_tableName, (byte) 0, m_table);
                             } else {
                                 // insert or upsert
-                                success = client.callProcedure(new InsertCallback(latch, p, shouldCopy, wrkQueue, unkQueue, loadTxnCount), m_procName, rpartitionParam, m_tableName, upsertMode, m_table);
+                                success = client.callProcedure(new InsertCallback(latch, p, shouldCopy, wrkQueue, unkQueue, loadTxnCount, (byte)2), m_procName, rpartitionParam, m_tableName, upsertMode, m_table);
                             }
                         } else {
                             if (upsertHitMode != 0) {
                                 // only insert
-                                success = client.callProcedure(new InsertCallback(latch, p, shouldCopy, wrkQueue, unkQueue, loadTxnCount), m_procName, m_tableName, (byte) 0, m_table);
+                                success = client.callProcedure(new InsertCallback(latch, p, shouldCopy, wrkQueue, unkQueue, loadTxnCount, (byte)3), m_procName, m_tableName, (byte) 0, m_table);
                             } else {
                                 // insert or upsert
-                                success = client.callProcedure(new InsertCallback(latch, p, shouldCopy, wrkQueue, unkQueue, loadTxnCount), m_procName, m_tableName, upsertMode, m_table);
+                                success = client.callProcedure(new InsertCallback(latch, p, shouldCopy, wrkQueue, unkQueue, loadTxnCount, (byte)4), m_procName, m_tableName, upsertMode, m_table);
                             }
                         }
                         if (!success) {
@@ -508,10 +527,12 @@ public class LoadTableLoader extends BenchmarkThread {
                             if (!m_isMP) {
                                 Object rpartitionParam = VoltType.valueToBytes(m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.BIGINT));
                                 // upsert only
-                                success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy, cpywrkQueue, cpyunkQueue, upsertTxnCount), m_procName, rpartitionParam, m_tableName, (byte) 1, m_table);
+                                success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy, cpywrkQueue,
+                                        cpyunkQueue, upsertTxnCount, (byte)5), m_procName, rpartitionParam, m_tableName, (byte) 1, m_table);
                             } else {
                                 // upsert only
-                                success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy, cpywrkQueue, cpyunkQueue, upsertTxnCount), m_procName, m_tableName, (byte) 1, m_table);
+                                success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy, cpywrkQueue,
+                                        cpyunkQueue, upsertTxnCount, (byte)6), m_procName, m_tableName, (byte) 1, m_table);
                             }
                             if (!success) {
                                 hardStop("Failed to invoke upsert for: " + cidList.get(i));
@@ -557,7 +578,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     for (Long lcid : workList) {
                         try {
                             boolean success;
-                            success = client.callProcedure(new DeleteCallback(odlatch, lcid, onlyDelQueue, unkQueue, null, delUnkQueue, 1), m_onlydelprocName, lcid);
+                            success = client.callProcedure(new DeleteCallback(odlatch, lcid, onlyDelQueue, unkQueue, null, delUnkQueue, 1, (byte)1), m_onlydelprocName, lcid);
                             if (!success) {
                                 hardStop("Failed to invoke delete for: " + lcid);
                             }
@@ -584,7 +605,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     for (Long lcid : workList) {
                         try {
                             boolean success;
-                            success = client.callProcedure(new DeleteCallback(odlatch, lcid, unkQueue, null, null, unkQueue, -1), m_onlydelprocName, lcid);
+                            success = client.callProcedure(new DeleteCallback(odlatch, lcid, unkQueue, null, null, unkQueue, -1, (byte)3), m_onlydelprocName, lcid);
                             if (!success) {
                                 hardStop("Failed to invoke delete for: " + lcid);
                             }

@@ -936,6 +936,22 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
+    /*
+     * We used to allow client.callProcedure("@AdHoc", "@SwapTables a b");
+     * This was in error, and we now have a guard for it.  This tests that
+     * the guard actually does what we expect it to do.
+     */
+    public void testAdhocSwapTables() throws Exception {
+        Client client = getClient();
+
+        try {
+            client.callProcedure("@AdHoc", "@SwapTables SWAP_THIS SWAP_THAT");
+            fail("Unexpected @AdHoc success.");
+        } catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("Error in \"@SwapTables SWAP_THIS SWAP_THAT\" unknown token"));
+        }
+    }
+
     public void testOneOffNegativeSwapTables() throws Exception {
         Client client = getClient();
 

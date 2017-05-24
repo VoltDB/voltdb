@@ -464,6 +464,22 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(var.getInbytes());
     }
 
+    public void testDDLWithHashDeprecatedWarning() {
+        String schema =
+            "create table test (dummy int); " +
+            "create index hashidx on test(dummy);";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
+
+        // Check warnings
+        assertEquals(1, compiler.m_warnings.size());
+        String warningMsg = compiler.m_warnings.get(0).getMessage();
+        String expectedMsg = "Hash indexes are deprecated. In a future release, VoltDB will only support tree indexes, even if the index name contains the string \"hash\"";
+        assertEquals(expectedMsg, warningMsg);
+    }
+
     public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
         int length = VoltType.MAX_VALUE_LENGTH + 10;
         String schema1 =
@@ -2330,17 +2346,31 @@ public class TestVoltCompiler extends TestCase {
         // Invalid return type
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.runWithUnsupportedReturnType;");
         verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
-        assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedReturnType has an unspported return type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType", fbs));
+        assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedReturnType has an unsupported return type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType", fbs));
 
         // Invalid parameter type
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.runWithUnsupportedParamType;");
         verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
-        assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedParamType has an unspported parameter type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType at position 2", fbs));
+        assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedParamType has an unsupported parameter type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType at position 2", fbs));
 
         // Multiple functions with the same name
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.dup;");
         verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Class InvalidUDFLibrary has multiple methods named dup. Only a single function method is supported.", fbs));
+
+        // Function name exists
+        // One from FunctionSQL
+        fbs = checkInvalidDDL("CREATE FUNCTION abs FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Function \"abs\" is already defined.", fbs));
+        // One from FunctionCustom
+        fbs = checkInvalidDDL("CREATE FUNCTION log FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Function \"log\" is already defined.", fbs));
+        // One from FunctionForVoltDB
+        fbs = checkInvalidDDL("CREATE FUNCTION longitude FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Function \"longitude\" is already defined.", fbs));
 
         // The class contains some other invalid functions with the same name
         VoltCompiler compiler = new VoltCompiler(false);
