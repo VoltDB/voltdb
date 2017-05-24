@@ -191,7 +191,7 @@ public interface NodeSettings extends Settings {
             if (getVoltDBRoot() == null) {
             	// The exception will be handled and printed out in RealVoltDB.java
                 throw new SettingsException("Missing VoltDB root " +
-                                            "information in properties file.");
+                                            "information in path.properties file.");
             }
             mb.put(VOLTDBROOT_PATH_KEY, getVoltDBRoot().getCanonicalPath());
             for (Map.Entry<String, File> e: getManagedArtifactPaths().entrySet()) {
