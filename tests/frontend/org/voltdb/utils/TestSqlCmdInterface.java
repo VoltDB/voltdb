@@ -263,12 +263,12 @@ public class TestSqlCmdInterface
         SQLCommand.testFrontEndOnly();
         final String fileName = "./tests/frontend/org/voltdb/utils/localQry.txt";
         String fileCmd = "file " + fileName;
-        final FileInfo fileInfo = SQLParser.parseFileStatement(null, fileCmd);
-        final File sqlFile = fileInfo.getFile();
+        final List<FileInfo> filesInfo = SQLParser.parseFileStatement(null, fileCmd);
+        final File sqlFile = filesInfo.get(0).getFile();
         assertTrue(sqlFile.exists());
         File matchFile = new File(fileName);
         assertEquals("Expected equal file objects", matchFile, sqlFile);
-        SQLCommand.executeScriptFile(fileInfo, null);
+        SQLCommand.executeScriptFile(filesInfo.get(0), null);
         String raw = SQLCommand.getTestResult();
 
         int numOfQueries = -1;
@@ -491,12 +491,12 @@ public class TestSqlCmdInterface
     public void testParseFileBatchDDL()
     {
         ID = 50;
-        FileInfo fileInfo = null;
+        List<FileInfo> filesInfo = null;
 
-        fileInfo = SQLParser.parseFileStatement(null, "FILE  haha.sql;");
-        assertFalse(fileInfo.isBatch());
+        filesInfo = SQLParser.parseFileStatement(null, "FILE  haha.sql;");
+        assertFalse(filesInfo.get(0).isBatch());
 
-        fileInfo = SQLParser.parseFileStatement(fileInfo, "FILE -batch heehee.sql;");
-        assertTrue(fileInfo.isBatch());
+        filesInfo = SQLParser.parseFileStatement(null, "FILE -batch heehee.sql;");
+        assertTrue(filesInfo.get(0).isBatch());
     }
 }

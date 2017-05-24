@@ -189,23 +189,30 @@ public class TestSQLParser extends TestCase {
     }
 
     public void testParseFileStatement() {
+        List<SQLParser.FileInfo> fis;
         SQLParser.FileInfo fi;
 
         // Plain file directive
-        fi = SQLParser.parseFileStatement("  file 'foo.sql';");
+        fis = SQLParser.parseFileStatement("  file 'foo.sql';");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.PLAIN, fi.getOption());
         assertEquals("foo.sql", fi.getFile().getName());
         assertFalse(fi.isBatch());
 
         // Plain file directive
         // no quotes and trailing whitespace.
-        fi = SQLParser.parseFileStatement("  file foo.sql  ");
+        fis = SQLParser.parseFileStatement("  file foo.sql  ");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.PLAIN, fi.getOption());
         assertFalse(fi.isBatch());
         assertEquals("foo.sql", fi.getFile().getName());
 
         // file -batch directive
-        fi = SQLParser.parseFileStatement("file -batch myddl.sql");
+        fis = SQLParser.parseFileStatement("file -batch myddl.sql");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.BATCH, fi.getOption());
         assertEquals("myddl.sql", fi.getFile().getName());
         assertTrue(fi.isBatch());
@@ -214,38 +221,49 @@ public class TestSQLParser extends TestCase {
         // quotes and trailing whitespace.
         // Whitespace in quotes is trimmed.  What are the rules here?
         // Please see ENG-7794.
-        fi = SQLParser.parseFileStatement("  file '  foo.sql  '");
+        fis = SQLParser.parseFileStatement("  file '  foo.sql  '");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.PLAIN, fi.getOption());
         assertFalse(fi.isBatch());
         assertEquals("foo.sql", fi.getFile().getName());
     }
 
     public void testParseFileStatementInlineBatch() {
+        List<SQLParser.FileInfo> fis = null;
         SQLParser.FileInfo fi = null;
 
         SQLParser.FileInfo parent = SQLParser.FileInfo.forSystemIn();
 
 
-        fi = SQLParser.parseFileStatement(parent, "file -inlinebatch EOF");
+        fis = SQLParser.parseFileStatement(parent, "file -inlinebatch EOF");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("EOF", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
-        fi = SQLParser.parseFileStatement(parent, "file -inlinebatch <<<<   ");
+        fis = SQLParser.parseFileStatement(parent, "file -inlinebatch <<<<   ");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("<<<<", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
         // terminating semicolon is ignored, as bash does.
         // also try FILE parent
-        SQLParser.FileInfo fileParent = SQLParser.parseFileStatement(parent, "file foo.sql ;");
-        fi = SQLParser.parseFileStatement(fileParent, "file -inlinebatch EOF;");
+        List<SQLParser.FileInfo> fileParent = SQLParser.parseFileStatement(parent, "file foo.sql ;");
+        fis = SQLParser.parseFileStatement(fileParent.get(0), "file -inlinebatch EOF;");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("EOF", fi.getDelimiter());
         assertTrue(fi.isBatch());
 
         // There can be whitespace around the semicolon
-        fi = SQLParser.parseFileStatement(parent, "file -inlinebatch END_OF_THE_BATCH  ; ");
+        fis = SQLParser.parseFileStatement(parent, "file -inlinebatch END_OF_THE_BATCH  ; ");
+        fi = fis.get(0);
+        assertEquals(1, fis.size());
         assertEquals(FileOption.INLINEBATCH, fi.getOption());
         assertEquals("END_OF_THE_BATCH", fi.getDelimiter());
         assertTrue(fi.isBatch());
