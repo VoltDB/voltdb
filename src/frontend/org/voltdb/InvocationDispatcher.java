@@ -323,9 +323,9 @@ public final class InvocationDispatcher {
          */
         if (task.getProcName().equals("@PrepareShutdown")) {
             VoltLogger vLogger = new VoltLogger("CONSOLE");
-            vLogger.info("=================================================================");
-            vLogger.info("Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.");
-            vLogger.info("=================================================================\n");
+            vLogger.warn("=================================================================");
+            vLogger.warn("Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.");
+            vLogger.warn("=================================================================\n");
         }
 
         final long nowNanos = System.nanoTime();
