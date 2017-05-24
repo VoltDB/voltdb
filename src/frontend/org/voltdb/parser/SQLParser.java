@@ -1408,7 +1408,7 @@ public class SQLParser extends SQLPatternFactory
 
         String remainder = statement.substring(fileMatcher.end(), statement.length());
 
-        List<FileInfo> filesInfo = new ArrayList<FileInfo>();
+        List<FileInfo> filesInfo = null;
 
         Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
         if (inlineBatchMatcher.lookingAt()) {
@@ -1419,6 +1419,7 @@ public class SQLParser extends SQLPatternFactory
             // all of the remainder, not just beginning
             if (delimiterMatcher.matches()) {
                 String delimiter = delimiterMatcher.group(1);
+                filesInfo = new ArrayList<FileInfo>();
                 filesInfo.add(new FileInfo(parentContext, FileOption.INLINEBATCH, delimiter));
                 return filesInfo;
             }
@@ -1465,6 +1466,7 @@ public class SQLParser extends SQLPatternFactory
             throw new SQLParser.Exception(msg);
         }*/
 
+        filesInfo = new ArrayList<FileInfo>();
         for (String filename: filenames) {
             if (filename.startsWith("~")) {
                 filename = filename.replaceFirst("~", System.getProperty("user.home"));

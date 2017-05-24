@@ -704,7 +704,7 @@ public class SQLCommand
                 List<FileInfo> nestedFilesInfo = SQLParser.parseFileStatement(fileInfo, line);
 
                 //if (nestedFileInfo != null) {
-                if (nestedFilesInfo.size() != 0) {
+                if ( nestedFilesInfo != null) {
                     // Guards must be added for FILE Batch containing batches.
                     if (batch != null) {
                         stopOrContinue(new RuntimeException(
