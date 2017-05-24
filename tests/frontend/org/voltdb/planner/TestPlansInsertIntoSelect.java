@@ -81,7 +81,7 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                      PlanNodeType.SEND,
                      PlanNodeType.INSERT,
                      // This PROJECTION node keeps the INSERT
-                     // node from being inlined.  See ENG-
+                     // node from being inlined.  See ENG-12434.
                      PlanNodeType.PROJECTION,
                      new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
                                              PlanNodeType.PROJECTION));
