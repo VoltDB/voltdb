@@ -185,7 +185,7 @@ public interface NodeSettings extends Settings {
             // Check if the VoltDBRoot exists
             if (getVoltDBRoot() == null) {
                 throw new SettingsException("Missing VoltDB root " +
-        	                                "information in properties file!");
+                                            "information in properties file!");
             }
             mb.put(VOLTDBROOT_PATH_KEY, getVoltDBRoot().getCanonicalPath());
             for (Map.Entry<String, File> e: getManagedArtifactPaths().entrySet()) {
