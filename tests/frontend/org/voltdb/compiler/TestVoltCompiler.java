@@ -464,6 +464,22 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(var.getInbytes());
     }
 
+    public void testDDLWithHashDeprecatedWarning() {
+        String schema =
+            "create table test (dummy int); " +
+            "create index hashidx on test(dummy);";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
+
+        // Check warnings
+        assertEquals(1, compiler.m_warnings.size());
+        String warningMsg = compiler.m_warnings.get(0).getMessage();
+        String expectedMsg = "Hash indexes are deprecated. In a future release, VoltDB will only support tree indexes, even if the index name contains the string \"hash\"";
+        assertEquals(expectedMsg, warningMsg);
+    }
+
     public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
         int length = VoltType.MAX_VALUE_LENGTH + 10;
         String schema1 =
