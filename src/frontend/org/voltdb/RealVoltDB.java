@@ -2227,6 +2227,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final boolean standalone = false;
         final boolean isXCDR = false;
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
+
+        compiler.setInitializeDDLWithFiltering(true);
         if (!compiler.compileFromSchemaAndClasses(config.m_userSchema, config.m_stagedClassesPath, stagedCatalogFH)) {
             VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
         }

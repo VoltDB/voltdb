@@ -23,7 +23,11 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -33,7 +37,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.util.EnumSet;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -263,6 +266,7 @@ final public class TestInitStartAction {
         File referenceFile = File.createTempFile("reference", ".jar");
         referenceFile.deleteOnExit();
         VoltCompiler compiler = new VoltCompiler(false);
+        compiler.setInitializeDDLWithFiltering(true);
         final boolean success = compiler.compileFromDDL(referenceFile.getAbsolutePath(), schemaFile.getPath());
         assertEquals(true, success);
         InMemoryJarfile referenceCatalogJar = new InMemoryJarfile(referenceFile);

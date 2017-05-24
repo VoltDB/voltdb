@@ -91,6 +91,9 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.LineReaderAdapter;
+import org.voltdb.utils.SQLCommand;
+
 
 
 /**
@@ -167,6 +170,10 @@ public class DDLCompiler {
 
     public static class DDLStatement {
         public DDLStatement() { }
+        public DDLStatement(String statement, int lineNo) {
+            this.statement = statement;
+            this.lineNo = lineNo;
+        }
         public String statement = "";
         public int lineNo;
     }
@@ -292,6 +299,73 @@ public class DDLCompiler {
         protected static final String DR = "DR";
     }
 
+    public void loadSchemaWithFiltering(Reader reader, final Database db, final DdlProceduresToLoad whichProcs, SQLParser.FileInfo fileInfo)
+            throws VoltCompiler.VoltCompilerException {
+
+        final LineReaderAdapter lineReader = new LineReaderAdapter(reader);
+
+        DDLParserCallback callback = new DDLParserCallback() {
+
+            @Override
+            public void statement(String statement, int lineNum) throws VoltCompiler.VoltCompilerException {
+                try {
+                    if (statement == null || statement.trim().isEmpty()) {
+                        return;
+                    }
+                    doExecuteStatement(statement.trim() + ";", lineNum);
+                }
+                catch (Exception e) {
+                    throw m_compiler.new VoltCompilerException(e);
+                }
+            }
+
+            @Override
+            public void batch(String batch, int batchEndLineNumber) throws VoltCompiler.VoltCompilerException {
+                try {
+                    String[] parts = batch.split(";");
+
+                    int currLine = batchEndLineNumber - parts.length;
+                    for (String s : parts) {
+                        if (!s.trim().isEmpty()) {
+                            doExecuteStatement(s.trim() + ";", currLine++);
+                        }
+                    }
+                }
+                catch (Exception e) {
+                    throw m_compiler.new VoltCompilerException(e);
+                }
+            }
+
+            private void doExecuteStatement(String statement, int lineNum) throws VoltCompiler.VoltCompilerException {
+
+                // Filter out any statements that we don't want to deal with
+                if (statement.toUpperCase().startsWith("LOAD")) {
+                    return;
+                }
+
+                DDLStatement stmt = new DDLStatement(statement, lineNum);
+                processVoltDBStatements(db, whichProcs, stmt);
+            }
+        };
+
+        try {
+            SQLCommand.executeScriptFromReader(fileInfo, lineReader, callback);
+        }
+        catch (Exception e) {
+            throw m_compiler.new VoltCompilerException(e);
+        }
+        finally {
+            // NEEDSWORK (ENG-12255): This really should be done outside the loop, by the caller. The exception propagation, at this point, is pretty messy, and
+            // changing it would be a pretty big effort that's really not relevant to this ticket. Fix this sometime.
+            lineReader.close();
+        }
+
+        // process extra classes
+        m_tracker.addExtraClasses(m_classMatcher.getMatchedClassList());
+        // possibly save some memory
+        m_classMatcher.clear();
+    }
+
     /**
      * Compile a DDL schema from an abstract reader
      * @param reader  abstract DDL reader
@@ -306,45 +380,7 @@ public class DDLCompiler {
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
-            boolean processed = false;
-            try {
-                // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
-                // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
-                processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
-            } catch (VoltCompilerException e) {
-                // Reformat the message thrown by VoltDB DDL processing to have a line number.
-                String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-            if (! processed) {
-                try {
-                    //* enable to debug */ System.out.println("DEBUG: " + stmt.statement);
-                    // kind of ugly.  We hex-encode each statement so we can
-                    // avoid embedded newlines so we can delimit statements
-                    // with newline.
-                    m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-
-                    // figure out what table this DDL might affect to minimize diff processing
-                    HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
-
-                    // Get the diff that results from applying this statement and apply it
-                    // to our local tree (with Volt-specific additions)
-                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(ddlStmtInfo, stmt.statement);
-                    // null diff means no change (usually drop if exists for non-existent thing)
-                    if (thisStmtDiff != null) {
-                        applyDiff(thisStmtDiff);
-                    }
-
-                    // special treatment for stream syntax
-                    if (ddlStmtInfo.creatStream) {
-                       processCreateStreamStatement(stmt, db, whichProcs);
-                    }
-                } catch (HSQLParseException e) {
-                    String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
-                    throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
-                }
-
-            }
+            processVoltDBStatements(db, whichProcs, stmt);
             stmt = getNextStatement(reader, m_compiler);
         }
 
@@ -1974,5 +2010,50 @@ public class DDLCompiler {
 
     public void processMaterializedViewWarnings(Database db) throws VoltCompilerException {
             m_mvProcessor.processMaterializedViewWarnings(db, m_matViewMap);
+    }
+
+    private void processVoltDBStatements(final Database db, final DdlProceduresToLoad whichProcs, DDLStatement stmt) throws VoltCompilerException {
+
+        boolean processed = false;
+
+        try {
+            // Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
+            // CREATE PROCEDURE, CREATE FUNCTION, and CREATE ROLE.
+            processed = m_voltStatementProcessor.process(stmt, db, whichProcs);
+        }
+        catch (VoltCompilerException e) {
+            // Reformat the message thrown by VoltDB DDL processing to have a line number.
+            String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+        if (! processed) {
+            try {
+                //* enable to debug */ System.out.println("DEBUG: " + stmt.statement);
+                // kind of ugly.  We hex-encode each statement so we can
+                // avoid embedded newlines so we can delimit statements
+                // with newline.
+                m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
+
+                // figure out what table this DDL might affect to minimize diff processing
+                HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
+
+                // Get the diff that results from applying this statement and apply it
+                // to our local tree (with Volt-specific additions)
+                VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(ddlStmtInfo, stmt.statement);
+                // null diff means no change (usually drop if exists for non-existent thing)
+                if (thisStmtDiff != null) {
+                    applyDiff(thisStmtDiff);
+                }
+
+                // special treatment for stream syntax
+                if (ddlStmtInfo.creatStream) {
+                    processCreateStreamStatement(stmt, db, whichProcs);
+                }
+            } catch (HSQLParseException e) {
+                String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
+                throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
+            }
+        }
     }
 }
