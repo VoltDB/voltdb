@@ -70,6 +70,7 @@ public class CatalogSpecificPlanner {
                                              false,
                                              partitionKey,
                                              ExplainMode.NONE,
+                                             false,
                                              userParams);
         stmts.add(result);
 

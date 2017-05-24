@@ -178,7 +178,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                         boolean inferPartitioning,
                                                         Object userPartitionKey,
                                                         ExplainMode explainMode,
-                                                        //boolean isSwapTables,
+                                                        boolean isSwapTables,
                                                         Object[] userParamSet)
                                                                 throws AdHocPlanningException
     {
@@ -207,7 +207,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                 return ptool.planSql(sqlStatement,
                                      partitioning,
                                      explainMode != ExplainMode.NONE,
-                                     userParamSet);
+                                     userParamSet,
+                                     isSwapTables);
             }
         }
         catch (Exception e) {
@@ -282,6 +283,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                                inferSP,
                                                                userPartitionKey,
                                                                explainMode,
+                                                               isSwapTables,
                                                                userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.

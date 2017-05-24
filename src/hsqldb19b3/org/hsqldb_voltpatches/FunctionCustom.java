@@ -245,13 +245,22 @@ public class FunctionCustom extends FunctionSQL {
 
     private int extractSpec;
 
-    public static FunctionSQL newCustomFunction(String token, int tokenType) {
+    public static int getFunctionId(String functionName) {
+        int tokenType = Tokens.get(functionName.toUpperCase());
+        return getFunctionId(tokenType);
+    }
 
+    public static int getFunctionId(int tokenType) {
         int id = customRegularFuncMap.get(tokenType, -1);
-
         if (id == -1) {
             id = customValueFuncMap.get(tokenType, -1);
         }
+        return id;
+    }
+
+    public static FunctionSQL newCustomFunction(String token, int tokenType) {
+
+        int id = getFunctionId(tokenType);
 
         if (id == -1) {
             return null;
