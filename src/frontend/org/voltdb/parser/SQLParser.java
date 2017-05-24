@@ -523,7 +523,7 @@ public class SQLParser extends SQLPatternFactory
             Pattern.CASE_INSENSITIVE);
 
     private static final Pattern FilenameToken = Pattern.compile(
-            "\\s+" +       // required preceding whitespace
+            "\\s*" +       // required preceding whitespace -- UPDATED - need not be required since we trim before getting file name(s) string
             "['\"]*" +     // optional opening quotes of either kind (ignored) (?)
             "([^;'\"]+)" + // file path assumed to end at the next quote or semicolon
             "['\"]*" +     // optional closing quotes -- assumed to match opening quotes (?)
@@ -1436,7 +1436,7 @@ public class SQLParser extends SQLPatternFactory
             remainder = remainder.substring(batchMatcher.end(), remainder.length());
         }
 
-        Matcher filenameMatcher = FilenameToken.matcher(remainder);
+        //Matcher filenameMatcher = FilenameToken.matcher(remainder);
         //String filename = null;
 
         // remove spaces before and after filenames
@@ -1468,10 +1468,20 @@ public class SQLParser extends SQLPatternFactory
 
         filesInfo = new ArrayList<FileInfo>();
         for (String filename: filenames) {
-            if (filename.startsWith("~")) {
-                filename = filename.replaceFirst("~", System.getProperty("user.home"));
+            Matcher filenameMatcher = FilenameToken.matcher(filename);
+            if (filenameMatcher.matches()) {
+                filename = filenameMatcher.group(1);
+
+                // Trim whitespace from beginning and end of the file name.
+                // User may have wanted quoted whitespace at the beginning or end
+                // of the file name, but that seems very unlikely.
+                filename = filename.trim();
+
+                if (filename.startsWith("~")) {
+                    filename = filename.replaceFirst("~", System.getProperty("user.home"));
+                }
+                filesInfo.add(new FileInfo(parentContext, option, filename));
             }
-            filesInfo.add(new FileInfo(parentContext, option, filename));
         }
 
         return filesInfo;
