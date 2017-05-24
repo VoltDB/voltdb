@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.Test;
 
@@ -40,6 +41,8 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.dtxn.LatencyHistogramStats;
+import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
@@ -161,8 +164,164 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
     }
 
-    public void testLatencyStatistics() throws Exception {
-        System.out.println("\n\nTESTING LATENCY STATS\n\n\n");
+    /** Make sure @Statistics LATENCY returns sane data in the expected formats.
+     */
+    public void testLatencyValidity() throws Exception {
+        System.out.println("\n\nTESTING LATENCY STATS VALIDITY\n\n\n");
+        Client client  = getFullyConnectedClient();
+
+        // Validate column names, types and ordering.
+        ColumnInfo[] expectedSchema = new ColumnInfo[13];
+        expectedSchema[0]  = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);  // milliseconds
+        expectedSchema[1]  = new ColumnInfo("HOST_ID",   VoltType.INTEGER);
+        expectedSchema[2]  = new ColumnInfo("HOSTNAME",  VoltType.STRING);
+        expectedSchema[3]  = new ColumnInfo("INTERVAL",  VoltType.INTEGER); // milliseconds
+        expectedSchema[4]  = new ColumnInfo("COUNT",     VoltType.INTEGER); // samples
+        expectedSchema[5]  = new ColumnInfo("TPS",       VoltType.INTEGER); // samples per second
+        expectedSchema[6]  = new ColumnInfo("P50",       VoltType.BIGINT);  // microseconds
+        expectedSchema[7]  = new ColumnInfo("P95",       VoltType.BIGINT);  // microseconds
+        expectedSchema[8]  = new ColumnInfo("P99",       VoltType.BIGINT);  // microseconds
+        expectedSchema[9]  = new ColumnInfo("P99.9",     VoltType.BIGINT);  // microseconds
+        expectedSchema[10] = new ColumnInfo("P99.99",    VoltType.BIGINT);  // microseconds
+        expectedSchema[11] = new ColumnInfo("P99.999",   VoltType.BIGINT);  // microseconds
+        expectedSchema[12] = new ColumnInfo("MAX",       VoltType.BIGINT);  // microseconds
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+
+        VoltTable[] results = null;
+
+        // Do some work that will generate latency stats
+        for (int i = 0; i < SITES * HOSTS; i++) {
+            results = client.callProcedure("NEW_ORDER.insert", i).getResults();
+        }
+
+        // Statistics roll over every 5 seconds.
+        // Retry until we've seen the window with our data.
+        // We retry more often than that so that we don't miss the window;
+        // this also speeds up tests when the data comes in towards the end of a window.
+        long samplesFound;
+        int numInvocations = 0;
+        final int delayMsec = (int) TimeUnit.SECONDS.toMillis(1);
+        final int invocationLimit = 2 * LatencyStats.INTERVAL_MS / delayMsec;
+        assertTrue(delayMsec < LatencyStats.INTERVAL_MS); // prevent misleading test failures if INTERVAL_MS changes
+        do {
+            Thread.sleep(delayMsec);
+
+            results = client.callProcedure("@Statistics", "LATENCY", 0).getResults();
+            // one aggregate table returned
+            assertEquals(1, results.length);
+            System.out.println("Test latency table: " + results[0].toString());
+
+            validateSchema(results[0], expectedTable);
+            // should have at least one row from each host
+            results[0].advanceRow();
+            Map<String, String> columnTargets = new HashMap<String, String>();
+            columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+            validateRowSeenAtAllHosts(results[0], columnTargets, false);
+            assertEquals(HOSTS, results[0].getRowCount());
+
+            // Search all nodes for the one that has our data
+            results[0].resetRowPosition();
+            samplesFound = 0;
+            while (results[0].advanceRow()) {
+                final long interval = results[0].getLong("INTERVAL"); // milliseconds
+                final long count    = results[0].getLong("COUNT");    // samples
+                final long tps      = results[0].getLong("TPS");      // samples per second
+                final long p50      = results[0].getLong("P50");      // microseconds
+                final long p95      = results[0].getLong("P95");      // microseconds
+                final long p99      = results[0].getLong("P99");      // microseconds
+                final long p39      = results[0].getLong("P99.9");    // microseconds
+                final long p49      = results[0].getLong("P99.99");   // microseconds
+                final long p59      = results[0].getLong("P99.999");  // microseconds
+                final long max      = results[0].getLong("MAX");      // microseconds
+
+                // Run sanity checks on the data
+                assertEquals(interval, LatencyStats.INTERVAL_MS);
+                // Test needs to do this calculation the exact same way as the code due to fixed point rounding
+                assertEquals(tps, (int) (TimeUnit.SECONDS.toMillis(count) / interval));
+                assertTrue(count == 0 || p50 > 0);
+                assertTrue(p50 <= p95);
+                assertTrue(p95 <= p99);
+                assertTrue(p99 <= p39);
+                assertTrue(p39 <= p49);
+                assertTrue(p49 <= p59);
+                assertTrue(p59 <= max);
+                samplesFound += count;
+            }
+            numInvocations++;
+        } while (samplesFound == 0 && numInvocations < invocationLimit);
+
+        assertTrue(samplesFound > 0);
+    }
+
+    // Helper method for testLatencyTiming()
+    private static VoltTable doLatencyStatsCall(Client client) throws Exception {
+        VoltTable[] results = client.callProcedure("@Statistics", "LATENCY", 0).getResults();
+        assertEquals(1, results.length);
+        // Guarantee the same host is used every time - they are not always returned in a consistent order.
+        // Expect about 20% failure if this loop is commented out.
+        do {
+            results[0].advanceRow();
+        } while (results[0].getLong("HOST_ID") != 0);
+        return results[0];
+    }
+
+    /** Verify that the timestamp from "@Statistics LATENCY"
+     * is associated with the data window, not the procedure call.
+     *
+     * We do this by checking:
+     * 1. Consecutive calls return the same timestamp (since they represent the same bin).
+     * 2. Calls separated by more than a full time window return different timestamps.
+     *
+     * There are a lot of reasons two consecutive calls would not return the same timestamp.
+     * Notably, histogram bin rollovers and sluggishness that cause the test to not execute.
+     * Keep trying until identical timestamps are observed -
+     * an implementation that gives each call a unique timestamp will still fail the test.
+     */
+    public void testLatencyTiming() throws Exception {
+        System.out.println("\n\nTESTING LATENCY STATS TIMING\n\n\n");
+        Client client = getFullyConnectedClient();
+
+        // Don't make so many attempts where a broken implementation will 'get lucky' and pass,
+        // but also try enough times to avoid the benign situations mentioned above.
+        // This may require some tweaking.
+        final int maxAttempts = 12;
+        int numAttempts = 0;
+        VoltTable previous;
+        VoltTable current = doLatencyStatsCall(client);
+        do {
+            previous = current;
+            current = doLatencyStatsCall(client);
+        } while (numAttempts++ < maxAttempts && previous.getLong("TIMESTAMP") != current.getLong("TIMESTAMP"));
+
+        System.out.println(numAttempts + " attempts made at obtaining timestamps from the same time window.");
+        assertTrue("Unable to use timestamps to verify that data comes from the same window.", numAttempts < maxAttempts);
+
+        // Verify that matching timestamps implies matching data
+        assertEquals(previous.getLong("TIMESTAMP"),  current.getLong("TIMESTAMP"));
+        assertEquals(previous.getLong("HOST_ID"),    current.getLong("HOST_ID"));
+        assertEquals(previous.getString("HOSTNAME"), current.getString("HOSTNAME"));
+        assertEquals(previous.getLong("INTERVAL"),   current.getLong("INTERVAL"));
+        assertEquals(previous.getLong("COUNT"),      current.getLong("COUNT"));
+        assertEquals(previous.getLong("TPS"),        current.getLong("TPS"));
+        assertEquals(previous.getLong("P50"),        current.getLong("P50"));
+        assertEquals(previous.getLong("P95"),        current.getLong("P95"));
+        assertEquals(previous.getLong("P99"),        current.getLong("P99"));
+        assertEquals(previous.getLong("P99.9"),      current.getLong("P99.9"));
+        assertEquals(previous.getLong("P99.99"),     current.getLong("P99.99"));
+        assertEquals(previous.getLong("P99.999"),    current.getLong("P99.999"));
+        assertEquals(previous.getLong("MAX"),        current.getLong("MAX"));
+
+        // Verify that >5 seconds later the timestamps are not the same.
+        final int extraDelayMsec = 1000;
+        final long beforeTimestamp = current.getLong("TIMESTAMP");
+        Thread.sleep(LatencyStats.INTERVAL_MS + extraDelayMsec);
+        final long afterTimestamp = doLatencyStatsCall(client).getLong("TIMESTAMP");
+        System.out.println("Non-consecutive timestamps: " + beforeTimestamp + ", " + afterTimestamp);
+        assertTrue(afterTimestamp > beforeTimestamp);
+    }
+
+    public void testLatencyCompressed() throws Exception {
+        System.out.println("\n\nTESTING LATENCY_COMPRESSED STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
         ColumnInfo[] expectedSchema = new ColumnInfo[5];
@@ -179,10 +338,11 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         for (int i = 0; i < SITES * HOSTS; i++) {
             results = client.callProcedure("NEW_ORDER.insert", i).getResults();
         }
-        results = client.callProcedure("@Statistics", "LATENCY", 0).getResults();
+
+        results = client.callProcedure("@Statistics", "LATENCY_COMPRESSED", 0).getResults();
         // one aggregate table returned
         assertEquals(1, results.length);
-        System.out.println("Test latency table: " + results[0].toString());
+        System.out.println("Test latency_compressed table: " + results[0].toString());
 
         validateSchema(results[0], expectedTable);
         // should have at least one row from each host

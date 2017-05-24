@@ -600,7 +600,7 @@ public enum VoltType {
             new VoltType[(VOLT_TYPE_MAX_ENUM)+1];
     static {
         ImmutableMap.Builder<Class<?>, VoltType> b = ImmutableMap.builder();
-        HashMap<Class<?>, VoltType> validation = new HashMap<Class<?>, VoltType>();
+        HashMap<Class<?>, VoltType> validation = new HashMap<>();
         for (VoltType type : values()) {
             s_types[type.m_value] = type;
             for (Class<?> cls : type.m_classes) {
@@ -1208,7 +1208,7 @@ public enum VoltType {
     private static final Long MAX_BIGINT = new Long(Long.MAX_VALUE);
     /** Max value for a <code>TIMESTAMP</code> index component. */
     private static final Long MAX_TIMESTAMP = new Long(Long.MAX_VALUE);
-    /** Max value for a <code>FLOAT</code> index component.ß */
+    /** Max value for a <code>FLOAT</code> index component. */
     private static final Float MAX_FLOAT = new Float(Float.MAX_VALUE);
 
     // for consistency at the API level, provide symbolic nulls for these types, too

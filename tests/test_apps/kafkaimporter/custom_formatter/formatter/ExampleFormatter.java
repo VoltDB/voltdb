@@ -29,8 +29,10 @@ import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.importer.formatter.FormatException;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
-public class ExampleFormatter implements Formatter<String> {
+public class ExampleFormatter implements Formatter {
     /**
      *  Normally the constructor would be used for selecting formatter type
      *  with the formatName argument, and configuring the formatter using the
@@ -52,7 +54,7 @@ public class ExampleFormatter implements Formatter<String> {
      * @param sourceData - Data type of this field is designated by the Formatter<?> data type.
      */
     @Override
-    public Object[] transform(String sourceData) throws FormatException {
+    public Object[] transform(ByteBuffer payload) throws FormatException {
         Object[] objs = {"", "", "", "", ""};
         Object[] badobjs1 = {"abc", "def", "123", "", "this one is ok"};
         Object[] badobjs2 = {"", "", "", "", "", ""};
@@ -67,7 +69,9 @@ public class ExampleFormatter implements Formatter<String> {
 
         String percentErrors = m_prop.getProperty("errorrate", "1").trim();
         int badinject = 1;
+        String sourceData = null;
         try {
+            sourceData = new String(payload.array(), payload.arrayOffset(), payload.limit(), StandardCharsets.UTF_8);
             badinject = Integer.parseInt(percentErrors);
         } catch (NumberFormatException e1) {
             e1.printStackTrace();

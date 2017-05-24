@@ -168,6 +168,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
 
+        void swapDRActions(PersistentTable* table1, PersistentTable* table2);
+
         ExecutorContext* getExecutorContext() { return m_executorContext; }
 
         int getCurrentIndexInBatch() const { return m_currentIndexInBatch; }
@@ -187,7 +189,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t spHandle,
                                  int64_t lastCommittedSpHandle,
                                  int64_t uniqueId,
-                                 int64_t undoToken);
+                                 int64_t undoToken,
+                                 bool traceOn);
 
         /**
          * Execute a single, top-level plan fragment.  This method is
@@ -231,9 +234,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         bool loadCatalog(int64_t timestamp, std::string const& catalogPayload);
 
-        bool updateCatalog(int64_t timestamp, std::string const& catalogPayload);
+        bool updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload);
 
-        bool processCatalogAdditions(int64_t timestamp);
+        bool processCatalogAdditions(bool isStreamUpdate, int64_t timestamp);
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.
@@ -248,15 +251,26 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        bool returnUniqueViolations,
                        bool shouldDRStream);
 
-        void resetReusedResultOutputBuffer(size_t headerSize = 0) {
-            m_resultOutput.initializeWithPosition(m_reusedResultBuffer,
-                                                  m_reusedResultCapacity,
-                                                  headerSize);
+        /**
+         * Reset the result buffer (use the nextResultBuffer by default)
+         */
+        void resetReusedResultOutputBuffer(const size_t startingPosition = 0, const int batchIndex = 1) {
+            if (batchIndex == 0) {
+                m_resultOutput.initializeWithPosition(m_firstReusedResultBuffer,
+                                                      m_firstReusedResultCapacity,
+                                                      startingPosition);
+            }
+            else {
+                m_resultOutput.initializeWithPosition(m_nextReusedResultBuffer,
+                                                      m_nextReusedResultCapacity,
+                                                      startingPosition);
+            }
             m_exceptionOutput.initializeWithPosition(m_exceptionBuffer,
                                                      m_exceptionBufferCapacity,
-                                                     headerSize);
+                                                     startingPosition);
             *reinterpret_cast<int32_t*>(m_exceptionBuffer) =
-                voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
+                    voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
+
         }
 
         void resetPerFragmentStatsOutputBuffer(int8_t perFragmentTimingEnabled = -1) {
@@ -279,12 +293,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }
 
-        void setBuffers(char* parameterBuffer, int parameterBufferCapacity,
+        void setBuffers(char *parameter_buffer, int m_parameterBuffercapacity,
                 char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
-                char* resultBuffer, int resultBufferCapacity,
-                char* exceptionBuffer, int exceptionBufferCapacity);
+                char *firstResultBuffer, int firstResultBufferCapacity,
+                char *nextResultBuffer, int nextResultBufferCapacity,
+                char *exceptionBuffer, int exceptionBufferCapacity);
 
-        char const* getParameterBuffer() const { return m_parameterBuffer; }
+        const char* getParameterBuffer() const { return m_parameterBuffer; }
 
         /** Returns the size of buffer for passing parameters to EE. */
         int getParameterBufferCapacity() const { return m_parameterBufferCapacity; }
@@ -295,15 +310,21 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void serializeException(SerializableEEException const& e);
 
         /**
+         * Retrieves the result buffer that could be either a buffer assigned through setBuffers() or
+         * the fallback buffer created dynamically for results larger than 10MB
+         */
+        const unsigned char* getResultsBuffer() const;
+
+        /**
          * Retrieves the size in bytes of the data that has been placed in the reused result buffer
          */
         int getResultsSize() const;
 
         /** Returns the buffer for receiving result tables from EE. */
-        char* getReusedResultBuffer() const { return m_reusedResultBuffer; }
+        char* getReusedResultBuffer() const { return m_nextReusedResultBuffer; }
 
         /** Returns the size of buffer for receiving result tables from EE. */
-        int getReusedResultBufferCapacity() const { return m_reusedResultCapacity; }
+        int getReusedResultBufferCapacity() const { return m_nextReusedResultCapacity; }
 
         int getPerFragmentStatsSize() const;
         char* getPerFragmentStatsBuffer() const { return m_perFragmentStatsBuffer; }
@@ -503,7 +524,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
                                 bool first,
-                                bool last);
+                                bool last,
+                                bool traceOn);
 
         /**
          * Set up the vector of executors for a given fragment id.
@@ -619,11 +641,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         int m_exceptionBufferCapacity;
 
-        /** buffer object to receive result tables from EE. */
-        char* m_reusedResultBuffer;
+        /** buffer object to receive all but the final result tables from EE. */
+        char* m_firstReusedResultBuffer;
 
-        /** size of reused_result_buffer. */
-        int m_reusedResultCapacity;
+        /** size of m_firstReusedResultBuffer. */
+        int m_firstReusedResultCapacity;
+
+        /** buffer object to receive final result tables from EE. */
+        char* m_nextReusedResultBuffer;
+
+        /** size of m_finalReusedResultBuffer. */
+        int m_nextReusedResultCapacity;
 
         // arrays to hold fragment ids and dep ids from java
         // n.b. these are 8k each, should be boost shared arrays?

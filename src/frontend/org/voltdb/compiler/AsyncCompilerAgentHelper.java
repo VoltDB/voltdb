@@ -26,8 +26,6 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -57,6 +55,7 @@ public class AsyncCompilerAgentHelper
         retval.hostname = work.hostname;
         retval.user = work.user;
         retval.tablesThatMustBeEmpty = new String[0]; // ensure non-null
+        retval.hasSchemaChange = true;
 
         try {
             // catalog change specific boiler plate
@@ -67,7 +66,7 @@ public class AsyncCompilerAgentHelper
             // or null if it still needs to be filled in.
             InMemoryJarfile newCatalogJar = null;
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
-
+            boolean updatedClass = false;
             String deploymentString = work.operationString;
             if ("@UpdateApplicationCatalog".equals(work.invocationName)) {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
@@ -86,8 +85,14 @@ public class AsyncCompilerAgentHelper
                     newCatalogJar = new InMemoryJarfile(work.operationBytes);
                 }
                 try {
-                    newCatalogJar = modifyCatalogClasses(context.catalog, oldJar, work.operationString,
+                    InMemoryJarfile modifiedJar = modifyCatalogClasses(context.catalog, oldJar, work.operationString,
                             newCatalogJar, work.drRole == DrRoleType.XDCR);
+                    if (modifiedJar == null) {
+                        newCatalogJar = oldJar;
+                    } else {
+                        newCatalogJar = modifiedJar;
+                        updatedClass = true;
+                    }
                 }
                 catch (ClassNotFoundException e) {
                     retval.errorMsg = "Unexpected error in @UpdateClasses modifying classes " +
@@ -97,6 +102,9 @@ public class AsyncCompilerAgentHelper
                 // Real deploymentString should be the current deployment, just set it to null
                 // here and let it get filled in correctly later.
                 deploymentString = null;
+
+                // mark it as non-schema change
+                retval.hasSchemaChange = false;
             }
             else if ("@AdHoc".equals(work.invocationName)) {
                 // work.adhocDDLStmts should be applied to the current catalog
@@ -221,7 +229,9 @@ public class AsyncCompilerAgentHelper
             }
 
             String commands = diff.commands();
+            compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
 
+            retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
             retval.diffCommandsLength = commands.length();
@@ -231,6 +241,7 @@ public class AsyncCompilerAgentHelper
             retval.tablesThatMustBeEmpty = emptyTablesAndReasons[0];
             retval.reasonsForEmptyTables = emptyTablesAndReasons[1];
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
+            retval.requiresNewExportGeneration = diff.requiresNewExportGeneration();
             retval.worksWithElastic = diff.worksWithElastic();
         }
         catch (Exception e) {
@@ -267,8 +278,13 @@ public class AsyncCompilerAgentHelper
         return jarfile;
     }
 
+    /**
+     * @return NUll if no classes changed, otherwise return the update jar file.
+     * @throws ClassNotFoundException
+     * @throws IOException
+     */
     private InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
-            InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException
+            InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException, IOException
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
@@ -304,19 +320,14 @@ public class AsyncCompilerAgentHelper
                 jarfile.put(e.getKey(), e.getValue());
             }
         }
-        if (deletedClasses || foundClasses) {
-            compilerLog.info("Checking java classes available to stored procedures");
-            // TODO: check the jar classes on all nodes
-            Database db = VoltCompiler.getCatalogDatabase(catalog);
-            for (Procedure proc: db.getProcedures()) {
-                // single statement procedure does not need to check class loading
-                if (proc.getHasjava() == false) continue;
-
-                if (! VoltCompilerUtils.containsClassName(jarfile, proc.getClassname())) {
-                    throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
-                }
-            }
+        if (!deletedClasses && !foundClasses) {
+            return null;
         }
+
+        compilerLog.info("Updating java classes available to stored procedures");
+        VoltCompiler compiler = new VoltCompiler(isXDCR);
+        compiler.compileInMemoryJarfile(jarfile);
+
         return jarfile;
     }
 }

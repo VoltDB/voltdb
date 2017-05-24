@@ -161,7 +161,10 @@ public interface VoltDBInterface
             long currentTxnId,
             long currentTxnTimestamp,
             byte[] deploymentBytes,
-            byte[] deploymentHash);
+            byte[] deploymentHash,
+            boolean requireCatalogDiffCmdsApplyToEE,
+            boolean hasSchemaChange,
+            boolean requiresNewExportGeneration);
 
     /**
      * Updates the cluster setting of this VoltDB
@@ -311,4 +314,5 @@ public interface VoltDBInterface
 
     public SnmpTrapSender getSnmpTrapSender();
 
+    public void swapTables(String oneTable, String otherTable);
 }

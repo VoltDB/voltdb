@@ -59,9 +59,6 @@ $(document).ready(function () {
         $("#logOut").css('display', 'none');
     }
 
-    //search text clean up required for mozilla
-    $("#filterStoredProc").val('');
-
     //Prevent scrolling of page.
     $('#navSchema').on("click", function (e) {
         //Browser validation for IE version less than IE 11
@@ -105,6 +102,9 @@ $(document).ready(function () {
 
             if (json["DrGraphView"] != undefined && json["DrGraphView"] != "")
                 saveInLocalStorage("dr-graph-view", json["DrGraphView"]);
+
+            if (json["ImporterGraphView"] != undefined && json["ImporterGraphView"] != "")
+                saveInLocalStorage("importer-graph-view", json["ImporterGraphView"]);
 
             if (json["CurrentServer"] != undefined && json["CurrentServer"] != "")
                 saveCurrentServer(json["CurrentServer"]);
@@ -196,6 +196,22 @@ $(document).ready(function () {
         }
     });
 
+    //Show Hide Graph Block
+    $('#showHideImporterGraphBlock').click(function () {
+        var graphState = $("#mainImporterGraphBlock").css('display');
+        if (graphState == 'none') {
+            $(".showhideImporterIcon").removeClass('collapsed');
+            $(".showhideImporterIcon").addClass('expanded');
+        } else {
+            $(".showhideImporterIcon").removeClass('expanded');
+            $(".showhideImporterIcon").addClass('collapsed');
+        }
+        $('#mainImporterGraphBlock').slideToggle();
+
+        //MonitorGraphUI.UpdateCharts();
+    });
+
+
     //DR Show/hide toggle
     // Show Hide Graph Block
     $('#showHideDrBlock').click(function () {
@@ -245,32 +261,6 @@ $(document).ready(function () {
             }
         }
     });
-
-    // Filters Stored Procedures
-    $('#filterStoredProc').keyup(function () {
-        var that = this;
-        $.each($('.storeTbl tbody tr'),
-        function (i, val) {
-            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
-                $('.storeTbl tbody tr').eq(i).hide();
-            } else {
-                $('.storeTbl tbody tr').eq(i).show();
-            }
-        });
-    });
-
-    // Filters Database Tables
-//    $('#filterDatabaseTable').keyup(function () {
-//        var that = this;
-//        $.each($('.dbTbl tbody tr'),
-//        function (i, val) {
-//            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
-//                $('.dbTbl tbody tr').eq(i).hide();
-//            } else {
-//                $('.dbTbl tbody tr').eq(i).show();
-//            }
-//        });
-//    });
 
     var refreshCss = function () {
         //Enable Schema specific css only for Schema Tab.
@@ -391,6 +381,13 @@ $(document).ready(function () {
                 $("#VDBQHelp").hide();
                 $("#VDBAdmHelp").hide();
                 MonitorGraphUI.UpdateCharts();
+            }  else if (VoltDbUI.CurrentTab ==  NavigationTabs.Importer){
+                $("#showMyHelp").html("Importer Help");
+                $("#VDBMonHelp").show();
+                $("#VDBSchHelp").hide();
+                $("#VDBQHelp").hide();
+                $("#VDBAdmHelp").hide();
+                MonitorGraphUI.RefreshImporterGraph();
             }
             shortcut.remove("f5");
             shortcut.remove("f6");
@@ -462,6 +459,7 @@ function downloadCSV(event,args,whichChart, chartId) {
     var data, filename, link;
     var graphView = $("#graphView").val()
     var drGraphVIew = $("#drGraphView").val()
+    var importGraphView = $("#importerGraphView").val()
     var chartData = {}
 
     if (whichChart == "cpu"){
@@ -545,6 +543,36 @@ function downloadCSV(event,args,whichChart, chartId) {
         else if (graphView == "Days"){
             chartData =  JSON.parse(localStorage.cmdLogDay)
         }
+    } else if(whichChart == "outTrans"){
+        if (importGraphView == "Seconds"){
+            chartData = convertImporterData(JSON.parse(localStorage.outTransDetails))
+        }
+        else if (importGraphView == "Minutes"){
+            chartData = convertImporterData(JSON.parse(localStorage.outTransDetailsMin))
+        }
+        else if (importGraphView == "Days"){
+            chartData = convertImporterData(JSON.parse(localStorage.outTransDetailsDay))
+        }
+    } else if(whichChart == "successRate"){
+        if (importGraphView == "Seconds"){
+            chartData = convertImporterData(JSON.parse(localStorage.successRateDetails))
+        }
+        else if (importGraphView == "Minutes"){
+            chartData = convertImporterData(JSON.parse(localStorage.successRateDetailsMin))
+        }
+        else if (importGraphView == "Days"){
+            chartData = convertImporterData(JSON.parse(localStorage.successRateDetailsDay))
+        }
+    } else if(whichChart == "failureRate"){
+        if (importGraphView == "Seconds"){
+            chartData = convertImporterData(JSON.parse(localStorage.failureRateDetails))
+        }
+        else if (importGraphView == "Minutes"){
+            chartData = convertImporterData(JSON.parse(localStorage.failureRateDetailsMin))
+        }
+        else if (importGraphView == "Days"){
+            chartData = convertImporterData(JSON.parse(localStorage.failureRateDetailsDay))
+        }
     }
 
     var csv = convertArrayOfObjectsToCSV({
@@ -554,6 +582,8 @@ function downloadCSV(event,args,whichChart, chartId) {
 
     if(whichChart == "dataReplication")
         filename = args.filename + "-" + drGraphVIew + ".csv";
+    else if(whichChart == "outTrans" || whichChart == "successRate" || whichChart == "failureRate")
+        filename = args.filename + "-" + importGraphView + ".csv"
     else
         filename = args.filename + "-" + graphView + ".csv";
 
@@ -570,6 +600,20 @@ function convertPartitionData(data){
             chartData.push({
                 "key": data[i].key.replace(" ", ""),
                 "type": getPartitionType(data[i].key, data[i].color),
+                "timestamp": data[i].values[j].x,
+                "value": data[i].values[j].y
+            })
+        }
+    }
+    return chartData;
+}
+
+function convertImporterData(data){
+    var chartData = [];
+    for (var i=0; i< data.length; i++){
+        for(var j=0 ; j< data[i].values.length; j++){
+            chartData.push({
+                "key": data[i].key.replace(" ", ""),
                 "timestamp": data[i].values[j].x,
                 "value": data[i].values[j].y
             })
@@ -662,11 +706,11 @@ var loadPage = function (serverName, portid) {
     function showEnableDisableDownloadBtn(){
          if ((navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) ||
          navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf('Trident/') > 0 ) {
-            $(".downloadCls").attr("src","css/resources/images/icon_download_disabled.png");
+            $(".downloadCls").attr("src","images/icon_download_disabled.png");
             $(".downloadCls").attr("title","Download file feature is not supported in this browser.")
             $(".downloadCls").css( 'cursor', 'default' );
          } else {
-            $(".downloadCls").attr("src","css/resources/images/downloadBtn.png");
+            $(".downloadCls").attr("src","images/downloadBtn.png");
             $(".downloadCls").attr("title","Download data as CSV")
             $(".downloadCls").css( 'cursor', 'pointer' );
          }
@@ -704,6 +748,8 @@ var loadPage = function (serverName, portid) {
                 } else {
                     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
                 }
+            }  else{
+                setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
             }
         }
     };
@@ -840,6 +886,7 @@ var loadPage = function (serverName, portid) {
                     CurrentServer: clickedServer,
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
                     DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
+                    ImporterGraphVIew: VoltDbUI.getFromLocalStorage("importer-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -879,6 +926,7 @@ var loadPage = function (serverName, portid) {
                     CurrentServer: clickedServer,
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
                     DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
+                    ImporterGraphVIew: VoltDbUI.getFromLocalStorage("importer-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -992,7 +1040,9 @@ var loadPage = function (serverName, portid) {
         var getLicenseInformation = function (licenseInfo) {
             if (licenseInfo != undefined && licenseInfo != "") {
                 var licInfo = $.parseJSON(licenseInfo);
-                $("#addNewConfigLink").show();
+                if(!VoltDbAdminConfig.isExportLoading){
+                    $("#addNewConfigLink").show();
+                }
                 $(".licenseInfo").show();
                 $("#tdLicenseInfo").hide();
                 $("#tdLicenseInfo").css("display", "none");
@@ -1061,15 +1111,53 @@ var loadPage = function (serverName, portid) {
         });
 
         voltDbRenderer.getLatencyGraphInformation(function (latencyDetails) {
-            MonitorGraphUI.RefreshLatency(latencyDetails, graphView, currentTab);
-        });
-
-        voltDbRenderer.GetTransactionInformation(function (transactionDetails) {
-            MonitorGraphUI.RefreshTransaction(transactionDetails, graphView, currentTab);
+            MonitorGraphUI.RefreshLatency(latencyDetails, graphView, currentTab, getCurrentServer());
+            MonitorGraphUI.RefreshTransaction(latencyDetails, graphView, currentTab, getCurrentServer());
         });
 
         voltDbRenderer.getCpuGraphInformation(function (cpuDetails) {
             MonitorGraphUI.RefreshCpu(cpuDetails, getCurrentServer(), graphView, currentTab);
+        });
+
+        voltDbRenderer.getImporterGraphInformation(function(importerDetails){
+            if(!$.isEmptyObject(importerDetails)){
+                var curTab = VoltDbUI.getCookie("current-tab");
+                graphView = $("#importerGraphView").val();
+                $('#navImporter').show();
+                if(curTab == NavigationTabs.Importer && !$("#navImporter").hasClass('active')){
+                    $("#overlay").show();
+                    setTimeout(function () { $("#navImporter> a").trigger("click"); }, 100);
+                }
+
+                if(VoltDbUI.isFirstImporterLoad){
+                    MonitorGraphUI.SetImporterData(importerDetails)
+                    MonitorGraphUI.AddImporterGraph(VoltDbUI.getFromLocalStorage("importer-graph-view"), $('#chartOutTransaction'), $('#chartSuccessRate'), $('#chartFailureRate'));
+                    VoltDbUI.isFirstImporterLoad = false;
+                }
+
+                var dataMapper = MonitorGraphUI.getImportMapperData();
+                var colorIndex = MonitorGraphUI.getDataMapperIndex(dataMapper);
+                var dataArray = ["outTransData_second", "outTransDataMin_minute", "outTransDataDay_day", "successRateData_second", "successRateDataMin_minute",
+                "successRateDataDay_day", "failureRateData_second", "failureRateDataMin_minute", "failureRateDataDay_day"]
+                $.each(importerDetails["SUCCESSES"], function(key, value){
+                    if(key != "TIMESTAMP" && !dataMapper.hasOwnProperty(key)){
+                        for(var i = 0; i < dataArray.length; i++){
+                            var dataSplit = dataArray[i].split('_')
+                            MonitorGraphUI.AddImporterGraphLine(dataSplit[0], key, dataSplit[1], colorIndex)
+                        }
+                    }
+                });
+
+
+                MonitorGraphUI.RefreshOutTransGraph(importerDetails["OUTSTANDING_REQUESTS"], graphView, curTab);
+                MonitorGraphUI.RefreshSuccessRateGraph(importerDetails["SUCCESSES"], graphView, curTab);
+                MonitorGraphUI.RefreshFailureRateGraph(importerDetails["FAILURES"], graphView, curTab);
+                MonitorGraphUI.RefreshImporterGraph(VoltDbUI.getFromLocalStorage("importer-graph-view"))
+            } else {
+                if($("#navImporter").hasClass('active'))
+                    setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
+                $('#navImporter').hide()
+            }
         });
 
         voltDbRenderer.GetPartitionIdleTimeInformation(function (partitionDetail) {
@@ -1342,7 +1430,7 @@ var loadPage = function (serverName, portid) {
                               '                <div id="mainGraphBlock_' + combinedId + '">' +
                               '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
                               '                        <div class="errorMsgLocalWrapper">' +
-                              '                            <img src="css/resources/images/alert.png" alt="Alert"/>' +
+                              '                            <img src="images/alert.png" alt="Alert"/>' +
                               '                        </div>' +
                               '                        <div class="textMsgLocalWrapper">' +
                               '                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>' +
@@ -1354,7 +1442,7 @@ var loadPage = function (serverName, portid) {
                               '                            <div class="chartHeader">' +
                               '                                <h1>Database Replication (DR)' +
                               '                                    <a href="#" class="downloadBtnChart" ' +
-                              '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
+                              '                                     > <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
                               '                                    <div class="clear"></div>' +
                               '                                </h1>' +
                               '                            </div>' +
@@ -2191,13 +2279,17 @@ var loadPage = function (serverName, portid) {
     if (VoltDbUI.getFromLocalStorage("graph-view") == undefined || VoltDbUI.getFromLocalStorage("graph-view") == null)
         saveInLocalStorage("graph-view", $("#graphView").val());
 
-    if (VoltDbUI.getFromLocalStorage("dr-graph-view") == undefined || VoltDbUI.getFromLocalStorage("graph-view") == null)
+    if (VoltDbUI.getFromLocalStorage("dr-graph-view") == undefined || VoltDbUI.getFromLocalStorage("dr-graph-view") == null)
         saveInLocalStorage("dr-graph-view", $("#drGraphView").val());
+
+    if (VoltDbUI.getFromLocalStorage("importer-graph-view") == undefined || VoltDbUI.getFromLocalStorage("importer-graph-view") == null)
+        saveInLocalStorage("importer-graph-view", $("#importerGraphView").val());
 
     $("#graphView").val(VoltDbUI.getFromLocalStorage("graph-view"));
     $("#drGraphView").val(VoltDbUI.getFromLocalStorage("dr-graph-view") != undefined ? VoltDbUI.getFromLocalStorage("dr-graph-view"): "Seconds");
-    MonitorGraphUI.AddGraph(VoltDbUI.getFromLocalStorage("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'), $('#chartCommandLogging'));
+    $("#importerGraphView").val(VoltDbUI.getFromLocalStorage("importer-graph-view") != undefined ? VoltDbUI.getFromLocalStorage("importer-graph-view"): "Seconds");
 
+    MonitorGraphUI.AddGraph(VoltDbUI.getFromLocalStorage("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'), $('#chartCommandLogging'));
 
     $("#graphView").on("change", function () {
         var graphView = $("#graphView").val();
@@ -2211,6 +2303,13 @@ var loadPage = function (serverName, portid) {
         saveInLocalStorage("dr-graph-view", drGraphView);
         MonitorGraphUI.RefreshDrGraph(drGraphView);
         MonitorGraphUI.UpdateDrCharts();
+    });
+
+    $("#importerGraphView").on("change", function () {
+        var graphView = $("#importerGraphView").val();
+        saveInLocalStorage("importer-graph-view", graphView);
+        MonitorGraphUI.RefreshImporterGraph(graphView);
+        MonitorGraphUI.UpdateImporterCharts();
     });
 
     //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked
@@ -2263,6 +2362,7 @@ var loadPage = function (serverName, portid) {
 
     configureUserPreferences();
     adjustGraphSpacing();
+    adjustImporterGraphSpacing();
     saveThreshold();
 
     $('#showMyHelp').popup();
@@ -2377,7 +2477,8 @@ var NavigationTabs = {
     Admin: 2,
     Schema: 3,
     SQLQuery: 4,
-    DR: 5
+    DR: 5,
+    Importer: 6
 };
 
 var getCurrentTab = function () {
@@ -2398,6 +2499,9 @@ var getCurrentTab = function () {
     } else if (activeLinkId == "navDR"){
         $(".nvtooltip").show();
         return NavigationTabs.DR;
+    } else if (activeLinkId ==  "navImporter"){
+        $(".nvtooltip").show();
+        return NavigationTabs.Importer;
     }
     $(".nvtooltip").show();
     return NavigationTabs.DBMonitor;
@@ -2581,6 +2685,22 @@ var adjustGraphSpacing = function () {
     }
 };
 
+//Adjust graph spacing for importer graph
+var adjustImporterGraphSpacing = function() {
+    var graphList = [$("#chartOutTransaction"), $("#chartSuccessRate"), $("#chartFailureRate")];
+    var css = "left";
+    for (var i = 0; i < graphList.length; i++) {
+        if (graphList[i].is(':visible')) {
+            graphList[i].removeClass("left right");
+            graphList[i].addClass(css);
+            if (css == "left")
+                css = "right";
+            else
+                css = "left";
+        }
+    }
+};
+
 (function (window) {
     var iVoltDbUi = (function () {
         this.prevDrRoleDetail = {}
@@ -2594,6 +2714,7 @@ var adjustGraphSpacing = function () {
         this.isDRInfoRequired = false;
         this.isCommandLogEnabled = false;
         this.isFirstDRLoad = true;
+        this.isFirstImporterLoad = true;
         this.DASHBOARD_PROGRESS_STATES = {
             REFRESHMEMORY: 0,
             REFRESHMEMORY_NONE: 1,

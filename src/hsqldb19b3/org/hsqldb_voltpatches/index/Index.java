@@ -66,10 +66,13 @@
 
 package org.hsqldb_voltpatches.index;
 
+import java.util.Map;
+
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.types.Type;
@@ -278,7 +281,8 @@ public interface Index extends SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    public org.hsqldb_voltpatches.VoltXMLElement voltGetIndexXML(Session session, String tableName)
+    public VoltXMLElement voltGetIndexXML(Session session, String tableName,
+            Map<String, VoltXMLElement> indexConstraintMapping)
         throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 
     /**

@@ -19,8 +19,10 @@ package org.voltdb;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 
 // Interface through which the outside world can interact with the consumer side
@@ -32,8 +34,13 @@ public interface ConsumerDRGateway extends Promotable {
      * Notify the consumer of catalog updates.
      * @param catalog             The new catalog.
      * @param newConnectionSource The new connection source if changed, or null if not.
+     * @param snapshotSource The cluster from which this joiner cluster should request snapshot.
+     *        Use -1 if there is no preferred snapshot source. If this joiner cluster has already
+     *        received snapshot, this change will have no effect.
      */
-    void updateCatalog(CatalogContext catalog, String newConnectionSource);
+    void updateCatalog(CatalogContext catalog, String newConnectionSource, byte snapshotSource);
+
+    void swapTables(final Set<Pair<String, Long>> swappedTables);
 
     Map<Byte, DRRoleStats.State> getStates();
 
@@ -43,10 +50,8 @@ public interface ConsumerDRGateway extends Promotable {
      * the snapshot as a joiner.
      * @param dataSourceCluster
      * @param expectedClusterMembers
-     * @return false if this cluster is a joiner and the sync snapshot did not finish loading form the
-     *         leader cluster
      */
-    boolean isSyncSnapshotComplete(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
+    void setInitialConversationMembership(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
 
     void initialize(boolean resumeReplication);
 
@@ -64,5 +69,17 @@ public interface ConsumerDRGateway extends Promotable {
 
     void startConsumerDispatcher(final MeshMemberInfo member);
 
+    void deactivateConsumerDispatcher(byte clusterId);
+
     void addLocallyLedPartition(int partitionId);
+
+    boolean isSafeForReset(byte clusterId);
+
+    void pauseConsumerDispatcher(byte clusterId);
+
+    void resumeConsumerDispatcher(byte clusterId);
+
+    void resetDrAppliedTracker(byte clusterId);
+
+    void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
 }

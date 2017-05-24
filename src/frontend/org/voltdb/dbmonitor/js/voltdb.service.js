@@ -370,7 +370,7 @@
             try {
                 var processName = "GRAPH_LATENCY";
                 var procedureNames = ['@Statistics'];
-                var parameters = ["LATENCY_HISTOGRAM"];
+                var parameters = ["LATENCY"];
                 var values = ['0'];
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
@@ -454,12 +454,11 @@
 
         };
 
-        //Render Cluster Transaction Graph
-        this.GetTransactionInformation = function (onConnectionAdded) {
+        this.GetImporterInformation = function (onConnectionAdded) {
             try {
-                var processName = "GRAPH_TRANSACTION";
+                var processName = "GRAPH_IMPORTER";
                 var procedureNames = ['@Statistics'];
-                var parameters = ["PROCEDUREPROFILE"];
+                var parameters = ["IMPORTER"];
                 var values = ['0'];
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
@@ -469,21 +468,15 @@
                                 onConnectionAdded(connection, status);
                             });
                         }
-
                     });
-
                 } else {
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
-
                     });
-
                 }
-
             } catch (e) {
                 console.log(e.message);
             }
-
         };
 
         this.GetTableInformation = function (onConnectionAdded) {

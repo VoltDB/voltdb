@@ -67,20 +67,16 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
-import org.xml.sax.SAXException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.HealthMonitor;
-import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Catalog.CatalogCmd;
-import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
@@ -124,8 +120,8 @@ import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
@@ -142,6 +138,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
+import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -186,7 +183,7 @@ public abstract class CatalogUtil {
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
 
-    public final static String[] CATALOG_DEFAULT_ARTIFCATS = {
+    public final static String[] CATALOG_DEFAULT_ARTIFACTS = {
             VoltCompiler.AUTOGEN_DDL_FILE_NAME,
             CATALOG_BUILDINFO_FILENAME,
             CATALOG_REPORT_FILENAME,
@@ -195,6 +192,8 @@ public abstract class CatalogUtil {
     };
 
     private static boolean m_exportEnabled = false;
+    public static final String CATALOG_FILE_NAME = "catalog.jar";
+    public static final String STAGED_CATALOG_PATH = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -330,7 +329,7 @@ public abstract class CatalogUtil {
      */
     public static InMemoryJarfile getCatalogJarWithoutDefaultArtifacts(final InMemoryJarfile jarfile) {
         InMemoryJarfile cloneJar = jarfile.deepCopy();
-        for (String entry : CATALOG_DEFAULT_ARTIFCATS) {
+        for (String entry : CATALOG_DEFAULT_ARTIFACTS) {
             cloneJar.remove(entry);
         }
         return cloneJar;
@@ -703,7 +702,7 @@ public abstract class CatalogUtil {
             setClusterInfo(catalog, deployment);
 
             //Set the snapshot schedule
-            setSnapshotInfo( catalog, deployment.getSnapshot());
+            setSnapshotInfo(catalog, deployment.getSnapshot());
 
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());
@@ -1952,7 +1951,18 @@ public abstract class CatalogUtil {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
+                if (drConnection.getPreferredSource() != null) {
+                    cluster.setPreferredsource(drConnection.getPreferredSource());
+                } else { // reset to -1, if this is an update catalog
+                    cluster.setPreferredsource(-1);
+                }
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
+            } else {
+                if (dr.getRole() == DrRoleType.XDCR) {
+                    // consumer should be enabled even without connection source for XDCR
+                    cluster.setDrconsumerenabled(true);
+                    cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
+                }
             }
         } else {
             cluster.setDrrole(DrRoleType.NONE.value());
@@ -2640,48 +2650,4 @@ public abstract class CatalogUtil {
         }
         return deployment;
     }
-
-    /**
-     * {@link CatalogDiffEngine} generates statement commands that will apply on catalog.
-     * Most of these diffCmds are useful for java in memory catalog, but only very few are used in EE.
-     * This function will generate EE applicable diffCmds.
-     * @param diffCmds
-     * @return
-     */
-    public static String getDiffCommandsForEE(String diffCmds) {
-        if (diffCmds == null || diffCmds.length() == 0) return "";
-        // We know EE does not care procedure changes, so we can skip them for EE diffs.
-        // There are more like deployment changes, the better way is to filter all the other
-        // catalog type changes other than the ones used in EE.
-        // Refer the EE catalog usage.
-
-        // e.g.
-        // add /clusters#cluster/databases#database procedures Vote
-        // set /clusters#cluster/databases#database/procedures#Vote classname "voter.Vote"
-        // set $PREV readonly false
-        // set $PREV singlepartition true
-        // add /clusters#cluster/databases#database/procedures#Vote statements checkContestantStmt
-        // set /clusters#cluster/databases#database/procedures#Vote/statements#checkContestantStmt sqltext "SELECT contes...
-        // set $PREV querytype 2
-        // set $PREV readonly true
-        // set $PREV singlepartition true
-
-        StringBuilder sb = new StringBuilder();
-        String[] cmds = diffCmds.split("\n");
-        boolean skip = false;
-        for (int i = 0; i < cmds.length; i++) {
-            String stmt = cmds[i];
-
-            char cmd = Catalog.parseStmtCmd(stmt);
-            if (cmd == 'a' || cmd == 'd') { // add, del
-                CatalogCmd catCmd = Catalog.parseStmt(stmt);
-                skip = catCmd.isProcedureRelatedCmd();
-            }
-            if (!skip) {
-                sb.append(stmt).append("\n");
-            }
-        }
-        return sb.toString();
-    }
-
 }

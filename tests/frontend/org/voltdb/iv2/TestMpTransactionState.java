@@ -44,6 +44,7 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
@@ -133,15 +134,15 @@ public class TestMpTransactionState extends TestCase
                 if (rollback && i == (remoteHSIds.length - 1)) {
                     resp.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR,
                                    new EEException(1234));
-                    resp.addDependency(distributedOutputDepIds.get(0),
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    resp.addDependency(new DependencyPair.TableDependencyPair(distributedOutputDepIds.get(0),
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1)));
                 }
                 else {
                     resp.setStatus(FragmentResponseMessage.SUCCESS, null);
                     for (int j = 0; j < distributedOutputDepIds.size(); j++) {
-                        resp.addDependency(distributedOutputDepIds.get(j),
+                        resp.addDependency(new DependencyPair.TableDependencyPair(distributedOutputDepIds.get(j),
                                            new VoltTable(new VoltTable.ColumnInfo("BOGO",
-                                                                                  VoltType.BIGINT)));
+                                                                                  VoltType.BIGINT))));
                     }
                 }
                 System.out.println("RESPONSE: " + resp);
@@ -173,9 +174,9 @@ public class TestMpTransactionState extends TestCase
         resp.m_sourceHSId = buddyHSId;
         resp.setStatus(FragmentResponseMessage.SUCCESS, null);
         for (int j = 0; j < batchSize ; j++) {
-            resp.addDependency(depsToResumeList.get(j),
+            resp.addDependency(new DependencyPair.TableDependencyPair(depsToResumeList.get(j),
                                new VoltTable(new VoltTable.ColumnInfo("BOGO",
-                                                                      VoltType.BIGINT)));
+                                                                      VoltType.BIGINT))));
         }
         System.out.println("BORROW RESPONSE: " + resp);
         plan.generatedResponses.add(resp);

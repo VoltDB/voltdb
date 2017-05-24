@@ -55,11 +55,18 @@ struct TableConfig {
      * All columns of all rows have this type.
      */
     typedef     int           contentType;
-    const       char         *m_tableName;
-    const       char        **m_columnNames;
+    const char               *m_tableName;
+    const char              **m_columnNames;
+    const voltdb::ValueType  *m_types;
+    const int32_t            *m_typeSizes;
     int                       m_numRows;
     int                       m_numCols;
+    // Some of the ints in the m_contents are
+    // really ints.  Some are offsets into the
+    // string table, which is m_strings.
     const contentType        *m_contents;
+    const char              **m_strings;
+    const int32_t             m_numStrings;
 };
 
 /**
@@ -85,9 +92,8 @@ struct TestConfig {
      */
     typedef TableConfig::contentType contentType;
     const char           *m_sql;
+    const bool            m_expectFail;
     const char           *m_planString;
-    unsigned int          m_numOutputRows;
-    unsigned int          m_numOutputCols;
-    const contentType    *m_outputTable;
+    const TableConfig    *m_outputConfig;
 };
 #endif /* TESTS_EE_TEST_UTILS_PLAN_TESTING_CONFIG_H_ */

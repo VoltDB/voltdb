@@ -113,21 +113,6 @@ AS
     INSERT INTO User
     VALUES (?, ?);
 
--- as source code
-
---CREATE PROCEDURE p3
---ALLOW
---    admin
---AS
---    ###
---    stmt = new SQLStmt('SELECT age, name FROM User WHERE age = ?')
---    transactOn = { int key ->
---                   voltQueueSQL(stmt,key)
---                   voltExecuteSQL(true)
---                 }
---    ### LANGUAGE GROOVY
---;
-
 
 -- CREATE TABLE
 -- test all supported SQL datatypes
@@ -558,6 +543,7 @@ FROM CLASS
     org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 ;
 
+CREATE FUNCTION IntFunction FROM METHOD org.voltdb_testfuncs.IntFunction.unaryIntFunction;
 
 -- PARTITION TABLE
 -- basic

@@ -1,8 +1,24 @@
 VoltDB Example HOWTOs
-================
+=====================
 
-At VoltDB, we get asked the same questions about examples over and over. For example, "How do I run an example in a 3 node cluster, when the examples are set up to run on localhost?"
+In this directory, we're collecting short tutorials and other "How to" examples to help you get started using VoltDB. The aim is to complement the documentation with working examples and easy to follow instructions to help you quicky get VoltDB up and running with some feature or demonstrating some technique.  The content is organized by role and function.
 
-In this directory, we're collecting a bunch of walkthroughs for similar kinds of example experiments. The aim is to complement the documentation with content specifically for examples.
+Development:
+------------
+ * [Using Eclipse to develop, unit test, and debug VoltDB stored procedures and java clients](EclipseUnitTestDebug.md)
+ * [Configure Logging](ConfigureLogging.md)
 
-Internally, we have a long list of HOWTOs we want to add to this folder. If there's something you'd specifically like to see, please let us know at askanengineer@voltdb.com.
+Administration
+--------------
+ * [Running VoltDB Server as a Daemon (in the background)](RunServerInTheBackground.md)
+ * [How to Run VoltDB Examples in a Cluster](RunAnExampleInACluster.md)
+ * [Run VoltDB Virtualized, Containerized or in the Cloud](VirtualizeOrContainerize.md)
+
+### Configuration
+ * [Enable Authentication](EnableAuthentication.md)
+ * [Enable SSL](EnableSSL.md)
+ * [Change Durability Settings](ChangeDurabilitySettings.md)
+ * [Configure Logging](ConfigureLogging.md)
+
+--------------------------------------------------------------------------------------
+If there's something you'd like to see here, please let us know at support@voltdb.com.

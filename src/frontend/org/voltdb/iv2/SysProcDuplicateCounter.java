@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.DependencyPair;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.utils.MiscUtils;
@@ -100,7 +101,10 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             tables.add(dep);
         }
 
-        return checkCommon(hash, message.isRecovering(), null, message);
+        // needs to be a three long array to work
+        int[] hashes = new int[] { (int) hash, 0, 0 };
+
+        return checkCommon(hashes, message.isRecovering(), null, message, false);
     }
 
     @Override
@@ -111,7 +115,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
         // union up all the deps we've collected and jam them in
         for (Entry<Integer, List<VoltTable>> dep : m_alldeps.entrySet()) {
             VoltTable grouped = VoltTableUtil.unionTables(dep.getValue());
-            unioned.addDependency(dep.getKey(), grouped);
+            unioned.addDependency(new DependencyPair.TableDependencyPair(dep.getKey(), grouped));
         }
         return unioned;
     }

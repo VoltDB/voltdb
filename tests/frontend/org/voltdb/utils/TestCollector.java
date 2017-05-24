@@ -51,8 +51,11 @@ import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
 import org.voltcore.utils.CoreUtils;
+
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
@@ -71,10 +74,15 @@ public class TestCollector extends JUnit4LocalClusterTest {
     String listener;
     Client client;
 
-    String voltDbRootPath;
+    String m_voltDbRootPath;
+    // used for specifying output file name to cli. Also used to store
+    // the output file path, after collector call, so that file can be deleted
+    String m_outputFileName = "";
+    String m_prefix = "";
     boolean resetCurrentTime = true;
 
-    String rootDir;
+    String m_collectBaseFolder;
+    int m_pid;
 
     @Before
     public void setUp() throws Exception {
@@ -102,37 +110,61 @@ public class TestCollector extends JUnit4LocalClusterTest {
             String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
             voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         }
-        voltDbRootPath = voltDbRoot.getPath();
+        m_voltDbRootPath = voltDbRoot.getPath();
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
+        m_outputFileName = "";
+        m_pid = getpid(m_voltDbRootPath);
+        m_prefix = "";
+
+        System.setProperty("VOLT_JUSTATEST", "true");
     }
 
     @After
     public void tearDown() throws Exception {
         client.close();
         cluster.shutDown();
+        deleteOutputFileIfExists();
     }
 
-    private ZipFile collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {
+    private ZipFile collect(boolean skipHeapDump, int days, boolean force) throws Exception {
         if(resetCurrentTime) {
             Collector.m_currentTimeMillis = System.currentTimeMillis();
         }
-        Collector.main(new String[]{"--voltdbroot="+voltDbRootPath, "--prefix=\"\"",
-                                    "--host=\"\"", "--username=\"\"", "--password=\"\"", // host, username, password
-                                    "--noprompt=true",  // noPrompt
-                                    "--dryrun=false", // dryRun
-                                    "--skipheapdump="+String.valueOf(skipHeapDump),
-                                    "--copyToVEM=true",
-                                    "--calledFromVEM=true",  // calledFromVem (set to true so that resulting collection can be easily located)
-                                    "--fileInfoOnly=false",  // fileInfoOnly
-                                    "--days="+String.valueOf(days),
-                                    "--libPathForTest="+getWorkingDir(voltDbRootPath)+"/lib"
-                                    });
 
-        rootDir = CoreUtils.getHostnameOrAddress() + "_voltlogs_";
-        File collectionFile = new File(voltDbRootPath, rootDir + ".zipfile");
+        String pathToOutputFile = "";
+        ArrayList<String> cliParams = new ArrayList<>(15);
+        cliParams.add("--voltdbroot=" + m_voltDbRootPath);
+        if (m_prefix.isEmpty()) {
+            cliParams.add("--prefix=\"\"");
+        } else {
+            cliParams.add("--prefix=" + m_prefix);
+            pathToOutputFile = System.getProperty("user.dir") + File.separator + m_prefix
+                    + "_" + Collector.PREFIX_DEFAULT_COLLECT_FILE + "_"
+                    + CoreUtils.getHostnameOrAddress() + Collector.COLLECT_FILE_EXTENSION;
+        }
+        cliParams.add("--dryrun=false");        // dryRun
+        cliParams.add("--skipheapdump=" + String.valueOf(skipHeapDump));
+        cliParams.add("--days=" + String.valueOf(days));
+        cliParams.add("--libPathForTest=" + getWorkingDir(m_voltDbRootPath) + "/lib");
+        cliParams.add("--force=" + String.valueOf(force));
+        if (!m_outputFileName.isEmpty()) {
+            cliParams.add("--outputFile=" + m_outputFileName);
+            pathToOutputFile = m_outputFileName;
+        }
+
+        if (pathToOutputFile.trim().isEmpty()) {
+            pathToOutputFile =  Collector.PREFIX_DEFAULT_COLLECT_FILE + "_"
+                    + CoreUtils.getHostnameOrAddress() + Collector.COLLECT_FILE_EXTENSION;
+        }
+
+        Collector.main(cliParams.toArray(new String[cliParams.size()]));
+
+        m_collectBaseFolder = Collector.getZipCollectFolderBase();
+        File collectionFile = new File(pathToOutputFile);
         assertTrue(collectionFile.exists());
+        m_outputFileName = pathToOutputFile;
 
         return new ZipFile(collectionFile);
     }
@@ -172,14 +204,14 @@ public class TestCollector extends JUnit4LocalClusterTest {
     private void createLogFiles() throws Exception {
 
         try {
-           String configInfoPath = voltDbRootPath + File.separator + Constants.CONFIG_DIR + File.separator + "config.json";;
+           String configInfoPath = m_voltDbRootPath + File.separator + Constants.CONFIG_DIR + File.separator + "config.json";;
            JSONObject jsonObject= Collector.parseJSONFile(configInfoPath);
            JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
 
            //maintain the file naming format
            String fileNamePrefix = "volt-junit-fulllog.txt.";
            String fileText = "This is a dummy log file.";
-           String workingDir = getWorkingDir(voltDbRootPath);
+           String workingDir = getWorkingDir(m_voltDbRootPath);
            VoltFile logFolder = new VoltFile(workingDir + "/obj/release/testoutput/");
            logFolder.mkdir();
 
@@ -249,6 +281,55 @@ public class TestCollector extends JUnit4LocalClusterTest {
         }
     }
 
+    private void deleteOutputFileIfExists() {
+        File outputFile = new File(m_outputFileName);
+        if (outputFile.exists()) {
+            assertTrue(outputFile.delete());
+        }
+    }
+
+    private void verifyBasicTestCollect(ZipFile collectionZip) throws Exception {
+        String subFolderPath = m_collectBaseFolder + File.separator;
+        ZipEntry heapdumpFile = collectionZip.getEntry(subFolderPath + "heap_dumps" + File.separator + "java_pid" + m_pid + ".hprof");
+        assertNotNull(heapdumpFile);
+
+        ZipEntry catalogJar = collectionZip.getEntry(subFolderPath + "voltdb_files" + File.separator + "catalog.jar");
+        assertNotNull(catalogJar);
+
+        ZipEntry deploymentXml = collectionZip.getEntry(subFolderPath + "voltdb_files" + File.separator + "deployment.xml");
+        assertNotNull(deploymentXml);
+
+        ZipEntry systemCheck = collectionZip.getEntry(subFolderPath + "system_logs" + File.separator + "systemcheck");
+        assertNotNull(systemCheck);
+
+        List<String> logPaths = getLogPaths(m_voltDbRootPath);
+        for (String path : logPaths) {
+            ZipEntry logFile = collectionZip.getEntry(subFolderPath + "voltdb_logs" + File.separator + new File(path).getName());
+            assertNotNull(logFile);
+        }
+
+        InputStream systemStatsIS;
+        if (System.getProperty("os.name").contains("Mac"))
+            systemStatsIS = new FileInputStream(getWorkingDir(m_voltDbRootPath)+"/lib/macstats.properties");
+        else
+            systemStatsIS = new FileInputStream(getWorkingDir(m_voltDbRootPath)+"/lib/linuxstats.properties");
+        assertNotNull(systemStatsIS);
+        Properties systemStats = new Properties();
+        systemStats.load(systemStatsIS);
+        for (String fileName : systemStats.stringPropertyNames()) {
+            ZipEntry statdata = collectionZip.getEntry(subFolderPath + "system_logs" + File.separator + fileName);
+            assertNotNull(statdata);
+        }
+
+        Enumeration<? extends ZipEntry> e = collectionZip.entries();
+        while (e.hasMoreElements()) {
+            String pathName = e.nextElement().getName();
+            if (pathName.startsWith(subFolderPath + "voltdb_crashfiles")) {
+                assertTrue(pathName.startsWith(subFolderPath + "voltdb_crashfiles" + File.separator + "voltdb_crash")
+                        && pathName.endsWith(".txt"));
+            }
+        }
+    }
     /*
      * For each type of file that need to be collected, check whether it actually appears in the collection
      * currently sar data and /var/log/syslog* are ignored in testing
@@ -270,63 +351,44 @@ public class TestCollector extends JUnit4LocalClusterTest {
         cluster.shutDown();
 
         // generate heap dump
-        int pid = getpid(voltDbRootPath);
-
-        File heapdumpGenerated = new File("/tmp", "java_pid" + pid + ".hprof");
-        heapdumpGenerated.deleteOnExit();
+        File heapdumpGenerated = new File("/tmp", "java_pid" + m_pid + ".hprof");
 
         PrintWriter writer = new PrintWriter(heapdumpGenerated.getPath());
+        heapdumpGenerated.deleteOnExit();
         writer.println("fake heapdump file");
         writer.close();
 
-        File f = new File(voltDbRootPath, "systemcheck");
+        File f = new File(m_voltDbRootPath, "systemcheck");
         f.createNewFile();
         FileOutputStream fStream = new FileOutputStream(f);
         fStream.write("fake text for test".getBytes());
         fStream.close();
 
-        ZipFile collectionZip = collect(voltDbRootPath, false, 50);
+        ZipFile collectionZip;
+        m_outputFileName = new File(m_voltDbRootPath).getParent() + File.separator + m_pid + "_withCrash.zip";
+        deleteOutputFileIfExists();
+        collectionZip = collect(false, 50, false);
+        verifyBasicTestCollect(collectionZip);
+        collectionZip.close();
+        deleteOutputFileIfExists();
 
-        String subFolderPath = rootDir + File.separator;
-        ZipEntry heapdumpFile = collectionZip.getEntry(subFolderPath + "heap_dumps" + File.separator + "java_pid" + pid + ".hprof");
-        assertNotNull(heapdumpFile);
 
-        ZipEntry catalogJar = collectionZip.getEntry(subFolderPath + "voltdb_files" + File.separator + "catalog.jar");
-        assertNotNull(catalogJar);
-
-        ZipEntry deploymentXml = collectionZip.getEntry(subFolderPath + "voltdb_files" + File.separator + "deployment.xml");
-        assertNotNull(deploymentXml);
-
-        ZipEntry systemCheck = collectionZip.getEntry(subFolderPath + "system_logs" + File.separator + "systemcheck");
-        assertNotNull(systemCheck);
-
-        List<String> logPaths = getLogPaths(voltDbRootPath);
-        for (String path : logPaths) {
-            ZipEntry logFile = collectionZip.getEntry(subFolderPath + "voltdb_logs" + File.separator + new File(path).getName());
-            assertNotNull(logFile);
+        // negative test - prefix and output set at same time
+        m_prefix = "foo_" + m_pid;
+        boolean caughtExcp = false;
+        try {
+            collect(true, 3, false);
+        } catch (SimulatedExitException excp) {
+            System.out.println(excp.getMessage());
+            caughtExcp = true;
         }
+        assertTrue(caughtExcp);
 
-        InputStream systemStatsIS;
-        if (System.getProperty("os.name").contains("Mac"))
-            systemStatsIS = new FileInputStream(getWorkingDir(voltDbRootPath)+"/lib/macstats.properties");
-        else
-            systemStatsIS = new FileInputStream(getWorkingDir(voltDbRootPath)+"/lib/linuxstats.properties");
-        assertNotNull(systemStatsIS);
-        Properties systemStats = new Properties();
-        systemStats.load(systemStatsIS);
-        for (String fileName : systemStats.stringPropertyNames()) {
-            ZipEntry statdata = collectionZip.getEntry(subFolderPath + "system_logs" + File.separator + fileName);
-            assertNotNull(statdata);
-        }
 
-        Enumeration<? extends ZipEntry> e = collectionZip.entries();
-        while (e.hasMoreElements()) {
-            String pathName = e.nextElement().getName();
-            if (pathName.startsWith(subFolderPath + "voltdb_crashfiles")) {
-                assertTrue(pathName.startsWith(subFolderPath + "voltdb_crashfiles" + File.separator + "voltdb_crash")
-                        && pathName.endsWith(".txt"));
-            }
-        }
+        m_outputFileName = "";
+        m_prefix = "prefix" + m_pid;
+        collectionZip = collect(false, 3, true);
+        verifyBasicTestCollect(collectionZip);
         collectionZip.close();
     }
 
@@ -343,13 +405,14 @@ public class TestCollector extends JUnit4LocalClusterTest {
         client.close();
         cluster.shutDown();
 
-        ZipFile collectionZip = collect(voltDbRootPath, true, 50);
+        m_outputFileName = new File(m_voltDbRootPath).getParent() + File.separator + m_pid + "_withJvmCrash.zip";
+        deleteOutputFileIfExists();
+        ZipFile collectionZip = collect(true, 50, false);
 
-        int pid = getpid(voltDbRootPath);
-        String workingDir = getWorkingDir(voltDbRootPath);
-        File jvmCrashGenerated = new File(workingDir, "hs_err_pid" + pid + ".log");
+        String workingDir = getWorkingDir(m_voltDbRootPath);
+        File jvmCrashGenerated = new File(workingDir, "hs_err_pid" + m_pid + ".log");
         jvmCrashGenerated.deleteOnExit();
-        ZipEntry logFile = collectionZip.getEntry(rootDir + File.separator + "system_logs" + File.separator + "hs_err_pid" + pid + ".log");
+        ZipEntry logFile = collectionZip.getEntry(m_collectBaseFolder + File.separator + "system_logs" + File.separator + "hs_err_pid" + m_pid + ".log");
         assertNotNull(logFile);
         collectionZip.close();
     }
@@ -359,12 +422,14 @@ public class TestCollector extends JUnit4LocalClusterTest {
 
         createLogFiles();
 
-        ZipFile collectionZip = collect(voltDbRootPath, true, 3);
+        m_outputFileName = new File(m_voltDbRootPath).getParent() + File.separator + m_pid + "_withDaysToCollect.zip";
+        deleteOutputFileIfExists();
+        ZipFile collectionZip = collect(true, 3, false);
         int logCount = 0;
         Enumeration<? extends ZipEntry> e = collectionZip.entries();
         while (e.hasMoreElements()) {
             ZipEntry z = e.nextElement();
-            if (z.getName().startsWith(rootDir + File.separator + "voltdb_logs" + File.separator))
+            if (z.getName().startsWith(m_collectBaseFolder + File.separator + "voltdb_logs" + File.separator))
                 logCount++;
         }
         assertEquals(logCount, 4);
@@ -382,11 +447,12 @@ public class TestCollector extends JUnit4LocalClusterTest {
         Collector.m_currentTimeMillis = cal.getTimeInMillis();
 
         resetCurrentTime = false;
-        ZipFile collectionZip = collect(voltDbRootPath, true, 4);
+        m_outputFileName = new File(m_voltDbRootPath).getParent() + File.separator + m_pid + "_withFilesOnYrBndry.zip";
+        ZipFile collectionZip = collect(true, 4, false);
         int logCount = 0;
         Enumeration<? extends ZipEntry> e = collectionZip.entries();
         while (e.hasMoreElements()) {
-            if (e.nextElement().getName().startsWith(rootDir + File.separator + "voltdb_logs" + File.separator))
+            if (e.nextElement().getName().startsWith(m_collectBaseFolder + File.separator + "voltdb_logs" + File.separator))
                 logCount++;
         }
         assertEquals(logCount, 1);
@@ -398,12 +464,16 @@ public class TestCollector extends JUnit4LocalClusterTest {
     public void testRepeatFileName() throws Exception {
 
         createLogFiles();
-
-        ZipFile collectionZip = collect(voltDbRootPath, true, 3);
+        m_outputFileName = new File(m_voltDbRootPath).getParent() + File.separator + m_pid + "_withRepeatedFileName.zip";
+        deleteOutputFileIfExists();
+        ZipFile collectionZip = collect(true, 3, false);
 
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-        ZipEntry repeatFile = collectionZip.getEntry(rootDir + File.separator + "voltdb_logs" + File.separator +
+        ZipEntry repeatFile = collectionZip.getEntry(m_collectBaseFolder + File.separator + "voltdb_logs" + File.separator +
                 "volt-junit-fulllog.txt." + formatter.format(new Date()) + "(1)");
         assertNotNull(repeatFile);
+        collectionZip.close();
     }
+
+
 }

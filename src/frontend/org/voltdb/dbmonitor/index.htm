@@ -6,17 +6,21 @@
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
     <meta name="description" content="">
     <meta name="author" content="">
-    <link href="css/resources/jquery-ui.css" rel="stylesheet" />
-    <link href="css/resources/layout.css" rel="stylesheet" />
-    <link href="css/resources/aero.css" rel="stylesheet" />
-    <link href="css/resources/nv.d3.css" rel="stylesheet" />
-    <link href="css/resources/tablesorter.css" rel="stylesheet" />
-    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
-    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
-    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
+    <link href="css/aero.css" rel="stylesheet" />
+    <link href="css/dataTables_page.css" rel="stylesheet" />
+    <link href="css/dataTables_table.css" rel="stylesheet" />
+    <link href="css/theme.default.min.css" rel="stylesheet" />
+    <link href="css/jquery.dataTables.css" rel="stylesheet" />
+    <link href="css/jquery-ui.css" rel="stylesheet" />
+    <link href="css/layout.css" rel="stylesheet" />
+    <link href="css/nv.d3.css" rel="stylesheet" />
+    <link href="css/tablesorter.css" rel="stylesheet" />
+    <link href="css/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
+    <link href="css/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
+    <link href="css/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
-    <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
-    <script type="text/javascript" src="js/d3/nv.d3.min(modified).js"></script>
+    <script type="text/javascript" src="js/d3.v3.min.js"></script>
+    <script type="text/javascript" src="js/nv.d3.min(modified).js"></script>
     <script type="text/javascript" src="js/long.js"></script>
     <script type="text/javascript" src="js/jquery.slimscroll.min.js"></script>
     <script type="text/javascript" src="js/jquery.popup.js"></script>
@@ -39,13 +43,9 @@
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
     <script type="text/javascript" src="js/FileSaver.min.js"></script>
     <script type="text/javascript" src="js/jquery.validate.min.js"></script>
-    <link href="css/resources/datatables/dataTables_page.css" rel="stylesheet" />
-    <link href="css/resources/datatables/dataTables_table.css" rel="stylesheet" />
-    <link href="css/resources/datatables/jquery.dataTables.css" rel="stylesheet" />
     <script src="js/bignumber.js"></script>
     <script src="js/jsonParse.js"></script>
-    <!--<link href="css/resources/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
-    <link href="css/resources/datatables/theme.default.min.css" rel="stylesheet" />
+    <!--<link href="css/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
     <script src="js/jquery.dataTables.min.js"></script>
     <script src="js/jqueryDatatablePlugins.js"></script>
     <script src="js/sha256.js"></script>
@@ -58,7 +58,7 @@
             <div class="header" id="headerMain">
                 <div class="headLeft">
                     <div class="logo">
-                        <img src="css/resources/images/voltdb-logo.png" alt="VoltDB" />
+                        <img src="images/voltdb-logo.png" alt="VoltDB" />
                     </div>
                     <div class="menu" id="toggle">
                         <div class="toggleMenu" id="toggleMenu">Menu</div>
@@ -69,6 +69,7 @@
                                 <li id="navSchema"><a href="#o">Schema</a></li>
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
                                 <li id="navDR" style="display: none;"><a href="#">DR</a></li>
+                                <li id="navImporter" style="display:none"><a href="#">Importer</a></li>
                             </ul>
                         </nav>
                     </div>
@@ -201,7 +202,7 @@
                     <div id="mainGraphBlock">
                     <div class="errorMsgLocalStorageFull" style="display:none">
                         <div class="errorMsgLocalWrapper">
-                        <img src="css/resources/images/alert.png" alt="Alert"/>
+                        <img src="images/alert.png" alt="Alert"/>
                         </div>
                         <div class="textMsgLocalWrapper">
                         <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
@@ -212,7 +213,7 @@
                             <div id="chartServerCPU" class="chart">
                                 <div class="chartHeader" id="chartHead">
                                     <h1>Server CPU <span class="activeServerName" title=""></span>
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "cpu-data" }, "cpu");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "cpu-data" }, "cpu");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -221,7 +222,7 @@
                             <div id="chartServerRAM" class="chart">
                                 <div class="chartHeader" id="chartRamHeader">
                                     <h1>Server RAM<span class="activeServerName" title=""></span>
-                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "memory-data" }, "memory");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "memory-data" }, "memory");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -230,7 +231,7 @@
                             <div id="chartClusterLatency" class="chart">
                                 <div class="chartHeader">
                                     <h1><div class="chartLeft">Cluster Latency (99th percentile, ms)</div>
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "latency-data" }, "latency");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "latency-data" }, "latency");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -239,7 +240,7 @@
                             <div id="chartClusterTransactions" class="chart">
                                 <div class="chartHeader">
                                     <h1>Cluster Transactions (tps)
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "clusterTransaction-data" }, "transaction");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "clusterTransaction-data" }, "transaction");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -248,7 +249,7 @@
                             <div id="chartPartitionIdleTime" class="chart">
                                 <div class="chartHeader">
                                     <h1>Partition Idle Time
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "partitionIdle-data" }, "partitionIdle");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "partitionIdle-data" }, "partitionIdle");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -264,7 +265,7 @@
                             <div id="chartCommandLogging" class="chart" style="display: none">
                                 <div class="chartHeader">
                                     <h1>Command Log Statistics
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "CommandLog-data" }, "commandLog");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "CommandLog-data" }, "commandLog");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -1143,6 +1144,70 @@
                     <div class="clear"></div>
                 </div>
             </div>
+            <!--Importer-->
+            <div class="container contents" id="importer" style="display: none;">
+                <div class="content displayPre" id="contentImport">
+                    <div class="leftShowhide">
+                        <div id="GraphBlock1" class="">
+                            <h1 class="headText1"><a href="#" id="showHideImporterGraphBlock" class="showhideImporterIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
+                        </div>
+                    </div>
+                    <div class="rightShowhide">
+                        <ul class="rightShowhideList" id="showHideRightImportList">
+                            <li class="viewSelect">
+                                <label>View</label>
+                                <select id="importerGraphView">
+                                    <option selected="selected">Seconds</option>
+                                    <option>Minutes</option>
+                                    <option>Days</option>
+                                </select>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+                <div id="mainImporterGraphBlock">
+                    <div class="errorImporterMsgLocalStorageFull" style="display:none">
+                        <div class="errorMsgLocalWrapper">
+                            <img src="images/alert.png" alt="Alert"/>
+                        </div>
+                        <div class="textMsgLocalWrapper">
+                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="graphChart" id="graphChartImporter">
+                        <div id="chartOutTransaction" class="chart left">
+                            <div class="chartHeader" id="chartOutTransHeader">
+                                <h1>Outstanding Transaction<span class="activeServerName" title=""></span>
+                                <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "outstanding-transaction-data" }, "outTrans");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <svg id="visualisationOutTrans" width="100%" height="350"></svg>
+                        </div>
+                        <div id="chartSuccessRate" class="chart right">
+                            <div class="chartHeader" id="chartSuccessRateHeader">
+                                <h1>Success Rate<span class="activeServerName" title=""></span>
+                                 <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "success-rate-data" }, "successRate");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <svg id="visualisationSuccessRate" width="100%" height="400"></svg>
+                        </div>
+                        <div id="chartFailureRate" class="chart left">
+                            <div class="chartHeader">
+                                <h1>Failure Rate<span class="activeServerName" title=""></span>
+                                <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "failure-rate-data" }, "failureRate");'> <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <svg id="visualisationFailureRate" width="100%" height="400"></svg>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     <div class="footer" id="mainFooter">
@@ -1235,7 +1300,7 @@
     <!--Logout popup-->
     <div id="logoutPopup" style="display: none">
         <div class="overlay-title ">
-            <img src="css/resources/images/Information.png" class="imgError" />Logout
+            <img src="images/Information.png" class="imgError" />Logout
         </div>
         <div class="clear"></div>
         <div class="overlay-contentError errorMsg">
@@ -1257,7 +1322,7 @@
     <div id="connectionPopup" style="display: none">
         <div id="conpop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1273,7 +1338,7 @@
     <div id="shutdownInfoPopup" style="display: none">
         <div id="shutdownPop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1289,7 +1354,7 @@
     <div id="serverUnavailablePopup" style="display: none">
         <div id="servUnavailablePop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1307,7 +1372,7 @@
     <div id="unAuthorizedPopup" style="display: none">
         <div id="kerberosPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1532,7 +1597,7 @@
     <div style="display: none"><a id="loginWarnPopup" href="#loginWarningPopup">login error</a></div>
     <div id="loginWarningPopup" style="display: none">
         <div class="overlay-title ">
-            <img src="css/resources/images/error.png" class="imgError" />Error
+            <img src="images/error.png" class="imgError" />Error
         </div>
         <div class="clear"></div>
         <div class="overlay-contentError errorMsg">
@@ -1680,7 +1745,7 @@
     <div id="saveSnapShotPopup" style="display: none">
         <div id="saveSnaps">
             <div class="overlay-title ">
-                <img id="imgSaveSnapshotStatus" src="css/resources/images/Information.png" class="imgError" /> <span id="saveSnapshotStatus"></span>
+                <img id="imgSaveSnapshotStatus" src="images/Information.png" class="imgError" /> <span id="saveSnapshotStatus"></span>
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError ">
@@ -1696,7 +1761,7 @@
     <div id="errorPromotePopup" style="display: none">
         <div id="errorPromote">
             <div class="overlay-title ">
-                <img src="css/resources/images/Information.png" class="imgError" /><span id="promoteErrorHeader">Failed to promote cluster</span>
+                <img src="images/Information.png" class="imgError" /><span id="promoteErrorHeader">Failed to promote cluster</span>
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError ">
@@ -1712,7 +1777,7 @@
     <div id="updateErrorPopup" style="display: none">
         <div id="updateInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1730,7 +1795,7 @@
     <div id="updateImportErrorPopup" style="display: none">
         <div id="updateImportInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1748,7 +1813,7 @@
     <div id="updateSnapshotErrorPopup" style="display: none">
         <div id="updateInnerSnapshotErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1767,7 +1832,7 @@
     <div id="updateSnmpErrorPopup" style="display: none">
         <div id="updateInnerSnmpErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1785,7 +1850,7 @@
     <div id="updateDrMasterErrorPopup" style="display: none">
         <div id="updateInnerDrMasterErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1803,7 +1868,7 @@
     <div id="queryTimeoutUpdateErrorPopup" style="display: none">
         <div id="queryTimeoutUpdateInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1821,7 +1886,7 @@
     <div id="memorySizeUpdateErrorPopup" style="display: none">
         <div id="memorySizeUpdateInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1839,7 +1904,7 @@
     <div id="diskSizeUpdateErrorPopup" style="display: none">
         <div id="diskSizeUpdateInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1857,7 +1922,7 @@
     <div id="securityUserErrorPopup" style="display: none">
         <div id="securityUserInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error
+                <img src="images/error.png" class="imgError" />Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
@@ -1977,7 +2042,7 @@
     <div id="queryDatabasePausedErrorPopup" style="display: none">
         <div id="queryDatabasePausedInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Query Execution Error
+                <img src="images/error.png" class="imgError" />Query Execution Error
             </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorQueryDbPause">
@@ -2021,7 +2086,7 @@
     </div>
     <!--DR warning POPUP  -->
     <div id="drPartitionWarning" style="display: none">
-        <div class="overlay-title"><div class="warninghead"><img src="css/resources/images/Information.png" />Warning</div></div>
+        <div class="overlay-title"><div class="warninghead"><img src="images/Information.png" />Warning</div></div>
         <div class="clear"></div>
         <div class="overlay-content warning">
             <p id="drPartitionWarningMsg"></p>
@@ -2192,37 +2257,37 @@
     <a id="btnPrepareShutdown" href="#shutdownStatusPopup" style="display: none;"></a>
     <div id="shutdownStatusPopup" style="display: none;">
         <div class="overlay-title ">
-                <img id="" src="css/resources/images/Information.png" class="imgError" /> <span>Shutting Down</span>
+                <img id="" src="images/Information.png" class="imgError" /> <span>Shutting Down</span>
         </div>
         <div class="clear"></div>
         <div class="overlay-content confirmationHeight" style="width:300px">
             <ul id="shutdownMsg">
                 <li id="liPrepareShutdownNormal"><span class='shutdownNormal'></span>Preparing for shutdown.</li>
-                <li id="liPrepareShutdownLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Preparing for shutdown.</li>
-                <li id="liPrepareShutdownOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Preparing for shutdown.</li>
-                <li id="liPrepareShutdownFailure" style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownFailure" style="display:none"><span class='shutdownFailure'><img src='images/shutdown-failure.png'></span>Preparing for shutdown.</li>
 
                 <li id="liQueueExpDataNormal"><span class='shutdownNormal'></span>Writing out all queued export data.</li>
-                <li id="liQueueExpDataLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Writing out all queued export data.</li>
-                <li id="liQueueExpDataOk"  style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Writing out all queued export data.</li>
-                <li id="liQueueExpDataFailure"  style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataOk"  style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataFailure"  style="display:none"><span class='shutdownFailure'><img src='images/shutdown-failure.png'></span>Writing out all queued export data.</li>
 
                 <li id="liCompleteOutstandingExpDrNormal"><span class='shutdownNormal'></span>Completing outstanding export and DR transactions.</li>
-                <li id="liCompleteOutstandingExpDrLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding export and DR transactions.</li>
-                <li id="liCompleteOutstandingExpDrOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding export and DR transactions.</li>
+                <li id="liCompleteOutstandingExpDrLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Completing outstanding export and DR transactions.</li>
+                <li id="liCompleteOutstandingExpDrOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Completing outstanding export and DR transactions.</li>
 
                 <li id="liCompleteClientTransNormal"><span class='shutdownNormal'></span>Completing outstanding client transactions.</li>
-                <li id="liCompleteClientTransLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding client transactions.</li>
-                <li id="liCompleteClientTransOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding client transactions.</li>
+                <li id="liCompleteClientTransLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Completing outstanding client transactions.</li>
+                <li id="liCompleteClientTransOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Completing outstanding client transactions.</li>
 
                 <li id="liCompleteOutstandingImpNormal"><span class='shutdownNormal'></span>Completing outstanding importer requests.</li>
-                <li id="liCompleteOutstandingImpLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding importer requests.</li>
-                <li id="liCompleteOutstandingImpOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding importer requests.</li>
+                <li id="liCompleteOutstandingImpLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Completing outstanding importer requests.</li>
+                <li id="liCompleteOutstandingImpOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Completing outstanding importer requests.</li>
 
                 <li id="liShutdownReadyNormal"><span class='shutdownNormal'></span>Cluster will shutdown now.</li>
-                <li id="liShutdownReadyLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Cluster will shutdown now.</li>
-                <li id="liShutdownReadyOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Cluster will shutdown now.</li>
-                <li id="liShutdownReadyFailure" style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyLoad" style="display:none"><span class='shutdownLoader'><img src='images/shutdown-loader.gif'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyOk" style="display:none"><span class='shutdownSuccess'><img src='images/shutdown-success.png'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyFailure" style="display:none"><span class='shutdownFailure'><img src='images/shutdown-failure.png'></span>Cluster will shutdown now.</li>
             </ul>
         </div>
         <div class="shutdownErrorMsg" id="divShutdownErrMsg" style="display:none">

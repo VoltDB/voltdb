@@ -501,12 +501,6 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
-    TestGeneratedPlans
-    TestWindowedRank
-    TestWindowedCount
-    TestWindowedMin
-    TestWindowedMax
-    TestWindowedSum
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
@@ -558,10 +552,19 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
-     WindowFunctionPlanNodeTest
      PlanNodeFragmentTest
+     PlanNodeUtilTest
+     WindowFunctionPlanNodeTest
     """
-
+#
+# This is set to a list of class names.  Each of
+# these will be run to (1) find out the names of
+# all tests for the makefile and (2) generate the
+# tests.
+#
+CTX.GENERATOR_CLASSES = [
+    "org.voltdb.planner.eegentests.GenerateEETests"
+]
 ###############################################################################
 #
 # Print some configuration information.  This is useful for debugging.
@@ -616,6 +619,5 @@ if CTX.TARGET == "TEST":
     retval = runTests(CTX)
 elif CTX.TARGET == "VOLTDBIPC":
     retval = buildIPC(CTX)
-
 if retval != 0:
     sys.exit(-1)

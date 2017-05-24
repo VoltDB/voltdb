@@ -224,7 +224,7 @@ public class PostGISBackend extends PostgreSQLBackend {
 
     // Captures the use of GEOGRAPHY_POINT (in DDL)
     private static final Pattern geographyPointDdl = Pattern.compile(
-            "(?<point>GEOGRAPHY_POINT)\\s*(,|\\))", Pattern.CASE_INSENSITIVE);
+            "(?<point>GEOGRAPHY_POINT)", Pattern.CASE_INSENSITIVE);
     // Modifies a DDL statement containing GEOGRAPHY_POINT, which
     // PostgreSQL/PostGIS does not support, and replaces it with
     // GEOGRAPHY(POINT,4326), which is an equivalent that PostGIS does
@@ -233,12 +233,12 @@ public class PostGISBackend extends PostgreSQLBackend {
     // we can find an appropriate SRIS to use, which PostGIS supports
     // (possibly 3857?)
     private static final QueryTransformer geographyPointDdlTransformer
-            = new QueryTransformer(geographyPointDdl)
-            .replacementText("GEOGRAPHY(POINT,4326)").useWholeMatch().groups("point");
+            = new QueryTransformer(geographyPointDdl).groups("point")
+            .replacementText("GEOGRAPHY(POINT,4326)").useWholeMatch();
 
     // Captures the use of GEOGRAPHY (in DDL)
     private static final Pattern geographyDdl = Pattern.compile(
-            "(?<polygon>GEOGRAPHY)\\s*(,|\\))", Pattern.CASE_INSENSITIVE);
+            "(?<polygon>GEOGRAPHY)(?!(_|\\s*\\(\\s*)POINT)", Pattern.CASE_INSENSITIVE);
     // Modifies a DDL statement containing GEOGRAPHY, which PostgreSQL/PostGIS
     // does not support, and replaces it with GEOGRAPHY(POLYGON,4326), which
     // is an equivalent that PostGIS does support. Note: 4326 is the standard,
@@ -246,8 +246,8 @@ public class PostGISBackend extends PostgreSQLBackend {
     // this to use a sphere, if we can find an appropriate SRIS to use, which
     // PostGIS supports (possibly 3857?)
     private static final QueryTransformer geographyDdlTransformer
-            = new QueryTransformer(geographyDdl)
-            .replacementText("GEOGRAPHY(POLYGON,4326)").useWholeMatch().groups("polygon");
+            = new QueryTransformer(geographyDdl).groups("polygon")
+            .replacementText("GEOGRAPHY(POLYGON,4326)").useWholeMatch();
 
     static public PostGISBackend initializePostGISBackend(CatalogContext context)
     {

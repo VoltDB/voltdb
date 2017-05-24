@@ -175,7 +175,7 @@ public:
 
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
-        m_engine->setBuffers(NULL, 0, NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
+        m_engine->setBuffers(NULL, 0, NULL, 0, NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         int partitionCount = 1;
         m_engine->initialize(0, 0, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
@@ -311,7 +311,7 @@ public:
         indexes.push_back(index);
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
-        m_engine->setBuffers(NULL, 0, NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
+        m_engine->setBuffers(NULL, 0, NULL, 0, NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         int partitionCount = 1;
         m_engine->initialize(0, 0, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);

@@ -497,6 +497,14 @@ public class TestWindowedFunctions extends PlannerTestCase {
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
                       "Use of both a windowed function call and GROUP BY in a single query is not supported.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), COUNT(*) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), COUNT(B) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), MAX(B) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), AVG(B) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) AS R1, " +
                       "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
                       "FROM AAA;",
@@ -506,6 +514,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // Windowed expressions can only appear in the selection list.
         failToCompile("SELECT A, B, C FROM AAA WHERE RANK() OVER (PARTITION BY A ORDER BY B) < 3;",
                       "Windowed function call expressions can only appear in the selection list of a query or subquery.");
+        failToCompile("SELECT COUNT((SELECT DISTINCT A FROM AAA)) OVER (PARTITION BY A) FROM AAA;",
+                      "Window function calls with subquery expression arguments are not allowed.");
 
         // Detect that PARTITION BY A is ambiguous when A names multiple columns.
         // Queries like this passed at one point in development, ignoring the subquery

@@ -98,6 +98,23 @@ public class CatalogContext {
     // database settings. contains both cluster and path settings
     private final DbSettings m_dbSettings;
 
+    /**
+     * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
+     * When @param hasSchemaChange is true, @param defaultProcManager and @param plannerTool will be created as new.
+     * Otherwise, it will try to use the ones passed in to save CPU cycles for performance reason.
+     * @param transactionId
+     * @param uniqueId
+     * @param catalog
+     * @param settings
+     * @param catalogBytes
+     * @param catalogBytesHash
+     * @param deploymentBytes
+     * @param version
+     * @param messenger
+     * @param hasSchemaChange
+     * @param defaultProcManager
+     * @param plannerTool
+     */
     public CatalogContext(
             long transactionId,
             long uniqueId,
@@ -107,7 +124,10 @@ public class CatalogContext {
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
             int version,
-            HostMessenger messenger)
+            HostMessenger messenger,
+            boolean hasSchemaChange,
+            DefaultProcedureManager defaultProcManager,
+            PlannerTool plannerTool)
     {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
@@ -159,10 +179,21 @@ public class CatalogContext {
         this.deploymentHashForConfig = CatalogUtil.makeDeploymentHashForConfig(deploymentBytes);
         m_memoizedDeployment = null;
 
-        m_defaultProcs = new DefaultProcedureManager(database);
+
+        // If there is no schema change, default procedures will not be changed.
+        // Also, the planner tool can be almost reused except updating the catalog hash string.
+        // When there is schema change, we just reload every default procedure and create new planner tool
+        // by applying the existing schema, which are costly in the UAC MP blocking path.
+        if (hasSchemaChange) {
+            m_defaultProcs = new DefaultProcedureManager(database);
+            m_ptool = new PlannerTool(database, catalogHash);
+        } else {
+            m_defaultProcs = defaultProcManager;
+            m_ptool = plannerTool.updateWhenNoSchemaChange(database, catalogBytesHash);;
+        }
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
-        m_ptool = new PlannerTool(cluster, database, catalogHash);
+
         catalogVersion = version;
         m_messenger = messenger;
 
@@ -174,6 +205,33 @@ public class CatalogContext {
                 }
             }
         }
+    }
+
+    /**
+     * Constructor of @CatalogConext used when creating brand-new instances.
+     * @param transactionId
+     * @param uniqueId
+     * @param catalog
+     * @param settings
+     * @param catalogBytes
+     * @param catalogBytesHash
+     * @param deploymentBytes
+     * @param version
+     * @param messenger
+     */
+    public CatalogContext(
+            long transactionId,
+            long uniqueId,
+            Catalog catalog,
+            DbSettings settings,
+            byte[] catalogBytes,
+            byte[] catalogBytesHash,
+            byte[] deploymentBytes,
+            int version,
+            HostMessenger messenger)
+    {
+        this(transactionId, uniqueId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
+                version, messenger, true, null, null);
     }
 
     public Cluster getCluster() {
@@ -196,7 +254,8 @@ public class CatalogContext {
             String diffCommands,
             boolean incrementVersion,
             byte[] deploymentBytes,
-            HostMessenger messenger)
+            HostMessenger messenger,
+            boolean hasSchemaChange)
     {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
@@ -227,7 +286,10 @@ public class CatalogContext {
                     catalogBytesHash,
                     depbytes,
                     catalogVersion + incValue,
-                    messenger);
+                    messenger,
+                    hasSchemaChange,
+                    m_defaultProcs,
+                    m_ptool);
         return retval;
     }
 

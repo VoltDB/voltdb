@@ -35,14 +35,12 @@ def pause(runner):
     #Check the STATUS column. runner.call_proc() detects and aborts on errors.
     status = runner.call_proc('@Pause', [], []).table(0).tuple(0).column_integer(0)
     if status <> 0:
-        runner.error('The cluster has failed to pause with status: %d' % status)
-        return
+        runner.abort('The cluster has failed to pause with status: %d' % status)
     runner.info('The cluster is paused.')
     if runner.opts.waiting:
         status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
         if status <> 0:
-            runner.error('The cluster has failed to quiesce with status: %d' % status)
-            return
+            runner.abort('The cluster has failed to quiesce with status: %d' % status)
         runner.info('The cluster is quiesced.')
         actionMessage = 'Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics'
         try:

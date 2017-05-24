@@ -18,7 +18,8 @@ import sys, os, subprocess
 from voltcli import utility
 
 dir_spec_help = ('Specifies the root directory for the database. The default is the current working directory.')
-get_resource_help = ('Supported configuration resources for get command are \'deployment\' and \'schema\'.\r\n'
+get_resource_help = ('Supported configuration resources for get command are \'classes\', \'deployment\' and \'schema\'.\r\n'
+                     '           classes    - gets procedure classes of current node\n'
                      '           deployment - gets deployment configuration of current node\n'
                      '           schema     - gets schema of current node\n')
 output_help = ('Specifies the path and file name for the output file. Defaults are: '

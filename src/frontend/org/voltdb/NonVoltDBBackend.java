@@ -61,6 +61,8 @@ public abstract class NonVoltDBBackend {
     protected String m_database_type = null;
     protected Connection dbconn;
     protected static FileWriter transformedSqlFileWriter;
+    protected static long countCaughtExceptions = 0;
+    protected static final long MAX_CAUGHT_EXCEPTION_MESSAGES = 100;
     protected static final boolean DEBUG = false;
 
     /** Pattern used to recognize "variables", such as {table} or {column:pk},
@@ -311,8 +313,8 @@ public abstract class NonVoltDBBackend {
 
         /** Specifies one or more strings whose appearance in the group means
          *  that this group should not be changed (e.g. "TRUNC", so as not to
-         *  wrap TRUNC around the same group twice); default is default is an
-         *  empty list of strings, in which case it is ignored. */
+         *  wrap TRUNC around the same group twice); default is an empty list
+         *  of strings, in which case it is ignored. */
         protected QueryTransformer exclude(String ... texts) {
             this.m_exclude.addAll(Arrays.asList(texts));
             return this;
@@ -366,6 +368,18 @@ public abstract class NonVoltDBBackend {
 
     }
 
+    /** Print a message about an Exception that was caught; but limit the number
+     *  of such print messages, so that the console is not swamped by them. */
+    protected static void printCaughtException(String exceptionMessage) {
+        if (++countCaughtExceptions <= MAX_CAUGHT_EXCEPTION_MESSAGES) {
+            System.out.println(exceptionMessage);
+        }
+        if (countCaughtExceptions == MAX_CAUGHT_EXCEPTION_MESSAGES) {
+            System.out.println("In NonVoltDBBackend, reached limit of " + MAX_CAUGHT_EXCEPTION_MESSAGES
+                    + " exception messages to be printed.");
+        }
+    }
+
     /** Returns all column names for the specified table, in the order defined
      *  in the DDL. */
     protected List<String> getAllColumns(String tableName) {
@@ -378,7 +392,7 @@ public abstract class NonVoltDBBackend {
                 columns.add(rs.getString(4));
             }
         } catch (SQLException e) {
-            System.out.println("In NonVoltDBBackend.getAllColumns, caught SQLException: " + e);
+            printCaughtException("In NonVoltDBBackend.getAllColumns, caught SQLException: " + e);
         }
         return columns;
     }
@@ -395,7 +409,7 @@ public abstract class NonVoltDBBackend {
                 pkCols.add(rs.getString(4));
             }
         } catch (SQLException e) {
-            System.out.println("In NonVoltDBBackend.getPrimaryKeys, caught SQLException: " + e);
+            printCaughtException("In NonVoltDBBackend.getPrimaryKeys, caught SQLException: " + e);
         }
         return pkCols;
     }
@@ -461,7 +475,7 @@ public abstract class NonVoltDBBackend {
                     }
                 }
             } catch (SQLException e) {
-                System.out.println("In NonVoltDBBackend.isColumnType, with tableName "+tableName+", columnName "
+                printCaughtException("In NonVoltDBBackend.isColumnType, with tableName "+tableName+", columnName "
                         + columnName+", columnTypes "+columnTypes+", caught SQLException:\n  " + e);
             }
         }
@@ -524,7 +538,7 @@ public abstract class NonVoltDBBackend {
      *  it may be overridden to do something more complicated, to make sure that
      *  the prefix and suffix go in the right place, relative to any parentheses
      *  found in the group. */
-    protected String handleParens(String group, String prefix, String suffix) {
+    protected String handleParens(String group, String prefix, String suffix, boolean debugPrint) {
         return prefix + group + suffix;
     }
 
@@ -536,7 +550,7 @@ public abstract class NonVoltDBBackend {
      *  sub-classes, to determine appropriate changes for that non-VoltDB
      *  backend database. */
     protected String replaceGroupNameVariables(String str,
-            List<String> groupNames, List<String> groupValues) {
+            List<String> groupNames, List<String> groupValues, boolean debugPrint) {
         return str;
     }
 
@@ -594,7 +608,7 @@ public abstract class NonVoltDBBackend {
                         suffixValue = qt.m_altSuffix;
                     }
                     // Make sure not to swallow up extra ')', in this group
-                    replaceText.append(handleParens(groupValue, qt.m_prefix, suffixValue));
+                    replaceText.append(handleParens(groupValue, qt.m_prefix, suffixValue, qt.m_debugPrint));
                 }
                 lastGroup = group;
             }
@@ -676,14 +690,17 @@ public abstract class NonVoltDBBackend {
                     // Make sure not to swallow up extra ')', in whole match; and
                     // replace symbols like {foo} with the appropriate group values
                     replaceText.append(replaceGroupNameVariables(
-                            handleParens(wholeMatch, qt.m_prefix, qt.m_suffix),
-                            qt.m_groups, groups));
+                            handleParens(wholeMatch, qt.m_prefix, qt.m_suffix, qt.m_debugPrint),
+                            qt.m_groups, groups, qt.m_debugPrint));
                 }
             }
             if (qt.m_debugPrint) {
                 System.out.println("  replaceText : " + replaceText);
             }
-            matcher.appendReplacement(modified_query, replaceText.toString());
+            // Extra escaping to make sure that "\\" remains as "\\" and "$"
+            // remains "$", despite appendReplacement's efforts to change them
+            matcher.appendReplacement(modified_query,
+                    replaceText.toString().replace("\\\\", "\\\\\\\\").replace("$", "\\$"));
         }
         matcher.appendTail(modified_query);
         if ((DEBUG || qt.m_debugPrint) && !query.equalsIgnoreCase(modified_query.toString())) {
@@ -713,9 +730,9 @@ public abstract class NonVoltDBBackend {
                 transformedSqlFileWriter.write("original SQL: " + originalSql + "\n");
                 transformedSqlFileWriter.write("modified SQL: " + modifiedSql + "\n");
             } catch (IOException e) {
-                System.out.println("Caught IOException:\n    " + e);
-                System.out.println("original SQL: " + originalSql);
-                System.out.println("modified SQL: " + modifiedSql);
+                printCaughtException("Caught IOException:\n    " + e
+                        + "\noriginal SQL: " + originalSql
+                        + "\nmodified SQL: " + modifiedSql);
             }
         }
     }

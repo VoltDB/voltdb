@@ -41,6 +41,8 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
@@ -537,6 +539,47 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
         }
 
+        public ByteBuffer readResultsBuffer() throws IOException {
+            // check the dirty-ness of the batch
+            final ByteBuffer dirtyBytes = ByteBuffer.allocate(1);
+            while (dirtyBytes.hasRemaining()) {
+                int read = m_socketChannel.read(dirtyBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            dirtyBytes.flip();
+            // check if anything was changed
+            m_dirty |= dirtyBytes.get() > 0;
+
+            final ByteBuffer resultTablesLengthBytes = ByteBuffer.allocate(4);
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (resultTablesLengthBytes.hasRemaining()) {
+                int read = m_socketChannel.read(resultTablesLengthBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            resultTablesLengthBytes.flip();
+            final int resultTablesLength = resultTablesLengthBytes.getInt();
+
+            if (resultTablesLength <= 0)
+                return resultTablesLengthBytes;
+
+            final ByteBuffer resultTablesBuffer = ByteBuffer
+                    .allocate(resultTablesLength+4);
+            //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            resultTablesBuffer.putInt(resultTablesLength);
+            while (resultTablesBuffer.hasRemaining()) {
+                int read = m_socketChannel.read(resultTablesBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            resultTablesBuffer.flip();
+            return resultTablesBuffer;
+        }
+
         /**
          * Read and deserialize a long from the wire.
          */
@@ -668,11 +711,21 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     private final String m_hostname;
     // private final FastSerializer m_fser;
     private final Connection m_connection;
-    private final BBContainer m_dataNetworkOrigin;
-    private final ByteBuffer m_dataNetwork;
+    private BBContainer m_dataNetworkOrigin;
+    private ByteBuffer m_dataNetwork;
     private ByteBuffer m_data;
 
     // private int m_counter;
+
+    private void verifyDataCapacity(int size) {
+        if (size+4 > m_dataNetwork.capacity()) {
+            m_dataNetworkOrigin.discard();
+            m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(size+4);
+            m_dataNetwork = m_dataNetworkOrigin.b();
+            m_dataNetwork.position(4);
+            m_data = m_dataNetwork.slice();
+        }
+    }
 
     public ExecutionEngineIPC(
             final int clusterIndex,
@@ -788,11 +841,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     protected void coreLoadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
+        verifyDataCapacity(catalogBytes.length + 100);
         m_data.clear();
-
-        if (m_data.capacity() < catalogBytes.length + 100) {
-            m_data = ByteBuffer.allocate(catalogBytes.length + 100);
-        }
         m_data.putInt(Commands.LoadCatalog.m_id);
         m_data.putLong(timestamp);
         m_data.put(catalogBytes);
@@ -811,17 +861,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void coreUpdateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(final long timestamp, final boolean isStreamUpdate, final String catalogDiffs) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
-        m_data.clear();
 
         try {
             final byte catalogBytes[] = catalogDiffs.getBytes("UTF-8");
-            if (m_data.capacity() < catalogBytes.length + 100) {
-                m_data = ByteBuffer.allocate(catalogBytes.length + 100);
-            }
+            verifyDataCapacity(catalogBytes.length + 100);
+            m_data.clear();
             m_data.putInt(Commands.UpdateCatalog.m_id);
             m_data.putLong(timestamp);
+            m_data.putInt(isStreamUpdate ? 1 : 0);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -881,6 +930,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
             final Object[] parameterSets,
+            DeterminismHash determinismHash,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -891,16 +943,19 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         final FastSerializer fser = new FastSerializer();
         try {
             for (int i = 0; i < numFragmentIds; ++i) {
+                Object params = parameterSets[i];
                 // pset can be ByteBuffer or ParameterSet instance
-                if (parameterSets[i] instanceof ByteBuffer) {
-                    fser.write((ByteBuffer) parameterSets[i]);
+                int paramStart = fser.getPosition();
+                if (params instanceof ByteBuffer) {
+                    ByteBuffer buf = (ByteBuffer) params;
+                    fser.write(buf);
                 }
                 else {
-                    ParameterSet pset = (ParameterSet) parameterSets[i];
-                    ByteBuffer buf = ByteBuffer.allocate(pset.getSerializedSize());
-                    pset.flattenToBuffer(buf);
-                    buf.flip();
-                    fser.write(buf);
+                    ParameterSet pset = (ParameterSet) params;
+                    fser.writeParameterSet(pset);
+                }
+                if (determinismHash != null && isWriteFrags[i]) {
+                    determinismHash.offerStatement(sqlCRCs[i], paramStart, fser.getContainerNoFlip().b());
                 }
             }
         } catch (final IOException exception) {
@@ -918,20 +973,23 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         m_data.clear();
-        m_data.putInt(cmd.m_id);
-        m_data.putLong(txnId);
-        m_data.putLong(spHandle);
-        m_data.putLong(lastCommittedSpHandle);
-        m_data.putLong(uniqueId);
-        m_data.putLong(undoToken);
-        m_data.put((m_perFragmentTimingEnabled ? (byte)1 : (byte)0));
-        m_data.putInt(numFragmentIds);
-        for (int i = 0; i < numFragmentIds; ++i) {
-            m_data.putLong(planFragmentIds[i]);
-        }
-        for (int i = 0; i < numFragmentIds; ++i) {
-            m_data.putLong(inputDepIds[i]);
-        }
+        do {
+            m_data.putInt(cmd.m_id);
+            m_data.putLong(txnId);
+            m_data.putLong(spHandle);
+            m_data.putLong(lastCommittedSpHandle);
+            m_data.putLong(uniqueId);
+            m_data.putLong(undoToken);
+            m_data.put((m_perFragmentTimingEnabled ? (byte)1 : (byte)0));
+            m_data.putInt(numFragmentIds);
+            for (int i = 0; i < numFragmentIds; ++i) {
+                m_data.putLong(planFragmentIds[i]);
+            }
+            for (int i = 0; i < numFragmentIds; ++i) {
+                m_data.putLong(inputDepIds[i]);
+            }
+            verifyDataCapacity(m_data.position()+fser.size());
+        } while (m_data.position() == 0);
         m_data.put(fser.getBuffer());
         fser.discard();
 
@@ -945,19 +1003,23 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    protected VoltTable[] coreExecutePlanFragments(
+    protected FastDeserializer coreExecutePlanFragments(
+            final int bufferHint,
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            DeterminismHash determinismHash,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
-            final long undoToken) throws EEException {
+            final long undoToken, boolean traceOn) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
-                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, txnId,
-                spHandle, lastCommittedSpHandle, uniqueId, undoToken);
+                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, determinismHash, isWriteFrags, sqlCRCs,
+                txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
         if (m_perFragmentTimingEnabled) {
             m_executionTimes = new long[numFragmentIds];
@@ -966,6 +1028,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         while (true) {
             try {
                 result = m_connection.readStatusByte();
+                ByteBuffer resultTables = null;
 
                 if (result == ExecutionEngine.ERRORCODE_NEED_PLAN) {
                     long fragmentId = m_connection.readLong();
@@ -976,17 +1039,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     m_connection.write();
                 }
                 else if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-                    final VoltTable resultTables[] = new VoltTable[numFragmentIds];
-                    for (int ii = 0; ii < numFragmentIds; ii++) {
-                        resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
-                    }
                     try {
-                        m_connection.readResultTables(resultTables);
+                        resultTables = m_connection.readResultsBuffer();
                     } catch (final IOException e) {
                         throw new EEException(
                                 ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
                     }
-                    return resultTables;
+                    return new FastDeserializer(resultTables);
                 }
                 else {
                     // failure
@@ -1028,27 +1087,21 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (returnUniqueViolations) {
             throw new UnsupportedOperationException("Haven't added IPC support for returning unique violations");
         }
-        m_data.clear();
-        m_data.putInt(Commands.LoadTable.m_id);
-        m_data.putInt(tableId);
-        m_data.putLong(txnId);
-        m_data.putLong(spHandle);
-        m_data.putLong(lastCommittedSpHandle);
-        m_data.putLong(uniqueId);
-        m_data.putLong(undoToken);
-        m_data.putInt(returnUniqueViolations ? 1 : 0);
-        m_data.putInt(shouldDRStream ? 1 : 0);
-
         final ByteBuffer tableBytes = PrivateVoltTableFactory.getTableDataReference(table);
-        if (m_data.remaining() < tableBytes.remaining()) {
-            m_data.flip();
-            final ByteBuffer newBuffer = ByteBuffer.allocate(m_data.remaining()
-                    + tableBytes.remaining());
-            newBuffer.rewind();
-            //newBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            newBuffer.put(m_data);
-            m_data = newBuffer;
-        }
+        m_data.clear();
+        do {
+            m_data.putInt(Commands.LoadTable.m_id);
+            m_data.putInt(tableId);
+            m_data.putLong(txnId);
+            m_data.putLong(spHandle);
+            m_data.putLong(lastCommittedSpHandle);
+            m_data.putLong(uniqueId);
+            m_data.putLong(undoToken);
+            m_data.putInt(returnUniqueViolations ? 1 : 0);
+            m_data.putInt(shouldDRStream ? 1 : 0);
+            verifyDataCapacity(m_data.position() + tableBytes.remaining());
+        } while (m_data.position() == 0);
+
         m_data.put(tableBytes);
 
         try {

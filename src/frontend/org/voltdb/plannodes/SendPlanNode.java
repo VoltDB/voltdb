@@ -20,7 +20,6 @@ package org.voltdb.plannodes;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -67,7 +66,7 @@ public class SendPlanNode extends AbstractPlanNode {
 
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate,
-            Cluster cluster, Database db, DatabaseEstimates estimates,
+            DatabaseEstimates estimates,
             ScalarValueHints[] paramHints) {
         assert(estimates != null);
         // Recursively compute and collect stats from the child node,

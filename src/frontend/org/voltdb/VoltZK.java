@@ -111,6 +111,7 @@ public class VoltZK {
 
     public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "join_blocker");
     public static final String rejoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "rejoin_blocker");
+    public static final String uacActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "uac_blocker");
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
     // Synchronized State Machine
@@ -285,10 +286,10 @@ public class VoltZK {
                       CreateMode.EPHEMERAL);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NODEEXISTS) {
-                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker", true, e);
+                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
             }
         } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to create catalog update blocker", true, e);
+            VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
         }
     }
 

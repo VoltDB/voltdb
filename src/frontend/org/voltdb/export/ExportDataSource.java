@@ -114,6 +114,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
     private RunnableWithES m_firstAction = null;
 
+    // Record the stacktrace of when this data source calls drain to help debug a race condition.
+    private volatile Exception m_drainTraceForDebug = null;
+
     /**
      * Create a new data source.
      * @param db
@@ -486,6 +489,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_pollFuture = null;
                 }
                 if (m_onDrain != null) {
+                    m_drainTraceForDebug = new Exception("Push USO " + uso + " endOfStream " + endOfStream +
+                                                         " poll " + poll);
                     m_onDrain.run();
                 }
             } else {
@@ -614,6 +619,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             m_pollFuture = null;
                         }
                         if (m_onDrain != null) {
+                            m_drainTraceForDebug = new Exception("Truncation txnId " + txnId);
                             m_onDrain.run();
                         }
                     }
@@ -749,6 +755,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //We are closing source.
                 }
                 if (m_onDrain != null) {
+                    m_drainTraceForDebug = new Exception();
                     m_onDrain.run();
                 }
                 return;
@@ -791,14 +798,21 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
             } else {
+                final AckingContainer ackingContainer = new AckingContainer(first_unpolled_block.unreleasedContainer(),
+                                                                            first_unpolled_block.uso() + first_unpolled_block.totalUso());
                 try {
-                    fut.set(
-                            new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                    first_unpolled_block.uso() + first_unpolled_block.totalUso()));
+                    fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source.
+                    ackingContainer.discard();
                 }
                 m_pollFuture = null;
+
+                if (m_drainTraceForDebug != null) {
+                    //Making this an ERROR. Looks like this is happening when ackImpl initiates drains and pollImpl is submitted to execute.
+                    exportLog.error("Rolling generation " + m_generation + " before it is fully drained. " +
+                                            "Drain was called from " + Throwables.getStackTraceAsString(m_drainTraceForDebug));
+                }
             }
         } catch (Throwable t) {
             fut.setException(t);
@@ -907,6 +921,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      private void ackImpl(long uso) {
 
         if (uso == Long.MIN_VALUE && m_onDrain != null) {
+            m_drainTraceForDebug = new Exception("Acking USO " + uso);
             m_onDrain.run();
             return;
         }

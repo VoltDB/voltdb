@@ -20,6 +20,8 @@ package org.voltdb.importer.formatter.builtin;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
 
@@ -30,7 +32,7 @@ import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
-public class VoltSuperCSVFormatter implements Formatter<String> {
+public class VoltSuperCSVFormatter implements Formatter {
 
     /** String that can be used to indicate NULL value in CSV files */
     public static final String CSV_NULL = "\\N";
@@ -107,19 +109,19 @@ public class VoltSuperCSVFormatter implements Formatter<String> {
     }
 
     @Override
-    public Object[] transform(String sourceData) throws FormatException {
-
-        if (sourceData == null) {
+    public Object[] transform(ByteBuffer payload) throws FormatException {
+        if (payload == null) {
             return null;
         }
-
-        m_tokenizer.setSourceString(sourceData);
+        String line = new String(payload.array(), payload.arrayOffset(), payload.limit(), StandardCharsets.UTF_8);
+        m_tokenizer.setSourceString(line);
         List<String> dataList;
         try {
             dataList = m_csvReader.read();
         } catch (IOException | SuperCsvException e) {
             throw new FormatException("Failed to parse csv data", e);
         }
+        if (dataList == null) return null;
         String[] data = dataList.toArray(new String[0]);
         normalize(data);
         return data;

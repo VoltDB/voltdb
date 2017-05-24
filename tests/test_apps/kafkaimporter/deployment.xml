@@ -6,24 +6,24 @@
     </httpd>
     <commandlog enabled="false" />
     <import>
-        <configuration module="kafkastream.jar" type="custom" enabled="true">
-            <property name="brokers">kafka2:9092</property>
+        <configuration type="kafka" enabled="true">
+            <property name="brokers">volt13i:9092</property>
             <property name="topics">T8_KAFKAEXPORTTABLE1</property>
             <property name="groupid">A8</property>
             <property name="procedure">InsertImport</property>
         </configuration>
 
-        <configuration module="kafkastream.jar" type="custom" enabled="true">
-            <property name="brokers">kafka2:9092</property>
+        <configuration type="kafka" enabled="true">
+            <property name="brokers">volt13i:9092</property>
             <property name="topics">T8_KAFKAEXPORTTABLE2</property>
             <property name="groupid">T8</property>
             <property name="procedure">InsertImport2</property>
         </configuration>
     </import>
 
-    <export enabled="true" target="kafka">
-        <configuration>
-            <property name="metadata.broker.list">kafka2:9092</property>
+    <export>
+        <configuration enabled="true" target="default" type="kafka">
+            <property name="metadata.broker.list">volt13i:9092</property>
             <property name="producer.type">async</property>
             <property name="acks">1</property>
             <property name="skipinternals">true</property>

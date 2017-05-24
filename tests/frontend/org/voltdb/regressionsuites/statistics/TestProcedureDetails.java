@@ -57,6 +57,7 @@ public class TestProcedureDetails extends RegressionSuite {
         private int m_updateCount = 1;
         private int m_deleteCount = 1;
         private int m_selectCount = 0;
+        private boolean m_twoBatch;
 
         static final int m_singlePartitionMask = 1 << 4;
         static final int m_option2BATCHMask = 1 << 3;
@@ -66,7 +67,7 @@ public class TestProcedureDetails extends RegressionSuite {
         static final int m_optionCount = 5;
 
         public ProcedureDetailTestConfig(int configValue) {
-            boolean twoBatch = (configValue & m_option2BATCHMask) > 0;
+            m_twoBatch = (configValue & m_option2BATCHMask) > 0;
             boolean readWrite = (configValue & m_optionRWMask) > 0;
             m_singlePartition = (configValue & m_singlePartitionMask) > 0;
             m_failure = (configValue & m_optionFAILMask) > 0;
@@ -84,9 +85,9 @@ public class TestProcedureDetails extends RegressionSuite {
             // But if the first batch in a multi-partition procedure failed, the procedure will abort
             // anyway even if the exception is being handled:
             // Multi-partition procedure xxx attempted to execute new batch after hitting EE exception in a previous batch
-            m_expectsException = m_failure || (m_abort && ! (m_singlePartition && twoBatch));
+            m_expectsException = m_failure || (m_abort && ! (m_singlePartition && m_twoBatch));
             StringBuilder argBuilder = new StringBuilder();
-            if (twoBatch) {
+            if (m_twoBatch) {
                 argBuilder.append("twobatch ");
                 if (! m_expectsException) {
                     m_insertCount++;
@@ -129,7 +130,15 @@ public class TestProcedureDetails extends RegressionSuite {
         }
 
         public boolean hasProcedureFailure() {
-            return m_failure;
+            // this logic is terrible, but matches what the proc does
+            // the SP proc swallows the sql exception if batched
+            if (m_singlePartition) {
+                return m_failure || (m_abort && !m_twoBatch);
+            }
+            // the MP proc tries to swallow if batched, but fails
+            else {
+                return m_failure || m_abort;
+            }
         }
 
         public boolean isSinglePartition() {

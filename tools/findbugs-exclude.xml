@@ -22,6 +22,12 @@ Exclusion file for findbugs ant task in build.xml
   <Match>
       <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE, NP_NULL_PARAM_DEREF, NP_NULL_ON_SOME_PATH"/>
   </Match>
+  <Match>
+    <Class name="org.voltdb.HsqlBackend" />
+  </Match>
+  <Match>
+    <Class name="org.voltdb.PostgreSQLBackend" />
+  </Match>
 </FindBugsFilter>
 
 

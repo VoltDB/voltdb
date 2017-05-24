@@ -24,12 +24,10 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
@@ -378,7 +376,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes(){}
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         // Cost counting index scans as constant, almost negligible work.
         // This might be unfair, as the tree has O(logn) complexity, but we
         // really want to pick this kind of search over others.
@@ -497,7 +495,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
         if (m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX) ||
-                m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX) ||
                 m_targetIndexName.equals(HSQLInterface.AUTO_GEN_MATVIEW_IDX) ) {
             indexDescription = " using its primary key index";
         }

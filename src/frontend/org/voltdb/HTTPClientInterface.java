@@ -300,7 +300,7 @@ public class HTTPClientInterface {
 
             authResult = authenticate(request);
             if (!authResult.isAuthenticated()) {
-                ok(jsonp, authResult.m_message, response);
+                unauthorized(jsonp, authResult.m_message, response);
                 request.setHandled(true);
                 return;
             }
@@ -442,13 +442,16 @@ public class HTTPClientInterface {
 
         assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20) || (hashedPasswordBytes.length == 32));
 
+        String fromAddress = request.getRemoteAddr();
+        if (fromAddress == null) fromAddress = "NULL";
+
         if (m_spnegoEnabled) {
             final String principal = spnegoLogin(token);
             AuthenticationRequest authReq = getAuthSystem().new SpnegoPassthroughRequest(principal);
-            if (!authReq.authenticate(ClientAuthScheme.SPNEGO)) {
+            if (!authReq.authenticate(ClientAuthScheme.SPNEGO, fromAddress)) {
                 return new AuthenticationResult(
                         false, null, adminMode, principal,
-                        "User " + principal + " failed to authorize"
+                        "User " + principal + " from " + fromAddress + " failed to authenticate"
                         );
             }
             return new AuthenticationResult(true, ClientAuthScheme.SPNEGO, adminMode, principal, "");
@@ -457,10 +460,10 @@ public class HTTPClientInterface {
             ClientAuthScheme scheme = hashedPasswordBytes != null ?
                     ClientAuthScheme.getByUnencodedLength(hashedPasswordBytes.length)
                     : ClientAuthScheme.HASH_SHA256;
-            if (!authReq.authenticate(scheme)) {
+            if (!authReq.authenticate(scheme, fromAddress)) {
                 return new AuthenticationResult(
                         false, null, adminMode, username,
-                        "User " + username + " failed to authorize"
+                        "User " + username + " from " + fromAddress + " failed to authenticate"
                         );
             }
             return new AuthenticationResult(true, scheme, adminMode, username, "");

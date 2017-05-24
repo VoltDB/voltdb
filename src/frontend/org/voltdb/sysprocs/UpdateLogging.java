@@ -19,7 +19,11 @@ package org.voltdb.sysprocs;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
@@ -37,6 +41,14 @@ import org.voltdb.VoltTable;
  */
 public class UpdateLogging extends VoltSystemProcedure
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    private final static CyclicBarrier barrier = new CyclicBarrier(VoltDB.instance().getCatalogContext().getNodeSettings().getLocalSitesCount());
+
+    private static final VoltLogger loggers[] = new VoltLogger[] {
+            new VoltLogger("HOST")
+    };
+
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{};
@@ -59,11 +71,45 @@ public class UpdateLogging extends VoltSystemProcedure
      */
     @SuppressWarnings("deprecation")
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
+                           String username,
+                           String remoteHost,
                            String xmlConfig)
     {
+        long oldLevels  = 0;
+        if (ctx.isLowestSiteId()) {
+            // Logger level is a global property, pick the site with lowest id to do it.
+            hostLog.info(String.format("%s from %s changed the log4j settings", username, remoteHost));
+            hostLog.info(xmlConfig);
+            oldLevels = hostLog.getLogLevels(loggers);
+        }
+
+        try {
+            // Mimic the multi-fragment semantics as scatter-gather pattern is an overkill for this simple task.
+            // There are chances that some sites being interrupted and update the logging before old logger level
+            // being read, but the reasons we don't care because 1) it is rare and 2) it only effects when HOST
+            // logger being changed from higher than INFO level to INFO or lower level.
+            barrier.await();
+        } catch (InterruptedException | BrokenBarrierException dontcare) { }
+
         VoltDB.instance().logUpdate(xmlConfig, DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                 ctx.getPaths().getVoltDBRoot());
         ctx.updateBackendLogLevels();
+
+        if (ctx.isLowestSiteId()) {
+            long newLevels = hostLog.getLogLevels(loggers);
+            if (newLevels != oldLevels) {
+                // If HOST logger wasn't able to log before and now it can, logs the setting change event.
+                int index = (int)((oldLevels >> 3) & 7);
+                Level before = Level.values()[index];
+                index = (int)((newLevels >> 3) & 7);
+                Level after = Level.values()[index];
+                if (before.ordinal() > Level.INFO.ordinal() && after.ordinal() <= Level.INFO.ordinal()) {
+                    hostLog.info(String.format("%s from %s changed the log4j settings", username, remoteHost));
+                    hostLog.info(xmlConfig);
+                }
+            }
+            barrier.reset();
+        }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);

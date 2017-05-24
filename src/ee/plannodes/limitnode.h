@@ -60,8 +60,15 @@ class Table;
  */
 class LimitPlanNode : public AbstractPlanNode {
 public:
-    LimitPlanNode() : limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1)
-    {}
+    LimitPlanNode()
+        : limit(-1)
+        , offset(0)
+        , limitParamIdx(-1)
+        , offsetParamIdx(-1)
+        , limitExpression(NULL)
+    {
+    }
+
     ~LimitPlanNode();
     PlanNodeType getPlanNodeType() const;
 

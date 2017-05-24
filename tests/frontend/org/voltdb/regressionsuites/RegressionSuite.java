@@ -44,9 +44,12 @@ import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
+import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientConfig;
@@ -61,7 +64,9 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -86,6 +91,9 @@ public class RegressionSuite extends TestCase {
     private final ArrayList<Client> m_clients = new ArrayList<>();
     private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<>();
     protected final String m_methodName;
+    // If the current RegressionSuite instance is the last one in the current VoltServerConfig,
+    // shutdown the cluster completely after finishing the test.
+    protected boolean m_completeShutdown;
 
     /**
      * Trivial constructor that passes parameter on to superclass.
@@ -96,6 +104,7 @@ public class RegressionSuite extends TestCase {
         m_methodName = name;
 
         VoltServerConfig.setInstanceSet(new HashSet<>());
+        m_completeShutdown = false;
     }
 
     /**
@@ -110,13 +119,65 @@ public class RegressionSuite extends TestCase {
         m_config.startUp(true);
     }
 
+    private static Catalog getCurrentCatalog() {
+        CatalogContext context = VoltDB.instance().getCatalogContext();
+        if (context == null) {
+            return null;
+        }
+        InMemoryJarfile currentCatalogJar = context.getCatalogJar();
+        String serializedCatalogString = CatalogUtil.getSerializedCatalogStringFromJar(currentCatalogJar);
+        assertNotNull(serializedCatalogString);
+        Catalog c = new Catalog();
+        c.execute(serializedCatalogString);
+        return c;
+    }
+
     /**
      * JUnit special method called to shutdown the test. This instance will
      * stop the VoltDB server using the VoltServerConfig instance provided.
      */
     @Override
     public void tearDown() throws Exception {
-        m_config.shutDown();
+        if (m_completeShutdown) {
+            m_config.shutDown();
+        }
+        else {
+            Catalog currentCataog = getCurrentCatalog();
+            if (currentCataog != null) {
+                CatalogDiffEngine diff = new CatalogDiffEngine(m_config.getInitialCatalog(), currentCataog);
+                // All catalog changes will have a changed "set /clusters#cluster/databases#database schema" command.
+                // If the diff command only has this line, it means something is changed first but restored later.
+                // We will ignore this case.
+                if (diff.commands().split("\n").length > 1) {
+                    fail("Catalog changed in test " + getName() +
+                            " while the regression suite optimization is on: \n" +
+                            diff.getDescriptionOfChanges(false));
+                }
+            }
+
+            Client client = getClient();
+            VoltTable tableList = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+            ArrayList<String> tableNames = new ArrayList<>(tableList.getRowCount());
+            int tableNameColIdx = tableList.getColumnIndex("TABLE_NAME");
+            int tableTypeColIdx = tableList.getColumnIndex("TABLE_TYPE");
+            while (tableList.advanceRow()) {
+                String tableType = tableList.getString(tableTypeColIdx);
+                if (! tableType.equalsIgnoreCase("EXPORT")) {
+                    tableNames.add(tableList.getString(tableNameColIdx));
+                }
+            }
+            for (String tableName : tableNames) {
+                try {
+                    client.callProcedure("@AdHoc", "DELETE FROM " + tableName);
+                }
+                catch (ProcCallException pce) {
+                    if (! pce.getMessage().contains("Illegal to modify a materialized view.")) {
+                        fail("Hit an exception when cleaning up tables between tests: " + pce.getMessage());
+                    }
+                }
+            }
+            client.drain();
+        }
         for (final Client c : m_clients) {
             c.close();
         }
@@ -1054,6 +1115,17 @@ public class RegressionSuite extends TestCase {
                 + "expected " + expectedTable.length + ", "
                 + "actual: " + actualTable.getRowCount(),
                 actualTable.advanceRow());
+    }
+
+    static protected void assertSuccessfulDML(Client client, String stmt) throws NoConnectionsException, IOException, ProcCallException {
+        assertSuccessfulDML(client, stmt, 1L);
+    }
+
+    static protected void assertSuccessfulDML(Client client, String stmt, long returnValue) throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable[] results = null;
+        results = client.callProcedure("@AdHoc", stmt).getResults();
+        assertEquals(1, results.length);
+        assertEquals(returnValue, results[0].asScalarLong());
     }
 
     static protected void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {

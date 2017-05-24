@@ -44,7 +44,8 @@ public enum TxnId2Utils {;
                 statusString.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
                 statusString.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
                 statusString.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
-                statusString.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*");
+                statusString.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*") ||
+                statusString.matches("(?s).*Ad Hoc Planner task queue is full.*");
     }
 
     static boolean isServerUnavailableIssue(String statusString) {
@@ -59,13 +60,25 @@ public enum TxnId2Utils {;
                 isServerUnavailableIssue(statusString);
     }
 
+    static boolean isTransactionStateIndeterminate(ClientResponse cr) {
+        String statusString = cr.getStatusString();
+        return (statusString.matches("(?s).*No response received in the allotted time.*") ||
+                statusString.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*"));
+    }
+
+
     static ClientResponse doProcCall(Client client, String proc, Object... parms) throws ProcCallException {
+        return doProcCall(client, proc, false, parms);
+    }
+    static ClientResponse doProcCallOneShot(Client client, String proc, Object... parms) throws ProcCallException {
+        return doProcCall(client, proc, true, parms);
+    }
+    static ClientResponse doProcCall(Client client, String proc, boolean oneshot, Object... parms) throws ProcCallException {
         Boolean sleep = false;
         Boolean noConnections = false;
-        Boolean timedOutOnce = false;
+        ClientResponse cr = null;
         while (true) {
             try {
-                ClientResponse cr = null;
                 if (proc == "@AdHoc")
                     cr = client.callProcedure("@AdHoc", (String) parms[0]);
                 else
@@ -82,12 +95,11 @@ public enum TxnId2Utils {;
             } catch (IOException e) {
                 Benchmark.hardStop(e);
             } catch (ProcCallException e) {
-                ClientResponse cr = e.getClientResponse();
+                cr = e.getClientResponse();
                 String ss = cr.getStatusString();
                 log.debug(ss);
-                if (/*cr.getStatus() == ClientResponse.USER_ABORT &&*/
-                    isConnectionTransactionOrCatalogIssue(ss)
-                    ) {}
+                if (isConnectionTransactionOrCatalogIssue(ss)
+                    ) { /* continue */ }
                 else if (isServerUnavailableIssue(ss)) {
                     sleep = true;
                 }
@@ -95,6 +107,8 @@ public enum TxnId2Utils {;
                     throw e;
                 }
             }
+            if (oneshot)
+                return cr;
             if (sleep | noConnections) {
                 try { Thread.sleep(3000); } catch (Exception f) { }
                 sleep = false;

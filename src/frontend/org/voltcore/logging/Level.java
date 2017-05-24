@@ -18,10 +18,12 @@
 package org.voltcore.logging;
 
 public enum Level {
+    ALL,
+    TRACE,
     DEBUG,
+    INFO,
+    WARN,
     ERROR,
     FATAL,
-    INFO,
-    TRACE,
-    WARN
+    OFF
 }
