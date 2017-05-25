@@ -2645,13 +2645,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
             return new ReadDeploymentResults(deploymentBytes, deployment);
-        } catch (SettingsException e) {
-            // Handling some setting errors (e.g. IO / Null Pointer) and print out
-            // error messages.
-            consoleLog.error("[FATAL ERROR] " + e.getMessage());
-            throw new RuntimeException(e);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            /*
+             * When a runtime exception is caught (e.g. reading a broken properties file),
+             * we probably just want to crash the DB anyway
+             */
+            consoleLog.fatal(e.getMessage());
+            VoltDB.crashLocalVoltDB(e.getMessage(), false, null);
+            return new ReadDeploymentResults(null, null);
         }
     }
 
