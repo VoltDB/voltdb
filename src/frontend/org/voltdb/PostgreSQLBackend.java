@@ -987,14 +987,25 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     protected void shutdown() {
         try {
             dbconn.close();
+            // Make sure the connection is closed, before proceeding
+            for (int i=1; dbconn.isValid(i) && i<=10; i++) {
+                Thread.sleep(1000*i);
+            }
             dbconn = null;
             System.gc();
-            try {
-                Statement stmt = m_permanent_db_backend.getConnection().createStatement();
-                stmt.execute("drop database if exists " + m_database_name + ";");
-            } catch (SQLException ex) {
-                System.err.println("In PostgreSQLBackend.shutdown(), caught exception: " + ex);
-                ex.printStackTrace();
+            for (int i=1; i<=3; i++) {
+                if (i > 1) {
+                    System.err.println("In PostgreSQLBackend.shutdown(): attempt #"+i+" ...");
+                }
+                try {
+                    Statement stmt = m_permanent_db_backend.getConnection().createStatement();
+                    stmt.execute("drop database if exists " + m_database_name + ";");
+                    break;
+                } catch (SQLException ex) {
+                    System.err.println("In PostgreSQLBackend.shutdown(), for "+dbconn_url
+                            +" on attempt #"+i+", caught exception:\n" + ex);
+                    ex.printStackTrace();
+                }
             }
             if (transformedSqlFileWriter != null) {
                 transformedSqlFileWriter.close();

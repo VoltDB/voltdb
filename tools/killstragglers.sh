@@ -37,10 +37,10 @@ if [ $USER = "test" ]; then
 fi
 
 # Uncomment these to get debug print:
-echo "STANDARD_VOLTDB_PORTS: $STANDARD_VOLTDB_PORTS"
-echo "SUDO: $SUDO"
-echo "USER: $USER"
-echo "BUILD_TAG: $BUILD_TAG"
+#echo "Debug: STANDARD_VOLTDB_PORTS: $STANDARD_VOLTDB_PORTS"
+#echo "Debug: SUDO: $SUDO"
+#echo "Debug: USER: $USER"
+#echo "Debug: BUILD_TAG: $BUILD_TAG"
 
 # Make an attempt to kill any VoltDB server processes; however,
 # this might not work when the process command is extremely long
@@ -82,16 +82,16 @@ else
 fi
 
 # Uncomment these to get debug print:
-echo "GET_PORT_PROCESS_COMMAND : $GET_PORT_PROCESS_COMMAND"
-echo "KILL_PORT_PROCESS_COMMAND: $KILL_PORT_PROCESS_COMMAND"
+#echo "Debug: GET_PORT_PROCESS_COMMAND : $GET_PORT_PROCESS_COMMAND"
+#echo "Debug: KILL_PORT_PROCESS_COMMAND: $KILL_PORT_PROCESS_COMMAND"
 
 PROC=
 for PORT in $STANDARD_VOLTDB_PORTS
 do
     $GET_PORT_PROCESS_COMMAND
     # Uncomment these to get debug print:
-    echo "PORT: $PORT"
-    echo "PROC: $PROC"
+    #echo "Debug: PORT: $PORT"
+    #echo "Debug: PROC: $PROC"
     if [ -n "$PROC" ]; then
         logger -sp user.notice -t TESTKILL "User $USER Port $PORT $BUILD_TAG Killing ($KILL_PORT_PROCESS_COMMAND): `$SUDO ps -p $PROC -o pid= -o user= -o command=`"
         $KILL_PORT_PROCESS_COMMAND
