@@ -166,11 +166,11 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
             validateSchema(results[0], expectedTable);
             if (success) {
                 success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX + "WAREHOUSE_W_PK_TREE", true);
+                        HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "W_PK_TREE", true);
             }
             if (success) {
                 success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX + "ITEM_I_PK_TREE", true);
+                        HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "I_PK_TREE", true);
             }
             if (success) break;
         }
