@@ -109,6 +109,18 @@ public class ForeignHost {
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
+
+            if (!m_closing && !isPrimary()) {
+                if (!m_hostMessenger.isShuttingDown()) {
+                    hostLog.warn("******************************************************************************************");
+                    hostLog.warn("********* Received remote hangup from foreign host " + hostnameAndIPAndPort() + " *********");
+                    hostLog.warn("******************************************************************************************");
+                } else {
+                    hostLog.warn("******************************************************************************************");
+                    hostLog.warn("********* Received remote shutdown from foreign host " + hostnameAndIPAndPort() + " *********");
+                    hostLog.warn("******************************************************************************************");
+                }
+            }
         }
 
         @Override
