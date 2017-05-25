@@ -106,11 +106,6 @@ public class ForeignHost {
                     hostLog.warn("******************************************************************************************");
                     hostLog.warn("********* Received remote hangup from foreign host " + hostnameAndIPAndPort() + " *********");
                     hostLog.warn("******************************************************************************************");
-                } else {
-                    VoltDB.dropStackTrace("Received remote shutdown command from foreign host " + hostnameAndIPAndPort());
-                    hostLog.warn("******************************************************************************************");
-                    hostLog.warn("******** Received remote shutdown from Admin: " + hostnameAndIPAndPort() + " ********");
-                    hostLog.warn("******************************************************************************************");
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
