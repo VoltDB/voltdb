@@ -325,7 +325,7 @@ public final class InvocationDispatcher {
         if (task.getProcName().equals("@PrepareShutdown")) {
             VoltLogger vLogger = new VoltLogger("HOST");
             vLogger.warn("=================================================================");
-            vLogger.warn("Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.");
+            vLogger.warn("User: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.");
             vLogger.warn("=================================================================\n");
         }
 
@@ -527,6 +527,7 @@ public final class InvocationDispatcher {
                 }
             } else if ("@Shutdown".equals(procName)) {
                 if (task.getParams().size() == 1) {
+                    consoleLog.info("@Shutdown size 1 !!! ========");
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                 }
             }
