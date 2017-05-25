@@ -66,8 +66,12 @@ public class ZKCountdownLatch
     }
 
     // Returns if already counted down to zero
-    public boolean isCountedDown() {
-        return countedDown;
+    public boolean isCountedDown() throws InterruptedException, KeeperException {
+        if (countedDown) return true;
+        int count = ByteBuffer.wrap(m_zk.getData(m_path, false, null)).getInt();
+        if (count > 0) return false;
+        countedDown = true;
+        return true;
     }
 
     public void countDown() throws InterruptedException, KeeperException {
