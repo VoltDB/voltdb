@@ -176,8 +176,6 @@ public class TestCalciteExpressions extends TestCalciteBase {
     public void testConcatConstStringExpr() throws Exception {
         String sql;
         sql = "select '55' || '22' from R1";
-        testPlan(sql, PlannerType.CALCITE);
-        testPlan(sql, PlannerType.VOLTDB);
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
         // HSQL concatenates the strings while parcing
@@ -191,12 +189,167 @@ public class TestCalciteExpressions extends TestCalciteBase {
     public void testConcatStringExpr() throws Exception {
         String sql;
         sql = "select v || '22' from R1";
-        testPlan(sql, PlannerType.CALCITE);
-        testPlan(sql, PlannerType.VOLTDB);
         Map<String, String> ignores = new HashMap<>();
         ignores.put("EXPR$0", "C1");
 
         comparePlans(sql, ignores);
+    }
+
+    // Arithmetic Expressions
+    public void testPlusExpr() throws Exception {
+        String sql;
+        sql = "select i + si from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        comparePlans(sql, ignores);
+    }
+    public void testMinusExpr() throws Exception {
+        String sql;
+        sql = "select i - si from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        comparePlans(sql, ignores);
+    }
+    public void testMultExpr() throws Exception {
+        String sql;
+        sql = "select i * si from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        comparePlans(sql, ignores);
+    }
+    public void testDivExpr() throws Exception {
+        String sql;
+        sql = "select i / si from R1";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        comparePlans(sql, ignores);
+    }
+
+    // TIMESTAMP
+    public void testInvalidDatetimeExpr() throws Exception {
+        String sql;
+        sql = "select ts + 10 from RTYPES";
+        failToCompile(PlannerType.CALCITE, sql, "Cannot apply '+' to arguments of type '<TIMESTAMP(0)> + <INTEGER>'");
+    }
+    public void testDatetimeExpr1() throws Exception {
+        String sql;
+        sql = "select ts from RTYPES";
+        comparePlans(sql);
+    }
+    public void testDatetimeConstExpr() throws Exception {
+        String sql;
+        sql = "select TIMESTAMP '1969-07-20 20:17:40' from RTYPES";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        comparePlans(sql, ignores);
+    }
+    public void testDatetimeConstMinusExpr() throws Exception {
+        String sql;
+        // Can not compare plans directly since HSQL simplifies the expression into a CVE during parsing
+        sql = "select TIMESTAMP '1969-07-20 20:17:40' - INTERVAL '1' DAY from RTYPES";
+
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        String calcitePlanJSON = testPlan(sql, PlannerType.CALCITE);
+
+        // Equivalent VoltDB query
+        sql = "select TO_TIMESTAMP(Microsecond, SINCE_EPOCH(Microsecond,TIMESTAMP '1969-07-20 20:17:40') - 86400000000) from rtypes";
+        String voltdbPlanJSON = testPlan(sql, PlannerType.VOLTDB);
+        compareJSONPlans(calcitePlanJSON, voltdbPlanJSON, ignores);
+    }
+    public void testDatetimeMinusExpr() throws Exception {
+        String sql;
+        // Can not compare plans directly since HSQL simplifies the expression into a CVE during parsing
+        sql = "select ts - INTERVAL '1' DAY from RTYPES";
+
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        String calcitePlanJSON = testPlan(sql, PlannerType.CALCITE);
+
+        // Equivalent VoltDB query
+        sql = "select TO_TIMESTAMP(Microsecond, SINCE_EPOCH(Microsecond,ts) - 86400000000) from rtypes";
+        String voltdbPlanJSON = testPlan(sql, PlannerType.VOLTDB);
+        compareJSONPlans(calcitePlanJSON, voltdbPlanJSON, ignores);
+    }
+
+    public void testDatetimeConstPlusExpr() throws Exception {
+        String sql;
+        // Can not compare plans directly since HSQL simplifies the expression into a CVE during parsing
+        sql = "select TIMESTAMP '1969-07-20 20:17:40' + INTERVAL '1' DAY from RTYPES";
+
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        String calcitePlanJSON = testPlan(sql, PlannerType.CALCITE);
+
+        // Equivalent VoltDB query
+        sql = "select TO_TIMESTAMP(Microsecond, SINCE_EPOCH(Microsecond,TIMESTAMP '1969-07-20 20:17:40') + 86400000000) from rtypes";
+        String voltdbPlanJSON = testPlan(sql, PlannerType.VOLTDB);
+        compareJSONPlans(calcitePlanJSON, voltdbPlanJSON, ignores);
+    }
+    public void testDatetimePlusExpr() throws Exception {
+        String sql;
+        // Can not compare plans directly since HSQL simplifies the expression into a CVE during parsing
+        sql = "select ts + INTERVAL '1' DAY from RTYPES";
+
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+        String calcitePlanJSON = testPlan(sql, PlannerType.CALCITE);
+
+        // Equivalent VoltDB query
+        sql = "select TO_TIMESTAMP(Microsecond, SINCE_EPOCH(Microsecond, ts) + 86400000000) from rtypes";
+        String voltdbPlanJSON = testPlan(sql, PlannerType.VOLTDB);
+        compareJSONPlans(calcitePlanJSON, voltdbPlanJSON, ignores);
+    }
+
+    public void testDatetimePlusParamExpr() throws Exception {
+        String sql;
+        // Can not compare plans directly since HSQL simplifies the expression into a CVE during parsing
+        sql = "select ts + INTERVAL ? DAY from RTYPES";
+
+        failToCompile(PlannerType.CALCITE, sql, "Encountered \"+ INTERVAL ?\"");
+
+        // Equivalent VoltDB query
+        sql = "select TO_TIMESTAMP(Microsecond, SINCE_EPOCH(Microsecond, ts) + ?) from rtypes";
+        String voltdbPlanJSON = testPlan(sql, PlannerType.VOLTDB);
+//        compareJSONPlans(calcitePlanJSON, voltdbPlanJSON, ignores);
+    }
+
+    public void testSinceEpochExpr() throws Exception {
+        String sql;
+        sql = "select SINCE_EPOCH(i) from post.rtypes";
+        String calcitePlanJSON = testPlan(sql, PlannerType.CALCITE);
+        
+//        final String viewSql = "select \"empid\" as EMPLOYEE_ID,\n"
+//                + "  \"name\" || ' ' || \"name\" as EMPLOYEE_NAME,\n"
+//                + "  \"salary\" as EMPLOYEE_SALARY,\n"
+//                + "  POST.MY_INCREMENT(\"empid\", 10) as INCREMENTED_SALARY\n"
+//                + "from \"hr\".\"emps\"";
+//        testPlan(viewSql, PlannerType.CALCITE);
+        
+//        String voltdbPlanJSON = testPlan(sql, PlannerType.VOLTDB);
+//        sql = "select TO_TIMESTAMP('1969-07-20' , 'YYYY-MM-DD') from rtypes";
+//        testPlan(sql, PlannerType.CALCITE);
+    }
+
+    public void testToTimestampExpr() throws Exception {
+        String sql;
+        sql = "select TO_TIMESTAMP(Second, SINCE_EPOCH(Second,ts) + 3600) from rtypes";
+        testPlan(sql, PlannerType.VOLTDB);
+//        sql = "select TO_TIMESTAMP('1969-07-20' , 'YYYY-MM-DD') from rtypes";
+//        testPlan(sql, PlannerType.CALCITE);
+    }
+
+   public void testDatetimeExpr() throws Exception {
+        String sql;
+        sql = "select ts + INTERVAL '45' DAY from rtypes";
+        testPlan(sql, PlannerType.CALCITE);
+    }
+
+    public void testFailMismatchOperandExpr() throws Exception {
+        String sql;
+        sql = "select vb + i from RTYPES";
+
+        failToCompile(PlannerType.CALCITE, sql, "Cannot apply '+' to arguments of type '<VARBINARY(1024)> + <INTEGER>'");
     }
 
 }

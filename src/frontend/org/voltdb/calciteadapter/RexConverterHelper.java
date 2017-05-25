@@ -17,14 +17,32 @@
 
 package org.voltdb.calciteadapter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.rel.type.RelDataType;
+import org.hsqldb_voltpatches.FunctionSQL;
+import org.hsqldb_voltpatches.FunctionForVoltDB;
+import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionId;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.types.ExpressionType;
 
 public class RexConverterHelper {
+
+    public static AbstractExpression createFunctionExpression(
+            RelDataType relDataType,
+            String funcName,
+            List<AbstractExpression> operands,
+            String impliedArg) {
+        FunctionId functionId = FunctionForVoltDB.newVoltDBFunctionId(funcName);
+        if (functionId == null) {
+            throw new CalcitePlanningException("Unsupported function:" + funcName);
+        }
+        return createFunctionExpression(relDataType, funcName, functionId.getId(), operands, impliedArg);
+    }
 
     public static AbstractExpression createFunctionExpression(
             RelDataType relDataType,
@@ -40,11 +58,66 @@ public class RexConverterHelper {
     }
 
     public static AbstractExpression createFunctionExpression(
-            RelDataType relDataType,
+            VoltType voltType,
             String funcName,
             int funcId,
-            List<AbstractExpression> operands) {
-        return createFunctionExpression(relDataType, funcName, funcId, operands, null);
+            List<AbstractExpression> operands,
+            String impliedArg) {
+        FunctionExpression fe = new FunctionExpression();
+        fe.setAttributes(funcName, impliedArg, funcId);
+        fe.setArgs(operands);
+        TypeConverter.setType(fe, voltType, voltType.getMaxLengthInBytes());
+        return fe;
+    }
+
+    public static AbstractExpression createToTimestampFunctionExpression(
+            RelDataType relDataType,
+            ExpressionType intervalOperatorType,
+            List<AbstractExpression> aeOperands) {
+        // There must be two operands
+        assert(2 == aeOperands.size());
+        // One of them is timestamp and another one is interval (BIGINT) in microseconds
+        AbstractExpression timestamp = null;
+        AbstractExpression interval = null;
+        if (aeOperands.get(0).getValueType() == VoltType.TIMESTAMP) {
+            timestamp = aeOperands.get(0);
+        } else if (aeOperands.get(0).getValueType() == VoltType.BIGINT) {
+            interval = aeOperands.get(0);
+        }
+        if (aeOperands.get(1).getValueType() == VoltType.TIMESTAMP) {
+            timestamp = aeOperands.get(1);
+        } else if (aeOperands.get(1).getValueType() == VoltType.BIGINT) {
+            interval = aeOperands.get(1);
+        }
+        if (timestamp == null || interval == null) {
+            throw new CalcitePlanningException("Invalid arguments for VoltDB TO_TIMESTAMP function");
+        }
+
+        // SINCE_EPOCH
+        List<AbstractExpression> epochOperands = new ArrayList<>();
+        epochOperands.add(timestamp);
+        String impliedArgMicrosecond = "MICROSECOND";
+        AbstractExpression sinceEpochExpr = createFunctionExpression(
+                VoltType.BIGINT,
+                "since_epoch",
+                FunctionSQL.voltGetSinceEpochId(impliedArgMicrosecond),
+                epochOperands,
+                impliedArgMicrosecond);
+
+        // Plus/Minus interval
+        AbstractExpression plusExpr = new OperatorExpression(intervalOperatorType, sinceEpochExpr, interval);
+
+        // TO_TIMESTAMP
+        List<AbstractExpression> timestampOperands = new ArrayList<>();
+        timestampOperands.add(plusExpr);
+        AbstractExpression timestampExpr = createFunctionExpression(
+                relDataType,
+                "to_timestamp",
+                FunctionSQL.voltGetToTimestampId(impliedArgMicrosecond),
+                timestampOperands,
+                impliedArgMicrosecond);
+
+        return timestampExpr;
     }
 
 }

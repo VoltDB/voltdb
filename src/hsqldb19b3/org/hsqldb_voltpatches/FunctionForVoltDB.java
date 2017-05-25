@@ -48,7 +48,7 @@ import org.hsqldb_voltpatches.types.Type;
  */
 public class FunctionForVoltDB extends FunctionSQL {
 
-    static class FunctionId {
+    public static class FunctionId {
         final private String m_name;
         final private int m_id;
         final private Type m_type;
@@ -433,6 +433,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
         FunctionSQL function = new FunctionForVoltDB(def);
         return function;
+    }
+
+    public static FunctionId newVoltDBFunctionId(String token) {
+       return FunctionId.fn_by_name(token);
     }
 
     public FunctionForVoltDB(FunctionId fn) {

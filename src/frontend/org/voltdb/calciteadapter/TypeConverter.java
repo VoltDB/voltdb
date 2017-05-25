@@ -60,6 +60,8 @@ public class TypeConverter {
                 // DATE TIME
                 case "TIMESTAMP"    : mapBuilder.put("TIMESTAMP", VoltType.TIMESTAMP);
                     break;
+                case "INTERVAL_DAY" : mapBuilder.put("INTERVAL_DAY", VoltType.BIGINT);
+                    break;
 
                 // STRING
                 case "CHAR"         : mapBuilder.put("CHAR", VoltType.STRING);
@@ -87,6 +89,11 @@ public class TypeConverter {
 
     public static void setType(AbstractExpression ae, RelDataType rdt) {
         VoltType vt = sqlTypeNameToVoltType(rdt.getSqlTypeName());
+        assert(vt != null);
+        setType(ae, vt, rdt.getPrecision());
+    }
+
+    public static void setType(AbstractExpression ae, VoltType vt, int precision) {
 
         ae.setValueType(vt);
 
@@ -98,7 +105,7 @@ public class TypeConverter {
                     (vt != VoltType.NULL) && (vt != VoltType.NUMERIC)) {
                 size = vt.getMaxLengthInBytes();
             } else {
-                size = rdt.getPrecision();
+                size = precision;
             }
             if (!(ae instanceof ParameterValueExpression)) {
                 ae.setValueSize(size);

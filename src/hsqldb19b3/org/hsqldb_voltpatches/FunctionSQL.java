@@ -2550,6 +2550,24 @@ public class FunctionSQL extends Expression {
         return FUNC_CURRENT_TIMESTAMP;
     }
 
+    public static int voltGetSinceEpochId(String impliedArg) {
+        switch (impliedArg) {
+            case "SECOND"       : return FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_SECOND;
+            case "MILLISECOND"  : return FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_MILLISECOND;
+            case "MICROSECOND"  : return FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_MICROSECOND;
+            default             : return FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH;
+        }
+    }
+
+    public static int voltGetToTimestampId(String impliedArg) {
+        switch (impliedArg) {
+            case "SECOND"       : return FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_SECOND;
+            case "MILLISECOND"  : return FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND;
+            case "MICROSECOND"  : return FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND;
+            default             : return FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP;
+        }
+    }
+
     protected void voltResolveToBigintTypesForBitwise() {
         for (int i = 0; i < nodes.length; i++) {
             voltResolveToBigintType(i);

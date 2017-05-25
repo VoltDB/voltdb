@@ -19,6 +19,7 @@ package org.voltdb.calciteadapter;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.GregorianCalendar;
 import java.util.List;
 
 import org.apache.calcite.rel.type.RelDataType;
@@ -32,11 +33,12 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexVisitorImpl;
+import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.type.IntervalSqlType;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
-import org.hsqldb_voltpatches.FunctionCustom;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
@@ -48,7 +50,6 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.utils.CatalogUtil;
 
 public class RexConverter {
 
@@ -106,11 +107,20 @@ public class RexConverter {
             if (literal.getValue() instanceof NlsString) {
                 NlsString nlsString = (NlsString) literal.getValue();
                 value = nlsString.getValue();
-            }
-            else if (literal.getValue() instanceof BigDecimal) {
+            } else if (literal.getValue() instanceof BigDecimal) {
                 BigDecimal bd = (BigDecimal) literal.getValue();
+                // Special treatment for intervals - VoltDB TIMESTAMP expects value in microseconds
+                if (literal.getType() instanceof IntervalSqlType) {
+                    BigDecimal thousand = BigDecimal.valueOf(1000);
+                    bd = bd.multiply(thousand);
+                }
                 value = bd.toPlainString();
+            } else if (literal.getValue() instanceof GregorianCalendar) {
+                // VoltDB TIMESTAMPS expects time in microseconds
+                long time = ((GregorianCalendar) literal.getValue()).getTimeInMillis() * 1000;
+                value = Long.toString(time);
             }
+
             assert value != null;
 
             cve.setValue(value);
@@ -193,16 +203,34 @@ public class RexConverter {
 
              // Arthimetic Operators
             case PLUS:
-                ae = new OperatorExpression(
+                // Check for DATETIME + INTERVAL expression first
+                if (SqlStdOperatorTable.DATETIME_PLUS.getName().equals(call.op.getName())) {
+                    // At this point left and right operands are converted to MICROSECONDS
+                    ae = RexConverterHelper.createToTimestampFunctionExpression(
+                            call.getType(),
+                            ExpressionType.OPERATOR_PLUS,
+                            aeOperands);
+                } else {
+                    ae = new OperatorExpression(
                             ExpressionType.OPERATOR_PLUS,
                             aeOperands.get(0),
                             aeOperands.get(1));
+                }
                 break;
             case MINUS:
-                ae = new OperatorExpression(
+                // Check for DATETIME - INTERVAL expression first
+                // For whatever reason Calcite treats + and - DATETIME operation differently
+                if (call.op instanceof SqlDatetimeSubtractionOperator) {
+                    ae = RexConverterHelper.createToTimestampFunctionExpression(
+                            call.getType(),
+                            ExpressionType.OPERATOR_MINUS,
+                            aeOperands);
+                } else {
+                    ae = new OperatorExpression(
                             ExpressionType.OPERATOR_MINUS,
                             aeOperands.get(0),
                             aeOperands.get(1));
+                }
                 break;
             case TIMES:
                 ae = new OperatorExpression(
@@ -253,7 +281,7 @@ public class RexConverter {
             case OTHER:
                 if ("||".equals(call.op.getName())) {
                     // CONCAT
-                    ae = RexConverterHelper.createFunctionExpression(call.getType(), "concat", FunctionCustom.FUNC_CONCAT_ID, aeOperands);
+                    ae = RexConverterHelper.createFunctionExpression(call.getType(), "concat", aeOperands, null);
                     TypeConverter.setType(ae, call.getType());
                 } else {
                     throw new CalcitePlanningException("Unsupported Calcite expression type: " +

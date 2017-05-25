@@ -73,22 +73,27 @@ public abstract class TestCalciteBase extends PlannerTestCase {
         compareCompiledPlans(calcitePlan, voltdbPlan);
     }
 
+    public void compareJSONPlans(String calciteJSON, String voltdbJSON, Map<String, String> ignoreMap) {
+        System.out.println("VoltDB : " + voltdbJSON);
+        System.out.println("Calcite: " + calciteJSON);
+        if (ignoreMap != null) {
+            for (Map.Entry<String, String> ignore : ignoreMap.entrySet()) {
+                calciteJSON = calciteJSON.replace(ignore.getKey(), ignore.getValue());
+            }
+            System.out.println("Calcite: " + calciteJSON);
+        }
+        assertEquals(voltdbJSON, calciteJSON);
+
+    }
+
     private void comparePlanTree(AbstractPlanNode calcitePlanNode, AbstractPlanNode voltdbPlanNode, Map<String, String> ignoreMap) {
         PlanNodeTree calcitePlanTree = new PlanNodeTree(calcitePlanNode);
         PlanNodeTree voltdbPlanTree = new PlanNodeTree(voltdbPlanNode);
 
         String calcitePlanTreeJSON = calcitePlanTree.toJSONString();
         String voltdbPlanTreeJSON = voltdbPlanTree.toJSONString();
-        System.out.println("VoltDB : " + voltdbPlanTreeJSON);
-        System.out.println("Calcite: " + calcitePlanTreeJSON);
 
-        if (ignoreMap != null) {
-            for (Map.Entry<String, String> ignore : ignoreMap.entrySet()) {
-                calcitePlanTreeJSON = calcitePlanTreeJSON.replace(ignore.getKey(), ignore.getValue());
-            }
-            System.out.println("Calcite: " + calcitePlanTreeJSON);
-        }
-        assertEquals(voltdbPlanTreeJSON, calcitePlanTreeJSON);
+        compareJSONPlans(calcitePlanTreeJSON, voltdbPlanTreeJSON, ignoreMap);
     }
 
     private void compareCompiledPlans(CompiledPlan calcitePlan, CompiledPlan voltdbPlan) {
@@ -103,7 +108,7 @@ public abstract class TestCalciteBase extends PlannerTestCase {
         }
     }
 
-    protected void testPlan(String sql, PlannerType plannerType) {
+    protected String testPlan(String sql, PlannerType plannerType) {
         CompiledPlan compiledPlan = (plannerType == PlannerType.CALCITE) ?
                 compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER) :
                     compileAdHocPlan(sql, true, true);
@@ -111,6 +116,7 @@ public abstract class TestCalciteBase extends PlannerTestCase {
         String planTreeJSON = planTree.toJSONString();
         System.out.println(plannerType.toString() + " : " + planTreeJSON);
         assert(compiledPlan.rootPlanGraph != null);
+        return planTreeJSON;
     }
 
 }
