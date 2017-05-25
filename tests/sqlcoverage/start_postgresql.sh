@@ -12,15 +12,17 @@
 # JDBC jar file, and the 'locate' command has been initialized
 IGNORE_CASE=
 MKTEMP_TEMPLATE=
+SHOW_LISTENING_PORTS='sudo netstat -ltnp | grep postgres'
 if [[ "$OSTYPE" == darwin* ]]; then
     IGNORE_CASE=-i
     MKTEMP_TEMPLATE=/tmp/tmp.XXXXXXXXXX
+    SHOW_LISTENING_PORTS='sudo lsof -n -u postgres | grep LISTEN'
 fi
 
 # Check for & kill any postgres processes, in case there is an old one leftover
-ps -ef | grep -i postgres
+ps -f -u postgres
 sudo pkill $IGNORE_CASE postgres
-ps -ef | grep -i postgres
+ps -f -u postgres
 
 # Prepare to start the PostgreSQL server, in a new temp dir
 export PG_TMP_DIR=$(mktemp -d $MKTEMP_TEMPLATE)
@@ -37,3 +39,7 @@ echo "CLASSPATH:" $CLASSPATH
 # Note: '-o --lc-collate=C' causes VARCHAR sorting to match VoltDB's
 sudo su - postgres -c "$PG_PATH/pg_ctl initdb -D $PG_TMP_DIR/data -o --lc-collate=C"
 sudo su - postgres -c "$PG_PATH/pg_ctl start  -D $PG_TMP_DIR/data -l $PG_TMP_DIR/postgres.log"
+
+# Print info about PostgreSQL processes, to make sure they are working OK
+ps -f -u postgres
+eval $SHOW_LISTENING_PORTS
