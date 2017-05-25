@@ -83,6 +83,7 @@ public class Shutdown extends VoltSystemProcedure {
             if (!m_failsafeArmed.getAndSet(true)) {
                 m_failsafe.start();
                 VoltLogger voltLogger = new VoltLogger("HOST");
+                // WARNING: BEAWARE OF LONG LINES
                 voltLogger.warn("******************************************************************************************");
                 voltLogger.warn("** VoltDB shutdown operation requested and in progress. Cluster will terminate shortly. **");
                 voltLogger.warn("******************************************************************************************\n");
@@ -108,6 +109,7 @@ public class Shutdown extends VoltSystemProcedure {
                     }
                     if (die) {
                         VoltLogger voltLogger = new VoltLogger("HOST");
+                        // WARNING: BEAWARE OF LONG LINES
                         voltLogger.warn("******************************************************************************************");
                         voltLogger.warn("**************** VoltDB shutting down as requested by @Shutdown command. *****************");
                         voltLogger.warn("******************************************************************************************\n");

@@ -103,9 +103,12 @@ public class ForeignHost {
                 // Log the remote host's action
                 if (!m_hostMessenger.isShuttingDown()) {
                     VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostnameAndIPAndPort());
-                    hostLog.warn("******************************************************************************************");
-                    hostLog.warn("********* Received remote hangup from foreign host " + hostnameAndIPAndPort() + " *********");
-                    hostLog.warn("******************************************************************************************\n");
+                    hostLog.warn("*******************************************************************************" +
+                                 "***********");
+                    hostLog.warn("********* Received remote hangup from foreign host " + hostnameAndIPAndPort() +
+                                 " *********");
+                    hostLog.warn("*******************************************************************************" +
+                                 "***********\n");
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
