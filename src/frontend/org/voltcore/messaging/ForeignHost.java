@@ -110,7 +110,9 @@ public class ForeignHost {
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
 
-            if (isPrimary()) {
+            hostLog.warn("m_closing: " + Boolean.toString(m_closing));
+            hostLog.warn("isPrimary(): " + Boolean.toString(isPrimary()));
+            if (m_closing && isPrimary()) {
                 if (!m_hostMessenger.isShuttingDown()) {
                     hostLog.warn("******************************************************************************************");
                     hostLog.warn("************* Received hangup from host " + hostnameAndIPAndPort() + " *************");
