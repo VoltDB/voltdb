@@ -325,7 +325,7 @@ public final class InvocationDispatcher {
         if (task.getProcName().equals("@PrepareShutdown")) {
             VoltLogger vLogger = new VoltLogger("HOST");
             vLogger.warn("=================================================================");
-            vLogger.warn("Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a procedure.");
+            vLogger.warn("Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.");
             vLogger.warn("=================================================================\n");
         }
 
