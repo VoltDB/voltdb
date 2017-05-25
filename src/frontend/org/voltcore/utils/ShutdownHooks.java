@@ -129,7 +129,7 @@ public class ShutdownHooks
     private synchronized void runHooks()
     {
         if (m_iAmAServer && !m_crashing && ShutdownHooks.m_crashMessage) {
-            VoltLogger voltLogger = new VoltLogger("CONSOLE");
+            VoltLogger voltLogger = new VoltLogger("HOST");
             voltLogger.warn("******************************************************************************************");
             voltLogger.warn("********* The VoltDB server will shut down due to a control-C or other JVM exit. *********");
             voltLogger.warn("******************************************************************************************\n");
