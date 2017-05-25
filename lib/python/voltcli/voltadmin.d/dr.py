@@ -37,12 +37,17 @@ def drop(runner):
         runner.info(message)
     else:
         runner.error(message)
-        sys.exit(1)
 
     # post check for drop
     actionMessage = 'Not all connected clusters report received reset. You may continue monitoring remaining consumer clusters with @Statistics'
     try:
-        checkstats.check_no_dr_consumer(runner)
+        if status == 0:
+            checkstats.check_no_dr_consumer(runner)
+            runner.info('All connected clusters have been successfully reset. Safe to shutdown...')
+        else:
+            if not checkstats.check_no_dr_consumer(runner, False):
+                runner.warn('This cluster has dr consumer(s) for unconnected cluster(s). ' +
+                            'This maybe due to an unfinished dr drop cluster command. Please check those cluster(s) and do reset manually.')
     except StatisticsProcedureException as proex:
         runner.info('The previous command has timed out and stopped waiting... The cluster is in dropping phase.')
         runner.error(proex.message)
@@ -52,6 +57,8 @@ def drop(runner):
     except (KeyboardInterrupt, SystemExit):
         runner.info('The previous command has stopped waiting... The cluster is in dropping phase.')
         runner.abort(actionMessage)
+
+    sys.exit(status)
 
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),

@@ -315,8 +315,8 @@ def check_dr_consumer(runner):
         lastValidationParamms = currentValidationParams.copy()
         time.sleep(1)
 
-def check_no_dr_consumer(runner):
-    runner.info('Completing resetting DR to all connected clusters...')
+def check_no_dr_consumer(runner, forDrop=True):
+    runner.info('Checking no dr consumers left...')
     last_node_dispatcher = []
     last_updated_time = time.time()
     notify_interval = 10
@@ -324,8 +324,9 @@ def check_no_dr_consumer(runner):
         resp = get_stats(runner, 'DRCONSUMERNODE')
         node_dispatcher = [row[1:6] for row in resp.table(0).tuples()]
         if not node_dispatcher:
-            runner.info('All connected clusters have been successfully reset. Safe to shutdown...')
-            return
+            return True
+        elif not forDrop:
+            return False
         notify_interval -= 1
         if notify_interval == 0:
             notify_interval = 10
