@@ -17,22 +17,37 @@
 
 package org.voltdb.utils;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.Reader;
 
 /**
- * This class provides a common interface for executing sqlcmd's file
- * command both for files on a disk or "here documents" entered
- * interactively.
+ * Wraps a reader into an SQLCommandLineReader. Can also keep track of line numbers.
+ *
+ * @author jcrump
  */
-public interface SQLCommandLineReader {
-    /**
-     * Read the next line of input from some underlying input stream.
-     * If the underlying stream is interactive, print out the prompt.
-     * */
-    public String readBatchLine() throws IOException;
+public class LineReaderAdapter implements SQLCommandLineReader {
+    private final BufferedReader m_reader;
+    private int m_lineNum = 0;
 
-    /**
-     * Return the line number of the most recently read line.
-     */
-    public int getLineNumber();
+    @Override
+    public int getLineNumber() {
+        return m_lineNum;
+    }
+
+    public LineReaderAdapter(Reader reader) {
+        m_reader = new BufferedReader(reader);
+    }
+
+    @Override
+    public String readBatchLine() throws IOException {
+        m_lineNum++;
+        return m_reader.readLine();
+    }
+
+    public void close() {
+        try {
+            m_reader.close();
+        } catch (IOException e) { }
+    }
 }
