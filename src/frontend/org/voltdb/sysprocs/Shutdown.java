@@ -108,6 +108,7 @@ public class Shutdown extends VoltSystemProcedure {
                         voltLogger.warn("******************************************************************************************");
                         voltLogger.warn("**************** VoltDB shutting down as requested by @Shutdown command. *****************");
                         voltLogger.warn("******************************************************************************************\n");
+                        VoltLogger.shutdownAsynchronousLogging();
                         System.exit(0);
                     }
                     else {
