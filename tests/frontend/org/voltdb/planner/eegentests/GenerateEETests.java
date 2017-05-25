@@ -739,7 +739,7 @@ public class GenerateEETests extends EEPlanGenerator {
         generateTests("executors", "TestGeneratedString", GSDB);
     }
 
-    public void generatedInlineInertPlan() throws Exception {
+    public void generatedInlineInsertPlan() throws Exception {
         Database db = getDatabase();
 
         final TableConfig T2Config = new TableConfig("T2",
@@ -781,7 +781,7 @@ public class GenerateEETests extends EEPlanGenerator {
             tg.generatedSumPlan();
             tg.generatedRankPlan();
             tg.generatedStringPlan();
-            tg.generatedInlineInertPlan();
+            tg.generatedInlineInsertPlan();
         } catch (Exception e) {
             System.err.printf("Unexpected exception: %s\n", e.getMessage());
             e.printStackTrace();

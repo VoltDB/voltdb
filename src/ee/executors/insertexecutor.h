@@ -86,10 +86,26 @@ class InsertExecutor : public AbstractExecutor
             {
             }
 
+    /**
+     * Return true iff all the work is done in init.  Inserting
+     * a replicated table into an export table with no partition
+     * column is done only on one site.  The rest of the sites
+     * don't have any work to do.
+     */
     bool p_execute_init(const TupleSchema *inputSchema,
                         TempTable *newOutputTable);
-    void p_execute_finish();
+
+    /**
+     * Insert a row into the target table and then count it.
+     */
     void p_execute_tuple(TableTuple &tuple);
+
+    /**
+     * After all the rows are inserted into the target table
+     * we insert one row into the output table with a count of
+     * the number of rows we inserted into the target table.
+     */
+    void p_execute_finish();
 
     Table *getTargetTable() {
         return m_targetTable;

@@ -20,9 +20,9 @@ import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
  * This marker interface lets us treat SeqScanPlanNode and IndexScanPlanNode
- * identically when inlining them.
+ * identically when placing an inline insert node into them.
  */
-public interface InlinableScanPlanNode {
+public interface ScanPlanNodeWithInlineInsert {
     public boolean hasInlineAggregateNode();
 
     public void addInlinePlanNode(AbstractPlanNode insertNode);

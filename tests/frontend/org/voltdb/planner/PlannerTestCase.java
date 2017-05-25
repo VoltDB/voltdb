@@ -645,7 +645,7 @@ public class PlannerTestCase extends TestCase {
         public String match(AbstractPlanNode node) {
             PlanNodeType mainNodeType = node.getPlanNodeType();
             if (m_type != mainNodeType) {
-                return String.format("PlanWithInlineNode: #xpected main plan node type %s, got %s",
+                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s",
                                      m_type, mainNodeType);
             }
             for (PlanNodeType nodeType : m_branches) {
@@ -663,10 +663,9 @@ public class PlannerTestCase extends TestCase {
     }
 
     /**
-     * Validate a plan, ignoring inline nodes.  This is kind of like
+     * Validate a plan.  This is kind of like
      * PlannerTestCase.compileToTopDownTree.  The differences are
      * <ol>
-     *   <li>We only look out out-of-line nodes,</li>
      *   <li>We can compile MP plans and SP plans, and</li>
      *   <li>The boundaries between fragments in MP plans
      *       are marked with PlanNodeType.INVALID.</li>
@@ -680,9 +679,9 @@ public class PlannerTestCase extends TestCase {
      * @param numberOfFragments The number of expected fragments.
      * @param types The plan node types of the inline and out-of-line nodes.
      *              If types[idx] is a PlanNodeType, then the node should
-     *              have no inline children.  If types[idx] is an array of
-     *              PlanNodeType values then the node has the type types[idx][0],
-     *              and it should have types[idx][1..] as inline children.
+     *              have no inline children.  If types[idx] is an object of
+     *              type PlanWithInlineNode then it has the main node type,
+     *              and node types of the inline children as well.
      */
     protected void validatePlan(String SQL,
                                 int numberOfFragments,
