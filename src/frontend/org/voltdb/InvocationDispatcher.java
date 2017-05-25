@@ -317,14 +317,15 @@ public final class InvocationDispatcher {
     {
         /*
          * When a user issues a shutdown command to the cluster, the detailed information
-         * should be printed out properly.
+         * should be printed out properly. The following message is printed at the node where
+         * the client is connected to.
          *
          * WARNING: HARDCODING
          */
         if (task.getProcName().equals("@PrepareShutdown")) {
-            VoltLogger vLogger = new VoltLogger("CONSOLE");
+            VoltLogger vLogger = new VoltLogger("HOST");
             vLogger.warn("=================================================================");
-            vLogger.warn("Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.");
+            vLogger.warn("Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a procedure.");
             vLogger.warn("=================================================================\n");
         }
 
