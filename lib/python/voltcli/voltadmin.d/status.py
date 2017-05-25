@@ -24,6 +24,7 @@ import sys
 import time
 import subprocess
 import json
+from voltcli.checkstats import StatisticsProcedureException
 
 RELEASE_MAJOR_VERSION = 7
 RELEASE_MINOR_VERSION = 2
