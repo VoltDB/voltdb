@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
@@ -284,9 +286,7 @@ public class SQLCommand
                     continue;
                 }
                 if (filesInfo != null && filesInfo.size() != 0) {
-                    //for (FileInfo fileInfo: filesInfo) {
                     executeScriptFiles(filesInfo, interactiveReader);
-                    //}
                     if (m_returningToPromptAfterError) {
                         // executeScriptFile stopped because of an error. Wipe the slate clean.
                         m_returningToPromptAfterError = false;
@@ -587,16 +587,19 @@ public class SQLCommand
      *
      * @param fileInfo    Info on the file directive being processed
      * @param parentLineReader  The current input stream, to be used for "here documents".
+     * @throws IOException
      */
-    static void executeScriptFiles(List<FileInfo> filesInfo, SQLCommandLineReader parentLineReader)
+    static void executeScriptFiles(List<FileInfo> filesInfo, SQLCommandLineReader parentLineReader) throws IOException
     {
         LineReaderAdapter adapter = null;
         SQLCommandLineReader reader = null;
+        StringBuilder statements = new StringBuilder();
 
-        for (FileInfo fileInfo: filesInfo) {
+        for (int ii = 0; ii < filesInfo.size(); ii++) {
 
-                adapter = null;
-                reader = null;
+                FileInfo fileInfo = filesInfo.get(ii);
+            adapter = null;
+            reader = null;
 
             if ( ! m_interactive) {
                 System.out.println();
@@ -616,6 +619,29 @@ public class SQLCommand
                     System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
                     stopOrContinue(e);
                     return; // continue to the next line after the FILE command
+                }
+
+                // if it is a batch option, get all contents from all the files and send it as a string
+                if(fileInfo.getOption() == FileOption.BATCH) {
+                        //StringBuilder statements = new StringBuilder();//= new ArrayList<String>();
+                        String line;
+                        // use the current reader we obtained to read from the file
+                        while ((line = reader.readBatchLine()) != null)
+                        {
+                            statements.append(line);
+                        }
+
+                        // if it is the last file, create a reader to read from the string of all files contents
+                        if( ii == filesInfo.size()-1 ) {
+                            //String statementsArray = statements.toArray(new String[0]);
+                            String allStatements = statements.toString();
+                            byte[] bytes = allStatements.getBytes("UTF-8");
+                            ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+                            reader = adapter = new LineReaderAdapter(new InputStreamReader( bais ) );
+                            //reader = adapter = new LineReaderAdapter(new BufferedReader( new StringReader( allStatements ) ) );
+                            //reader = adapter = new LineReaderAdapter(new StringReader( allStatements )  );
+                        }
+                        // fileInfo is the last file info for batch with multiple files
                 }
             }
             try {
@@ -709,7 +735,6 @@ public class SQLCommand
                 // Recursively process FILE commands, any failure will cause a recursive failure
                 List<FileInfo> nestedFilesInfo = SQLParser.parseFileStatement(fileInfo, line);
 
-                //if (nestedFileInfo != null) {
                 if ( nestedFilesInfo != null) {
                     // Guards must be added for FILE Batch containing batches.
                     if (batch != null) {
@@ -720,9 +745,8 @@ public class SQLCommand
 
                     // Execute the file content or fail to but only set m_returningToPromptAfterError
                     // if the intent is to cause a recursive failure, stopOrContinue decided to stop.
-                    //for (FileInfo nestedFileInfo: nestedFilesInfo) {
-                        executeScriptFiles(nestedFilesInfo, reader);
-                    //}
+                    executeScriptFiles(nestedFilesInfo, reader);
+
                     if (m_returningToPromptAfterError) {
                         // The recursive readScriptFile stopped because of an error.
                         // Escape to the outermost readScriptFile caller so it can exit or

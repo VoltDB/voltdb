@@ -258,7 +258,7 @@ public class TestSqlCmdInterface
     }
 
     @Test
-    public void testParseQuery21() throws FileNotFoundException {
+    public void testParseQuery21() throws IOException {
         ID = 21;
         SQLCommand.testFrontEndOnly();
         final String fileName = "./tests/frontend/org/voltdb/utils/localQry.txt";
