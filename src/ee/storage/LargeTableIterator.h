@@ -58,7 +58,7 @@ protected:
         , m_activeTuples(table->m_tupleCount)
         , m_foundTuples(0)
         , m_blockIdIterator(start)
-        , m_currBlock(nullptr)
+        , m_currBlock(NULL)
         , m_currBlockId(-1)
         , m_dataPtr(NULL)
         , m_blockOffset(0)

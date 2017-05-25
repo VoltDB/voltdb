@@ -29,7 +29,7 @@ namespace voltdb {
         : Table(BLOCKSIZE)
         , m_insertsFinished(false)
         , m_iter(this)
-        , m_blockForWriting(nullptr)
+        , m_blockForWriting(NULL)
         , m_blockIds()
     {
     }
@@ -38,10 +38,10 @@ bool LargeTempTable::insertTuple(TableTuple& source) {
     TableTuple target(m_schema);
     assert(! m_insertsFinished);
 
-    if (m_blockForWriting == nullptr || !m_blockForWriting->hasFreeTuples()) {
+    if (m_blockForWriting == NULL || !m_blockForWriting->hasFreeTuples()) {
         LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-        if (m_blockForWriting != nullptr) {
+        if (m_blockForWriting != NULL) {
             int64_t lastBlockId = m_blockIds.back();
             lttBlockCache->unpinBlock(lastBlockId);
         }
