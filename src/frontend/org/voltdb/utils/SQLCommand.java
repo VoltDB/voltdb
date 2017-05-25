@@ -283,7 +283,7 @@ public class SQLCommand
                     stopOrContinue(e);
                     continue;
                 }
-                if (filesInfo.size() != 0) {
+                if (filesInfo != null && filesInfo.size() != 0) {
                     for (FileInfo fileInfo: filesInfo) {
                         executeScriptFile(fileInfo, interactiveReader);
                     }
