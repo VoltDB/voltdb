@@ -1400,7 +1400,7 @@ public class VoltDB {
             }
         }
         catch (OutOfMemoryError e) {
-            new VoltLogger("HOST").error("[FATAL ERROR] VoltDB has encountered an OutOfMemory error.");
+            new VoltLogger("HOST").fatal("VoltDB has encountered an OutOfMemory error.");
             String errmsg = "VoltDB Main thread: ran out of Java memory. This node will shut down.";
             VoltDB.crashLocalVoltDB(errmsg, false, e);
         }
