@@ -1489,7 +1489,7 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the partitioning key ( non-primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN name;\n";
-        checkValidUniqueAndAssumeUnique(schema, msgP, msgPK);
+        checkValidUniqueAndAssumeUnique(schema, msgP, msgPR);
 
         // A unique index on the partitioning key ( no primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer);\n" +
