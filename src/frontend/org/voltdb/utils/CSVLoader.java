@@ -581,11 +581,13 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             try {
                 client.createConnection(server.trim(), port);
                 break;
-            } catch(Exception e) { /* Do Nothing */ }
+            } catch(IOException e) {
+                // Only swallow the exceptions from Java network or connection problems
+                // Unresolved hostname exceptions will be thrown
+            }
         }
-        
         if (client.getConnectedHostList().isEmpty()) {
-            throw new Exception("Fail to connect any server.");
+            throw new Exception("Unable to connect to any servers.");
         }
         return client;
     }
