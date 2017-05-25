@@ -284,9 +284,9 @@ public class SQLCommand
                     continue;
                 }
                 if (filesInfo != null && filesInfo.size() != 0) {
-                    for (FileInfo fileInfo: filesInfo) {
-                        executeScriptFile(fileInfo, interactiveReader);
-                    }
+                    //for (FileInfo fileInfo: filesInfo) {
+                    executeScriptFiles(filesInfo, interactiveReader);
+                    //}
                     if (m_returningToPromptAfterError) {
                         // executeScriptFile stopped because of an error. Wipe the slate clean.
                         m_returningToPromptAfterError = false;
@@ -588,43 +588,49 @@ public class SQLCommand
      * @param fileInfo    Info on the file directive being processed
      * @param parentLineReader  The current input stream, to be used for "here documents".
      */
-    static void executeScriptFile(FileInfo fileInfo, SQLCommandLineReader parentLineReader)
+    static void executeScriptFiles(List<FileInfo> filesInfo, SQLCommandLineReader parentLineReader)
     {
         LineReaderAdapter adapter = null;
         SQLCommandLineReader reader = null;
 
-        if ( ! m_interactive) {
-            System.out.println();
-            System.out.println(fileInfo.toString());
-        }
+        for (FileInfo fileInfo: filesInfo) {
 
-        if (fileInfo.getOption() == FileOption.INLINEBATCH) {
-            // File command is a "here document" so pass in the current
-            // input stream.
-            reader = parentLineReader;
-        }
-        else {
+                adapter = null;
+                reader = null;
+
+            if ( ! m_interactive) {
+                System.out.println();
+                System.out.println(fileInfo.toString());
+            }
+
+            if (fileInfo.getOption() == FileOption.INLINEBATCH) {
+                // File command is a "here document" so pass in the current
+                // input stream.
+                reader = parentLineReader;
+            }
+            else {
+                try {
+                    reader = adapter = new LineReaderAdapter(new FileReader(fileInfo.getFile()));
+                }
+                catch (FileNotFoundException e) {
+                    System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
+                    stopOrContinue(e);
+                    return; // continue to the next line after the FILE command
+                }
+            }
             try {
-                reader = adapter = new LineReaderAdapter(new FileReader(fileInfo.getFile()));
+                executeScriptFromReader(fileInfo, reader);
             }
-            catch (FileNotFoundException e) {
-                System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
-                stopOrContinue(e);
-                return; // continue to the next line after the FILE command
+            catch (SQLCmdEarlyExitException e) {
+                throw e;
             }
-        }
-        try {
-            executeScriptFromReader(fileInfo, reader);
-        }
-        catch (SQLCmdEarlyExitException e) {
-            throw e;
-        }
-        catch (Exception x) {
-            stopOrContinue(x);
-        }
-        finally {
-            if (adapter != null) {
-                adapter.close();
+            catch (Exception x) {
+                stopOrContinue(x);
+            }
+            finally {
+                if (adapter != null) {
+                    adapter.close();
+                }
             }
         }
     }
@@ -714,9 +720,9 @@ public class SQLCommand
 
                     // Execute the file content or fail to but only set m_returningToPromptAfterError
                     // if the intent is to cause a recursive failure, stopOrContinue decided to stop.
-                    for (FileInfo nestedFileInfo: nestedFilesInfo) {
-                        executeScriptFile(nestedFileInfo, reader);
-                    }
+                    //for (FileInfo nestedFileInfo: nestedFilesInfo) {
+                        executeScriptFiles(nestedFilesInfo, reader);
+                    //}
                     if (m_returningToPromptAfterError) {
                         // The recursive readScriptFile stopped because of an error.
                         // Escape to the outermost readScriptFile caller so it can exit or
