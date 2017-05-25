@@ -529,6 +529,11 @@ public final class InvocationDispatcher {
                 if (task.getParams().size() == 1) {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                 }
+            } else if ("PrepareShutdown".equals(procName)) {
+                VoltLogger vLogger = new VoltLogger("HOST");
+                vLogger.warn("=================================================================");
+                vLogger.warn("User: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.");
+                vLogger.warn("=================================================================\n");
             }
 
             // Verify that admin mode sysprocs are called from a client on the
