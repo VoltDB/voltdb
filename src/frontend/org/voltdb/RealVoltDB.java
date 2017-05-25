@@ -2653,7 +2653,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              */
             consoleLog.fatal(e.getMessage());
             VoltDB.crashLocalVoltDB(e.getMessage(), false, null);
-            return new ReadDeploymentResults(null, null);
+            return null;
         }
     }
 
