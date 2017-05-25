@@ -61,8 +61,7 @@ public class ZKCountdownLatch
 
     // Returns the current count
     public int getCount() throws InterruptedException, KeeperException {
-        ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-        return ByteBuffer.wrap(m_zk.getData(m_path, fw, null)).getInt();
+        return ByteBuffer.wrap(m_zk.getData(m_path, false, null)).getInt();
     }
 
     // Returns if already counted down to zero

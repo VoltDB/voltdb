@@ -316,7 +316,7 @@ def check_dr_consumer(runner):
         time.sleep(1)
 
 def check_no_dr_consumer(runner, forDrop=True):
-    runner.info('Checking no dr consumers left...')
+    runner.info('Checking dr consumers...')
     last_node_dispatcher = []
     last_updated_time = time.time()
     notify_interval = 10
