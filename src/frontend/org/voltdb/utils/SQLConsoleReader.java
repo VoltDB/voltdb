@@ -49,6 +49,11 @@ public class SQLConsoleReader extends jline.console.ConsoleReader implements SQL
     @Override
     public String readBatchLine() throws IOException { return readLine("batch>"); }
 
+    @Override
+    public int getLineNumber() {
+        return 0;
+    }
+
     /* (non-Javadoc)
      * @see jline.console.ConsoleReader#searchBackwards(java.lang.String, int, boolean)
      * Overrides and replaces search logic to make it case-insensitive.

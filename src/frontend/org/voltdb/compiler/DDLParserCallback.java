@@ -15,24 +15,14 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.utils;
-
-import java.io.IOException;
+package org.voltdb.compiler;
 
 /**
- * This class provides a common interface for executing sqlcmd's file
- * command both for files on a disk or "here documents" entered
- * interactively.
+ * Callback interface for filtering during parsing operations.
+ *
+ * @author jcrump
  */
-public interface SQLCommandLineReader {
-    /**
-     * Read the next line of input from some underlying input stream.
-     * If the underlying stream is interactive, print out the prompt.
-     * */
-    public String readBatchLine() throws IOException;
-
-    /**
-     * Return the line number of the most recently read line.
-     */
-    public int getLineNumber();
+public interface DDLParserCallback {
+    public void statement(String statement, int lineNum) throws VoltCompiler.VoltCompilerException;
+    public void batch(String batch, int batchEndLineNum) throws VoltCompiler.VoltCompilerException;
 }
