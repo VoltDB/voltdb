@@ -52,6 +52,7 @@
 #include "common/ValueFactory.hpp"
 #include "executors/aggregateexecutor.h"
 #include "executors/executorutil.h"
+#include "executors/insertexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
@@ -83,8 +84,14 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node);
     assert(m_node->getTargetTable());
 
-    // Create output table based on output schema from the plan
-    setTempOutputTable(limits, m_node->getTargetTable()->name());
+    // If we have an inline insert node, then the output
+    // schema is the ususal DML schema.  Otherwise it's in the
+    // plan node.  So, create output table based on output schema from the plan.
+    if (m_insertExec != NULL) {
+        setDMLCountOutputTable(limits);
+    } else {
+        setTempOutputTable(limits, m_node->getTargetTable()->name());
+    }
 
     //
     // INLINE PROJECTION
@@ -100,6 +107,11 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 
     // Inline aggregation can be serial, partial or hash
     m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
+    m_insertExec = voltdb::getInlineInsertExecutor(m_abstractNode);
+    // For the moment we will not produce a plan with both an
+    // inline aggregate and an inline insert node.  This just
+    // confuses things.
+    assert(m_aggExec == NULL || m_insertExec == NULL);
 
     //
     // Make sure that we have search keys and that they're not null
@@ -192,12 +204,21 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     TableTuple temp_tuple;
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
-    if (m_aggExec != NULL) {
-        const TupleSchema * inputSchema = tableIndex->getTupleSchema();
+    const TupleSchema * inputSchema = tableIndex->getTupleSchema();
+    if (m_aggExec != NULL || m_insertExec != NULL) {
         if (m_projectionNode != NULL) {
             inputSchema = m_projectionNode->getOutputTable()->schema();
         }
-        temp_tuple = m_aggExec->p_execute_init(params, &pmp, inputSchema, m_outputTable, &postfilter);
+        if (m_aggExec != NULL) {
+            temp_tuple = m_aggExec->p_execute_init(params, &pmp, inputSchema, m_outputTable, &postfilter);
+        } else {
+            // We may actually find out during initialization
+            // that we are done.  See the definition of InsertExecutor::p_execute_init.
+            if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable)) {
+                return true;
+            }
+            temp_tuple = m_insertExec->getTargetTable()->tempTuple();
+        }
     } else {
         temp_tuple = m_outputTable->tempTuple();
     }
@@ -207,6 +228,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG ("Empty Index Scan :\n %s", m_outputTable->debug().c_str());
         if (m_aggExec != NULL) {
             m_aggExec->p_execute_finish();
+        } else if (m_insertExec != NULL) {
+            m_insertExec->p_execute_finish();
         }
         return true;
     }
@@ -331,6 +354,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         if (m_aggExec != NULL) {
             m_aggExec->p_execute_finish();
         }
+        if (m_insertExec != NULL) {
+            m_insertExec->p_execute_finish();
+        }
         return true;
     }
 
@@ -425,7 +451,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     //
-    // We have to different nextValue() methods for different lookup types
+    // We have different nextValue() methods for different lookup types
     //
     while (postfilter.isUnderLimit() &&
            getNextTuple(localLookupType,
@@ -476,6 +502,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_finish();
     }
+    if (m_insertExec != NULL) {
+        m_insertExec->p_execute_finish();
+    }
 
 
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
@@ -485,6 +514,10 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 void IndexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_tuple(tuple);
+        return;
+    }
+    if (m_insertExec != NULL) {
+        m_insertExec->p_execute_tuple(tuple);
         return;
     }
     //
