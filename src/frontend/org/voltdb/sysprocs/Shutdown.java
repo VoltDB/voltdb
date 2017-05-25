@@ -54,7 +54,10 @@ public class Shutdown extends VoltSystemProcedure {
             try {
                 Thread.sleep(10000);
             } catch (InterruptedException e) {}
-            new VoltLogger("HOST").warn("VoltDB shutting down as requested by @Shutdown command.");
+            VoltLogger voltLogger = new VoltLogger("HOST");
+            voltLogger.warn("******************************************************************************************");
+            voltLogger.warn("**************** VoltDB shutting down as requested by @Shutdown command. *****************");
+            voltLogger.warn("******************************************************************************************\n");
             System.exit(0);
         }
     };
@@ -107,9 +110,7 @@ public class Shutdown extends VoltSystemProcedure {
                         VoltLogger voltLogger = new VoltLogger("HOST");
                         voltLogger.warn("******************************************************************************************");
                         voltLogger.warn("**************** VoltDB shutting down as requested by @Shutdown command. *****************");
-                        voltLogger.warn("******************************************************************************************\n\r");
-                        VoltLogger.shutdownAsynchronousLogging();
-                        // The log just does not get flushed ?!
+                        voltLogger.warn("******************************************************************************************\n");
                         System.exit(0);
                     }
                     else {
