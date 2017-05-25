@@ -103,23 +103,25 @@ public class ForeignHost {
                 // Log the remote host's action
                 if (!m_hostMessenger.isShuttingDown()) {
                     VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostnameAndIPAndPort());
-                    hostLog.warn("******************************************************************************************");
-                    hostLog.warn("********* Received remote hangup from foreign host " + hostnameAndIPAndPort() + " *********");
-                    hostLog.warn("******************************************************************************************");
+//                    hostLog.warn("******************************************************************************************");
+//                    hostLog.warn("********* Received remote hangup from foreign host " + hostnameAndIPAndPort() + " *********");
+//                    hostLog.warn("******************************************************************************************");
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
 
             hostLog.warn("m_closing: " + Boolean.toString(m_closing));
             hostLog.warn("isPrimary(): " + Boolean.toString(isPrimary()));
-            if (!m_hostMessenger.isShuttingDown()) {
-                hostLog.warn("******************************************************************************************");
-                hostLog.warn("********* Received remote hangup from foreign host " + hostnameAndIPAndPort() + " *********");
-                hostLog.warn("******************************************************************************************");
-            } else {
-                hostLog.warn("******************************************************************************************");
-                hostLog.warn("********* Received remote shutdown from foreign host " + hostnameAndIPAndPort() + " *********");
-                hostLog.warn("******************************************************************************************");
+            if (isPrimary()) {
+                if (!m_hostMessenger.isShuttingDown()) {
+                    hostLog.warn("******************************************************************************************");
+                    hostLog.warn("********* Received remote hangup from foreign host " + hostnameAndIPAndPort() + " *********");
+                    hostLog.warn("******************************************************************************************");
+                } else {
+                    hostLog.warn("******************************************************************************************");
+                    hostLog.warn("********* Received remote shutdown from foreign host " + hostnameAndIPAndPort() + " *********");
+                    hostLog.warn("******************************************************************************************");
+                }
             }
         }
 
