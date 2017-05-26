@@ -28,8 +28,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.net.URL;
-import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -42,20 +40,12 @@ import org.apache.log4j.net.SocketAppender;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
-import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 /**
  * End to end Import tests using the injected socket importer.
@@ -102,13 +92,11 @@ public class TestImportSuite extends RegressionSuite {
         private final int m_count;
         private final CountDownLatch m_latch;
         private final char m_separator;
-        private int m_expectedRestarts;
 
-        public DataPusher(int count, CountDownLatch latch, char separator, int expectedRestarts) {
+        public DataPusher(int count, CountDownLatch latch, char separator) {
             m_count = count;
             m_latch = latch;
             m_separator = separator;
-            m_expectedRestarts = expectedRestarts;
         }
 
         protected abstract void initialize();
@@ -117,31 +105,20 @@ public class TestImportSuite extends RegressionSuite {
 
         @Override
         public void run() {
+            initialize();
+
             try {
-                int currentCount = 0;
-                int numRestarts = 0;
-                do {
-                    initialize();
-                    try {
-                        do {
-                            String s = String.valueOf(System.nanoTime() + currentCount) + m_separator + System.currentTimeMillis() + "\n";
-                            pushData(s);
-                            currentCount++;
-                            Thread.sleep(0, 1);
-                        } while (currentCount < m_count);
-                    } catch (IOException e) {
-                        if (numRestarts >= m_expectedRestarts) {
-                            throw e; // we're not expecting the exception
-                        }
-                    }
-                } while (++numRestarts < m_expectedRestarts && currentCount < m_count);
+                for (int icnt = 0; icnt < m_count; icnt++) {
+                    String s = String.valueOf(System.nanoTime() + icnt) + m_separator + System.currentTimeMillis() + "\n";
+                    pushData(s);
+                    Thread.sleep(0, 1);
+                }
             } catch (Exception ex) {
                 ex.printStackTrace();
             } finally {
                 close();
                 m_latch.countDown();
             }
-            System.out.println("Done pushing data");
         }
 
     }
@@ -151,8 +128,8 @@ public class TestImportSuite extends RegressionSuite {
         private final int m_port;
         private OutputStream m_sout;
 
-        public SocketDataPusher(String server, int port, int count, CountDownLatch latch, char separator, int expectedRetries) {
-            super(count, latch, separator, expectedRetries);
+        public SocketDataPusher(String server, int port, int count, CountDownLatch latch, char separator) {
+            super(count, latch, separator);
             m_server = server;
             m_port = port;
         }
@@ -182,8 +159,8 @@ public class TestImportSuite extends RegressionSuite {
 
         private final Random random = new Random();
 
-        public Log4jDataPusher(int count, CountDownLatch latch, char separator, int expectedRetries) {
-            super(count, latch, separator, expectedRetries);
+        public Log4jDataPusher(int count, CountDownLatch latch, char separator) {
+            super(count, latch, separator);
         }
 
         @Override
@@ -201,23 +178,23 @@ public class TestImportSuite extends RegressionSuite {
         }
     }
 
-    private CountDownLatch asyncPushDataToImporters(int count, int loops, int expectedRestarts) throws Exception {
+    private CountDownLatch asyncPushDataToImporters(int count, int loops) throws Exception {
         CountDownLatch latch = new CountDownLatch(2*loops);
         for (int i=0; i<loops; i++) {
-            (new SocketDataPusher("localhost", 7001, count, latch, '\t', expectedRestarts)).start();
-            (new Log4jDataPusher(count, latch, ',', expectedRestarts)).start();
+            (new SocketDataPusher("localhost", 7001, count, latch, '\t')).start();
+            (new Log4jDataPusher(count, latch, ',')).start();
         }
         return latch;
     }
 
     private void pushDataToImporters(int count, int loops) throws Exception {
-        CountDownLatch latch = asyncPushDataToImporters(count, loops, 0);
+        CountDownLatch latch = asyncPushDataToImporters(count, loops);
         latch.await();
     }
 
     private static Map<String, String> expectedStatRows = new HashMap<>();
     static {
-        expectedStatRows.put("SocketServerImporter", "PopulateImportTable");
+        expectedStatRows.put("SocketServerImporter", "importTable.insert");
         expectedStatRows.put("Log4jSocketHandlerImporter", "log_events.insert");
     };
     private static final String CONN_HOST_COL = "CONNECTION_HOSTNAME";
@@ -295,8 +272,6 @@ public class TestImportSuite extends RegressionSuite {
         }
     }
 
-    /*
-
     public void testImportSimpleData() throws Exception {
         System.out.println("testImportSimpleData");
         Client client = getClient();
@@ -352,7 +327,8 @@ public class TestImportSuite extends RegressionSuite {
     }
 
     /** Verify that importer can withstand unrelated UACs without restarting.
-     * We don't expect the importers to be restarted during this test, so we direct the pushers not ignore IOExceptions from restarts.
+     * We don't expect the importers to be restarted during this test;
+     * the pushers will get IOExceptions if the importers restart.
      * It's possible to get a false pass if the data finishes before the UACs and importers restart anyway,
      * but manual runs indicate that the data outlasts the UACs by 2-3 seconds.
      */
@@ -362,7 +338,7 @@ public class TestImportSuite extends RegressionSuite {
         waitForHashinator(client);
 
         // Count was chosen to keep importers busy during all UACs without making the test take much longer than necessary.
-        CountDownLatch dataGenerationAwaiter = asyncPushDataToImporters(4000, 3, 0);
+        CountDownLatch dataGenerationAwaiter = asyncPushDataToImporters(4000, 3);
 
         ClientResponse response = client.callProcedure("@AdHoc", "create table nudge(id integer);");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -384,105 +360,6 @@ public class TestImportSuite extends RegressionSuite {
 
         dataGenerationAwaiter.await();
         verifyData(client, 12000);
-        client.close();
-    }
-
-    /** Verify that importer configuration change while pushing works.
-     */
-    public void testImportConfigChangeWhilePushing() throws Exception {
-        System.out.println("testImportMissingProcedureWhilePushing");
-        Client client = getClient();
-        waitForHashinator(client);
-        ClientResponse response;
-        asyncPushDataToImporters(2000, 3, 1);
-
-        // FIXME how do I change deployment when @AdHoc is the only supported way to change DDL?
-/*
-        Client adminClient = getAdminClient();
-        response = adminClient.updateApplicationCatalog(catalogPath, deploymentPath);
-        assertEquals(ClientResponse.SUCCESS, true);
-        adminClient.close();
-*/
-        verifyData(client, 6000);
-        client.close();
-    }
-
-    /** Switch the procedure while importer is getting data. We must not miss any rows.
-     *  The data pushers know to restart the connection when it goes down, since we tell them how many UPDATE CLASSES we will run.
-     */
-    public void testImportModifyProcedureWhilePushing() throws Exception {
-        System.out.println("testImportModifyProcedureWhilePushing");
-        Client client = getClient();
-        ClientResponse response;
-
-        InMemoryJarfile originalClassesJar = new InMemoryJarfile();
-        VoltCompiler originalCompiler = new VoltCompiler(false);
-        originalCompiler.addClassToJar(originalClassesJar, org.voltdb_testprocs.insertproc1.PopulateImportTable.class);
-        File originalClassesJarfile = File.createTempFile("original-procs", ".jar");
-        originalClassesJar.writeToFile(originalClassesJarfile);
-
-        InMemoryJarfile replacementJar = new InMemoryJarfile();
-        VoltCompiler replacementCompiler = new VoltCompiler(false);
-        replacementCompiler.addClassToJar(replacementJar, org.voltdb_testprocs.insertproc2.PopulateImportTable.class);
-        File replacementJarfile = File.createTempFile("replacement-procs", ".jar");
-        replacementJar.writeToFile(replacementJarfile);
-
-        // Start test
-        waitForHashinator(client);
-        final int EXPECTED_RESTARTS = 2; // two LOAD CLASSES that affect importers
-        CountDownLatch awaiter = asyncPushDataToImporters(14000, 3, EXPECTED_RESTARTS);
-        Thread.sleep(1000);
-
-        System.out.println("Data is flowing; swapping the procedures");
-
-        // Replace the importer's class with a new version
-        response = client.callProcedure("@AdHoc", "DROP PROCEDURE PopulateImportTable");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.updateClasses(replacementJarfile, null);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.insertproc2.PopulateImportTable");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
-        Thread.sleep(5000);
-
-        System.out.println("Restoring original procedure version");
-
-        // Switch them back
-        response = client.callProcedure("@AdHoc", "DROP PROCEDURE PopulateImportTable");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.updateClasses(replacementJarfile, null);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.insertproc1.PopulateImportTable");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
-        System.out.println("Waiting for data to finish. Latch count=" + awaiter.getCount());
-
-        // Wait for data to finish and verify that no rows were lost.
-        awaiter.await();
-        System.out.println("Done waiting for data");
-
-        // Verify that the updated procedure saw use
-        final int minRowsFromNewProcVersion = 20;
-        response = client.callProcedure("@AdHoc", "SELECT * FROM importTable WHERE PROC_VERSION = 2 LIMIT " + Integer.toString(minRowsFromNewProcVersion) + ";");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        VoltTable results = response.getResults()[0];
-        assertTrue(results.advanceRow());
-        assertEquals(minRowsFromNewProcVersion, response.getResults()[0].getRowCount());
-
-        // Verify all data was received.
-        // TODO this is failing
-/*
-        try {
-            verifyData(client, 42000);
-        } catch (AssertionError e){
-            System.err.println(e.getMessage());
-            System.err.println("Entering forever loop to allow debugging using 'sqlcmd --port 21312'");
-            e.printStackTrace();
-            do {
-                Thread.sleep(1000);
-            } while (true);
-        }
-*/
         client.close();
     }
 
@@ -528,13 +405,13 @@ public class TestImportSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl-with-classes.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
 
         // configure socket importer
         Properties props = buildProperties(
                 "port", "7001",
                 "decode", "true",
-                "procedure", "PopulateImportTable");
+                "procedure", "importTable.insert");
         project.addImport(true, "custom", "tsv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
