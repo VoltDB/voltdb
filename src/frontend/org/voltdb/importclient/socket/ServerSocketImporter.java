@@ -65,7 +65,7 @@ public class ServerSocketImporter extends AbstractImporter {
     }
 
     @Override
-    protected void stop()
+    public void stop()
     {
         try {
             m_config.getServerSocket().close();
