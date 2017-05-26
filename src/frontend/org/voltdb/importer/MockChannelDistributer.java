@@ -21,19 +21,48 @@ import java.net.URI;
 import java.util.Set;
 
 /**
+ * A fake ChannelDistributer that allows tests to generate mesh events.
  * Created by bshaw on 5/26/17.
  */
-public interface ChannelDistributer extends ChannelChangeCallback {
+public class MockChannelDistributer implements ChannelDistributer {
 
 
-    String getClusterTag();
+    public MockChannelDistributer(String myHostId) {
 
+    }
 
-    void registerCallback(String m_distributerDesignation, ChannelChangeCallback importerLifeCycleManager);
+    @Override
+    public String getClusterTag() {
+        return null;
+    }
 
-    void registerChannels(String m_distributerDesignation, Set<URI> uris);
+    @Override
+    public void registerCallback(String m_distributerDesignation, ChannelChangeCallback importerLifeCycleManager) {
 
-    void unregisterCallback(String m_distributerDesignation);
+    }
 
-    void shutdown();
+    @Override
+    public void registerChannels(String m_distributerDesignation, Set<URI> uris) {
+
+    }
+
+    @Override
+    public void unregisterCallback(String m_distributerDesignation) {
+
+    }
+
+    @Override
+    public void shutdown() {
+
+    }
+
+    @Override
+    public void onChange(ImporterChannelAssignment assignment) {
+
+    }
+
+    @Override
+    public void onClusterStateChange(VersionedOperationMode mode) {
+
+    }
 }

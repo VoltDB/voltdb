@@ -20,10 +20,8 @@ package org.voltdb.importer;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.osgi.framework.BundleException;
@@ -54,11 +52,11 @@ public class ImportManager implements ChannelChangeCallback {
     private final Map<String, AbstractFormatterFactory> m_formatterFactories = new HashMap<String, AbstractFormatterFactory>();
 
     /** Obtain the global ImportManager via its instance() method */
-    private static ImportManager m_self;
+    protected static ImportManager m_self;
     private final HostMessenger m_messenger;
 
-    private final int m_myHostId;
-    private ChannelDistributer m_distributer;
+    protected final int m_myHostId;
+    protected ChannelDistributer m_distributer;
     private boolean m_serverStarted;
     private final ImporterStatsCollector m_statsCollector;
     private final ModuleManager m_moduleManager;
@@ -75,22 +73,23 @@ public class ImportManager implements ChannelChangeCallback {
         return ModuleManager.instance();
     }
 
-    protected ImportManager(int myHostId, HostMessenger messenger, ImporterStatsCollector statsCollector) throws IOException {
+    protected ImportManager(int myHostId, HostMessenger messenger, ImporterStatsCollector statsCollector) {
         m_myHostId = myHostId;
         m_messenger = messenger;
         m_statsCollector = statsCollector;
         m_moduleManager = getModuleManager();
     }
 
-    private void initializeChannelDistributer() throws BundleException {
+    protected void initializeChannelDistributer() throws BundleException {
         if (m_distributer != null) return;
 
-        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
+        m_distributer = new ZKChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
         m_distributer.registerCallback("__IMPORT_MANAGER__", this);
     }
 
     /**
      * Create the singleton ImportManager and initialize.
+     * WARNING: if you change this method, please update the ImportManagerWithMocks constructor!
      * @param myHostId my host id in cluster
      * @param catalogContext current catalog context
      * @param messenger messenger to get to ZK
@@ -135,7 +134,7 @@ public class ImportManager implements ChannelChangeCallback {
      * @param myHostId
      * @param catalogContext
      */
-    private synchronized void create(int myHostId, CatalogContext catalogContext) {
+    protected synchronized void create(int myHostId, CatalogContext catalogContext) {
         try {
             ImportType importElement = catalogContext.getDeployment().getImport();
             if (importElement == null || importElement.getConfiguration().isEmpty()) {
@@ -187,7 +186,7 @@ public class ImportManager implements ChannelChangeCallback {
 
     public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
         m_self.create(m_myHostId, catalogContext);
-        m_self.readyForDataInternal(catalogContext, messenger);
+        m_self.readyForDataInternal(catalogContext);
     }
 
     //Call this method to restart the whole importer system. It takes current catalogcontext and hostmessenger
@@ -225,10 +224,10 @@ public class ImportManager implements ChannelChangeCallback {
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
         m_serverStarted = true; // Note that server is ready, so that we know whether to process catalog updates
-        readyForDataInternal(catalogContext, messenger);
+        readyForDataInternal(catalogContext);
     }
 
-    public synchronized void readyForDataInternal(CatalogContext catalogContext, HostMessenger messenger) {
+    public synchronized void readyForDataInternal(CatalogContext catalogContext) {
         if (!m_serverStarted) {
             if (importLog.isDebugEnabled()) {
                 importLog.debug("Server not started. Not sending readyForData to ImportProcessor");
@@ -241,7 +240,7 @@ public class ImportManager implements ChannelChangeCallback {
             return;
         }
         //Tell import processors and in turn ImportHandlers that we are ready to take in data.
-        m_processor.get().readyForData(catalogContext, messenger);
+        m_processor.get().readyForData(catalogContext);
     }
 
     @Override
