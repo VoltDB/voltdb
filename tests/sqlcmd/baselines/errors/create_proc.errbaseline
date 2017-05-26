@@ -44,7 +44,7 @@ Expect to fail because the jar has been killed by dropping a statically
     dependent class.
 VOLTDB ERROR: UNEXPECTED FAILURE:
   org.voltdb.VoltProcedure$VoltAbortException: sqlcmdtest/Breakable1$NestedGetsKilled
-	at org.voltdb.sysprocs.UpdateApplicationCatalog.executePlanFragment(UpdateApplicationCatalog.java:#)
+	at org.voltdb.sysprocs.UpdateCore.executePlanFragment(UpdateCore.java:#)
 	at org.voltdb.ProcedureRunner.executeSysProcPlanFragment(ProcedureRunner.java:#)
 	at org.voltdb.iv2.Site.executeSysProcPlanFragment(Site.java:#)
 	at org.voltdb.iv2.SysprocFragmentTask.processFragmentTask(SysprocFragmentTask.java:#)
@@ -56,8 +56,8 @@ Caused by: java.lang.NoClassDefFoundError: sqlcmdtest/Breakable1$NestedGetsKille
 	at java.lang.Class.forName0(Native Method)
 	at java.lang.Class.forName(Class.java:#)
 	at org.voltdb.CatalogContext.classForProcedure(CatalogContext.java:#)
-	at org.voltdb.sysprocs.UpdateApplicationCatalog$JavaClassForTest.forName(UpdateApplicationCatalog.java:#)
-	at org.voltdb.sysprocs.UpdateApplicationCatalog.executePlanFragment(UpdateApplicationCatalog.java:#)
+	at org.voltdb.sysprocs.UpdateCore$JavaClassForTest.forName(UpdateCore.java:#)
+	at org.voltdb.sysprocs.UpdateCore.executePlanFragment(UpdateCore.java:#)
 	... 6 more
 Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable1$NestedGetsKilled
 	at java.net.URLClassLoader.findClass(URLClassLoader.java:#)

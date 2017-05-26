@@ -667,10 +667,7 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition).get();
-            if (batch.errorMsg != null) {
-                throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + batch.errorMsg);
-            }
+            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition);
 
             if (m_isReadOnly && !batch.isReadOnly()) {
                 throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");
