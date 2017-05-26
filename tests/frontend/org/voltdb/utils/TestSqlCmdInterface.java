@@ -500,5 +500,16 @@ public class TestSqlCmdInterface
         filesInfo = SQLParser.parseFileStatement(null, "FILE -batch heehee.sql;");
         assertEquals(1, filesInfo.size());
         assertTrue(filesInfo.get(0).isBatch());
+
+        filesInfo = SQLParser.parseFileStatement(null, "FILE -batch heehee.sql hahaa.sql;");
+        assertEquals(2, filesInfo.size());
+        assertTrue(filesInfo.get(0).isBatch());
+        assertTrue(filesInfo.get(1).isBatch());
+
+        filesInfo = SQLParser.parseFileStatement(null, "FILE -batch 'file 1.sql';");
+        assertEquals(1, filesInfo.size());
+        assertTrue(filesInfo.get(0).isBatch());
+        assertEquals("file 1.sql", filesInfo.get(0).getFile().toString());
+
     }
 }
