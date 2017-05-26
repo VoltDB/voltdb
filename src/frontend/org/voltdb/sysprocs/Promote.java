@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.ReplicationRole;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.CatalogChangeResult;
@@ -27,49 +28,35 @@ import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 /**
- * Non-transactional procedure to implement public @UpdateApplicationCatalog system
- * procedure.
+ * Non-transactional procedure to implement public @Promote system procedure.
  *
  */
-public class UpdateApplicationCatalog extends UpdateApplicationBase {
+public class Promote extends UpdateApplicationBase {
 
-    public CompletableFuture<ClientResponse> run(byte[] catalogJarBytes, String deploymentString) {
-        // catalogJarBytes if null, when passed along, will tell the
-        // catalog change planner that we want to use the current catalog.
+    public CompletableFuture<ClientResponse> run() {
+        if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                    "@Promote issued on non-replica cluster. No action taken.");
+        }
 
         DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
-        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema() && !isRestoring();
+        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
 
-        // normalize empty string and null
-        if ((catalogJarBytes != null) && (catalogJarBytes.length == 0)) {
-            catalogJarBytes = null;
-        }
-
-        if (!allowPausedModeWork(isRestoring(), isAdminConnection())) {
+        if (!allowPausedModeWork(false, isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
-        }
-        // We have an @UAC.  Is it okay to run it?
-        // If we weren't provided operationBytes, it's a deployment-only change and okay to take
-        // master and adhoc DDL method chosen
-
-        if (catalogJarBytes != null && useDDLSchema) {
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    "Cluster is configured to use AdHoc DDL to change application schema. " +
-                    "Use of @UpdateApplicationCatalog is forbidden.");
         }
 
         CatalogChangeResult ccr = null;
         try {
             ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
-                                                catalogJarBytes,
-                                                deploymentString,
+                                                null,
+                                                null,
                                                 new String[0],
                                                 null,
-                                                false, /* isPromotion */
+                                                true, /* isPromotion */
                                                 drRole,
                                                 useDDLSchema,
                                                 false,
@@ -93,11 +80,6 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
         }
 
-        // This means no more @UAC calls when using DDL mode.
-        if (isRestoring()) {
-            noteRestoreCompleted();
-        }
-
         // initiate the transaction.
         return callProcedure("@UpdateCore",
                              ccr.encodedDiffCommands,
@@ -114,4 +96,5 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                              ccr.hasSchemaChange ?  1 : 0,
                              ccr.requiresNewExportGeneration ? 1 : 0);
     }
+
 }

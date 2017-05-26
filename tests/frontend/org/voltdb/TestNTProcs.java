@@ -25,8 +25,11 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,16 +49,22 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.sysprocs.AdHoc_RO_MP;
 import org.voltdb.sysprocs.GC;
-import org.voltdb.sysprocs.UpdateApplicationCatalog;
+import org.voltdb.sysprocs.UpdateCore;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
 public class TestNTProcs extends TestCase {
 
     public static class TrivialNTProc extends VoltNonTransactionalProcedure {
+
+        final static AtomicLong m_runCount = new AtomicLong(0);
+        final static AtomicLong m_returnCount = new AtomicLong(0);
+
         public long run() throws InterruptedException, ExecutionException {
+            m_runCount.incrementAndGet();
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
+            m_returnCount.incrementAndGet();
             //System.out.println("Ran trivial proc!");
             return -1;
         }
@@ -103,7 +112,6 @@ public class TestNTProcs extends TestCase {
             System.out.flush();
 
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
-            assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
 
             System.out.println("Got to nextStep!");
             return 0;
@@ -233,18 +241,25 @@ public class TestNTProcs extends TestCase {
 
     public static class NTProcThatSlams extends VoltNonTransactionalProcedure {
 
+        final static AtomicLong m_runCount = new AtomicLong(0);
+        final static AtomicLong m_returnCount = new AtomicLong(0);
+
         final static int COLLECT_BLOCK = 0;
         final static int COLLECT_RETURN = 1;
         final static int COLLECT_ASYNC = 2;
 
         public ClientResponse secondPart(ClientResponse response) {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
-            assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
 
+            m_returnCount.incrementAndGet();
+            assert(response != null);
+            assert(response.getStatus() == ClientResponse.SUCCESS);
             return response;
         }
 
         public CompletableFuture<ClientResponse> run(String whatToCall, byte[] serializedParams, int howToCollect, int timeToSleep) {
+            m_runCount.incrementAndGet();
+
             CompletableFuture<ClientResponse> cf = null;
 
             // sleep for specified time
@@ -275,6 +290,18 @@ public class TestNTProcs extends TestCase {
             }
 
             cf = callProcedure(whatToCall, params);
+            try {
+                ClientResponse cr = cf.get();
+                assert(cr.getStatus() == ClientResponse.SUCCESS);
+            } catch (InterruptedException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
+                fail();
+            } catch (ExecutionException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
+                fail();
+            }
 
             switch (howToCollect) {
             case COLLECT_BLOCK:
@@ -291,6 +318,7 @@ public class TestNTProcs extends TestCase {
             case COLLECT_RETURN:
                 return cf;
             case COLLECT_ASYNC:
+                //m_runCount.incrementAndGet();
                 return cf.thenApply(this::secondPart);
             default:
                 fail();
@@ -393,7 +421,7 @@ public class TestNTProcs extends TestCase {
         compile();
     }
 
-    public void testTrivialNTRoundTrip() throws Exception {
+    /*public void testTrivialNTRoundTrip() throws Exception {
         ServerThread localServer = start();
 
         Client client = ClientFactory.createClient();
@@ -414,7 +442,7 @@ public class TestNTProcs extends TestCase {
 
         localServer.shutdown();
         localServer.join();
-    }
+    }*/
 
     public void testNestedNTRoundTrip() throws Exception {
         ServerThread localServer = start();
@@ -546,7 +574,7 @@ public class TestNTProcs extends TestCase {
         // repeatedly call stats until they match
         long start = System.currentTimeMillis();
         boolean found = false;
-        while (System.currentTimeMillis() - start < 20000) {
+        while ((System.currentTimeMillis() - start) < 30000) {
             Map<String, Long> stats = aggregateProcRow(client, NTProcWithFutures.class.getName());
             if ((CALL_COUNT + 1) == stats.get("INVOCATIONS").longValue()) {
                 found = true;
@@ -670,9 +698,9 @@ public class TestNTProcs extends TestCase {
         VoltTable statsT = getStats(client, "PROCEDURE");
         System.out.println("STATS: " + statsT.toFormattedString());
 
-        assertTrue(VoltTableUtil.tableContainsString(statsT, "UpdateApplicationCatalog", true));
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "UpdateCore", true));
 
-        Map<String, Long> stats = aggregateProcRow(client, UpdateApplicationCatalog.class.getName());
+        Map<String, Long> stats = aggregateProcRow(client, UpdateCore.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
 
         localServer.shutdown();
@@ -688,11 +716,43 @@ public class TestNTProcs extends TestCase {
     final static int CALL_STATS = 5;
     */
 
+    static class SlamCallback implements ProcedureCallback {
+        final Set<Long> m_outstanding;
+        final long m_id;
+        final AtomicBoolean m_done = new AtomicBoolean(false);
+        final static AtomicLong m_count = new AtomicLong(0);
+
+        SlamCallback(long id, Set<Long> outstanding) {
+            m_id = id; m_outstanding = outstanding;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            m_count.incrementAndGet();
+
+            if (!m_done.compareAndSet(false, true)) {
+                assert(false);
+                fail();
+            }
+
+            boolean removed = m_outstanding.remove(m_id);
+            assertTrue(removed);
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                ClientResponseImpl cri = (ClientResponseImpl) clientResponse;
+                System.err.println(cri.toJSONString());
+                System.err.flush();
+                fail();
+            }
+        }
+    }
+
     public void testSlamNTProcs() throws Exception {
+
+        final Set<Long> outstanding = Collections.synchronizedSet(new HashSet<Long>());
+
         ServerThread localServer = start();
 
         final AtomicLong called = new AtomicLong(0);
-        final AtomicLong responded = new AtomicLong(0);
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -700,35 +760,30 @@ public class TestNTProcs extends TestCase {
         final Client firehoseClient = ClientFactory.createClient();
         firehoseClient.createConnection("localhost");
         final AtomicBoolean keepFirehosing = new AtomicBoolean(true);
-
-        final ProcedureCallback firehoseCallback = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse) throws Exception {
-                responded.incrementAndGet();
-                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    ClientResponseImpl cri = (ClientResponseImpl) clientResponse;
-                    System.err.println(cri.toJSONString());
-                    System.err.flush();
-                    fail();
-                }
-            }
-        };
+        final AtomicBoolean keepChecking = new AtomicBoolean(true);
 
         Thread firehoseThread = new Thread() {
             @Override
             public void run() {
+                long id = 0;
+
                 while (keepFirehosing.get()) {
+
+                    SlamCallback scb = new SlamCallback(++id, outstanding);
+                    outstanding.add(scb.m_id);
+
                     try {
-                        firehoseClient.callProcedure(firehoseCallback,
-                                                     "TestNTProcs$NTProcThatSlams",
-                                                     "TestNTProcs$TrivialNTProc",
-                                                     new byte[0], // params
-                                                     NTProcThatSlams.COLLECT_ASYNC,
-                                                     1);
+                        boolean status = firehoseClient.callProcedure(scb,
+                                                                      "TestNTProcs$NTProcThatSlams",
+                                                                      "TestNTProcs$TrivialNTProc",
+                                                                      new byte[0], // params
+                                                                      NTProcThatSlams.COLLECT_ASYNC,
+                                                                      1);
+                        assertTrue(status);
                         called.incrementAndGet();
                     } catch (IOException e) {
-                        // TODO Auto-generated catch block
                         e.printStackTrace();
+                        fail();
                     }
                 }
                 try {
@@ -736,6 +791,7 @@ public class TestNTProcs extends TestCase {
                 } catch (NoConnectionsException | InterruptedException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
+                    fail();
                 }
             }
         };
@@ -745,14 +801,56 @@ public class TestNTProcs extends TestCase {
         long nanoTime1 = System.nanoTime();
         Thread.sleep(5000);
         long nanoTime2 = System.nanoTime();
-        long nowCalled = called.get(); long nowResponsed = responded.get();
-        System.out.printf("Ran for %.2f seconds. Called %d procs with %d responded and %d outstanding.\n",
-                (nanoTime2 - nanoTime1) / 1000000000.0, nowCalled, nowResponsed, nowCalled - nowResponsed);
+        long nowCalled = called.get(); long leftToRespond = outstanding.size();
+        System.out.printf("Ran for %.2f seconds. Called %d procs with %d outstanding.\n",
+                (nanoTime2 - nanoTime1) / 1000000000.0, nowCalled, leftToRespond);
+        System.out.printf("NTProcThatSlams reports %d starts and %d returns.\n",
+                NTProcThatSlams.m_runCount.get(), NTProcThatSlams.m_returnCount.get());
+        System.out.printf("TrivialNTProc reports %d starts and %d returns.\n",
+                TrivialNTProc.m_runCount.get(), TrivialNTProc.m_returnCount.get());
         keepFirehosing.set(false);
+
+        Thread statsThread = new Thread() {
+            @Override
+            public void run() {
+                while (keepChecking.get()) {
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                    long nowCalled = called.get(); long leftToRespond = outstanding.size();
+                    System.out.printf("Update: Called %d procs with %d outstanding.\n",
+                            nowCalled, leftToRespond);
+                    System.out.printf("  NTProcThatSlams reports %d starts and %d returns.\n",
+                            NTProcThatSlams.m_runCount.get(), NTProcThatSlams.m_returnCount.get());
+                    System.out.printf("  TrivialNTProc reports %d starts and %d returns.\n",
+                            TrivialNTProc.m_runCount.get(), TrivialNTProc.m_returnCount.get());
+                    if (outstanding.size() > 0) {
+                        Set<Long> copySet = new HashSet<>();
+                        copySet.addAll(outstanding);
+                        System.out.print("  Outstanding: ");
+                        copySet.stream().forEach(l -> System.out.printf("%d, ", l));
+                        System.out.println();
+                    }
+                    System.out.printf("  SlamCallback reports %d processed.\n",
+                            SlamCallback.m_count.get());
+                }
+            }
+        };
+
+        statsThread.start();
+
         firehoseThread.join();
+        keepChecking.set(false);
         long nanoTime3 = System.nanoTime();
-        System.out.printf("Drained for %.2f seconds. %d responded.\n",
-                (nanoTime3 - nanoTime2) / 1000000000.0, nowCalled - nowResponsed);
+        System.out.printf("Drained for %.2f seconds. %d outstanding.\n",
+                (nanoTime3 - nanoTime2) / 1000000000.0, outstanding.size());
+        System.out.printf("NTProcThatSlams reports %d starts and %d returns.\n",
+                NTProcThatSlams.m_runCount.get(), NTProcThatSlams.m_returnCount.get());
+        System.out.printf("TrivialNTProc reports %d starts and %d returns.\n",
+                TrivialNTProc.m_runCount.get(), TrivialNTProc.m_returnCount.get());
 
         // CHECK STATS
         VoltTable statsT = getStats(client, "PROCEDURE");
