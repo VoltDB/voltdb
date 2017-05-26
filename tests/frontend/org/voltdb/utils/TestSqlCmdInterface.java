@@ -494,9 +494,11 @@ public class TestSqlCmdInterface
         List<FileInfo> filesInfo = null;
 
         filesInfo = SQLParser.parseFileStatement(null, "FILE  haha.sql;");
+        assertEquals(1, filesInfo.size());
         assertFalse(filesInfo.get(0).isBatch());
 
         filesInfo = SQLParser.parseFileStatement(null, "FILE -batch heehee.sql;");
+        assertEquals(1, filesInfo.size());
         assertTrue(filesInfo.get(0).isBatch());
     }
 }
