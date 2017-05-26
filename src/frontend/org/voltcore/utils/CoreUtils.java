@@ -1204,7 +1204,9 @@ public class CoreUtils {
     }
 
     /**
-     * Print logs surrounded by stars
+     * Print beautiful logs surrounded by stars. This function handles long lines (wrapping
+     * into multiple lines) as well. Please use only spaces and newline characters for word
+     * separation.
      * @param vLogger   The provided VoltLogger
      * @param msg   Message to be printed out beautifully
      * @param level Logging level
@@ -1213,51 +1215,99 @@ public class CoreUtils {
     {
         if (vLogger == null || msg == null || level == Level.OFF) { return; }
 
-        // The border of the star-surrounded message
-        //      **********
-        //      * msg... *
-        //      **********
-        // Improvement may be needed to handle multi-line messages
+        // Construct the new message (wrap the lines)
+        // Assume 100 characters is a proper max length for
+        // each line
+        List<String> msgLines = new ArrayList<>();
+        StringBuilder lineBuilder = new StringBuilder();
+        int maxLen = 0;
 
-        // WARNING: String.join cannot be used here
-        // String stars = String.join("", Collections.nCopies(msg.length() + 4, "*"));
+        String[] splits = msg.split("\n");
+        for (String line : splits) {
+            if (line.length() != 0) {
+                if (line.length() <= 100) {
+                    msgLines.add(line);
+                    if (line.length() > maxLen) {maxLen = line.length(); }
+                } else {
+                    // Assume only spaces
+                    String[] words = line.split("\\s");
+                    for (String word : words) {
+                        if (lineBuilder.length() + word.length() <= 100) {
+                            lineBuilder.append(word);
+                            lineBuilder.append(" ");
+                        } else if (lineBuilder.length() == 0) {
+                            // In case of long word
+                            msgLines.add(word);
+                            if (word.length() > maxLen) { maxLen = word.length(); }
+                        } else {
+                            // Remove the last space
+                            lineBuilder.deleteCharAt(lineBuilder.length() - 1);
+                            // Update the max line length
+                            if (lineBuilder.length() > maxLen) { maxLen = lineBuilder.length(); }
+                            msgLines.add(lineBuilder.toString());
+                            lineBuilder.setLength(0);
+                        }
+                    }
+                    if (lineBuilder.length() > 0) {
+                        // Remove the last space
+                        lineBuilder.deleteCharAt(lineBuilder.length() - 1);
+                        // Update the max line length
+                        if (lineBuilder.length() > maxLen) { maxLen = lineBuilder.length(); }
+                        msgLines.add(lineBuilder.toString());
+                        lineBuilder.setLength(0);
+                    }
+                }
+            }
+        }
+
+        // The boundary of the message box
         StringBuilder sBuilder = new StringBuilder();
-        for (int i = 0; i < msg.length() + 4; i++) {
+        for (int i = 0; i < maxLen + 4; i++) {
             sBuilder.append("*");
         }
         String stars = sBuilder.toString();
 
-        String new_msg = "* " + msg + " *";
-
         switch (level) {
             case DEBUG:
                 vLogger.debug(stars);
-                vLogger.debug(new_msg);
+                for (String line : msgLines) {
+                    vLogger.debug("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
+                }
                 vLogger.debug(stars);
                 break;
             case WARN:
                 vLogger.warn(stars);
-                vLogger.warn(new_msg);
+                for (String line : msgLines) {
+                    vLogger.warn("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
+                }
                 vLogger.warn(stars);
                 break;
             case ERROR:
                 vLogger.error(stars);
-                vLogger.error(new_msg);
+                for (String line : msgLines) {
+                    vLogger.error("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
+                }
                 vLogger.error(stars);
                 break;
             case FATAL:
                 vLogger.fatal(stars);
-                vLogger.fatal(new_msg);
+                for (String line : msgLines) {
+                    vLogger.fatal("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
+                }
                 vLogger.fatal(stars);
                 break;
             case INFO:
                 vLogger.info(stars);
-                vLogger.info(new_msg);
+                for (String line : msgLines) {
+                    vLogger.info("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
+                }
                 vLogger.info(stars);
                 break;
             case TRACE:
                 vLogger.trace(stars);
-                vLogger.trace(new_msg);
+                for (String line : msgLines) {
+                    vLogger.trace("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
+                }
                 vLogger.trace(stars);
                 break;
             default:
