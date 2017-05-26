@@ -137,7 +137,17 @@ public class MiscUtils {
                 }
 
                 @Override
-                public boolean isTrial() {
+                public boolean isAnyKindOfTrial() {
+                    return false;
+                }
+
+                @Override
+                public boolean isProTrial() {
+                    return false;
+                }
+
+                @Override
+                public boolean isEnterpriseTrial() {
                     return false;
                 }
 
@@ -335,7 +345,7 @@ public class MiscUtils {
 
         if (yesterday.after(licenseApi.expires())) {
             if (licenseApi.hardExpiration()) {
-                if (licenseApi.isTrial()) {
+                if (licenseApi.isAnyKindOfTrial()) {
                     hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
                 }
                 else {
@@ -392,7 +402,7 @@ public class MiscUtils {
         long diffDays = diff / (24 * 60 * 60 * 1000);
 
         // print out trial success message
-        if (licenseApi.isTrial()) {
+        if (licenseApi.isAnyKindOfTrial()) {
             consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + " (" + diffDays + " days remaining).");
             return true;
         }
