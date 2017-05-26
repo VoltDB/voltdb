@@ -37,8 +37,8 @@ echo "CLASSPATH:" $CLASSPATH
 
 # Start the PostgreSQL server, in the new temp directory
 # Note: '-o --lc-collate=C' causes VARCHAR sorting to match VoltDB's
-sudo su - postgres -c "$PG_PATH/pg_ctl initdb -D $PG_TMP_DIR/data -o --lc-collate=C"
-sudo su - postgres -c "$PG_PATH/pg_ctl start  -D $PG_TMP_DIR/data -l $PG_TMP_DIR/postgres.log"
+sudo su - postgres -c "$PG_PATH/pg_ctl initdb   -D $PG_TMP_DIR/data -o --lc-collate=C"
+sudo su - postgres -c "$PG_PATH/pg_ctl start -w -D $PG_TMP_DIR/data -l $PG_TMP_DIR/postgres.log"
 
 # Print info about PostgreSQL processes, to make sure they are working OK
 ps -f -u postgres
