@@ -46,8 +46,8 @@ def drop(runner):
             runner.info('All connected clusters have been successfully reset. Safe to shutdown...')
         else:
             if not checkstats.check_no_dr_consumer(runner, False):
-                runner.warn('This cluster has dr consumer(s) for unconnected cluster(s). ' +
-                            'This maybe due to an unfinished dr drop cluster command. Please check those cluster(s) and do reset manually.')
+                runner.warn('This cluster still has dr consumer(s). ' +
+                            'This may be due to an unfinished dr drop cluster command. Please check those cluster(s) and do reset manually.')
     except StatisticsProcedureException as proex:
         runner.info('The previous command has timed out and stopped waiting... The cluster is in dropping phase.')
         runner.error(proex.message)
