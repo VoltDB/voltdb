@@ -1205,9 +1205,9 @@ public class CoreUtils {
 
     /**
      * Print logs surrounded by stars
-     * @param vLogger
-     * @param msg
-     * @param level
+     * @param vLogger   The provided VoltLogger
+     * @param msg   Message to be printed out beautifully
+     * @param level Logging level
      */
     public static void PrintGoodLookingLog(VoltLogger vLogger, String msg, Level level)
     {
@@ -1218,7 +1218,15 @@ public class CoreUtils {
         //      * msg... *
         //      **********
         // Improvement may be needed to handle multi-line messages
-        String stars = String.join("", Collections.nCopies(msg.length() + 4, "*"));
+
+        // WARNING: String.join cannot be used here
+        // String stars = String.join("", Collections.nCopies(msg.length() + 4, "*"));
+        StringBuilder sBuilder = new StringBuilder();
+        for (int i = 0; i < msg.length() + 4; i++) {
+            sBuilder.append("*");
+        }
+        String stars = sBuilder.toString();
+
         String new_msg = "* " + msg + " *";
 
         switch (level) {
