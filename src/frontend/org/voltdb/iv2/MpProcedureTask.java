@@ -36,9 +36,9 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.collect.Maps;
-import org.voltdb.utils.VoltTrace;
 
 /**
  * Implements the Multi-partition procedure ProcedureTask.
@@ -131,7 +131,7 @@ public class MpProcedureTask extends ProcedureTask
                 spName.startsWith("@") &&
                 !spName.startsWith("@AdHoc") &&
                 !spName.startsWith("@LoadMultipartitionTable") &&
-                !spName.equals("@UpdateApplicationCatalog") &&
+                !spName.equals("@UpdateCore") &&
                 !spName.equals("@ApplyBinaryLogMP"))
         {
             InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);

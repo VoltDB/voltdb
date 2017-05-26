@@ -58,6 +58,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.DDLParserCallback;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.FileInfo;
 import org.voltdb.parser.SQLParser.FileOption;
@@ -118,8 +119,14 @@ public class SQLCommand
         return response;
     }
 
-    private static void executeDDLBatch(String batchFileName, String statements) {
+    private static void executeDDLBatch(String batchFileName, String statements, DDLParserCallback callback, int batchEndLineNumber) {
+
         try {
+            if (callback != null) {
+                callback.batch(statements, batchEndLineNumber);
+                return;
+            }
+
             if ( ! m_interactive ) {
                 System.out.println();
                 System.out.println(statements);
@@ -284,7 +291,7 @@ public class SQLCommand
                     continue;
                 }
                 if (fileInfo != null) {
-                    executeScriptFile(fileInfo, interactiveReader);
+                    executeScriptFile(fileInfo, interactiveReader, null);
                     if (m_returningToPromptAfterError) {
                         // executeScriptFile stopped because of an error. Wipe the slate clean.
                         m_returningToPromptAfterError = false;
@@ -294,7 +301,7 @@ public class SQLCommand
 
                 // else treat the input line as a regular database command
                 if (executeImmediate) {
-                    executeStatements(line + "\n");
+                    executeStatements(line + "\n", null, 0);
                     if (m_testFrontEndOnly) {
                         break; // test mode expects this early return before end of input.
                     }
@@ -313,7 +320,7 @@ public class SQLCommand
                 RecallableSessionLines.add(line);
                 if (executeImmediate) {
                     statement.append(line + "\n");
-                    executeStatements(statement.toString());
+                    executeStatements(statement.toString(), null, 0);
                     if (m_testFrontEndOnly) {
                         break; // test mode expects this early return before end of input.
                     }
@@ -337,8 +344,8 @@ public class SQLCommand
     public static void executeNoninteractive() throws Exception
     {
         SQLCommandLineReader stdinReader = new LineReaderAdapter(new InputStreamReader(System.in));
-        FileInfo fileInfo = SQLParser.FileInfo.forSystemIn();
-        executeScriptFromReader(fileInfo, stdinReader);
+        FileInfo fileInfo = FileInfo.forSystemIn();
+        executeScriptFromReader(fileInfo, stdinReader, null);
     }
 
 
@@ -557,26 +564,6 @@ public class SQLCommand
         System.out.println();
     }
 
-    /** Adapt BufferedReader into a SQLCommandLineReader */
-    private static class LineReaderAdapter implements SQLCommandLineReader {
-        private final BufferedReader m_reader;
-
-        LineReaderAdapter(InputStreamReader reader) {
-            m_reader = new BufferedReader(reader);
-        }
-
-        @Override
-        public String readBatchLine() throws IOException {
-            return m_reader.readLine();
-        }
-
-        void close() {
-            try {
-                m_reader.close();
-            } catch (IOException e) { }
-        }
-    }
-
     /**
      * Reads a script file and executes its content.
      * Note that the "script file" could be an inline batch,
@@ -586,12 +573,15 @@ public class SQLCommand
      * @param fileInfo    Info on the file directive being processed
      * @param parentLineReader  The current input stream, to be used for "here documents".
      */
-    static void executeScriptFile(FileInfo fileInfo, SQLCommandLineReader parentLineReader)
+    static void executeScriptFile(FileInfo fileInfo, SQLCommandLineReader parentLineReader, DDLParserCallback callback)
     {
         LineReaderAdapter adapter = null;
         SQLCommandLineReader reader = null;
 
-        if ( ! m_interactive) {
+        if ( ! m_interactive && callback == null) {
+            // We have to check for the callback to avoid spewing to System.out in the "init --classes" filtering codepath.
+            // Better logging/output handling in general would be nice to have here -- output on System.out will be consumed
+            // by the test generators (build_eemakefield) and cause build failures.
             System.out.println();
             System.out.println(fileInfo.toString());
         }
@@ -612,7 +602,7 @@ public class SQLCommand
             }
         }
         try {
-            executeScriptFromReader(fileInfo, reader);
+            executeScriptFromReader(fileInfo, reader, callback);
         }
         catch (SQLCmdEarlyExitException e) {
             throw e;
@@ -632,9 +622,9 @@ public class SQLCommand
      * @param fileInfo  The FileInfo object describing the file command (or stdin)
      * @throws Exception
      */
-    private static void executeScriptFromReader(FileInfo fileInfo, SQLCommandLineReader reader)
-            throws Exception {
 
+    public static void executeScriptFromReader(FileInfo fileInfo, SQLCommandLineReader reader, DDLParserCallback callback)
+            throws Exception {
         StringBuilder statement = new StringBuilder();
         // non-interactive modes need to be more careful about discarding blank lines to
         // keep from throwing off diagnostic line numbers. So "statement" may be non-empty even
@@ -648,6 +638,7 @@ public class SQLCommand
         while (true) {
 
             String line = reader.readBatchLine();
+
             if (delimiter != null) {
                 if (line == null) {
                     // We only print this nice message if the inline batch is
@@ -671,7 +662,7 @@ public class SQLCommand
                         // like a blank line from stdin.
                         if ( ! statementString.trim().isEmpty()) {
                             //* enable to debug */if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                            executeStatements(statementString);
+                            executeStatements(statementString, callback, reader.getLineNumber());
                         }
                     }
                     else {
@@ -680,7 +671,7 @@ public class SQLCommand
                         // For now, treat the final semicolon as optional and
                         // assume that we are not just adding a partial statement to the batch.
                         batch.append(statement);
-                        executeDDLBatch(fileInfo.getFilePath(), batch.toString());
+                        executeDDLBatch(fileInfo.getFilePath(), batch.toString(), callback, reader.getLineNumber());
                     }
                 }
                 return;
@@ -693,7 +684,7 @@ public class SQLCommand
                     // numbers (in a batch), we should at least append a newline.
                     // Whether to echo comments or blank lines from a batch is
                     // a grey area.
-                    if (batch != null) {
+                    if (batch != null && callback == null) {
                         statement.append(line).append("\n");
                     }
                     continue;
@@ -710,7 +701,7 @@ public class SQLCommand
 
                     // Execute the file content or fail to but only set m_returningToPromptAfterError
                     // if the intent is to cause a recursive failure, stopOrContinue decided to stop.
-                    executeScriptFile(nestedFileInfo, reader);
+                    executeScriptFile(nestedFileInfo, reader, callback);
                     if (m_returningToPromptAfterError) {
                         // The recursive readScriptFile stopped because of an error.
                         // Escape to the outermost readScriptFile caller so it can exit or
@@ -749,7 +740,7 @@ public class SQLCommand
                     // like a blank line from stdin.
                     if ( ! statementString.trim().isEmpty()) {
                         //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                        executeStatements(statementString);
+                        executeStatements(statementString, callback, reader.getLineNumber());
                     }
                     statement.setLength(0);
                 }
@@ -769,25 +760,31 @@ public class SQLCommand
     // the end of a statement. It could give a false negative for something as
     // simple as an end-of-line comment.
     //
-    private static void executeStatements(String statements)
+    private static void executeStatements(String statements, DDLParserCallback callback, int lineNum)
     {
         List<String> parsedStatements = SQLParser.parseQuery(statements);
         for (String statement: parsedStatements) {
-            executeStatement(statement);
+            executeStatement(statement, callback, lineNum);
         }
     }
 
-    private static void executeStatement(String statement)
+    private static void executeStatement(String statement, DDLParserCallback callback, int lineNum)
     {
         if (m_testFrontEndOnly) {
             m_testFrontEndResult += statement + ";\n";
             return;
         }
-        if ( !m_interactive && m_outputShowMetadata) {
+        if ( !m_interactive && m_outputShowMetadata && callback == null) {
             System.out.println();
             System.out.println(statement + ";");
         }
         try {
+
+            if (callback != null) {
+                callback.statement(statement, lineNum);
+                return;
+            }
+
             // EXEC <procedure> <params>...
             m_startTime = System.nanoTime();
             SQLParser.ExecuteCallResults execCallResults = SQLParser.parseExecuteCall(statement, Procedures);
@@ -1502,7 +1499,7 @@ public class SQLCommand
                 //TODO: Someday we should honor batching.
                 m_interactive = false;
                 for (String query : queries) {
-                    executeStatement(query);
+                    executeStatement(query, null, 0);
                 }
             }
             // This test for an interactive environment is mostly
