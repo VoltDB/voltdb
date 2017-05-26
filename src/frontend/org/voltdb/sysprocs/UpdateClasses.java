@@ -27,26 +27,17 @@ import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 /**
- * Non-transactional procedure to implement public @UpdateApplicationCatalog system
- * procedure.
+ * Non-transactional procedure to implement public @UpdateClasses system procedure.
  *
  */
-public class UpdateApplicationCatalog extends UpdateApplicationBase {
+public class UpdateClasses extends UpdateApplicationBase {
 
-    public CompletableFuture<ClientResponse> run(byte[] catalogJarBytes, String deploymentString) {
-        // catalogJarBytes if null, when passed along, will tell the
-        // catalog change planner that we want to use the current catalog.
-
+    public CompletableFuture<ClientResponse> run(byte[] jarfileBytes, String classesToDeleteSelector) {
         DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
-        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema() && !isRestoring();
+        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
 
-        // normalize empty string and null
-        if ((catalogJarBytes != null) && (catalogJarBytes.length == 0)) {
-            catalogJarBytes = null;
-        }
-
-        if (!allowPausedModeWork(isRestoring(), isAdminConnection())) {
+        if (!allowPausedModeWork(false, isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
@@ -54,19 +45,18 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         // We have an @UAC.  Is it okay to run it?
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen
-
-        if (catalogJarBytes != null && useDDLSchema) {
+        if (!useDDLSchema) {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
-                    "Cluster is configured to use AdHoc DDL to change application schema. " +
-                    "Use of @UpdateApplicationCatalog is forbidden.");
+                    "Cluster is configured to use @UpdateApplicationCatalog " +
+                    "to change application schema.  Use of @UpdateClasses is forbidden.");
         }
 
         CatalogChangeResult ccr = null;
         try {
-            ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
-                                                catalogJarBytes,
-                                                deploymentString,
+            ccr = prepareApplicationCatalogDiff("@UpdateClasses",
+                                                jarfileBytes,
+                                                classesToDeleteSelector,
                                                 new String[0],
                                                 null,
                                                 false, /* isPromotion */
@@ -77,7 +67,7 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                                                 getUsername());
         }
         catch (PrepareDiffFailureException pe) {
-            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
+            hostLog.info("A request to update the loaded classes has been rejected. More info returned to client.");
             return makeQuickResponse(pe.statusCode, pe.getMessage());
         }
 
@@ -91,11 +81,6 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         // case for @CatalogChangeResult
         if (ccr.encodedDiffCommands.trim().length() == 0) {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
-        }
-
-        // This means no more @UAC calls when using DDL mode.
-        if (isRestoring()) {
-            noteRestoreCompleted();
         }
 
         // initiate the transaction.

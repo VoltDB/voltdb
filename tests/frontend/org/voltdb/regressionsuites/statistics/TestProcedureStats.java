@@ -44,7 +44,7 @@ public class TestProcedureStats extends AdhocDDLTestBase {
         VoltTable vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
         assertEquals(1, vt.getRowCount());
         vt.advanceRow();
-        assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+        assertEquals("org.voltdb.sysprocs.UpdateCore", vt.getString(5));
         assertEquals(timedInvocations, vt.getLong(7));
     }
 
@@ -91,7 +91,7 @@ public class TestProcedureStats extends AdhocDDLTestBase {
             assertEquals(1, vt.getRowCount());
 
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
-            checkKeepedStats(new String[]{"TB1.insert", "org.voltdb.sysprocs.UpdateApplicationCatalog"});
+            checkKeepedStats(new String[]{"TB1.insert", "org.voltdb.sysprocs.UpdateCore"});
 
             String ddl = "create table tb2 (a int not null unique); partition table tb2 on column a;";
             vt = m_client.callProcedure("@AdHoc", ddl).getResults()[0];
@@ -125,7 +125,7 @@ public class TestProcedureStats extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             checkKeepedStats(new String[]{"TB1.insert", "TB1.delete", "TB1.upsert",
                     "TB2.insert", "TB2.insert", // two records for each partition (SP procedure)
-                    "org.voltdb.sysprocs.UpdateApplicationCatalog"});
+                    "org.voltdb.sysprocs.UpdateCore"});
 
             vt = m_client.callProcedure("@AdHoc", "alter table tb1 add column b int;").getResults()[0];
             assertEquals(1, vt.getRowCount());
