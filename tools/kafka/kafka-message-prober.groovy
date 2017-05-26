@@ -147,7 +147,7 @@ class Fetcher {
 def cli = new CliBuilder(usage: 'groovy kafka-offset-info.groovy [options]')
 cli.with {
     b(longOpt: 'brokers','kafka comma delimited broker list', required:true, args:1)
-    g(longOpt: 'group', 'consumenr group', required:true, args:1)
+    g(longOpt: 'group', 'consumer group', required:true, args:1)
     t(longOpt: 'topic', 'kafka topic', required:true, args:1)
     h(longOpt: 'help', 'usage information', required: false)
     w(longOpt: 'wait', 'fetch request wait time', args:1, required:false)
