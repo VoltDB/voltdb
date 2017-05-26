@@ -628,7 +628,7 @@ public class SQLCommand
                         // and append to existing statements
                         while ((line = reader.readBatchLine()) != null)
                         {
-                            statements.append(line);
+                            statements.append(line).append("\n");
                         }
 
                         // if it is the last file, create a reader to read from the string of all files contents
