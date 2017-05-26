@@ -534,7 +534,7 @@ public final class InvocationDispatcher {
             // should be printed out properly. The following message is printed at the node where
             // the client is connected to.
             if ("@PrepareShutdown".equals(procName)) {
-                String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.";
+                String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a PrepareShutdown.";
                 LoggerHelper.PrintGoodLookingLog(hostLog, msg, Level.WARN);
             }
         }
