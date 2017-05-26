@@ -28,7 +28,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,6 +90,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.LoggerHelper;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
@@ -535,10 +535,7 @@ public final class InvocationDispatcher {
             // the client is connected to.
             if ("@PrepareShutdown".equals(procName)) {
                 String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.";
-                // Surround the message with stars
-                hostLog.warn(Collections.nCopies(msg.length() + 4, "*"));
-                hostLog.warn("* " + msg + " *");
-                hostLog.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
+                LoggerHelper.PrintGoodLookingLog(hostLog, msg, Level.WARN);
             }
         }
         // If you're going to copy and paste something, CnP the pattern

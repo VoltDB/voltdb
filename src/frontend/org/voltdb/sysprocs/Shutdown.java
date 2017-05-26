@@ -17,11 +17,11 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -33,6 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.utils.LoggerHelper;
 
 /**
  * A wholly improper shutdown. No promise is given to return a result to a client,
@@ -57,10 +58,7 @@ public class Shutdown extends VoltSystemProcedure {
             } catch (InterruptedException e) {}
             VoltLogger voltLogger = new VoltLogger("HOST");
             String msg = "VoltDB shutting down as requested by @Shutdown command.";
-            // Surround the error message with stars
-            voltLogger.warn(Collections.nCopies(msg.length() + 4, "*"));
-            voltLogger.warn("* " + msg + " *");
-            voltLogger.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
+            LoggerHelper.PrintGoodLookingLog(voltLogger, msg, Level.WARN);
             System.exit(0);
         }
     };
@@ -87,10 +85,7 @@ public class Shutdown extends VoltSystemProcedure {
                 m_failsafe.start();
                 VoltLogger voltLogger = new VoltLogger("HOST");
                 String msg = "VoltDB shutdown operation requested and in progress. Cluster will terminate shortly.";
-                // Surround the error message with stars
-                voltLogger.warn(Collections.nCopies(msg.length() + 4, "*"));
-                voltLogger.warn("* " + msg + " *");
-                voltLogger.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
+                LoggerHelper.PrintGoodLookingLog(voltLogger, msg, Level.WARN);
             }
             VoltTable rslt = new VoltTable(new ColumnInfo[] { new ColumnInfo("HA", VoltType.STRING) });
             return new DependencyPair.TableDependencyPair(DEP_shutdownSync, rslt);
@@ -114,10 +109,7 @@ public class Shutdown extends VoltSystemProcedure {
                     if (die) {
                         VoltLogger voltLogger = new VoltLogger("HOST");
                         String msg = "VoltDB shutting down as requested by @Shutdown command.";
-                        // Surround the error message with stars
-                        voltLogger.warn(Collections.nCopies(msg.length() + 4, "*"));
-                        voltLogger.warn("* " + msg + " *");
-                        voltLogger.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
+                        LoggerHelper.PrintGoodLookingLog(voltLogger, msg, Level.WARN);
                         System.exit(0);
                     }
                     else {

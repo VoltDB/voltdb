@@ -18,13 +18,14 @@
 package org.voltcore.utils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.utils.LoggerHelper;
 
 /**
  * A hacky singleton which provides simple coordinated registration of ShutdownHooks within Volt.
@@ -132,9 +133,7 @@ public class ShutdownHooks
         if (m_iAmAServer && !m_crashing && ShutdownHooks.m_crashMessage) {
             VoltLogger voltLogger = new VoltLogger("CONSOLE");
             String msg = "The VoltDB server will shut down due to a control-C or other JVM exit.";
-            voltLogger.warn(Collections.nCopies(msg.length() + 4, "*"));
-            voltLogger.warn("* " + msg + " *");
-            voltLogger.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
+            LoggerHelper.PrintGoodLookingLog(voltLogger, msg, Level.WARN);
         }
         for (Entry<Integer, List<ShutdownTask>> tasks : m_shutdownTasks.entrySet()) {
             for (ShutdownTask task : tasks.getValue()) {
