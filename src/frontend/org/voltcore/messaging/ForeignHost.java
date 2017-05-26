@@ -23,7 +23,6 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -41,6 +40,7 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.LoggerHelper;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -105,10 +105,7 @@ public class ForeignHost {
                 if (!m_hostMessenger.isShuttingDown()) {
                     String msg = "Received remote hangup from foreign host " + hostnameAndIPAndPort();
                     VoltDB.dropStackTrace(msg);
-                    // Surround the error message with stars
-                    hostLog.warn(Collections.nCopies(msg.length() + 4, "*"));
-                    hostLog.warn("* " + msg + " *");
-                    hostLog.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
+                    LoggerHelper.PrintGoodLookingLog(hostLog, msg, Level.WARN);
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
