@@ -70,7 +70,6 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.LoggerHelper;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
@@ -471,7 +470,7 @@ public final class InvocationDispatcher {
             // the client is connected to.
             if ("@PrepareShutdown".equals(procName)) {
                 String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a PrepareShutdown.";
-                LoggerHelper.PrintGoodLookingLog(hostLog, msg, Level.WARN);
+                CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
             }
         }
         // If you're going to copy and paste something, CnP the pattern

@@ -40,7 +40,6 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
-import org.voltdb.utils.LoggerHelper;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -105,7 +104,7 @@ public class ForeignHost {
                 if (!m_hostMessenger.isShuttingDown()) {
                     String msg = "Received remote hangup from foreign host " + hostnameAndIPAndPort();
                     VoltDB.dropStackTrace(msg);
-                    LoggerHelper.PrintGoodLookingLog(hostLog, msg, Level.WARN);
+                    CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
