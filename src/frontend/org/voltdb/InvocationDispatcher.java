@@ -28,6 +28,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -315,20 +316,6 @@ public final class InvocationDispatcher {
             OverrideCheck bypass,
             boolean ntPriority)
     {
-        /*
-         * When a user issues a shutdown command to the cluster, the detailed information
-         * should be printed out properly. The following message is printed at the node where
-         * the client is connected to.
-         *
-         * WARNING: HARDCODING
-         */
-        if (task.getProcName().equals("@PrepareShutdown")) {
-            VoltLogger vLogger = new VoltLogger("HOST");
-            vLogger.warn("=================================================================");
-            vLogger.warn("User: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.");
-            vLogger.warn("=================================================================\n");
-        }
-
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
@@ -541,6 +528,17 @@ public final class InvocationDispatcher {
                 return unexpectedFailureResponse(
                         procName + " is not available to this client",
                         task.clientHandle);
+            }
+
+            // After we verify the shutdown command from an admin user, the detailed information
+            // should be printed out properly. The following message is printed at the node where
+            // the client is connected to.
+            if ("@PrepareShutdown".equals(procName)) {
+                String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a shutdown procedure.";
+                // Surround the message with stars
+                hostLog.warn(Collections.nCopies(msg.length() + 4, "*"));
+                hostLog.warn("* " + msg + " *");
+                hostLog.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
             }
         }
         // If you're going to copy and paste something, CnP the pattern

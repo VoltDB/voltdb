@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -102,13 +103,12 @@ public class ForeignHost {
             {
                 // Log the remote host's action
                 if (!m_hostMessenger.isShuttingDown()) {
-                    VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostnameAndIPAndPort());
-                    hostLog.warn("*******************************************************************************" +
-                                 "***********");
-                    hostLog.warn("********* Received remote hangup from foreign host " + hostnameAndIPAndPort() +
-                                 " *********");
-                    hostLog.warn("*******************************************************************************" +
-                                 "***********\n");
+                    String msg = "Received remote hangup from foreign host " + hostnameAndIPAndPort();
+                    VoltDB.dropStackTrace(msg);
+                    // Surround the error message with stars
+                    hostLog.warn(Collections.nCopies(msg.length() + 4, "*"));
+                    hostLog.warn("* " + msg + " *");
+                    hostLog.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }

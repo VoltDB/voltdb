@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -55,9 +56,11 @@ public class Shutdown extends VoltSystemProcedure {
                 Thread.sleep(10000);
             } catch (InterruptedException e) {}
             VoltLogger voltLogger = new VoltLogger("HOST");
-            voltLogger.warn("******************************************************************************************");
-            voltLogger.warn("**************** VoltDB shutting down as requested by @Shutdown command. *****************");
-            voltLogger.warn("******************************************************************************************\n");
+            String msg = "VoltDB shutting down as requested by @Shutdown command.";
+            // Surround the error message with stars
+            voltLogger.warn(Collections.nCopies(msg.length() + 4, "*"));
+            voltLogger.warn("* " + msg + " *");
+            voltLogger.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
             System.exit(0);
         }
     };
@@ -83,10 +86,11 @@ public class Shutdown extends VoltSystemProcedure {
             if (!m_failsafeArmed.getAndSet(true)) {
                 m_failsafe.start();
                 VoltLogger voltLogger = new VoltLogger("HOST");
-                // WARNING: BEAWARE OF LONG LINES
-                voltLogger.warn("******************************************************************************************");
-                voltLogger.warn("** VoltDB shutdown operation requested and in progress. Cluster will terminate shortly. **");
-                voltLogger.warn("******************************************************************************************\n");
+                String msg = "VoltDB shutdown operation requested and in progress. Cluster will terminate shortly.";
+                // Surround the error message with stars
+                voltLogger.warn(Collections.nCopies(msg.length() + 4, "*"));
+                voltLogger.warn("* " + msg + " *");
+                voltLogger.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
             }
             VoltTable rslt = new VoltTable(new ColumnInfo[] { new ColumnInfo("HA", VoltType.STRING) });
             return new DependencyPair.TableDependencyPair(DEP_shutdownSync, rslt);
@@ -109,10 +113,11 @@ public class Shutdown extends VoltSystemProcedure {
                     }
                     if (die) {
                         VoltLogger voltLogger = new VoltLogger("HOST");
-                        // WARNING: BEAWARE OF LONG LINES
-                        voltLogger.warn("******************************************************************************************");
-                        voltLogger.warn("**************** VoltDB shutting down as requested by @Shutdown command. *****************");
-                        voltLogger.warn("******************************************************************************************\n");
+                        String msg = "VoltDB shutting down as requested by @Shutdown command.";
+                        // Surround the error message with stars
+                        voltLogger.warn(Collections.nCopies(msg.length() + 4, "*"));
+                        voltLogger.warn("* " + msg + " *");
+                        voltLogger.warn(Collections.nCopies(msg.length() + 4, "*") + "\n");
                         System.exit(0);
                     }
                     else {
