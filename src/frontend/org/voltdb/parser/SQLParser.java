@@ -1445,7 +1445,7 @@ public class SQLParser extends SQLPatternFactory
         // split filenames assuming they are separated by space ignoring spaces within quotes
         //String[] filenames = remainder.split("\\s+");
         List<String> filenames = new ArrayList<String>();
-        Pattern regex = Pattern.compile("[^\\s\"']+|\"[^\"]*\"|'[^']*'");
+        Pattern regex = Pattern.compile("[^\\s\"']+|'[^']*'");
         Matcher regexMatcher = regex.matcher(remainder);
         while (regexMatcher.find()) {
             filenames.add(regexMatcher.group());

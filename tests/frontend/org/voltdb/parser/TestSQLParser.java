@@ -226,7 +226,7 @@ public class TestSQLParser extends TestCase {
         assertTrue(fi.isBatch());
 
         // file -batch directive
-        fis = SQLParser.parseFileStatement("file -batch myddl.sql \"quote sample.sql\" 'space file.sql'");
+        fis = SQLParser.parseFileStatement("file -batch myddl.sql 'quote sample.sql' 'space file.sql'");
         fi = fis.get(0);
         assertEquals(3, fis.size());
         assertEquals(FileOption.BATCH, fi.getOption());

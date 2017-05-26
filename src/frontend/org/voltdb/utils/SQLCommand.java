@@ -597,7 +597,7 @@ public class SQLCommand
 
         for (int ii = 0; ii < filesInfo.size(); ii++) {
 
-                FileInfo fileInfo = filesInfo.get(ii);
+            FileInfo fileInfo = filesInfo.get(ii);
             adapter = null;
             reader = null;
 
@@ -623,9 +623,9 @@ public class SQLCommand
 
                 // if it is a batch option, get all contents from all the files and send it as a string
                 if(fileInfo.getOption() == FileOption.BATCH) {
-                        //StringBuilder statements = new StringBuilder();//= new ArrayList<String>();
                         String line;
                         // use the current reader we obtained to read from the file
+                        // and append to existing statements
                         while ((line = reader.readBatchLine()) != null)
                         {
                             statements.append(line);
@@ -633,15 +633,13 @@ public class SQLCommand
 
                         // if it is the last file, create a reader to read from the string of all files contents
                         if( ii == filesInfo.size()-1 ) {
-                            //String statementsArray = statements.toArray(new String[0]);
                             String allStatements = statements.toString();
                             byte[] bytes = allStatements.getBytes("UTF-8");
                             ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+                            // reader LineReaderAdapter needs an input stream reader
                             reader = adapter = new LineReaderAdapter(new InputStreamReader( bais ) );
-                            //reader = adapter = new LineReaderAdapter(new BufferedReader( new StringReader( allStatements ) ) );
-                            //reader = adapter = new LineReaderAdapter(new StringReader( allStatements )  );
                         }
-                        // fileInfo is the last file info for batch with multiple files
+                        // NOTE - fileInfo has the last file info for batch with multiple files
                 }
             }
             try {
