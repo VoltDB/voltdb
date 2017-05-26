@@ -471,11 +471,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
     {
         synchronized(backendLock) {
-            if (m_backend == null) {
-                try {
-                    if (m_permanent_db_backend == null) {
-                        m_permanent_db_backend = new PostgreSQLBackend();
-                    }
+            try {
+                if (m_permanent_db_backend == null) {
+                    m_permanent_db_backend = new PostgreSQLBackend();
+                }
+                if (m_backend == null) {
                     Statement stmt = m_permanent_db_backend.getConnection().createStatement();
                     stmt.execute("drop database if exists " + m_database_name + ";");
                     stmt.execute("create database " + m_database_name + ";");
@@ -492,10 +492,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                         m_backend.runDDL(decoded_cmd);
                     }
                 }
-                catch (final Exception e) {
-                    hostLog.fatal("Unable to construct PostgreSQL backend");
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
+            }
+            catch (final Exception e) {
+                hostLog.fatal("Unable to construct PostgreSQL backend");
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
             return (PostgreSQLBackend) m_backend;
         }
@@ -986,6 +986,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     @Override
     protected void shutdown() {
         try {
+            System.out.println("Closing and dropping database: " + dbconn_url
+                    + "; and closing: "+m_permanent_db_backend.dbconn_url);
             dbconn.close();
             // Make sure the connection is closed, before proceeding
             for (int i=1; dbconn.isValid(i) && i<=10; i++) {
@@ -1007,6 +1009,15 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                     ex.printStackTrace();
                 }
             }
+            // Also close the "permanent" connection
+            try {
+                m_permanent_db_backend.getConnection().close();
+            } catch (SQLException ex) {
+                System.err.println("In PostgreSQLBackend.shutdown(), for "+m_permanent_db_backend.dbconn_url
+                        + ", caught exception:\n" + ex);
+                ex.printStackTrace();
+            }
+            // And close the FileWriter (for printing modified SQL)
             if (transformedSqlFileWriter != null) {
                 transformedSqlFileWriter.close();
                 transformedSqlFileWriter = null;
