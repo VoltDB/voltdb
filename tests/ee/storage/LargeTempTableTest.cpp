@@ -173,10 +173,8 @@ public:
 
     bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
         std::pair<TBPtr, std::unique_ptr<Pool>> blockAndPool = block->releaseData();
-        // m_map.emplace(std::make_pair(blockId,
-        //                              StoredBlock(blockAndPool.first,
-        //                                          std::move(blockAndPool.second))));
-        m_map.insert(std::make_pair(blockId, StoredBlock()));
+        m_map[blockId];
+
         auto it = m_map.find(blockId);
         it->second.setBlock(blockAndPool.first);
         it->second.setPool(std::move(blockAndPool.second));
@@ -235,6 +233,8 @@ private:
             p.swap(m_pool);
             return p;
         }
+
+        StoredBlock(const StoredBlock&) = delete;
 
     private:
         TBPtr m_tbp;
