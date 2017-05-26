@@ -506,10 +506,20 @@ public class TestSqlCmdInterface
         assertTrue(filesInfo.get(0).isBatch());
         assertTrue(filesInfo.get(1).isBatch());
 
+        // space allowed for batch file processing
         filesInfo = SQLParser.parseFileStatement(null, "FILE -batch 'file 1.sql';");
         assertEquals(1, filesInfo.size());
         assertTrue(filesInfo.get(0).isBatch());
         assertEquals("file 1.sql", filesInfo.get(0).getFile().toString());
+
+        filesInfo = SQLParser.parseFileStatement(null, "FILE -batch 'file 1.sql' 'file 2.sql' 3.sql");
+        assertEquals(3, filesInfo.size());
+        assertTrue(filesInfo.get(0).isBatch());
+        assertTrue(filesInfo.get(1).isBatch());
+        assertTrue(filesInfo.get(2).isBatch());
+        assertEquals("file 1.sql", filesInfo.get(0).getFile().toString());
+        assertEquals("file 2.sql", filesInfo.get(1).getFile().toString());
+        assertEquals("3.sql", filesInfo.get(2).getFile().toString());
 
     }
 }
