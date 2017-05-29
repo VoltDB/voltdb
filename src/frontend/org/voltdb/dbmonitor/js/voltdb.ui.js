@@ -1481,7 +1481,7 @@ var loadPage = function (serverName, portid) {
                               '                        <div id="drMasterSection_' + combinedId + '" class="masterWrapper" style="display:block;">' +
                               '                            <div id="tblMAster_wrapper_' + combinedId + '" class="dataTables_wrapper no-footer">' +
                               '                                <div class="tabs-filter-wrapperDR">' +
-                              '                                    <div class="drTitle icon-master" id="drMasterTitle_' + combinedId + '">Master</div>' +
+                              '                                    <div class="drTitle icon-master drSearch" id="drMasterTitle_' + combinedId + '">Master</div>' +
                               '                                    <div class="filter">' +
                               '                                        <input name="filter" id="filterPartitionId_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData_' + combinedId + '"  href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
@@ -1513,7 +1513,7 @@ var loadPage = function (serverName, portid) {
                               '                        <div id="drReplicaSection_' + combinedId + '" class="replicaWrapper" style="display:block">' +
                               '                            <div id="tblReplica_wrapper_' + combinedId +'" class="dataTables_wrapper no-footer">' +
                               '                                <div class="tabs-filter-wrapperDR">' +
-                              '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + combinedId + '">Replica</div>' +
+                              '                                    <div class="drTitle icon-replica drSearch" id="drReplicaTitle_' + combinedId + '">Replica</div>' +
                               '                                    <div class="filter">' +
                               '                                        <input name="filter" id="filterHostID_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData_' + combinedId + '" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
