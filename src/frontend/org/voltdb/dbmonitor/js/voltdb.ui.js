@@ -748,7 +748,9 @@ var loadPage = function (serverName, portid) {
                 } else {
                     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
                 }
-            }  else{
+            } else if (curTab == NavigationTabs.DR){
+                //Do nothing
+            } else{
                 setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
             }
         }
@@ -1178,6 +1180,8 @@ var loadPage = function (serverName, portid) {
                  voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
                         populateDRGraphandTable(drRoleDetail, replicationData["DR_GRAPH"])
                  });
+            } else {
+                hideDrInformation();
             }
 
         });
@@ -1221,7 +1225,6 @@ var loadPage = function (serverName, portid) {
             }
             if(isDisabled == false){
                 voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
-
                     if (getCurrentServer() != undefined) {
                         var isReplicaDataVisible = false;
                         var isMasterDataVisible = false;
@@ -1372,6 +1375,8 @@ var loadPage = function (serverName, portid) {
                         hideDrInformation()
                     }
                 });
+            } else {
+                hideDrInformation()
             }
         }
 
@@ -1627,7 +1632,6 @@ var loadPage = function (serverName, portid) {
 
         }
 
-
        var showHideDrGraph = function(status){
             var chartList =  VoltDbUI.drChartList;
             if(chartList != undefined && chartList.length > 0){
@@ -1673,6 +1677,11 @@ var loadPage = function (serverName, portid) {
             $("#divDrWrapperAdmin").hide();
             showHideDrGraph(false);
             VoltDbUI.isFirstDRLoad = false;
+
+            var curTab = VoltDbUI.getCookie("current-tab");
+            if (curTab == NavigationTabs.DR){
+                setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
+            }
         }
 
 
