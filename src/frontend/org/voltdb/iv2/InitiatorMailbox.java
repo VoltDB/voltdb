@@ -335,6 +335,9 @@ public class InitiatorMailbox implements Mailbox
             }
         }
         if (canDeliver) {
+            //For a message delivered to partition leaders, the message may not have the updated transaction id yet.
+            //The scheduler of partition leader will advance the transaction id, update the message and add it to repair log.
+            //so that the partition leader and replicas have the consistent items in their repair logs.
             m_scheduler.deliver(message);
         } else {
             m_repairLog.deliver(message);

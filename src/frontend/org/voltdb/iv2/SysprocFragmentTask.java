@@ -154,9 +154,9 @@ public class SysprocFragmentTask extends TransactionTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
-        // special case @UpdateApplicationCatalog to die die die during rejoin
+        // special case @UpdateCore to die die die during rejoin
         if (SysProcFragmentId.isCatalogUpdateFragment(m_fragmentMsg.getPlanHash(0))) {
-            VoltDB.crashLocalVoltDB("@UpdateApplicationCatalog is not supported during a rejoin. " +
+            VoltDB.crashLocalVoltDB("@UpdateCore is not supported during a rejoin. " +
                     "The rejoining node's VoltDB process will now exit.", false, null);
         }
 

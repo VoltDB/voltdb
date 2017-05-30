@@ -25,4 +25,4 @@
  * A fake use case intended for use verifying that 'voltdb init --classes' works with non-trivial use cases.
  * The theme is querying translations for 'Hello' in different languages.
  */
-package fakeusecase.greetings;
+package org.voltdb_testprocs.fakeusecase.greetings;

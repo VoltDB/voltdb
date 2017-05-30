@@ -17,63 +17,50 @@
 
 package org.voltdb.importer;
 
-import java.net.URI;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ImporterServerAdapterImpl;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.importer.formatter.FormatterBuilder;
-import org.voltdb.modular.ModuleManager;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import java.util.concurrent.ExecutionException;
 
 public class ImportProcessor implements ImportDataProcessor {
 
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
-    private final Map<String, ModuleWrapper> m_bundles = new HashMap<String, ModuleWrapper>();
-    private final Map<String, ModuleWrapper> m_bundlesByName = new HashMap<String, ModuleWrapper>();
-    private final ModuleManager m_moduleManager;
+    private final Map<String, ImporterWrapper> m_importers = new HashMap<String, ImporterWrapper>();
     private final ChannelDistributer m_distributer;
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
     private final String m_clusterTag;
 
-    public ImportProcessor(
-            int myHostId,
+
+    public ImportProcessor(int myHostId,
             ChannelDistributer distributer,
-            ModuleManager moduleManager,
             ImporterStatsCollector statsCollector,
             String clusterTag)
     {
-        m_moduleManager = moduleManager;
         m_distributer = distributer;
         m_importServerAdapter = new ImporterServerAdapterImpl(statsCollector);
         m_clusterTag = clusterTag;
     }
 
     //This abstracts OSGi based and class based importers.
-    public class ModuleWrapper {
-        private final URI m_bundleURI;
+    public class ImporterWrapper {
         private AbstractImporterFactory m_importerFactory;
         private ImporterLifeCycleManager m_importerTypeMgr;
 
-        public ModuleWrapper(AbstractImporterFactory importerFactory, URI bundleURI) {
-            m_bundleURI = bundleURI;
+        public ImporterWrapper(AbstractImporterFactory importerFactory) {
             m_importerFactory = importerFactory;
             m_importerFactory.setImportServerAdapter(m_importServerAdapter);
             m_importerTypeMgr = new ImporterLifeCycleManager(
@@ -98,66 +85,16 @@ public class ImportProcessor implements ImportDataProcessor {
                 if (m_importerFactory != null) {
                     m_importerTypeMgr.stop();
                 }
-                if (m_bundleURI != null) {
-                    m_moduleManager.unload(m_bundleURI);
-                }
             } catch (Exception ex) {
                 m_logger.error("Failed to stop the import bundles.", ex);
             }
         }
     }
 
-    public void addProcessorConfig(ImportConfiguration config) {
-        Properties properties = config.getmoduleProperties();
-
-        String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
-        String attrs[] = module.split("\\|");
-        String bundleJar = attrs[1];
-        String moduleType = attrs[0];
-
-        FormatterBuilder formatterBuilder = config.getFormatterBuilder();
-        try {
-            ModuleWrapper wrapper = m_bundles.get(bundleJar);
-            if (wrapper == null) {
-                if (moduleType.equalsIgnoreCase("osgi")) {
-                    URI bundleURI = URI.create(bundleJar);
-                    AbstractImporterFactory importerFactory = m_moduleManager
-                            .getService(bundleURI, AbstractImporterFactory.class);
-                    if (importerFactory == null) {
-                        m_logger.error("Failed to initialize importer from: " + bundleJar);
-                        return;
-                    }
-                    wrapper = new ModuleWrapper(importerFactory, bundleURI);
-                } else {
-                    //Class based importer.
-                    Class<?> reference = this.getClass().getClassLoader().loadClass(bundleJar);
-                    if (reference == null) {
-                        m_logger.error("Failed to initialize importer from: " + bundleJar);
-                        return;
-                    }
-                    AbstractImporterFactory importerFactory =
-                            (AbstractImporterFactory)reference.newInstance();
-                    wrapper = new ModuleWrapper(importerFactory, null);
-                }
-                String name = wrapper.getImporterType();
-                if (name == null || name.trim().length() == 0) {
-                    throw new RuntimeException("Importer must implement and return a valid unique name.");
-                }
-                Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-                m_bundlesByName.put(name, wrapper);
-                m_bundles.put(bundleJar, wrapper);
-            }
-            wrapper.configure(properties, formatterBuilder);
-        } catch(Throwable t) {
-            m_logger.error("Failed to configure import handler for " + bundleJar, t);
-            Throwables.propagate(t);
-        }
-    }
-
     @Override
     public int getPartitionsCount() {
         int count = 0;
-        for (ModuleWrapper wapper : m_bundles.values()) {
+        for (ImporterWrapper wapper : m_importers.values()) {
             if (wapper != null) {
                 count += wapper.getConfigsCount();
             }
@@ -167,11 +104,10 @@ public class ImportProcessor implements ImportDataProcessor {
 
     @Override
     public synchronized void readyForData(final CatalogContext catContext, final HostMessenger messenger) {
-
         m_es.submit(new Runnable() {
             @Override
             public void run() {
-                for (ModuleWrapper bw : m_bundles.values()) {
+                for (ImporterWrapper bw : m_importers.values()) {
                     try {
                         bw.m_importerTypeMgr.readyForData();
                     } catch (Exception ex) {
@@ -192,14 +128,14 @@ public class ImportProcessor implements ImportDataProcessor {
             public void run() {
                 try {
                     //Stop all the bundle wrappers.
-                    for (ModuleWrapper bw : m_bundles.values()) {
+                    for (ImporterWrapper bw : m_importers.values()) {
                         try {
                             bw.stop();
                         } catch (Exception ex) {
                             m_logger.error("Failed to stop the import handler: " + bw.m_importerFactory.getTypeName(), ex);
                         }
                     }
-                    m_bundles.clear();
+                    m_importers.clear();
                 } catch (Exception ex) {
                     m_logger.error("Failed to stop the import bundles.", ex);
                     Throwables.propagate(ex);
@@ -221,30 +157,41 @@ public class ImportProcessor implements ImportDataProcessor {
         }
     }
 
-    @Override
-    public void setProcessorConfig(CatalogContext catalogContext, Map<String, ImportConfiguration> config) {
-        List<String> configuredImporters = new ArrayList<String>();
-        for (String cname : config.keySet()) {
-            ImportConfiguration iConfig = config.get(cname);
-            Properties properties = iConfig.getmoduleProperties();
+    private void addProcessorConfig(ImportConfiguration config, Map<String, AbstractImporterFactory> importerModules) {
+        Properties properties = config.getmoduleProperties();
 
-            String importBundleJar = properties.getProperty(IMPORT_MODULE);
-            Preconditions.checkNotNull(importBundleJar, "Import source is undefined or custom export plugin class missing.");
-            String procedure = properties.getProperty(IMPORT_PROCEDURE);
-            //TODO: If processors is a list dont start till all procedures exists.
-            Procedure catProc = catalogContext.procedures.get(procedure);
-            if (catProc == null) {
-                catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
-            }
+        String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
+        assert(module != null);
+        String attrs[] = module.split("\\|");
+        String bundleJar = attrs[1];
 
-            if (catProc == null) {
-                m_logger.info("Importer " + cname + " Procedure " + procedure + " is missing will disable this importer until the procedure becomes available.");
-                continue;
+        FormatterBuilder formatterBuilder = config.getFormatterBuilder();
+        try {
+
+            ImporterWrapper wrapper = m_importers.get(bundleJar);
+            if (wrapper == null) {
+                AbstractImporterFactory importFactory = importerModules.get(bundleJar);
+                wrapper = new ImporterWrapper(importFactory);
+                String name = wrapper.getImporterType();
+                if (name == null || name.trim().isEmpty()) {
+                    throw new RuntimeException("Importer must implement and return a valid unique name.");
+                }
+                m_importers.put(bundleJar, wrapper);
             }
-            configuredImporters.add(cname);
-            addProcessorConfig(iConfig);
+            wrapper.configure(properties, formatterBuilder);
+        } catch(Throwable t) {
+            m_logger.error("Failed to configure import handler for " + bundleJar, t);
+            Throwables.propagate(t);
         }
-        m_logger.info("Import Processor is configured. Configured Importers: " + configuredImporters);
+    }
+
+    @Override
+    public void setProcessorConfig(Map<String, ImportConfiguration> config,
+            final Map<String, AbstractImporterFactory> importerModules) {
+        for (String configName : config.keySet()) {
+            ImportConfiguration importConfig = config.get(configName);
+            addProcessorConfig(importConfig, importerModules);
+        }
     }
 
 }

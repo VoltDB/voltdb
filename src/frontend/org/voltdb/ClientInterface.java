@@ -160,7 +160,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long DR_REPLICATION_SNAPSHOT_BASE_CID  = Long.MIN_VALUE + setBaseValue(2);
     public static final long DR_REPLICATION_NORMAL_BASE_CID    = Long.MIN_VALUE + setBaseValue(3);
     public static final long DR_REPLICATION_MP_BASE_CID        = Long.MIN_VALUE + setBaseValue(4);
-    public static final long INTERNAL_CID                      = Long.MIN_VALUE + setBaseValue(5);
+    public static final long NT_ADAPTER_CID                    = Long.MIN_VALUE + setBaseValue(5);
+    public static final long INTERNAL_CID                      = Long.MIN_VALUE + setBaseValue(6);
 
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
@@ -1263,6 +1264,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         bindAdapter(m_executeTaskAdpater, null);
 
         m_dispatcher = InvocationDispatcher.builder()
+                .clientInterface(this)
                 .snapshotDaemon(m_snapshotDaemon)
                 .replicationRole(replicationRole)
                 .cartographer(m_cartographer)
@@ -1271,7 +1273,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .clientInterfaceHandleManagerMap(m_cihm)
                 .plannerSiteId(m_plannerSiteId)
                 .siteId(m_siteId)
-                .internalConnectionHandler(m_internalConnectionHandler)
                 .build();
     }
 

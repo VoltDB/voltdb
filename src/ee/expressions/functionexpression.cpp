@@ -15,6 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "expressions/constantvalueexpression.h"
 #include "expressions/functionexpression.h"
 #include "expressions/geofunctions.h"
 #include "expressions/expressionutil.h"
@@ -31,7 +32,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     if (type == VALUE_TYPE_VARCHAR) {
         if (isNull()) {
              throw SQLException(SQLException::dynamic_sql_error,
-                                "Must not ask  for object length on sql null object.");
+                                "Must not ask for object length on sql null object.");
         }
         int32_t length;
         const char* buf = getObject_withoutNull(&length);
@@ -195,6 +196,9 @@ using namespace functionexpression;
 
 AbstractExpression*
 ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments) {
+    if (IS_USER_DEFINED_ID(functionId)) {
+        return new ConstantValueExpression(NValue::getNullValue(VALUE_TYPE_BIGINT));
+    }
     AbstractExpression* ret = 0;
     assert(arguments);
     size_t nArgs = arguments->size();
