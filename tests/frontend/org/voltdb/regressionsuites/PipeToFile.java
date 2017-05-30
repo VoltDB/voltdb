@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
         FileWriter m_writer ;
         BufferedReader m_input;
         String m_filename;
+        StringBuffer m_log = null;
 
         // set m_witnessReady when the m_token byte sequence is seen.
         AtomicBoolean m_witnessedReady;
@@ -68,6 +69,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
             catch (IOException ex) {
                 throw new RuntimeException(ex);
             }
+        }
+
+        PipeToFile(String filename, InputStream stream, String token,
+                boolean appendLog, Process proc, StringBuffer log) {
+            this(filename, stream, token, appendLog, proc);
+            m_log = log;
         }
 
         /**
@@ -137,6 +144,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
                     m_writer.write(data + "\n");
                     m_writer.flush();
+                    // Write to StringBuilder as well for easy search of strings
+                    if (m_log != null) { m_log.append(data + "\n"); }
                 }
                 catch (IOException ex) {
                     m_eof.set(true);

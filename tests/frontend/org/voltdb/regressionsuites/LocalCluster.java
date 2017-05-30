@@ -24,7 +24,9 @@ package org.voltdb.regressionsuites;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -107,6 +109,12 @@ public class LocalCluster extends VoltServerConfig {
     private boolean m_expectedToCrash = false;
     private boolean m_expectedToInitialize = true;
     int m_replicationPort = -1;
+    // Storing the paths of the logs for each host, the 1st string is the init log,
+    // the 2nd is the host log. The file paths are stored to ease future maintenance.
+    Map<Integer, String[]> m_logFiles = new HashMap<>();
+    // Copy of the logs stored in memory (the init logs are still left on disk, since
+    // they are small anyway)
+    Map<Integer, StringBuffer> m_logs = new HashMap<>();
 
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
@@ -122,7 +130,9 @@ public class LocalCluster extends VoltServerConfig {
         return m_subRoots;
     }
 
-    boolean m_hasLocalServer = true;
+    // Should this be set to false so that all the logs are written to files?
+    // There is no easy way to duplicate i/o in Java apart from brutal-force
+    boolean m_hasLocalServer = false;
     public void setHasLocalServer(boolean hasLocalServer) {
         m_hasLocalServer = hasLocalServer;
     }
@@ -1034,6 +1044,12 @@ public class LocalCluster extends VoltServerConfig {
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
+
+            // Put the init log path into the map
+            String paths[] = new String[2];
+            paths[0] = fileName;
+            m_logFiles.put(hostId, paths);
+
             ptf = new PipeToFile(
                     fileName,
                     proc.getInputStream(),
@@ -1042,7 +1058,7 @@ public class LocalCluster extends VoltServerConfig {
                     proc);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
-            proc.waitFor();
+            proc.waitFor(); // Wait for the server initialization to finish ?
         }
         catch (IOException ex) {
             log.error("Failed to start cluster process:" + ex.getMessage(), ex);
@@ -1213,12 +1229,23 @@ public class LocalCluster extends VoltServerConfig {
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
+
+            // Put the host log path in the map
+            String[] paths = m_logFiles.get(hostId);
+            // This shouldn't be null anyway
+            if (paths != null) {
+                paths[1] = fileName;
+            }
+            StringBuffer sBuffer = new StringBuffer();
+            m_logs.put(hostId, sBuffer);
+
             ptf = new PipeToFile(
                     fileName,
                     proc.getInputStream(),
                     PipeToFile.m_initToken,
                     false,
-                    proc);
+                    proc,
+                    sBuffer);
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
@@ -2179,5 +2206,58 @@ public class LocalCluster extends VoltServerConfig {
 
     public void setDeplayBetweenNodeStartup(long deplayBetweenNodeStartup) {
         m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
+    }
+
+    /*
+     * Check if a given string exists in all the host logs
+     */
+    public boolean checkAllHostLog(String str) {
+        for (java.util.Map.Entry<Integer, StringBuffer> tuple : m_logs.entrySet()) {
+            StringBuffer log = tuple.getValue();
+            if (log.indexOf(str) < 0) { return false; }
+        }
+        return true;
+    }
+
+    /*
+     * Check the given string in a server process with a given hostId
+     */
+    public boolean checkHostLog(int hostId, String str) {
+        StringBuffer log = m_logs.get(hostId);
+        if (log == null) {
+            System.err.println("Host id " + hostId + " does not exist!");
+        } else {
+            if (log.indexOf(str) >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /*
+     * Check the given string in a given file path. This can be used to
+     * check in a given init log file.
+     */
+    public boolean checkStringInFile(String filePath, String str) {
+        BufferedReader bReader = null;
+        boolean ifExist = false;
+        try {
+            bReader = new BufferedReader(new FileReader(filePath));
+            String line;
+            while ((line = bReader.readLine()) != null) {
+                if (line.contains(str)) {
+                    ifExist = true;
+                    bReader.close();
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            // Do nothing
+        } finally {
+            try {
+                if (bReader != null) { bReader.close(); }
+            } catch (IOException e) {}
+        }
+        return ifExist;
     }
 }
