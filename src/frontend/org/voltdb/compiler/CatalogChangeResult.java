@@ -19,8 +19,17 @@ package org.voltdb.compiler;
 
 import org.voltdb.client.ProcedureInvocationType;
 
-public class CatalogChangeResult extends AsyncCompilerResult {
-    private static final long serialVersionUID = 5065393610771307485L;
+public class CatalogChangeResult {
+
+    public static class PrepareDiffFailureException extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        public final byte statusCode;
+        public PrepareDiffFailureException(byte statusCode, String msg) {
+            super(msg);
+            this.statusCode = statusCode;
+        }
+    }
 
     public byte[] catalogHash;
     public byte[] catalogBytes;
@@ -32,19 +41,15 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public boolean requiresSnapshotIsolation;
     public boolean worksWithElastic;
     public ProcedureInvocationType invocationType;
-    public long originalTxnId;
-    public long originalUniqueId;
     // null or source version string if an automatic upgrade was done.
     public String upgradedFromVersion;
     public byte[] deploymentHash;
     public boolean isForReplay;
-    public long replayTxnId;
-    public long replayUniqueId;
-
     // Should catalog diff commands apply to EE or not
     public boolean requireCatalogDiffCmdsApplyToEE;
     // mark it false for UpdateClasses, in future may be marked false for deployment changes
     public boolean hasSchemaChange;
+    public int expectedCatalogVersion = -1;
     // This is set to true if schema change involves stream or connector changes or a view on stream is created or dropped.
     public boolean requiresNewExportGeneration;
 }

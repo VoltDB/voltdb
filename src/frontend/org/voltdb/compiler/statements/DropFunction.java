@@ -19,6 +19,7 @@ package org.voltdb.compiler.statements;
 
 import java.util.regex.Matcher;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Function;
@@ -46,11 +47,12 @@ public class DropFunction extends StatementProcessor {
         if (! statementMatcher.matches()) {
             return false;
         }
-        String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement);
+        String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
         boolean ifExists = statementMatcher.group(2) != null;
         CatalogMap<Function> functions = db.getFunctions();
         if (functions.get(functionName) != null) {
             functions.delete(functionName);
+            FunctionForVoltDB.deregisterUserDefinedFunction(functionName);
         }
         else {
             if (! ifExists) {

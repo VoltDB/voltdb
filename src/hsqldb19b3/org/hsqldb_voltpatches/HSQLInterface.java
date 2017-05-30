@@ -54,6 +54,8 @@ public class HSQLInterface {
     // Prefixes for system-generated indexes that enforce constraints
     public static final String AUTO_GEN_IDX_PREFIX = AUTO_GEN_PREFIX + "IDX_";
     public static final String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_IDX_PREFIX + "PK_";
+    public static final String AUTO_GEN_UNIQUE_IDX_PREFIX = AUTO_GEN_IDX_PREFIX + "CT_";
+    public static final String AUTO_GEN_NAMED_CONSTRAINT_IDX = AUTO_GEN_PREFIX + "CONSTRAINT_IDX_";
 
     // Prefixes for indexes on materialized views
     public static final String AUTO_GEN_MATVIEW = "MATVIEW_PK_";

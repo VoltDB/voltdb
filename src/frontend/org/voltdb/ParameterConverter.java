@@ -532,6 +532,11 @@ public class ParameterConverter {
                 return String.valueOf(param);
             }
         }
+        // this is for NT sysprocs with variable arguments
+        // they do their own validation
+        else if (expectedClz == ParameterSet.class && inputClz == ParameterSet.class) {
+            return param;
+        }
 
         // handle SystemProcedureExecutionContext without linking to it
         // these are used by system procedures and are ignored here

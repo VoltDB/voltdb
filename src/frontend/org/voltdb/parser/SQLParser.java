@@ -1307,6 +1307,12 @@ public class SQLParser extends SQLPatternFactory
         private final String m_delimiter;
         private static FileInfo m_oneForSystemIn = null; // Create on demand.
 
+        public FileInfo(String path) {
+            m_context = null;
+            m_option = FileOption.PLAIN;
+            m_file = new File(path);
+            m_delimiter = null;
+        }
         FileInfo(FileInfo context, FileOption option, String filenameOrDelimiter) {
             m_context = context;
             m_option = option;

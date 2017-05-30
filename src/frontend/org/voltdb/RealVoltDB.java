@@ -115,7 +115,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
@@ -230,9 +229,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "7.2";
+    static final String m_defaultVersionString = "7.3";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q7.2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q7.3\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -241,9 +240,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
-    private AsyncCompilerAgent m_asyncCompilerAgent = null;
-
-    public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
@@ -798,7 +794,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (config.m_isEnterprise) {
                     if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
                     if (m_licenseApi.isPro()) edition = "Pro Edition";
-                    if (m_licenseApi.isTrial()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isEnterpriseTrial()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isProTrial()) edition = "Pro Edition";
                     if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
                 }
 
@@ -932,7 +929,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_snmp = new DummySnmpTrapSender();
             m_messenger = null;
             m_opsRegistrar = new OpsRegistrar();
-            m_asyncCompilerAgent = null;
             m_snapshotCompletionMonitor = null;
             m_catalogContext = null;
             m_partitionCountStats = null;
@@ -1090,12 +1086,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
-            m_asyncCompilerAgent = new AsyncCompilerAgent(m_licenseApi);
-
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
                 JSONObject jo = new JSONObject();
-                jo.put("trial", m_licenseApi.isTrial());
+                jo.put("trial", m_licenseApi.isAnyKindOfTrial());
                 jo.put("hostcount",m_licenseApi.maxHostcount());
                 jo.put("commandlogging", m_licenseApi.isCommandLoggingAllowed());
                 jo.put("wanreplication", m_licenseApi.isDrReplicationAllowed());
@@ -1253,7 +1247,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             /*
              * Construct an adhoc planner for the initial catalog
              */
-            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
+            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_catalogContext);
 
             // Initialize stats
             m_ioStats = new IOStats();
@@ -2227,6 +2221,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final boolean standalone = false;
         final boolean isXCDR = false;
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
+
+        compiler.setInitializeDDLWithFiltering(true);
         if (!compiler.compileFromSchemaAndClasses(config.m_userSchema, config.m_stagedClassesPath, stagedCatalogFH)) {
             VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
         }
@@ -2644,7 +2640,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             return new ReadDeploymentResults(deploymentBytes, deployment);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            /*
+             * When a settings exception is caught (e.g. reading a broken properties file),
+             * we probably just want to crash the DB anyway
+             */
+            consoleLog.fatal(e.getMessage());
+            VoltDB.crashLocalVoltDB(e.getMessage());
+            return null;
         }
     }
 
@@ -3234,11 +3236,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 }
 
-                if (m_asyncCompilerAgent != null) {
-                    m_asyncCompilerAgent.shutdown();
-                    m_asyncCompilerAgent = null;
-                }
-
                 ExportManager.instance().shutdown();
                 m_computationService.shutdown();
                 m_computationService.awaitTermination(1, TimeUnit.DAYS);
@@ -3360,7 +3357,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             deploymentBytes,
                             m_messenger,
                             hasSchemaChange);
-                final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
+                final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(/*m_asyncCompilerAgent,*/ m_catalogContext);
                 m_txnIdToContextTracker.put(currentTxnId,
                         new ContextTracker(
                                 m_catalogContext,
@@ -3493,7 +3490,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(
             ClusterSettings settings, final int expectedVersionId)
     {
-        CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
+        CatalogSpecificPlanner csp = new CatalogSpecificPlanner(/*m_asyncCompilerAgent,*/ m_catalogContext);
         synchronized(m_catalogUpdateLock) {
             int stamp [] = new int[]{0};
             ClusterSettings expect = m_clusterSettings.get(stamp);

@@ -40,6 +40,7 @@ load classes sqlcmdtest-procs.jar;
 Command succeeded.
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
@@ -56,6 +57,7 @@ load classes sqlcmdtest-funcs.jar;
 Command succeeded.
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
@@ -165,6 +167,7 @@ InsertEmployee            	varchar, varchar, varchar
 
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
@@ -272,6 +275,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
@@ -292,10 +296,11 @@ create function IntFunction from method sqlcmdtest.IntFunction.run;
 Command succeeded.
 
 --- User-defined Functions -----------------------------------
-IntFunction         scalar function     sqlcmdtest.IntFunction.run                        
+intfunction         scalar function     sqlcmdtest.IntFunction.run                        
 
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
@@ -316,6 +321,7 @@ Command succeeded.
 
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    
@@ -336,6 +342,7 @@ remove classes sqlcmdtest.InsertEmployee;
 Command succeeded.
 
 --- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                       
  sqlcmdtest.Breakable0                    
  sqlcmdtest.Breakable1                    
  sqlcmdtest.Breakable2                    

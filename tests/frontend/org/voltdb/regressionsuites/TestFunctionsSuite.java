@@ -2696,6 +2696,15 @@ public class TestFunctionsSuite extends RegressionSuite {
                 expectedError,
                 "REPEAT", 4611686018427387903L, 1);
         }
+
+        // Make sure that repeat of an empty string doesn't take a long time
+        // This verifies the fix for ENG-12118
+        long startTime = System.nanoTime();
+        cr = client.callProcedure("@AdHoc", "select repeat('', 10000000000000) from P1 limit 1");
+        assertContentOfTable(new Object[][] {{""}}, cr.getResults()[0]);
+        long elapsedNanos = System.nanoTime() - startTime;
+        // It should take less than a minute (much much less) to complete this query
+        assertTrue("Repeat with empty string took too long!", elapsedNanos < 1000000000L * 60L);
     }
 
     public void testReplace() throws NoConnectionsException, IOException, ProcCallException {

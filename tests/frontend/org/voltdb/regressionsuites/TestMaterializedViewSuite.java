@@ -1472,14 +1472,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1L, results[0].asScalarLong());
     }
 
-    private void insertRowAdHoc(Client client, String stmt) throws IOException, ProcCallException
-    {
-        VoltTable[] results = null;
-        results = client.callProcedure("@AdHoc", stmt).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].asScalarLong());
-    }
-
     private void deleteRow(Client client, Object... parameters) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
@@ -1823,7 +1815,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             "INSERT INTO TAXI_LOCATIONS VALUES (223, '2008-02-02 15:31:02', POINTFROMTEXT('POINT(116.537664 39.913775)'));"  // region 3
         };
         for (String insert : inserts) {
-            insertRowAdHoc(client, insert);
+            assertSuccessfulDML(client, insert);
         }
         VoltTable vresult = client.callProcedure("@AdHoc", "SELECT * FROM REGIONAL_TAXI_COUNT ORDER BY 1;").getResults()[0];
         assertContentOfTable(new Object[][]{{1, 1}, {3, 2}, {5, 1}, {6, 1}}, vresult);
@@ -2276,9 +2268,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         String bugTrigger = "UPDATE T1_ENG_11314 SET C2=64, C3=1024 WHERE G1=2;";
         Object[][] viewContent = { {0, 2, 0, 0, 1024, 64, 0, 0, 0, 0, 0, 0, "abc", "def"} };
         // -1- Insert data
-        insertRowAdHoc(client, insertT1[0]);
-        insertRowAdHoc(client, insertT1[1]);
-        insertRowAdHoc(client, insertT2);
+        assertSuccessfulDML(client, insertT1[0]);
+        assertSuccessfulDML(client, insertT1[1]);
+        assertSuccessfulDML(client, insertT2);
         // -2- Test if the UPDATE statement will trigger an error on single table view V1:
         client.callProcedure("@AdHoc", bugTrigger);
         // -3- Verify view contents

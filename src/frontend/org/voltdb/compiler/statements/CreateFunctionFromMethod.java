@@ -24,6 +24,9 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 
+import org.hsqldb_voltpatches.FunctionCustom;
+import org.hsqldb_voltpatches.FunctionForVoltDB;
+import org.hsqldb_voltpatches.FunctionSQL;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
@@ -44,6 +47,7 @@ import org.voltdb.types.TimestampType;
  */
 public class CreateFunctionFromMethod extends StatementProcessor {
 
+    static int ID_NOT_DEFINED = -1;
     static Set<Class<?>> m_allowedDataTypes = new HashSet<>();
 
     static {
@@ -85,13 +89,17 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         // generate compiler warnings.
         m_compiler.addWarn("User-defined functions are not implemented yet.");
 
-        String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement);
+        String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
         String className = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
         String methodName = checkIdentifierStart(statementMatcher.group(3), ddlStatement.statement);
         CatalogMap<Function> functions = db.getFunctions();
-        if (functions.get(functionName) != null) {
+        int functionId = FunctionForVoltDB.getFunctionId(functionName);
+        if (functions.get(functionName) != null
+                || FunctionSQL.isFunction(functionName)
+                || FunctionCustom.getFunctionId(functionName) != ID_NOT_DEFINED
+                || (functionId != ID_NOT_DEFINED && ! FunctionForVoltDB.isUserDefinedFunctionId(functionId))) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Function name \"%s\" in CREATE FUNCTION statement already exists.",
+                    "Function \"%s\" is already defined.",
                     functionName));
         }
 
@@ -166,23 +174,26 @@ public class CreateFunctionFromMethod extends StatementProcessor {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
-        if (! m_allowedDataTypes.contains(functionMethod.getReturnType())) {
-            String msg = String.format("Method %s.%s has an unspported return type %s",
-                    shortName, methodName, functionMethod.getReturnType().getName());
+        Class<?> returnTypeClass = functionMethod.getReturnType();
+        if (! m_allowedDataTypes.contains(returnTypeClass)) {
+            String msg = String.format("Method %s.%s has an unsupported return type %s",
+                    shortName, methodName, returnTypeClass.getName());
             throw m_compiler.new VoltCompilerException(msg);
         }
 
-        Class<?>[] paramTypes = functionMethod.getParameterTypes();
-        for (int i = 0; i < paramTypes.length; i++) {
-            Class<?> paramType = paramTypes[i];
+        Class<?>[] paramTypeClasses = functionMethod.getParameterTypes();
+        for (int i = 0; i < paramTypeClasses.length; i++) {
+            Class<?> paramType = paramTypeClasses[i];
             if (! m_allowedDataTypes.contains(paramType)) {
-                String msg = String.format("Method %s.%s has an unspported parameter type %s at position %d",
+                String msg = String.format("Method %s.%s has an unsupported parameter type %s at position %d",
                         shortName, methodName, paramType.getName(), i);
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
 
-        Function func = functions.add(functionName);
+        FunctionForVoltDB.registerUserDefinedFunction(functionName, returnTypeClass, paramTypeClasses);
+
+        Function func = db.getFunctions().add(functionName);
         func.setFunctionname(functionName);
         func.setClassname(className);
         func.setMethodname(methodName);
