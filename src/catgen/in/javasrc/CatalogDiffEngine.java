@@ -159,11 +159,6 @@ public class CatalogDiffEngine {
     private final Map<String, CatalogMap<Index>> m_originalIndexesByTable = new HashMap<>();
     private final Map<String, CatalogMap<Index>> m_newIndexesByTable = new HashMap<>();
 
-    // Since we find out if it is compatible in the ctor, this cannot be set in DRCatalogDiffEngine class.
-    // By the time it is set in that class, which will be after call to super(),
-    // compatiblity would already be calculated and it too late to set this.
-    private final boolean m_isXDCR;
-
     /**
      * Instantiate a new diff. The resulting object can return the text
      * of the difference and report whether the difference is allowed in a
@@ -172,7 +167,7 @@ public class CatalogDiffEngine {
      * @param next Tip of the new catalog.
      */
     public CatalogDiffEngine(Catalog prev, Catalog next, boolean forceVerbose) {
-        m_isXDCR = prev.getClusters().get("cluster").getDrrole().equals(DrRoleType.XDCR.value());
+        initialize(prev, next);
         m_supported = true;
         if (forceVerbose) {
             m_triggeredVerbosity = true;
@@ -210,8 +205,11 @@ public class CatalogDiffEngine {
         this(prev, next, false);
     }
 
-    public boolean isXDCR() {
-        return m_isXDCR;
+    /**
+     * Override this to do initializations before the diff is calculated.
+     * The parameters are the same catalog parameters passed into the constructor.
+     */
+    protected void initialize(Catalog prev, Catalog next) {
     }
 
     public String commands() {
