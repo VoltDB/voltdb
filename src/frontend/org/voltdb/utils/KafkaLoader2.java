@@ -65,8 +65,6 @@ public class KafkaLoader2 implements ImporterSupport {
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
 
     private final KafkaConfig m_config;
-
-    // NEEDSWORK: Hook up the max-failure callback into the importer
     private final static AtomicLong m_failedCount = new AtomicLong(0);
 
     private CSVDataLoader m_loader = null;
@@ -82,7 +80,7 @@ public class KafkaLoader2 implements ImporterSupport {
         stop();
         if (m_executorService != null) {
             m_executorService.shutdownNow();
-            m_executorService.awaitTermination(365, TimeUnit.DAYS);
+            m_executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
             m_executorService = null;
         }
     }
@@ -102,7 +100,7 @@ public class KafkaLoader2 implements ImporterSupport {
         }
     }
 
-    public void processKafkaMessages() throws Exception {
+    private void processKafkaMessages() throws Exception {
 
         // If we need to prompt the user for a VoltDB password, do so.
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
@@ -117,7 +115,7 @@ public class KafkaLoader2 implements ImporterSupport {
 
         // Create the Volt client:
         final String[] voltServers = m_config.servers.split(",");
-        m_client = getClient(c_config, voltServers, m_config.port);
+        m_client = getVoltClient(c_config, voltServers, m_config.port);
 
         if (m_config.useSuppliedProcedure) {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback());
@@ -135,8 +133,8 @@ public class KafkaLoader2 implements ImporterSupport {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
             }
 
-            // NEEDSWORK: Is this right? Do we really want to shut down in a year, or should we make this infinite?
-            m_executorService.awaitTermination(365, TimeUnit.DAYS);
+            // Wait forever, per http://docs.oracle.com/javase/7/docs/api/java/util/concurrent/package-summary.htm
+            m_executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
         }
         catch (Throwable terminate) {
             m_log.error("Error in Kafka Consumer", terminate);
@@ -198,7 +196,6 @@ public class KafkaLoader2 implements ImporterSupport {
     @Override
     public void info(Throwable t, String msgFormat, Object... args) {
         m_log.info(String.format(msgFormat, args), t);
-
     }
 
     @Override
@@ -254,22 +251,18 @@ public class KafkaLoader2 implements ImporterSupport {
         // Concatenate the host:port values of each broker into one string that can be used to compute the key:
         String brokersString = StringUtils.join(brokers.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
         String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokersString);
-
         String groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
 
-        // NEEDSWORK: Are these customizable?
+        // NEEDSWORK: Should these be customizable?
         int fetchSize = 65536;
         int soTimeout = 30000;
 
-        // NEEDSWORK: Test for the combinations of procedure/topic supplied/not supplied.
         String procedure = properties.getProcedure();
         String topic = properties.getTopic();
         String commitPolicy = "NONE";
 
-
         Properties props = new Properties();
         props.put("procedure", procedure);
-
         FormatterBuilder fb = createFormatterBuilder(properties);
 
         return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokers, topic, groupId, procedure, soTimeout, fetchSize, commitPolicy, fb);
@@ -317,15 +310,7 @@ public class KafkaLoader2 implements ImporterSupport {
 
     }
 
-    /**
-     * Get connection to servers in cluster.
-     *
-     * @param config
-     * @param servers
-     * @return client
-     * @throws Exception
-     */
-    public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {
+    private static Client getVoltClient(ClientConfig config, String[] servers, int port) throws Exception {
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
             client.createConnection(server.trim(), port);

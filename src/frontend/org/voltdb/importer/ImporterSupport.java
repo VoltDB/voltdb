@@ -19,6 +19,10 @@ package org.voltdb.importer;
 
 import org.voltcore.logging.Level;
 
+/**
+ * Interface for in-database and external-to-database importers to interact with the base implementation.
+ * @author jcrump
+ */
 public interface ImporterSupport {
 
     public boolean shouldRun();
