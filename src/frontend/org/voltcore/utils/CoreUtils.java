@@ -1215,99 +1215,43 @@ public class CoreUtils {
     {
         if (vLogger == null || msg == null || level == Level.OFF) { return; }
 
-        // Construct the new message (wrap the lines)
-        // Assume 100 characters is a proper max length for
-        // each line
-        List<String> msgLines = new ArrayList<>();
-        StringBuilder lineBuilder = new StringBuilder();
-        int maxLen = 0;
-
-        String[] splits = msg.split("\n");
-        for (String line : splits) {
-            if (line.length() != 0) {
-                if (line.length() <= 100) {
-                    msgLines.add(line);
-                    if (line.length() > maxLen) {maxLen = line.length(); }
-                } else {
-                    // Assume only spaces
-                    String[] words = line.split("\\s");
-                    for (String word : words) {
-                        if (lineBuilder.length() + word.length() <= 100) {
-                            lineBuilder.append(word);
-                            lineBuilder.append(" ");
-                        } else if (lineBuilder.length() == 0) {
-                            // In case of long word
-                            msgLines.add(word);
-                            if (word.length() > maxLen) { maxLen = word.length(); }
-                        } else {
-                            // Remove the last space
-                            lineBuilder.deleteCharAt(lineBuilder.length() - 1);
-                            // Update the max line length
-                            if (lineBuilder.length() > maxLen) { maxLen = lineBuilder.length(); }
-                            msgLines.add(lineBuilder.toString());
-                            lineBuilder.setLength(0);
-                        }
-                    }
-                    if (lineBuilder.length() > 0) {
-                        // Remove the last space
-                        lineBuilder.deleteCharAt(lineBuilder.length() - 1);
-                        // Update the max line length
-                        if (lineBuilder.length() > maxLen) { maxLen = lineBuilder.length(); }
-                        msgLines.add(lineBuilder.toString());
-                        lineBuilder.setLength(0);
-                    }
-                }
-            }
+        // 80 stars in a line
+        StringBuilder starBuilder = new StringBuilder();
+        for (int i = 0; i < 80; i++) {
+            starBuilder.append("*");
         }
+        String stars = starBuilder.toString();
 
-        // The boundary of the message box
-        StringBuilder sBuilder = new StringBuilder();
-        for (int i = 0; i < maxLen + 4; i++) {
-            sBuilder.append("*");
-        }
-        String stars = sBuilder.toString();
-
+        // Wrap the message with 2 lines of stars
         switch (level) {
             case DEBUG:
                 vLogger.debug(stars);
-                for (String line : msgLines) {
-                    vLogger.debug("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
-                }
+                vLogger.debug("* " + stars + " *");
                 vLogger.debug(stars);
                 break;
             case WARN:
                 vLogger.warn(stars);
-                for (String line : msgLines) {
-                    vLogger.warn("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
-                }
+                vLogger.warn("* " + stars + " *");
                 vLogger.warn(stars);
                 break;
             case ERROR:
                 vLogger.error(stars);
-                for (String line : msgLines) {
-                    vLogger.error("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
-                }
+                vLogger.error("* " + stars + " *");
                 vLogger.error(stars);
                 break;
             case FATAL:
                 vLogger.fatal(stars);
-                for (String line : msgLines) {
-                    vLogger.fatal("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
-                }
+                vLogger.fatal("* " + stars + " *");
                 vLogger.fatal(stars);
                 break;
             case INFO:
                 vLogger.info(stars);
-                for (String line : msgLines) {
-                    vLogger.info("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
-                }
+                vLogger.info("* " + stars + " *");
                 vLogger.info(stars);
                 break;
             case TRACE:
                 vLogger.trace(stars);
-                for (String line : msgLines) {
-                    vLogger.trace("* " + line + new String(new char[maxLen - line.length()]).replaceAll("\0", " ") + " *");
-                }
+                vLogger.trace("* " + stars + " *");
                 vLogger.trace(stars);
                 break;
             default:
