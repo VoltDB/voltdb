@@ -253,11 +253,11 @@ public class KafkaExternalLoader implements ImporterSupport {
         String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokersString);
 
         String groupId;
-        if (properties.groupId == null || properties.groupId.trim().length() == 0) {
+        if (properties.groupid == null || properties.groupid.trim().length() == 0) {
             groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
         }
         else {
-            groupId = properties.groupId.trim();
+            groupId = properties.groupid.trim();
         }
 
         // NEEDSWORK: Should these be customizable?
@@ -413,7 +413,7 @@ public class KafkaExternalLoader implements ImporterSupport {
 
     private static class KafkaExternalLoaderCLIArguments extends CLIConfig {
 
-        @Option(shortOpt = "p", desc = "procedure name to insert the data into the database")
+        @Option(shortOpt = "p", desc = "Procedure name to insert the data into the database")
         String procedure = "";
 
         // This is set to true when -p option is used.
@@ -423,24 +423,24 @@ public class KafkaExternalLoader implements ImporterSupport {
         String topic = "";
 
         @Option(shortOpt = "g", desc = "Kafka group-id")
-        String groupId = "";
+        String groupid = "";
 
-        @Option(shortOpt = "m", desc = "maximum errors allowed")
+        @Option(shortOpt = "m", desc = "Maximum errors allowed before terminating import")
         int maxerrors = 100;
 
-        @Option(shortOpt = "s", desc = "list of VoltDB servers to connect to (default: localhost)")
+        @Option(shortOpt = "s", desc = "List of VoltDB servers to connect to (default: localhost)")
         String servers = "localhost";
 
-        @Option(desc = "port to use when connecting to database (default: 21212)")
+        @Option(desc = "Port to use when connecting to VoltDB servers (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
-        @Option(desc = "username when connecting to the VoltDB servers")
+        @Option(desc = "Username for connecting to VoltDB servers")
         String user = "";
 
-        @Option(desc = "password to use when connecting to VoltDB servers")
+        @Option(desc = "Password for connecting to VoltDB servers")
         String password = "";
 
-        @Option(shortOpt = "z", desc = "kafka zookeeper to connect to. (format: zkserver:port)")
+        @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to. (format: zkserver:port)")
         String zookeeper = ""; //No default here as default will clash with local voltdb cluster
 
         @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds. (default: 10)")
@@ -452,13 +452,13 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(desc = "Batch Size for processing.")
         public int batch = 200;
 
-        @AdditionalArgs(desc = "insert the data into this table.")
+        @AdditionalArgs(desc = "Insert the data into this table.")
         public String table = "";
 
         @Option(desc = "Use upsert instead of insert", hasArg = false)
         boolean update = false;
 
-        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        @Option(desc = "Enable SSL, optionally provide configuration file.")
         String ssl = "";
 
         //Read properties from formatter option and do basic validation.
@@ -469,6 +469,7 @@ public class KafkaExternalLoader implements ImporterSupport {
          */
         @Override
         public void validate() {
+
             if (batch < 0) {
                 exitWithMessageAndUsage("batch size number must be >= 0");
             }
@@ -497,6 +498,7 @@ public class KafkaExternalLoader implements ImporterSupport {
                 update = false;
                 exitWithMessageAndUsage("update is not applicable when stored procedure specified");
             }
+
             //Try and load classes we need and not packaged.
             try {
                 KafkaExternalLoader.class.getClassLoader().loadClass("org.I0Itec.zkclient.IZkStateListener");
