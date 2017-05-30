@@ -32,116 +32,13 @@
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
 #include "common/types.h"
-#include "storage/LargeTableIterator.h"
+#include "storage/LargeTempTableIterator.h"
 #include "storage/LargeTempTable.h"
 #include "storage/tablefactory.h"
 
+#include "test_utils/Tools.hpp"
+
 using namespace voltdb;
-
-template<typename T>
-NValue nvalueFromNative(T val);
-
-template<>
-NValue nvalueFromNative(int64_t val) {
-    return ValueFactory::getBigIntValue(val);
-}
-
-template<>
-NValue nvalueFromNative(int val) {
-    return nvalueFromNative(static_cast<int64_t>(val));
-}
-
-template<>
-NValue nvalueFromNative(std::string val) {
-    return ValueFactory::getTempStringValue(val);
-}
-
-template<>
-NValue nvalueFromNative(const char* val) {
-    return ValueFactory::getTempStringValue(val, strlen(val));
-}
-
-template<>
-NValue nvalueFromNative(double val) {
-    return ValueFactory::getDoubleValue(val);
-}
-
-NValue toDecimal(double val) {
-    return ValueFactory::getDecimalValue(val);
-}
-
-template<>
-NValue nvalueFromNative(NValue nval) {
-    return nval;
-}
-
-void setTupleValuesHelper(TableTuple* tuple, int index) {
-    assert(tuple->getSchema()->columnCount() == index);
-}
-
-template<typename T, typename ... Args>
-void setTupleValuesHelper(TableTuple* tuple, int index, T arg, Args... args) {
-    tuple->setNValue(index, nvalueFromNative(arg));
-    setTupleValuesHelper(tuple, index + 1, args...);
-}
-
-template<typename ... Args>
-void setTupleValues(TableTuple* tuple, Args... args) {
-    setTupleValuesHelper(tuple, 0, args...);
-}
-
-
-void buildSchemaHelper(std::vector<ValueType>* columnTypes,
-                       std::vector<int32_t>* columnSizes) {
-    return;
-}
-
-template<typename... Args>
-void buildSchemaHelper(std::vector<ValueType>* columnTypes,
-                       std::vector<int32_t>* columnSizes,
-                       ValueType valueType,
-                       Args... args);
-template<typename... Args>
-void buildSchemaHelper(std::vector<ValueType>* columnTypes,
-                       std::vector<int32_t>* columnSizes,
-                       std::pair<ValueType, int> typeAndSize,
-                       Args... args);
-
-template<typename... Args>
-void buildSchemaHelper(std::vector<ValueType>* columnTypes,
-                       std::vector<int32_t>* columnSizes,
-                       ValueType valueType,
-                       Args... args) {
-    assert(! isVariableLengthType(valueType));
-    columnTypes->push_back(valueType);
-    columnSizes->push_back(NValue::getTupleStorageSize(valueType));
-    buildSchemaHelper(columnTypes, columnSizes, args...);
-}
-
-template<typename... Args>
-void buildSchemaHelper(std::vector<ValueType>* columnTypes,
-                       std::vector<int32_t>* columnSizes,
-                       std::pair<ValueType, int> typeAndSize,
-                       Args... args) {
-    assert(isVariableLengthType(typeAndSize.first));
-    columnTypes->push_back(typeAndSize.first);
-    columnSizes->push_back(typeAndSize.second);
-    buildSchemaHelper(columnTypes, columnSizes, args...);
-}
-
-template<typename... Args>
-TupleSchema* buildSchema(Args... args) {
-    std::vector<ValueType> columnTypes;
-    std::vector<int32_t> columnSizes;
-
-    buildSchemaHelper(&columnTypes, &columnSizes, args...);
-
-    std::vector<bool> allowNull(columnTypes.size(), true);
-    std::vector<bool> inBytes(columnTypes.size(), false);
-
-    return TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, inBytes);
-}
-
 
 class LargeTempTableTest : public Test {
 protected:
@@ -153,7 +50,7 @@ protected:
     template<typename T, typename ...Args>
     void assertTupleValuesEqualHelper(TableTuple* tuple, int index, T expected, Args... args) {
         NValue actualNVal = tuple->getNValue(index);
-        NValue expectedNVal = nvalueFromNative(expected);
+        NValue expectedNVal = Tools::nvalueFromNative(expected);
 
         ASSERT_EQ(ValuePeeker::peekValueType(expectedNVal), ValuePeeker::peekValueType(actualNVal));
         ASSERT_EQ(0, expectedNVal.compare(actualNVal));
@@ -246,9 +143,9 @@ TEST_F(LargeTempTableTest, Basic) {
 
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
 
-    TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
-                                      VALUE_TYPE_DOUBLE,
-                                      std::make_pair(VALUE_TYPE_VARCHAR, 128));
+    TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                             VALUE_TYPE_DOUBLE,
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 128));
 
     std::vector<std::string> names{"pk", "val", "text"};
 
@@ -268,7 +165,7 @@ TEST_F(LargeTempTableTest, Basic) {
 
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
     for (int i = 0; i < pkVals.size(); ++i) {
-        setTupleValues(&tuple, pkVals[i], floatVals[i], textVals[i]);
+        Tools::setTupleValues(&tuple, pkVals[i], floatVals[i], textVals[i]);
         ltt->insertTuple(tuple);
     }
 
@@ -279,7 +176,7 @@ TEST_F(LargeTempTableTest, Basic) {
     ASSERT_EQ(0, lttBlockCache->numPinnedEntries());
 
     {
-        LargeTableIterator iter = ltt->largeIterator();
+        LargeTempTableIterator iter = ltt->largeIterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
@@ -302,16 +199,16 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
 
-    TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
-                                      VALUE_TYPE_DOUBLE,
-                                      VALUE_TYPE_DOUBLE,
-                                      VALUE_TYPE_DOUBLE,
-                                      VALUE_TYPE_DECIMAL,
-                                      VALUE_TYPE_DECIMAL,
-                                      VALUE_TYPE_DECIMAL,
-                                      std::make_pair(VALUE_TYPE_VARCHAR, 15),
-                                      std::make_pair(VALUE_TYPE_VARCHAR, 15),
-                                      std::make_pair(VALUE_TYPE_VARCHAR, 15));
+    TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                             VALUE_TYPE_DOUBLE,
+                                             VALUE_TYPE_DOUBLE,
+                                             VALUE_TYPE_DOUBLE,
+                                             VALUE_TYPE_DECIMAL,
+                                             VALUE_TYPE_DECIMAL,
+                                             VALUE_TYPE_DECIMAL,
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15));
 
     std::vector<std::string> names{
         "pk",
@@ -339,17 +236,17 @@ TEST_F(LargeTempTableTest, MultiBlock) {
     const int NUM_TUPLES = 500;
     for (int i = 0; i < NUM_TUPLES; ++i) {
         std::string text(15, 'a' + (i % 26));
-        setTupleValues(&tuple,
-                       i,
-                       0.5 * i,
-                       0.5 * i + 1,
-                       0.5 * i + 2,
-                       toDecimal(0.5 * i),
-                       toDecimal(0.5 * i + 1),
-                       toDecimal(0.5 * i + 2),
-                       text,
-                       text,
-                       text);
+        Tools::setTupleValues(&tuple,
+                              i,
+                              0.5 * i,
+                              0.5 * i + 1,
+                              0.5 * i + 2,
+                              Tools::toDec(0.5 * i),
+                              Tools::toDec(0.5 * i + 1),
+                              Tools::toDec(0.5 * i + 2),
+                              text,
+                              text,
+                              text);
 
         ltt->insertTuple(tuple);
     }
@@ -367,7 +264,7 @@ TEST_F(LargeTempTableTest, MultiBlock) {
 #endif
 
     {
-        LargeTableIterator iter = ltt->largeIterator();
+        LargeTempTableIterator iter = ltt->largeIterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
@@ -377,9 +274,9 @@ TEST_F(LargeTempTableTest, MultiBlock) {
                                    0.5 * i,
                                    0.5 * i + 1,
                                    0.5 * i + 2,
-                                   toDecimal(0.5 * i),
-                                   toDecimal(0.5 * i + 1),
-                                   toDecimal(0.5 * i + 2),
+                                   Tools::toDec(0.5 * i),
+                                   Tools::toDec(0.5 * i + 1),
+                                   Tools::toDec(0.5 * i + 2),
                                    text,
                                    text,
                                    text);
@@ -404,16 +301,16 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     voltdb::LargeTempTableBlockCache::CACHE_SIZE_IN_BYTES() = 80000;
 #endif
 
-    TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
-                                      VALUE_TYPE_DOUBLE,
-                                      VALUE_TYPE_DOUBLE,
-                                      VALUE_TYPE_DOUBLE,
-                                      VALUE_TYPE_DECIMAL,
-                                      VALUE_TYPE_DECIMAL,
-                                      VALUE_TYPE_DECIMAL,
-                                      std::make_pair(VALUE_TYPE_VARCHAR, 15),
-                                      std::make_pair(VALUE_TYPE_VARCHAR, 15),
-                                      std::make_pair(VALUE_TYPE_VARCHAR, 15));
+    TupleSchema* schema = Tools::buildSchema(VALUE_TYPE_BIGINT,
+                                             VALUE_TYPE_DOUBLE,
+                                             VALUE_TYPE_DOUBLE,
+                                             VALUE_TYPE_DOUBLE,
+                                             VALUE_TYPE_DECIMAL,
+                                             VALUE_TYPE_DECIMAL,
+                                             VALUE_TYPE_DECIMAL,
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15),
+                                             std::make_pair(VALUE_TYPE_VARCHAR, 15));
 
     std::vector<std::string> names{
         "pk",
@@ -441,17 +338,17 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     const int NUM_TUPLES = 1500;
     for (int i = 0; i < NUM_TUPLES; ++i) {
         std::string text(15, 'a' + (i % 26));
-        setTupleValues(&tuple,
-                       i,
-                       0.5 * i,
-                       0.5 * i + 1,
-                       0.5 * i + 2,
-                       toDecimal(0.5 * i),
-                       toDecimal(0.5 * i + 1),
-                       toDecimal(0.5 * i + 2),
-                       text,
-                       text,
-                       text);
+        Tools::setTupleValues(&tuple,
+                              i,
+                              0.5 * i,
+                              0.5 * i + 1,
+                              0.5 * i + 2,
+                              Tools::toDec(0.5 * i),
+                              Tools::toDec(0.5 * i + 1),
+                              Tools::toDec(0.5 * i + 2),
+                              text,
+                              text,
+                              text);
 
         ltt->insertTuple(tuple);
     }
@@ -474,7 +371,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
 #endif
 
     {
-        LargeTableIterator iter = ltt->largeIterator();
+        LargeTempTableIterator iter = ltt->largeIterator();
         TableTuple iterTuple(ltt->schema());
         int i = 0;
         while (iter.next(iterTuple)) {
@@ -484,9 +381,9 @@ TEST_F(LargeTempTableTest, OverflowCache) {
                                    0.5 * i,
                                    0.5 * i + 1,
                                    0.5 * i + 2,
-                                   toDecimal(0.5 * i),
-                                   toDecimal(0.5 * i + 1),
-                                   toDecimal(0.5 * i + 2),
+                                   Tools::toDec(0.5 * i),
+                                   Tools::toDec(0.5 * i + 1),
+                                   Tools::toDec(0.5 * i + 2),
                                    text,
                                    text,
                                    text);

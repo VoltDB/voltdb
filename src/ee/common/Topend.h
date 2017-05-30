@@ -84,10 +84,13 @@ class Topend {
     /** Calls the java method in org.voltdb.utils.Encoder */
     virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
 
+    /** Store the given block to disk to make room for more large temp table data. */
     virtual bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) = 0;
 
+    /** Load the given block into memory from disk. */
     virtual bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) = 0;
 
+    /** Delete any data for the specified block that is stored on disk. */
     virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
 
     virtual ~Topend()

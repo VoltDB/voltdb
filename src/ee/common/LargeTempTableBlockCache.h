@@ -33,84 +33,113 @@ class LargeTempTableTest_OverflowCache;
 
 namespace voltdb {
 
-    class LargeTempTable;
+class LargeTempTable;
 
-    // xxx This class really belongs in storage
-    class LargeTempTableBlockCache {
 
-        friend class ::LargeTempTableTest_OverflowCache;
+/**
+ * There is one instance of this class for each EE instance (one per
+ * thread).
+ *
+ * This class keeps track of tuple blocks (and associated pools
+ * containing variable length data) for all large temp tables
+ * currently in use.
+ */
+class LargeTempTableBlockCache {
 
-    public:
-        LargeTempTableBlockCache();
+    friend class ::LargeTempTableTest_OverflowCache;
 
-        std::pair<int64_t, LargeTempTableBlock*> getEmptyBlock(LargeTempTable* ltt);
+ public:
 
-        void unpinBlock(int64_t blockId);
+    /**
+     * Construct an instance of a cache containing zero large temp
+     * table blocks.
+     */
+    LargeTempTableBlockCache();
 
-        LargeTempTableBlock* fetchBlock(int64_t blockId);
+    /** Get a new empty block for the supplied table.  Returns the id
+        of the new block and the new block. */
+    std::pair<int64_t, LargeTempTableBlock*> getEmptyBlock(LargeTempTable* ltt);
 
-        void releaseBlock(int64_t blockId);
+    /** "Unpin" the specified block, i.e., mark it as a candidate to
+        store to disk when the cache becomes full. */
+    void unpinBlock(int64_t blockId);
 
-        void increaseAllocatedMemory(int64_t numBytes);
-        void decreaseAllocatedMemory(int64_t numBytes);
+    /** Fetch (and pin) the specified block, loading it from disk if
+        necessary. */
+    LargeTempTableBlock* fetchBlock(int64_t blockId);
 
-        size_t numPinnedEntries() const {
-            size_t cnt = 0;
-            BOOST_FOREACH(auto &block, m_blockList) {
-                if (block->isPinned()) {
-                    ++cnt;
-                }
+    /** The large temp table for this block is being destroyed, so
+        release all resources associated with this block. */
+    void releaseBlock(int64_t blockId);
+
+    /** Called from LargeTempTableBlock.  Increase the amount of
+        memory in use by the cache, and store a block to disk if
+        necessary to make more room. */
+    void increaseAllocatedMemory(int64_t numBytes);
+
+    /** Called from LargeTempTableBlock destructor. */
+    void decreaseAllocatedMemory(int64_t numBytes);
+
+    size_t numPinnedEntries() const {
+        size_t cnt = 0;
+        BOOST_FOREACH(auto &block, m_blockList) {
+            if (block->isPinned()) {
+                ++cnt;
             }
-
-            return cnt;
         }
 
-        size_t residentBlockCount() const {
-            size_t count = 0;
-            BOOST_FOREACH(auto &block, m_blockList) {
-                if (block->isResident()) {
-                    ++count;
-                }
+        return cnt;
+    }
+
+    size_t residentBlockCount() const {
+        size_t count = 0;
+        BOOST_FOREACH(auto &block, m_blockList) {
+            if (block->isResident()) {
+                ++count;
             }
-
-            return count;
         }
 
-        size_t totalBlockCount() const {
-            return m_blockList.size();
-        }
+        return count;
+    }
 
-        int64_t allocatedMemory() const {
-            return m_totalAllocatedBytes;
-        }
+    size_t totalBlockCount() const {
+        return m_blockList.size();
+    }
 
-    private:
+    int64_t allocatedMemory() const {
+        return m_totalAllocatedBytes;
+    }
 
-        // Set to be modifiable here for testing purposes
-        static int64_t& CACHE_SIZE_IN_BYTES() {
-            static int64_t cacheSizeInBytes = 50 * 1024 * 1024; // 50 MB
-            return cacheSizeInBytes;
-        }
+ private:
 
-        int64_t getNextId() {
-            int64_t nextId = m_nextId;
-            ++m_nextId;
-            return nextId;
-        }
+    // Set to be modifiable here for testing purposes
+    static int64_t& CACHE_SIZE_IN_BYTES() {
+        static int64_t cacheSizeInBytes = 50 * 1024 * 1024; // 50 MB
+        return cacheSizeInBytes;
+    }
 
-        bool storeABlock();
+    // This at some point may need to be unique across the entire process
+    int64_t getNextId() {
+        int64_t nextId = m_nextId;
+        ++m_nextId;
+        return nextId;
+    }
 
-        typedef std::list<std::unique_ptr<LargeTempTableBlock>> BlockList;
+    // Stores the least recently used block to disk.
+    bool storeABlock();
 
-        // The front of the block list are the most recently used blocks.
-        // The tail will be the least recently used blocks.
-        // The tail of the list should have no pinned blocks.
-        BlockList m_blockList;
-        std::map<int64_t, BlockList::iterator> m_idToBlockMap;
+    typedef std::list<std::unique_ptr<LargeTempTableBlock>> BlockList;
 
-        int64_t m_nextId;
-        int64_t m_totalAllocatedBytes;
-    };
+    // The front of the block list are the most recently used blocks.
+    // The tail will be the least recently used blocks.
+    // The tail of the list should have no pinned blocks.
+    BlockList m_blockList;
+    std::map<int64_t, BlockList::iterator> m_idToBlockMap;
+
+    int64_t m_nextId;
+    int64_t m_totalAllocatedBytes;
+};
+
 }
 
 #endif // VOLTDB_LARGETEMPTABLEBLOCKCACHE_H

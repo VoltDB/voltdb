@@ -26,80 +26,84 @@
 
 namespace voltdb {
 
-    class LargeTempTable;
+class LargeTempTable;
 
-    /**
-     * A LargeTempTableBlock contains a normal tuple block
-     * and also a separate pool which contains all the
-     * variable-length data in the block.  If we need to
-     * store this block to make room for other data,
-     * the pool gets stored with the fixed-size data.
-     *
-     * Block size is 128k
-     * Pool chunk size is 32k
-     */
-    class LargeTempTableBlock {
-    public:
-        LargeTempTableBlock(int64_t id, LargeTempTable* ltt);
+/**
+ * A LargeTempTableBlock contains a normal tuple block and also a
+ * separate pool which contains all the variable-length data in the
+ * block.  If we need to store this block to make room for other data,
+ * the pool gets stored with the fixed-size data.
+ *
+ * Most methods just forward to the underylying tuple block.
+ *
+ * Block size is 128k
+ * Pool chunk size is 32k
+ */
+class LargeTempTableBlock {
+ public:
+    /** constructor for a new block. */
+    LargeTempTableBlock(int64_t id, LargeTempTable* ltt);
 
-        LargeTempTableBlock(int64_t id, std::unique_ptr<Pool> pool, TBPtr tbp);
+    LargeTempTableBlock(int64_t id, std::unique_ptr<Pool> pool, TBPtr tbp);
 
-        int64_t id() const {
-            return m_id;
+    int64_t id() const {
+        return m_id;
+    }
+
+
+    bool hasFreeTuples() const;
+
+    void insertTuple(const TableTuple& source);
+
+    uint32_t unusedTupleBoundary() {
+        return m_tupleBlockPointer->unusedTupleBoundary();
+    }
+
+    char* address() {
+        return m_tupleBlockPointer->address();
+    }
+
+    int64_t getAllocatedMemory() const;
+
+    std::pair<TBPtr, std::unique_ptr<Pool>> releaseData();
+
+    void setData(TBPtr block, std::unique_ptr<Pool> pool);
+
+    virtual ~LargeTempTableBlock();
+
+    bool isPinned() const {
+        return m_isPinned;
+    }
+
+    void pin() {
+        assert(!m_isPinned);
+        m_isPinned = true;
+    }
+
+    void unpin() {
+        assert(m_isPinned);
+        m_isPinned = false;
+    }
+
+    bool isResident() const {
+        if (m_tupleBlockPointer.get() == NULL) {
+            assert(m_pool.get() == NULL);
+            return false;
         }
-
-        bool hasFreeTuples() const;
-
-        void insertTuple(const TableTuple& source);
-
-        uint32_t unusedTupleBoundary() {
-            return m_tupleBlockPointer->unusedTupleBoundary();
+        else {
+            assert(m_pool.get() != NULL);
+            return true;
         }
+    }
 
-        char* address() {
-            return m_tupleBlockPointer->address();
-        }
+ private:
 
-        int64_t getAllocatedMemory() const;
+    int64_t m_id;
+    std::unique_ptr<Pool> m_pool;
+    TBPtr m_tupleBlockPointer;
+    bool m_isPinned;
+};
 
-        std::pair<TBPtr, std::unique_ptr<Pool>> releaseData();
-
-        void setData(TBPtr block, std::unique_ptr<Pool> pool);
-
-        virtual ~LargeTempTableBlock();
-
-        bool isPinned() const {
-            return m_isPinned;
-        }
-
-        void pin() {
-            assert(!m_isPinned);
-            m_isPinned = true;
-        }
-
-        void unpin() {
-            assert(m_isPinned);
-            m_isPinned = false;
-        }
-
-        bool isResident() const {
-            if (m_tupleBlockPointer.get() == NULL) {
-                assert(m_pool.get() == NULL);
-                return false;
-            }
-            else {
-                assert(m_pool.get() != NULL);
-                return true;
-            }
-        }
-
-    private:
-
-        int64_t m_id;
-        std::unique_ptr<Pool> m_pool;
-        TBPtr m_tupleBlockPointer;
-        bool m_isPinned;
-    };
 } // end namespace voltdb
 
 #endif // VOLTDB_LARGETEMPTABLEBLOCK_HPP

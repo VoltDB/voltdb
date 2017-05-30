@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _VOLTDB_LARGETABLEITERATOR_H
-#define _VOLTDB_LARGETABLEITERATOR_H
+#ifndef _VOLTDB_LARGETEMPTABLEITERATOR_H
+#define _VOLTDB_LARGETEMPTABLEITERATOR_H
 
 #include <vector>
 
@@ -29,13 +29,16 @@
 
 namespace voltdb {
 
-class LargeTableIterator {
+/** A class for iterating over large tables.  Interface is the same as
+    for TableIterator, merging this code into TableIterator is future
+    work. */
+class LargeTempTableIterator {
 
     friend class LargeTempTable;
 
 public:
 
-    LargeTableIterator(const LargeTableIterator& that)
+    LargeTempTableIterator(const LargeTempTableIterator& that)
         : m_tupleLength(that.m_tupleLength)
         , m_activeTuples(that.m_activeTuples)
         , m_foundTuples(that.m_foundTuples)
@@ -50,10 +53,10 @@ public:
     inline bool next(TableTuple& out);
     bool hasNext() const;
 
-    inline virtual ~LargeTableIterator();
+    inline virtual ~LargeTempTableIterator();
 
 protected:
- LargeTableIterator(Table* table, std::vector<int64_t>::iterator start)
+ LargeTempTableIterator(Table* table, std::vector<int64_t>::iterator start)
      : m_tupleLength(table->m_tupleLength)
         , m_activeTuples(table->m_tupleCount)
         , m_foundTuples(0)
@@ -79,7 +82,7 @@ private:
 };
 
 
-bool LargeTableIterator::next(TableTuple& out) {
+bool LargeTempTableIterator::next(TableTuple& out) {
     if (m_foundTuples < m_activeTuples) {
         if (m_currBlock == NULL ||
             m_blockOffset >= m_currBlock->unusedTupleBoundary()) {
@@ -115,7 +118,7 @@ bool LargeTableIterator::next(TableTuple& out) {
     return false;
 }
 
-LargeTableIterator::~LargeTableIterator() {
+LargeTempTableIterator::~LargeTempTableIterator() {
     if (m_currBlock != NULL) {
         LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
         lttCache->unpinBlock(m_currBlockId);
@@ -124,4 +127,4 @@ LargeTableIterator::~LargeTableIterator() {
 
 } // namespace voltdb
 
-#endif // _VOLTDB_LARGETABLEITERATOR_H
+#endif // _VOLTDB_LARGETEMPTABLEITERATOR_H

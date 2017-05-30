@@ -16,23 +16,23 @@
  */
 
 #include "common/LargeTempTableBlockCache.h"
-#include "storage/LargeTableIterator.h"
+#include "storage/LargeTempTableIterator.h"
 #include "storage/LargeTempTable.h"
 #include "storage/LargeTempTableBlock.h"
 
 namespace voltdb {
 
-    // Copied from temptable.h
-    static const int BLOCKSIZE = 131072;
+// Copied from temptable.h
+static const int BLOCKSIZE = 131072;
 
-    LargeTempTable::LargeTempTable()
-        : Table(BLOCKSIZE)
-        , m_insertsFinished(false)
-        , m_iter(this)
-        , m_blockForWriting(NULL)
-        , m_blockIds()
-    {
-    }
+LargeTempTable::LargeTempTable()
+    : Table(BLOCKSIZE)
+    , m_insertsFinished(false)
+    , m_iter(this)
+    , m_blockForWriting(NULL)
+    , m_blockIds()
+{
+}
 
 bool LargeTempTable::insertTuple(TableTuple& source) {
     TableTuple target(m_schema);
@@ -70,19 +70,19 @@ void LargeTempTable::finishInserts() {
     lttBlockCache->unpinBlock(m_blockIds.back());
 }
 
-LargeTableIterator LargeTempTable::largeIterator() {
-    return LargeTableIterator(this, m_blockIds.begin());
+LargeTempTableIterator LargeTempTable::largeIterator() {
+    return LargeTempTableIterator(this, m_blockIds.begin());
 }
 
-    LargeTempTable::~LargeTempTable() {
-        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-        if (! m_insertsFinished) {
-            finishInserts();
-        }
-
-        BOOST_FOREACH(int64_t blockId, m_blockIds) {
-            lttBlockCache->releaseBlock(blockId);
-        }
+LargeTempTable::~LargeTempTable() {
+    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+    if (! m_insertsFinished) {
+        finishInserts();
     }
+
+    BOOST_FOREACH(int64_t blockId, m_blockIds) {
+        lttBlockCache->releaseBlock(blockId);
+    }
+}
 
 } // namespace voltdb

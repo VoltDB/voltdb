@@ -65,17 +65,17 @@ public:
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
     bool storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        throw std::logic_error("unimplemented!");
+        throw std::logic_error("unimplemented method called!");
         return false;
     }
 
     bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
-        throw std::logic_error("unimplemented!");
+        throw std::logic_error("unimplemented method called!");
         return false;;
     }
 
     bool releaseLargeTempTableBlock(int64_t blockId) {
-        throw std::logic_error("unimplemented!");
+        throw std::logic_error("unimplemented method called!");
         return false;
     }
 

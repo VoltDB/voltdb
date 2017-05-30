@@ -24,9 +24,11 @@
 
 namespace voltdb {
 
-class LargeTableIterator;
+class LargeTempTableIterator;
 class LargeTempTableBlock;
 
+/** A large temp table class that uses LargeTempTableCache to request
+    tuple blocks, allowing some blocks to be stored on disk.  */
 class LargeTempTable : public Table {
 
     friend class TableFactory;
@@ -37,7 +39,7 @@ public:
         return m_iter;
     }
 
-    LargeTableIterator largeIterator();
+    LargeTempTableIterator largeIterator();
 
     TableIterator& iteratorDeletingAsWeGo() {
         return m_iter;
@@ -49,7 +51,8 @@ public:
 
     bool insertTuple(TableTuple& tuple);
 
-    // To unpin the last written block when all inserts are complete.
+    /** To unpin the last written block when all inserts are
+        complete. */
     void finishInserts();
 
     size_t allocatedBlockCount() const {
