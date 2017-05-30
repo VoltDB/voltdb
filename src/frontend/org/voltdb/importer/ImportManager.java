@@ -25,11 +25,16 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.osgi.framework.BundleException;
+
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Throwables;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.modular.ModuleManager;
@@ -57,9 +62,17 @@ public class ImportManager implements ChannelChangeCallback {
 
     private final int m_myHostId;
     private ChannelDistributer m_distributer;
-    private boolean m_serverStarted;
+    private volatile boolean m_serverStarted;
     private final ImporterStatsCollector m_statsCollector;
     private final ModuleManager m_moduleManager;
+
+    // Maintains the record of the importer bundles that have been loaded into the memory based on importer config.
+    // These loaded loaded bundles remains in memory. ready for use and don't get loaded/unloaded
+    private Map<String, AbstractImporterFactory> m_loadedBundles = new HashMap<String, AbstractImporterFactory>();
+    private Map<String, AbstractImporterFactory> m_importersByType = new HashMap<String, AbstractImporterFactory>();
+    // maintains mapping of active importer config to the bundle bundle path used for communicating import processor
+    // about the jars to use
+    private Map<String, ImportConfiguration> m_configsForProcessor= new HashMap<String, ImportConfiguration>();
 
     /**
      * Get the global instance of the ImportManager.
@@ -123,7 +136,7 @@ public class ImportManager implements ChannelChangeCallback {
             final String clusterTag = m_distributer.getClusterTag();
 
             ImportDataProcessor newProcessor = new ImportProcessor(
-                    myHostId, m_distributer, m_moduleManager, m_statsCollector, clusterTag);
+                    myHostId, m_distributer, m_statsCollector, clusterTag);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             m_formatterFactories.clear();
 
@@ -146,12 +159,103 @@ public class ImportManager implements ChannelChangeCallback {
                 }
             }
 
-            newProcessor.setProcessorConfig(catalogContext, m_processorConfig);
-            m_processor.set(newProcessor);
+            discoverConfigsAndLoadBundles(catalogContext);
+            if (!m_configsForProcessor.isEmpty()) {
+                newProcessor.setProcessorConfig(m_configsForProcessor, m_loadedBundles);
+                m_processor.set(newProcessor);
+            } else {
+                m_processor.set(null);
+            }
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
         }
     }
+
+    /**
+     * Parses importer configs and loads the bundle needed for importer into memory. Updates
+     * mapping of active importer bundle to the bundle jar needed by the impoter
+     * @param catalogContext
+     */
+    private void discoverConfigsAndLoadBundles(CatalogContext catalogContext) {
+        m_configsForProcessor.clear();
+        for (String configName : m_processorConfig.keySet()) {
+            ImportConfiguration importConfig = m_processorConfig.get(configName);
+            Properties properties = importConfig.getmoduleProperties();
+
+            String importBundleJar = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
+            Preconditions.checkNotNull(importBundleJar,
+                    "Import source is undefined or custom import plugin class missing.");
+            String procedure = properties.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
+            //TODO: If processors is a list dont start till all procedures exists.
+            Procedure catProc = catalogContext.procedures.get(procedure);
+            if (catProc == null) {
+                catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
+            }
+
+            if (catProc == null) {
+                importLog.info("Importer " + configName + " Procedure " + procedure +
+                        " is missing will disable this importer until the procedure becomes available.");
+                continue;
+            }
+
+            if (loadImporterBundle(properties)) {
+                m_configsForProcessor.put(configName, importConfig);
+            }
+        }
+        if (!m_configsForProcessor.isEmpty()) {
+            importLog.info("Loaded importer modules: " + m_loadedBundles.keySet() +", types: " + m_importersByType.keySet());
+        }
+    }
+
+
+
+    /**
+     * Checks if the module for importer has been loaded in the memory. If bundle doesn't exists, it loades one and
+     * updates the mapping records of the bundles.
+     *
+     * @param moduleProperties
+     * @return true, if the bundle corresponding to the importer is in memory (uploaded or was already present)
+     */
+    private boolean loadImporterBundle(Properties moduleProperties){
+        String importModuleName = moduleProperties.getProperty(ImportDataProcessor.IMPORT_MODULE);
+        String attrs[] = importModuleName.split("\\|");
+        String bundleJar = attrs[1];
+        String moduleType = attrs[0];
+
+        try {
+            AbstractImporterFactory importerFactory = m_loadedBundles.get(bundleJar);
+            if (importerFactory == null) {
+                if (moduleType.equalsIgnoreCase("osgi")) {
+                    URI bundleURI = URI.create(bundleJar);
+                    importerFactory = m_moduleManager.getService(bundleURI, AbstractImporterFactory.class);
+                    if (importerFactory == null) {
+                        importLog.error("Failed to initialize importer from: " + bundleJar);
+                        return false;
+                    }
+                } else {
+                    // class based importer.
+                    Class<?> reference = this.getClass().getClassLoader().loadClass(bundleJar);
+                    if (reference == null) {
+                        importLog.error("Failed to initialize importer from: " + bundleJar);
+                        return false;
+                    }
+                    importerFactory = (AbstractImporterFactory)reference.newInstance();
+                }
+                String importerType = importerFactory.getTypeName();
+                if (importerType == null || importerType.trim().isEmpty()) {
+                    throw new RuntimeException("Importer must implement and return a valid unique name.");
+                }
+                Preconditions.checkState(!m_importersByType.containsKey(importerType),
+                        "Importer must implement and return a valid unique name: " + importerType);
+                m_importersByType.put(importerType, importerFactory);
+                m_loadedBundles.put(bundleJar, importerFactory);
+            }
+        } catch(Throwable t) {
+            importLog.error("Failed to configure import handler for " + bundleJar, t);
+            Throwables.propagate(t);
+        }
+        return true;
+}
 
     public static int getPartitionsCount() {
         if (m_self.m_processor.get() != null) {

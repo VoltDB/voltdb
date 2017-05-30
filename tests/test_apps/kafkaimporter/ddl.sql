@@ -150,7 +150,6 @@ CREATE PROCEDURE CountImport1 as select count(*) from kafkaimporttable1;
 CREATE PROCEDURE CountMirror2 as select count(*) from kafkamirrortable2;
 CREATE PROCEDURE CountImport2 as select count(*) from kafkaimporttable2;
 CREATE PROCEDURE ImportCountMinMax as select count(key), min(key), max(key) from kafkaimporttable1;
-CREATE PROCEDURE InsertOnly as upsert into KAFKAIMPORTTABLE1(key, value) VALUES(?, ?);
-PARTITION PROCEDURE InsertOnly ON TABLE Kafkaimporttable1 COLUMN key;
+CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE1 COLUMN key as upsert into KAFKAIMPORTTABLE1(key, value) VALUES(?, ?);
 
 END_OF_BATCH

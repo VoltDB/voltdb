@@ -680,7 +680,17 @@ public class MockVoltDB implements VoltDBInterface
             }
 
             @Override
-            public boolean isTrial() {
+            public boolean isAnyKindOfTrial() {
+                return false;
+            }
+
+            @Override
+            public boolean isProTrial() {
+                return false;
+            }
+
+            @Override
+            public boolean isEnterpriseTrial() {
                 return false;
             }
 

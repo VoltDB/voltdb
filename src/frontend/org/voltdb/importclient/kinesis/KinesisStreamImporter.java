@@ -40,6 +40,7 @@ import com.amazonaws.services.kinesis.clientlibrary.types.InitializationInput;
 import com.amazonaws.services.kinesis.clientlibrary.types.ProcessRecordsInput;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownInput;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
+import com.amazonaws.services.kinesis.metrics.interfaces.MetricsLevel;
 import com.amazonaws.services.kinesis.model.Record;
 
 import org.voltcore.logging.Level;
@@ -59,9 +60,22 @@ public class KinesisStreamImporter extends AbstractImporter {
     private AtomicLong m_cbcnt = new AtomicLong(0);
 
     private Worker m_worker;
+    private String m_workerId;
 
     public KinesisStreamImporter(KinesisStreamImporterConfig config) {
         m_config = config;
+        m_workerId = UUID.randomUUID().toString();
+        KinesisClientLibConfiguration kclConfig = new KinesisClientLibConfiguration(m_config.getAppName(),
+                m_config.getStreamName(), credentials(), m_workerId);
+
+        kclConfig.withRegionName(m_config.getRegion()).withMaxRecords((int) m_config.getMaxReadBatchSize())
+                .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON)
+                .withIdleTimeBetweenReadsInMillis(m_config.getIdleTimeBetweenReads())
+                .withMetricsLevel(MetricsLevel.NONE)
+                .withTaskBackoffTimeMillis(m_config.getTaskBackoffTimeMillis()).withKinesisClientConfig(
+                        KinesisStreamImporterConfig.getClientConfigWithUserAgent(m_config.getAppName()));
+        m_worker = new Worker.Builder().recordProcessorFactory(new RecordProcessorFactory()).config(kclConfig)
+                .build();
     }
 
     @Override
@@ -70,31 +84,19 @@ public class KinesisStreamImporter extends AbstractImporter {
     }
 
     @Override
-    public void accept() {
+    public String getTaskThreadName() {
+        return getName() + "-" + m_config.getAppName() + "-" + m_workerId;
+    };
 
+    @Override
+    public void accept() {
         info(null, "Starting data stream fetcher for " + m_config.getResourceID().toString());
         try {
-            KinesisClientLibConfiguration kclConfig = new KinesisClientLibConfiguration(m_config.getAppName(),
-                    m_config.getStreamName(), credentials(), UUID.randomUUID().toString());
-
-            kclConfig.withRegionName(m_config.getRegion()).withMaxRecords((int) m_config.getMaxReadBatchSize())
-                    .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON)
-                    .withIdleTimeBetweenReadsInMillis(m_config.getIdleTimeBetweenReads())
-                    .withTaskBackoffTimeMillis(m_config.getTaskBackoffTimeMillis()).withKinesisClientConfig(
-                            KinesisStreamImporterConfig.getClientConfigWithUserAgent(m_config.getAppName()));
-
-            m_worker = new Worker.Builder().recordProcessorFactory(new RecordProcessorFactory()).config(kclConfig)
-                    .build();
-
             m_worker.run();
-
         } catch (RuntimeException e) {
-
             //aws silences all the exceptions but IllegalArgumentException, throw RuntimeException.
             rateLimitedLog(Level.ERROR, e, "Error in Kinesis stream importer %s", m_config.getResourceID());
-            if (null != m_worker)
-                m_worker.shutdown();
-
+            m_worker.shutdown();
         }
 
         info(null, "Data stream fetcher stopped for %s. Callback Rcvd: %d. Submitted: %d",
@@ -104,10 +106,9 @@ public class KinesisStreamImporter extends AbstractImporter {
 
     @Override
     public void stop() {
-        if (null != m_worker) {
-            m_worker.shutdown();
-        }
+        m_worker.shutdown();
     }
+
 
     @Override
     public String getName() {
@@ -134,7 +135,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
     private class StreamConsumer implements IRecordProcessor {
 
-        private String m_shardId;
+        private String m_shardId = new String("unknown");
         private Formatter m_formatter;
         Gap m_gapTracker = new Gap(Integer.getInteger("KINESIS_IMPORT_GAP_LEAD", 32768));
         private BigInteger m_lastFetchCommittedSequenceNumber = BigInteger.ZERO;
@@ -209,6 +210,10 @@ public class KinesisStreamImporter extends AbstractImporter {
 
         @Override
         public void shutdown(ShutdownInput shutDownInput) {
+
+            if (isDebugEnabled()) {
+                debug(null, "shard ID: " + m_shardId + ", shutdown reason: " + shutDownInput.getShutdownReason().name());
+            }
 
             if (ShutdownReason.TERMINATE.equals(shutDownInput.getShutdownReason())) {
                 //The shard may be split or merged. checkpoint one last time

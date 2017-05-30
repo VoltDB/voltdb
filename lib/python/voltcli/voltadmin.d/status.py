@@ -24,6 +24,7 @@ import sys
 import time
 import subprocess
 import json
+from voltcli.checkstats import StatisticsProcedureException
 
 RELEASE_MAJOR_VERSION = 7
 RELEASE_MINOR_VERSION = 2
@@ -125,7 +126,12 @@ def getClusterInfo(runner):
         cluster.add_member(hostId, hostInfo.hostname)
 
     # number of live clients connect to the cluster
-    response = checkstats.get_stats(runner, "LIVECLIENTS")
+    try:
+        response = checkstats.get_stats(runner, "LIVECLIENTS")
+    except StatisticsProcedureException as e:
+        runner.info(e.message)
+        sys.exit(e.exitCode)
+
     liveclients = 0
     for tuple in response.table(0).tuples():
         isAdmin = tuple[5]
@@ -136,7 +142,12 @@ def getClusterInfo(runner):
 
     if runner.opts.dr:
         # Do we have any ongoing DR conversation?
-        response = checkstats.get_stats(runner, "DRROLE")
+        try:
+            response = checkstats.get_stats(runner, "DRROLE")
+        except StatisticsProcedureException as e:
+            runner.info(e.message)
+            sys.exit(e.exitCode)
+
         for tuple in response.table(0).tuples():
             role = tuple[0]
             status = tuple[1]
@@ -144,7 +155,11 @@ def getClusterInfo(runner):
             if (remote_cluster_id != -1):
                 cluster.add_remote_cluster(remote_cluster_id, status, role)
 
-        response = checkstats.get_stats(runner, "DRPRODUCER")
+        try:
+            response = checkstats.get_stats(runner, "DRPRODUCER")
+        except StatisticsProcedureException as e:
+            runner.info(e.message)
+            sys.exit(e.exitCode)
         for tuple in response.table(0).tuples():
             host_name = tuple[2]
             remote_cluster_id = tuple[4]
@@ -158,7 +173,12 @@ def getClusterInfo(runner):
             cluster.get_remote_cluster(remote_cluster_id).update_producer_latency(host_name, remote_cluster_id, delay)
 
         # Find remote topology through drconsumer stats
-        response = checkstats.get_stats(runner, "DRCONSUMER")
+        try:
+            response = checkstats.get_stats(runner, "DRCONSUMER")
+        except StatisticsProcedureException as e:
+            runner.info(e.message)
+            sys.exit(e.exitCode)
+
         for tuple in response.table(1).tuples():
             remote_cluster_id = tuple[4]
             covering_host = tuple[7]
