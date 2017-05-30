@@ -595,16 +595,22 @@ public class SQLCommand
         SQLCommandLineReader reader = null;
         StringBuilder statements = new StringBuilder();
 
+        if ( ! m_interactive) {
+            System.out.println();
+
+            StringBuilder commandString = new StringBuilder();
+            commandString.append(filesInfo.get(0).toString());
+            for (int ii = 1; ii < filesInfo.size(); ii++) {
+                    commandString.append(" " + filesInfo.get(ii).getFile().toString());
+            }
+            System.out.println(commandString.toString());
+        }
+
         for (int ii = 0; ii < filesInfo.size(); ii++) {
 
             FileInfo fileInfo = filesInfo.get(ii);
             adapter = null;
             reader = null;
-
-            if ( ! m_interactive) {
-                System.out.println();
-                System.out.println(fileInfo.toString());
-            }
 
             if (fileInfo.getOption() == FileOption.INLINEBATCH) {
                 // File command is a "here document" so pass in the current
