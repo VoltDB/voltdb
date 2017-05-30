@@ -59,6 +59,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 
@@ -1199,6 +1200,62 @@ public class CoreUtils {
         }
         catch (Exception e) {
             log.fatal("Unable to list ports in use at this time.");
+        }
+    }
+
+    /**
+     * Print beautiful logs surrounded by stars. This function handles long lines (wrapping
+     * into multiple lines) as well. Please use only spaces and newline characters for word
+     * separation.
+     * @param vLogger   The provided VoltLogger
+     * @param msg   Message to be printed out beautifully
+     * @param level Logging level
+     */
+    public static void PrintGoodLookingLog(VoltLogger vLogger, String msg, Level level)
+    {
+        if (vLogger == null || msg == null || level == Level.OFF) { return; }
+
+        // 80 stars in a line
+        StringBuilder starBuilder = new StringBuilder();
+        for (int i = 0; i < 80; i++) {
+            starBuilder.append("*");
+        }
+        String stars = starBuilder.toString();
+
+        // Wrap the message with 2 lines of stars
+        switch (level) {
+            case DEBUG:
+                vLogger.debug(stars);
+                vLogger.debug("* " + stars + " *");
+                vLogger.debug(stars);
+                break;
+            case WARN:
+                vLogger.warn(stars);
+                vLogger.warn("* " + stars + " *");
+                vLogger.warn(stars);
+                break;
+            case ERROR:
+                vLogger.error(stars);
+                vLogger.error("* " + stars + " *");
+                vLogger.error(stars);
+                break;
+            case FATAL:
+                vLogger.fatal(stars);
+                vLogger.fatal("* " + stars + " *");
+                vLogger.fatal(stars);
+                break;
+            case INFO:
+                vLogger.info(stars);
+                vLogger.info("* " + stars + " *");
+                vLogger.info(stars);
+                break;
+            case TRACE:
+                vLogger.trace(stars);
+                vLogger.trace("* " + stars + " *");
+                vLogger.trace(stars);
+                break;
+            default:
+                break;
         }
     }
 

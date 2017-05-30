@@ -744,7 +744,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             assertEquals(1, vt.getRowCount());
             vt.advanceRow();
-            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+            assertEquals("org.voltdb.sysprocs.UpdateCore", vt.getString(5));
 
             // create procedure 0
             resp = m_client.callProcedure("@AdHoc", "create procedure from class " +
@@ -753,7 +753,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             assertEquals(vt.getRowCount(), 1);
             vt.advanceRow();
-            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+            assertEquals("org.voltdb.sysprocs.UpdateCore", vt.getString(5));
 
             // invoke a new user procedure
             vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
@@ -767,7 +767,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             assertEquals(2, vt.getRowCount());
             assertTrue(vt.toString().contains("org.voltdb_testprocs.updateclasses.testImportProc"));
-            assertTrue(vt.toString().contains("org.voltdb.sysprocs.UpdateApplicationCatalog"));
+            assertTrue(vt.toString().contains("org.voltdb.sysprocs.UpdateCore"));
 
             // create procedure 1
             resp = m_client.callProcedure("@AdHoc", "create procedure from class " +
@@ -776,7 +776,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             assertEquals(1, vt.getRowCount());
             vt.advanceRow();
-            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+            assertEquals("org.voltdb.sysprocs.UpdateCore", vt.getString(5));
 
             resp = m_client.callProcedure(PROC_CLASSES[1].getSimpleName(), 1l, "", "");
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
