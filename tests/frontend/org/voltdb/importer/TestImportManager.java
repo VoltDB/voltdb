@@ -23,7 +23,10 @@
 
 package org.voltdb.importer;
 
+import static org.junit.Assert.*;
+
 import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.CatalogContext;
 
 /**
@@ -51,8 +54,12 @@ public class TestImportManager {
         CatalogContext mockCatalogV1 = buildMockCatalogContext();
         m_mockChannelDistributer = new MockChannelDistributer(Integer.toString(HOSTID));
         m_statsCollector = new ImporterStatsCollector(SITEID);
-        m_manager = new ImportManagerWithMocks(HOSTID, mockCatalogV1, m_mockChannelDistributer, m_statsCollector);
+        ImportManager.initializeWithMocks(HOSTID, mockCatalogV1, m_mockChannelDistributer, m_statsCollector);
+        m_manager = ImportManager.instance();
     }
 
-
+    @Test
+    public void testDev() throws Exception {
+        //m_manager.
+    }
 }

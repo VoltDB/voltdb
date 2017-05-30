@@ -42,7 +42,6 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
     private final String m_clusterTag;
-    private final Map<String, Boolean> m_proceduresUsedByImporters = new HashMap<>();
 
 
     public ImportProcessor(int myHostId,
@@ -194,8 +193,4 @@ public class ImportProcessor implements ImportDataProcessor {
         }
     }
 
-    @Override
-    public Map<String, Boolean> getUtilizedProcedures() {
-        return m_proceduresUsedByImporters;
-    }
 }

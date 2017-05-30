@@ -20,6 +20,7 @@ package org.voltdb.importer;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,7 +54,6 @@ public class ImportManager implements ChannelChangeCallback {
     private static final VoltLogger importLog = new VoltLogger("IMPORT");
 
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
-    private volatile Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
     private final Map<String, AbstractFormatterFactory> m_formatterFactories = new HashMap<String, AbstractFormatterFactory>();
 
     /** Obtain the global ImportManager via its instance() method */
@@ -72,7 +72,7 @@ public class ImportManager implements ChannelChangeCallback {
     private Map<String, AbstractImporterFactory> m_importersByType = new HashMap<String, AbstractImporterFactory>();
     // maintains mapping of active importer config to the bundle bundle path used for communicating import processor
     // about the jars to use
-    private Map<String, ImportConfiguration> m_configsForProcessor= new HashMap<String, ImportConfiguration>();
+    private Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
 
     /**
      * Get the global instance of the ImportManager.
@@ -93,19 +93,16 @@ public class ImportManager implements ChannelChangeCallback {
         m_moduleManager = getModuleManager();
     }
 
-    protected void initializeChannelDistributer() throws BundleException {
-        if (m_distributer != null) return;
-
-        m_distributer = new ZKChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
+    private void initializeChannelDistributer(ChannelDistributer distributer) {
+        m_distributer = distributer;
         m_distributer.registerCallback("__IMPORT_MANAGER__", this);
     }
 
     /**
      * Create the singleton ImportManager and initialize.
-     * WARNING: if you change this method, please update the ImportManagerWithMocks constructor!
      * @param myHostId my host id in cluster
      * @param catalogContext current catalog context
-     * @param messenger messenger to get to ZK
+     * @param messenger used to obtain access to ZK
      * @throws org.osgi.framework.BundleException
      * @throws java.io.IOException
      */
@@ -118,7 +115,21 @@ public class ImportManager implements ChannelChangeCallback {
                 statsCollector);
 
         m_self = em;
-        em.create(myHostId, catalogContext);
+        em.initializeChannelDistributer(new ZKChannelDistributer(messenger.getZK(), String.valueOf(myHostId)));
+        em.applyCatalogToImporters(catalogContext, false);
+    }
+
+    /** FOR UNIT TESTING ONLY: creates an ImportManager with fewer dependencies (no VoltDB, HostMessenger, or Zookeeper).
+     * @param myHostId
+     * @param initialCatalogCtxt
+     * @param mockChannelDistributer
+     * @param myStatsCollector
+     */
+    public static synchronized void initializeWithMocks(int myHostId, CatalogContext initialCatalogCtxt, ChannelDistributer mockChannelDistributer, ImporterStatsCollector myStatsCollector) {
+        ImportManager em = new ImportManagerWithMocks(myHostId, myStatsCollector);
+        m_self = em;
+        em.initializeChannelDistributer(mockChannelDistributer);
+        em.applyCatalogToImporters(initialCatalogCtxt, false);
     }
 
     private void setupFormatterFactoryForConfig(Map<String, ImportConfiguration> processorConfig) {
@@ -142,34 +153,44 @@ public class ImportManager implements ChannelChangeCallback {
         }
     }
 
-    /**
-     * This creates a import connector from configuration provided.
-     * @param myHostId
+    /** Creates an import connector if required by the provided configuration.
+     * If this catalog represents a change to any aspect of the importer configuration (such as the deployment file or procedure availability):
+     * - Shut down any existing importers
+     * - Create importers for the new catalog
+     * - Start new importers
+     * If this catalog does not represent a change:
+     * - Do nothing
+     * During manager initialization, the initial catalog context is compared to an empty one with no importers.
+     *
      * @param catalogContext
+     * @param start Whether or not to signal importers that we are ready for data.
+     * @return whether or not the importers were affected by the catalog change (on startup, this comparison is with an empty importer config)
      */
-    protected synchronized void create(int myHostId, CatalogContext catalogContext) {
+    private synchronized void applyCatalogToImporters(CatalogContext catalogContext, boolean start) {
         try {
-            ImportType importElement = catalogContext.getDeployment().getImport();
-            if (importElement == null || importElement.getConfiguration().isEmpty()) {
-                return;
-            }
-            initializeChannelDistributer();
+            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
+            final boolean changeOccurred = !m_processorConfig.equals(newProcessorConfig);
+            if (changeOccurred) {
+                // Need to shut down any existing importers and create anew.
+                close();
+                assert(m_processor.get() == null);
 
-            final String clusterTag = m_distributer.getClusterTag();
+                m_processorConfig = newProcessorConfig;
+                importLog.info("Currently loaded importer modules: " + m_loadedBundles.keySet() + ", types: " + m_importersByType.keySet());
 
-            ImportDataProcessor newProcessor = new ImportProcessor(
-                    myHostId, m_distributer, m_statsCollector, clusterTag);
-            m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
-            m_formatterFactories.clear();
+                if (!newProcessorConfig.isEmpty()) {
+                    final String clusterTag = m_distributer.getClusterTag();
+                    ImportDataProcessor newProcessor = new ImportProcessor(
+                            m_myHostId, m_distributer, m_statsCollector, clusterTag);
+                    newProcessor.setProcessorConfig(newProcessorConfig, m_loadedBundles);
+                    m_processor.set(newProcessor);
+                } else {
+                    m_processor.set(null);
+                }
 
-            setupFormatterFactoryForConfig(m_processorConfig);
-
-            discoverConfigsAndLoadBundles(catalogContext);
-            if (!m_configsForProcessor.isEmpty()) {
-                newProcessor.setProcessorConfig(m_configsForProcessor, m_loadedBundles);
-                m_processor.set(newProcessor);
-            } else {
-                m_processor.set(null);
+                if (start) {
+                    readyForDataInternal(catalogContext);
+                }
             }
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
@@ -178,13 +199,24 @@ public class ImportManager implements ChannelChangeCallback {
 
     /**
      * Parses importer configs and loads the bundle needed for importer into memory. Updates
-     * mapping of active importer bundle to the bundle jar needed by the impoter
+     * mapping of active importer bundle to the bundle jar needed by the importer
      * @param catalogContext
+     * @return new importer configuration
      */
-    private void discoverConfigsAndLoadBundles(CatalogContext catalogContext) {
-        m_configsForProcessor.clear();
-        for (String configName : m_processorConfig.keySet()) {
-            ImportConfiguration importConfig = m_processorConfig.get(configName);
+    private synchronized Map<String, ImportConfiguration> loadNewConfigAndBundles(CatalogContext catalogContext) {
+        Map<String, ImportConfiguration> newProcessorConfig;
+
+        ImportType importElement = catalogContext.getDeployment().getImport();
+        if (importElement == null || importElement.getConfiguration().isEmpty()) {
+            newProcessorConfig = new HashMap<>();
+        } else {
+            newProcessorConfig = CatalogUtil.getImportProcessorConfig(importElement);
+        }
+
+        Iterator<Map.Entry<String, ImportConfiguration>> iter = newProcessorConfig.entrySet().iterator();
+        while (iter.hasNext()) {
+            String configName = iter.next().getKey();
+            ImportConfiguration importConfig = newProcessorConfig.get(configName);
             Properties properties = importConfig.getmoduleProperties();
 
             String importBundleJar = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
@@ -193,29 +225,28 @@ public class ImportManager implements ChannelChangeCallback {
             String procedure = properties.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
             //TODO: If processors is a list dont start till all procedures exists.
             Procedure catProc = catalogContext.procedures.get(procedure);
-
             if (catProc == null) {
                 catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
             }
-            m_proceduresUsedByImporters.put(procedure, (catProc != null));
-
             if (catProc == null) {
                 importLog.info("Importer " + configName + " Procedure " + procedure +
                         " is missing will disable this importer until the procedure becomes available.");
+                iter.remove();
                 continue;
             }
-
-            if (loadImporterBundle(properties)) {
-                m_configsForProcessor.put(configName, importConfig);
+            // NOTE: if bundle is already loaded, loadImporterBundle does nothing and returns true
+            boolean bundlePresent = loadImporterBundle(properties);
+            if (!bundlePresent) {
+                iter.remove();
             }
         }
-        if (!m_configsForProcessor.isEmpty()) {
-            importLog.info("Loaded importer modules: " + m_loadedBundles.keySet() +", types: " + m_importersByType.keySet());
-        }
+
+        setupFormatterFactoryForConfig(newProcessorConfig);
+        return newProcessorConfig;
     }
 
     /**
-     * Checks if the module for importer has been loaded in the memory. If bundle doesn't exists, it loades one and
+     * Checks if the module for importer has been loaded in the memory. If bundle doesn't exists, it loads one and
      * updates the mapping records of the bundles.
      *
      * @param moduleProperties
@@ -288,42 +319,12 @@ public class ImportManager implements ChannelChangeCallback {
         m_processor.set(null);
     }
 
-    public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
-        m_self.create(m_myHostId, catalogContext);
-        m_self.readyForDataInternal(catalogContext);
+    public synchronized void resume() {
+        m_self.applyCatalogToImporters(VoltDB.instance().getCatalogContext(), true);
     }
 
-    //Call this method to restart the whole importer system. It takes current catalogcontext and hostmessenger
-    private synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
-        //Shutdown and recreate.
-        m_self.close();
-        assert(m_processor.get() == null);
-        m_self.start(catalogContext, messenger);
-    }
-
-    public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
-        Map<String, ImportConfiguration> oldImportConfig = m_processorConfig;
-        Map<String, ImportConfiguration> newImportConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
-        setupFormatterFactoryForConfig(newImportConfig);
-        final boolean importConfigChanged = !oldImportConfig.equals(newImportConfig);
-
-        boolean procedureAvailabilityChanged = false;
-        ImportDataProcessor currentProcessor = m_processor.get();
-        if (currentProcessor != null) {
-            for (Map.Entry<String, Boolean> procedureStatus : currentProcessor.getUtilizedProcedures().entrySet()) {
-                // NOTE: default procedures are not tracked since it's assumed they cannot be added or removed.
-                String procedureToCheck = procedureStatus.getKey();
-                boolean procedureAvailableBefore = procedureStatus.getValue();
-                boolean procedureAvailableNow = catalogContext.procedures.get(procedureToCheck) != null;
-                if (procedureAvailableBefore != procedureAvailableNow) {
-                    procedureAvailabilityChanged = true;
-                    break;
-                }
-            }
-        }
-        if (importConfigChanged || procedureAvailabilityChanged) {
-            restart(catalogContext, messenger);
-        }
+    public synchronized void updateCatalog(CatalogContext catalogContext) {
+        m_self.applyCatalogToImporters(catalogContext, true);
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
@@ -362,7 +363,7 @@ public class ImportManager implements ChannelChangeCallback {
                 break;
             case RUNNING:
                 importLog.info("Cluster is resumed STARTING all importers.");
-                start(VoltDB.instance().getCatalogContext(), VoltDB.instance().getHostMessenger());
+                resume();
                 importLog.info("Cluster is resumed STARTED all importers.");
                 break;
             default:

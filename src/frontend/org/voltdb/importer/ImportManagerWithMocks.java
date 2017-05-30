@@ -27,23 +27,9 @@ public class ImportManagerWithMocks extends ImportManager {
 
     /** Creates partially mocked-out ImportManager for standalone use.
      * @param myHostId Fake Host ID (0 is fine)
-     * @param mockChannelDistributer Fake ChannelDistributer. The test can use it to simulate mesh events, and this eliminates a dependency on Zookeeper.
      * @param myStatsCollector Real ImporterStatsCollector that test can use to get data if it wants. This class has no onerous dependencies so no need to mock it.
      */
-    public ImportManagerWithMocks(int myHostId, CatalogContext initialCatalogCtxt, ChannelDistributer mockChannelDistributer, ImporterStatsCollector myStatsCollector) {
+    ImportManagerWithMocks(int myHostId, ImporterStatsCollector myStatsCollector) {
         super(myHostId, null, myStatsCollector);
-
-        // from ImportManager.initialize()
-        m_self = this;
-        create(myHostId, initialCatalogCtxt);
-    }
-
-
-    @Override
-    protected void initializeChannelDistributer()  {
-        if (m_distributer != null) return;
-
-        m_distributer = new MockChannelDistributer(String.valueOf(m_myHostId));
-        m_distributer.registerCallback("__IMPORT_MANAGER__", this);
     }
 }

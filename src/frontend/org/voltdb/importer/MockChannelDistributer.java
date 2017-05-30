@@ -26,6 +26,8 @@ import java.util.Set;
  */
 public class MockChannelDistributer implements ChannelDistributer {
 
+    private ChannelChangeCallback m_callback = null;
+
 
     public MockChannelDistributer(String myHostId) {
 
@@ -38,7 +40,7 @@ public class MockChannelDistributer implements ChannelDistributer {
 
     @Override
     public void registerCallback(String m_distributerDesignation, ChannelChangeCallback importerLifeCycleManager) {
-
+        m_callback = importerLifeCycleManager;
     }
 
     @Override
@@ -48,7 +50,7 @@ public class MockChannelDistributer implements ChannelDistributer {
 
     @Override
     public void unregisterCallback(String m_distributerDesignation) {
-
+        m_callback = null;
     }
 
     @Override
