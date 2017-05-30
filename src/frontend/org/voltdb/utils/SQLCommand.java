@@ -294,7 +294,7 @@ public class SQLCommand
                 }
 
                 if (filesInfo != null && filesInfo.size() != 0) {
-                    executeScriptFile(filesInfo, interactiveReader, null);
+                    executeScriptFiles(filesInfo, interactiveReader, null);
 
                     if (m_returningToPromptAfterError) {
                         // executeScriptFile stopped because of an error. Wipe the slate clean.
