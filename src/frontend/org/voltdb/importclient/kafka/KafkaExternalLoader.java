@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.utils;
+package org.voltdb.importclient.kafka;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -42,36 +42,36 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.importclient.kafka.BaseKafkaTopicPartitionImporter;
-import org.voltdb.importclient.kafka.KafkaStreamImporterConfig;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
-import org.voltdb.importclient.kafka.TopicPartitionInvocationCallback;
 import org.voltdb.importer.ImporterSupport;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.importer.formatter.builtin.VoltCSVFormatterFactory;
+import org.voltdb.utils.BulkLoaderErrorHandler;
+import org.voltdb.utils.CSVBulkDataLoader;
+import org.voltdb.utils.CSVDataLoader;
+import org.voltdb.utils.CSVTupleDataLoader;
+import org.voltdb.utils.RowWithMetaData;
 
 import kafka.cluster.Broker;
 
 /**
- * KafkaConsumer loads data from kafka into voltdb
- * Only csv formatted data is supported at this time.
- * VARBINARY columns are not supported
+ * Import Kafka data into the database, using a remote Volt client and manual offset management.
  */
-public class KafkaLoader2 implements ImporterSupport {
+public class KafkaExternalLoader implements ImporterSupport {
 
     private static final VoltLogger m_log = new VoltLogger("KAFKALOADER2");
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
 
-    private final KafkaConfig m_config;
+    private final KafkaExternalLoaderCLIArguments m_config;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
 
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private ExecutorService m_executorService = null;
 
-    public KafkaLoader2(KafkaConfig config) {
+    public KafkaExternalLoader(KafkaExternalLoaderCLIArguments config) {
         m_config = config;
     }
 
@@ -244,21 +244,28 @@ public class KafkaLoader2 implements ImporterSupport {
         return executor;
     }
 
-    private Map<URI, KafkaStreamImporterConfig> createKafkaImporterConfigFromProperties(KafkaConfig properties) throws Exception {
+    private Map<URI, KafkaStreamImporterConfig> createKafkaImporterConfigFromProperties(KafkaExternalLoaderCLIArguments properties) throws Exception {
 
-        List<HostAndPort> brokers = getBrokersFromZookeeper(properties.getZookeeper());
+        List<HostAndPort> brokers = getBrokersFromZookeeper(properties.zookeeper);
 
         // Concatenate the host:port values of each broker into one string that can be used to compute the key:
         String brokersString = StringUtils.join(brokers.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
         String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokersString);
-        String groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
+
+        String groupId;
+        if (properties.groupId == null || properties.groupId.trim().length() == 0) {
+            groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
+        }
+        else {
+            groupId = properties.groupId.trim();
+        }
 
         // NEEDSWORK: Should these be customizable?
         int fetchSize = 65536;
         int soTimeout = 30000;
 
-        String procedure = properties.getProcedure();
-        String topic = properties.getTopic();
+        String procedure = properties.procedure;
+        String topic = properties.topic;
         String commitPolicy = "NONE";
 
         Properties props = new Properties();
@@ -268,7 +275,7 @@ public class KafkaLoader2 implements ImporterSupport {
         return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokers, topic, groupId, procedure, soTimeout, fetchSize, commitPolicy, fb);
     }
 
-    private FormatterBuilder createFormatterBuilder(KafkaConfig properties) throws Exception {
+    private FormatterBuilder createFormatterBuilder(KafkaExternalLoaderCLIArguments properties) throws Exception {
 
         FormatterBuilder fb;
         Properties formatterProperties = m_config.m_formatterProperties;
@@ -404,13 +411,111 @@ public class KafkaLoader2 implements ImporterSupport {
 
     }
 
+    private static class KafkaExternalLoaderCLIArguments extends CLIConfig {
+
+        @Option(shortOpt = "p", desc = "procedure name to insert the data into the database")
+        String procedure = "";
+
+        // This is set to true when -p option is used.
+        boolean useSuppliedProcedure = false;
+
+        @Option(shortOpt = "t", desc = "Kafka Topic to subscribe to")
+        String topic = "";
+
+        @Option(shortOpt = "g", desc = "Kafka group-id")
+        String groupId = "";
+
+        @Option(shortOpt = "m", desc = "maximum errors allowed")
+        int maxerrors = 100;
+
+        @Option(shortOpt = "s", desc = "list of VoltDB servers to connect to (default: localhost)")
+        String servers = "localhost";
+
+        @Option(desc = "port to use when connecting to database (default: 21212)")
+        int port = Client.VOLTDB_SERVER_PORT;
+
+        @Option(desc = "username when connecting to the VoltDB servers")
+        String user = "";
+
+        @Option(desc = "password to use when connecting to VoltDB servers")
+        String password = "";
+
+        @Option(shortOpt = "z", desc = "kafka zookeeper to connect to. (format: zkserver:port)")
+        String zookeeper = ""; //No default here as default will clash with local voltdb cluster
+
+        @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds. (default: 10)")
+        int flush = 10;
+
+        @Option(desc = "Formatter configuration file. (Optional) .")
+        String formatter = "";
+
+        @Option(desc = "Batch Size for processing.")
+        public int batch = 200;
+
+        @AdditionalArgs(desc = "insert the data into this table.")
+        public String table = "";
+
+        @Option(desc = "Use upsert instead of insert", hasArg = false)
+        boolean update = false;
+
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        String ssl = "";
+
+        //Read properties from formatter option and do basic validation.
+        Properties m_formatterProperties = new Properties();
+
+        /**
+         * Validate command line options.
+         */
+        @Override
+        public void validate() {
+            if (batch < 0) {
+                exitWithMessageAndUsage("batch size number must be >= 0");
+            }
+            if (flush <= 0) {
+                exitWithMessageAndUsage("Periodic Flush Interval must be > 0");
+            }
+            if (topic.trim().isEmpty()) {
+                exitWithMessageAndUsage("Topic must be specified.");
+            }
+            if (zookeeper.trim().isEmpty()) {
+                exitWithMessageAndUsage("Kafka Zookeeper must be specified.");
+            }
+            if (port < 0) {
+                exitWithMessageAndUsage("port number must be >= 0");
+            }
+            if (procedure.trim().isEmpty() && table.trim().isEmpty()) {
+                exitWithMessageAndUsage("procedure name or a table name required");
+            }
+            if (!procedure.trim().isEmpty() && !table.trim().isEmpty()) {
+                exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
+            }
+            if (!procedure.trim().isEmpty()) {
+                useSuppliedProcedure = true;
+            }
+            if ((useSuppliedProcedure) && (update)){
+                update = false;
+                exitWithMessageAndUsage("update is not applicable when stored procedure specified");
+            }
+            //Try and load classes we need and not packaged.
+            try {
+                KafkaExternalLoader.class.getClassLoader().loadClass("org.I0Itec.zkclient.IZkStateListener");
+                KafkaExternalLoader.class.getClassLoader().loadClass("org.apache.zookeeper.Watcher");
+            }
+            catch (ClassNotFoundException cnfex) {
+                System.out.println("Cannot find the Zookeeper libraries, zkclient-0.3.jar and zookeeper-3.3.4.jar.");
+                System.out.println("Use the ZKLIB environment variable to specify the path to the Zookeeper jars files.");
+                System.exit(1);
+            }
+        }
+    }
+
     public static void main(String[] args) {
 
-        final KafkaConfig cfg = new KafkaConfig();
-        cfg.parse(KafkaLoader2.class.getName(), args);
+        final KafkaExternalLoaderCLIArguments cfg = new KafkaExternalLoaderCLIArguments();
+        cfg.parse(KafkaExternalLoader.class.getName(), args);
 
         try {
-
             if (!cfg.formatter.trim().isEmpty()) {
                 InputStream pfile = new FileInputStream(cfg.formatter);
                 cfg.m_formatterProperties.load(pfile);
@@ -420,13 +525,16 @@ public class KafkaLoader2 implements ImporterSupport {
                     System.exit(-1);
                 }
             }
-            KafkaLoader2 kloader = new KafkaLoader2(cfg);
+            KafkaExternalLoader kloader = new KafkaExternalLoader(cfg);
             kloader.processKafkaMessages();
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             m_log.error("Failure in kafkaloader", e);
             System.exit(-1);
         }
 
         System.exit(0);
     }
+
+
 }
