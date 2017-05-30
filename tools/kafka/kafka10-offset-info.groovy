@@ -28,8 +28,6 @@
     @Grab('com.google.guava:guava:19.0'),
     @Grab('log4j:log4j:1.2.17'),    
 	@Grab('org.apache.kafka:kafka-clients:0.10.2.1'),
-	//@Grab('org.slf4j:slf4j-api:1.7.5'),
-	//@Grab('org.slf4j:slf4j-simple:1.6.4'),
     @GrabExclude('javax.mail:mail'),
     @GrabExclude('javax.jms:jms'),
     @GrabExclude('com.sun.jdmk:jmxtools')
@@ -115,7 +113,6 @@ try {
         long lag = (committed == 0 || committed < startOffset) ? (endOffset - startOffset) :
             (committed > endOffset) ? 0L : (endOffset - committed)        
         long nextOffset = consumer.position(tp)
-        //long offset = (committed == 0 || committed < startOffset) ? startOffset : (committed > endOffset) ? endOffset : committed
         prtoffs[tp.partition()] = nextOffset
         printf("%-32s %4d %,16d %,16d %,16d %,12d\n",tp.topic(), tp.partition(), startOffset, endOffset, committed, lag)
     }

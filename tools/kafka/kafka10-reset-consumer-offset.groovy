@@ -28,14 +28,11 @@
     @Grab('com.google.guava:guava:19.0'),
     @Grab('log4j:log4j:1.2.17'),    
 	@Grab('org.apache.kafka:kafka-clients:0.10.2.1'),
-	//@Grab('org.slf4j:slf4j-api:1.7.5'),
-	//@Grab('org.slf4j:slf4j-simple:1.6.4'),
     @GrabExclude('javax.mail:mail'),
     @GrabExclude('javax.jms:jms'),
     @GrabExclude('com.sun.jdmk:jmxtools')
 ])
 
-import com.google.common.net.HostAndPort
 import static com.google.common.base.Throwables.getStackTraceAsString as stackTraceFor
 import groovy.json.JsonSlurper
 

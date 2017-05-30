@@ -33,7 +33,7 @@
     @GrabExclude('com.sun.jdmk:jmxtools')
 ])
 
-import com.google.common.net.HostAndPort
+import com.google.common.collect.Iterables
 import com.google.common.util.concurrent.SettableFuture
 import com.google.common.util.concurrent.ListenableFuture
 import static com.google.common.base.Throwables.getStackTraceAsString as stackTraceFor
@@ -124,8 +124,9 @@ class Fetcher {
                             return
                         }
                         def msgs = frs.messageSet(tnp.topic(),tnp.partition())
-                        if (msgs.size() == 0) break
-                        msgcnt += msgs.size()
+                        int elements = Iterables.size(msgs)
+                        if (elements == 0) break
+                        msgcnt += elements
                         msgs.each {
                             bytes += it.message().payload().limit()
                             offset = it.nextOffset()
