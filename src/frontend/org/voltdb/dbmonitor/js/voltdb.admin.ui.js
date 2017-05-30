@@ -2864,7 +2864,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
             var content = '';
             if (voltDbRenderer.drTablesArray.length == 0) {
-                $("#drPopup").html("No DR tables available.");
+                $("#drPopup").html("<span style='font-size: 14px'>No DR tables available.</span>");
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='drTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.drTablesArray.length - 1; i++) {
@@ -2888,7 +2888,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
             var content = '';
             if (voltDbRenderer.exportTablesArray.length == 0) {
-                $("#exportPopup").html("No Export tables available.");
+                $("#exportPopup").html("<span style='font-size: 14px'>No export streams available.</span>");
             } else {
                 content = "<table width='100%' border='0' cellspacing='0' cellpadding='0' class='tblPopup'><tbody id='exportTableBody'>";
                 for (var i = 0; i <= voltDbRenderer.exportTablesArray.length - 1; i++) {
@@ -5395,6 +5395,7 @@ function loadAdminPage() {
 
         var getImportProperties = function (data) {
             var result = "";
+            var procedureName = "";
             if (data != undefined) {
                 //Do not update the data in loading condition
                 if (adminEditObjects.importConfiguration.data("status") == "loading") {
@@ -5402,6 +5403,8 @@ function loadAdminPage() {
                 }
 
                 for (var i = 0; i < data.length; i++) {
+                    var resultProperty = "";
+                    var resultSubProperty = "";
                     var type = data[i].type ? VoltDbAdminConfig.escapeHtml(data[i].type) : "";
                     var enabled = data[i].enabled;
                     var importProperty = data[i].property;
@@ -5413,10 +5416,35 @@ function loadAdminPage() {
                         VoltDbAdminConfig.toggleStates[rowId] = false;
                         style = 'style = "display:none;"';
                     }
+                    if (importProperty && importProperty.length > 0) {
+                        var isFirstProcedureProp = true;
+                        for (var j = 0; j < importProperty.length; j++) {
+                            var name = importProperty[j].name;
+                            var value = importProperty[j].value;
 
-                    result += '<tr class="child-row-5 subLabelRow parentprop" id="' + rowId + '">' +
+                            resultSubProperty += '' +
+                                '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
+                                '   <td class="configLabe2">' + name + '</td>' +
+                                '   <td class="wordBreak" align="right">' + value + '</td>' +
+                                '<td>&nbsp;</td>' +
+                                '<td>&nbsp;</td>' +
+                                '</tr>';
+
+                            if(name == 'procedure' && isFirstProcedureProp){
+                                isFirstProcedureProp = false;
+                                procedureName = value;
+                            }
+                        }
+                    } else {
+                        resultSubProperty += '<tr class="childprop-' + rowId + ' propertyLast subLabelRow" ' + style + '>' +
+                            '   <td width="67%" class="configLabe2" colspan="3">No properties available.</td>' +
+                            '   <td width="33%">&nbsp</td>' +
+                            '</tr>';
+                    }
+
+                    resultProperty += '<tr class="child-row-5 subLabelRow parentprop" id="' + rowId + '">' +
                             '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
-                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + type + '</a>' +
+                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + procedureName + ' (' + type + ')</a>' +
                             '   </td>' +
                             '   <td align="right">' +
                             '       <div class="' + getOnOffClass(enabled) + '"></div>' +
@@ -5427,28 +5455,7 @@ function loadAdminPage() {
                             '       <a href="javascript:void(0)" id="importEdit' + i + '" class="edit" onclick="editImportStream(' + i + ')" title="Edit">&nbsp;</a>' +
                             '   </td>' +
                             '</tr>';
-
-                    if (importProperty && importProperty.length > 0) {
-                        for (var j = 0; j < importProperty.length; j++) {
-                            var name = importProperty[j].name;
-                            var value = importProperty[j].value;
-
-                            result += '' +
-                                '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
-                                '   <td class="configLabe2">' + name + '</td>' +
-                                '   <td class="wordBreak" align="right">' + value + '</td>' +
-                                '<td>&nbsp;</td>' +
-                                '<td>&nbsp;</td>' +
-                                '</tr>';
-                        }
-
-
-                    } else {
-                        result += '<tr class="childprop-' + rowId + ' propertyLast subLabelRow" ' + style + '>' +
-                            '   <td width="67%" class="configLabe2" colspan="3">No properties available.</td>' +
-                            '   <td width="33%">&nbsp</td>' +
-                            '</tr>';
-                    }
+                result += resultProperty + resultSubProperty;
                 }
             }
 
