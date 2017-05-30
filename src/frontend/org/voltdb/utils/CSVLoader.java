@@ -574,10 +574,20 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      */
     public static Client getClient(ClientConfig config, String[] servers,
             int port) throws Exception {
+        config.setTopologyChangeAware(true); // Set client to be topology-aware
         final Client client = ClientFactory.createClient(config);
-
         for (String server : servers) {
-            client.createConnection(server.trim(), port);
+            // Try connecting servers one by one until we have a success
+            try {
+                client.createConnection(server.trim(), port);
+                break;
+            } catch(IOException e) {
+                // Only swallow the exceptions from Java network or connection problems
+                // Unresolved hostname exceptions will be thrown
+            }
+        }
+        if (client.getConnectedHostList().isEmpty()) {
+            throw new Exception("Unable to connect to any servers.");
         }
         return client;
     }

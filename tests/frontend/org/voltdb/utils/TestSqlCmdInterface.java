@@ -268,7 +268,9 @@ public class TestSqlCmdInterface
         assertTrue(sqlFile.exists());
         File matchFile = new File(fileName);
         assertEquals("Expected equal file objects", matchFile, sqlFile);
-        SQLCommand.executeScriptFiles(filesInfo, null);
+
+        SQLCommand.executeScriptFiles(filesInfo, null, null);
+
         String raw = SQLCommand.getTestResult();
 
         int numOfQueries = -1;

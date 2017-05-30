@@ -91,6 +91,53 @@ public class TestVoltCompiler extends TestCase {
         tjar.delete();
     }
 
+    public void testDDLFiltering() throws Exception {
+
+        String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +
+                     "-- This comment is inside a batch\n" +
+                     "DROP PROCEDURE Initialize                     IF EXISTS;\n" +
+                     "DROP PROCEDURE Results                         IF EXISTS;\n" +
+                     "\n" +
+                     "END_OF_DROP_BATCH\n" +
+                     "-- This command cannot be part of a DDL batch.\n" +
+                     "LOAD CLASSES voter-procs.jar\n";
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertTrue(success);
+
+        success = compileInitDDL(false, ddl, compiler);
+        assertFalse(success);
+    }
+
+    public void testDDLFilteringNoEndBatch() throws Exception {
+
+        String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +
+                     "-- This comment is inside a batch\n" +
+                     "DROP PROCEDURE Initialize                     IF EXISTS;\n" +
+                     "DROP PROCEDURE Results                         IF EXISTS;\n" +
+                     "\n";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertFalse(success);
+    }
+
+    public void testDDLFilteringCaseInsensitve() throws Exception {
+
+        String ddl = "FiLe -inlinebatch END_OF_DROP_BATCH\n" +
+                     "-- This comment is inside a batch\n" +
+                     "DROP PROCEDURE Initialize                     IF EXISTS;\n" +
+                     "DROP PROCEDURE Results                         IF EXISTS;\n" +
+                     "\n" +
+                     "END_OF_DROP_BATCH\n" +
+                     "-- This command cannot be part of a DDL batch.\n" +
+                     "Load Classes voter-procs.jar\n";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertTrue(success);
+    }
+
     public void testBrokenLineParsing() throws IOException {
         String schema =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
@@ -462,6 +509,22 @@ public class TestVoltCompiler extends TestCase {
         Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
         Column var = db.getTables().get("BOOKS").getColumns().get("TITLE");
         assertTrue(var.getInbytes());
+    }
+
+    public void testDDLWithHashDeprecatedWarning() {
+        String schema =
+            "create table test (dummy int); " +
+            "create index hashidx on test(dummy);";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
+
+        // Check warnings
+        assertEquals(1, compiler.m_warnings.size());
+        String warningMsg = compiler.m_warnings.get(0).getMessage();
+        String expectedMsg = "Hash indexes are deprecated. In a future release, VoltDB will only support tree indexes, even if the index name contains the string \"hash\"";
+        assertEquals(expectedMsg, warningMsg);
     }
 
     public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
@@ -1426,7 +1489,7 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the partitioning key ( non-primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN name;\n";
-        checkValidUniqueAndAssumeUnique(schema, msgP, msgPK);
+        checkValidUniqueAndAssumeUnique(schema, msgP, msgPR);
 
         // A unique index on the partitioning key ( no primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer);\n" +
@@ -1489,6 +1552,13 @@ public class TestVoltCompiler extends TestCase {
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         String schemaPath = schemaFile.getPath();
 
+        return compiler.compileFromDDL(testout_jar, schemaPath);
+    }
+
+    private boolean compileInitDDL(boolean isInit, String ddl, VoltCompiler compiler) {
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
+        String schemaPath = schemaFile.getPath();
+        compiler.setInitializeDDLWithFiltering(isInit);
         return compiler.compileFromDDL(testout_jar, schemaPath);
     }
 

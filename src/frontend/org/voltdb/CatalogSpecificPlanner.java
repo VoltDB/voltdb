@@ -16,43 +16,70 @@
  */
 package org.voltdb;
 
-import org.voltdb.compiler.AdHocPlannedStmtBatch;
-import org.voltdb.compiler.AdHocPlannerWork;
-import org.voltdb.compiler.AsyncCompilerAgent;
-import org.voltdb.compiler.AsyncCompilerResult;
-import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
+import java.util.ArrayList;
+import java.util.List;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.compiler.AdHocPlannedStatement;
+import org.voltdb.compiler.AdHocPlannedStmtBatch;
+import org.voltdb.sysprocs.AdHocNTBase;
+import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
+import org.voltdb.sysprocs.AdHocNTBase.AdHocSQLMix;
 
 /*
  * Wrapper around a planner tied to a specific catalog version. This planner
  * is specifically configured to generate plans from within a stored procedure
- * so it will give a slightly different set of config to the planner
- * via AdHocPlannerWork
+ * so it will give a slightly different set of config to the planner.
  */
 public class CatalogSpecificPlanner {
-    private final AsyncCompilerAgent m_agent;
     private final CatalogContext m_catalogContext;
 
-    public CatalogSpecificPlanner(AsyncCompilerAgent agent, CatalogContext context) {
-        m_agent = agent;
+    public CatalogSpecificPlanner(CatalogContext context) {
         m_catalogContext = context;
     }
 
-    public ListenableFuture<AdHocPlannedStmtBatch> plan(String sql,
-            Object[] userParams, boolean singlePartition) {
-        final SettableFuture<AdHocPlannedStmtBatch> retval = SettableFuture.create();
-        AsyncCompilerWorkCompletionHandler completionHandler = new AsyncCompilerWorkCompletionHandler()
-        {
-            @Override
-            public void onCompletion(AsyncCompilerResult result) {
-                retval.set((AdHocPlannedStmtBatch)result);
-            }
-        };
-        AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(-1, sql, userParams,
-                singlePartition, m_catalogContext, completionHandler);
-        m_agent.compileAdHocPlanForProcedure(work);
-        return retval;
+    public AdHocPlannedStmtBatch plan(String sql, Object[] userParams, boolean singlePartition) throws AdHocPlanningException {
+
+        List<String> sqlStatements = new ArrayList<>();
+        AdHocSQLMix mix = AdHocNTBase.processAdHocSQLStmtTypes(sql, sqlStatements);
+
+        switch (mix) {
+        case EMPTY:
+            throw new AdHocPlanningException("No valid SQL found.");
+        case ALL_DDL:
+        case MIXED:
+            throw new AdHocPlanningException("DDL not supported in stored procedures.");
+        default:
+            break;
+        }
+
+        if (sqlStatements.size() != 1) {
+            throw new AdHocPlanningException("Only one statement is allowed in stored procedure, but received " + sqlStatements.size());
+        }
+
+        sql = sqlStatements.get(0);
+
+        // any object will signify SP
+        Object partitionKey = singlePartition ? "1" : null;
+
+        List<AdHocPlannedStatement> stmts = new ArrayList<>();
+        AdHocPlannedStatement result = null;
+
+        result = AdHocNTBase.compileAdHocSQL(m_catalogContext,
+                                             sql,
+                                             false,
+                                             partitionKey,
+                                             ExplainMode.NONE,
+                                             false,
+                                             userParams);
+        stmts.add(result);
+
+
+        return new AdHocPlannedStmtBatch(userParams,
+                                         stmts,
+                                         -1,
+                                         null,
+                                         null,
+                                         userParams);
     }
 }
