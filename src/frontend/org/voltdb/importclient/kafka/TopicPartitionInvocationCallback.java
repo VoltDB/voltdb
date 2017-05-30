@@ -57,4 +57,8 @@ public class TopicPartitionInvocationCallback implements ProcedureCallback
             m_pauseOffset.accumulateAndGet(m_offset, new PausedOffsetCalculator());
         }
     }
+
+    public long getOffset() {
+        return m_offset;
+    }
 }

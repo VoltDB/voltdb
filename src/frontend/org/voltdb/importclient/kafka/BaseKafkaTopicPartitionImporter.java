@@ -454,7 +454,6 @@ public abstract class BaseKafkaTopicPartitionImporter {
                                 messageAndOffset.nextOffset(), callbackTracker, m_gapTracker, m_dead, m_pauseOffset);
 
                         if (m_wrapper.hasTransaction()) {
-                            //if (callProcedure(new Invocation(m_config.getProcedure(), params), cb)) {
                             if (executeVolt(params, cb)) {
                                 callbackTracker.produceWork();
                             }

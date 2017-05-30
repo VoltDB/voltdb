@@ -21,7 +21,6 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +36,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -357,9 +357,53 @@ public class KafkaLoader2 implements ImporterSupport {
         @Override
         public boolean executeVolt(Object[] params, TopicPartitionInvocationCallback cb) {
            try {
-               // NEEDSWORK: What to do with the callback?
-               System.out.println(Arrays.toString(params));
-               m_loader.insertRow(new RowWithMetaData("some message", 999), params);
+               m_loader.insertRow(new RowWithMetaData(StringUtils.join(params, ","), cb.getOffset()), params);
+               cb.clientCallback(new ClientResponse() {
+
+                   @Override
+                   public int getClientRoundtrip() {
+                       // TODO Auto-generated method stub
+                       return 0;
+                   }
+
+                   @Override
+                   public int getClusterRoundtrip() {
+                       // TODO Auto-generated method stub
+                       return 0;
+                   }
+
+                   @Override
+                   public String getStatusString() {
+                       return null;
+                   }
+
+                   @Override
+                   public VoltTable[] getResults() {
+                       return null;
+                   }
+
+                   @Override
+                   public byte getStatus() {
+                       return ClientResponse.SUCCESS;
+                   }
+
+                   @Override
+                   public byte getAppStatus() {
+                       return 0;
+                   }
+
+                   @Override
+                   public String getAppStatusString() {
+                       return null;
+                   }
+
+                   @Override
+                   public long getClientRoundtripNanos() {
+                       // TODO Auto-generated method stub
+                       return 0;
+                   }
+               });
+
            }
            catch (Exception e) {
                e.printStackTrace();
