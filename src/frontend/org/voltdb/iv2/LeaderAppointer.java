@@ -34,6 +34,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -54,8 +55,8 @@ import org.voltdb.ReplicationRole;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
@@ -96,10 +97,6 @@ public class LeaderAppointer implements Promotable
     private final boolean m_expectingDrSnapshot;
     private final AtomicBoolean m_snapshotSyncComplete = new AtomicBoolean(false);
     private final KSafetyStats m_stats;
-    private HostMessenger m_messenger;
-
-    private final AtomicReference<ImmutableSortedMap<Integer, Host>> m_hostInfoMap =
-            new AtomicReference<ImmutableSortedMap<Integer, Host>>();
 
     /*
      * Track partitions that are cleaned up during election/promotion etc.
@@ -119,6 +116,10 @@ public class LeaderAppointer implements Promotable
         final int m_partitionId;
         final Set<Long> m_replicas;
         long m_currentLeader;
+
+        //A candidate to host partition leader when nodes are down
+        //It is calculated when nodes are down.
+        int newLeaderHostId = -1;
 
         /** Constructor used when we know (or think we know) who the leader for this partition is */
         PartitionCallback(int partitionId, long currentLeader)
@@ -204,7 +205,7 @@ public class LeaderAppointer implements Promotable
             } else {
                 Set<Integer> hostsOnRing = new HashSet<Integer>();
                 // Check for k-safety
-                if (!isClusterKSafe(hostsOnRing)) {
+                if (!isClusterKSafe(hostsOnRing, null)) {
                     VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
                             false, null);
                 }
@@ -233,6 +234,52 @@ public class LeaderAppointer implements Promotable
             m_replicas.clear();
             m_replicas.addAll(updatedHSIds);
         }
+
+        private long assignLeader(int partitionId, List<Long> children)
+        {
+            // We used masterHostId = -1 as a way to force the leader choice to be
+            // the first replica in the list, if we don't have some other mechanism
+            // which has successfully overridden it.
+            int masterHostId = -1;
+            if (m_state.get() == AppointerState.CLUSTER_START) {
+                try {
+                    // find master in topo
+                    JSONArray parts = m_topo.getJSONArray(AbstractTopology.TOPO_PARTITIONS);
+                    for (int p = 0; p < parts.length(); p++) {
+                        JSONObject aPartition = parts.getJSONObject(p);
+                        int pid = aPartition.getInt(AbstractTopology.TOPO_PARTITION_ID);
+                        if (pid == partitionId) {
+                            masterHostId = aPartition.getInt(AbstractTopology.TOPO_MASTER);
+                            break;
+                        }
+                    }
+                } catch (JSONException jse) {
+                    tmLog.error("Failed to find master for partition " + partitionId + ", defaulting to 0");
+                    masterHostId = -1;
+                }
+            } else {
+
+                //node down
+                masterHostId = newLeaderHostId;
+                newLeaderHostId = -1;
+            }
+
+            long masterHSId = children.get(0);
+            for (Long child : children) {
+                if (CoreUtils.getHostIdFromHSId(child) == masterHostId) {
+                    masterHSId = child;
+                    break;
+                }
+            }
+            tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
+                        partitionId);
+            try {
+                m_iv2appointees.put(partitionId, masterHSId);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
+            }
+            return masterHSId;
+        }
     }
 
     /* We'll use this callback purely for startup so we can discover when all
@@ -246,7 +293,7 @@ public class LeaderAppointer implements Promotable
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 try {
                     if (currentLeaders.size() == getInitialPartitionCount()) {
-                       tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
+                        tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
                         m_state.set(AppointerState.DONE);
                         m_MPI.acceptPromotion();
                         m_startupLatch.set(null);
@@ -255,24 +302,6 @@ public class LeaderAppointer implements Promotable
                     // This should never happen
                     VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
                 }
-            }
-            Set<Integer> liveHosts = m_messenger.getLiveHostIds();
-            Map<Integer, Host> hostLeaderMap = Maps.newHashMap();
-            for (Long site: currentLeaders) {
-                //filter our dead hosts
-                int hostId = CoreUtils.getHostIdFromHSId(site);
-                if (liveHosts.contains(hostId)) {
-                    Host host = hostLeaderMap.get(hostId);
-                    if (host == null) {
-                        host = new Host(hostId);
-                        hostLeaderMap.put(hostId, host);
-                    }
-                    host.increasePartitionLeader();
-                }
-            }
-            m_hostInfoMap.set(ImmutableSortedMap.copyOf(hostLeaderMap));
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[LeaderAppointer]Updated leaders: " + CoreUtils.hsIdCollectionToString(currentLeaders));
             }
         }
     };
@@ -304,26 +333,31 @@ public class LeaderAppointer implements Promotable
         }
     };
 
-    public static class Host implements Comparable<Host> {
-        public final int id;
-        public int partitionLeaders;
-        private Host(int id) {
+    private static class Host implements Comparable<Host> {
+        final int id;
+        int leaderCount;
+        Set<Integer> partitions = Sets.newHashSet();
+        Host(int id) {
             this.id = id;
-            partitionLeaders = 0;
+            leaderCount = 0;
         }
 
         public void increasePartitionLeader() {
-            partitionLeaders++;
+            leaderCount++;
+        }
+
+        public void addPartition(int partitionId) {
+            partitions.add(partitionId);
         }
 
         @Override
         public String toString() {
-            return String.format("Host %d has %d partition leaders", id, partitionLeaders);
+            return String.format("Host ID: %d,leader count: %d, partitions: %s", id, leaderCount, partitions.toString());
         }
 
         @Override
         public int compareTo(Host o) {
-            return (this.partitionLeaders - o.partitionLeaders);
+            return (this.leaderCount - o.leaderCount);
         }
     }
 
@@ -335,7 +369,6 @@ public class LeaderAppointer implements Promotable
                            KSafetyStats stats,
                            boolean expectingDrSnapshot)
     {
-        m_messenger = hm;
         m_zk = hm.getZK();
         m_kfactor = kfactor;
         m_topo = topology;
@@ -347,7 +380,6 @@ public class LeaderAppointer implements Promotable
         m_iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_masterCallback);
         m_stats = stats;
         m_expectingDrSnapshot = expectingDrSnapshot;
-
     }
 
     @Override
@@ -521,55 +553,7 @@ public class LeaderAppointer implements Promotable
         m_partitionWatchers.put(pid, babySitter);
     }
 
-    private long assignLeader(int partitionId, List<Long> children)
-    {
-        // We used masterHostId = -1 as a way to force the leader choice to be
-        // the first replica in the list, if we don't have some other mechanism
-        // which has successfully overridden it.
-        int masterHostId = -1;
-        if (m_state.get() == AppointerState.CLUSTER_START) {
-            try {
-                // find master in topo
-                JSONArray parts = m_topo.getJSONArray(AbstractTopology.TOPO_PARTITIONS);
-                for (int p = 0; p < parts.length(); p++) {
-                    JSONObject aPartition = parts.getJSONObject(p);
-                    int pid = aPartition.getInt(AbstractTopology.TOPO_PARTITION_ID);
-                    if (pid == partitionId) {
-                        masterHostId = aPartition.getInt(AbstractTopology.TOPO_MASTER);
-                        break;
-                    }
-                }
-            }
-            catch (JSONException jse) {
-                tmLog.error("Failed to find master for partition " + partitionId + ", defaulting to 0");
-                jse.printStackTrace();
-                masterHostId = -1;
-            }
-        }
-        else {
-            masterHostId = findHostForPartitionLeader(partitionId, children);
-            tmLog.info(String.format("Found new host %d for partition %d", masterHostId, partitionId));
-        }
-
-        long masterHSId = children.get(0);
-        for (Long child : children) {
-            if (CoreUtils.getHostIdFromHSId(child) == masterHostId) {
-                masterHSId = child;
-                break;
-            }
-        }
-        tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
-                    partitionId);
-        try {
-            m_iv2appointees.put(partitionId, masterHSId);
-        }
-        catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
-        }
-        return masterHSId;
-    }
-
-    public boolean isClusterKSafe(Set<Integer> hostsOnRing)
+    public boolean isClusterKSafe(Set<Integer> hostsOnRing, Set<Integer> failedHosts)
     {
         boolean retval = true;
         List<String> partitionDirs = null;
@@ -599,10 +583,11 @@ public class LeaderAppointer implements Promotable
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
+        Map<Integer, Host> hostLeaderMap = Maps.newHashMap();
+        ImmutableMap<Integer, Long> masters = m_iv2masters.pointInTimeCache();
         final long statTs = System.currentTimeMillis();
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
-
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
                 // The data of the partition dir indicates whether the partition has finished
@@ -633,6 +618,16 @@ public class LeaderAppointer implements Promotable
                         final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                         final int hostId = CoreUtils.getHostIdFromHSId(hsId);
                         hostsOnRing.add(hostId);
+
+                        //The appointer with master LeaderCache started.
+                        if (failedHosts != null && !masters.isEmpty() && !(failedHosts.contains(hostId))) {
+                            Host host = hostLeaderMap.get(hostId);
+                            if (host == null) {
+                                host = new Host(hostId);
+                                hostLeaderMap.put(hostId, host);
+                            }
+                            host.addPartition(pid);
+                        }
                     }
                 }
                 if (!isInitializing && !partitionNotOnHashRing) {
@@ -645,8 +640,29 @@ public class LeaderAppointer implements Promotable
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
-        m_stats.setSafetySet(lackingReplication.build());
 
+        //calculate partition leaders when RealVoltDB.hostsFailed in invoked.
+        if (!hostLeaderMap.isEmpty() && failedHosts != null) {
+            for (Map.Entry<Integer, Long> entry: masters.entrySet()) {
+
+                //ignore MPI
+                if (entry.getKey() == MpInitiator.MP_INIT_PID) continue;
+                int hostId = CoreUtils.getHostIdFromHSId(entry.getValue());
+
+                //ignore the failed hosts
+                if (failedHosts.contains(hostId)) continue;
+                Host host = hostLeaderMap.get(hostId);
+                if (host == null) {
+                    host = new Host(hostId);
+                    hostLeaderMap.put(hostId, host);
+                }
+
+                host.increasePartitionLeader();
+                host.addPartition(entry.getKey());
+            }
+            calculateNewPartitionLeaders(hostLeaderMap);
+        }
+        m_stats.setSafetySet(lackingReplication.build());
         return retval;
     }
 
@@ -731,54 +747,39 @@ public class LeaderAppointer implements Promotable
     }
 
     /**
-     * On a partition call back, an accurate and real time view of the whole topology is not guaranteed.
-     * Thus the placement of partition leaders to their new hosts may not be optimal.
-     * The new host for a partition is assigned based on the topology the partition callback can see at this moment.
-     * @param partitionId The partition id
-     * @param replicas  A list of existing sites for the partition
-     * @return the new host id
+     * On a partition call back, an accurate view of the whole topology is not guaranteed since every partition callback
+     * tries to determine its new leader. The placement of partition leaders is calculated before partition callback
+     * are triggered. If the topology is changed after the new leaders are calculated, the site with the lowest host id
+     * will be picked up as the new leader.
+     * @param leaderHostMap the partition leader info
+     * @param failedHosts  the failed hosts
      */
-    private int findHostForPartitionLeader(int partitionId, List<Long> replicas){
-        Set<Integer> candidateHost = Sets.newHashSet();
-        for (Long site : replicas) {
-            candidateHost.add(CoreUtils.getHostIdFromHSId(site));
+    private void calculateNewPartitionLeaders(Map<Integer, Host> leaderHostMap){
+        if (leaderHostMap.isEmpty() || m_callbacks.isEmpty()) {
+            return;
         }
+        // iterate through all partitions to see if its current leaders are on the failed hosts.
+        for (PartitionCallback cb : m_callbacks.values()) {
+            SortedSet<Host> hosts = new TreeSet<Host>();
+            hosts.addAll(leaderHostMap.values());
+            for (Host host : hosts) {
+                int hostId = CoreUtils.getHostIdFromHSId(cb.m_currentLeader);
 
-        ImmutableSortedMap<Integer, Host> masterCountByHost = m_hostInfoMap.get();
-        Set<Integer> liveHosts = m_messenger.getLiveHostIds();
-
-        //check newly joined hosts.If a newly joined host has the replica,
-        //put the master on it since a newly joined host does not have masters on it
-        for (Integer hostId : liveHosts) {
-            if (candidateHost.contains(hostId) && !masterCountByHost.containsKey(hostId)) {
-                Map<Integer, Host> currentCountMap = Maps.newHashMap();
-                currentCountMap.putAll(masterCountByHost);
-                Host host = new Host(hostId);
-                host.increasePartitionLeader();
-                currentCountMap.put(hostId, host);
-                m_hostInfoMap.set(ImmutableSortedMap.copyOf(currentCountMap));
-                return hostId;
-            }
-        }
-
-        //Find a host with the partition but with the least number of masters
-        SortedSet<Host> hosts = new TreeSet<Host>();
-        hosts.addAll(masterCountByHost.values());
-        if (tmLog.isDebugEnabled()) {
-            StringBuilder builder = new StringBuilder("[findHostForPartitionLeader]:");
-            builder.append(" partition:" + partitionId);
-            builder.append("\nHost Info:" + hosts);
-            tmLog.debug(builder.toString());
-        }
-        for (Host host : hosts) {
-            if (candidateHost.contains(host.id)) {
-                host.increasePartitionLeader();
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("[findHostForPartitionLeader]: found host " + host.id + " for partition " + partitionId);
+                //The partition has a valid leader
+                if (leaderHostMap.containsKey(hostId)) {
+                    continue;
                 }
-                return host.id;
+
+                //The host does not have this partition
+                if (!(host.partitions.contains(cb.m_partitionId))) {
+                    continue;
+                }
+
+                //find the host which has the lowest leader count.
+                host.increasePartitionLeader();
+                cb.newLeaderHostId = host.id;
+                break;
             }
         }
-        return -1;
     }
 }

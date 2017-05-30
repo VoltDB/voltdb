@@ -1616,7 +1616,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // before allowing the fault log to be updated by the notifications
                     // generated below.
                     Set<Integer> hostsOnRing = new HashSet<>();
-                    if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
+                    if (!m_leaderAppointer.isClusterKSafe(hostsOnRing, failedHosts)) {
                         VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
                                 false, null);
                         return;
