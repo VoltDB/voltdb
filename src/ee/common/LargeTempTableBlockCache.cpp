@@ -43,21 +43,28 @@ namespace voltdb {
     }
 
     LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
-        LargeTempTableBlock *block = m_idToBlockMap[blockId]->get();
-        if (! block->isResident()) {
+        auto mapIt = m_idToBlockMap.find(blockId);
+        assert (mapIt != m_idToBlockMap.end());
+        auto listIt = mapIt->second;
+        if (! (*listIt)->isResident()) {
             Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
-            bool rc = topend->loadLargeTempTableBlock(block->id(), block);
+            bool rc = topend->loadLargeTempTableBlock((*listIt)->id(), listIt->get());
             assert(rc);
-            assert (block->isPinned());
+            assert ((*listIt)->isPinned());
         }
         else {
-            block->pin();
+            (*listIt)->pin();
         }
 
         // Also need to move it to the front of the queue.
+        std::unique_ptr<LargeTempTableBlock> blockPtr;
+        blockPtr.swap(*listIt);
 
+        m_blockList.erase(listIt);
+        m_blockList.emplace_front(std::move(blockPtr));
+        m_idToBlockMap[blockId] = m_blockList.begin();
 
-        return block;
+        return m_blockList.begin()->get();
     }
 
     void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
