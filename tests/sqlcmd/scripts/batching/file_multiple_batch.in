@@ -1,0 +1,3 @@
+drop table people if exists;
+
+FILE -batch ./scripts/batching/1.sql ./scripts/batching/2.sql
