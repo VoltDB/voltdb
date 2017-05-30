@@ -47,6 +47,8 @@ public class TestEmptySchema extends RegressionSuite
     }
 
     public void testEmptySchema() throws Exception {
+        System.out.println("=============================== Entering testEmptySchema ==========================");
+
         final Client client = getClient();
         // sleep a little so that we have time for the IPC backend to actually be running
         // so it can screw us on empty results
@@ -98,6 +100,13 @@ public class TestEmptySchema extends RegressionSuite
         validateSchema(results[0], expectedTable);
     }
 
+    /*
+     * Another method to test the validity of the string search utilities for the logs.
+     */
+    public void testEmptySchemaWithLogSearch() throws Exception {
+
+    }
+
     static public Test suite() throws IOException {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestEmptySchema.class);
@@ -105,7 +114,8 @@ public class TestEmptySchema extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalCluster config = new LocalCluster("decimal-default.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster("decimal-default.jar", 2, 3, 0, BackendTarget.NATIVE_EE_JNI);
+
         success = config.compile(project);
         assertTrue(success);
 
