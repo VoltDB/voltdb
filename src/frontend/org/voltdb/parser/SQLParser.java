@@ -1436,14 +1436,10 @@ public class SQLParser extends SQLPatternFactory
             remainder = remainder.substring(batchMatcher.end(), remainder.length());
         }
 
-        //Matcher filenameMatcher = FilenameToken.matcher(remainder);
-        //String filename = null;
-
         // remove spaces before and after filenames
         remainder = remainder.trim();
 
         // split filenames assuming they are separated by space ignoring spaces within quotes
-        //String[] filenames = remainder.split("\\s+");
         List<String> filenames = new ArrayList<String>();
         Pattern regex = Pattern.compile("[^\\s\"']+|'[^']*'");
         Matcher regexMatcher = regex.matcher(remainder);
@@ -1451,26 +1447,10 @@ public class SQLParser extends SQLPatternFactory
             filenames.add(regexMatcher.group());
         }
 
-        // Use matches to match all input, not just beginning
-        /*if (filenameMatcher.matches()) {
-            filename = filenameMatcher.group(1);
-
-            // Trim whitespace from beginning and end of the file name.
-            // User may have wanted quoted whitespace at the beginning or end
-            // of the file name, but that seems very unlikely.
-            filename = filename.trim();
-        }*/
-
-        // If no filename, or a filename of only spaces, then throw an error.
-        /*if (filename == null || filename.length() == 0) {
-            String msg = String.format("Did not find valid file name in \"file%s\" command.",
-                    option == FileOption.BATCH ? " -batch" : "");
-            throw new SQLParser.Exception(msg);
-        }*/
-
         filesInfo = new ArrayList<FileInfo>();
         for (String filename: filenames) {
             Matcher filenameMatcher = FilenameToken.matcher(filename);
+            // Use matches to match all input, not just beginning
             if (filenameMatcher.matches()) {
                 filename = filenameMatcher.group(1);
 
@@ -1486,7 +1466,7 @@ public class SQLParser extends SQLPatternFactory
             }
         }
 
-     // If no filename, or a filename of only spaces, then throw an error.
+        // If no filename, or a filename of only spaces, then throw an error.
         if ( filesInfo.size() == 0 ) { //  filenames.length == 1 && filenames[0].length() == 0) {
             String msg = String.format("Did not find valid file name in \"file%s\" command.",
                     option == FileOption.BATCH ? " -batch" : "");
@@ -1494,13 +1474,6 @@ public class SQLParser extends SQLPatternFactory
         }
 
         return filesInfo;
-        /*filename = filenames[0];
-        if (filename.startsWith("~")) {
-            filename = filename.replaceFirst("~", System.getProperty("user.home"));
-        }
-
-        return new FileInfo(parentContext, option, filename);*/
-
     }
     /**
      * Parse FILE statement for interactive sqlcmd (or simple tests).
