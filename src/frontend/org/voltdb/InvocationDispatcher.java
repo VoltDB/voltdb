@@ -464,6 +464,14 @@ public final class InvocationDispatcher {
                         procName + " is not available to this client",
                         task.clientHandle);
             }
+
+            // After we verify the shutdown command from an admin user, the detailed information
+            // should be printed out properly. The following message is printed at the node where
+            // the client is connected to.
+            if ("@PrepareShutdown".equals(procName)) {
+                String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a PrepareShutdown.";
+                CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
+            }
         }
         // If you're going to copy and paste something, CnP the pattern
         // up above.  -rtb.

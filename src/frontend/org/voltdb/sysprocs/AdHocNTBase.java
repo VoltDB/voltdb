@@ -44,6 +44,8 @@ import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
+import com.google_voltpatches.common.base.Charsets;
+
 /**
  * Base class for non-transactional sysprocs AdHoc, AdHocSPForTest and SwapTables
  *
@@ -77,25 +79,26 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * @param batch  planned statement batch
      */
     private void logBatch(final CatalogContext context,
-                          final String[] sqlStatements,
-                          final Object[] userParams,
-                          final AdHocPlannedStmtBatch batch)
+                          final AdHocPlannedStmtBatch batch,
+                          final Object[] userParams)
     {
-        final int numStmts = sqlStatements.length;
-        final int numParams = userParams.length;
+        final int numStmts = batch.getPlannedStatementCount();
+        final int numParams = userParams == null ? 0 : userParams.length;
         final String readOnly = batch.readOnly ? "yes" : "no";
         final String singlePartition = batch.isSinglePartitionCompatible() ? "yes" : "no";
         final String user = getUsername();
         final String[] groupNames = context.authSystem.getGroupNamesForUser(user);
         final String groupList = StringUtils.join(groupNames, ',');
 
+        //String[] stmtArray = batch.stmts.stream().map(s -> new String(s.sql, Charsets.UTF_8)).toArray(String[]::new);
+
         adhocLog.debug(String.format(
             "=== statements=%d parameters=%d read-only=%s single-partition=%s user=%s groups=[%s]",
             numStmts, numParams, readOnly, singlePartition, user, groupList));
-        if (sqlStatements != null) {
-            for (int i = 0; i < sqlStatements.length; ++i) {
-                adhocLog.debug(String.format("Statement #%d: %s", i + 1, sqlStatements[i]));
-            }
+        for (int i = 0; i < batch.getPlannedStatementCount(); i++) {
+            AdHocPlannedStatement stmt = batch.getPlannedStatement(i);
+            String sql = stmt.sql == null ? "SQL_UNKNOWN" : new String(stmt.sql, Charsets.UTF_8);
+            adhocLog.debug(String.format("Statement #%d: %s", i + 1, sql));
         }
         if (userParams != null) {
             for (int i = 0; i < userParams.length; ++i) {
@@ -313,7 +316,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                           userPartitionKey == null ? null : new Object[] { userPartitionKey });
 
         if (adhocLog.isDebugEnabled()) {
-            logBatch(context, stmts.toArray(new String[0]), userParamSet, plannedStmtBatch);
+            logBatch(context, plannedStmtBatch, userParamSet);
         }
 
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);

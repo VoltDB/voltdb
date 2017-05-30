@@ -80,6 +80,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 "SP", agent, startAction);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
+        ((SpScheduler)m_scheduler).m_repairLog = m_repairLog;
     }
 
     @Override
