@@ -16,32 +16,55 @@
  */
 package org.voltdb.planner.microoptimizations;
 
+import org.voltdb.planner.ScanPlanNodeWhichCanHaveInlineInsert;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.InsertPlanNode;
 
 public class MakeInsertNodesInlineIfPossible extends MicroOptimization {
 
     @Override
     protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan) {
-        /*
         AbstractPlanNode answer = null;
         for (AbstractPlanNode node = plan, child = null;
-                node != plan;
+                node != null;
                 node = child) {
             child = (node.getChildCount() > 0) ? node.getChild(0) : null;
-            InlinableScanPlanNode planNode
-              = (node instanceof InlinableScanPlanNode)
-                    ? ((InlinableScanPlanNode)node)
-                    : null;
-            // If we have a sequential scan node without an inline aggregate
-            // node, then we can inline the insert node.
-            if (planNode != null
-                    && ( ! planNode.hasInlineAggregateNode())) {
-                planNode.addInlinePlanNode(insertNode);
-                root = planNode.getAbstractNode();
+            /*
+             * Look for an insert node whose (first) child is
+             * a ScanPlanNodeWhichCanHaveInlineInsert.
+             */
+            if (node instanceof InsertPlanNode) {
+                InsertPlanNode insertNode = (InsertPlanNode)node;
+                ScanPlanNodeWhichCanHaveInlineInsert targetNode
+                  = (child instanceof ScanPlanNodeWhichCanHaveInlineInsert)
+                        ? ((ScanPlanNodeWhichCanHaveInlineInsert)child)
+                        : null;
+                // If we have a sequential scan node without an inline aggregate
+                // node, which is also not an then we can inline the insert node.
+                if (child != null
+                        && ( targetNode != null )
+                        && ( ! insertNode.isUpsert())
+                        && ( ! targetNode.hasInlineAggregateNode())) {
+                    AbstractPlanNode parent = (insertNode.getParentCount() > 0) ? insertNode.getParent(0) : null;
+                    targetNode.addInlinePlanNode(insertNode);
+                    if (parent != null) {
+                        parent.clearChildren();
+                        targetNode.getAbstractNode().clearParents();
+                        parent.addAndLinkChild(targetNode.getAbstractNode());
+                    } else {
+                        answer = targetNode.getAbstractNode();
+                    }
+                }
             }
-         *
-         */
+        }
+        if (answer != null) {
+            return answer;
+        }
         return plan;
     }
 
+    @Override
+    MicroOptimizationRunner.Phases getPhase() {
+        return MicroOptimizationRunner.Phases.AFTER_BEST_SELECTION;
+    }
 }
