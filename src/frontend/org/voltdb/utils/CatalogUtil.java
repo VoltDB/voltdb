@@ -738,6 +738,7 @@ public abstract class CatalogUtil {
             // Anything that goes wrong anywhere in trying to handle the deployment file
             // should return an error, and let the caller decide what to do (crash or not, for
             // example)
+            e.printStackTrace(); // BSDBG
             errmsg = "Error validating deployment configuration: " + e.getMessage();
             hostLog.error(errmsg);
             return errmsg;

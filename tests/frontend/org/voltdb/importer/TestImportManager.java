@@ -25,9 +25,33 @@ package org.voltdb.importer;
 
 import static org.junit.Assert.*;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
+import org.voltdb.VoltDB;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.*;
+import org.voltdb.importclient.junit.JUnitImporter;
+import org.voltdb.importclient.junit.JUnitImporterConfig;
+import org.voltdb.importclient.junit.JUnitImporterEventExaminer;
+import org.voltdb.importclient.junit.JUnitImporterMessenger;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
+import org.voltdb.utils.CatalogUtil;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.net.URI;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by bshaw on 5/26/17.
@@ -41,25 +65,139 @@ public class TestImportManager {
     private MockChannelDistributer m_mockChannelDistributer = null;
     private ImporterStatsCollector m_statsCollector = null;
 
-    private static CatalogContext buildMockCatalogContext() throws Exception {
-        return null; // new CatalogContext(); // TODO this is going to be a lot of work to mock - perhaps look into cheap ways to make real ones?!
+    private CatalogContext m_initialCatalogContext = null;
+
+    private static final int RESTART_CHECK_MAX_MS              = (int) TimeUnit.SECONDS.toMillis(5);
+    private static final int RESTART_CHECK_POLLING_INTERVAL_MS = 500;
+
+    private static final boolean DEFAULT_CATALOG_ENABLES_COMMAND_LOG = false; // this is used to generate non-importer-related config changes
+
+
+    public class DetectImporterRestart implements JUnitImporterEventExaminer {
+
+        private Set<URI> m_importersWithRestarts = new HashSet<>();
+
+        public Set<URI> getImportersWithRestarts() {
+            return m_importersWithRestarts;
+        }
+
+        @Override
+        public void examine(Map<URI, List<JUnitImporter.Event>> eventTracker) {
+            // TODO: detect the pattern which indicates an importer restarted and add applicable importers to the set.
+        }
+    }
+
+    /** Builds a CatalogContext for the import manager to use.
+     * @param numKafkaTopics Number of Kafka topics to use. Supply 0 to disable all importers.
+     * @param enableCommandLogs Whether or not command logs should be on. This is to allow testing how an unrelated change affects importer behavior.
+     * @return Catalog context
+     * @throws Exception upon error or test failure
+     */
+    private static CatalogContext buildMockCatalogContext(int numKafkaTopics, boolean enableCommandLogs) throws Exception {
+
+        // create a dummy catalog to load deployment info into
+        Catalog catalog = new Catalog();
+        // Need these in the dummy catalog
+        Cluster cluster = catalog.getClusters().add("cluster");
+        cluster.getDatabases().add("database");
+        HostMessenger dummyHostMessenger = new HostMessenger(new HostMessenger.Config(), null);
+        DbSettings dbSettings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
+        //CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, new byte[]{}, null, new byte[0], 0, dummyHostMessenger);
+
+        /*
+        DeploymentType inMemoryDeployment = new ObjectFactory().createDeploymentType();
+        CatalogUtil.populateDefaultDeployment(inMemoryDeployment);
+        ImportType importType = new ImportType();
+        List<ImportConfigurationType> importerConfig = importType.getConfiguration();
+
+        for (int i = 0; i < numKafkaTopics; i++) {
+            ImportConfigurationType importerConfig = new ImportConfigurationType();
+            importerConfig.setType();
+            importerConfig.add();
+            new JUnitImporterConfig()
+        }
+
+        inMemoryDeployment.setImport(importType);
+        */
+
+        VoltProjectBuilder projectBuilder = new VoltProjectBuilder();
+        for (int i = 0; i < numKafkaTopics; i++) {
+            Properties importerProperties = new Properties();
+            importerProperties.setProperty(ImportDataProcessor.IMPORT_PROCEDURE, "procedure" + i);
+            projectBuilder.addImport(true, "custom", null, JUnitImporterConfig.URI_SCHEME + ".jar", importerProperties);
+        }
+        projectBuilder.configureLogging(false, enableCommandLogs, 100, 1000, 10000);
+        File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly("voltdbroot", 1, 1, 0, 0));
+
+        System.out.println("Deployment file written to " + deploymentFilePath.getCanonicalPath());
+
+        byte[] deploymentBytes = new byte[(int) deploymentFilePath.length()];
+        new FileInputStream(deploymentFilePath).read(deploymentBytes);
+        DeploymentType inMemoryDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+        assertNotNull("Error parsing deployment schema - see log file for details", inMemoryDeployment);
+
+        // NOTE: this is borrowed from RealVoltDB.readDeploymentAndCreateStarterCatalogContext() at the very end
+        String result = CatalogUtil.compileDeployment(catalog, inMemoryDeployment, true);
+        assertTrue(result, result == null); // Any other non-enterprise deployment errors will be caught and handled here
+
+        CatalogContext context = new CatalogContext(
+                TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
+                0, //timestamp
+                catalog,
+                dbSettings,
+                new byte[] {},
+                null,
+                deploymentBytes, // literal bytes for deployment
+                0,
+                dummyHostMessenger);
+
+        return context;
     }
 
     /** Before test setup code.
      * NOTE: ImportManager is a singleton.
-     * @throws Exception
+     * @throws Exception upon error or test failure.
      */
     @Before
     public void setUp() throws Exception {
-        CatalogContext mockCatalogV1 = buildMockCatalogContext();
+        CatalogContext catalogContextWith3Kafka = buildMockCatalogContext(3, false);
+
         m_mockChannelDistributer = new MockChannelDistributer(Integer.toString(HOSTID));
         m_statsCollector = new ImporterStatsCollector(SITEID);
-        ImportManager.initializeWithMocks(HOSTID, mockCatalogV1, m_mockChannelDistributer, m_statsCollector);
+        ImportManager.initializeWithMocks(HOSTID, catalogContextWith3Kafka, m_mockChannelDistributer, m_statsCollector);
+        m_initialCatalogContext = catalogContextWith3Kafka;
         m_manager = ImportManager.instance();
     }
 
+    @After
+    public void tearDown() throws Exception {
+        m_manager = null;
+        m_initialCatalogContext = null;
+    }
+
+    private boolean checkForImporterRestart() throws Exception {
+        System.out.println("Waiting up to " + TimeUnit.MILLISECONDS.toSeconds(RESTART_CHECK_MAX_MS) + " seconds for importers to restart.");
+
+        // FIXME: this is the OPPOSITE of what I need! I need one with all importers, not none of them!
+        Set<URI> expectedImporterSet = new HashSet<>();
+
+        for (int i = 0; i < RESTART_CHECK_MAX_MS / RESTART_CHECK_POLLING_INTERVAL_MS; i++) {
+            Thread.sleep(RESTART_CHECK_POLLING_INTERVAL_MS);
+            DetectImporterRestart detector = new DetectImporterRestart();
+            JUnitImporterMessenger.instance().checkEventList(detector);
+            if (detector.getImportersWithRestarts().equals(expectedImporterSet)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Test
-    public void testDev() throws Exception {
-        //m_manager.
+    public void testImporterRestartDeploymentChanges() throws Exception {
+        CatalogContext catalogContextWithoutKafka = buildMockCatalogContext(0, DEFAULT_CATALOG_ENABLES_COMMAND_LOG);
+
+        m_manager.updateCatalog(catalogContextWithoutKafka);
+        m_manager.updateCatalog(m_initialCatalogContext);
+        assertEquals("Importers did not restart after importers were removed and re-added.", true, checkForImporterRestart());
     }
 }

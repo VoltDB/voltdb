@@ -223,6 +223,7 @@ public class ImportManager implements ChannelChangeCallback {
             Preconditions.checkNotNull(importBundleJar,
                     "Import source is undefined or custom import plugin class missing.");
             String procedure = properties.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
+            assert procedure != null;
             //TODO: If processors is a list dont start till all procedures exists.
             Procedure catProc = catalogContext.procedures.get(procedure);
             if (catProc == null) {
@@ -257,6 +258,8 @@ public class ImportManager implements ChannelChangeCallback {
         String attrs[] = importModuleName.split("\\|");
         String bundleJar = attrs[1];
         String moduleType = attrs[0];
+
+        System.out.println("BSDBG: bundleJar = \"" + bundleJar + "\"");
 
         try {
             AbstractImporterFactory importerFactory = m_loadedBundles.get(bundleJar);

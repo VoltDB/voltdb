@@ -5,7 +5,7 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
-    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, voltcsvformatter, kinesisstream, kafkastream10"/>
+    <target name="buildbundles" depends="junitimporter, socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, voltcsvformatter, kinesisstream, kafkastream10"/>
 
     <resources id="default.imports.resource">
         <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
@@ -26,6 +26,15 @@
     </resources>
 
     <pathconvert property="default.imports" refid="default.imports.resource" pathsep=","/>
+
+    <target name="junitimporter">
+        <antcall target="osgibundle">
+            <param name="bundle.name" value="junitimporter"/>
+            <param name="activator" value="org.voltdb.importclient.junit.JUnitImporterFactory"/>
+            <param name="bundle.displayname" value="JUnitImporter"/>
+            <param name="include.classpattern" value="junit/JUnitImporter*.class"/>
+        </antcall>
+    </target>
 
     <target name="socketstream">
         <antcall target="osgibundle">
