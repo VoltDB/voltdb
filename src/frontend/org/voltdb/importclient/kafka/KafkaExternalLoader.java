@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -231,11 +232,24 @@ public class KafkaExternalLoader implements ImporterSupport {
      */
     private Map<URI, KafkaStreamImporterConfig> createKafkaImporterConfigFromProperties(KafkaExternalLoaderCLIArguments properties) throws Exception {
 
-        // Concatenate the host:port values of each broker into one string that can be used to compute the key:
-        List<HostAndPort> brokers = getBrokersFromZookeeper(properties.zookeeper);
-        String brokersString = StringUtils.join(brokers.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
-        String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokersString);
+        // If user supplied the 'zookeeper' argument, get the list of brokers from Zookeeper. Otherwise, use the list of brokers
+        // that they supplied with the 'brokers' argument.  CLI argument validation ensures that one or the other, but not both, are supplied.
+        List<HostAndPort> brokerList;
+        String brokerListString;
 
+        if (!properties.zookeeper.trim().isEmpty()) {
+            brokerList = getBrokersFromZookeeper(properties.zookeeper);
+            brokerListString = StringUtils.join(brokerList.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
+        }
+        else {
+            brokerListString = properties.brokers.trim();
+            brokerList = Arrays.stream(brokerListString.split(",")).map(s -> HostAndPort.fromString(s)).collect(Collectors.toList());
+        }
+
+        // Derive the key from the list of broker URIs:
+        String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokerListString);
+
+        // GroupId can be specified by the command line, or dervied from the table/procedure:
         String groupId;
         if (properties.groupid == null || properties.groupid.trim().length() == 0) {
             groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
@@ -244,9 +258,10 @@ public class KafkaExternalLoader implements ImporterSupport {
             groupId = properties.groupid.trim();
         }
 
+        // Create the input formatter:
         FormatterBuilder fb = createFormatterBuilder(properties);
 
-        return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokers, properties.topic, groupId,
+        return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokerList, properties.topic, groupId,
                                                 properties.procedure, properties.timeout, properties.buffersize, KafkaImporterCommitPolicy.NONE.name(), fb);
     }
 
@@ -452,8 +467,11 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(desc = "Password for connecting to VoltDB servers")
         String password = "";
 
-        @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to. (format: zkserver:port)")
+        @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to (format: zkserver:port)")
         String zookeeper = ""; //No default here as default will clash with local voltdb cluster
+
+        @Option(shortOpt = "b", desc = "Comma-seprated list of Kafka brokers (server:port) to connect to")
+        String brokers = "";
 
         @Option(shortOpt = "f", desc = "Periodic flush interval in seconds. (default: 10)")
         int flush = 10;
@@ -491,8 +509,11 @@ public class KafkaExternalLoader implements ImporterSupport {
             if (topic.trim().isEmpty()) {
                 exitWithMessageAndUsage("Topic must be specified.");
             }
-            if (zookeeper.trim().isEmpty()) {
-                exitWithMessageAndUsage("Kafka Zookeeper must be specified.");
+            if (zookeeper.trim().isEmpty() && brokers.trim().isEmpty()) {
+                exitWithMessageAndUsage("Either Kafka Zookeeper or list of brokers must be specified.");
+            }
+            if (!zookeeper.trim().isEmpty() && !brokers.trim().isEmpty()) {
+                exitWithMessageAndUsage("Only one of Kafka Zookeeper or list of brokers can be specified.");
             }
             if (port < 0) {
                 exitWithMessageAndUsage("port number must be >= 0");
