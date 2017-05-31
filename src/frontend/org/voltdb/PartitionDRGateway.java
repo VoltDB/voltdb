@@ -142,12 +142,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                         ProducerDRGateway producerGateway,
                         StartAction startAction) throws IOException, ExecutionException, InterruptedException
     {}
-    public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
-                                          StoredProcedureInvocation spi,
-                                          ClientResponseImpl response) {}
-    public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
-                                   StoredProcedureInvocation spi,
-                                   ClientResponseImpl response) {}
+    public void onSuccessfulProcedureCall(StoredProcedureInvocation spi) {}
+    public void onSuccessfulMPCall(StoredProcedureInvocation spi) {}
     public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber,
             long lastSpUniqueId, long lastMpUniqueId, EventType eventType, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);

@@ -1428,7 +1428,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (drSequenceNumbers != null) {
             Long partitionDRSequenceNumber = drSequenceNumbers.get(m_partitionId);
             Long mpDRSequenceNumber = drSequenceNumbers.get(MpInitiator.MP_INIT_PID);
+            hostLog.info("Setting drIds " + partitionDRSequenceNumber + " and " + mpDRSequenceNumber);
             setDRSequenceNumbers(partitionDRSequenceNumber, mpDRSequenceNumber);
+            if (VoltDB.instance().getNodeDRGateway() != null && m_sysprocContext.isLowestSiteId()) {
+                VoltDB.instance().getNodeDRGateway().cacheRejoinStartDRSNs(drSequenceNumbers);
+            }
         } else if (requireExistingSequenceNumbers) {
             VoltDB.crashLocalVoltDB("Could not find DR sequence number for partition " + m_partitionId);
         }
