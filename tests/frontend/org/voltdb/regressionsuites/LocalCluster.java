@@ -803,7 +803,6 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public void startUp(boolean clearLocalDataDirectories, boolean skipInit) {
-        System.out.println("========================== Entering Startup ! ==========================");
         if (m_running) {
             return;
         }
