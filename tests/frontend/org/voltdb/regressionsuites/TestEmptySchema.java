@@ -47,8 +47,6 @@ public class TestEmptySchema extends RegressionSuite
     }
 
     public void testEmptySchema() throws Exception {
-        System.out.println("=============================== Entering testEmptySchema ==========================");
-
         final Client client = getClient();
         // sleep a little so that we have time for the IPC backend to actually be running
         // so it can screw us on empty results
