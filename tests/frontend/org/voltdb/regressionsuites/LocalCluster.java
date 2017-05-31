@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
@@ -110,7 +111,7 @@ public class LocalCluster extends VoltServerConfig {
     private boolean m_expectedToInitialize = true;
     int m_replicationPort = -1;
     // Storing the paths of the logs for each host, the 1st string is the init log,
-    // the 2nd is the host log. The file paths are stored to ease future maintenance.
+    // the 2nd is the host log. The full file paths are stored to ease future maintenance.
     Map<Integer, String[]> m_logFiles = new HashMap<>();
     // Copy of the logs stored in memory (the init logs are still left on disk, since
     // they are small anyway)
@@ -800,6 +801,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public void startUp(boolean clearLocalDataDirectories, boolean skipInit) {
+        System.out.println("========================== Entering Startup ! ==========================");
         if (m_running) {
             return;
         }
@@ -2235,8 +2237,32 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
+     * Check if the given string exists in all the init logs
+     */
+    public boolean checkAllInitLog(String str) {
+        for (Entry<Integer, String[]> tuple : m_logFiles.entrySet()) {
+            String initLogFilePath = tuple.getValue()[0];
+            if (!checkStringInFile(initLogFilePath, str)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /*
+     * Check the given string in a given host with a hostId
+     */
+    public boolean checkInitLog(int hostId, String str) {
+        String[] paths = m_logFiles.get(hostId);
+        if (paths == null) {
+            return false;
+        }
+        return checkStringInFile(paths[0], str);
+    }
+
+    /*
      * Check the given string in a given file path. This can be used to
-     * check in a given init log file.
+     * check in a given log file saved on disk.
      */
     public boolean checkStringInFile(String filePath, String str) {
         BufferedReader bReader = null;
