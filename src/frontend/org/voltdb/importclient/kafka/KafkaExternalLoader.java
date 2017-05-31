@@ -470,7 +470,7 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to (format: zkserver:port)")
         String zookeeper = ""; //No default here as default will clash with local voltdb cluster
 
-        @Option(shortOpt = "b", desc = "Comma-seprated list of Kafka brokers (server:port) to connect to")
+        @Option(shortOpt = "b", desc = "Comma-separated list of Kafka brokers (server:port) to connect to")
         String brokers = "";
 
         @Option(shortOpt = "f", desc = "Periodic flush interval in seconds. (default: 10)")
