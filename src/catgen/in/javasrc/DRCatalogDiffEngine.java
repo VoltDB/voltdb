@@ -60,7 +60,6 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
 
     public DRCatalogDiffEngine(Catalog localCatalog, Catalog remoteCatalog) {
         super(localCatalog, remoteCatalog);
-        localCatalog.getClusters().get("cluster").getDrclusterid();
     }
 
     protected void initialize(Catalog prev, Catalog next) {
