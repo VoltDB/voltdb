@@ -25,7 +25,6 @@ package org.voltdb.regressionsuites;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,19 +48,12 @@ import org.voltdb.utils.VoltFile;
 /** Tests that 'start' works with initialized schemas
  * 'init' tests can be found in TestInitStartAction
  */
-final public class TestStartWithSchema {
+final public class TestStartWithClassesOnly {
 
     static final int siteCount = 1;
     static final int hostCount = 3;
     static final int kfactor   = 0;
     static final int clusterID = 0;
-
-    static final String schema =
-            "create table HELLOWORLD (greeting varchar(30), greeterid integer, PRIMARY KEY(greeting));\n" +
-            "create procedure from class org.voltdb.compiler.procedures.SelectStarHelloWorld;";
-
-    static final String mismatchSchema =
-            "create table TEST (myval bigint not null, PRIMARY KEY(myval));";
 
     static void ensureAllCatalogDefaultArtifactsExists(InMemoryJarfile jarFile, String nameForDebugging) {
         Set<String> files = jarFile.keySet();
@@ -101,7 +93,7 @@ final public class TestStartWithSchema {
         // Creates a cluster on the local machine using NewCLI, staging the specified schema.
         // Catalog compilation is taken care of by VoltDB itself - no need to do so explicitly.
         cluster = new LocalCluster(
-                schema,
+                null,
                 null,
                 siteCount,
                 hostCount,
@@ -120,7 +112,7 @@ final public class TestStartWithSchema {
     }
 
     @Test
-    public void testMatch() throws Exception
+    public void testLoadAndStart() throws Exception
     {
         System.out.println("Start up is expected to succeed");
         boolean clearLocalDataDirectories = true;
@@ -136,6 +128,14 @@ final public class TestStartWithSchema {
         Client client = ClientFactory.createClient();
         client.createConnection("localhost", cluster.port(1));
         ClientResponse response;
+
+        //Now load the table and procedure should be successful as classes should be present.
+        response = client.callProcedure("@AdHoc", "create table HELLOWORLD (greeting varchar(30), greeterid integer, PRIMARY KEY(greeting));");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("@AdHoc", "create procedure from class org.voltdb.compiler.procedures.SelectStarHelloWorld;");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        //We should be able to utilize those artifacts.
         response = client.callProcedure("@AdHoc", "INSERT INTO HELLOWORLD VALUES ('Hello, world!', 1);");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("SelectStarHelloWorld");
@@ -144,51 +144,11 @@ final public class TestStartWithSchema {
         assertEquals(1, response.getResults()[0].getRowCount());
 
         // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
-        int nodesWithStagedCatalog = TestStartWithSchema.countNodesWithStagedCatalog(cluster);
+        int nodesWithStagedCatalog = TestStartWithClassesOnly.countNodesWithStagedCatalog(cluster);
         assertEquals(hostCount, nodesWithStagedCatalog);
 
         client.close();
         cluster.shutDown();
     }
 
-    /** Verify that one node having a staged catalog that is different prevents cluster from starting.
-     */
-    @Test
-    public void testMismatch() throws Exception
-    {
-        cluster.setMismatchSchemaForInit(mismatchSchema, 1);
-
-        System.out.println("Start up is expected to fail");
-        boolean clearLocalDataDirectories = true;
-        boolean skipInit = false;
-        try {
-            cluster.setExpectedToCrash(false); // ensure we get the exception
-            cluster.startUp(clearLocalDataDirectories, skipInit);
-            fail("Cluster started with mismatched schemas");
-        } catch (Exception e){
-            if (e.getMessage() == null || !e.getMessage().contains("external processes failed to start")){
-                throw e;
-            }
-        }
-        // cluster should already be shut down
-    }
-
-    @Test
-    public void testMissing() throws Exception
-    {
-        cluster.setMismatchSchemaForInit(null, 2); // leave node 2 bare
-
-        System.out.println("Start up is expected to fail");
-        boolean clearLocalDataDirectories = true;
-        boolean skipInit = false;
-        try {
-            cluster.startUp(clearLocalDataDirectories, skipInit);
-            fail("Cluster started with a node missing the staged schema");
-        } catch (Exception e){
-            if (e.getMessage() == null || !e.getMessage().contains("external processes failed to start")){
-                throw e;
-            }
-        }
-        // cluster should already be shut down
-    }
 }

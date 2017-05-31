@@ -301,10 +301,7 @@ public class LocalCluster extends VoltServerConfig {
                         boolean isRejoinTest,
                         Map<String, String> env)
     {
-        if (schemaToStage == null) {
-            assert catalogJarFileName != null : "Catalog jar file name is null";
-            setNewCli(isNewCli);
-        } else {
+        if (schemaToStage != null) {
             assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
             setNewCli(true);
             m_usesStagedSchema = true;
