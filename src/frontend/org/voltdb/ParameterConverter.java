@@ -249,10 +249,12 @@ public class ParameterConverter {
     {
         /* uncomment for debugging
         System.err.printf("Converting %s of type %s to type %s\n",
+
                 String.valueOf(param),
                 param == null ? "NULL" : param.getClass().getName(),
                 expectedClz.getName());
-        System.err.flush(); */
+        System.err.flush();
+        // */
 
         // Get blatant null out of the way fast, as it avoids some inline checks
         // There are some subtle null values that aren't java null coming up, but wait until
