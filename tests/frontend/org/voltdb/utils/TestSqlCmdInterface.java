@@ -523,5 +523,14 @@ public class TestSqlCmdInterface
         assertEquals("file 2.sql", filesInfo.get(1).getFile().toString());
         assertEquals("3.sql", filesInfo.get(2).getFile().toString());
 
+        filesInfo = SQLParser.parseFileStatement(null, "FILE -batch 'abc.sql' 'def.sql' 'ghi jkl.sql'");
+        assertEquals(3, filesInfo.size());
+        assertTrue(filesInfo.get(0).isBatch());
+        assertTrue(filesInfo.get(1).isBatch());
+        assertTrue(filesInfo.get(2).isBatch());
+        assertEquals("abc.sql", filesInfo.get(0).getFile().toString());
+        assertEquals("def.sql", filesInfo.get(1).getFile().toString());
+        assertEquals("ghi jkl.sql", filesInfo.get(2).getFile().toString());
+
     }
 }
