@@ -58,15 +58,17 @@ import kafka.cluster.Broker;
 
 /**
  * Import Kafka data into the database, using a remote Volt client and manual offset management.
+ *
+ * @author jcrump
+ * @since 7.4
  */
 public class KafkaExternalLoader implements ImporterSupport {
 
-    private static final VoltLogger m_log = new VoltLogger("KAFKALOADER2");
+    private static final VoltLogger m_log = new VoltLogger("KAFKAEXTERNALLOADER");
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
-
-    private final KafkaExternalLoaderCLIArguments m_config;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
 
+    private final KafkaExternalLoaderCLIArguments m_config;
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private ExecutorService m_executorService = null;
@@ -75,31 +77,9 @@ public class KafkaExternalLoader implements ImporterSupport {
         m_config = config;
     }
 
-    public void closeConsumer() throws InterruptedException {
-
-        stop();
-        if (m_executorService != null) {
-            m_executorService.shutdownNow();
-            m_executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-            m_executorService = null;
-        }
-    }
-
-    /**
-     * Close all connections and cleanup on both the sides.
+    /*
+     * Construct the infrastructure and start processing messages from Kafka
      */
-    public void close() {
-        try {
-            closeConsumer();
-            m_loader.close();
-            if (m_client != null) {
-                m_client.close();
-                m_client = null;
-            }
-        } catch (Exception ex) {
-        }
-    }
-
     private void processKafkaMessages() throws Exception {
 
         // If we need to prompt the user for a VoltDB password, do so.
@@ -111,7 +91,9 @@ public class KafkaExternalLoader implements ImporterSupport {
             c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
             c_config.enableSSL();
         }
-        c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
+
+        // Set procedure call timeout to forever:
+        c_config.setProcedureCallTimeout(0);
 
         // Create the Volt client:
         final String[] voltServers = m_config.servers.split(",");
@@ -120,16 +102,18 @@ public class KafkaExternalLoader implements ImporterSupport {
         if (m_config.useSuppliedProcedure) {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback());
         } else {
-            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.update, new KafkaBulkLoaderCallback());
+            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batchsize, m_config.update, new KafkaBulkLoaderCallback());
         }
+
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
 
         try {
-
             m_executorService = getConsumerExecutor(m_loader, this);
+
             if (m_config.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started using procedure: " + m_config.procedure);
-            } else {
+            }
+            else {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
             }
 
@@ -140,10 +124,15 @@ public class KafkaExternalLoader implements ImporterSupport {
             m_log.error("Error in Kafka Consumer", terminate);
             System.exit(-1);
         }
-        close();
+        finally {
+            close();
+        }
     }
 
-    class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler {
+    /*
+     * Error callback from the CSV loader
+     */
+    private class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler {
 
         @Override
         public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
@@ -153,15 +142,10 @@ public class KafkaExternalLoader implements ImporterSupport {
                 if (status != ClientResponse.SUCCESS) {
                     m_log.error("Failed to Insert Row: " + metaData.rawLine);
                     long fc = m_failedCount.incrementAndGet();
-                    if ((m_config.maxerrors > 0 && fc > m_config.maxerrors)
-                           || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
-                        try {
-                            m_log.error("Kafkaloader will exit.");
-                            closeConsumer();
-                            return true;
-                        }
-                        catch (InterruptedException ex) {
-                        }
+                    if ((m_config.maxerrors > 0 && fc > m_config.maxerrors) || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
+                        m_log.error("Max error count reached, exiting.");
+                        close();
+                        return true;
                     }
                 }
             }
@@ -223,19 +207,17 @@ public class KafkaExternalLoader implements ImporterSupport {
         return true;
     }
 
+    /*
+     * Create an executor with one importer per thread (per partition).
+     */
     private ExecutorService getConsumerExecutor(CSVDataLoader loader, final ImporterSupport wrapper) throws Exception {
-
-        // NEEDSWORK: We don't need the configuration to tell us how many partitions we have.  Is this OK,
-        // can we remove that value?  This will impact the doc.
-
-        // NEEDSWORK: Do we still need the Zookeeper config options?  No place for them, as it stands.
 
         Map<URI, KafkaStreamImporterConfig> configs = createKafkaImporterConfigFromProperties(m_config);
         ExecutorService executor = Executors.newFixedThreadPool(configs.size());
-        System.out.println("Created " + configs.size() + " configurations for partitions:");
+        m_log.warn("Created " + configs.size() + " configurations for partitions:");
 
         for (URI uri : configs.keySet()) {
-            System.out.println(" " + uri);
+            m_log.warn(" " + uri);
             KafkaStreamImporterConfig cfg = configs.get(uri);
             LoaderTopicPartitionImporter importer = new LoaderTopicPartitionImporter(cfg , wrapper);
             executor.submit(importer);
@@ -244,11 +226,13 @@ public class KafkaExternalLoader implements ImporterSupport {
         return executor;
     }
 
+    /*
+     * Create an importer config for each partition.
+     */
     private Map<URI, KafkaStreamImporterConfig> createKafkaImporterConfigFromProperties(KafkaExternalLoaderCLIArguments properties) throws Exception {
 
-        List<HostAndPort> brokers = getBrokersFromZookeeper(properties.zookeeper);
-
         // Concatenate the host:port values of each broker into one string that can be used to compute the key:
+        List<HostAndPort> brokers = getBrokersFromZookeeper(properties.zookeeper);
         String brokersString = StringUtils.join(brokers.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
         String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokersString);
 
@@ -260,21 +244,15 @@ public class KafkaExternalLoader implements ImporterSupport {
             groupId = properties.groupid.trim();
         }
 
-        // NEEDSWORK: Should these be customizable?
-        int fetchSize = 65536;
-        int soTimeout = 30000;
-
-        String procedure = properties.procedure;
-        String topic = properties.topic;
-        String commitPolicy = "NONE";
-
-        Properties props = new Properties();
-        props.put("procedure", procedure);
         FormatterBuilder fb = createFormatterBuilder(properties);
 
-        return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokers, topic, groupId, procedure, soTimeout, fetchSize, commitPolicy, fb);
+        return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokers, properties.topic, groupId,
+                                                properties.procedure, properties.timeout, properties.buffersize, KafkaImporterCommitPolicy.NONE.name(), fb);
     }
 
+    /*
+     * Create a FormatterBuilder from the supplied arguments. If no formatter is specified by configuration, return a default CSV formatter builder.
+     */
     private FormatterBuilder createFormatterBuilder(KafkaExternalLoaderCLIArguments properties) throws Exception {
 
         FormatterBuilder fb;
@@ -282,7 +260,6 @@ public class KafkaExternalLoader implements ImporterSupport {
         AbstractFormatterFactory factory;
 
         if (formatterProperties.size() > 0) {
-
             String formatterClass = m_config.m_formatterProperties.getProperty("formatter");
             String format = m_config.m_formatterProperties.getProperty("format", "csv");
             Class<?> classz = Class.forName(formatterClass);
@@ -317,6 +294,9 @@ public class KafkaExternalLoader implements ImporterSupport {
 
     }
 
+    /*
+     * Create a Volt client from the supplied configuration and list of servers.
+     */
     private static Client getVoltClient(ClientConfig config, String[] servers, int port) throws Exception {
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
@@ -325,22 +305,52 @@ public class KafkaExternalLoader implements ImporterSupport {
         return client;
     }
 
+    /*
+     * Fetch the list of brokers from Zookeeper, and return a list of their URIs.
+     */
     private static List<HostAndPort> getBrokersFromZookeeper(String zookeeperHost) throws Exception {
+
         ZooKeeper zk = new ZooKeeper(zookeeperHost, 10000, null, new HashSet<Long>());
         ArrayList<HostAndPort> brokers = new ArrayList<HostAndPort>();
         List<String> ids = zk.getChildren("/brokers/ids", false);
+
         for (String id : ids) {
             String brokerInfo = new String(zk.getData("/brokers/ids/" + id, false, null));
             Broker broker = Broker.createBroker(Integer.valueOf(id), brokerInfo);
             if (broker != null) {
-                System.out.println("Adding broker: " + broker.connectionString());
+                m_log.warn("Adding broker: " + broker.connectionString());
                 brokers.add(new HostAndPort(broker.host(), broker.port()));
             }
         }
         return brokers;
     }
 
-    class LoaderTopicPartitionImporter extends BaseKafkaTopicPartitionImporter implements Runnable {
+    /*
+     * Shut down, close connections, and clean up.
+     */
+    private void close() {
+       try {
+            stop();
+            if (m_executorService != null) {
+                m_executorService.shutdownNow();
+                m_executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+                m_executorService = null;
+            }
+
+            m_loader.close();
+            if (m_client != null) {
+                m_client.close();
+                m_client = null;
+            }
+        }
+        catch (Exception ex) {
+        }
+    }
+
+    /*
+     * Extend the base partition importer to use a remote volt client (wrapped in a CSV loader) to write to the database
+     */
+    private class LoaderTopicPartitionImporter extends BaseKafkaTopicPartitionImporter implements Runnable {
 
         public LoaderTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterSupport wrapper) {
             super(config, wrapper);
@@ -351,16 +361,13 @@ public class KafkaExternalLoader implements ImporterSupport {
            try {
                m_loader.insertRow(new RowWithMetaData(StringUtils.join(params, ","), cb.getOffset()), params);
                cb.clientCallback(new ClientResponse() {
-
                    @Override
                    public int getClientRoundtrip() {
-                       // TODO Auto-generated method stub
                        return 0;
                    }
 
                    @Override
                    public int getClusterRoundtrip() {
-                       // TODO Auto-generated method stub
                        return 0;
                    }
 
@@ -371,7 +378,7 @@ public class KafkaExternalLoader implements ImporterSupport {
 
                    @Override
                    public VoltTable[] getResults() {
-                       return null;
+                       return new VoltTable[0];
                    }
 
                    @Override
@@ -391,14 +398,13 @@ public class KafkaExternalLoader implements ImporterSupport {
 
                    @Override
                    public long getClientRoundtripNanos() {
-                       // TODO Auto-generated method stub
                        return 0;
                    }
                });
 
            }
            catch (Exception e) {
-               e.printStackTrace();
+               m_log.error(e);
                return false;
            }
            return true;
@@ -411,6 +417,9 @@ public class KafkaExternalLoader implements ImporterSupport {
 
     }
 
+    /*
+     * Process command line arguments and do some validation.
+     */
     private static class KafkaExternalLoaderCLIArguments extends CLIConfig {
 
         @Option(shortOpt = "p", desc = "Procedure name to insert the data into the database")
@@ -418,6 +427,9 @@ public class KafkaExternalLoader implements ImporterSupport {
 
         // This is set to true when -p option is used.
         boolean useSuppliedProcedure = false;
+
+        // Input formatter properties
+        Properties m_formatterProperties = new Properties();
 
         @Option(shortOpt = "t", desc = "Kafka Topic to subscribe to")
         String topic = "";
@@ -443,17 +455,17 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to. (format: zkserver:port)")
         String zookeeper = ""; //No default here as default will clash with local voltdb cluster
 
-        @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds. (default: 10)")
+        @Option(shortOpt = "f", desc = "Periodic flush interval in seconds. (default: 10)")
         int flush = 10;
 
         @Option(desc = "Formatter configuration file. (Optional) .")
         String formatter = "";
 
-        @Option(desc = "Batch Size for processing.")
-        public int batch = 200;
+        @Option(desc = "Batch size for writing to VoltDB.")
+        int batchsize = 200;
 
         @AdditionalArgs(desc = "Insert the data into this table.")
-        public String table = "";
+        String table = "";
 
         @Option(desc = "Use upsert instead of insert", hasArg = false)
         boolean update = false;
@@ -461,16 +473,16 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(desc = "Enable SSL, optionally provide configuration file.")
         String ssl = "";
 
-        //Read properties from formatter option and do basic validation.
-        Properties m_formatterProperties = new Properties();
+        @Option(desc = "Kafka consumer buffer size (default 65536).")
+        int buffersize = 65536;
 
-        /**
-         * Validate command line options.
-         */
+        @Option(desc = "Kafka consumer socket timeout, in milliseconds (default 30000, or thirty seconds)")
+        int timeout = 30000;
+
         @Override
         public void validate() {
 
-            if (batch < 0) {
+            if (batchsize < 0) {
                 exitWithMessageAndUsage("batch size number must be >= 0");
             }
             if (flush <= 0) {
@@ -499,7 +511,7 @@ public class KafkaExternalLoader implements ImporterSupport {
                 exitWithMessageAndUsage("update is not applicable when stored procedure specified");
             }
 
-            //Try and load classes we need and not packaged.
+            // Try and load classes we need and not packaged.
             try {
                 KafkaExternalLoader.class.getClassLoader().loadClass("org.I0Itec.zkclient.IZkStateListener");
                 KafkaExternalLoader.class.getClassLoader().loadClass("org.apache.zookeeper.Watcher");
