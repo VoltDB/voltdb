@@ -34,7 +34,8 @@ public class MicroOptimizationRunner {
     // list all of the micro optimizations here
     static Map<Phases, List<MicroOptimization>> optimizations = new HashMap<>();
 
-    static void addOptimization(Phases phase, MicroOptimization opt) {
+    static void addOptimization(MicroOptimization opt) {
+        Phases phase = opt.getPhase();
         List<MicroOptimization> optlist = optimizations.get(phase);
         if (optlist == null) {
             optlist = new ArrayList<>();
@@ -44,15 +45,20 @@ public class MicroOptimizationRunner {
     }
     static {
         // The orders here is important
-        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new PushdownLimits());
-        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new ReplaceWithIndexCounter());
-        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new ReplaceWithIndexLimit());
+        addOptimization(new PushdownLimits());
+        addOptimization(new ReplaceWithIndexCounter());
+        addOptimization(new ReplaceWithIndexLimit());
 
         // Inline aggregation has to be applied after Index counter and Index Limit with MIN/MAX.
-        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new InlineAggregation());
+        addOptimization(new InlineAggregation());
 
         // MP ORDER BY Optimization
-        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new InlineOrderByIntoMergeReceive());
+        addOptimization(new InlineOrderByIntoMergeReceive());
+
+        // Remove Unnecessary Projection nodes.  This is applied
+        // at a later phase then the previous optimizations.
+        addOptimization(new RemoveUnnecessaryProjectNodes());
+        addOptimization(new MakeInsertNodesInlineIfPossible());
     }
 
     public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt, Phases phase)

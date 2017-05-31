@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.Collection;
+import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -168,5 +169,37 @@ public class ProjectionPlanNode extends AbstractPlanNode {
      */
     public boolean planNodeClassNeedsProjectionNode() {
         return false;
+    }
+
+
+    /**
+     * Return true if this node unneeded if its
+     * input schema is the given one.
+     *
+     * @param inputSchema The Input Schema.
+     * @return true iff the node is unnecessary.
+     */
+    public boolean isIdentity(NodeSchema inputSchema) {
+        NodeSchema outputSchema = getOutputSchema();
+        List<SchemaColumn> cols = outputSchema.getColumns();
+        List<SchemaColumn> childCols = (inputSchema == null) ? null : inputSchema.getColumns();
+        if (childCols != null && (cols.size() != childCols.size())) {
+            return false;
+        }
+        for (int idx = 0; idx < cols.size(); idx += 1) {
+            SchemaColumn col = cols.get(idx);
+            SchemaColumn childCol = (childCols == null) ? null : childCols.get(idx);
+            if (childCol != null && (col.getType() != childCol.getType())) {
+                return false;
+            }
+            if ( ! (col.getExpression() instanceof TupleValueExpression)) {
+                return false;
+            }
+            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
+            if (tve.getColumnIndex() != idx) {
+                return false;
+            }
+        }
+        return true;
     }
 }
