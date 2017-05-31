@@ -32,6 +32,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
@@ -436,7 +437,9 @@ public class QueryPlanner {
         // Execute the generateOutputSchema and resolveColumnIndexes once for the best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
-
+        MicroOptimizationRunner.applyAll(bestPlan,
+                                         parsedStmt,
+                                         MicroOptimizationRunner.Phases.AFTER_BEST_SELECTION);
         if (parsedStmt instanceof ParsedSelectStmt) {
             List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
             ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);

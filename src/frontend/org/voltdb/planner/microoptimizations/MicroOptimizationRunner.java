@@ -18,32 +18,50 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 
 public class MicroOptimizationRunner {
+    public enum Phases {
+        SELECT_CONSTRUCTION_PHASE,
+        AFTER_BEST_SELECTION
+    };
 
     // list all of the micro optimizations here
-    static ArrayList<MicroOptimization> optimizations = new ArrayList<>();
+    static Map<Phases, List<MicroOptimization>> optimizations = new HashMap<>();
+
+    static void addOptimization(Phases phase, MicroOptimization opt) {
+        List<MicroOptimization> optlist = optimizations.get(phase);
+        if (optlist == null) {
+            optlist = new ArrayList<>();
+            optimizations.put(phase, optlist);
+        }
+        optlist.add(opt);
+    }
     static {
         // The orders here is important
-        optimizations.add(new PushdownLimits());
-        optimizations.add(new ReplaceWithIndexCounter());
-        optimizations.add(new ReplaceWithIndexLimit());
+        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new PushdownLimits());
+        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new ReplaceWithIndexCounter());
+        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new ReplaceWithIndexLimit());
 
         // Inline aggregation has to be applied after Index counter and Index Limit with MIN/MAX.
-        optimizations.add(new InlineAggregation());
+        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new InlineAggregation());
 
         // MP ORDER BY Optimization
-        optimizations.add(new InlineOrderByIntoMergeReceive());
+        addOptimization(Phases.SELECT_CONSTRUCTION_PHASE, new InlineOrderByIntoMergeReceive());
     }
 
-    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
+    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt, Phases phase)
     {
-        for (int i = 0; i < optimizations.size(); i++) {
-            MicroOptimization opt = optimizations.get(i);
-            opt.apply(plan, parsedStmt);
+        List<MicroOptimization> opts = optimizations.get(phase);
+        if (opts != null) {
+            for (MicroOptimization opt : opts) {
+                opt.apply(plan, parsedStmt);
+            }
         }
     }
 }

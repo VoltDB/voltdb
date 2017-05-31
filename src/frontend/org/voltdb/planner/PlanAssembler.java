@@ -1157,10 +1157,11 @@ public class PlanAssembler {
         String contentDeterminismMessage = m_parsedSelect.getContentDeterminismMessage();
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismMessage);
 
-        // Apply the micro-optimization:
+        // Apply the select construction phase micro-optimizations:
         // LIMIT push down, Table count / Counting Index, Optimized Min/Max
-        MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
-
+        MicroOptimizationRunner.applyAll(plan,
+                                         m_parsedSelect,
+                                         MicroOptimizationRunner.Phases.SELECT_CONSTRUCTION_PHASE);
         return plan;
     }
 
