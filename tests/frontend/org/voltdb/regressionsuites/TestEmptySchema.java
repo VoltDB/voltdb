@@ -80,7 +80,7 @@ public class TestEmptySchema extends RegressionSuite
         LocalCluster localCluster = getLocalCluster();
         if (localCluster != null) {
             assertEquals(true, localCluster.checkAllInitLog("Initialized VoltDB root directory"));
-            assertEquals(true, localCluster.checkAllHostLog("VoltDB Community Edition"));
+            assertEquals(true, localCluster.checkAllHostLog(".*VoltDB [a-zA-Z]* Edition.*"));
         }
         validateSchema(results[0], expectedTable);
 

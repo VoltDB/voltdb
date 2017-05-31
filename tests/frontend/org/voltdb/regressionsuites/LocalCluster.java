@@ -36,6 +36,7 @@ import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -2211,38 +2212,38 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
-     * Check if a given string exists in all the host logs
+     * Check if a regex string exists in all the host logs
      */
-    public boolean checkAllHostLog(String str) {
+    public boolean checkAllHostLog(String regex) {
+        Pattern pattern = Pattern.compile(regex);
         for (java.util.Map.Entry<Integer, StringBuffer> tuple : m_logs.entrySet()) {
             StringBuffer log = tuple.getValue();
-            if (log.indexOf(str) < 0) { return false; }
+            if (!pattern.matcher(log).find()) { return false; }
         }
         return true;
     }
 
     /*
-     * Check the given string in a server process with a given hostId
+     * Check the given regex in a server process with a given hostId
      */
-    public boolean checkHostLog(int hostId, String str) {
+    public boolean checkHostLog(int hostId, String regex) {
         StringBuffer log = m_logs.get(hostId);
         if (log == null) {
             System.err.println("Host id " + hostId + " does not exist!");
         } else {
-            if (log.indexOf(str) >= 0) {
-                return true;
-            }
+            Pattern pattern = Pattern.compile(regex);
+            return pattern.matcher(log).find();
         }
         return false;
     }
 
     /*
-     * Check if the given string exists in all the init logs
+     * Check if the given regex exists in all the init logs
      */
-    public boolean checkAllInitLog(String str) {
+    public boolean checkAllInitLog(String regex) {
         for (Entry<Integer, String[]> tuple : m_logFiles.entrySet()) {
             String initLogFilePath = tuple.getValue()[0];
-            if (!checkStringInFile(initLogFilePath, str)) {
+            if (!checkStringInFile(initLogFilePath, regex)) {
                 return false;
             }
         }
@@ -2250,28 +2251,32 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
-     * Check the given string in a given host with a hostId
+     * Check the given regex in a given host with a hostId
      */
-    public boolean checkInitLog(int hostId, String str) {
+    public boolean checkInitLog(int hostId, String regex) {
         String[] paths = m_logFiles.get(hostId);
         if (paths == null) {
             return false;
         }
-        return checkStringInFile(paths[0], str);
+        return checkStringInFile(paths[0], regex);
     }
 
     /*
-     * Check the given string in a given file path. This can be used to
+     * Check the given regex in a given file path. This can be used to
      * check in a given log file saved on disk.
+     *
+     * WARNING: This does not work with \n currently, since init logs
+     * are read line by line.
      */
-    public boolean checkStringInFile(String filePath, String str) {
+    public boolean checkStringInFile(String filePath, String regex) {
         BufferedReader bReader = null;
         boolean ifExist = false;
+        Pattern pattern = Pattern.compile(regex);
         try {
             bReader = new BufferedReader(new FileReader(filePath));
             String line;
             while ((line = bReader.readLine()) != null) {
-                if (line.contains(str)) {
+                if (pattern.matcher(line).find()) {
                     ifExist = true;
                     bReader.close();
                     return true;
