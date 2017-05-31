@@ -70,14 +70,23 @@ protected:
 
 private:
     const uint32_t m_tupleLength;
+
+    // The number of tuples in the table.  For temp tables all tuples
+    // are active.
     const uint32_t m_activeTuples;
 
+    // The number of tuples found and returned so far by this iterator.
     uint32_t m_foundTuples;
 
     std::vector<int64_t>::iterator m_blockIdIterator;
+
     LargeTempTableBlock* m_currBlock;
     int64_t m_currBlockId;
+
+    // A pointer to the current tuple within the current block.
     char * m_dataPtr;
+
+    // The ordinal position of the current tuple in the current block.
     uint32_t m_blockOffset;
 };
 

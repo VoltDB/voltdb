@@ -237,8 +237,9 @@ public:
     }
 
     /**
-     * Return the number of bytes in the storage for this
-     * tuple block.
+     * Return the maximum number of bytes in this tuple block which
+     * may actually be used for tuples, i.e., the size of the chunk of
+     * memory pointed to by m_storage.
      */
     inline int64_t getAllocatedMemory() {
         return m_tupleLength * m_tuplesPerBlock;

@@ -65,16 +65,17 @@ class LargeTempTableBlockCache {
     void unpinBlock(int64_t blockId);
 
     /** Fetch (and pin) the specified block, loading it from disk if
-        necessary. */
+        necessary.  */
     LargeTempTableBlock* fetchBlock(int64_t blockId);
 
     /** The large temp table for this block is being destroyed, so
         release all resources associated with this block. */
     void releaseBlock(int64_t blockId);
 
-    /** Called from LargeTempTableBlock.  Increase the amount of
-        memory in use by the cache, and store a block to disk if
-        necessary to make more room. */
+    /** Called from LargeTempTableBlock.  Report an increase in the
+        amount of memory in use by the cache, and store a block to
+        disk if necessary to make more room.  Argument represents the
+        amount of new memory now in use. */
     void increaseAllocatedMemory(int64_t numBytes);
 
     /** Called from LargeTempTableBlock destructor. */

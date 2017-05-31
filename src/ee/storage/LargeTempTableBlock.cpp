@@ -26,15 +26,10 @@ LargeTempTableBlock::LargeTempTableBlock(int64_t id, LargeTempTable *ltt)
     , m_tupleBlockPointer(new TupleBlock(ltt, TBBucketPtr()))
     , m_isPinned(false)
 {
-    LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-    lttBlockCache->increaseAllocatedMemory(getAllocatedMemory());
-}
-
-LargeTempTableBlock::LargeTempTableBlock(int64_t id, std::unique_ptr<Pool> pool, TBPtr tbp)
-    : m_id(id)
-    , m_pool(std::move(pool))
-    , m_tupleBlockPointer(tbp)
-{
+    // Report the amount of memory used by this block.
+    //
+    // Even though it has zero tuples, this is the memory for the
+    // tuple block and the first chunk in the string pool.
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     lttBlockCache->increaseAllocatedMemory(getAllocatedMemory());
 }

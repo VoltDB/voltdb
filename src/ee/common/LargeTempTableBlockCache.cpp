@@ -20,6 +20,7 @@
 #include "common/Topend.h"
 #include "common/executorcontext.hpp"
 #include "common/FixUnusedAssertHack.h"
+#include "common/SQLException.h"
 
 namespace voltdb {
 
@@ -44,7 +45,10 @@ std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock
 
 LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
     auto mapIt = m_idToBlockMap.find(blockId);
-    assert (mapIt != m_idToBlockMap.end());
+    if (mapIt == m_idToBlockMap.end()) {
+        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+    }
+
     auto listIt = mapIt->second;
     if (! (*listIt)->isResident()) {
         Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
@@ -68,11 +72,22 @@ LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
 }
 
 void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
-    (*m_idToBlockMap[blockId])->unpin();
+    auto mapIt = m_idToBlockMap.find(blockId);
+    if (mapIt == m_idToBlockMap.end()) {
+        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+    }
+
+    (*(mapIt->second))->unpin();
 }
 
 void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
-    auto it = m_idToBlockMap[blockId];
+    auto mapIt = m_idToBlockMap.find(blockId);
+    if (mapIt == m_idToBlockMap.end()) {
+        throwDynamicSQLException("Request for unknown block ID in LargeTempTableBlockCache");
+    }
+
+
+    auto it = mapIt->second;
     if (! (*it)->isResident()) {
         Topend* topend = ExecutorContext::getExecutorContext()->getTopend();
         bool rc = topend->releaseLargeTempTableBlock(blockId);

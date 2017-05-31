@@ -44,8 +44,6 @@ class LargeTempTableBlock {
     /** constructor for a new block. */
     LargeTempTableBlock(int64_t id, LargeTempTable* ltt);
 
-    LargeTempTableBlock(int64_t id, std::unique_ptr<Pool> pool, TBPtr tbp);
-
     int64_t id() const {
         return m_id;
     }
