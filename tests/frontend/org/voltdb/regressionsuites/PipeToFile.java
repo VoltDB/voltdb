@@ -144,7 +144,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
                     m_writer.write(data + "\n");
                     m_writer.flush();
-                    // Write to StringBuilder as well for easy search of strings
+                    // Write to StringBuffer as well for easy search of strings
                     if (m_log != null) { m_log.append(data + "\n"); }
                 }
                 catch (IOException ex) {

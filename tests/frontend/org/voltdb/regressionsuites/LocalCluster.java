@@ -116,6 +116,7 @@ public class LocalCluster extends VoltServerConfig {
     Map<Integer, String[]> m_logFiles = new HashMap<>();
     // Copy of the logs stored in memory (the init logs are still left on disk, since
     // they are small anyway)
+    // Use StringBuffer for thread-safety
     Map<Integer, StringBuffer> m_logs = new HashMap<>();
 
     Map<String, String> m_hostRoots = new HashMap<>();
