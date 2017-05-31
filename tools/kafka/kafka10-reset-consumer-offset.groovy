@@ -26,21 +26,16 @@
 
 @Grapes([
     @Grab('com.google.guava:guava:19.0'),
-    @Grab('log4j:log4j:1.2.17'),    
-	@Grab('org.apache.kafka:kafka-clients:0.10.2.1'),
-    @GrabExclude('javax.mail:mail'),
-    @GrabExclude('javax.jms:jms'),
-    @GrabExclude('com.sun.jdmk:jmxtools')
+    @Grab('log4j:log4j:1.2.17'),
+    @Grab('org.apache.kafka:kafka-clients:0.10.2.1'),
 ])
 
-import static com.google.common.base.Throwables.getStackTraceAsString as stackTraceFor
 import groovy.json.JsonSlurper
 
 import static org.apache.kafka.clients.consumer.ConsumerConfig.*;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.PartitionInfo
 import org.apache.kafka.common.TopicPartition

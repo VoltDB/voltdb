@@ -26,24 +26,18 @@
 
 @Grapes([
     @Grab('com.google.guava:guava:19.0'),
-    @Grab('log4j:log4j:1.2.17'),    
-	@Grab('org.apache.kafka:kafka-clients:0.10.2.1'),
-    @GrabExclude('javax.mail:mail'),
-    @GrabExclude('javax.jms:jms'),
-    @GrabExclude('com.sun.jdmk:jmxtools')
+    @Grab('log4j:log4j:1.2.17'),
+    @Grab('org.apache.kafka:kafka-clients:0.10.2.1'),
 ])
 
 import com.google.common.util.concurrent.SettableFuture
 import com.google.common.util.concurrent.ListenableFuture
-import static com.google.common.base.Throwables.getStackTraceAsString as stackTraceFor
 
-
-import static org.apache.kafka.clients.consumer.ConsumerConfig.*;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import static org.apache.kafka.clients.consumer.ConsumerConfig.*
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.clients.consumer.ConsumerRecords
+import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.PartitionInfo
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
@@ -57,7 +51,7 @@ cli.with {
     t(longOpt: 'topic', 'kafka topic', required:true, args:1)
     h(longOpt: 'help', 'usage information', required: false)
     m(longOpt: 'messages', 'number of messages to read', args:1, required:false)
-    a(longOpt: 'subscribe', 'use kafka consumer\'s partition auto assignment', args:0, required:false)
+    a(longOpt: 'auto-assign', 'use kafka consumer\'s partition auto assignment', args:0, required:false)
 }
 
 def opts = cli.parse(args)
@@ -72,10 +66,10 @@ TIMEOUT = 60 * 1000
 clientId = 'voltdb-msg-prober'
 topic = opts.t
 group = opts.g
-msgs  = (opts.m ?: '1_000').replaceAll('_','') as int
-boolean subcribeTopic = false
+msgsToRead  = (opts.m ?: '1_000').replaceAll('_','') as int
+boolean autoAssignPartition = false
 if (opts.a) {
-    subcribeTopic = true
+    autoAssignPartition = true
 }
 
 def consumerConf = [
@@ -89,7 +83,6 @@ def consumerConf = [
     (REQUEST_TIMEOUT_MS_CONFIG): (TIMEOUT + 30),
     (SESSION_TIMEOUT_MS_CONFIG): TIMEOUT,
     (FETCH_MAX_WAIT_MS_CONFIG): TIMEOUT,
-//    (RECEIVE_BUFFER_CONFIG): (64 << 10), /// commented at preesent - for expiremental purpose
 ]
 
 @groovy.transform.Canonical
@@ -100,9 +93,9 @@ class ProbeResults {
     final long startOffset
     final double bytesPerSec
     final double msgsPerSec
-    ProbeResults(TopicPartition tp, int msgs, long bytesRead, long startOffset, long durationInMillis) {
+    ProbeResults(TopicPartition tp, int msgsToRead, long bytesRead, long startOffset, long durationInMillis) {
         topicPartition = tp
-        this.msgsRead = msgs
+        this.msgsRead = msgsToRead
         this.bytesRead = bytesRead
         this.startOffset = startOffset
         this.bytesPerSec = (this.bytesRead*1000/durationInMillis)
@@ -189,14 +182,14 @@ try {
 }
 
 Long defaultMaxPoll = consumerConf.get(MAX_POLL_RECORDS_CONFIG);
-if (defaultMaxPoll == null || defaultMaxPoll > msgs) {
-    consumerConf.put(MAX_POLL_RECORDS_CONFIG, msgs)
+if (defaultMaxPoll == null || defaultMaxPoll > msgsToRead) {
+    consumerConf.put(MAX_POLL_RECORDS_CONFIG, msgsToRead)
 }
 
 tpart.collect {tp ->
     int startOffset = tpOffsets[tp];
     assert startOffset != null
-    new Fetcher(tp, startOffset, msgs, consumerConf, subcribeTopic)
+    new Fetcher(tp, startOffset, msgsToRead, consumerConf, autoAssignPartition)
 }.collect {
     it.fetch()
 }.collect {
