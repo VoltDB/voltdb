@@ -361,13 +361,11 @@ public class ParameterConverter {
             } else if (expectedClz == double.class) {
                 // This conversion could potentially lose information
                 BigDecimal pBigDecimal = (BigDecimal) param;
-                try {
-                    double result = pBigDecimal.doubleValue();
-                    // The converted double could be infinity if out of range
-                    if (result != Double.POSITIVE_INFINITY && result != Double.NEGATIVE_INFINITY) {
-                        return result;
-                    }
-                } catch (ArithmeticException e) {}
+                double result = pBigDecimal.doubleValue();
+                // The converted double could be infinity if out of range
+                if (result != Double.POSITIVE_INFINITY && result != Double.NEGATIVE_INFINITY) {
+                    return result;
+                }
                 throw new VoltTypeException(
                         "tryToMakeCompatible: The provided value: (" + param.toString() +
                         ") of type: " + inputClz.getName() +
