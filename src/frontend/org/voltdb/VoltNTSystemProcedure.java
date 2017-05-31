@@ -34,4 +34,28 @@ public class VoltNTSystemProcedure extends VoltNonTransactionalProcedure {
     protected CompletableFuture<Map<Integer,ClientResponse>> callNTProcedureOnAllHosts(String procName, Object... params) {
         return m_runner.callAllNodeNTProcedure(procName, params);
     }
+
+    protected String getHostname() {
+        return m_runner.getHostname();
+    }
+
+    protected boolean isAdminConnection() {
+        return m_runner.isAdminConnection();
+    }
+
+    protected long getClientHandle() {
+        return m_runner.getClientHandle();
+    }
+
+    protected String getUsername() {
+        return m_runner.getUsername();
+    }
+
+    protected boolean isRestoring() {
+        return m_runner.isRestoring();
+    }
+
+    protected void noteRestoreCompleted() {
+        m_runner.noteRestoreCompleted();
+    }
 }

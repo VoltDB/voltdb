@@ -667,10 +667,7 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition).get();
-            if (batch.errorMsg != null) {
-                throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + batch.errorMsg);
-            }
+            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition);
 
             if (m_isReadOnly && !batch.isReadOnly()) {
                 throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");
@@ -1611,7 +1608,9 @@ public class ProcedureRunner {
        final int batchSize = batch.size();
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
-       SQLStmt[] stmts = new SQLStmt[batchSize];
+       String[] sqlTexts = new String[batchSize];
+       boolean[] isWriteFrag = new boolean[batchSize];
+       int[] sqlCRCs = new int[batchSize];
        int succeededFragmentsCount = 0;
 
        int i = 0;
@@ -1620,7 +1619,9 @@ public class ProcedureRunner {
            fragmentIds[i] = qs.stmt.aggregator.id;
            // use the pre-serialized params if it exists
            params[i] = qs.params;
-           stmts[i] = qs.stmt;
+           sqlTexts[i] = qs.stmt.getText();
+           isWriteFrag[i] = !qs.stmt.isReadOnly;
+           sqlCRCs[i] = SQLStmtAdHocHelper.getHash(qs.stmt);
            i++;
        }
 
@@ -1634,7 +1635,9 @@ public class ProcedureRunner {
                    null,
                    params,
                    m_determinismHash,
-                   stmts,
+                   sqlTexts,
+                   isWriteFrag,
+                   sqlCRCs,
                    m_txnState.txnId,
                    m_txnState.m_spHandle,
                    m_txnState.uniqueId,

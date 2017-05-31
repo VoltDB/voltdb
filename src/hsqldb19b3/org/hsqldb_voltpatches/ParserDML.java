@@ -654,6 +654,7 @@ public class ParserDML extends ParserDQL {
             }
         }
 
+        /* Disabled for ENG-11832
         if (!targetTable.isView) {
             return;
         }
@@ -666,6 +667,7 @@ public class ParserDML extends ParserDQL {
                 colExpressions[i].replaceColumnReferences(rangeVariables[0],
                     select.exprColumns);
         }
+        */
     }
 
     void readSetClauseList(RangeVariable[] rangeVars, OrderedHashSet colNames,

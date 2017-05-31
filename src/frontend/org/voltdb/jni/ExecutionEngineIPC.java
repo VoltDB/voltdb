@@ -33,7 +33,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SQLStmt;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
@@ -932,7 +931,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             long[] inputDepIdsIn,
             final Object[] parameterSets,
             DeterminismHash determinismHash,
-            SQLStmt[] stmts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -954,8 +954,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     ParameterSet pset = (ParameterSet) params;
                     fser.writeParameterSet(pset);
                 }
-                if (stmts != null && determinismHash != null && !stmts[i].isReadOnly()) {
-                    determinismHash.offerStatement(stmts[i], paramStart, fser.getContainerNoFlip().b());
+                if (determinismHash != null && isWriteFrags[i]) {
+                    determinismHash.offerStatement(sqlCRCs[i], paramStart, fser.getContainerNoFlip().b());
                 }
             }
         } catch (final IOException exception) {
@@ -1010,14 +1010,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] inputDepIds,
             final Object[] parameterSets,
             DeterminismHash determinismHash,
-            SQLStmt[] stmts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
             final long undoToken, boolean traceOn) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
-                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, determinismHash, stmts,
+                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, determinismHash, isWriteFrags, sqlCRCs,
                 txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
         if (m_perFragmentTimingEnabled) {

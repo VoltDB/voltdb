@@ -24,10 +24,15 @@ import java.io.IOException;
  * command both for files on a disk or "here documents" entered
  * interactively.
  */
-interface SQLCommandLineReader {
+public interface SQLCommandLineReader {
     /**
      * Read the next line of input from some underlying input stream.
      * If the underlying stream is interactive, print out the prompt.
      * */
     public String readBatchLine() throws IOException;
+
+    /**
+     * Return the line number of the most recently read line.
+     */
+    public int getLineNumber();
 }

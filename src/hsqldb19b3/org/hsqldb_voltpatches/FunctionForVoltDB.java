@@ -187,6 +187,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_MAX_VALID_TIMESTAMP          = 21022;    // Maximum valid timestamp.
         static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?
 
+        /*
+         * All VoltDB user-defined functions must have IDs in this range.
+         */
+        static final int FUNC_VOLT_UDF_ID_START                 = 1000000;
 
         /*
          * Note: The name must be all lower case.
@@ -420,13 +424,24 @@ public class FunctionForVoltDB extends FunctionSQL {
             return m_typeParameter;
         }
 
+        private static int udfCount = 0;
+
+        static void addUserDefinedFunctionId(String functionName, Type returnType, Type[] parameterTypes, short[] syntax) {
+            FunctionId fid = by_LC_name.get(functionName);
+            if (fid == null) {
+                int seqId = udfCount + FUNC_VOLT_UDF_ID_START;
+                udfCount++;
+                fid = new FunctionId(functionName, returnType, seqId, -1, parameterTypes, syntax);
+                by_LC_name.put(functionName, fid);
+            }
+        }
     }
 
     public static final int FUNC_VOLT_ID_FOR_CONTAINS = FunctionId.FUNC_VOLT_CONTAINS;
 
     private final FunctionId m_def;
 
-    public static FunctionSQL newVoltDBFunction(String token, int tokenType) {
+    public static FunctionSQL newVoltDBFunction(String token) {
         FunctionId def = FunctionId.fn_by_name(token);
         if (def == null) {
             return null;
@@ -808,6 +823,48 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
         sb.append(Tokens.T_CLOSEBRACKET);
         return sb.toString();
+    }
+
+    public static void registerUserDefinedFunction(String functionName, Class<?> returnTypeClass, Class<?>[] parameterTypeClasses) {
+        Type returnType = Type.getDefaultTypeWithSize(Types.getParameterSQLTypeNumber(returnTypeClass));
+        Type[] parameterTypes = new Type[parameterTypeClasses.length];
+        for (int i = 0; i < parameterTypeClasses.length; i++) {
+            parameterTypes[i] = Type.getDefaultTypeWithSize(Types.getParameterSQLTypeNumber(parameterTypeClasses[i]));
+        }
+
+        // A pair of parentheses + number of parameters
+        int syntaxLength = 2 + parameterTypes.length;
+        if (parameterTypes.length > 1) {
+            // Add commas in between
+            syntaxLength += parameterTypes.length - 1;
+        }
+        short[] syntax = new short[syntaxLength];
+        syntax[0] = Tokens.OPENBRACKET;
+        int idx = 1;
+        for (int parId = 0; parId < parameterTypes.length; parId++) {
+            if (parId > 0) {
+                syntax[idx++] = Tokens.COMMA;
+            }
+            syntax[idx++] = Tokens.QUESTION;
+        }
+        syntax[syntax.length - 1] = Tokens.CLOSEBRACKET;
+        FunctionId.addUserDefinedFunctionId(functionName, returnType, parameterTypes, syntax);
+    }
+
+    public static void deregisterUserDefinedFunction(String functionName) {
+        FunctionId.by_LC_name.remove(functionName);
+    }
+
+    public static int getFunctionId(String functionName) {
+        FunctionId fid = FunctionId.fn_by_name(functionName);
+        if (fid == null) {
+            return -1;
+        }
+        return fid.getId();
+    }
+
+    public static boolean isUserDefinedFunctionId(int functionId) {
+        return functionId >= FunctionId.FUNC_VOLT_UDF_ID_START;
     }
 
 }

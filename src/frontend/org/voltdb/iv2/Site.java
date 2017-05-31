@@ -55,7 +55,6 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
-import org.voltdb.SQLStmt;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
@@ -75,6 +74,7 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.DRCatalogCommands;
@@ -1458,7 +1458,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long[] inputDepIds,
             Object[] parameterSets,
             DeterminismHash determinismHash,
-            SQLStmt[] stmts,
+            String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,
@@ -1472,7 +1474,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 inputDepIds,
                 parameterSets,
                 determinismHash,
-                stmts,
+                sqlTexts,
+                isWriteFrags,
+                sqlCRCs,
                 txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
@@ -1499,6 +1503,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration)
     {
+        CatalogContext oldContext = m_context;
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
@@ -1526,6 +1531,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
             }
         }
+
+        if (!DRCatalogChange) { // Check against old catalog for deletions
+            CatalogMap<Table> oldTables = oldContext.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
+            for (Table t : oldTables) {
+                if (t.getIsdred()) {
+                    DRCatalogChange |= diffCmds.contains(CatalogDiffEngine.getDeleteDiffStatement(t, "tables"));
+                    if (DRCatalogChange) {
+                        break;
+                    }
+                }
+            }
+        }
+
         // if a snapshot is in process, wait for it to finish
         // don't bother if this isn't a schema change
         //
