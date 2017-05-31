@@ -713,7 +713,8 @@ public class PlannerTestCase extends TestCase {
                     fail(String.format("Expected %d plan nodes, but found more.", types.length));
                 }
                 if (types[idx] instanceof PlanNodeType) {
-                    assertEquals(types[idx], plan.getPlanNodeType());
+                    assertEquals(String.format("Expected %s plan node by found %s", types[idx], plan.getPlanNodeType()),
+                                 types[idx], plan.getPlanNodeType());
                 } else if (types[idx] instanceof PlanWithInlineNodes) {
                     PlanWithInlineNodes branch = (PlanWithInlineNodes)types[idx];
                     String error = branch.match(plan);
