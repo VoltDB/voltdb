@@ -64,9 +64,7 @@
 #include <vector>
 #include <set>
 
-using namespace std;
-using namespace voltdb;
-
+namespace voltdb {
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
                             TempTableLimits* limits)
 {
@@ -356,11 +354,13 @@ void InsertExecutor::p_execute_finish() {
 bool InsertExecutor::p_execute(const NValueArray &params) {
     //
     // See p_execute_init above.  If we are inserting a
-    // replicated table, we only insert on one site.  So
-    // we will be done on all the other sites.
+    // replicated table into an export table with no partition column,
+    // we only insert on one site.  For all other sites we just
+    // do nothing.
     //
     const TupleSchema *inputSchema = m_inputTable->schema();
     if (p_execute_init(inputSchema, m_tmpOutputTable)) {
+        p_execute_finish();
         return true;
     }
 
@@ -378,7 +378,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-namespace voltdb {
 InsertExecutor *getInlineInsertExecutor(const AbstractPlanNode *node) {
     InsertExecutor *answer = NULL;
     InsertPlanNode *insertNode = dynamic_cast<InsertPlanNode *>(node->getInlinePlanNode(PLAN_NODE_TYPE_INSERT));

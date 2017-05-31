@@ -41,7 +41,7 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.InlinableScanPlanNode;
+import org.voltdb.planner.ScanPlanNodeWithInlineInsert;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
@@ -51,7 +51,7 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
-public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSortablePlanNode, InlinableScanPlanNode {
+public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSortablePlanNode, ScanPlanNodeWithInlineInsert {
 
     public enum Members {
         TARGET_INDEX_NAME,

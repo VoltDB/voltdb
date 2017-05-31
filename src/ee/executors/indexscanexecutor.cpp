@@ -84,6 +84,9 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node);
     assert(m_node->getTargetTable());
 
+    // Inline aggregation can be serial, partial or hash
+    m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
+    m_insertExec = voltdb::getInlineInsertExecutor(m_abstractNode);
     // If we have an inline insert node, then the output
     // schema is the ususal DML schema.  Otherwise it's in the
     // plan node.  So, create output table based on output schema from the plan.
@@ -105,9 +108,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
                              m_node->getTargetTable()->schema());
     }
 
-    // Inline aggregation can be serial, partial or hash
-    m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
-    m_insertExec = voltdb::getInlineInsertExecutor(m_abstractNode);
     // For the moment we will not produce a plan with both an
     // inline aggregate and an inline insert node.  This just
     // confuses things.
@@ -204,8 +204,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     TableTuple temp_tuple;
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
-    const TupleSchema * inputSchema = tableIndex->getTupleSchema();
     if (m_aggExec != NULL || m_insertExec != NULL) {
+        const TupleSchema * inputSchema = tableIndex->getTupleSchema();
         if (m_projectionNode != NULL) {
             inputSchema = m_projectionNode->getOutputTable()->schema();
         }
@@ -502,7 +502,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_finish();
     }
-    if (m_insertExec != NULL) {
+    else if (m_insertExec != NULL) {
         m_insertExec->p_execute_finish();
     }
 
@@ -516,7 +516,7 @@ void IndexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& 
         m_aggExec->p_execute_tuple(tuple);
         return;
     }
-    if (m_insertExec != NULL) {
+    else if (m_insertExec != NULL) {
         m_insertExec->p_execute_tuple(tuple);
         return;
     }

@@ -121,6 +121,45 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                                              PlanNodeType.INSERT));
     }
 
+    public void testNoInlineInsert() {
+        // No inline insert for UPSERT.
+        validatePlan("UPSERT INTO T1 SELECT * FROM T2 ORDER BY ID, AAA, BBB;",
+                     2,
+                     PlanNodeType.SEND,
+                     PlanNodeType.LIMIT,
+                     PlanNodeType.RECEIVE,
+                     PlanNodeType.INVALID,
+                     PlanNodeType.SEND,
+                     PlanNodeType.INSERT,
+                     PlanNodeType.PROJECTION,
+                     PlanNodeType.ORDERBY,
+                     PlanNodeType.SEQSCAN);
+        validatePlan("INSERT INTO T1 SELECT L.ID, L.AAA, R.BBB from T1 L JOIN T1 R ON L.ID = R.ID;",
+                     2,
+                     PlanNodeType.SEND,
+                     PlanNodeType.LIMIT,
+                     PlanNodeType.RECEIVE,
+                     PlanNodeType.INVALID,
+                     PlanNodeType.SEND,
+                     PlanNodeType.INSERT,
+                     PlanNodeType.PROJECTION,
+                     new PlanWithInlineNodes(PlanNodeType.NESTLOOPINDEX, PlanNodeType.INDEXSCAN),
+                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN, PlanNodeType.PROJECTION));
+        validatePlan("INSERT INTO T1 SELECT ID, AAA, AAA+ID from T1 group by ID, AAA;",
+                     2,
+                     PlanNodeType.SEND,
+                     PlanNodeType.LIMIT,
+                     PlanNodeType.RECEIVE,
+                     PlanNodeType.INVALID,
+                     PlanNodeType.SEND,
+                     PlanNodeType.INSERT,
+                     PlanNodeType.PROJECTION,
+                     new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                             PlanNodeType.PARTIALAGGREGATE,
+                                             PlanNodeType.PROJECTION));
+
+    }
+
     //
     // This is not allowed, no surprise: INSERT INTO T1 SELECT * from P2;
     //

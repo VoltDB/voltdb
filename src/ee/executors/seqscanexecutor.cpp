@@ -198,8 +198,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
         TableTuple temp_tuple;
         assert(m_tmpOutputTable);
-        const TupleSchema * inputSchema = input_table->schema();
         if (m_aggExec != NULL || m_insertExec != NULL) {
+            const TupleSchema * inputSchema = input_table->schema();
             if (projection_node != NULL) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
@@ -260,7 +260,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         if (m_aggExec != NULL) {
             m_aggExec->p_execute_finish();
         }
-        if (m_insertExec != NULL) {
+        else if (m_insertExec != NULL) {
             m_insertExec->p_execute_finish();
         }
     }
@@ -283,7 +283,7 @@ void SeqScanExecutor::outputTuple(TableTuple& tuple) {
         m_aggExec->p_execute_tuple(tuple);
         return;
     }
-    if (m_insertExec != NULL) {
+    else if (m_insertExec != NULL) {
         m_insertExec->p_execute_tuple(tuple);
         return;
     }
