@@ -249,12 +249,10 @@ public class ParameterConverter {
     {
         /* uncomment for debugging
         System.err.printf("Converting %s of type %s to type %s\n",
-
                 String.valueOf(param),
                 param == null ? "NULL" : param.getClass().getName(),
                 expectedClz.getName());
-        System.err.flush();
-        // */
+        System.err.flush(); */
 
         // Get blatant null out of the way fast, as it avoids some inline checks
         // There are some subtle null values that aren't java null coming up, but wait until
@@ -342,6 +340,38 @@ public class ParameterConverter {
                 param == VoltType.NULL_POINT ||
                 param == VoltType.NULL_DECIMAL) {
             return nullValueForType(expectedClz);
+        }
+        // [ENG-12522] BigDecimal should be able to be converted to long or float if possible
+        // If it cannot be converted (say out of range), just display the error message.
+        else if (inputClz == BigDecimal.class) {
+            if (expectedClz == long.class) {
+                BigDecimal pBigDecimal = (BigDecimal) param;
+                try {
+                    long result = pBigDecimal.longValueExact();
+                    return result;
+                } catch (ArithmeticException e) {
+                    throw new VoltTypeException(
+                            "tryToMakeCompatible: The provided value: (" + param.toString() +
+                            ") of type: " + inputClz.getName() +
+                            " is out of range for the target parameter type: " +
+                            expectedClz.getName());
+                }
+            } else if (expectedClz == double.class) {
+                // This conversion could potentially lose information
+                BigDecimal pBigDecimal = (BigDecimal) param;
+                try {
+                    double result = pBigDecimal.doubleValue();
+                    // The converted double could be infinity if out of range
+                    if (result != Double.POSITIVE_INFINITY && result != Double.NEGATIVE_INFINITY) {
+                        return result;
+                    }
+                } catch (ArithmeticException e) {}
+                throw new VoltTypeException(
+                        "tryToMakeCompatible: The provided value: (" + param.toString() +
+                        ") of type: " + inputClz.getName() +
+                        " is out of range for the target parameter type: " +
+                        expectedClz.getName());
+            }
         }
 
         // make sure we get the array/scalar match
