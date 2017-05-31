@@ -1226,32 +1226,32 @@ public class CoreUtils {
         switch (level) {
             case DEBUG:
                 vLogger.debug(stars);
-                vLogger.debug("* " + stars + " *");
+                vLogger.debug("* " + msg + " *");
                 vLogger.debug(stars);
                 break;
             case WARN:
                 vLogger.warn(stars);
-                vLogger.warn("* " + stars + " *");
+                vLogger.warn("* " + msg + " *");
                 vLogger.warn(stars);
                 break;
             case ERROR:
                 vLogger.error(stars);
-                vLogger.error("* " + stars + " *");
+                vLogger.error("* " + msg + " *");
                 vLogger.error(stars);
                 break;
             case FATAL:
                 vLogger.fatal(stars);
-                vLogger.fatal("* " + stars + " *");
+                vLogger.fatal("* " + msg + " *");
                 vLogger.fatal(stars);
                 break;
             case INFO:
                 vLogger.info(stars);
-                vLogger.info("* " + stars + " *");
+                vLogger.info("* " + msg + " *");
                 vLogger.info(stars);
                 break;
             case TRACE:
                 vLogger.trace(stars);
-                vLogger.trace("* " + stars + " *");
+                vLogger.trace("* " + msg + " *");
                 vLogger.trace(stars);
                 break;
             default:
