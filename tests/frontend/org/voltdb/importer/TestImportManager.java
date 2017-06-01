@@ -102,23 +102,6 @@ public class TestImportManager {
         cluster.getDatabases().add("database");
         HostMessenger dummyHostMessenger = new HostMessenger(new HostMessenger.Config(), null);
         DbSettings dbSettings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
-        //CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, new byte[]{}, null, new byte[0], 0, dummyHostMessenger);
-
-        /*
-        DeploymentType inMemoryDeployment = new ObjectFactory().createDeploymentType();
-        CatalogUtil.populateDefaultDeployment(inMemoryDeployment);
-        ImportType importType = new ImportType();
-        List<ImportConfigurationType> importerConfig = importType.getConfiguration();
-
-        for (int i = 0; i < numKafkaTopics; i++) {
-            ImportConfigurationType importerConfig = new ImportConfigurationType();
-            importerConfig.setType();
-            importerConfig.add();
-            new JUnitImporterConfig()
-        }
-
-        inMemoryDeployment.setImport(importType);
-        */
 
         VoltProjectBuilder projectBuilder = new VoltProjectBuilder();
         for (int i = 0; i < numKafkaTopics; i++) {
@@ -129,8 +112,7 @@ public class TestImportManager {
             projectBuilder.addImport(true, "custom", null, JUnitImporterConfig.URI_SCHEME + ".jar", importerProperties);
         }
         projectBuilder.configureLogging(false, enableCommandLogs, 100, 1000, 10000);
-
-        // TODO do I want DDL schema or UAC schema?
+        projectBuilder.setUseDDLSchema(true); // BSDBG this makes manually debugging the test easier
 
         File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly("voltdbroot", 1, 1, 0, 0));
 
