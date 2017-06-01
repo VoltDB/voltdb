@@ -32,6 +32,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.*;
 import org.voltdb.importclient.junit.JUnitImporter;
@@ -72,6 +73,11 @@ public class TestImportManager {
     private static final boolean DEFAULT_CATALOG_ENABLES_COMMAND_LOG = false; // this is used to generate non-importer-related config changes
     private static String m_previousBundlePath;
 
+    private static final int NUM_IMPORTERS = 2;
+    private static final String SCHEMA = "CREATE TABLE test (foo BIGINT NOT NULL, bar VARCHAR(8) NOT NULL);\n"
+                                       + "CREATE PROCEDURE procedure1 AS INSERT INTO test VALUES (?, ?);\n"
+                                       + "CREATE PROCEDURE procedure2 AS INSERT INTO test VALUES (? * 2, lower(?));";
+
 
     public class DetectImporterRestart implements JUnitImporterEventExaminer {
 
@@ -88,14 +94,16 @@ public class TestImportManager {
     }
 
     /** Builds a CatalogContext for the import manager to use.
-     * @param numKafkaTopics Number of Kafka topics to use. Supply 0 to disable all importers.
+     * @param numImporters Number of Kafka topics to use. Supply 0 to disable all importers.
      * @param enableCommandLogs Whether or not command logs should be on. This is to allow testing how an unrelated change affects importer behavior.
      * @return Catalog context
      * @throws Exception upon error or test failure
      */
-    private static CatalogContext buildMockCatalogContext(int numKafkaTopics, boolean enableCommandLogs) throws Exception {
+    private static CatalogContext buildMockCatalogContext(int numImporters, boolean enableCommandLogs) throws Exception {
 
         // create a dummy catalog to load deployment info into
+        //File schemaFile = VoltProjectBuilder.createFileForSchema(SCHEMA);
+        //Catalog catalog = new VoltCompiler(false, false).compileCatalogFromDDL();
         Catalog catalog = new Catalog();
         // Need these in the dummy catalog
         Cluster cluster = catalog.getClusters().add("cluster");
@@ -104,7 +112,7 @@ public class TestImportManager {
         DbSettings dbSettings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
 
         VoltProjectBuilder projectBuilder = new VoltProjectBuilder();
-        for (int i = 0; i < numKafkaTopics; i++) {
+        for (int i = 0; i < numImporters; i++) {
             Properties importerProperties = new Properties();
             importerProperties.setProperty(ImportDataProcessor.IMPORT_PROCEDURE, "procedure" + i);
             // NOTE: importFormat=null defaults to "csv", which isn't something we need but doesn't cause any additional pain.
@@ -148,10 +156,16 @@ public class TestImportManager {
     @Before
     public void setUp() throws Exception {
         m_previousBundlePath = System.getProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
-        System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, "/home/bshaw/workspace/voltdb/bundles/"); // FIXME System.getProperty("user.dir") + "/bundles/");
 
-        CatalogContext catalogContextWith3Kafka = buildMockCatalogContext(3, false);
+        String locationOfCatalogUtil = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+        if (locationOfCatalogUtil.contains("voltdb" + File.separator + "obj")) {
+            // for junits run from ant, VoltDB's default bundles directory is incorrect.
+            int index = locationOfCatalogUtil.indexOf("obj");
+            String pathToBundles = locationOfCatalogUtil.substring(0, index) + File.separator + "bundles";
+            System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, pathToBundles);
+        }
 
+        CatalogContext catalogContextWith3Kafka = buildMockCatalogContext(NUM_IMPORTERS, false);
         m_mockChannelDistributer = new MockChannelDistributer(Integer.toString(HOSTID));
         m_statsCollector = new ImporterStatsCollector(SITEID);
         ImportManager.initializeWithMocks(HOSTID, catalogContextWith3Kafka, m_mockChannelDistributer, m_statsCollector);
