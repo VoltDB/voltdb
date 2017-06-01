@@ -91,6 +91,9 @@ public abstract class BaseKafkaTopicPartitionImporter {
 
     protected ImporterSupport m_wrapper;
 
+    /*
+     * Submit the supplied data to the database. Subclasses override this method with the appropriate operations.
+     */
     public abstract boolean executeVolt(Object[] params, TopicPartitionInvocationCallback cb);
 
     public BaseKafkaTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterSupport wrapper)
@@ -100,10 +103,12 @@ public abstract class BaseKafkaTopicPartitionImporter {
         m_coordinator = m_config.getPartitionLeader();
         m_topicAndPartition = new TopicAndPartition(config.getTopic(), config.getPartition());
         m_fetchRequestBuilder = new FetchRequestBuilder().clientId(KafkaStreamImporterConfig.CLIENT_ID);
-        if (m_config.getCommitPolicy() == KafkaImporterCommitPolicy.TIME && m_config.getTriggerValue() > 0)
+        if (m_config.getCommitPolicy() == KafkaImporterCommitPolicy.TIME && m_config.getTriggerValue() > 0) {
             m_gapTracker = new SimpleTracker();
-        else
+        }
+        else {
             m_gapTracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
+        }
     }
 
     public URI getResourceID()  {
