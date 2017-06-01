@@ -1670,6 +1670,7 @@ public class LocalCluster extends VoltServerConfig {
                 m_logs.remove(ptf.getHostId());
                 // Free the memory right away
                 buffer.delete(0, buffer.length());
+                ptf.m_log = null;
             }
         }
 
