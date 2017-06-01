@@ -1639,9 +1639,12 @@ public class LocalCluster extends VoltServerConfig {
         if (proc != null) {
             proc.destroy();
             proc.waitFor();
-            // Remove the killed process's log from the list
+            // Remove the killed process's log from the in-memory list immediately
             if (ptf != null) {
+                StringBuffer buffer = m_logs.get(ptf.getHostId());
                 m_logs.remove(ptf.getHostId());
+                // Free the memory right away
+                buffer.delete(0, buffer.length());
             }
         }
 
