@@ -148,6 +148,9 @@ public class KafkaImportBenchmark {
         @Option(desc = "Are we running the multi-stream/nmulti topic test?")
         boolean streamtest = false;
 
+        @Option(desc = "Are we importing with kafkaloader, not in-server imports?")
+        boolean loadertest = false;
+
         @Option(desc = "Number of streams and topics we're importing.")
         int streams = 1;
 
