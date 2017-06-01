@@ -101,6 +101,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.PlanSelector;
 import org.voltdb.planner.PlannerTestCase;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -211,8 +212,18 @@ public class EEPlanGenerator extends PlannerTestCase {
     private boolean m_namesOnly = false;
 
     protected String getPlanString(String sqlStmt) throws JSONException {
-        AbstractPlanNode node = compile(sqlStmt);
-        String planString = PlanSelector.outputPlanDebugString(node);
+        return getPlanString(sqlStmt, 0);
+    }
+
+    protected String getPlanString(String sqlStmt, int fragmentNumber) throws JSONException {
+        boolean planForSinglePartition = (fragmentNumber == 0);
+        List<AbstractPlanNode> nodes = compileToFragments(sqlStmt, planForSinglePartition);
+        if (nodes.size() <= fragmentNumber) {
+            throw new PlanningErrorException(String.format("requested fragment number %d is out of range [0,%d)\n",
+                                                           fragmentNumber,
+                                                           nodes.size()));
+        }
+        String planString = PlanSelector.outputPlanDebugString(nodes.get(fragmentNumber));
         return planString;
     }
 
@@ -710,7 +721,8 @@ public class EEPlanGenerator extends PlannerTestCase {
                   .append("        // Failure is expected\n")
                   .append(String.format("        %s,\n", tc.isExpectedToFail() ? "true" : "false"))
                   .append("        // Plan String\n")
-                  .append(String.format("        %s,\n", cleanString(getPlanString(tc.m_sqlString), "        ")))
+                  .append(String.format("        %s,\n",
+                                        cleanString(getPlanString(tc.m_sqlString, tc.getPlanFragment()), "        ")))
                   .append(String.format("        %s\n",  tc.getOutputTableName()))
                   .append("    },\n");
             }
@@ -753,6 +765,7 @@ public class EEPlanGenerator extends PlannerTestCase {
             m_sqlString      = sqlString;
             m_expectedOutput = expectedOutput;
             m_expectFail     = expectFail;
+            m_planFragment   = 0;
         }
 
         public TestConfig(String testName,
@@ -825,10 +838,20 @@ public class EEPlanGenerator extends PlannerTestCase {
                 return "NULL";
             }
         }
+
+        public TestConfig setPlanFragment(int number) {
+            m_planFragment = number;
+            return this;
+        }
+
+        public int getPlanFragment() {
+            return m_planFragment;
+        }
         private String      m_testName;
         private String      m_sqlString;
         private TableConfig m_expectedOutput;
         private boolean     m_expectFail;
+        private int         m_planFragment;
     }
 
     /**
