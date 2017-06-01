@@ -351,13 +351,7 @@ public class ParameterConverter {
                 try {
                     long result = pBigDecimal.longValueExact();
                     return result;
-                } catch (ArithmeticException e) {
-                    throw new VoltTypeException(
-                            "tryToMakeCompatible: The provided value: (" + param.toString() +
-                            ") of type: " + inputClz.getName() +
-                            " is out of range for the target parameter type: " +
-                            expectedClz.getName());
-                }
+                } catch (ArithmeticException e) {}
             } else if (expectedClz == double.class) {
                 // This conversion could potentially lose information
                 BigDecimal pBigDecimal = (BigDecimal) param;
@@ -366,12 +360,12 @@ public class ParameterConverter {
                 if (result != Double.POSITIVE_INFINITY && result != Double.NEGATIVE_INFINITY) {
                     return result;
                 }
-                throw new VoltTypeException(
-                        "tryToMakeCompatible: The provided value: (" + param.toString() +
-                        ") of type: " + inputClz.getName() +
-                        " is out of range for the target parameter type: " +
-                        expectedClz.getName());
             }
+            throw new VoltTypeException(
+                            "tryToMakeCompatible: The provided value: (" + param.toString() +
+                            ") of type: " + inputClz.getName() +
+                            " is out of range for the target parameter type: " +
+                            expectedClz.getName());
         }
 
         // make sure we get the array/scalar match
