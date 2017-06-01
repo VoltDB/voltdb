@@ -203,4 +203,41 @@ public class TestParameterConverter extends TestCase
         assertEquals(null, ParameterConverter.tryToMakeCompatible(String.class, VoltType.NULL_STRING_OR_VARBINARY));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(BigDecimal.class, VoltType.NULL_DECIMAL));
     }
+
+    public void testBigDecimalToLong() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(long.class, new BigDecimal(1000));
+        assertTrue("expect long", r.getClass() == Long.class);
+        assertEquals(1000L, ((Long)r).longValue());
+
+        // No lossy conversion
+        boolean hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(long.class, new BigDecimal(1000.01));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
+
+        // No out-of-range conversion
+        hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(long.class, new BigDecimal("10000000000000000000000000000000000"));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
+    }
+
+    public void testBigDecimalToInt() {
+
+    }
+
+    public void testBigDecimalToShort() {
+
+    }
+
+    public void testBigDecimalToDouble() {
+
+    }
 }
