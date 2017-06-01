@@ -61,13 +61,15 @@ public class JUnitImporterMessenger {
     }
 
     public static JUnitImporterMessenger initialize() {
-        Preconditions.checkState(m_self == null, "JUnitImporterMessenger is already initialized");
-        m_self = new JUnitImporterMessenger();
-        m_self.m_eventBus.register(m_self);
+        if (m_self == null) {
+            m_self = new JUnitImporterMessenger();
+            m_self.m_eventBus.register(m_self);
+        }
         return m_self;
     }
 
     public static JUnitImporterMessenger instance() {
+        Preconditions.checkState(m_self != null, "JUnitImporterMessenger is not initialized");
         return m_self;
     }
 

@@ -195,6 +195,7 @@ public abstract class CatalogUtil {
     private static boolean m_exportEnabled = false;
     public static final String CATALOG_FILE_NAME = "catalog.jar";
     public static final String STAGED_CATALOG_PATH = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
+    public static final java.lang.String VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME = "voltdbbundlelocation";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -738,7 +739,6 @@ public abstract class CatalogUtil {
             // Anything that goes wrong anywhere in trying to handle the deployment file
             // should return an error, and let the caller decide what to do (crash or not, for
             // example)
-            e.printStackTrace(); // BSDBG
             errmsg = "Error validating deployment configuration: " + e.getMessage();
             hostLog.error(errmsg);
             return errmsg;
@@ -1334,7 +1334,7 @@ public abstract class CatalogUtil {
         String bundleUrl = bundle;
         if (is == null) {
             try {
-                String bundlelocation = System.getProperty("voltdbbundlelocation");
+                String bundlelocation = System.getProperty(VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
                 if (bundlelocation == null || bundlelocation.trim().length() == 0) {
                     String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
                     hostLog.info("Module base is: " + rpath + "/../bundles/");

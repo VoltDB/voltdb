@@ -30,7 +30,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
-import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -71,6 +70,7 @@ public class TestImportManager {
     private static final int RESTART_CHECK_POLLING_INTERVAL_MS = 500;
 
     private static final boolean DEFAULT_CATALOG_ENABLES_COMMAND_LOG = false; // this is used to generate non-importer-related config changes
+    private static String m_previousBundlePath;
 
 
     public class DetectImporterRestart implements JUnitImporterEventExaminer {
@@ -124,9 +124,14 @@ public class TestImportManager {
         for (int i = 0; i < numKafkaTopics; i++) {
             Properties importerProperties = new Properties();
             importerProperties.setProperty(ImportDataProcessor.IMPORT_PROCEDURE, "procedure" + i);
+            // NOTE: importFormat=null defaults to "csv", which isn't something we need but doesn't cause any additional pain.
+            // We need to load an OSGI bundle either way since JUnitImporter is packaged as a normal importer.
             projectBuilder.addImport(true, "custom", null, JUnitImporterConfig.URI_SCHEME + ".jar", importerProperties);
         }
         projectBuilder.configureLogging(false, enableCommandLogs, 100, 1000, 10000);
+
+        // TODO do I want DDL schema or UAC schema?
+
         File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly("voltdbroot", 1, 1, 0, 0));
 
         System.out.println("Deployment file written to " + deploymentFilePath.getCanonicalPath());
@@ -160,6 +165,9 @@ public class TestImportManager {
      */
     @Before
     public void setUp() throws Exception {
+        m_previousBundlePath = System.getProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
+        System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, "/home/bshaw/workspace/voltdb/bundles/"); // FIXME System.getProperty("user.dir") + "/bundles/");
+
         CatalogContext catalogContextWith3Kafka = buildMockCatalogContext(3, false);
 
         m_mockChannelDistributer = new MockChannelDistributer(Integer.toString(HOSTID));
@@ -167,12 +175,21 @@ public class TestImportManager {
         ImportManager.initializeWithMocks(HOSTID, catalogContextWith3Kafka, m_mockChannelDistributer, m_statsCollector);
         m_initialCatalogContext = catalogContextWith3Kafka;
         m_manager = ImportManager.instance();
+        JUnitImporterMessenger.initialize(); // if initial config doesn't have importers which are enabled, this is required for checkForImporterRestart().
     }
 
     @After
     public void tearDown() throws Exception {
-        m_manager = null;
-        m_initialCatalogContext = null;
+        try {
+            m_manager = null;
+            m_initialCatalogContext = null;
+        } finally {
+            if (m_previousBundlePath == null) {
+                System.clearProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
+            } else {
+                System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, m_previousBundlePath);
+            }
+        }
     }
 
     private boolean checkForImporterRestart() throws Exception {

@@ -38,6 +38,7 @@ public class JUnitImporterFactory extends AbstractImporterFactory {
 
     @Override
     protected AbstractImporter create(ImporterConfig config) {
+        JUnitImporterMessenger.initialize();
         return new JUnitImporter((JUnitImporterConfig) config);
     }
 
