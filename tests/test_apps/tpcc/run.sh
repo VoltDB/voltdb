@@ -63,7 +63,7 @@ function init() {
 # run the client that drives the example
 function client() {
     jars-ifneeded
-    java -classpath $APPNAME-client.jar:$APPCLASSPATH MyTPCC \
+    java -classpath $APPNAME-client.jar:$APPCLASSPATH:$APPNAME-procs.jar com.MyTPCC \
         --servers=localhost \
         --duration=180 \
         --warehouses=256 \

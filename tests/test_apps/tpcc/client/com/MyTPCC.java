@@ -26,6 +26,7 @@ package com;
 import org.voltdb.types.TimestampType;
 import org.voltdb.client.ClientResponse;
 import com.Clock;
+import com.Constants;
 import com.procedures.LoadStatus;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.Client;
