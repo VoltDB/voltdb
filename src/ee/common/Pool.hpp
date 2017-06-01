@@ -288,18 +288,21 @@ private:
     Pool(const Pool&);
     Pool& operator=(const Pool&);
 };
-#else
+#else // for MEMCHECK builds
 /**
  * A debug version of the memory pool that does each allocation on the heap keeps a list for when purge is called
  */
 class Pool {
 public:
     Pool()
+        : m_allocations()
+        , m_memTotal(0)
     {
     }
 
-    Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
-        m_memTotal(0)
+    Pool(uint64_t allocationSize, uint64_t maxChunkCount)
+        : m_allocations()
+        , m_memTotal(0)
     {
     }
 
