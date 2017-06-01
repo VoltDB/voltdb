@@ -97,8 +97,11 @@ public class KafkaExternalLoader implements ImporterSupport {
         c_config.setProcedureCallTimeout(0);
 
         // Create the Volt client:
-        final String[] voltServers = m_config.servers.split(",");
-        m_client = getVoltClient(c_config, voltServers, m_config.port);
+        if (m_config.hosts == null || m_config.hosts.trim().isEmpty()) {
+            m_config.hosts = "localhost:" + Client.VOLTDB_SERVER_PORT;
+        }
+        String[] hosts = m_config.hosts.split(",");
+        m_client = getVoltClient(c_config, hosts);
 
         if (m_config.useSuppliedProcedure) {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback());
@@ -316,10 +319,10 @@ public class KafkaExternalLoader implements ImporterSupport {
     /*
      * Create a Volt client from the supplied configuration and list of servers.
      */
-    private static Client getVoltClient(ClientConfig config, String[] servers, int port) throws Exception {
+    private static Client getVoltClient(ClientConfig config, String[] hosts) throws Exception {
         final Client client = ClientFactory.createClient(config);
-        for (String server : servers) {
-            client.createConnection(server.trim(), port);
+        for (String host : hosts) {
+            client.createConnection(host);
         }
         return client;
     }
@@ -459,11 +462,8 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(shortOpt = "m", desc = "Maximum errors allowed before terminating import")
         int maxerrors = 100;
 
-        @Option(shortOpt = "s", desc = "List of VoltDB servers to connect to (default: localhost)")
-        String servers = "localhost";
-
-        @Option(desc = "Port to use when connecting to VoltDB servers (default: 21212)")
-        int port = Client.VOLTDB_SERVER_PORT;
+        @Option(desc = "Comma separated list of VoltDB servers (host:port) to connect to")
+        String hosts = "";
 
         @Option(desc = "Username for connecting to VoltDB servers")
         String user = "";
@@ -471,10 +471,10 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(desc = "Password for connecting to VoltDB servers")
         String password = "";
 
-        @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to (format: zkserver:port)")
+        @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to (format: host:port)")
         String zookeeper = ""; //No default here as default will clash with local voltdb cluster
 
-        @Option(shortOpt = "b", desc = "Comma-separated list of Kafka brokers (server:port) to connect to")
+        @Option(shortOpt = "b", desc = "Comma-separated list of Kafka brokers (host:port) to connect to")
         String brokers = "";
 
         @Option(shortOpt = "f", desc = "Periodic flush interval in seconds. (default: 10)")
@@ -518,9 +518,6 @@ public class KafkaExternalLoader implements ImporterSupport {
             }
             if (!zookeeper.trim().isEmpty() && !brokers.trim().isEmpty()) {
                 exitWithMessageAndUsage("Only one of Kafka Zookeeper or list of brokers can be specified.");
-            }
-            if (port < 0) {
-                exitWithMessageAndUsage("port number must be >= 0");
             }
             if (procedure.trim().isEmpty() && table.trim().isEmpty()) {
                 exitWithMessageAndUsage("procedure name or a table name required");
