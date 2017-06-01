@@ -84,7 +84,7 @@ public:
     bool next(TableTuple &out);
 
     bool hasNext();
-    int getLocation() const;
+    uint32_t getLocation() const;
 
     void setTempTableDeleteAsGo(bool flag) {
         m_tempTableDeleteAsGo = flag;
@@ -98,95 +98,136 @@ public:
         return ! ((*this) == other);
     }
 protected:
-    // Get an iterator via table->iterator()
+    /** Constructor for persistent tables */
     TableIterator(Table *, TBMapI);
+
+    /** Constructor for temp tables */
     TableIterator(Table *, std::vector<TBPtr>::iterator);
 
-    // avoid if possible -- less safe
-    TableIterator(Table *);
+    /** Constructor for large temp tables */
+    TableIterator(Table *, std::vector<int64_t>::iterator);
+
+
+    /* /\** Constructor used for both persistent and temp tables *\/ */
+    /* TableIterator(Table *); */
+
+    /** moves iterator to beginning of table.
+        (Called only for persistent tables) */
+    void reset(TBMapI);
+
+    /** moves iterator to beginning of table.
+        (Called only for temp tables) */
+    void reset(std::vector<TBPtr>::iterator);
+
+    bool continuationPredicate();
 
     bool persistentNext(TableTuple &out);
     bool tempNext(TableTuple &out);
 
-    void reset(TBMapI);
-    void reset(std::vector<TBPtr>::iterator);
-    bool continuationPredicate();
+    TBMapI getBlockIterator() const {
+        return m_blockIterator;
+    }
 
-    /*
-     * Configuration parameter that controls whether the table iterator
-     * stops when it has found the expected number of tuples or when it has iterated
-     * all the blocks. The former is able to stop sooner without having to read to the end of
-     * of the block. The latter is useful when the table will be modified after the creation of
-     * the iterator. It is assumed that the code invoking this iterator is handling
-     * the modifications that occur after the iterator is created.
-     *
-     * When set to false the counting of found tuples method is used. When set to true
-     * all blocks are scanned.
-     */
+    void setBlockIterator(const TBMapI& it) {
+        m_blockIterator = it;
+    }
+
+    uint32_t getBlockOffset() const {
+        return m_blockOffset;
+    }
+
+    uint32_t getFoundTuples() const {
+        return m_foundTuples;
+    }
+
+    void setFoundTuples(uint32_t found) {
+        m_foundTuples = found;
+    }
+
+    void setLocation(uint32_t loc) {
+        m_location = loc;
+    }
+
+    uint32_t getTuplesPerBlock() {
+        return m_tuplesPerBlock;
+    }
+
+private:
+
+    // State that is common to both temporary and persistent table
+    // iterators
     Table *m_table;
-    TBMapI m_blockIterator;
-    char *m_dataPtr;
-    uint32_t m_location;
-    uint32_t m_blockOffset;
     uint32_t m_activeTuples;
-    uint32_t m_foundTuples;
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;
     TBPtr m_currentBlock;
-    std::vector<TBPtr>::iterator m_tempBlockIterator;
+    uint32_t m_foundTuples;
+    uint32_t m_blockOffset;
+    char *m_dataPtr;
+    uint32_t m_location;
     bool m_tempTableIterator;
+
+    // State only for persistent table iterators
+    TBMapI m_blockIterator;
+
+    // State only for temp table iterators
+    std::vector<TBPtr>::iterator m_tempBlockIterator;
     bool m_tempTableDeleteAsGo;
 };
 
+// Construct iterator for temp tables
 inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
     : m_table(parent),
-      m_blockIterator(), // unused for temp table iterator
-      m_dataPtr(NULL),
-      m_location(0),
-      m_blockOffset(0),
       m_activeTuples((int) m_table->m_tupleCount),
-      m_foundTuples(0),
       m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock),
       m_currentBlock(NULL),
-      m_tempBlockIterator(start),
+      m_foundTuples(0),
+      m_blockOffset(0),
+      m_dataPtr(NULL),
+      m_location(0),
       m_tempTableIterator(true),
+      m_blockIterator(), // unused for temp table iterator
+      m_tempBlockIterator(start),
       m_tempTableDeleteAsGo(false)
     {
     }
 
-
+// Construct iterator for persistent tables
 inline TableIterator::TableIterator(Table *parent, TBMapI start)
     : m_table(parent),
-      m_blockIterator(start),
-      m_dataPtr(NULL),
-      m_location(0),
-      m_blockOffset(0),
       m_activeTuples((int) m_table->m_tupleCount),
-      m_foundTuples(0),
       m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock),
       m_currentBlock(NULL),
-      m_tempTableIterator(false),
-      m_tempTableDeleteAsGo(false)
-    {
-    }
-
-inline TableIterator::TableIterator(Table *parent)
-    : m_table(parent),
+      m_foundTuples(0),
+      m_blockOffset(0),
       m_dataPtr(NULL),
       m_location(0),
-      m_blockOffset(0),
-      m_activeTuples(0),
-      m_foundTuples(0),
-      m_tupleLength(0),
-      m_tuplesPerBlock(1),
-      m_currentBlock(NULL),
-      m_tempTableIterator(true),
-      m_tempTableDeleteAsGo(false)
+      m_tempTableIterator(false),
+      m_blockIterator(start),
+      m_tempBlockIterator(), // unused for persistent table iterator
+      m_tempTableDeleteAsGo(false) // unused for persistent table iterator
     {
     }
 
+//  Construct an iterator for large temp tables
+inline TableIterator::TableIterator(Table *parent, std::vector<int64_t>::iterator start)
+    : m_table(parent),
+      m_activeTuples((int) m_table->m_tupleCount),
+      m_tupleLength(parent->m_tupleLength),
+      m_tuplesPerBlock(parent->m_tuplesPerBlock),
+      m_currentBlock(NULL),
+      m_foundTuples(0),
+      m_blockOffset(0),
+      m_dataPtr(NULL),
+      m_location(0),
+      m_tempTableIterator(false),
+      m_blockIterator(), // unused for temp table iterator
+      m_tempBlockIterator(), // unused
+      m_tempTableDeleteAsGo(false) // unused
+    {
+    }
 
 inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_tempBlockIterator = start;
@@ -306,45 +347,8 @@ inline bool TableIterator::tempNext(TableTuple &out) {
     return false;
 }
 
-inline int TableIterator::getLocation() const {
+inline uint32_t TableIterator::getLocation() const {
     return m_location;
-}
-
-class JumpingTableIterator : public TableIterator {
-public:
-    // Get an iterator via table->iterator()
-    JumpingTableIterator(PersistentTable* table, TBMapI start, TBMapI end);
-    int getTuplesInNextBlock();
-    bool hasNextBlock();
-    void nextBlock();
-
-private:
-    TBMapI m_end;        // Use here for easy access to end()
-};
-
-inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent, TBMapI start, TBMapI end)
-    : TableIterator((Table*)parent, start), m_end(end)
-    {
-    }
-
-
-inline int JumpingTableIterator::getTuplesInNextBlock() {
-    assert(m_blockIterator != m_end);
-    return m_blockIterator.data()->activeTuples();
-}
-
-inline bool JumpingTableIterator::hasNextBlock() {
-    assert(m_blockOffset == 0);
-    return m_blockIterator != m_end;
-}
-
-inline void JumpingTableIterator::nextBlock() {
-    assert(m_blockOffset == 0);
-    assert(m_blockIterator != m_end);
-    TBPtr currentBlock = m_blockIterator.data();
-    m_blockIterator++;
-    m_foundTuples += currentBlock->activeTuples();
-    m_location += m_table->getTuplesPerBlock();
 }
 
 }

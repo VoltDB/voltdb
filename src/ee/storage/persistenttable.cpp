@@ -114,32 +114,43 @@ private:
     TableTuple& m_target;
 };
 
-PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
-    Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
-    m_iter(this),
-    m_allowNulls(),
-    m_partitionColumn(partitionColumn),
-    m_tupleLimit(tupleLimit),
-    m_purgeExecutorVector(),
-    m_stats(this),
-    m_failedCompactionCount(0),
-    m_invisibleTuplesPendingDeleteCount(0),
-    m_surgeon(*this),
-    m_tableForStreamIndexing(NULL),
-    m_isMaterialized(isMaterialized),
-    m_drEnabled(drEnabled),
-    m_noAvailableUniqueIndex(false),
-    m_smallestUniqueIndex(NULL),
-    m_smallestUniqueIndexCrc(0),
-    m_drTimestampColumnIndex(-1),
-    m_pkeyIndex(NULL),
-    m_mvHandler(NULL),
-    m_deltaTable(NULL),
-    m_deltaTableActive(false)
+PersistentTable::PersistentTable(int partitionColumn,
+                                 char const* signature,
+                                 bool isMaterialized,
+                                 int tableAllocationTargetSize,
+                                 int tupleLimit,
+                                 bool drEnabled)
+    : Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize)
+    , m_data()
+    , m_iter(this, m_data.begin())
+    , m_allowNulls()
+    , m_partitionColumn(partitionColumn)
+    , m_tupleLimit(tupleLimit)
+    , m_purgeExecutorVector()
+    , m_views()
+    , m_stats(this)
+    , m_blocksNotPendingSnapshotLoad()
+    , m_blocksPendingSnapshotLoad()
+    , m_blocksNotPendingSnapshot()
+    , m_blocksPendingSnapshot()
+    , m_blocksWithSpace()
+    , m_tableStreamer()
+    , m_failedCompactionCount(0)
+    , m_invisibleTuplesPendingDeleteCount(0)
+    , m_surgeon(*this)
+    , m_tableForStreamIndexing(NULL)
+    , m_isMaterialized(isMaterialized)
+    , m_drEnabled(drEnabled)
+    , m_noAvailableUniqueIndex(false)
+    , m_smallestUniqueIndex(NULL)
+    , m_smallestUniqueIndexCrc(0)
+    , m_drTimestampColumnIndex(-1)
+    , m_pkeyIndex(NULL)
+    , m_mvHandler(NULL)
+    , m_viewHandlers()
+    , m_deltaTable(NULL)
+    , m_deltaTableActive(false)
 {
-    // this happens here because m_data might not be initialized above
-    m_iter.reset(m_data.begin());
-
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));

@@ -27,10 +27,11 @@ static const int BLOCKSIZE = 131072;
 
 LargeTempTable::LargeTempTable()
     : Table(BLOCKSIZE)
-    , m_insertsFinished(false)
-    , m_iter(this)
-    , m_blockForWriting(NULL)
     , m_blockIds()
+    , m_insertsFinished(false)
+    , m_iter(this, m_blockIds.begin())
+    , m_blockForWriting(NULL)
+
 {
 }
 

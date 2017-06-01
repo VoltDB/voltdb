@@ -77,9 +77,6 @@ class TempTable : public Table {
     TempTable(TempTable const&);
     TempTable operator=(TempTable const&);
 
-    // default iterator
-    TableIterator m_iter;
-
   public:
     // Return the table iterator by reference
     TableIterator& iterator() {
@@ -143,8 +140,8 @@ class TempTable : public Table {
     }
 
   protected:
-    // can not use this constructor to coerce a cast
-    explicit TempTable();
+
+    TempTable();
 
     size_t allocatedBlockCount() const {
         return m_data.size();
@@ -165,6 +162,9 @@ class TempTable : public Table {
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     std::vector<TBPtr> m_data;
+
+    // default iterator
+    TableIterator m_iter;
 
     // ptr to global integer tracking temp table memory allocated per frag
     TempTableLimits* m_limits;

@@ -75,10 +75,6 @@ public:
 
     }
 
-    int64_t numTuples() const {
-        return m_numTuples;
-    }
-
     virtual ~LargeTempTable();
 
 protected:
@@ -87,14 +83,13 @@ protected:
 
 private:
 
+    std::vector<int64_t> m_blockIds;
+
     bool m_insertsFinished;
 
     TableIterator m_iter;
 
     LargeTempTableBlock* m_blockForWriting;
-    std::vector<int64_t> m_blockIds;
-
-    int64_t m_numTuples; // redundant with base class?? xxx
 };
 
 }
