@@ -23,7 +23,15 @@
 
 package org.voltdb.planner;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.net.URL;
+import java.net.URLDecoder;
+
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 
 public class TestDeterminism extends PlannerTestCase {
     @Override
@@ -1072,6 +1080,30 @@ public class TestDeterminism extends PlannerTestCase {
         // indexes defined on both the tables. At most one row output is not guaranteed.
         sql = "select * from punique, ppk where punique.a = ppk.a";
         assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+    }
+
+    /*
+     * A test that runs some read-only non-deterministic DDLs, check that the output does not contain
+     * any ND warnings
+     */
+    public void testDeterminismReadOnlyNoWarning() throws Exception {
+        // Should the members be reused here?
+        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        VoltCompiler compiler = new VoltCompiler(false);
+        VoltCompiler.DdlProceduresToLoad all_procs = DdlProceduresToLoad.NO_DDL_PROCEDURES;
+
+        URL path = TestDeterminism.class.getResource("testplans-determinism-read-only.sql");
+        String pathStr = URLDecoder.decode(path.getPath(), "UTF-8");
+        compiler.loadSchema(hsql, all_procs, pathStr);
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        compiler.summarizeSuccess(new PrintStream(outputStream), null, "");
+        System.out.println(outputStream.toString());
+        // There is no warnings generated for read-only ND queries
+        String msg = outputStream.toString();
+        assert(!msg.contains("ND"));
+        assert(!msg.contains("WARN"));
+        outputStream.close();
     }
 
     private void assertMPPlanDeterminismCore(String sql, boolean order, boolean content, DeterminismMode detMode) {
