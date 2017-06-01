@@ -23,7 +23,7 @@ import org.voltdb.importer.ImporterSupport;
 import org.voltdb.importer.Invocation;
 
 /**
- * Implementation that imports from a Kafka topic. This is for a single partition of a Kafka topic.
+ * Implementation that imports from a single partition of a Kafka topic.
  */
 
 public class KafkaTopicPartitionImporter extends AbstractImporter

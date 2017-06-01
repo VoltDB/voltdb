@@ -109,7 +109,7 @@ public class KafkaExternalLoader implements ImporterSupport {
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
 
         try {
-            m_executorService = getConsumerExecutor(m_loader, this);
+            m_executorService = createImporterExecutor(m_loader, this);
 
             if (m_config.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started using procedure: " + m_config.procedure);
@@ -161,6 +161,10 @@ public class KafkaExternalLoader implements ImporterSupport {
     }
 
 
+    //
+    // ImporterSupport implementation
+    //
+
     private volatile boolean m_stopping = false;
 
     @Override
@@ -211,7 +215,7 @@ public class KafkaExternalLoader implements ImporterSupport {
     /*
      * Create an executor with one importer per thread (per partition).
      */
-    private ExecutorService getConsumerExecutor(CSVDataLoader loader, final ImporterSupport wrapper) throws Exception {
+    private ExecutorService createImporterExecutor(CSVDataLoader loader, final ImporterSupport wrapper) throws Exception {
 
         Map<URI, KafkaStreamImporterConfig> configs = createKafkaImporterConfigFromProperties(m_config);
         ExecutorService executor = Executors.newFixedThreadPool(configs.size());
@@ -249,7 +253,7 @@ public class KafkaExternalLoader implements ImporterSupport {
         // Derive the key from the list of broker URIs:
         String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokerListString);
 
-        // GroupId can be specified by the command line, or dervied from the table/procedure:
+        // GroupId can be specified by the command line, or derived from the table/procedure:
         String groupId;
         if (properties.groupid == null || properties.groupid.trim().length() == 0) {
             groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
