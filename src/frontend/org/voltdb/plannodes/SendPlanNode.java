@@ -46,9 +46,7 @@ public class SendPlanNode extends AbstractPlanNode {
         AbstractPlanNode childNode = m_children.get(0);
         childNode.resolveColumnIndexes();
         NodeSchema inputSchema = childNode.getOutputSchema();
-
         assert(inputSchema.equalsOnlyNames(m_outputSchema));
-
         for (SchemaColumn col : m_outputSchema.getColumns()) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
