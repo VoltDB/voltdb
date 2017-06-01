@@ -146,4 +146,15 @@ namespace voltdb {
         return "";
     }
 
-}
+    bool DummyTopend::storeLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        return false;
+    }
+
+    bool DummyTopend::loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block) {
+        return false;
+    }
+
+    bool DummyTopend::releaseLargeTempTableBlock(int64_t blockId) {
+        return false;
+    }
+} // end namespace voltdb

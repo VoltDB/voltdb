@@ -1657,7 +1657,9 @@ public class PlanAssembler {
             i++;
         }
 
-        // the root of the insert plan is always an InsertPlanNode
+        // the root of the insert plan may be an InsertPlanNode, or
+        // it may be a scan plan node.  We may do an inline InsertPlanNode
+        // as well.
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
         if (subquery != null) {
@@ -1668,21 +1670,36 @@ public class PlanAssembler {
         // where to put values produced by child into the row to be inserted.
         insertNode.setFieldMap(fieldMap);
 
+        AbstractPlanNode root = insertNode;
         if (matSchema != null) {
             MaterializePlanNode matNode =
                     new MaterializePlanNode(matSchema);
             // connect the insert and the materialize nodes together
             insertNode.addAndLinkChild(matNode);
-
             retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
         }
         else {
-            insertNode.addAndLinkChild(retval.rootPlanGraph);
+            ScanPlanNodeWithInlineInsert planNode
+              = (retval.rootPlanGraph instanceof ScanPlanNodeWithInlineInsert)
+                    ? ((ScanPlanNodeWithInlineInsert)retval.rootPlanGraph)
+                    : null;
+            // If we have a sequential or index scan node without an inline aggregate
+            // node, and this is not an upsert, then we can inline the insert node.
+            // Inline upsert might be possible, but not now.
+            if (planNode != null
+                    && ( ! m_parsedInsert.m_isUpsert)
+                    && ( ! planNode.hasInlineAggregateNode())) {
+                planNode.addInlinePlanNode(insertNode);
+                root = planNode.getAbstractNode();
+            } else {
+                // Otherwise just make it out-of-line.
+                insertNode.addAndLinkChild(retval.rootPlanGraph);
+            }
         }
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
-            retval.rootPlanGraph = insertNode;
+            retval.rootPlanGraph = root;
             return retval;
         }
 
@@ -1690,7 +1707,7 @@ public class PlanAssembler {
         // Add a compensating sum of modified tuple counts or a limit 1
         // AND a send on top of a union-like receive node.
         boolean isReplicated = targetTable.getIsreplicated();
-        retval.rootPlanGraph = addCoordinatorToDMLNode(insertNode, isReplicated);
+        retval.rootPlanGraph = addCoordinatorToDMLNode(root, isReplicated);
         return retval;
     }
 
@@ -1808,9 +1825,7 @@ public class PlanAssembler {
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
         // If the projection can be done inline. then add the
-        // projection node inline.  Even if the rootNode is a
-        // scan, if we have a windowed expression we need to
-        // add it out of line.
+        // projection node inline.
         if (rootNode instanceof AbstractScanPlanNode) {
             rootNode.addInlinePlanNode(projectionNode);
             return rootNode;

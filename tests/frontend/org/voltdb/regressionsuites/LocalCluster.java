@@ -2154,6 +2154,7 @@ public class LocalCluster extends VoltServerConfig {
         if (remoteReplicationPort != 0) {
             builder.setDRMasterHost("localhost:" + remoteReplicationPort);
         }
+        builder.setUseDDLSchema(true);
         LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI, false);
         lc.setReplicationPort(replicationPort);
         if (callingMethodName != null) {

@@ -260,6 +260,7 @@ CTX.INPUT['common'] = """
  TupleSchema.cpp
  types.cpp
  UndoLog.cpp
+ LargeTempTableBlockCache.cpp
  NValue.cpp
  RecoveryProtoMessage.cpp
  RecoveryProtoMessageBuilder.cpp
@@ -377,6 +378,8 @@ CTX.INPUT['storage'] = """
  ElasticIndexReadContext.cpp
  ElasticScanner.cpp
  ExportTupleStream.cpp
+ LargeTempTable.cpp
+ LargeTempTableBlock.cpp
  MaterializedViewHandler.cpp
  MaterializedViewTriggerForInsert.cpp
  MaterializedViewTriggerForWrite.cpp
@@ -523,6 +526,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      DRBinaryLog_test
      DRTupleStream_test
      ExportTupleStream_test
+     LargeTempTableTest
      PersistentTableMemStatsTest
      StreamedTable_test
      TempTableLimitsTest

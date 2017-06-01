@@ -78,8 +78,8 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementL
 
         bool foundSourceTuple = false;
         //Iterate further into the block looking for active tuples
-        //Stop when running into the unused tuple boundry
-        while (m_nextTupleInSourceOffset < source->unusedTupleBoundry()) {
+        //Stop when running into the unused tuple boundary
+        while (m_nextTupleInSourceOffset < source->unusedTupleBoundary()) {
             sourceTupleWithNewValues.move(&source->address()[m_tupleLength * m_nextTupleInSourceOffset]);
             m_nextTupleInSourceOffset++;
             if (sourceTupleWithNewValues.isActive()) {
@@ -132,4 +132,3 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementL
     }
 }
 }
-
