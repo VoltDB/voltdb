@@ -343,23 +343,35 @@ public class ParameterConverter {
                 param == VoltType.NULL_DECIMAL) {
             return nullValueForType(expectedClz);
         }
-        // [ENG-12522] BigDecimal should be able to be converted to long or float if possible
+        // [ENG-12522] BigDecimal should be able to be converted to long / double or other
+        // primitive numeric types if possible
         // If it cannot be converted (say out of range), just display the error message.
         else if (inputClz == BigDecimal.class) {
+            // Only conversion to primitive numeric types are considered
+            BigDecimal pBigDecimal = (BigDecimal) param;
             if (expectedClz == long.class) {
-                BigDecimal pBigDecimal = (BigDecimal) param;
                 try {
                     long result = pBigDecimal.longValueExact();
                     return result;
-                } catch (ArithmeticException e) {}
+                } catch (ArithmeticException e) {}  // The error will be re-thrown below
             } else if (expectedClz == double.class) {
-                // This conversion could potentially lose information
-                BigDecimal pBigDecimal = (BigDecimal) param;
+                // This conversion could potentially lose information, should a warning be
+                // given at a higher level ?
                 double result = pBigDecimal.doubleValue();
                 // The converted double could be infinity if out of range
                 if (result != Double.POSITIVE_INFINITY && result != Double.NEGATIVE_INFINITY) {
                     return result;
                 }
+            } else if (expectedClz == int.class) {
+                try {
+                    int result = pBigDecimal.intValueExact();
+                    return result;
+                } catch (ArithmeticException e) {}  // The error will be re-thrown below
+            } else if (expectedClz == short.class) {
+                try {
+                    short result = pBigDecimal.shortValueExact();
+                    return result;
+                } catch (ArithmeticException e) {} // The error will be re-thrown below
             }
             throw new VoltTypeException(
                             "tryToMakeCompatible: The provided value: (" + param.toString() +
