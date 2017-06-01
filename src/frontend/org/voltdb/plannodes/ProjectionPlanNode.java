@@ -180,16 +180,18 @@ public class ProjectionPlanNode extends AbstractPlanNode {
      * @return true iff the node is unnecessary.
      */
     public boolean isIdentity(NodeSchema inputSchema) {
+        assert(inputSchema != null);
         NodeSchema outputSchema = getOutputSchema();
         List<SchemaColumn> cols = outputSchema.getColumns();
-        List<SchemaColumn> childCols = (inputSchema == null) ? null : inputSchema.getColumns();
-        if (childCols != null && (cols.size() != childCols.size())) {
+        List<SchemaColumn> childCols = inputSchema.getColumns();
+        assert(childCols != null);
+        if (cols.size() != childCols.size()) {
             return false;
         }
         for (int idx = 0; idx < cols.size(); idx += 1) {
             SchemaColumn col = cols.get(idx);
-            SchemaColumn childCol = (childCols == null) ? null : childCols.get(idx);
-            if (childCol != null && (col.getType() != childCol.getType())) {
+            SchemaColumn childCol = childCols.get(idx);
+            if (col.getType() != childCol.getType()) {
                 return false;
             }
             if ( ! (col.getExpression() instanceof TupleValueExpression)) {
