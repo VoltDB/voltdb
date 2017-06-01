@@ -22,13 +22,8 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -50,7 +45,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
@@ -58,47 +52,31 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Permission;
-import org.voltdb.compiler.AdHocPlannedStatement;
-import org.voltdb.compiler.AdHocPlannedStmtBatch;
-import org.voltdb.compiler.AdHocPlannerWork;
-import org.voltdb.compiler.AsyncCompilerResult;
-import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
-import org.voltdb.compiler.CatalogChangeResult;
-import org.voltdb.compiler.CatalogChangeWork;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compilereport.ViewExplainer;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.parser.SQLLexer;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
 
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 
 public final class InvocationDispatcher {
 
@@ -127,7 +105,6 @@ public final class InvocationDispatcher {
      * This reference is shared with the one in {@link ClientInterface}
      */
     private final AtomicReference<CatalogContext> m_catalogContext;
-    private final long m_plannerSiteId;
     private final long m_siteId;
     private final Mailbox m_mailbox;
     //This validator will verify params or per procedure invocation validation.
@@ -144,12 +121,9 @@ public final class InvocationDispatcher {
 
     private final NTProcedureService m_NTProcedureService;
 
-    private final boolean m_isConfiguredForNonVoltDBBackend;
-
-    InternalConnectionHandler m_internalConnectionHandler;
-
     public final static class Builder {
 
+        ClientInterface m_clientInterface;
         Cartographer m_cartographer;
         AtomicReference<CatalogContext> m_catalogContext;
         ConcurrentMap<Long, ClientInterfaceHandleManager> m_cihm;
@@ -158,7 +132,11 @@ public final class InvocationDispatcher {
         SnapshotDaemon m_snapshotDaemon;
         long m_plannerSiteId;
         long m_siteId;
-        InternalConnectionHandler m_ich;
+
+        public Builder clientInterface(ClientInterface clientInterface) {
+            m_clientInterface = checkNotNull(clientInterface, "given client interface is null");
+            return this;
+        }
 
         public Builder cartographer(Cartographer cartographer) {
             m_cartographer = checkNotNull(cartographer, "given cartographer is null");
@@ -200,13 +178,9 @@ public final class InvocationDispatcher {
             return this;
         }
 
-        public Builder internalConnectionHandler(InternalConnectionHandler ich) {
-            m_ich = checkNotNull(ich,"internal connection handler is null");;
-            return this;
-        }
-
         public InvocationDispatcher build() {
             return new InvocationDispatcher(
+                    m_clientInterface,
                     m_cartographer,
                     m_catalogContext,
                     m_cihm,
@@ -214,8 +188,7 @@ public final class InvocationDispatcher {
                     m_snapshotDaemon,
                     m_replicationRole,
                     m_plannerSiteId,
-                    m_siteId,
-                    m_ich
+                    m_siteId
                     );
         }
     }
@@ -225,6 +198,7 @@ public final class InvocationDispatcher {
     }
 
     private InvocationDispatcher(
+            ClientInterface clientInterface,
             Cartographer cartographer,
             AtomicReference<CatalogContext> catalogContext,
             ConcurrentMap<Long, ClientInterfaceHandleManager> cihm,
@@ -232,11 +206,9 @@ public final class InvocationDispatcher {
             SnapshotDaemon snapshotDaemon,
             ReplicationRole replicationRole,
             long plannerSiteId,
-            long siteId,
-            InternalConnectionHandler ich)
+            long siteId)
     {
         m_siteId = siteId;
-        m_plannerSiteId = plannerSiteId;
         m_mailbox = checkNotNull(mailbox, "given mailbox is null");
         m_catalogContext = checkNotNull(catalogContext, "given catalog context is null");
         m_cihm = checkNotNull(cihm, "given client interface handler manager lookup map is null");
@@ -244,19 +216,13 @@ public final class InvocationDispatcher {
                 checkNotNull(replicationRole, "given replication role is null")
                 );
         m_cartographer = checkNotNull(cartographer, "given cartographer is null");
-        BackendTarget backendTargetType = VoltDB.instance().getBackendTargetType();
-        m_isConfiguredForNonVoltDBBackend = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
-                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND ||
-                                             backendTargetType == BackendTarget.POSTGIS_BACKEND);
-
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
-
-        m_internalConnectionHandler = ich;
 
         // try to get the global default setting for read consistency, but fall back to SAFE
         m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
 
-        m_NTProcedureService = new NTProcedureService(m_internalConnectionHandler, m_mailbox);
+        m_NTProcedureService = new NTProcedureService(clientInterface, this, m_mailbox);
+
         // this kicks off the initial NT procedures being loaded
         notifyNTProcedureServiceOfCatalogUpdate();
     }
@@ -383,6 +349,13 @@ public final class InvocationDispatcher {
             }
         }
 
+        // handle non-transactional procedures (INCLUDING NT SYSPROCS)
+        // note that we also need to check for java for now as transactional flag is
+        // only 100% when we're talking Java
+        if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
+            return dispatchNTProcedure(handler, task, user, ccxn, nowNanos, ntPriority);
+        }
+
         // check for allPartition invocation and provide a nice error if it's misused
         if (task.getAllPartition()) {
             // must be single partition and must be partitioned on parameter 0
@@ -395,13 +368,6 @@ public final class InvocationDispatcher {
             }
         }
 
-        // handle non-transactional procedures (INCLUDING NT SYSPROCS)
-        // note that we also need to check for java for now as transactional flag is
-        // only 100% when we're talking Java
-        if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
-            return dispatchNTProcedure(handler, task, user, ccxn, nowNanos, ntPriority);
-        }
-
         if (catProc.getSystemproc()) {
             // COMMUNITY SYSPROC SPECIAL HANDLING
 
@@ -409,10 +375,6 @@ public final class InvocationDispatcher {
             // nb: ping is not a real procedure, so this is checked before other "sysprocs"
             if ("@Ping".equals(procName)) {
                 return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
-            }
-            else if ("@AdHoc".equals(procName)) {
-                dispatchAdHoc(task, handler, ccxn, ExplainMode.NONE, user);
-                return null;
             }
             else if ("@GetPartitionKeys".equals(procName)) {
                 return dispatchGetPartitionKeys(task);
@@ -435,26 +397,9 @@ public final class InvocationDispatcher {
             else if ("@StopNode".equals(procName)) {
                 return dispatchStopNode(task);
             }
-            else if ("@Explain".equals(procName)) {
-                dispatchAdHoc(task, handler, ccxn, ExplainMode.EXPLAIN_ADHOC, user);
-                return null;
-            }
-            else if ("@ExplainProc".equals(procName)) {
-                return dispatchExplainProcedure(task, handler, ccxn, user);
-            }
-            else if ("@ExplainView".equals(procName)) {
-                return dispatchExplainView(task, ccxn);
-            }
-            else if ("@AdHocSpForTest".equals(procName)) {
-                return dispatchAdHocSpForTest(task, handler, ccxn, false, user);
-            }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
-            }
-            else if ("@SwapTables".equals(procName)) {
-                dispatchSwapTables(task, handler, ccxn, user);
-                return null;
             }
             else if ("@ExecuteTask".equals(procName)) {
                 // ExecuteTask is an internal procedure, not for public use.
@@ -476,19 +421,9 @@ public final class InvocationDispatcher {
                             task.clientHandle);
                 }
             }
-            final boolean useDdlSchema = catalogContext.cluster.getUseddlschema();
-            if ("@UpdateApplicationCatalog".equals(procName)) {
-                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user, useDdlSchema);
-            }
-            else if ("@UpdateClasses".equals(procName)) {
-                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user, useDdlSchema);
-            }
             else if ("@SnapshotSave".equals(procName)) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
-            }
-            else if ("@Promote".equals(procName)) {
-                return dispatchPromote(task, handler, ccxn, user, useDdlSchema);
             }
             else if ("@SnapshotStatus".equals(procName)) {
                 // SnapshotStatus is really through @Statistics now, but preserve the
@@ -509,6 +444,7 @@ public final class InvocationDispatcher {
                     return retval;
                 }
                 if (m_isInitialRestore.compareAndSet(true, false) && isSchemaEmpty()) {
+                    m_NTProcedureService.isRestoring = true;
                     return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
                 }
             } else if ("@Shutdown".equals(procName)) {
@@ -527,6 +463,14 @@ public final class InvocationDispatcher {
                 return unexpectedFailureResponse(
                         procName + " is not available to this client",
                         task.clientHandle);
+            }
+
+            // After we verify the shutdown command from an admin user, the detailed information
+            // should be printed out properly. The following message is printed at the node where
+            // the client is connected to.
+            if ("@PrepareShutdown".equals(procName)) {
+                String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a PrepareShutdown.";
+                CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
             }
         }
         // If you're going to copy and paste something, CnP the pattern
@@ -573,22 +517,7 @@ public final class InvocationDispatcher {
         }
 
         if (catProc == null) {
-            String proc = procName;
-            if ("@AdHoc".equals(procName) || "@AdHocSpForTest".equals(procName)) {
-                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-                // configured differently for @AdHoc... variants this code will have to
-                // change in order to use the proper variant based on whether the work
-                // is single or multi partition and read-only or read-write.
-                proc = "@AdHoc_RW_MP";
-            }
-            else if ("@UpdateClasses".equals(procName)) {
-                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
-                // permissions and replication policy for @UAC, and we'll deal with the
-                // parameter validation stuff separately (the different name will
-                // skip the @UAC-specific policy)
-                proc = "@UpdateApplicationCatalog";
-            }
-            Config sysProc = SystemProcedureCatalog.listing.get(proc);
+            Config sysProc = SystemProcedureCatalog.listing.get(procName);
             if (sysProc != null) {
                 catProc = sysProc.asCatalogProcedure();
             }
@@ -765,112 +694,6 @@ public final class InvocationDispatcher {
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
-    // Go to the catalog and fetch all the "explain plan" strings of the queries in the view.
-    private final ClientResponseImpl dispatchExplainView(StoredProcedureInvocation task, Connection ccxn) {
-        ParameterSet params = task.getParams();
-        /*
-         * TODO: We don't actually support multiple view names in an ExplainView call,
-         * so I THINK that the string is always a single view symbol and all this
-         * splitting and iterating is a no-op.
-         */
-        List<String> viewNames = SQLLexer.splitStatements((String)params.toArray()[0]);
-        int size = viewNames.size();
-        VoltTable[] vt = new VoltTable[size];
-        CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
-        for (int i = 0; i < size; i++) {
-            String viewName = viewNames.get(i);
-
-            // look in the catalog
-            // get the view table from the catalog
-            Table viewTable = tables.getIgnoreCase(viewName);
-            if (viewTable == null) {
-                return unexpectedFailureResponse("View " + viewName + " does not exist.", task.clientHandle);
-            }
-
-            vt[i] = new VoltTable(new VoltTable.ColumnInfo("TASK",           VoltType.STRING),
-                                  new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
-            try {
-                ArrayList<String[]> viewExplanation = ViewExplainer.explain(viewTable);
-                for (String[] row : viewExplanation) {
-                    vt[i].addRow(row[0], row[1]);
-                }
-            }
-            catch (Exception e) {
-                return unexpectedFailureResponse(e.getMessage(), task.clientHandle);
-            }
-        }
-
-        ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                        null,
-                        vt,
-                        null);
-        response.setClientHandle( task.clientHandle );
-        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-        buf.putInt(buf.capacity() - 4);
-        response.flattenToBuffer(buf);
-        buf.flip();
-        ccxn.writeStream().enqueue(buf);
-        return null;
-    }
-
-    // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
-    private final ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, InvocationClientHandler handler,
-            Connection ccxn, AuthUser user) {
-        ParameterSet params = task.getParams();
-        /*
-         * TODO: We don't actually support multiple proc names in an ExplainProc call,
-         * so I THINK that the string is always a single procname symbol and all this
-         * splitting and iterating is a no-op.
-         */
-        //String procs = (String) params.toArray()[0];
-        List<String> procNames = SQLLexer.splitStatements( (String)params.toArray()[0]);
-        int size = procNames.size();
-        VoltTable[] vt = new VoltTable[ size ];
-        for( int i=0; i<size; i++ ) {
-            String procName = procNames.get(i);
-
-            // look in the catalog
-            Procedure proc = m_catalogContext.get().procedures.get(procName);
-            if (proc == null) {
-                // check default procs and send them off to be explained using the regular
-                // adhoc explain process
-                proc = m_catalogContext.get().m_defaultProcs.checkForDefaultProcedure(procName);
-                if (proc != null) {
-                    String sql = m_catalogContext.get().m_defaultProcs.sqlForDefaultProc(proc);
-                    dispatchAdHocCommon(task, handler, ccxn, ExplainMode.EXPLAIN_DEFAULT_PROC, sql, new Object[0], null, user);
-                    return null;
-                }
-
-                return unexpectedFailureResponse("Procedure "+procName+" not in catalog", task.clientHandle);
-            }
-
-            vt[i] = new VoltTable(new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
-                                  new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
-
-            for( Statement stmt : proc.getStatements() ) {
-                vt[i].addRow( stmt.getSqltext(), Encoder.hexDecodeToString( stmt.getExplainplan() ) );
-            }
-        }
-
-        ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                        null,
-                        vt,
-                        null);
-        response.setClientHandle( task.clientHandle );
-        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-        buf.putInt(buf.capacity() - 4);
-        response.flattenToBuffer(buf);
-        buf.flip();
-        ccxn.writeStream().enqueue(buf);
-        return null;
-    }
-
     public final ClientResponseImpl dispatchNTProcedure(InvocationClientHandler handler,
                                                         StoredProcedureInvocation task,
                                                         AuthUser user,
@@ -922,40 +745,13 @@ public final class InvocationDispatcher {
         // do at the top of this method won't release any backpressure accounting.
 
         // actually kick off the NT proc
-        ParameterSet paramSet = task.getParams();
         m_NTProcedureService.callProcedureNT(handle,
                                              user,
                                              ccxn,
-                                             task.clientHandle,
+                                             handler.isAdmin(),
                                              ntPriority,
-                                             task.getProcName(),
-                                             paramSet);
+                                             task);
         return null;
-    }
-
-    private final void dispatchAdHoc(StoredProcedureInvocation task, InvocationClientHandler handler,
-            Connection ccxn, ExplainMode explainMode, AuthSystem.AuthUser user) {
-        ParameterSet params = task.getParams();
-        Object[] paramArray = params.toArray();
-        String sql = (String) paramArray[0];
-        Object[] userParams = null;
-        if (params.size() > 1) {
-            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
-        }
-        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, null, user);
-    }
-
-    private void dispatchSwapTables(StoredProcedureInvocation task,
-            InvocationClientHandler handler,
-            Connection ccxn, AuthSystem.AuthUser user) {
-        ParameterSet params = task.getParams();
-        Object[] paramArray = params.toArray();
-        String theTable = (String) paramArray[0];
-        String otherTable = (String) paramArray[1];
-        String sql = "@SwapTables " + theTable + " " + otherTable;
-        Object[] userParams = null;
-        dispatchAdHocCommon(task, handler, ccxn, ExplainMode.NONE, sql,
-                userParams, null, user);
     }
 
     private StoredProcedureInvocation appendAuditParams(StoredProcedureInvocation task,
@@ -999,25 +795,6 @@ public final class InvocationDispatcher {
                         false,  // isReadOnly
                         forReplay);  // isForReplay
         m_mailbox.send(initiatorHSId, mppm);
-    }
-
-    private final ClientResponseImpl dispatchAdHocSpForTest(StoredProcedureInvocation task,
-            InvocationClientHandler handler, Connection ccxn, boolean isExplain, AuthSystem.AuthUser user) {
-        ParameterSet params = task.getParams();
-        assert(params.size() > 1);
-        Object[] paramArray = params.toArray();
-        String sql = (String) paramArray[0];
-        // get the partition param which must exist
-        Object[] userPartitionKey = Arrays.copyOfRange(paramArray, 1, 2);
-        Object[] userParams = null;
-        // There's no reason (any more) that AdHocSP's can't have '?' parameters, but
-        // note that the explicit partition key argument is not considered one of them.
-        if (params.size() > 2) {
-            userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
-        }
-        ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
-        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, userPartitionKey, user);
-        return null;
     }
 
     /**
@@ -1072,83 +849,6 @@ public final class InvocationDispatcher {
 
         Column pCol = catTable.getPartitioncolumn();
         return pCol.getType();
-    }
-
-    final void dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            boolean useDdlSchema, boolean isPromotion,
-            Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin)
-    {
-        ParameterSet params = task.getParams();
-        final Object [] paramArray = params.toArray();
-        // default catalogBytes to null, when passed along, will tell the
-        // catalog change planner that we want to use the current catalog.
-        byte[] catalogBytes = null;
-        Object catalogObj = paramArray[0];
-        if (catalogObj != null) {
-            if (catalogObj instanceof String) {
-                // treat an empty string as no catalog provided
-                String catalogString = (String) catalogObj;
-                if (!catalogString.isEmpty()) {
-                    catalogBytes = Encoder.hexDecode(catalogString);
-                }
-            } else if (catalogObj instanceof byte[]) {
-                // treat an empty array as no catalog provided
-                byte[] catalogArr = (byte[]) catalogObj;
-                if (catalogArr.length != 0) {
-                    catalogBytes = catalogArr;
-                }
-            }
-        }
-        String deploymentString = (String) paramArray[1];
-        LocalObjectMessage work = new LocalObjectMessage(
-                new CatalogChangeWork(
-                    m_siteId,
-                    task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
-                    isAdmin, ccxn, catalogBytes, deploymentString,
-                    task.getProcName(),
-                    DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
-                    useDdlSchema,
-                    m_adhocCompletionHandler, user,
-                    null, isPromotion, -1L, -1L
-                    ));
-
-        m_mailbox.send(m_plannerSiteId, work);
-    }
-
-    private final ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user,
-            boolean useDdlSchema)
-    {
-        dispatchUpdateApplicationCatalog(task, useDdlSchema, false, ccxn, user, handler.isAdmin());
-        return null;
-    }
-
-    private final ClientResponseImpl dispatchPromote(StoredProcedureInvocation task,
-                                                     InvocationClientHandler handler,
-                                                     Connection ccxn, AuthSystem.AuthUser user,
-                                                     boolean useDdlSchema)
-    {
-        if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE)
-        {
-            return gracefulFailureResponse(
-                    "@Promote issued on non-replica cluster. No action taken.",
-                    task.clientHandle);
-        }
-
-        LocalObjectMessage work = new LocalObjectMessage(
-            new CatalogChangeWork(m_siteId,
-                                  task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
-                                  handler.isAdmin(), ccxn, null, null,
-                                  "@UpdateApplicationCatalog",
-                                  DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
-                                  useDdlSchema,
-                                  m_adhocCompletionHandler, user,
-                                  null, true, -1L, -1L
-            ));
-
-        m_mailbox.send(m_plannerSiteId, work);
-
-        return null;
     }
 
     public void setReplicationRole(ReplicationRole role) {
@@ -1456,414 +1156,13 @@ public final class InvocationDispatcher {
 
             VoltDB.instance().getClientInterface().bindAdapter(alternateAdapter, null);
 
-            dispatchUpdateApplicationCatalog(catalogUpdateTask, alternateHandler, alternateAdapter, user, false);
-
-        } catch (JSONException e) {
+            // dispatch the catalog update
+            dispatchNTProcedure(alternateHandler, catalogUpdateTask, user, alternateAdapter, System.nanoTime(), false);
+        }
+        catch (JSONException e) {
             return unexpectedFailureResponse("Unable to parse parameters.", task.clientHandle);
         }
         return null;
-    }
-
-
-    /*
-     * Allow the async compiler thread to immediately process completed planning tasks
-     * without waiting for the periodic work thread to poll the mailbox.
-     */
-    private final  AsyncCompilerWorkCompletionHandler m_adhocCompletionHandler = new AsyncCompilerWorkCompletionHandler() {
-        @Override
-        public void onCompletion(AsyncCompilerResult result) {
-            processFinishedCompilerWork(result);
-        }
-    };
-
-    private final void dispatchAdHocCommon(StoredProcedureInvocation task,
-            InvocationClientHandler handler, Connection ccxn, ExplainMode explainMode,
-            String sql, Object[] userParams, Object[] userPartitionKey, AuthSystem.AuthUser user) {
-        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
-        if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.beginAsync("planadhoc", task.getClientHandle(),
-                                                    "clientHandle", Long.toString(task.getClientHandle()),
-                                                    "sql", sql));
-        }
-
-        List<String> sqlStatements = SQLLexer.splitStatements(sql);
-        String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
-
-        AdHocPlannerWork ahpw = new AdHocPlannerWork(
-                m_siteId,
-                task.clientHandle, handler.connectionId(),
-                handler.isAdmin(), ccxn,
-                sql, stmtsArray, userParams, null, explainMode,
-                userPartitionKey == null, userPartitionKey,
-                task.getProcName(),
-                task.getBatchTimeout(),
-                DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
-                VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
-                m_adhocCompletionHandler, user);
-        LocalObjectMessage work = new LocalObjectMessage( ahpw );
-
-        m_mailbox.send(m_plannerSiteId, work);
-    }
-
-    /*
-     * Invoked from the AsyncCompilerWorkCompletionHandler from the AsyncCompilerAgent thread.
-     * Has the effect of immediately handing the completed work to the network thread of the
-     * client instance that created the work and then dispatching it.
-     */
-    public ListenableFutureTask<?> processFinishedCompilerWork(final AsyncCompilerResult result) {
-        /*
-         * Do the task in the network thread associated with the connection
-         * so that access to the CIHM can be lock free for fast path work.
-         * Can't access the CIHM from this thread without adding locking.
-         */
-        final Connection c = (Connection)result.clientData;
-        final ListenableFutureTask<?> ft = ListenableFutureTask.create(new Runnable() {
-            @Override
-            public void run() {
-                if (result.errorMsg != null) {
-                    ClientResponseImpl errorResponse =
-                            new ClientResponseImpl(
-                                    (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
-                                    new VoltTable[0], result.errorMsg,
-                                    result.clientHandle);
-                    writeResponseToConnection(errorResponse);
-                    return;
-                }
-                Preconditions.checkState(
-                        result instanceof AdHocPlannedStmtBatch || result instanceof CatalogChangeResult,
-                        "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
-
-                if (result instanceof AdHocPlannedStmtBatch) {
-                    final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
-                    ExplainMode explainMode = plannedStmtBatch.getExplainMode();
-
-                    final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
-                    if (traceLog != null) {
-                        traceLog.add(() -> VoltTrace.endAsync("planadhoc", plannedStmtBatch.clientHandle));
-                    }
-
-                    // assume all stmts have the same catalog version
-                    if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
-                            (!plannedStmtBatch.getPlannedStatement(0).core.wasPlannedAgainstHash(m_catalogContext.get().getCatalogHash())))
-                    {
-
-                        /* The adhoc planner learns of catalog updates after the EE and the
-                           rest of the system. If the adhoc sql was planned against an
-                           obsolete catalog, re-plan. */
-                        LocalObjectMessage work = new LocalObjectMessage(
-                                AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
-
-                        m_mailbox.send(m_plannerSiteId, work);
-                    }
-                    else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
-                        processExplainPlannedStmtBatch(plannedStmtBatch);
-                    }
-                    else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
-                        processExplainDefaultProc(plannedStmtBatch);
-                    }
-                    else {
-                        try {
-                            createAdHocTransaction(plannedStmtBatch, c);
-                        }
-                        catch (VoltTypeException vte) {
-                            String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
-                            writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle));
-                        }
-                    }
-                    // early return for @AdHocPlannedStmtBatch case
-                    return;
-                }
-
-                // case for @CatalogChangeResult
-                final CatalogChangeResult changeResult = (CatalogChangeResult) result;
-                if (changeResult.encodedDiffCommands.trim().length() == 0) {
-                    ClientResponseImpl shortcutResponse =
-                            new ClientResponseImpl(
-                                    ClientResponseImpl.SUCCESS,
-                                    new VoltTable[0], "Catalog update with no changes was skipped.",
-                                    result.clientHandle);
-                    writeResponseToConnection(shortcutResponse);
-                    return;
-                }
-
-                // create the execution site task
-                StoredProcedureInvocation task = getUpdateCatalogExecutionTask(changeResult);
-
-                ClientResponseImpl error = null;
-                if ((error = m_permissionValidator.shouldAccept(task.getProcName(), result.user, task,
-                        SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
-                    writeResponseToConnection(error);
-                    return;
-                }
-
-                /*
-                 * Round trip the invocation to initialize it for command logging
-                 */
-                try {
-                    task = MiscUtils.roundTripForCL(task);
-                } catch (Exception e) {
-                    hostLog.fatal(e);
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
-                // initiate the transaction. These hard-coded values from catalog
-                // procedure are horrible, horrible, horrible.
-                createTransaction(changeResult.connectionId,
-                        task, false, false, false, 0, task.getSerializedSize(),
-                        System.nanoTime());
-            }
-
-            private final void writeResponseToConnection(ClientResponseImpl response) {
-                ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                response.flattenToBuffer(buf);
-                buf.flip();
-                c.writeStream().enqueue(buf);
-            }
-        }, null);
-        if (c != null) {
-            c.queueTask(ft);
-        }
-
-        /*
-         * Add error handling in case of an unexpected exception
-         */
-        ft.addListener(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                     ft.get();
-                } catch (Exception e) {
-                    String realReason = result.errorMsg;
-                    // Prefer adding detail to reporting an anonymous exception.
-                    // This helped debugging when it caught a programming error
-                    // -- not sure if this ever should catch anything in production code
-                    // that could be explained in friendlier user terms.
-                    // In that case, the root cause stack trace might be more of a distraction.
-                    if (realReason == null) {
-                        StringWriter sw = new StringWriter();
-                        PrintWriter pw = new PrintWriter(sw);
-                        e.printStackTrace(pw);
-                        Throwable cause = e.getCause();
-                        if (cause != null) {
-                            cause.printStackTrace(pw);
-                        }
-                        pw.flush();
-                        realReason = sw.toString();
-                    }
-                    ClientResponseImpl errorResponse =
-                            new ClientResponseImpl(
-                                    ClientResponseImpl.UNEXPECTED_FAILURE,
-                                    new VoltTable[0], realReason,
-                                    result.clientHandle);
-                    ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                    buf.putInt(buf.capacity() - 4);
-                    errorResponse.flattenToBuffer(buf);
-                    buf.flip();
-                    c.writeStream().enqueue(buf);
-                }
-            }
-        }, CoreUtils.SAMETHREADEXECUTOR);
-
-        //Return the future task for test code
-        return ft;
-    }
-
-    /**
-     * Take the response from the async ad hoc planning process and put the explain
-     * plan in a table with the right format.
-     */
-    private final void processExplainPlannedStmtBatch(  AdHocPlannedStmtBatch planBatch ) {
-        final Connection c = (Connection)planBatch.clientData;
-        Database db = m_catalogContext.get().database;
-        int size = planBatch.getPlannedStatementCount();
-
-        VoltTable[] vt = new VoltTable[ size ];
-        for (int i = 0; i < size; ++i) {
-            vt[i] = new VoltTable(new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
-            String str = planBatch.explainStatement(i, db);
-            vt[i].addRow(str);
-        }
-
-        ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                        null,
-                        vt,
-                        null);
-        response.setClientHandle( planBatch.clientHandle );
-        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-        buf.putInt(buf.capacity() - 4);
-        response.flattenToBuffer(buf);
-        buf.flip();
-        c.writeStream().enqueue(buf);
-    }
-
-    public static final StoredProcedureInvocation getUpdateCatalogExecutionTask(CatalogChangeResult changeResult) {
-        // create the execution site task
-           StoredProcedureInvocation task = new StoredProcedureInvocation();
-           task.setProcName("@UpdateApplicationCatalog");
-           task.setParams(changeResult.encodedDiffCommands,
-                          changeResult.catalogHash,
-                          changeResult.catalogBytes,
-                          changeResult.expectedCatalogVersion,
-                          changeResult.deploymentString,
-                          changeResult.tablesThatMustBeEmpty,
-                          changeResult.reasonsForEmptyTables,
-                          changeResult.requiresSnapshotIsolation ? 1 : 0,
-                          changeResult.worksWithElastic ? 1 : 0,
-                          changeResult.deploymentHash,
-                          changeResult.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                          changeResult.hasSchemaChange ? 1 : 0,
-                          changeResult.requiresNewExportGeneration ? 1 : 0);
-           task.clientHandle = changeResult.clientHandle;
-           // DR stuff
-           task.type = changeResult.invocationType;
-           return task;
-       }
-
-
-    /**
-     * Explain Proc for a default proc is routed through the regular Explain
-     * path using ad hoc planning and all. Take the result from that async
-     * process and format it like other explains for procedures.
-     */
-    private final void processExplainDefaultProc(AdHocPlannedStmtBatch planBatch) {
-        final Connection c = (Connection)planBatch.clientData;
-        Database db = m_catalogContext.get().database;
-
-        // there better be one statement if this is really sql
-        // from a default procedure
-        assert(planBatch.getPlannedStatementCount() == 1);
-        AdHocPlannedStatement ahps = planBatch.getPlannedStatement(0);
-        String sql = new String(ahps.sql, StandardCharsets.UTF_8);
-        String explain = planBatch.explainStatement(0, db);
-
-        VoltTable vt = new VoltTable(new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
-                new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
-        vt.addRow(sql, explain);
-
-        ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                        null,
-                        new VoltTable[] { vt },
-                        null);
-        response.setClientHandle( planBatch.clientHandle );
-        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-        buf.putInt(buf.capacity() - 4);
-        response.flattenToBuffer(buf);
-        buf.flip();
-        c.writeStream().enqueue(buf);
-    }
-
-    private final void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch, Connection c)
-            throws VoltTypeException
-    {
-        ByteBuffer buf = null;
-        try {
-            buf = plannedStmtBatch.flattenPlanArrayToBuffer();
-        }
-        catch (IOException e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-        }
-        assert(buf.hasArray());
-
-        // create the execution site task
-        StoredProcedureInvocation task = new StoredProcedureInvocation();
-        task.setBatchTimeout(plannedStmtBatch.work.m_batchTimeout);
-        // pick the sysproc based on the presence of partition info
-        // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
-        // -- instead, use its always-SP implementation of AdHoc
-        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
-        int partition = -1;
-
-        if (isSinglePartition) {
-            if (plannedStmtBatch.isReadOnly()) {
-                task.setProcName("@AdHoc_RO_SP");
-            }
-            else {
-                task.setProcName("@AdHoc_RW_SP");
-            }
-            int type = VoltType.NULL.getValue();
-            // replicated table read is single-part without a partitioning param
-            // I copied this from below, but I'm not convinced that the above statement is correct
-            // or that the null behavior here either (a) ever actually happens or (b) has the
-            // desired intent.
-            Object partitionParam = plannedStmtBatch.partitionParam();
-            byte[] param = null;
-            if (partitionParam != null) {
-                type = VoltType.typeFromClass(partitionParam.getClass()).getValue();
-                param = VoltType.valueToBytes(partitionParam);
-            }
-            partition = TheHashinator.getPartitionForParameter(type, partitionParam);
-
-            // Send the partitioning parameter and its type along so that the site can check if
-            // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
-            task.setParams(param, (byte)type, buf.array());
-        }
-        else {
-            if (plannedStmtBatch.isReadOnly()) {
-                task.setProcName("@AdHoc_RO_MP");
-            }
-            else {
-                if ("@SwapTables".equals(plannedStmtBatch.work.invocationName)) {
-                    task.setProcName("@SwapTables");
-                }
-                else {
-                    task.setProcName("@AdHoc_RW_MP");
-                }
-            }
-            task.setParams(buf.array());
-        }
-        task.clientHandle = plannedStmtBatch.clientHandle;
-
-        ClientResponseImpl error = null;
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED &&
-                !plannedStmtBatch.isReadOnly() && !plannedStmtBatch.adminConnection) {
-            error = new ClientResponseImpl(
-                    ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0],
-                    "Server is paused and is available in read-only mode - please try again later",
-                    plannedStmtBatch.clientHandle);
-            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
-            buffer.putInt(buffer.capacity() - 4);
-            error.flattenToBuffer(buffer).flip();
-            c.writeStream().enqueue(buffer);
-        }
-        else
-        if ((error = m_permissionValidator.shouldAccept(task.getProcName(), plannedStmtBatch.work.user, task,
-                SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
-            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
-            buffer.putInt(buffer.capacity() - 4);
-            error.flattenToBuffer(buffer).flip();
-            c.writeStream().enqueue(buffer);
-        }
-        else
-        if ((error = m_invocationValidator.shouldAccept(task.getProcName(), plannedStmtBatch.work.user, task,
-                SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
-            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
-            buffer.putInt(buffer.capacity() - 4);
-            error.flattenToBuffer(buffer).flip();
-            c.writeStream().enqueue(buffer);
-        }
-        else {
-            /*
-             * Round trip the invocation to initialize it for command logging
-             */
-            try {
-                task = MiscUtils.roundTripForCL(task);
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
-
-            // initiate the transaction
-            createTransaction(plannedStmtBatch.connectionId, task,
-                    plannedStmtBatch.isReadOnly(), isSinglePartition, false,
-                    partition,
-                    task.getSerializedSize(), System.nanoTime());
-        }
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future

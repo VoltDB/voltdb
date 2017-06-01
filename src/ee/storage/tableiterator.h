@@ -72,6 +72,7 @@ class TableIterator : public TupleIterator {
 
     friend class TempTable;
     friend class PersistentTable;
+    friend class LargeTempTable;
 
 public:
 
@@ -139,12 +140,15 @@ protected:
 
 inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
     : m_table(parent),
+      m_blockIterator(), // unused for temp table iterator
       m_dataPtr(NULL),
       m_location(0),
       m_blockOffset(0),
       m_activeTuples((int) m_table->m_tupleCount),
-      m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
-      m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
+      m_foundTuples(0),
+      m_tupleLength(parent->m_tupleLength),
+      m_tuplesPerBlock(parent->m_tuplesPerBlock),
+      m_currentBlock(NULL),
       m_tempBlockIterator(start),
       m_tempTableIterator(true),
       m_tempTableDeleteAsGo(false)
@@ -228,7 +232,7 @@ inline bool TableIterator::next(TableTuple &out) {
 inline bool TableIterator::persistentNext(TableTuple &out) {
     while (m_foundTuples < m_activeTuples) {
         if (m_currentBlock == NULL ||
-            m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
+            m_blockOffset >= m_currentBlock->unusedTupleBoundary()) {
 //            assert(m_blockIterator != m_table->m_data.end());
 //            if (m_blockIterator == m_table->m_data.end()) {
 //                throwFatalException("Could not find the expected number of tuples during a table scan");
@@ -268,7 +272,7 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
 inline bool TableIterator::tempNext(TableTuple &out) {
     if (m_foundTuples < m_activeTuples) {
         if (m_currentBlock == NULL ||
-            m_blockOffset >= m_currentBlock->unusedTupleBoundry())
+            m_blockOffset >= m_currentBlock->unusedTupleBoundary())
         {
             // delete the last block of tuples in this temp table when they will never be used
             if (m_tempTableDeleteAsGo) {

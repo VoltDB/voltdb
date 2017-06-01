@@ -60,6 +60,7 @@ public abstract class NonVoltDBBackend {
     protected static NonVoltDBBackend m_backend = null;
     protected String m_database_type = null;
     protected Connection dbconn;
+    protected String dbconn_url = "UNKNOWN";
     protected static FileWriter transformedSqlFileWriter;
     protected static long countCaughtExceptions = 0;
     protected static final long MAX_CAUGHT_EXCEPTION_MESSAGES = 100;
@@ -112,8 +113,10 @@ public abstract class NonVoltDBBackend {
             dbconn = DriverManager.getConnection(connectionURL, username, password);
             dbconn.setAutoCommit(true);
             dbconn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+            dbconn_url = connectionURL;
             DatabaseMetaData meta = dbconn.getMetaData();
-            System.out.println("Using database: " + meta.getDatabaseProductName()+" "+meta.getDatabaseProductVersion());
+            System.out.println("Using database: " + meta.getDatabaseProductName()+" "
+                    + meta.getDatabaseProductVersion() + " ("+connectionURL+")");
             System.out.println(" & JDBC driver: " + meta.getDriverName()+", "+meta.getDriverVersion());
         } catch (SQLException e) {
             throw new RuntimeException("Failed to open connection to: " + connectionURL, e);

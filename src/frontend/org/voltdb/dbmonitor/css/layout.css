@@ -3166,13 +3166,16 @@ tr.drSubSection td {
     top: 2px;
 }
 .paging_extStyleLF {
-    width: 165px !important;
+    width: 203px !important;
     margin-bottom: 10px;
 }
+.dataTables_wrapper .dataTables_paginate { text-align:left}
 .navigationLabel {
-    display: inline !important;
+    display: inline-block !important;
     margin: 5px !important;
     color: #000000;
+    width: 100px;
+    text-align:center;
 }
 .paginate_enabled_next.paginate_button,
 .paginate_disabled_next.paginate_button {
@@ -3203,6 +3206,7 @@ tr.drSubSection td {
     font-weight: bold;
     width: 197px;
 }
+
 .drIcon {
     position: relative;
     left: 3px;
@@ -3607,7 +3611,7 @@ label.errorTimeOut {
     border: none;
 }
 .queryWrapper {
-    height: calc(100% - 85px)
+    height: calc(100% - 96px)
 }
 .verticalWrapper {
     height: 90%;
@@ -3670,6 +3674,7 @@ ul#shutdownMsg li {
 .loadingSNMP {
     position: static;
 }
+
 /*********************************************media Qu********************/
 
 @media (max-width: 300px) {
@@ -4275,10 +4280,10 @@ ul#shutdownMsg li {
         float: none;
         width: 100%;
     }
-    .tblScroll {
+/*    .tblScroll {
         overflow: auto;
         width: 100%;
-    }
+    }*/
 }
 @media (width: 320px) {
     input.icon-search {
@@ -4385,7 +4390,7 @@ ul#shutdownMsg li {
         height: 310px!important;
     }
     .drScroll {
-        overflow: visible !important;
+        /*overflow: visible !important;*/
     }
 }
 @media screen and (orientation: landscape) {
@@ -4463,6 +4468,23 @@ ul#shutdownMsg li {
     .gutter.gutter-horizontal {
         height: 75%;
     }
+    .drTitle{ width:175px;}
+
+}
+@media (max-width: 766px) {
+.drReplicaContainer, .cmdLogContainer{ overflow:auto; width:100%;}
+
+}
+
+@media (min-width: 767px) and (max-width: 980px) {
+.tblScroll { overflow: auto;
+    position: relative;
+    top: -45px;
+    width: 100%;}
+.drSearch{ width:132px;}
+table.dataTable {top:0;}
+.cmdLogContainer {overflow: auto; width: 100%;position: relative;   top: -48px;}
+.drReplicaContainer { top:-48px;overflow: auto; width: 100%;position: relative; }
 }
 /* ----------- iPad mini ----------- */
 @media only screen and (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {

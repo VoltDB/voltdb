@@ -257,6 +257,7 @@ public class HealthMonitor implements Runnable, Promotable
         if (m_rssLimit > 0 && datum.rss >= m_rssLimit) {
             m_logger.error(String.format(
                     "Resource limit exceeded. RSS limit %s on %s. Setting database to read-only. " +
+                    "Please contact your administrator to clean up space via the admin port. " +
                     "Use \"voltadmin resume\" command once resource constraint is corrected.",
                     getRssLimitLogString(m_rssLimit,m_rssLimitStr), CoreUtils.getHostnameOrAddress()));
             m_logger.error(String.format("Resource limit exceeded. Current RSS size %s.", getValueWithUnit(datum.rss)));

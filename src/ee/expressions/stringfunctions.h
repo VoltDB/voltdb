@@ -169,8 +169,10 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
     }
 
     std::string repeatStr;
-    while (count-- > 0) {
-        repeatStr.append(buf, argLength);
+    if (argLength > 0) {
+        while (count-- > 0) {
+            repeatStr.append(buf, argLength);
+        }
     }
 
     return getTempStringValue(repeatStr.c_str(), repeatStr.length());

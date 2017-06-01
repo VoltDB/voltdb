@@ -256,7 +256,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (m_tableSchema == null) {
             initTableSchema(db);
         }
-
+        InsertPlanNode ins = (InsertPlanNode)getInlinePlanNode(PlanNodeType.INSERT);
+        if (ins != null) {
+            ins.generateOutputSchema(db);
+        }
         initPreAggOutputSchema();
 
         // Generate the output schema for subqueries
@@ -278,13 +281,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     // Until the scan has an implicit projection rather than an explicitly
     // inlined one, the output schema generation is going to be a bit odd.
-    // It will depend on two bits of state: whether any scan columns were
-    // specified for this table and whether or not there is an inlined
-    // projection.
+    // It will depend on three bits of state: whether any scan columns were
+    // specified for this table, whether or not there is an inlined
+    // projection and whether or not there is an inlined insert node.
+    // Note that only a seqscan node can have an inlined insert node,
+    // though support for index scan is expected.
     //
-    // If there is an inlined projection, then we'll just steal that
-    // output schema as our own.
-    // If there is no inlined projection, then, if there are no scan columns
+    // If there is an inlined insert or projection, then we'll just steal that
+    // output schema as our own, preferring insert to projection.
+    // If there is no inlined insert or projection, then, if there are no scan columns
     // specified, use the entire table's schema as the output schema.
     // Otherwise add an inline projection that projects the scan columns
     // and then take that output schema as our own.
@@ -301,9 +306,17 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     // See also the comments in NestLoopIndexPlanNode.resolveColumnIndexes.
     // Related tickets: ENG-9389, ENG-9533.
     private void initPreAggOutputSchema() {
+        InsertPlanNode ins =
+                (InsertPlanNode)getInlinePlanNode(PlanNodeType.INSERT);
         ProjectionPlanNode proj =
             (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
-        if (proj != null) {
+        if (ins != null) {
+            // If this is has an inline insert, then just make the
+            // output schema copied from the insert node.
+            m_outputSchema = ins.getOutputSchema().copyAndReplaceWithTVE();
+            m_hasSignificantOutputSchema = true;
+        }
+        else if (proj != null) {
             // Does this operation needs to change complex expressions
             // into tuple value expressions with an column alias?
             // Is this always true for clone?  Or do we need a new method?
@@ -389,16 +402,29 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             tve.setColumnIndexUsingSchema(m_tableSchema);
         }
 
-        // inline projection
+        // inline projection and insert
+        InsertPlanNode ins =
+                (InsertPlanNode)getInlinePlanNode(PlanNodeType.INSERT);
         ProjectionPlanNode proj =
             (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+        // Resolve the inline projection and insert if there are any.
         if (proj != null) {
             proj.resolveColumnIndexesUsingSchema(m_tableSchema);
+        }
+        if (ins != null) {
+            ins.resolveColumnIndexes();
+        }
+        // Snag the insert or projection node's output schema
+        // if there are any, in that order.
+        if (ins != null) {
+            m_outputSchema = ins.getOutputSchema().clone();
+        }
+        else if (proj != null) {
             m_outputSchema = proj.getOutputSchema().clone();
         }
         else {
             m_outputSchema = m_preAggOutputSchema;
-            // With no inline projection to define the output columns,
+            // With no inline insert or projection to define the output columns,
             // iterate through the output schema TVEs
             // and sort them by table schema index order.
             for (SchemaColumn col : m_outputSchema.getColumns()) {
@@ -502,6 +528,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     protected void copyDifferentiatorMap(
             Map<Integer, Integer> diffMap) {
         m_differentiatorMap = new HashMap<>(diffMap);
+    }
+
+    @Override
+    public String getUpdatedTable() {
+        InsertPlanNode ipn = (InsertPlanNode)getInlinePlanNode(PlanNodeType.INSERT);
+        if (ipn == null) {
+            return null;
+        }
+        return ipn.getUpdatedTable();
     }
 
 }

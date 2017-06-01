@@ -104,7 +104,7 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
         return false;
     }
     while (true) {
-        if (m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
+        if (m_blockOffset >= m_currentBlock->unusedTupleBoundary()) {
             if (m_blockIterator == m_end) {
                 m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, TBPtr());
                 break;
@@ -164,7 +164,7 @@ int64_t CopyOnWriteIterator::countRemaining() const {
     TBMapI blockIterator = m_blockIterator;
     int64_t count = 0;
     while (true) {
-        if (blockOffset >= currentBlock->unusedTupleBoundry()) {
+        if (blockOffset >= currentBlock->unusedTupleBoundary()) {
             if (blockIterator == m_end) {
                 break;
             }
