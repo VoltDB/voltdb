@@ -2094,19 +2094,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // The latest joined host will take over partition leader migration. The task is executed every minute by default
     private void scheduleBalanceSpiTask() {
-        final long interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "60"));
+        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
+        if (disableSpiTask) {
+            hostLog.info("SPI balance task is not scheduled.");
+            return;
+        }
+        final long interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
+        final long delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "10"));
         Runnable task = () -> {
             TreeSet<Integer> hosts = (TreeSet<Integer>)(getHostMessenger().getLiveHostIds());
             if (m_myHostId == hosts.pollLast()) {
                 m_clientInterface.balanceSPI(m_myHostId);
             }
         };
-        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
-        if (!disableSpiTask) {
-            m_periodicWorks.add(scheduleWork(task, 60, interval, TimeUnit.SECONDS));
-        } else {
-            hostLog.info("SPI balance task is not scheduled.");
-        }
+
+        m_periodicWorks.add(scheduleWork(task, delay, interval, TimeUnit.SECONDS));
     }
 
     private void startHealthMonitor() {
