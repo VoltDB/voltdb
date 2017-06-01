@@ -75,11 +75,13 @@ public class TestEmptySchema extends RegressionSuite
         assertEquals(0, results[0].getRowCount());
         assertEquals(expectedSchema.length, results[0].getColumnCount());
         // Test the log search utility
-        LocalCluster localCluster = getLocalCluster();
-        if (localCluster != null) {
-            assertEquals(true, localCluster.checkAllInitLog("Initialized VoltDB root directory"));
-            assertEquals(true, localCluster.checkAllHostLog(".*VoltDB [a-zA-Z]* Edition.*"));
+        assertEquals(true, localClusterAllInitLogsContain("Initialized VoltDB root directory"));
+        assertEquals(true, localClusterAllHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
+        for (int i : getLocalHostIds()) {
+            assertEquals(true, localClusterInitlogContains(i, "Initialized VoltDB .* directory"));
+            assertEquals(true, localClusterHostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
         }
+
         validateSchema(results[0], expectedTable);
 
         expectedSchema = new ColumnInfo[12];

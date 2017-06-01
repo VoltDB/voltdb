@@ -855,6 +855,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
                 stageSchemaFiles(config);
                 stageInitializedMarker(config);
+                // If these logs are changed, change them in line 77 TestEmptySchema.java as well.
                 hostLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);

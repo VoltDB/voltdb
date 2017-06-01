@@ -24,10 +24,9 @@ package org.voltdb.regressionsuites;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -111,10 +110,11 @@ public class LocalCluster extends VoltServerConfig {
     private boolean m_expectedToCrash = false;
     private boolean m_expectedToInitialize = true;
     int m_replicationPort = -1;
-    // Storing the paths of the logs for each host, the 1st string is the init log,
-    // the 2nd is the host log. The full file paths are stored to ease future maintenance.
-    Map<Integer, String[]> m_logFiles = new HashMap<>();
-    // Copy of the logs stored in memory (the init logs are still left on disk, since
+    // Storing the paths of both the init and host logs for each host, the 1st string is
+    // the init log path, the 2nd is the host log path. The full file paths are stored to
+    // ease future maintenance.
+    Map<Integer, String[]> m_initLogFilePath = new HashMap<>();
+    // Copy of the host logs stored in memory (the init logs are still left on disk, since
     // they are small anyway)
     // Use StringBuffer for thread-safety
     Map<Integer, StringBuffer> m_logs = new HashMap<>();
@@ -1051,7 +1051,7 @@ public class LocalCluster extends VoltServerConfig {
             // Put the init log path into the map
             String paths[] = new String[2];
             paths[0] = fileName;
-            m_logFiles.put(hostId, paths);
+            m_initLogFilePath.put(hostId, paths);
 
             ptf = new PipeToFile(
                     fileName,
@@ -1234,7 +1234,7 @@ public class LocalCluster extends VoltServerConfig {
             System.out.println("Process output can be found in: " + fileName);
 
             // Put the host log path in the map
-            String[] paths = m_logFiles.get(hostId);
+            String[] paths = m_initLogFilePath.get(hostId);
             // This shouldn't be null anyway
             if (paths != null) {
                 paths[1] = fileName;
@@ -2214,7 +2214,7 @@ public class LocalCluster extends VoltServerConfig {
     /*
      * Check if a regex string exists in all the host logs
      */
-    public boolean checkAllHostLog(String regex) {
+    public boolean allHostLogsContain(String regex) {
         Pattern pattern = Pattern.compile(regex);
         for (java.util.Map.Entry<Integer, StringBuffer> tuple : m_logs.entrySet()) {
             StringBuffer log = tuple.getValue();
@@ -2226,24 +2226,20 @@ public class LocalCluster extends VoltServerConfig {
     /*
      * Check the given regex in a server process with a given hostId
      */
-    public boolean checkHostLog(int hostId, String regex) {
+    public boolean hostLogContains(int hostId, String regex) {
         StringBuffer log = m_logs.get(hostId);
-        if (log == null) {
-            System.err.println("Host id " + hostId + " does not exist!");
-        } else {
-            Pattern pattern = Pattern.compile(regex);
-            return pattern.matcher(log).find();
-        }
-        return false;
+        assert(log != null);
+        Pattern pattern = Pattern.compile(regex);
+        return pattern.matcher(log).find();
     }
 
     /*
      * Check if the given regex exists in all the init logs
      */
-    public boolean checkAllInitLog(String regex) {
-        for (Entry<Integer, String[]> tuple : m_logFiles.entrySet()) {
+    public boolean allInitLogsContain(String regex) {
+        for (Entry<Integer, String[]> tuple : m_initLogFilePath.entrySet()) {
             String initLogFilePath = tuple.getValue()[0];
-            if (!checkStringInFile(initLogFilePath, regex)) {
+            if (!fileContains(initLogFilePath, regex)) {
                 return false;
             }
         }
@@ -2253,42 +2249,28 @@ public class LocalCluster extends VoltServerConfig {
     /*
      * Check the given regex in a given host with a hostId
      */
-    public boolean checkInitLog(int hostId, String regex) {
-        String[] paths = m_logFiles.get(hostId);
-        if (paths == null) {
-            return false;
-        }
-        return checkStringInFile(paths[0], regex);
+    public boolean initLogContains(int hostId, String regex) {
+        String[] paths = m_initLogFilePath.get(hostId);
+        assert (paths != null);
+        return fileContains(paths[0], regex);
     }
 
     /*
      * Check the given regex in a given file path. This can be used to
      * check in a given log file saved on disk.
-     *
-     * WARNING: This does not work with \n currently, since init logs
-     * are read line by line.
      */
-    public boolean checkStringInFile(String filePath, String regex) {
-        BufferedReader bReader = null;
+    public boolean fileContains(String filePath, String regex) {
         boolean ifExist = false;
         Pattern pattern = Pattern.compile(regex);
         try {
-            bReader = new BufferedReader(new FileReader(filePath));
-            String line;
-            while ((line = bReader.readLine()) != null) {
-                if (pattern.matcher(line).find()) {
-                    ifExist = true;
-                    bReader.close();
-                    return true;
-                }
-            }
-        } catch (IOException e) {
-            // Do nothing
-        } finally {
-            try {
-                if (bReader != null) { bReader.close(); }
-            } catch (IOException e) {}
-        }
+            String contents = new String(Files.readAllBytes(java.nio.file.Paths.get(filePath)));
+            ifExist = pattern.matcher(contents).find();
+        } catch (IOException e) {}
         return ifExist;
+    }
+
+    // Return the set of host IDs
+    public Set<Integer> getHostIds() {
+        return m_logs.keySet();
     }
 }
