@@ -1212,7 +1212,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(m_sendToHSIds, msg);
             }
         } else {
-            if(!m_isLeader && message.isToLeader()) {
+            if(!m_isLeader) {
                 setMaxSeenTxnId(msg.getSpHandle());
                 logRepair(msg);
             }
