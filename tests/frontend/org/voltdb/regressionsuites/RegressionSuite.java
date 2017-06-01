@@ -461,7 +461,6 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-
     @Override
     public String getName() {
         // munge the test name with the VoltServerConfig instance name
