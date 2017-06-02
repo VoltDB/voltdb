@@ -49,6 +49,7 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "storage/table.h"
+#include "storage/LargeTempTable.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/temptable.h"
@@ -163,6 +164,15 @@ TempTable* TableFactory::buildCopiedTempTable(
     TempTable* table = new TempTable();
     initCommon(0, table, name, template_table->m_schema, template_table->m_columnNames, false);
     table->m_limits = limits;
+    return table;
+}
+
+LargeTempTable* TableFactory::buildLargeTempTable(
+            const std::string &name,
+            TupleSchema* schema,
+            const std::vector<std::string> &columnNames) {
+    LargeTempTable* table = new LargeTempTable();
+    initCommon(0, table, name, schema, columnNames, true);
     return table;
 }
 
