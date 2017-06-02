@@ -1649,8 +1649,10 @@ public class LocalCluster extends VoltServerConfig {
         shutDownExternal();
 
         // Cleanup the resources
-        m_logs.clear();
-        m_initLogFilePath.clear();
+        if (m_enableLogSearch) {
+            m_logs.clear();
+            m_initLogFilePath.clear();
+        }
 
         VoltServerConfig.removeInstance(this);
     }

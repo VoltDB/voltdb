@@ -450,17 +450,6 @@ public class RegressionSuite extends TestCase {
         m_config = config;
     }
 
-    /*
-     * Return the local configuration if it is a LocalCluster
-     */
-    public LocalCluster getLocalCluster() {
-        if (m_config instanceof LocalCluster) {
-            return (LocalCluster) m_config;
-        } else {
-            return null;
-        }
-    }
-
     @Override
     public String getName() {
         // munge the test name with the VoltServerConfig instance name
