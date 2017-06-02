@@ -19,6 +19,7 @@ package org.voltdb.utils;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -276,8 +277,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
-        @Option(desc = "username when connecting to the servers")
 
+        @Option(desc = "username when connecting to the servers")
         String user = "";
 
         @Option(desc = "password to use when connecting to servers")
@@ -286,11 +287,15 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
-        @Option(shortOpt = "z", desc = "timezone for interpreting date and time strings")
+        @Option( desc = "timezone for interpreting date and time strings")
         String timezone = "";
 
-        @Option(shortOpt = "n", desc = "Custom null string, overrides all other Null pattern matching")
+        @Option(desc = "Custom null string, overrides all other Null pattern matching")
         String customNullString = "";
+
+        // add a charset flag as "c"
+        @Option(shortOpt = "c", desc = "character set , default system character set")
+        String characterSet = "";
 
         @Option(desc = "Disables the quote character. All characters between delimiters, including quote characters, are included in the input.",
                 hasArg = false)
@@ -407,8 +412,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             config.quotechar = '\u0000';
         }
 
-
         configuration();
+
         final Tokenizer tokenizer;
         ICsvListReader listReader = null;
         try {
@@ -418,10 +423,26 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                         config.skip, config.header);
                 listReader = new CsvListReader(tokenizer, csvPreference);
             } else {
-                tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
-                        config.strictquotes, config.escape, config.columnsizelimit,
-                        config.skip, config.header);
-                listReader = new CsvListReader(tokenizer, csvPreference);
+            	if (null==config.characterSet||config.characterSet.trim().equals("")){
+            		tokenizer = new Tokenizer(new FileReader(config.file),
+            				 				  csvPreference,
+            				 				  config.strictquotes,
+            				 				  config.escape,
+            				 				  config.columnsizelimit,
+            		                          config.skip,
+            		                          config.header);
+            	} else {
+            		FileInputStream fis = new FileInputStream(config.file);
+            		InputStreamReader isr = new InputStreamReader(fis, config.characterSet);
+            		tokenizer = new Tokenizer(isr,
+            								  csvPreference,
+            								  config.strictquotes,
+            								  config.escape,
+            								  config.columnsizelimit,
+            								  config.skip,
+            								  config.header);
+            	}
+           		listReader = new CsvListReader(tokenizer, csvPreference);
             }
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
@@ -466,6 +487,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             } else {
                 dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
             }
+
 
             CSVFileReader.initializeReader(cfg, csvClient, listReader);
 
@@ -649,4 +671,5 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         out_logfile.close();
         out_reportfile.close();
     }
+
 }
