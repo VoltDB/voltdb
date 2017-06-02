@@ -263,7 +263,7 @@ public class TestParameterConverter extends TestCase
         // No lossy conversion
         boolean hasException = false;
         try {
-            r = ParameterConverter.tryToMakeCompatible(short.class, new BigDecimal(1000.01));
+            r = ParameterConverter.tryToMakeCompatible(short.class, new BigDecimal(10.99));
         } catch (VoltTypeException e) {
             hasException = true;
         }
@@ -280,24 +280,15 @@ public class TestParameterConverter extends TestCase
     }
 
     public void testBigDecimalToDouble() {
-     // Normal conversion
+        // Normal conversion
         Object r = ParameterConverter.tryToMakeCompatible(double.class, new BigDecimal(-3.568));
         assertTrue("expect double", r.getClass() == Double.class);
-        assertEquals(-3.568, ((Double)r).longValue());
-
-        // No lossy conversion
-        boolean hasException = false;
-        try {
-            r = ParameterConverter.tryToMakeCompatible(double.class, new BigDecimal(1000.01));
-        } catch (VoltTypeException e) {
-            hasException = true;
-        }
-        assertEquals(true, hasException);
+        assertEquals(-3.568, ((Double)r).doubleValue());
 
         // No out-of-range conversion
-        hasException = false;
+        boolean hasException = false;
         try {
-            r = ParameterConverter.tryToMakeCompatible(long.class, new BigDecimal("10000000000000000000000000000000000"));
+            r = ParameterConverter.tryToMakeCompatible(double.class, new BigDecimal("4e400"));
         } catch (VoltTypeException e) {
             hasException = true;
         }
