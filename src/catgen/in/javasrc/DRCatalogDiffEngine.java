@@ -54,8 +54,17 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             "sqltext", "querytype", "readonly", "singlepartition", "replicatedtabledml", "iscontentdeterministic", "isorderdeterministic", "nondeterminismdetail",
             "cost", "seqscancount", "explainplan", "tablesread", "tablesupdated", "indexesused", "cachekeyprefix"
             );
+
+    private boolean m_isXDCR;
+    private byte m_remoteClusterId;
+
     public DRCatalogDiffEngine(Catalog localCatalog, Catalog remoteCatalog) {
         super(localCatalog, remoteCatalog);
+    }
+
+    protected void initialize(Catalog prev, Catalog next) {
+        m_isXDCR = prev.getClusters().get("cluster").getDrrole().equals(DrRoleType.XDCR.value());
+        m_remoteClusterId = (byte) next.getClusters().get("cluster").getDrclusterid();
     }
 
     public static DRCatalogCommands serializeCatalogCommandsForDr(Catalog catalog, int protocolVersion) {
@@ -103,12 +112,21 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
 
     @Override
     protected String checkAddDropWhitelist(final CatalogType suspect, final ChangeType changeType) {
+        // Only on remote
         if (ChangeType.ADDITION == changeType && suspect instanceof Table) {
             assert ((Boolean)suspect.getField("isDRed"));
-            return "Missing DR table " + suspect.getTypeName() + " on replica cluster";
+            return "Missing DR table " + suspect.getTypeName() + " on local cluster";
         }
+
+        // Only on local. We care only if it is XDCR.
+        if (ChangeType.DELETION == changeType && suspect instanceof Table && m_isXDCR) {
+            assert ((Boolean)suspect.getField("isDRed"));
+            return "Missing DR table " + suspect.getTypeName() + " on remote cluster " + m_remoteClusterId;
+        }
+
         if (suspect instanceof Column || isUniqueIndex(suspect) || isUniqueIndexColumn(suspect)) {
-            return "Missing " + suspect + " from " + suspect.getParent() + " on " + (ChangeType.ADDITION == changeType ? "replica" : "master");
+            return "Missing " + suspect + " from " + suspect.getParent() + " on " +
+                (ChangeType.ADDITION == changeType ? "local cluster" : "remote cluster " + m_remoteClusterId);
         }
         return null;
     }
@@ -128,7 +146,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         } else if (suspect instanceof Table) {
             if ("isdred".equalsIgnoreCase(field)) {
                 assert ((Boolean)suspect.getField("isDRed"));
-                return "Table " + suspect.getTypeName() + " has DR enabled on the master but not the replica";
+                return "Table " + suspect.getTypeName() + " has DR enabled on the remote cluster " + m_remoteClusterId + " but not on the local cluster";
             }
             if ("estimatedtuplecount".equals(field)) {
                 return null;
@@ -156,7 +174,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                    (suspect instanceof ColumnRef && !isUniqueIndexColumn(suspect))) {
             return null;
         }
-        return "Incompatible schema between master and replica: field " + field + " in schema object " + suspect;
+        return "Incompatible schema between remote cluster " + m_remoteClusterId + " and local cluster: field " + field + " in schema object " + suspect;
     }
 
     private boolean isUniqueIndexColumn(CatalogType suspect) {

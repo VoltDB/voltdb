@@ -214,7 +214,7 @@ public:
         m_freeList.clear();
     }
 
-    inline uint32_t unusedTupleBoundry() {
+    inline uint32_t unusedTupleBoundary() {
         return m_nextFreeTuple;
     }
 
@@ -234,6 +234,15 @@ public:
 
     inline TBBucketPtr currentBucket() {
         return m_bucket;
+    }
+
+    /**
+     * Return the maximum number of bytes in this tuple block which
+     * may actually be used for tuples, i.e., the size of the chunk of
+     * memory pointed to by m_storage.
+     */
+    inline int64_t getAllocatedMemory() {
+        return m_tupleLength * m_tuplesPerBlock;
     }
 private:
     char*   m_storage;

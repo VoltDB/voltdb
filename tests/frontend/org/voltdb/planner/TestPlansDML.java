@@ -354,10 +354,27 @@ public class TestPlansDML extends PlannerTestCase {
             // UPSERT is INSERT
             dmlType = "INSERT";
         }
-        assertEquals(dmlType, dmlNode.getPlanNodeType().toString());
+        // This must somehow start with a node which is named by
+        // dmlType.  It could be a sequential scan node with an
+        // inline node named by dmlType, or it could be a dmlType
+        // node just by itself.
+        //
+        // This seems somewhat fragile.  It seem like we should have
+        // a description of the expected plan which we just match
+        // here.  See the member function TestCase.validatePlan.  That
+        // member function is not actually convenient here, but perhaps
+        // it could be extended in some way.
+        if ((dmlNode instanceof SeqScanPlanNode)
+                && "INSERT".equals(dmlType)) {
+            assertNotNull("Expected an insert node.",
+                          dmlNode.getInlinePlanNode(PlanNodeType.INSERT));
+        }
+        else {
+            assertEquals(dmlType, dmlNode.getPlanNodeType().toString());
+        }
 
         PlanNodeType nodeType = dmlNode.getPlanNodeType();
-        while(nodeType != PlanNodeType.SEQSCAN && nodeType != PlanNodeType.MATERIALIZE && nodeType != PlanNodeType.INDEXSCAN) {
+        while (nodeType != PlanNodeType.SEQSCAN && nodeType != PlanNodeType.MATERIALIZE && nodeType != PlanNodeType.INDEXSCAN) {
             dmlNode = dmlNode.getChild(0);
             nodeType = dmlNode.getPlanNodeType();
         }
