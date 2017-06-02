@@ -211,22 +211,10 @@ public class TestParameterConverter extends TestCase
         assertEquals(1000L, ((Long)r).longValue());
 
         // No lossy conversion
-        boolean hasException = false;
-        try {
-            r = ParameterConverter.tryToMakeCompatible(long.class, new BigDecimal(1000.01));
-        } catch (VoltTypeException e) {
-            hasException = true;
-        }
-        assertEquals(true, hasException);
+        testBigDecimalFailWithInvalidConversion(long.class, new BigDecimal(1000.01));
 
         // No out-of-range conversion
-        hasException = false;
-        try {
-            r = ParameterConverter.tryToMakeCompatible(long.class, new BigDecimal("10000000000000000000000000000000000"));
-        } catch (VoltTypeException e) {
-            hasException = true;
-        }
-        assertEquals(true, hasException);
+        testBigDecimalFailWithInvalidConversion(long.class, new BigDecimal("10000000000000000000000000000000000"));
     }
 
     public void testBigDecimalToInt() {
@@ -236,22 +224,10 @@ public class TestParameterConverter extends TestCase
         assertEquals(-1000, ((Integer)r).intValue());
 
         // No lossy conversion
-        boolean hasException = false;
-        try {
-            r = ParameterConverter.tryToMakeCompatible(int.class, new BigDecimal(-1000.01));
-        } catch (VoltTypeException e) {
-            hasException = true;
-        }
-        assertEquals(true, hasException);
+        testBigDecimalFailWithInvalidConversion(int.class, new BigDecimal(-1000.01));
 
         // No out-of-range conversion
-        hasException = false;
-        try {
-            r = ParameterConverter.tryToMakeCompatible(int.class, new BigDecimal("-10000000000000000000000000000000000"));
-        } catch (VoltTypeException e) {
-            hasException = true;
-        }
-        assertEquals(true, hasException);
+        testBigDecimalFailWithInvalidConversion(int.class, new BigDecimal("-10000000000000000000000000000000000"));
     }
 
     public void testBigDecimalToShort() {
@@ -261,22 +237,10 @@ public class TestParameterConverter extends TestCase
         assertEquals((short) 15, ((Short)r).shortValue());
 
         // No lossy conversion
-        boolean hasException = false;
-        try {
-            r = ParameterConverter.tryToMakeCompatible(short.class, new BigDecimal(10.99));
-        } catch (VoltTypeException e) {
-            hasException = true;
-        }
-        assertEquals(true, hasException);
+        testBigDecimalFailWithInvalidConversion(short.class, new BigDecimal(10.99));
 
         // No out-of-range conversion
-        hasException = false;
-        try {
-            r = ParameterConverter.tryToMakeCompatible(short.class, new BigDecimal("10000000000000000000000000000000000"));
-        } catch (VoltTypeException e) {
-            hasException = true;
-        }
-        assertEquals(true, hasException);
+        testBigDecimalFailWithInvalidConversion(short.class, new BigDecimal("10000000000000000000000000000000000"));
     }
 
     public void testBigDecimalToDouble() {
@@ -286,14 +250,9 @@ public class TestParameterConverter extends TestCase
         assertEquals(-3.568, ((Double)r).doubleValue());
 
         // Conversion to double can be lossy anyway
+
         // No out-of-range conversion
-        boolean hasException = false;
-        try {
-            r = ParameterConverter.tryToMakeCompatible(double.class, new BigDecimal("4e400"));
-        } catch (VoltTypeException e) {
-            hasException = true;
-        }
-        assertEquals(true, hasException);
+        testBigDecimalFailWithInvalidConversion(double.class, new BigDecimal("4e400"));
     }
 
     public void testBigDecimalToByte() {
@@ -303,18 +262,20 @@ public class TestParameterConverter extends TestCase
         assertEquals((byte) 9, ((Byte)r).byteValue());
 
         // No lossy conversion
-        boolean hasException = false;
-        try {
-            r = ParameterConverter.tryToMakeCompatible(byte.class, new BigDecimal(10.99));
-        } catch (VoltTypeException e) {
-            hasException = true;
-        }
-        assertEquals(true, hasException);
+        testBigDecimalFailWithInvalidConversion(byte.class, new BigDecimal(10.99));
 
         // No out-of-range conversion
-        hasException = false;
+        testBigDecimalFailWithInvalidConversion(byte.class, new BigDecimal("10000000000000000000000000000000000"));
+    }
+
+    /*
+     * The helper function to test lossy / out-of-range conversions from BigDecimal. This function
+     * expects the conversion to fail.
+     */
+    public static void testBigDecimalFailWithInvalidConversion(Class<?> expectedClz, BigDecimal param) {
+        boolean hasException = false;
         try {
-            r = ParameterConverter.tryToMakeCompatible(byte.class, new BigDecimal("10000000000000000000000000000000000"));
+            ParameterConverter.tryToMakeCompatible(expectedClz, param);
         } catch (VoltTypeException e) {
             hasException = true;
         }
