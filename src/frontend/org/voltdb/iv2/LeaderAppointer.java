@@ -203,9 +203,8 @@ public class LeaderAppointer implements Promotable
                             "for k-safety before startup");
                 }
             } else {
-                Set<Integer> hostsOnRing = new HashSet<Integer>();
-                // Check for k-safety
-                if (!isClusterKSafe(hostsOnRing, null)) {
+                 // Check for k-safety
+                if (!isClusterKSafe(null)) {
                     VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
                             false, null);
                 }
@@ -553,7 +552,7 @@ public class LeaderAppointer implements Promotable
         m_partitionWatchers.put(pid, babySitter);
     }
 
-    public boolean isClusterKSafe(Set<Integer> hostsOnRing, Set<Integer> failedHosts)
+    public boolean isClusterKSafe(Set<Integer> failedHosts)
     {
         boolean retval = true;
         List<String> partitionDirs = null;
@@ -617,7 +616,6 @@ public class LeaderAppointer implements Promotable
                         final String split[] = replica.split("/");
                         final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                         final int hostId = CoreUtils.getHostIdFromHSId(hsId);
-                        hostsOnRing.add(hostId);
 
                         //The appointer with master LeaderCache started.
                         if (failedHosts != null && !masters.isEmpty() && !(failedHosts.contains(hostId))) {
@@ -752,7 +750,6 @@ public class LeaderAppointer implements Promotable
      * are triggered. If the topology is changed after the new leaders are calculated, the site with the lowest host id
      * will be picked up as the new leader.
      * @param leaderHostMap the partition leader info
-     * @param failedHosts  the failed hosts
      */
     private void calculateNewPartitionLeaders(Map<Integer, Host> leaderHostMap){
         if (leaderHostMap.isEmpty() || m_callbacks.isEmpty()) {
