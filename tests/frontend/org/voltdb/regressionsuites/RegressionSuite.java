@@ -1358,7 +1358,7 @@ public class RegressionSuite extends TestCase {
      * init logs.
      */
     public boolean localClusterAllInitLogsContain(String regex) {
-        assert (m_config instanceof LocalCluster);
+        assertEquals(true, m_config instanceof LocalCluster);
         return ((LocalCluster) m_config).allInitLogsContain(regex);
     }
 
@@ -1367,7 +1367,7 @@ public class RegressionSuite extends TestCase {
      * host logs.
      */
     public boolean localClusterAllHostLogsContain(String regex) {
-        assert (m_config instanceof LocalCluster);
+        assertEquals(true, m_config instanceof LocalCluster);
         return ((LocalCluster) m_config).allHostLogsContain(regex);
     }
 
@@ -1375,12 +1375,12 @@ public class RegressionSuite extends TestCase {
      * Check the existence of a regex expression in a particular host's log
      */
     public boolean localClusterInitlogContains(int hostId, String regex) {
-        assert (m_config instanceof LocalCluster);
+        assertEquals(true, m_config instanceof LocalCluster);
         return ((LocalCluster) m_config).initLogContains(hostId, regex);
     }
 
     public boolean localClusterHostLogContains(int hostId, String regex) {
-        assert (m_config instanceof LocalCluster);
+        assertEquals(true, m_config instanceof LocalCluster);
         return ((LocalCluster) m_config).hostLogContains(hostId, regex);
     }
 
@@ -1389,7 +1389,7 @@ public class RegressionSuite extends TestCase {
      * is an instance of LocalCluster
      */
     public Set<Integer> getLocalHostIds() {
-        assert(m_config instanceof LocalCluster);
+        assertEquals(true, m_config instanceof LocalCluster);
         return ((LocalCluster) m_config).getHostIds();
     }
 }
