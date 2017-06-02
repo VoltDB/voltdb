@@ -1101,8 +1101,10 @@ public class TestDeterminism extends PlannerTestCase {
         System.out.println(outputStream.toString());
         // There is no warnings generated for read-only ND queries
         String msg = outputStream.toString();
-        assert(!msg.contains("ND"));
-        assert(!msg.contains("WARN"));
+        assertFalse(stringContains(msg, "ND"));
+        assertFalse(stringContains(msg, "WARN"));
+        assertTrue(stringContains(msg, "Successfully created"));
+        assertTrue(stringContains(msg, "Catalog contains"));
         outputStream.close();
     }
 
@@ -1200,4 +1202,11 @@ public class TestDeterminism extends PlannerTestCase {
         assertMPPlanDeterminismCombo(sql, ORDERED, CONSISTENT, tryOrderBy, null, DeterminismMode.SAFER);
     }
 
+    /*
+     * Helper function for sub-string regex matching
+     */
+    private boolean stringContains(String msg, String regex) {
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regex);
+        return pattern.matcher(msg).find();
+    }
 }
