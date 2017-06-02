@@ -72,9 +72,7 @@ public:
         return NULL;
     }
 
-    void nextFreeTuple(TableTuple* tuple) {
-
-    }
+    void nextFreeTuple(TableTuple* tuple);
 
     virtual ~LargeTempTable();
 

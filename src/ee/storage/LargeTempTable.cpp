@@ -81,4 +81,8 @@ LargeTempTable::~LargeTempTable() {
     }
 }
 
+void LargeTempTable::nextFreeTuple(TableTuple*) {
+    throwDynamicSQLException("nextFreeTuple not yet implemented");
+}
+
 } // namespace voltdb
