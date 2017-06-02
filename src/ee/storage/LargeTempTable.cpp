@@ -31,7 +31,6 @@ LargeTempTable::LargeTempTable()
     , m_insertsFinished(false)
     , m_iter(this, m_blockIds.begin())
     , m_blockForWriting(NULL)
-
 {
 }
 
@@ -69,10 +68,6 @@ void LargeTempTable::finishInserts() {
 
     LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
     lttBlockCache->unpinBlock(m_blockIds.back());
-}
-
-LargeTempTableIterator LargeTempTable::largeIterator() {
-    return LargeTempTableIterator(this, m_blockIds.begin());
 }
 
 LargeTempTable::~LargeTempTable() {
