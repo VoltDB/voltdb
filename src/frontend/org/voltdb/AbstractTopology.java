@@ -37,8 +37,6 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.iv2.MpInitiator;
-
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -1532,50 +1530,5 @@ public class AbstractTopology {
             mp.leader = mutableHostMap.get(leader);
         }
         return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
-    }
-
-    /**
-     * build AbstractTopology from @Statistics TOPO
-     * @param vt from @Statistics TOPO
-     * @param kfactor kfactor
-     * @return  AbstractTopology
-     */
-    public static AbstractTopology topologyFromStatistics(VoltTable vt, int kfactor) {
-        vt.resetRowPosition();
-        Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
-        Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
-        while (vt.advanceRow()) {
-            int partitionId = (int)vt.getLong("Partition");
-            //ignore MP site
-            if (MpInitiator.MP_INIT_PID == partitionId) {
-                continue;
-            }
-
-            MutablePartition mp = new MutablePartition(partitionId, kfactor);
-            mutablePartitionMap.put(mp.id, mp);
-
-            String[] sites = vt.getString("Sites").split(",");
-            for (String site : sites) {
-                site = (site.split(":")[0]).trim();
-                Integer hostId = Integer.parseInt(site);
-                MutableHost mutableHost = mutableHostMap.get(hostId);
-                if (mutableHost == null) {
-                    mutableHost = new MutableHost(hostId, 0, null);
-                    mutableHostMap.put(hostId, mutableHost);
-                }
-                mp.hosts.add(mutableHost);
-                mutableHost.partitions.add(mp);
-            }
-
-            int leader = Integer.parseInt(vt.getString("Leader").split(":")[0]);
-            mp.leader = mutableHostMap.get(leader);
-        }
-        Integer[] hosts = mutableHostMap.keySet().toArray(new Integer[0]);
-        HAGroup haGroup = new HAGroup("0", ArrayUtils.toPrimitive(hosts));
-        for (MutableHost host : mutableHostMap.values()) {
-            host.haGroup = haGroup;
-            host.targetSiteCount = host.partitions.size();
-        }
-        return convertMutablesToTopology(0, mutableHostMap, mutablePartitionMap);
     }
 }
