@@ -501,7 +501,7 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(desc = "Kafka consumer socket timeout, in milliseconds (default 30000, or thirty seconds)")
         int timeout = 30000;
 
-        @Option(desc = "Kafka commit policy. Valid values are TIME and NONE (default NONE)")
+        @Option(desc = "Kafka time-based commit policy interval in milliseconds.  Default is to use manual offset commit.")
         String commitPolicy = "";
 
         @Override
@@ -537,9 +537,6 @@ public class KafkaExternalLoader implements ImporterSupport {
             }
             if (commitPolicy.trim().isEmpty()) {
                 commitPolicy = KafkaImporterCommitPolicy.NONE.name();
-            }
-            else if (!KafkaImporterCommitPolicy.isValid(commitPolicy)) {
-                exitWithMessageAndUsage("Invalid commit policy specified: " + commitPolicy);
             }
 
             // Try and load classes we need and not packaged.
