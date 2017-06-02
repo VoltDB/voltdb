@@ -230,7 +230,7 @@ public class TestParameterConverter extends TestCase
     }
 
     public void testBigDecimalToInt() {
-     // Normal conversion
+        // Normal conversion
         Object r = ParameterConverter.tryToMakeCompatible(int.class, new BigDecimal(-1000));
         assertTrue("expect int", r.getClass() == Integer.class);
         assertEquals(-1000, ((Integer)r).intValue());
@@ -255,7 +255,7 @@ public class TestParameterConverter extends TestCase
     }
 
     public void testBigDecimalToShort() {
-     // Normal conversion
+        // Normal conversion
         Object r = ParameterConverter.tryToMakeCompatible(short.class, new BigDecimal(15));
         assertTrue("expect short", r.getClass() == Short.class);
         assertEquals((short) 15, ((Short)r).shortValue());
@@ -285,10 +285,36 @@ public class TestParameterConverter extends TestCase
         assertTrue("expect double", r.getClass() == Double.class);
         assertEquals(-3.568, ((Double)r).doubleValue());
 
+        // Conversion to double can be lossy anyway
         // No out-of-range conversion
         boolean hasException = false;
         try {
             r = ParameterConverter.tryToMakeCompatible(double.class, new BigDecimal("4e400"));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
+    }
+
+    public void testBigDecimalToByte() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(byte.class, new BigDecimal(9));
+        assertTrue("expect byte", r.getClass() == Byte.class);
+        assertEquals((byte) 9, ((Byte)r).byteValue());
+
+        // No lossy conversion
+        boolean hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(byte.class, new BigDecimal(10.99));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
+
+        // No out-of-range conversion
+        hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(byte.class, new BigDecimal("10000000000000000000000000000000000"));
         } catch (VoltTypeException e) {
             hasException = true;
         }

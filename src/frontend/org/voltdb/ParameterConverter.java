@@ -373,6 +373,12 @@ public class ParameterConverter {
                     return result;
                 } catch (ArithmeticException e) {} // The error will be re-thrown below
             }
+            else if (expectedClz == byte.class) {
+                try {
+                    byte result = pBigDecimal.byteValueExact();
+                    return result;
+                } catch (ArithmeticException e) {}
+            }
             throw new VoltTypeException(
                             "tryToMakeCompatible: The provided value: (" + param.toString() +
                             ") of type: " + inputClz.getName() +
