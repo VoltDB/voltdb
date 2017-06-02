@@ -25,7 +25,7 @@ import org.voltdb.planner.CompiledPlan;
 public class MicroOptimizationRunner {
 
     // list all of the micro optimizations here
-    static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
+    static ArrayList<MicroOptimization> optimizations = new ArrayList<>();
     static {
         // The orders here is important
         optimizations.add(new PushdownLimits());
