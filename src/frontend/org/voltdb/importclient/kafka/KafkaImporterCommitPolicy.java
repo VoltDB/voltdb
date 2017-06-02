@@ -45,4 +45,13 @@ public enum KafkaImporterCommitPolicy {
             return 0;
         };
 
+        public static final boolean isValid(String s) {
+            try {
+                KafkaImporterCommitPolicy.valueOf(s);
+                return true;
+            }
+            catch (Exception e) {
+                return false;
+            }
+        }
 }

@@ -269,7 +269,7 @@ public class KafkaExternalLoader implements ImporterSupport {
         FormatterBuilder fb = createFormatterBuilder(properties);
 
         return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokerList, properties.topic, groupId,
-                                                properties.procedure, properties.timeout, properties.buffersize, KafkaImporterCommitPolicy.NONE.name(), fb);
+                                                properties.procedure, properties.timeout, properties.buffersize, properties.commitPolicy, fb);
     }
 
     /*
@@ -501,6 +501,9 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(desc = "Kafka consumer socket timeout, in milliseconds (default 30000, or thirty seconds)")
         int timeout = 30000;
 
+        @Option(desc = "Kafka commit policy. Valid values are TIME and NONE (default NONE)")
+        String commitPolicy = "";
+
         @Override
         public void validate() {
 
@@ -531,6 +534,12 @@ public class KafkaExternalLoader implements ImporterSupport {
             if ((useSuppliedProcedure) && (update)){
                 update = false;
                 exitWithMessageAndUsage("update is not applicable when stored procedure specified");
+            }
+            if (commitPolicy.trim().isEmpty()) {
+                commitPolicy = KafkaImporterCommitPolicy.NONE.name();
+            }
+            else if (!KafkaImporterCommitPolicy.isValid(commitPolicy)) {
+                exitWithMessageAndUsage("Invalid commit policy specified: " + commitPolicy);
             }
 
             // Try and load classes we need and not packaged.
