@@ -120,7 +120,6 @@ class CSVFileReader implements Runnable {
                 }
                 long st = System.nanoTime();
                 lineList = m_listReader.read();
-
                 long end = System.nanoTime();
                 m_parsingTime += (end - st);
                 if (lineList == null) {
