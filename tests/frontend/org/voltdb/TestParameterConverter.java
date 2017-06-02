@@ -230,14 +230,77 @@ public class TestParameterConverter extends TestCase
     }
 
     public void testBigDecimalToInt() {
+     // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(int.class, new BigDecimal(-1000));
+        assertTrue("expect int", r.getClass() == Integer.class);
+        assertEquals(-1000, ((Integer)r).intValue());
 
+        // No lossy conversion
+        boolean hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(int.class, new BigDecimal(-1000.01));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
+
+        // No out-of-range conversion
+        hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(int.class, new BigDecimal("-10000000000000000000000000000000000"));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
     }
 
     public void testBigDecimalToShort() {
+     // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(short.class, new BigDecimal(15));
+        assertTrue("expect short", r.getClass() == Short.class);
+        assertEquals((short) 15, ((Short)r).shortValue());
 
+        // No lossy conversion
+        boolean hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(short.class, new BigDecimal(1000.01));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
+
+        // No out-of-range conversion
+        hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(short.class, new BigDecimal("10000000000000000000000000000000000"));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
     }
 
     public void testBigDecimalToDouble() {
+     // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(double.class, new BigDecimal(-3.568));
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(-3.568, ((Double)r).longValue());
 
+        // No lossy conversion
+        boolean hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(double.class, new BigDecimal(1000.01));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
+
+        // No out-of-range conversion
+        hasException = false;
+        try {
+            r = ParameterConverter.tryToMakeCompatible(long.class, new BigDecimal("10000000000000000000000000000000000"));
+        } catch (VoltTypeException e) {
+            hasException = true;
+        }
+        assertEquals(true, hasException);
     }
 }
