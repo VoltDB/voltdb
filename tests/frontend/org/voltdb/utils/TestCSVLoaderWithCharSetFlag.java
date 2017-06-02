@@ -134,7 +134,7 @@ public class TestCSVLoaderWithCharSetFlag {
             String encodingExpression = my_options[1];
             int pos = encodingExpression.indexOf("=");
             String encoding = encodingExpression.substring(pos+1);
-            System.out.println(encoding);
+            //System.out.println(encoding);
             FileOutputStream fos = new FileOutputStream(path_csv);
             OutputStreamWriter osw = new OutputStreamWriter(fos, encoding);
             BufferedWriter out_csv = new BufferedWriter(osw);
@@ -155,14 +155,11 @@ public class TestCSVLoaderWithCharSetFlag {
 
         VoltTable modCount;
         modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
-
-        System.out.println("data inserted to table BLAH:\n" + modCount);
         int rowct = modCount.getRowCount();
 
         // Call validate partitioning to check if we are good.
         VoltTable valTable;
         valTable = client.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
-        System.out.println("Validate for BLAH:\n" + valTable);
         while (valTable.advanceRow()) {
             long miscnt = valTable.getLong("MISPARTITIONED_ROWS");
             assertEquals(miscnt, 0);
@@ -186,7 +183,6 @@ public class TestCSVLoaderWithCharSetFlag {
             }
         }
         csvreport.close();
-        System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
         assertEquals(lineCount-validLineUpsertCnt,  rowct);
         //assert validLineCnt specified equals the successfully inserted lineCount
         assertEquals(validLineCnt, lineCount);
@@ -1721,7 +1717,7 @@ public class TestCSVLoaderWithCharSetFlag {
         while(table.advanceRow()) {
         	int i = table.getActiveRowIndex();
         	VoltTableRow row = table.fetchRow(i);
-        	System.out.println(row.getString(4) + "   ");
+        	//System.out.println(row.getString(4) + "   ");
         	assertEquals(row.getString(4),strings[pos]);
         	pos++;
         }
@@ -1762,14 +1758,14 @@ public class TestCSVLoaderWithCharSetFlag {
 				bw = new BufferedWriter(osw);
 
 				for(String str: myData) {
-					System.out.println(str);
+					//System.out.println(str);
 					bw.write(str + "\n");
 				}
 				bw.flush();
 				osw.flush();
 				fos.flush();
 			}
-			System.out.println("Done");
+			//System.out.println("Done Creating the file");
 		} catch (IOException e) {
 			e.printStackTrace();
 		} finally {
