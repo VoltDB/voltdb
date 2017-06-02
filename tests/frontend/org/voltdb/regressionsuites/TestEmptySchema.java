@@ -127,9 +127,7 @@ public class TestEmptySchema extends RegressionSuite
         // Note that host 1 is not successfully joined, therefore its log cannot be trusted
         for (int i : getLocalClusterHostIds()) {
             if (i != 1) {
-                String hostLogPath = localCluster.getHostLogPath(i);
-                assertTrue(localCluster.fileContains(hostLogPath,
-                        "VoltDB has encountered an unrecoverable error and is exiting."));
+                assertTrue(localClusterHostLogContains(i, "VoltDB has encountered an unrecoverable error and is exiting."));
             }
         }
         localCluster.startUp();
