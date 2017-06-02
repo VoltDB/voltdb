@@ -77,7 +77,7 @@ public class TestEmptySchema extends RegressionSuite
         // Test the log search utility
         assertEquals(true, localClusterAllInitLogsContain("Initialized VoltDB root directory"));
         assertEquals(true, localClusterAllHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
-        for (int i : getLocalHostIds()) {
+        for (int i : getLocalClusterHostIds()) {
             assertEquals(true, localClusterInitlogContains(i, "Initialized VoltDB .* directory"));
             assertEquals(true, localClusterHostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
         }
@@ -108,22 +108,36 @@ public class TestEmptySchema extends RegressionSuite
         // Shutdown a single host and restart
         LocalCluster localCluster = (LocalCluster) m_config;
         localCluster.killSingleHost(1);
+
+        localCluster.allHostLogsContain("Host 1 failed");
+
         localCluster.setNewCli(false);  // This is needed to perform rejoin
         localCluster.recoverOne(1, 1, "");
 
         // In community edition this should fail ? Since rejoin is only supported in enterprise
         // edition
         boolean rejoinMsg = localClusterHostLogContains(1, "VoltDB Community Edition only supports .*") // failure
-                            || localClusterHostLogContains(1, "Initializing VoltDB .*$");    // Success
+                            || localClusterHostLogContains(1, "Initializing VoltDB .*");    // Success
         assertEquals(true, rejoinMsg);
 
         // Shutdown and startup the whole cluster
-        localCluster.shutDown();
+        localCluster.shutDown();    // After shutdown the in-memory logs are cleared
+
+        // Check the on-disk files instead
+        // Note that host 1 is not successfully joined, therefore its log cannot be trusted
+        for (int i : getLocalClusterHostIds()) {
+            if (i != 1) {
+                String hostLogPath = localCluster.getHostLogPath(i);
+                assertTrue(localCluster.fileContains(hostLogPath,
+                        "VoltDB has encountered an unrecoverable error and is exiting."));
+            }
+        }
         localCluster.startUp();
+
         // Test the log search utility
         assertEquals(true, localClusterAllInitLogsContain("Initialized VoltDB root directory"));
         assertEquals(true, localClusterAllHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
-        for (int i : getLocalHostIds()) {
+        for (int i : getLocalClusterHostIds()) {
             // No init log after restart (newCli == false)
             assertEquals(true, localClusterHostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
         }

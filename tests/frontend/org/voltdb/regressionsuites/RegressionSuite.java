@@ -1377,7 +1377,7 @@ public class RegressionSuite extends TestCase {
      * Get HostIds in the LocalCluster, make sure the server configuration
      * is an instance of LocalCluster
      */
-    public Set<Integer> getLocalHostIds() {
+    public Set<Integer> getLocalClusterHostIds() {
         assertEquals(true, m_config instanceof LocalCluster);
         return ((LocalCluster) m_config).getHostIds();
     }

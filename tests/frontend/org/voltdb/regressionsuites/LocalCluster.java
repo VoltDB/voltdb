@@ -863,6 +863,8 @@ public class LocalCluster extends VoltServerConfig {
         m_pipes.clear();
         m_cluster.clear();
         m_cmdLines.clear();
+        m_logs.clear();
+        m_initLogFilePath.clear();
         int oopStartIndex = 0;
 
         // create the in-process server instance.
@@ -1648,10 +1650,9 @@ public class LocalCluster extends VoltServerConfig {
         }
         shutDownExternal();
 
-        // Cleanup the resources
+        // Cleanup the in-memory logs
         if (m_enableLogSearch) {
             m_logs.clear();
-            m_initLogFilePath.clear();
         }
 
         VoltServerConfig.removeInstance(this);
@@ -2334,6 +2335,13 @@ public class LocalCluster extends VoltServerConfig {
             ifExist = pattern.matcher(contents).find();
         } catch (IOException e) {}
         return ifExist;
+    }
+
+    public String getHostLogPath(int HostId) {
+        assert(m_enableLogSearch);
+        String[] paths = m_initLogFilePath.get(HostId);
+        assert (paths != null);
+        return paths[1];
     }
 
     // Return the set of host IDs
