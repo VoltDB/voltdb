@@ -1440,6 +1440,8 @@ public class LocalCluster extends VoltServerConfig {
             return true;
         }
 
+        // For some mythical reason rejoinHostId is not actually used for the newly created host,
+        // hostNum is used by default
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
@@ -1536,17 +1538,35 @@ public class LocalCluster extends VoltServerConfig {
                 assert(status);
             }
 
-            ptf = new PipeToFile(
-                    testoutputdir +
-                    File.separator +
-                    "LC-" +
-                    getFileName() + "-" +
-                    hostId + "-" +
-                    "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
-                    ".rejoined.txt",
-                    proc.getInputStream(),
-                    PipeToFile.m_initToken,
-                    true, proc);
+            String filePath = testoutputdir +
+                              File.separator +
+                              "LC-" +
+                              getFileName() + "-" +
+                              hostId + "-" +
+                              "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
+                              ".rejoined.txt";
+            // Setup in-memory log buffer
+            if (m_enableLogSearch) {
+                String[] paths = m_initLogFilePath.get(hostId);
+                // This shouldn't be null anyway
+                if (paths != null) {
+                    paths[1] = filePath;
+                }
+                StringBuffer sBuffer = new StringBuffer();
+                m_logs.put(hostId, sBuffer);
+                ptf = new PipeToFile(
+                        filePath,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        true, proc, sBuffer);
+            } else {
+                ptf = new PipeToFile(
+                        filePath,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        true, proc);
+            }
+
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
                 // replace the existing dead proc
@@ -1628,6 +1648,10 @@ public class LocalCluster extends VoltServerConfig {
         }
         shutDownExternal();
 
+        // Cleanup the resources
+        m_logs.clear();
+        m_initLogFilePath.clear();
+
         VoltServerConfig.removeInstance(this);
     }
 
@@ -1667,10 +1691,13 @@ public class LocalCluster extends VoltServerConfig {
             // Remove the killed process's log from the in-memory list immediately
             if (m_enableLogSearch && ptf != null) {
                 StringBuffer buffer = m_logs.get(ptf.getHostId());
-                m_logs.remove(ptf.getHostId());
-                // Free the memory right away
-                buffer.delete(0, buffer.length());
-                ptf.m_log = null;
+                if (buffer != null) {
+                    m_logs.remove(ptf.getHostId());
+
+                    // Free the memory right away
+                    ptf.m_log = null;
+                    buffer.delete(0, buffer.length());
+                }
             }
         }
 

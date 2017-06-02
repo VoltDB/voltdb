@@ -104,6 +104,29 @@ public class TestEmptySchema extends RegressionSuite
         assertEquals(0, results[0].getRowCount());
         assertEquals(expectedSchema.length, results[0].getColumnCount());
         validateSchema(results[0], expectedTable);
+
+        // Shutdown a single host and restart
+        LocalCluster localCluster = (LocalCluster) m_config;
+        localCluster.killSingleHost(1);
+        localCluster.setNewCli(false);  // This is needed to perform rejoin
+        localCluster.recoverOne(1, 1, "");
+
+        // In community edition this should fail ? Since rejoin is only supported in enterprise
+        // edition
+        boolean rejoinMsg = localClusterHostLogContains(1, "VoltDB Community Edition only supports .*") // failure
+                            || localClusterHostLogContains(1, "Initializing VoltDB .*$");    // Success
+        assertEquals(true, rejoinMsg);
+
+        // Shutdown and startup the whole cluster
+        localCluster.shutDown();
+        localCluster.startUp();
+        // Test the log search utility
+        assertEquals(true, localClusterAllInitLogsContain("Initialized VoltDB root directory"));
+        assertEquals(true, localClusterAllHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
+        for (int i : getLocalHostIds()) {
+            // No init log after restart (newCli == false)
+            assertEquals(true, localClusterHostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
+        }
     }
 
     static public Test suite() throws IOException {
@@ -113,7 +136,7 @@ public class TestEmptySchema extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalCluster config = new LocalCluster(true, "decimal-default.jar", 2, 3, 0, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster(true, "decimal-default.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
 
         success = config.compile(project);
         assertTrue(success);
