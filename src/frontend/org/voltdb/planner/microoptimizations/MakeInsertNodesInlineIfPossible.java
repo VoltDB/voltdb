@@ -24,41 +24,55 @@ public class MakeInsertNodesInlineIfPossible extends MicroOptimization {
 
     @Override
     protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan) {
-        AbstractPlanNode answer = null;
-        for (AbstractPlanNode node = plan, child = null;
-                node != null;
-                node = child) {
-            child = (node.getChildCount() > 0) ? node.getChild(0) : null;
-            /*
-             * Look for an insert node whose (first) child is
-             * a ScanPlanNodeWhichCanHaveInlineInsert.
-             */
-            if (node instanceof InsertPlanNode) {
-                InsertPlanNode insertNode = (InsertPlanNode)node;
-                ScanPlanNodeWhichCanHaveInlineInsert targetNode
-                  = (child instanceof ScanPlanNodeWhichCanHaveInlineInsert)
-                        ? ((ScanPlanNodeWhichCanHaveInlineInsert)child)
+        return recursivelyApply(plan, -1);
+    }
+
+    /**
+     * This helper function is called when we recurse down the childIdx-th
+     * child of a parent node.
+     * @param plan
+     * @param parentIdx
+     * @return
+     */
+    private AbstractPlanNode recursivelyApply(AbstractPlanNode plan, int childIdx) {
+        // If this is an insert plan node, then try to
+        // inline it.  There will only ever by one insert
+        // node, so if we can't inline it we just return the
+        // given plan.
+        if (plan instanceof InsertPlanNode) {
+            InsertPlanNode insertNode = (InsertPlanNode)plan;
+            assert(insertNode.getChildCount() == 1);
+            AbstractPlanNode abstractChild = insertNode.getChild(0);
+            ScanPlanNodeWhichCanHaveInlineInsert targetNode
+                  = (abstractChild instanceof ScanPlanNodeWhichCanHaveInlineInsert)
+                        ? ((ScanPlanNodeWhichCanHaveInlineInsert)abstractChild)
                         : null;
-                // If we have a sequential scan node without an inline aggregate
-                // node, which is also not an then we can inline the insert node.
-                if (child != null
-                        && ( targetNode != null )
-                        && ( ! insertNode.isUpsert())
-                        && ( ! targetNode.hasInlineAggregateNode())) {
-                    AbstractPlanNode parent = (insertNode.getParentCount() > 0) ? insertNode.getParent(0) : null;
-                    targetNode.addInlinePlanNode(insertNode);
-                    if (parent != null) {
-                        parent.clearChildren();
-                        targetNode.getAbstractNode().clearParents();
-                        parent.addAndLinkChild(targetNode.getAbstractNode());
-                    } else {
-                        answer = targetNode.getAbstractNode();
-                    }
+            // If we have a sequential scan node without an inline aggregate
+            // node, which is also not an then we can inline the insert node.
+            if (( ! insertNode.isUpsert())
+                    && ( targetNode != null )
+                    && ( ! targetNode.hasInlineAggregateNode())) {
+                AbstractPlanNode parent = (insertNode.getParentCount() > 0) ? insertNode.getParent(0) : null;
+                AbstractPlanNode abstractTargetNode = targetNode.getAbstractNode();
+                abstractTargetNode.addInlinePlanNode(insertNode);
+                // Don't call removeFromGraph.  That
+                // screws up the order of the children.
+                insertNode.clearChildren();
+                insertNode.clearParents();
+                // Remvoe all the abstractTarget node's parents.
+                // It used to be the insertNode, which is now
+                // dead to us.
+                abstractTargetNode.clearParents();
+                if (parent != null) {
+                    parent.setAndLinkChild(childIdx, abstractTargetNode);
                 }
+                plan = abstractTargetNode;
             }
+            return plan;
         }
-        if (answer != null) {
-            return answer;
+        for (int idx = 0; idx < plan.getChildCount(); idx += 1) {
+            AbstractPlanNode child = plan.getChild(idx);
+            recursivelyApply(child, idx);
         }
         return plan;
     }

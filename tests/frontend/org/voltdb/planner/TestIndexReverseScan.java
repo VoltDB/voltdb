@@ -484,8 +484,6 @@ public class TestIndexReverseScan extends PlannerTestCase {
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
         if (needOrderby) {
-            assertTrue(pn instanceof ProjectionPlanNode);
-            pn = pn.getChild(0);
             assertTrue(pn instanceof OrderByPlanNode);
             pn = pn.getChild(0);
         }
@@ -529,8 +527,6 @@ public class TestIndexReverseScan extends PlannerTestCase {
         pn = pn.getChild(0);
 
         if (needOrderby) {
-            assertTrue(pn instanceof ProjectionPlanNode);
-            pn = pn.getChild(0);
             assertTrue(pn instanceof OrderByPlanNode);
             pn = pn.getChild(0);
         }

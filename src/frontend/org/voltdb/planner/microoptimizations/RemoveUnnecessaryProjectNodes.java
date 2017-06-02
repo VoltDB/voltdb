@@ -50,30 +50,43 @@ public class RemoveUnnecessaryProjectNodes extends MicroOptimization {
      */
     @Override
     protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan) {
-        AbstractPlanNode answer = null;;
-        for (AbstractPlanNode node = plan, child = null;
-                node != null;
-                node = child) {
-            child = (node.getChildCount() > 0) ? node.getChild(0) : null;
-            if (node.getPlanNodeType() == PlanNodeType.PROJECTION) {
-                assert(child != null);
-                NodeSchema childSchema = child.getOutputSchema();
-                assert(childSchema != null);
-                if (((ProjectionPlanNode)node).isIdentity(childSchema)) {
-                    AbstractPlanNode parent = (node.getParentCount() > 0) ? node.getParent(0) : null;
-                    if (parent == null) {
-                        answer = child;
-                    } else {
-                        node.removeFromGraph();
-                        child.clearParents();
-                        parent.clearChildren();
-                        parent.addAndLinkChild(child);
-                    }
+        // When we pass in -1 here we are saying
+        // we have not come to this node through
+        // any parent.  That is to say, this is the root
+        // of the plan.
+        return recursivelyApply(plan, -1);
+    }
+
+    private AbstractPlanNode recursivelyApply(AbstractPlanNode plan, int parentIndex) {
+        // Check to see if this is a projection node which may be
+        // eliminated.  We may eliminate a string of them here.
+        // I don't think this ever happens, but it could.
+        while (plan.getPlanNodeType() == PlanNodeType.PROJECTION) {
+            ProjectionPlanNode pNode = (ProjectionPlanNode)plan;
+            assert(pNode.getChildCount() == 1);
+            AbstractPlanNode child = pNode.getChild(0);
+            NodeSchema childSchema = child.getOutputSchema();
+            assert(childSchema != null);
+            AbstractPlanNode parent = (pNode.getParentCount() > 0) ? pNode.getParent(0) : null;
+            // Either we have no parent or else we have come
+            // down some non-negative child index.
+            assert((parentIndex < 0) || (parent != null));
+            if (pNode.isIdentity(childSchema)) {
+                child.clearParents();
+                if (parent != null) {
+                    parent.setAndLinkChild(parentIndex, child);
                 }
+                plan = child;
+            } else {
+                break;
             }
         }
-        if (answer != null) {
-            return answer;
+        for (int idx = 0; idx < plan.getChildCount(); idx += 1) {
+            AbstractPlanNode child = plan.getChild(idx);
+            AbstractPlanNode newChild = recursivelyApply(child, idx);
+            // We've already fixed up the parent
+            // in the child and the child in the parent.  So,
+            // there is nothing to do here.
         }
         return plan;
     }
