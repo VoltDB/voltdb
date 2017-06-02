@@ -572,7 +572,7 @@ public class JdbcDatabaseMetaDataGenerator
                         results.addRow(null,
                                        null, // table schema
                                        table.getTypeName(), // table name
-                                       column.getTypeName(), // column name
+                                       c.getTypeName().equals("MATVIEW_PK_CONSTRAINT") ? column.getColumn().getTypeName() : column.getTypeName(), // column name
                                        column.getRelativeIndex(), // key_seq
                                        c.getTypeName() // PK_NAME
                                       );
