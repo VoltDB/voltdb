@@ -17,7 +17,6 @@
 
 package org.voltdb.importclient.junit;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.AbstractImporterFactory;
 import org.voltdb.importer.ImporterConfig;
@@ -34,7 +33,6 @@ import java.util.Properties;
  * Created by bshaw on 5/31/17.
  */
 public class JUnitImporterFactory extends AbstractImporterFactory {
-
 
     @Override
     protected AbstractImporter create(ImporterConfig config) {
@@ -54,6 +52,6 @@ public class JUnitImporterFactory extends AbstractImporterFactory {
 
     @Override
     public boolean isImporterRunEveryWhere() {
-        return true; // BSDBG kafka uses false; can this be made test controllable?
+        return true; // make this test controllable?
     }
 }

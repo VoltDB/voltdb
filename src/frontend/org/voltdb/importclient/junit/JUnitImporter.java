@@ -21,6 +21,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import org.voltdb.importer.AbstractImporter;
 
 import java.net.URI;
+import java.util.List;
 
 import static org.voltdb.importclient.junit.JUnitImporter.Event.*;
 
@@ -31,6 +32,8 @@ public class JUnitImporter extends AbstractImporter {
 
     public static final int DEFAULT_IMPORTER_SLEEP_DURATION_MS = 250;
 
+    private JUnitImporterConfig m_config;
+
     public enum Event {
         CONSTRUCTED,
         ACCEPT_CALLED,
@@ -38,7 +41,51 @@ public class JUnitImporter extends AbstractImporter {
         NO_LONGER_RUNNING
     }
 
-    private JUnitImporterConfig m_config;
+    public enum State {
+        UNKNOWN,
+        STARTING,
+        RUNNING,
+        STOPPING,
+        STOPPED
+    }
+
+    public static State computeStateFromEvents(List<Event> eventList) {
+        if (eventList.size() == 0) {
+            return State.UNKNOWN; // assume test cleared the event list - this should not be an importer whose constructor isn't done!
+        }
+
+        Event mostRecentEvent = eventList.get(eventList.size() - 1);
+        Event secondMostRecentEvent = eventList.size() > 1 ? eventList.get(eventList.size() - 2) : null;
+
+        switch (mostRecentEvent) {
+            case CONSTRUCTED:
+                return State.STARTING;
+            case ACCEPT_CALLED:
+                return State.RUNNING;
+            // There is a race condition between STOP_CALLED and NO_LONGER_RUNNING.
+            // Usually STOP_CALLED will be first but don't assume that's always the case.
+            case STOP_CALLED:
+                if (secondMostRecentEvent == null) {
+                    return State.UNKNOWN; // assume test cleared event list
+                } else if (secondMostRecentEvent.equals(Event.ACCEPT_CALLED)) {
+                    return State.STOPPING;
+                } else {
+                    assert (secondMostRecentEvent.equals(Event.NO_LONGER_RUNNING) || secondMostRecentEvent.equals(Event.CONSTRUCTED));
+                    return State.STOPPED;
+                }
+            case NO_LONGER_RUNNING:
+                if (secondMostRecentEvent == null) {
+                    return State.UNKNOWN; // assume test cleared event list
+                } else if (secondMostRecentEvent.equals(Event.ACCEPT_CALLED)) {
+                    return State.STOPPING;
+                } else {
+                    assert (secondMostRecentEvent.equals(Event.STOP_CALLED) || secondMostRecentEvent.equals(Event.CONSTRUCTED));
+                    return State.STOPPED;
+                }
+        }
+        throw new RuntimeException("We cannot get here but the compiler requires a return statement");
+    }
+
 
     private JUnitImporterMessenger getMessenger() {
         JUnitImporterMessenger messenger = JUnitImporterMessenger.instance();

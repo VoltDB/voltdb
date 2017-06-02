@@ -32,7 +32,6 @@ import org.junit.Test;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.*;
@@ -56,7 +55,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created by bshaw on 5/26/17.
+ * Tests importer state change logic.
  */
 public class TestImportManager {
 
@@ -75,24 +74,59 @@ public class TestImportManager {
     private static final boolean DEFAULT_CATALOG_ENABLES_COMMAND_LOG = false; // this is used to generate non-importer-related config changes
     private static String m_previousBundlePath;
 
-    private static final int NUM_IMPORTERS = 2;
+    private static final int NUM_IMPORTERS_FOR_TEST = 2;
     private static final String SCHEMA = "CREATE TABLE test (foo BIGINT NOT NULL, bar VARCHAR(8) NOT NULL);\n"
                                        + "CREATE PROCEDURE procedure1 AS INSERT INTO test VALUES (?, ?);\n"
                                        + "CREATE PROCEDURE procedure2 AS INSERT INTO test VALUES (CAST(? AS BIGINT) * 2, lower(CAST(? AS VARCHAR(8))));";
 
 
-    public class DetectImporterRestart implements JUnitImporterEventExaminer {
+    /* ---- Event and state detectors ---- */
 
-        private Set<URI> m_importersWithRestarts = new HashSet<>();
+    public class DetectImporterCount implements JUnitImporterEventExaminer {
 
-        public Set<URI> getImportersWithRestarts() {
-            return m_importersWithRestarts;
+        private Optional<Integer> m_importerCount = Optional.empty();
+
+        @Override
+        public void examine(Map<URI, List<JUnitImporter.Event>> eventTracker) {
+            m_importerCount = Optional.of(eventTracker.keySet().size());
+        }
+
+        public int getImporterCount() {
+            assertTrue(m_importerCount.isPresent());
+            return m_importerCount.get();
+        }
+    }
+
+    public static class DetectImporterState implements JUnitImporterEventExaminer {
+
+        private final Set<URI> m_importersInState = new HashSet<>();
+        private final JUnitImporter.State m_expectedState;
+
+        public DetectImporterState(JUnitImporter.State expectedState) {
+            m_expectedState = expectedState;
         }
 
         @Override
         public void examine(Map<URI, List<JUnitImporter.Event>> eventTracker) {
-            // TODO: detect the pattern which indicates an importer restarted and add applicable importers to the set.
+            m_importersInState.clear();
+            for (Map.Entry<URI, List<JUnitImporter.Event>> entry : eventTracker.entrySet()) {
+                JUnitImporter.State actualState = JUnitImporter.computeStateFromEvents(entry.getValue());
+                if (m_expectedState.equals(actualState)) {
+                    m_importersInState.add(entry.getKey());
+                }
+            }
         }
+
+        public Set<URI> getImporters() {
+            return m_importersInState;
+        }
+    }
+
+
+    /* ---- Helper methods ---- */
+
+    private static String generateImporterID(int index) {
+        return "MockImporter" + Integer.toString(index);
     }
 
     /** Builds a CatalogContext for the import manager to use.
@@ -112,7 +146,7 @@ public class TestImportManager {
         for (int i = 0; i < numImporters; i++) {
             Properties importerProperties = new Properties();
             importerProperties.setProperty(ImportDataProcessor.IMPORT_PROCEDURE, "procedure" + i);
-            importerProperties.setProperty(JUnitImporterConfig.IMPORTER_ID_PROPERTY, "MockImporter" + Integer.toString(i));
+            importerProperties.setProperty(JUnitImporterConfig.IMPORTER_ID_PROPERTY, generateImporterID(i));
             projectBuilder.addImport(true, "custom", null, JUnitImporterConfig.URI_SCHEME + ".jar", importerProperties);
         }
         projectBuilder.configureLogging(false, enableCommandLogs, 100, 1000, 10000);
@@ -159,7 +193,7 @@ public class TestImportManager {
             System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, pathToBundles);
         }
 
-        CatalogContext catalogContextWith3Kafka = buildMockCatalogContext(m_voltDbRoot, NUM_IMPORTERS, false);
+        CatalogContext catalogContextWith3Kafka = buildMockCatalogContext(m_voltDbRoot, NUM_IMPORTERS_FOR_TEST, false);
         m_mockChannelDistributer = new MockChannelDistributer(Integer.toString(HOSTID));
         m_statsCollector = new ImporterStatsCollector(SITEID);
         ImportManager.initializeWithMocks(m_voltDbRoot, HOSTID, catalogContextWith3Kafka, m_mockChannelDistributer, m_statsCollector);
@@ -184,29 +218,51 @@ public class TestImportManager {
         }
     }
 
-    private boolean checkForImporterRestart() throws Exception {
-        System.out.println("Waiting up to " + TimeUnit.MILLISECONDS.toSeconds(RESTART_CHECK_MAX_MS) + " seconds for importers to restart.");
-
-        // FIXME: this is the OPPOSITE of what I need! I need one with all importers, not none of them!
+    private Set<URI> generateExpectedImporters(int numImportersExpected) {
         Set<URI> expectedImporterSet = new HashSet<>();
-
-        for (int i = 0; i < RESTART_CHECK_MAX_MS / RESTART_CHECK_POLLING_INTERVAL_MS; i++) {
-            Thread.sleep(RESTART_CHECK_POLLING_INTERVAL_MS);
-            DetectImporterRestart detector = new DetectImporterRestart();
-            JUnitImporterMessenger.instance().checkEventList(detector);
-            if (detector.getImportersWithRestarts().equals(expectedImporterSet)) {
-                return true;
-            }
+        for (int i = 0; i < numImportersExpected; i++) {
+            expectedImporterSet.add(JUnitImporterConfig.generateURIForImporter(generateImporterID(i)));
         }
-        return false;
+        return expectedImporterSet;
     }
 
+    private void checkImportersAreRunning(Set<URI> expectedImporters) throws Exception {
+        System.out.println("Waiting up to " + TimeUnit.MILLISECONDS.toSeconds(RESTART_CHECK_MAX_MS) + " seconds for " + expectedImporters.size() + " importers to be running");
+
+        Set<URI> runningImporters = null;
+        for (int i = 0; i < RESTART_CHECK_MAX_MS / RESTART_CHECK_POLLING_INTERVAL_MS; i++) {
+            Thread.sleep(RESTART_CHECK_POLLING_INTERVAL_MS);
+            DetectImporterState detector = new DetectImporterState(JUnitImporter.State.RUNNING);
+            JUnitImporterMessenger.instance().checkEventList(detector);
+            runningImporters = detector.getImporters();
+            if (runningImporters.equals(expectedImporters)) {
+                return;
+            }
+        }
+        throw new AssertionError("Expected running importers " + expectedImporters.toString() + " but found running importers " + runningImporters.toString());
+    }
+
+    private void checkImportersAreOff() throws Exception {
+        DetectImporterCount detector = new DetectImporterCount();
+        JUnitImporterMessenger.instance().checkEventList(detector);
+        assertEquals(0, detector.getImporterCount());
+    }
+
+    /* ---- Tests ---- */
+
+    /** Verify that removing and restoring importers in the deployment file results in the importers restarting.
+     * @throws Exception on failure
+     */
     @Test
     public void testImporterRestartDeploymentChanges() throws Exception {
-        CatalogContext catalogContextWithoutKafka = buildMockCatalogContext(m_voltDbRoot, 0, DEFAULT_CATALOG_ENABLES_COMMAND_LOG);
+        Set<URI> expectedImporters = generateExpectedImporters(NUM_IMPORTERS_FOR_TEST);
+        checkImportersAreRunning(expectedImporters);
 
+        CatalogContext catalogContextWithoutKafka = buildMockCatalogContext(m_voltDbRoot, 0, DEFAULT_CATALOG_ENABLES_COMMAND_LOG);
         m_manager.updateCatalog(catalogContextWithoutKafka);
+        checkImportersAreOff();
+
         m_manager.updateCatalog(m_initialCatalogContext);
-        assertEquals("Importers did not restart after importers were removed and re-added.", true, checkForImporterRestart());
+        checkImportersAreRunning(expectedImporters);
     }
 }

@@ -50,7 +50,7 @@ public class JUnitImporterConfig implements ImporterConfig {
         return m_formatterBuilder;
     }
 
-    private static URI generateURIForImporter(String importerID) {
+    public static URI generateURIForImporter(String importerID) {
         try {
             URI importerURI = new URI(URI_SCHEME, importerID, null);
             return importerURI;

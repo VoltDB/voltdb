@@ -261,8 +261,6 @@ public class ImportManager implements ChannelChangeCallback {
         String bundleJar = attrs[1];
         String moduleType = attrs[0];
 
-        System.out.println("BSDBG: bundleJar = \"" + bundleJar + "\"");
-
         try {
             AbstractImporterFactory importerFactory = m_loadedBundles.get(bundleJar);
             if (importerFactory == null) {
