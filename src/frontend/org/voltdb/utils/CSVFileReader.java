@@ -97,7 +97,6 @@ class CSVFileReader implements Runnable {
     @Override
     public void run() {
         List<String> lineList;
-        //System.out.println("We are in the CSVFileReader thread...");
         //if header option is true, check whether csv first line is valid
         if (m_config.header) {
             if (!checkHeader()) {
