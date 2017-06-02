@@ -287,10 +287,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
-        @Option( desc = "timezone for interpreting date and time strings")
+        @Option(shortOpt = "z", desc = "timezone for interpreting date and time strings")
         String timezone = "";
 
-        @Option(desc = "Custom null string, overrides all other Null pattern matching")
+        @Option(shortOpt = "n", desc = "Custom null string, overrides all other Null pattern matching")
         String customNullString = "";
 
         // add a charset flag as "c"
@@ -488,7 +488,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
             }
 
-
             CSVFileReader.initializeReader(cfg, csvClient, listReader);
 
             CSVFileReader csvReader = new CSVFileReader(dataLoader, errHandler);
@@ -662,7 +661,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         } catch (Exception x) {
             m_log.error(x.getMessage());
         }
-
     }
 
     private static void close_cleanup() throws IOException,
@@ -671,5 +669,4 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         out_logfile.close();
         out_reportfile.close();
     }
-
 }

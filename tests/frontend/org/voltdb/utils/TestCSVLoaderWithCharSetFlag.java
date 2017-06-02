@@ -1542,6 +1542,7 @@ public class TestCSVLoaderWithCharSetFlag {
         }
     }
 
+
     @Test
     public void testUTF8WithGBKEncoding() throws Exception
     {
@@ -1577,10 +1578,7 @@ public class TestCSVLoaderWithCharSetFlag {
 			br = new BufferedReader(fr);
 			String sCurrentLine;
 			br = new BufferedReader(new FileReader(FILENAME));
-			System.out.println("______________");
-			System.out.println("We are in the second test case");
 			while ((sCurrentLine = br.readLine()) != null) {
-				System.out.println(sCurrentLine);
 				list.add(sCurrentLine);
 			}
 		} catch (IOException e) {
@@ -1626,6 +1624,92 @@ public class TestCSVLoaderWithCharSetFlag {
         	e.printStackTrace();
         }
     }
+
+
+    @Test
+    public void testGB2312WithGBKEncoding() throws Exception
+    {
+        // ENG-12324: csvloader --header doesn't work if header has spaces. This is essentially the same test as testHeaderColumnNumNotSame, but with some
+        // strategically placed whitespace in the header.
+
+    	originEncoding = "gb2312";
+    	createCSVFile("gb2312");
+
+        String []myOptions = {
+                "-f" + path_csv,
+                "--characterSet=gbk",	// use gbk to decode it
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        String FILENAME = "gb2312_encoded_text.csv";
+        List<String> list = new ArrayList<>();
+
+		//read from the file
+		BufferedReader br = null;
+		FileReader fr = null;
+		try {
+			fr = new FileReader(FILENAME);
+			br = new BufferedReader(fr);
+			String sCurrentLine;
+			br = new BufferedReader(new FileReader(FILENAME));
+			while ((sCurrentLine = br.readLine()) != null) {
+				list.add(sCurrentLine);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (br != null)
+					br.close();
+				if (fr != null)
+					fr.close();
+			} catch (IOException ex) {
+				ex.printStackTrace();
+			}
+		}
+
+		String[] myData2 = new String[list.size()];
+		for(int i = 0; i < list.size(); i++) {
+			myData2[i] = list.get(i);
+		}
+
+        int invalidLineCnt = 0;
+        int validLineCnt = 8;
+        test_Interface(myOptions, myData2, invalidLineCnt, validLineCnt );
+
+        // query the database
+        VoltTable table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH ORDER BY CLM_INTEGER;").getResults()[0];
+        String[] strings = {"first复杂的漢字查询内容","second","third",null,"abcdeg","sixth","seventh","first"};
+        int pos = 0;
+        while(table.advanceRow()) {
+        	int i = table.getActiveRowIndex();
+        	if(i==0) {
+        		// System.out.println(table.fetchRow(i).getString(4) + "in the table, " + strings[pos] + " expected");
+        		assertFalse(table.fetchRow(i).getString(4).equals(strings[pos]));
+        		pos++;continue;
+        	}
+        	VoltTableRow row = table.fetchRow(i);
+        	assertEquals(row.getString(4),strings[pos]);
+        	pos++;
+        }
+        try {
+        	File temp = new File(FILENAME);
+        	if(temp.exists()) temp.delete();
+        } catch (Exception e) {
+        	e.printStackTrace();
+        }
+    }
+
+
 
     @Test
     public void testMultiByteCharacterGBK() throws Exception
@@ -1698,6 +1782,12 @@ public class TestCSVLoaderWithCharSetFlag {
         	//System.out.println(row.getString(4) + "   ");
         	assertEquals(row.getString(4),strings[pos]);
         	pos++;
+        }
+        try {
+        	File temp = new File(FILENAME);
+        	if(temp.exists()) temp.delete();
+        } catch (Exception e) {
+        	e.printStackTrace();
         }
     }
 
@@ -1775,6 +1865,12 @@ public class TestCSVLoaderWithCharSetFlag {
         	//System.out.println(row.getString(4) + "   ");
         	assertEquals(row.getString(4),strings[pos]);
         	pos++;
+        }
+        try {
+        	File temp = new File(FILENAME);
+        	if(temp.exists()) temp.delete();
+        } catch (Exception e) {
+        	e.printStackTrace();
         }
     }
 
