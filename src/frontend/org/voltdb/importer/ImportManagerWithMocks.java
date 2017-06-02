@@ -17,7 +17,6 @@
 
 package org.voltdb.importer;
 
-import org.voltdb.CatalogContext;
 
 /**
  * For regression test use only. An ImportManager that has fewer dependencies and can be used standalone for testing.

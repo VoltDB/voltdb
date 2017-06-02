@@ -33,10 +33,11 @@ import java.util.Properties;
 public class JUnitImporterConfig implements ImporterConfig {
 
     public static final String URI_SCHEME = "junitimporter";
-    public static final String NUM_IMPORTERS_PROPERTY = "JUnitImporter.NUM_IMPORTERS";
+    public static final String IMPORTER_ID_PROPERTY = "JUnitImporter.IMPORTER_ID";
     public static final String SLEEP_DURATION_PROPERTY = "JUnitImporter.SLEEP_DURATION_MS";
 
     private URI m_resourceID = null;
+    private FormatterBuilder m_formatterBuilder = null;
     private int m_sleepDurationMs = JUnitImporter.DEFAULT_IMPORTER_SLEEP_DURATION_MS;
 
     @Override
@@ -46,12 +47,12 @@ public class JUnitImporterConfig implements ImporterConfig {
 
     @Override
     public FormatterBuilder getFormatterBuilder() {
-        return null;
+        return m_formatterBuilder;
     }
 
-    private static URI generateURIForImporter(int index) {
+    private static URI generateURIForImporter(String importerID) {
         try {
-            URI importerURI = new URI(URI_SCHEME, Integer.toString(index), null);
+            URI importerURI = new URI(URI_SCHEME, importerID, null);
             return importerURI;
         } catch (URISyntaxException bug) {
             throw new RuntimeException(bug);
@@ -59,28 +60,26 @@ public class JUnitImporterConfig implements ImporterConfig {
     }
 
     public static Map<URI,ImporterConfig> createConfigEntries(Properties props, FormatterBuilder formatterBuilder) {
-        assert formatterBuilder == null; // dummy importer doesn't need a formatter
-        int numImporters;
         int importerSleepDurationMs;
-
         try {
-            String numImportersAsString = props.getProperty(NUM_IMPORTERS_PROPERTY);
-            Preconditions.checkNotNull(numImportersAsString, "number of importers was not specified");
-            numImporters = Integer.parseInt(numImportersAsString);
             importerSleepDurationMs = Integer.parseInt(props.getProperty(SLEEP_DURATION_PROPERTY, Integer.toString(JUnitImporter.DEFAULT_IMPORTER_SLEEP_DURATION_MS)));
-
         } catch (NumberFormatException shouldNotHappen) {
             throw new RuntimeException(shouldNotHappen);
         }
 
+        String importerID = props.getProperty(IMPORTER_ID_PROPERTY);
+        Preconditions.checkNotNull(importerID, "Every JUnitImporter must have a unique IMPORTER_ID");
+
+        // NOTE: JUnitImporter only supports one 'real' importer per configured importer.
+        // Kafka, by contrast, supports one per broker.
         Map<URI, ImporterConfig> configMap = new HashMap<>();
-        for (int i = 0; i < numImporters; i++) {
-            URI importerURI = generateURIForImporter(i);
-            JUnitImporterConfig config = new JUnitImporterConfig();
-            config.m_resourceID = importerURI;
-            config.m_sleepDurationMs = importerSleepDurationMs;
-            configMap.put(importerURI, config);
-        }
+        URI importerURI = generateURIForImporter(importerID);
+        JUnitImporterConfig config = new JUnitImporterConfig();
+        config.m_resourceID = importerURI;
+        config.m_formatterBuilder = formatterBuilder;
+        config.m_sleepDurationMs = importerSleepDurationMs;
+        ImporterConfig previousConfig = configMap.put(importerURI, config);
+        Preconditions.checkState(previousConfig == null, "Importer ID " + importerID + " is not unique.");
         return configMap;
     }
 

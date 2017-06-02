@@ -17,6 +17,7 @@
 
 package org.voltdb.importer;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
@@ -125,7 +126,8 @@ public class ImportManager implements ChannelChangeCallback {
      * @param mockChannelDistributer
      * @param myStatsCollector
      */
-    public static synchronized void initializeWithMocks(int myHostId, CatalogContext initialCatalogCtxt, ChannelDistributer mockChannelDistributer, ImporterStatsCollector myStatsCollector) {
+    public static synchronized void initializeWithMocks(File voltDbRoot, int myHostId, CatalogContext initialCatalogCtxt, ChannelDistributer mockChannelDistributer, ImporterStatsCollector myStatsCollector) {
+        ModuleManager.initializeCacheRoot(new File(voltDbRoot, VoltDB.MODULE_CACHE));
         ImportManager em = new ImportManagerWithMocks(myHostId, myStatsCollector);
         m_self = em;
         em.initializeChannelDistributer(mockChannelDistributer);
