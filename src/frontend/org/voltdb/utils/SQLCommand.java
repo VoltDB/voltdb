@@ -837,6 +837,13 @@ public class SQLCommand
                 return;
             }
 
+            // explainjson => @ExplainJSON
+            String explainStatementInJSON = SQLParser.parseExplainJSONCall(statement);
+            if (explainStatementInJSON != null) {
+                printResponse(m_client.callProcedure("@ExplainJSON", explainStatementInJSON), false);
+                return;
+            }
+
             String explainProcName = SQLParser.parseExplainProcCall(statement);
             if (explainProcName != null) {
                 // We've got a statement that starts with "explainproc", send the statement to

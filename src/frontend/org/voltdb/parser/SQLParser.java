@@ -559,6 +559,16 @@ public class SQLParser extends SQLPatternFactory
             // explain.
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    // Match queries that start with "explainjson" (case insensitive).  We'll convert them to @ExplainJSON invocations.
+    private static final Pattern ExplainJSONCallPreamble = Pattern.compile(
+            "^\\s*" +            // optional indent at start of line
+            "explainjson" +      // required command, whitespace terminated
+            "(\\W|$)" +          // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that explain command
+            // diagnostics can "own" any line starting with the word
+            // explain.
+            "\\s*",              // extra spaces
+            Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
     private static final Pattern ExplainProcCallPreamble = Pattern.compile(
             "^\\s*" +            // optional indent at start of line
@@ -1853,6 +1863,20 @@ public class SQLParser extends SQLPatternFactory
     public static String parseExplainCall(String statement)
     {
         Matcher matcher = ExplainCallPreamble.matcher(statement);
+        if ( ! matcher.lookingAt()) {
+            return null;
+        }
+        return statement.substring(matcher.end());
+    }
+
+    /**
+     * Parse EXPLAINJSON <query>
+     * @param statement  statement to parse
+     * @return           query parameter string or NULL if statement wasn't recognized
+     */
+    public static String parseExplainJSONCall(String statement)
+    {
+        Matcher matcher = ExplainJSONCallPreamble.matcher(statement);
         if ( ! matcher.lookingAt()) {
             return null;
         }

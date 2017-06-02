@@ -330,6 +330,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
             return processExplainDefaultProc(plannedStmtBatch);
         }
+        else if (explainMode == ExplainMode.EXPLAIN_JSON) {
+            return processExplainPlannedStmtBatchInJSON(plannedStmtBatch);
+        }
         else {
             try {
                 return createAdHocTransaction(plannedStmtBatch, isSwapTables);
@@ -352,7 +355,35 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         VoltTable[] vt = new VoltTable[ size ];
         for (int i = 0; i < size; ++i) {
             vt[i] = new VoltTable(new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
-            String str = planBatch.explainStatement(i, db);
+            String str = planBatch.explainStatement(i, db, false);
+            vt[i].addRow(str);
+        }
+
+        ClientResponseImpl response =
+                new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS,
+                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null,
+                        vt,
+                        null);
+
+        CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
+        fut.complete(response);
+        return fut;
+    }
+
+    static CompletableFuture<ClientResponse> processExplainPlannedStmtBatchInJSON(AdHocPlannedStmtBatch planBatch) {
+        /**
+         * Take the response from the async ad hoc planning process and put the explain
+         * plan in a table with the right format.
+         */
+        Database db = VoltDB.instance().getCatalogContext().database;
+        int size = planBatch.getPlannedStatementCount();
+
+        VoltTable[] vt = new VoltTable[ size ];
+        for (int i = 0; i < size; ++i) {
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo("JSON_PLAN", VoltType.STRING));
+            String str = planBatch.explainStatement(i, db, true);
             vt[i].addRow(str);
         }
 
@@ -382,7 +413,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         assert(planBatch.getPlannedStatementCount() == 1);
         AdHocPlannedStatement ahps = planBatch.getPlannedStatement(0);
         String sql = new String(ahps.sql, StandardCharsets.UTF_8);
-        String explain = planBatch.explainStatement(0, db);
+        String explain = planBatch.explainStatement(0, db, false);
 
         VoltTable vt = new VoltTable(new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
                 new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));

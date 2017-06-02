@@ -166,7 +166,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
     public enum ExplainMode {
-        NONE, EXPLAIN_ADHOC, EXPLAIN_DEFAULT_PROC;
+        NONE, EXPLAIN_ADHOC, EXPLAIN_DEFAULT_PROC, EXPLAIN_JSON;
     }
 
     private final ClientAcceptor m_acceptor;
