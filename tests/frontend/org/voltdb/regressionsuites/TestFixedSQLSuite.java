@@ -1767,6 +1767,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
 
         try {
+            client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2, repeat('" + var1 + "',2))");
+            fail();
+        } catch(Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                                      var1.length()*2, var1+var1, 10)));
+            assertTrue(ex.getMessage().contains("for column 'VAR1'"));
+        }
+
+        try {
             client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "' || 'abc')");
             fail();
         } catch(Exception ex) {
@@ -1783,6 +1793,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertTrue(ex.getMessage().contains(
                     String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
                             var1.length(), var1, 10)));
+            assertTrue(ex.getMessage().contains("for column 'VAR1'"));
         }
 
         // Test non-inlined varchar with stored procedure and threshold

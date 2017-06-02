@@ -135,7 +135,15 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
     if (all_param_array != NULL) {
         VOLT_TRACE("sweet, all params\n");
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-            temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
+            try {
+                temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
+            } catch (SQLException& ex) {
+                std::string errorMsg = ex.message()
+                                    + " (for column '"
+                                    + (output_table -> getColumnNames()).at(ctr) + "')";
+
+                throw SQLException(ex.getSqlState(), errorMsg);
+            }
         }
     }
     else {
@@ -147,8 +155,8 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
                 temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&dummy, NULL));
             } catch (SQLException& ex) {
                 std::string errorMsg = ex.message()
-                                    + "\n length exceeds for column: "
-                                    + (output_table -> getColumnNames()).at(ctr);
+                                    + " (for column '"
+                                    + (output_table -> getColumnNames()).at(ctr) + "')";
 
                 throw SQLException(ex.getSqlState(), errorMsg);
             }
