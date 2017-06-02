@@ -1763,6 +1763,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains("Value ("+var1+") is too wide for a constant varchar value of size 10"));
+            assertTrue(ex.getMessage().contains("for column 'VAR1' in the table 'VARLENGTH'"));
         }
 
         try {
