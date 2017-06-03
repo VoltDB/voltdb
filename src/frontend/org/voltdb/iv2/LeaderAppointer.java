@@ -257,7 +257,6 @@ public class LeaderAppointer implements Promotable
                     masterHostId = -1;
                 }
             } else {
-
                 //node down
                 masterHostId = newLeaderHostId;
                 newLeaderHostId = -1;
@@ -356,7 +355,11 @@ public class LeaderAppointer implements Promotable
 
         @Override
         public int compareTo(Host o) {
-            return (this.leaderCount - o.leaderCount);
+            int ret = (leaderCount - o.leaderCount);
+            if (ret != 0) {
+                return ret;
+            }
+            return (id - o.id);
         }
     }
 
@@ -565,7 +568,6 @@ public class LeaderAppointer implements Promotable
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to read partitions from ZK", true, e);
         }
-
         //Don't fetch the values serially do it asynchronously
         Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
         Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<ZKUtil.ChildrenCallback>();
@@ -759,14 +761,12 @@ public class LeaderAppointer implements Promotable
         for (PartitionCallback cb : m_callbacks.values()) {
             SortedSet<Host> hosts = new TreeSet<Host>();
             hosts.addAll(leaderHostMap.values());
+            int hostId = CoreUtils.getHostIdFromHSId(cb.m_currentLeader);
+            //The partition has a valid leader
+            if (leaderHostMap.containsKey(hostId)) {
+                continue;
+            }
             for (Host host : hosts) {
-                int hostId = CoreUtils.getHostIdFromHSId(cb.m_currentLeader);
-
-                //The partition has a valid leader
-                if (leaderHostMap.containsKey(hostId)) {
-                    continue;
-                }
-
                 //The host does not have this partition
                 if (!(host.partitions.contains(cb.m_partitionId))) {
                     continue;
