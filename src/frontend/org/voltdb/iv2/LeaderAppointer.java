@@ -259,6 +259,10 @@ public class LeaderAppointer implements Promotable
             } else {
                 //node down
                 masterHostId = newLeaderHostId;
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.info("[assignLeader]moving leader of partition " + m_partitionId + " to host " + newLeaderHostId + " ["
+                        + CoreUtils.hsIdCollectionToString(children) + "]");
+                }
                 newLeaderHostId = -1;
             }
 
@@ -757,6 +761,8 @@ public class LeaderAppointer implements Promotable
         if (leaderHostMap.isEmpty() || m_callbacks.isEmpty()) {
             return;
         }
+
+        tmLog.debug("[LeaderAppointer] calculating partition leaders.");
         // iterate through all partitions to see if its current leaders are on the failed hosts.
         for (PartitionCallback cb : m_callbacks.values()) {
             SortedSet<Host> hosts = new TreeSet<Host>();
