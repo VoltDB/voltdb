@@ -316,16 +316,16 @@ public class TestCalciteExpressions extends TestCalciteBase {
 
     public void testSinceEpochExpr() throws Exception {
         String sql;
-        sql = "select SINCE_EPOCH(i) from post.rtypes";
+        sql = "select SINCE_EPOCH(i) from RTYPES";
         String calcitePlanJSON = testPlan(sql, PlannerType.CALCITE);
-        
+
 //        final String viewSql = "select \"empid\" as EMPLOYEE_ID,\n"
 //                + "  \"name\" || ' ' || \"name\" as EMPLOYEE_NAME,\n"
 //                + "  \"salary\" as EMPLOYEE_SALARY,\n"
 //                + "  POST.MY_INCREMENT(\"empid\", 10) as INCREMENTED_SALARY\n"
 //                + "from \"hr\".\"emps\"";
 //        testPlan(viewSql, PlannerType.CALCITE);
-        
+
 //        String voltdbPlanJSON = testPlan(sql, PlannerType.VOLTDB);
 //        sql = "select TO_TIMESTAMP('1969-07-20' , 'YYYY-MM-DD') from rtypes";
 //        testPlan(sql, PlannerType.CALCITE);
@@ -350,6 +350,81 @@ public class TestCalciteExpressions extends TestCalciteBase {
         sql = "select vb + i from RTYPES";
 
         failToCompile(PlannerType.CALCITE, sql, "Cannot apply '+' to arguments of type '<VARBINARY(1024)> + <INTEGER>'");
+    }
+
+    // Conjunction
+    public void testConjunctionAndExpr() throws Exception {
+        String sql;
+        sql = "select 1 from RTYPES where i = 1 and vc = 'foo'";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
+    }
+    public void testConjunctionOrExpr() throws Exception {
+        String sql;
+        sql = "select 1 from RTYPES where i = 1 or i = 4";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
+    }
+
+    // Compare
+    public void testCompareInExpr1() throws Exception {
+        String sql;
+        sql = "select 1 from RTYPES where i IN (1, ?, 3)";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // Calcite transforms the IN expression into ORs during the transformation stage
+        comparePlans(sql, ignores);
+    }
+    public void testCompareInExpr2() throws Exception {
+        String sql;
+        sql = "select 1 from RTYPES where i IN (?)"; // Calcite Regular EQUAL
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // Calcite transforms the IN expression into ORs during the transformation stage
+        comparePlans(sql, ignores);
+    }
+    public void testCompareInExpr3() throws Exception {
+        String sql;
+        sql = "select 1 from RTYPES where i IN ?"; // Calcite Regular EQUAL
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // Calcite transforms the IN expression into ORs during the transformation stage
+        comparePlans(sql, ignores);
+    }
+    public void testCompareInExpr4() throws Exception {
+        String sql;
+        sql = "select 1 from RTYPES where i IN (1, 2)"; // Calcite Regular OR
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // Calcite transforms the IN expression into ORs during the transformation stage
+        comparePlans(sql, ignores);
+    }
+
+    public void testCompareLikeExpr1() throws Exception {
+        String sql;
+        sql = "select 1 from RTYPES where vc LIKE 'ab%c'";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        // HSQL transfroms the LIKE 'ab%c' expression into
+        // (((VC LIKE 'ab%c') AND (VC >= 'ab')) AND (VC <= 'ab�'))
+        comparePlans(sql, ignores);
+    }
+    public void testCompareLikeExprWithParam() throws Exception {
+        String sql;
+        sql = "select 1 from RTYPES where vc LIKE ?";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("EXPR$0", "C1");
+
+        comparePlans(sql, ignores);
     }
 
 }

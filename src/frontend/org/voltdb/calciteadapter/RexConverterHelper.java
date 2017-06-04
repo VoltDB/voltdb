@@ -26,9 +26,13 @@ import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionForVoltDB.FunctionId;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.QuantifierType;
 
 public class RexConverterHelper {
 
@@ -120,4 +124,25 @@ public class RexConverterHelper {
         return timestampExpr;
     }
 
+    public static AbstractExpression createInComparisonExpression(
+            List<AbstractExpression> aeOperands) {
+        //
+        assert (aeOperands.size() > 0);
+        // The left expression should be the same for all operands because it is IN expression
+        AbstractExpression leftInExpr = aeOperands.get(0).getLeft();
+        assert(leftInExpr != null);
+        AbstractExpression rightInExpr = new VectorValueExpression();
+        List<AbstractExpression> inArgs = new ArrayList<>();
+        for (AbstractExpression expr : aeOperands) {
+            assert(expr.getRight() != null);
+            inArgs.add(expr.getRight());
+        }
+        rightInExpr.setArgs(inArgs);
+
+        ComparisonExpression inExpr = new InComparisonExpression();
+        inExpr.setLeft(leftInExpr);
+        inExpr.setRight(rightInExpr);
+        inExpr.setQuantifier(QuantifierType.ANY);
+        return inExpr;
+    }
 }

@@ -44,6 +44,7 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -149,10 +150,17 @@ public class RexConverter {
                             aeOperands.get(1));
                 break;
             case OR:
-                ae = new ConjunctionExpression(
-                        ExpressionType.CONJUNCTION_OR,
-                        aeOperands.get(0),
-                        aeOperands.get(1));
+                if (aeOperands.size() == 2) {
+                    // Binary OR
+                    ae = new ConjunctionExpression(
+                            ExpressionType.CONJUNCTION_OR,
+                            aeOperands.get(0),
+                            aeOperands.get(1));
+                } else {
+                    // COMPARE_IN
+                    ae = RexConverterHelper.createInComparisonExpression(aeOperands);
+                }
+                break;
 
             // Binary Comparison
             case EQUALS:
@@ -197,8 +205,6 @@ public class RexConverter {
                         aeOperands.get(0),
                         aeOperands.get(1));
                 break;
-//            COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
-//                // IN operator. left IN right. right must be VectorValue
 //            COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT", true),
 
              // Arthimetic Operators
