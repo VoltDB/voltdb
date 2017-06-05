@@ -17,10 +17,12 @@
 
 package org.voltdb.planner;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.Sha1Wrapper;
 
@@ -107,6 +109,15 @@ public abstract class ActivePlanRepository {
                 m_plansById.put(frag.fragId, frag);
                 if (m_plansById.size() > ExecutionEngine.EE_PLAN_CACHE_SIZE) {
                     evictLRUfragment();
+                }
+            } else {
+                // find the plan
+                // validate plan and its hash
+                if (! Arrays.equals(frag.plan, plan)) {
+                    new VoltLogger("HOST").error("Find the cached plan by sha1 hash, but the plan bytes are not equal. "
+                            + "stmtText: " + stmtText + "\n expect plan: " + new String(plan)
+                            + "\n actual cached plan: " + new String(frag.plan)
+                            + "\n cached plan id: " + frag.fragId + ", cached plan stmt:" + (frag.stmtText == null ? "null" : "frag.stmtText"));
                 }
             }
 

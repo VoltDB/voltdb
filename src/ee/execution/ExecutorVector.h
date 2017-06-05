@@ -96,6 +96,8 @@ public:
 
     ~ExecutorVector();
 
+    std::string m_jsonPlan;
+
 private:
 
     /**
@@ -116,7 +118,7 @@ private:
                    int64_t logThreshold,
                    int64_t memoryLimit,
                    PlanNodeFragment* fragment)
-        : m_fragId(fragmentId)
+        : m_jsonPlan(""), m_fragId(fragmentId)
         , m_limits(memoryLimit, logThreshold)
         , m_fragment(fragment)
     { }

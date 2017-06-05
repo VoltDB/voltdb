@@ -122,6 +122,7 @@ std::string ExecutorVector::debug() const {
     std::map<int, std::vector<AbstractExecutor*>* >::const_iterator it;
     oss << "Fragment ID: " << m_fragId << ", ";
     oss << "Temp table memory in bytes: " << m_limits.getAllocated() << std::endl;
+    oss << "Json string plan: " << m_jsonPlan << std::endl;
     for (it = m_subplanExecListMap.begin(); it != m_subplanExecListMap.end(); ++it) {
         std::vector<AbstractExecutor*>& executorList = *it->second;
        oss << "Statement id:" << it->first << ", list size: " << executorList.size() << ", ";

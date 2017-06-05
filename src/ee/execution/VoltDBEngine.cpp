@@ -440,9 +440,9 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     }
     catch (const SerializableEEException &e) {
 
-        if (dynamic_cast<const SQLException*>(&e) != NULL) {
-            VOLT_ERROR("%s", debugForVarcharException().c_str());
-        }
+//        if (dynamic_cast<const SQLException*>(&e) != NULL) {
+//        }
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, debugForVarcharException().c_str());
 
         serializeException(e);
         resetExecutionMetadata();
@@ -1157,6 +1157,8 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
     assert(m_currExecutorVec);
     // update the context
     m_currExecutorVec->setupContext(m_executorContext);
+
+    m_currExecutorVec->m_jsonPlan = plan;
 }
 
 // -------------------------------------------------
