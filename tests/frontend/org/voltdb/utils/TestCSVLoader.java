@@ -1379,8 +1379,8 @@ public class TestCSVLoader {
     @Test
     public void testMultiByteCharacterUTF8() throws Exception
     {
-    	String encoding = "utf8";
-    	createCSVFile("utf8");
+        String encoding = "utf8";
+        createCSVFile("utf8");
 
         String []myOptions = {
                 "-f" + path_csv,
@@ -1400,34 +1400,32 @@ public class TestCSVLoader {
         String FILENAME = "utf8_encoded_text.csv";
         List<String> list = new ArrayList<>();
 
-		//read from the file
-		BufferedReader br = null;
-		FileReader fr = null;
-		try {
-			fr = new FileReader(FILENAME);
-			br = new BufferedReader(fr);
-			String sCurrentLine;
-			br = new BufferedReader(new FileReader(FILENAME));
-			while ((sCurrentLine = br.readLine()) != null) {
-				list.add(sCurrentLine);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				if (br != null)
-					br.close();
-				if (fr != null)
-					fr.close();
-			} catch (IOException ex) {
-				ex.printStackTrace();
-			}
-		}
+        //read from the file
+        BufferedReader br = null;
+        FileReader fr = null;
+        try {
+            fr = new FileReader(FILENAME);
+        br = new BufferedReader(fr);
+            String sCurrentLine;
+            br = new BufferedReader(new FileReader(FILENAME));
+            while ((sCurrentLine = br.readLine()) != null) {
+                list.add(sCurrentLine);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (br != null)
+                    br.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
 
-		String[] myData2 = new String[list.size()];
-		for(int i = 0; i < list.size(); i++) {
-			myData2[i] = list.get(i);
-		}
+        String[] myData2 = new String[list.size()];
+        for(int i = 0; i < list.size(); i++) {
+            myData2[i] = list.get(i);
+        }
 
         int invalidLineCnt = 0;
         int validLineCnt = 8;
@@ -1438,25 +1436,25 @@ public class TestCSVLoader {
         String[] strings = {"first复杂的漢字查询内容","second","third",null,"abcdeg","sixth","seventh","first"};
         int pos = 0;
         while(table.advanceRow()) {
-        	int i = table.getActiveRowIndex();
-        	VoltTableRow row = table.fetchRow(i);
-        	assertEquals(row.getString(4),strings[pos]);
-        	pos++;
+            int i = table.getActiveRowIndex();
+            VoltTableRow row = table.fetchRow(i);
+            assertEquals(row.getString(4),strings[pos]);
+            pos++;
         }
 
         try {
-        	File temp = new File(FILENAME);
-        	if(temp.exists()) temp.delete();
+            File temp = new File(FILENAME);
+            if(temp.exists()) temp.delete();
         } catch (Exception e) {
-        	e.printStackTrace();
+            e.printStackTrace();
         }
     }
 
     @Test
     public void testUTF8WithGBKEncoding() throws Exception
     {
-    	String encoding = "utf8";
-    	createCSVFile("utf8");
+        String encoding = "utf8";
+        createCSVFile("utf8");
 
         String []myOptions = {
                 "-f" + path_csv,
@@ -1476,34 +1474,32 @@ public class TestCSVLoader {
         String FILENAME = "utf8_encoded_text.csv";
         List<String> list = new ArrayList<>();
 
-		//read from the file
-		BufferedReader br = null;
-		FileReader fr = null;
-		try {
-			fr = new FileReader(FILENAME);
-			br = new BufferedReader(fr);
-			String sCurrentLine;
-			br = new BufferedReader(new FileReader(FILENAME));
-			while ((sCurrentLine = br.readLine()) != null) {
-				list.add(sCurrentLine);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				if (br != null)
-					br.close();
-				if (fr != null)
-					fr.close();
-			} catch (IOException ex) {
-				ex.printStackTrace();
-			}
-		}
+        //read from the file
+        BufferedReader br = null;
+        FileReader fr = null;
+        try {
+            fr = new FileReader(FILENAME);
+            br = new BufferedReader(fr);
+            String sCurrentLine;
+            br = new BufferedReader(new FileReader(FILENAME));
+            while ((sCurrentLine = br.readLine()) != null) {
+                list.add(sCurrentLine);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (br != null)
+                    br.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
 
-		String[] myData2 = new String[list.size()];
-		for(int i = 0; i < list.size(); i++) {
-			myData2[i] = list.get(i);
-		}
+        String[] myData2 = new String[list.size()];
+        for(int i = 0; i < list.size(); i++) {
+            myData2[i] = list.get(i);
+        }
 
         int invalidLineCnt = 0;
         int validLineCnt = 8;
@@ -1514,33 +1510,33 @@ public class TestCSVLoader {
         String[] strings = {"first复杂的漢字查询内容","second","third",null,"abcdeg","sixth","seventh","first"};
         int pos = 0;
         while(table.advanceRow()) {
-        	int i = table.getActiveRowIndex();
-        	if(i==0) {
-        		assertFalse(table.fetchRow(i).getString(4).equals(strings[pos]));
-        		pos++;continue;
-        	}
-        	VoltTableRow row = table.fetchRow(i);
-        	assertEquals(row.getString(4),strings[pos]);
-        	pos++;
+            int i = table.getActiveRowIndex();
+            if(i==0) {
+                assertFalse(table.fetchRow(i).getString(4).equals(strings[pos]));
+                pos++;continue;
+            }
+            VoltTableRow row = table.fetchRow(i);
+            assertEquals(row.getString(4),strings[pos]);
+            pos++;
         }
         try {
-        	File temp = new File(FILENAME);
-        	if(temp.exists()) temp.delete();
+            File temp = new File(FILENAME);
+            if(temp.exists())
+                temp.delete();
         } catch (Exception e) {
-        	e.printStackTrace();
+            e.printStackTrace();
         }
     }
 
     @Test
     public void testGB2312WithGBKEncoding() throws Exception
     {
-    	System.out.println("We are int BG2312 / GBK test case");
-    	String encoding = "gb2312";
-    	createCSVFile("gb2312");
+        String encoding = "gb2312";
+        createCSVFile("gb2312");
 
         String []myOptions = {
                 "-f" + path_csv,
-                "--characterSet=gbk",	// use gbk to decode it
+                "--characterSet=gbk",    // use gbk to decode it
                 "--reportdir=" + reportDir,
                 "--maxerrors=50",
                 "--user=",
@@ -1556,34 +1552,32 @@ public class TestCSVLoader {
         String FILENAME = "gb2312_encoded_text.csv";
         List<String> list = new ArrayList<>();
 
-		//read from the file
-		BufferedReader br = null;
-		FileReader fr = null;
-		try {
-			fr = new FileReader(FILENAME);
-			br = new BufferedReader(fr);
-			String sCurrentLine;
-			br = new BufferedReader(new FileReader(FILENAME));
-			while ((sCurrentLine = br.readLine()) != null) {
-				list.add(sCurrentLine);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				if (br != null)
-					br.close();
-				if (fr != null)
-					fr.close();
-			} catch (IOException ex) {
-				ex.printStackTrace();
-			}
-		}
+        //read from the file
+        BufferedReader br = null;
+        FileReader fr = null;
+        try {
+            fr = new FileReader(FILENAME);
+            br = new BufferedReader(fr);
+            String sCurrentLine;
+            br = new BufferedReader(new FileReader(FILENAME));
+            while ((sCurrentLine = br.readLine()) != null) {
+                list.add(sCurrentLine);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (br != null)
+                    br.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
 
-		String[] myData2 = new String[list.size()];
-		for(int i = 0; i < list.size(); i++) {
-			myData2[i] = list.get(i);
-		}
+        String[] myData2 = new String[list.size()];
+        for(int i = 0; i < list.size(); i++) {
+            myData2[i] = list.get(i);
+        }
 
         int invalidLineCnt = 0;
         int validLineCnt = 8;
@@ -1594,29 +1588,29 @@ public class TestCSVLoader {
         String[] strings = {"first复杂的漢字查询内容","second","third",null,"abcdeg","sixth","seventh","first"};
         int pos = 0;
         while(table.advanceRow()) {
-        	int i = table.getActiveRowIndex();
-        	if(i==0) {
-        		//System.out.println(table.fetchRow(i).getString(4) + "in the table, " + strings[pos] + " expected");
-        		assertFalse(table.fetchRow(i).getString(4).equals(strings[pos]));
-        		pos++;continue;
-        	}
-        	VoltTableRow row = table.fetchRow(i);
-        	assertEquals(row.getString(4),strings[pos]);
-        	pos++;
+            int i = table.getActiveRowIndex();
+            if(i == 0) {
+                assertFalse(table.fetchRow(i).getString(4).equals(strings[pos]));
+                pos++;
+                continue;
+            }
+            VoltTableRow row = table.fetchRow(i);
+            assertEquals(row.getString(4),strings[pos]);
+            pos++;
         }
         try {
-        	File temp = new File(FILENAME);
-        	if(temp.exists()) temp.delete();
+            File temp = new File(FILENAME);
+            if(temp.exists()) temp.delete();
         } catch (Exception e) {
-        	e.printStackTrace();
+            e.printStackTrace();
         }
     }
 
     @Test
     public void testMultiByteCharacterGBK() throws Exception
     {
-    	String encoding = "gbk";
-    	createCSVFile("gbk");
+        String encoding = "gbk";
+        createCSVFile("gbk");
 
         String []myOptions = {
                 "-f" + path_csv,
@@ -1636,35 +1630,32 @@ public class TestCSVLoader {
         String FILENAME = "gbk_encoded_text.csv";
         List<String> list = new ArrayList<>();
 
-		//read from the file
-		BufferedReader br = null;
-		FileReader fr = null;
-		try {
-			fr = new FileReader(FILENAME);
-			br = new BufferedReader(fr);
-			String sCurrentLine;
-			br = new BufferedReader(new InputStreamReader(new FileInputStream(FILENAME), Charset.forName("GBK")));
-			while ((sCurrentLine = br.readLine()) != null) {
+        //read from the file
+        BufferedReader br = null;
+        FileReader fr = null;
+        try {
+            fr = new FileReader(FILENAME);
+            br = new BufferedReader(fr);
+            String sCurrentLine;
+            br = new BufferedReader(new InputStreamReader(new FileInputStream(FILENAME), Charset.forName("GBK")));
+            while ((sCurrentLine = br.readLine()) != null) {
+                list.add(sCurrentLine);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (br != null)
+                    br.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
 
-				list.add(sCurrentLine);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				if (br != null)
-					br.close();
-				if (fr != null)
-					fr.close();
-			} catch (IOException ex) {
-				ex.printStackTrace();
-			}
-		}
-
-		String[] myData2 = new String[list.size()];
-		for(int i = 0; i < list.size(); i++) {
-			myData2[i] = list.get(i);
-		}
+        String[] myData2 = new String[list.size()];
+        for(int i = 0; i < list.size(); i++) {
+            myData2[i] = list.get(i);
+        }
 
         int invalidLineCnt = 0;
         int validLineCnt = 8;
@@ -1675,28 +1666,24 @@ public class TestCSVLoader {
         String[] strings = {"first复杂的漢字查询内容","second","third",null,"abcdeg","sixth","seventh","first"};
         int pos = 0;
         while(table.advanceRow()) {
-        	int i = table.getActiveRowIndex();
-        	VoltTableRow row = table.fetchRow(i);
-        	System.out.println(row.getString(4) + "in the table, " + strings[pos] + " expected");
-        	assertEquals(row.getString(4),strings[pos]);
-        	pos++;
+            int i = table.getActiveRowIndex();
+            VoltTableRow row = table.fetchRow(i);
+            assertEquals(row.getString(4),strings[pos]);
+            pos++;
         }
         try {
-        	File temp = new File(FILENAME);
-        	if(temp.exists()) temp.delete();
+            File temp = new File(FILENAME);
+            if(temp.exists()) temp.delete();
         } catch (Exception e) {
-        	e.printStackTrace();
+            e.printStackTrace();
         }
     }
 
     @Test
     public void testMultiByteCharacterGB2312() throws Exception
     {
-        // ENG-12324: csvloader --header doesn't work if header has spaces. This is essentially the same test as testHeaderColumnNumNotSame, but with some
-        // strategically placed whitespace in the header.
-
-    	String encoding = "gb2312";
-    	createCSVFile("gb2312");
+        String encoding = "gb2312";
+        createCSVFile("gb2312");
 
         String []myOptions = {
                 "-f" + path_csv,
@@ -1716,35 +1703,32 @@ public class TestCSVLoader {
         String FILENAME = "gb2312_encoded_text.csv";
         List<String> list = new ArrayList<>();
 
-		//read from the file
-		BufferedReader br = null;
-		FileReader fr = null;
-		try {
-			fr = new FileReader(FILENAME);
-			br = new BufferedReader(fr);
-			String sCurrentLine;
-			br = new BufferedReader(new InputStreamReader(new FileInputStream(FILENAME), Charset.forName("GBK")));
-			while ((sCurrentLine = br.readLine()) != null) {
+        //read from the file
+        BufferedReader br = null;
+        FileReader fr = null;
+        try {
+            fr = new FileReader(FILENAME);
+            br = new BufferedReader(fr);
+            String sCurrentLine;
+            br = new BufferedReader(new InputStreamReader(new FileInputStream(FILENAME), Charset.forName("GBK")));
+            while ((sCurrentLine = br.readLine()) != null) {
+                list.add(sCurrentLine);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (br != null)
+                    br.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
 
-				list.add(sCurrentLine);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				if (br != null)
-					br.close();
-				if (fr != null)
-					fr.close();
-			} catch (IOException ex) {
-				ex.printStackTrace();
-			}
-		}
-
-		String[] myData2 = new String[list.size()];
-		for(int i = 0; i < list.size(); i++) {
-			myData2[i] = list.get(i);
-		}
+        String[] myData2 = new String[list.size()];
+        for(int i = 0; i < list.size(); i++) {
+            myData2[i] = list.get(i);
+        }
 
         int invalidLineCnt = 0;
         int validLineCnt = 8;
@@ -1752,33 +1736,39 @@ public class TestCSVLoader {
 
         // query the database
         VoltTable table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH ORDER BY CLM_INTEGER;").getResults()[0];
-        String[] strings = {"first复杂的汉字查询内容","second","third",null,"abcdeg","sixth","seventh","first"};
+        String[] strings = {"first复杂的汉字查询内容",
+                            "second",
+                            "third",
+                            null,
+                            "abcdeg",
+                            "sixth",
+                            "seventh",
+                            "first"};
         int pos = 0;
         while(table.advanceRow()) {
-        	int i = table.getActiveRowIndex();
-        	if(i==0) {
-        		assertFalse(table.fetchRow(i).getString(4).equals(strings[pos]));
-        		pos++;continue;
-        	}
-        	VoltTableRow row = table.fetchRow(i);
-        	//System.out.println(row.getString(4) + "   ");
-        	assertEquals(row.getString(4),strings[pos]);
-        	pos++;
+            int i = table.getActiveRowIndex();
+            if(i==0) {
+                assertFalse(table.fetchRow(i).getString(4).equals(strings[pos]));
+                pos++;
+                continue;
+            }
+            VoltTableRow row = table.fetchRow(i);
+            assertEquals(row.getString(4),strings[pos]);
+            pos++;
         }
         try {
-        	File temp = new File(FILENAME);
-        	if(temp.exists()) temp.delete();
+            File temp = new File(FILENAME);
+            if(temp.exists()) temp.delete();
         } catch (Exception e) {
-        	e.printStackTrace();
+            e.printStackTrace();
         }
     }
 
     private void createCSVFile(String encoding) {
-    	String FILENAME = encoding+"_encoded_text.csv";
-		BufferedWriter bw = null;
-		FileWriter fw = null;
+        String FILENAME = encoding+"_encoded_text.csv";
+        BufferedWriter bw = null;
 
-		String currentTime = String.valueOf(System.currentTimeMillis());
+        String currentTime = String.valueOf(System.currentTimeMillis());
 
         String []myData = {
                 "  clm_integer, clm_tinyint,clm_smallint,  clm_bigint  ,clm_string,clm_decimal,clm_float  , clm_timestamp,clm_point ,clm_geography",
@@ -1792,49 +1782,43 @@ public class TestCSVLoader {
                 "11, 1 ,1,\"1,000\",first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 8 0, 0 8, 0 0))\"",
         };
 
-		try {
-			if(encoding.equalsIgnoreCase("utf8") || encoding.equalsIgnoreCase("utf-8")) {
-				bw = new BufferedWriter
-						(new OutputStreamWriter(new FileOutputStream(FILENAME), Charset.forName("UTF-8")));
-				for(String line: myData) {
-					bw.write(line+"\n");
-				}
-			} else if(encoding.equalsIgnoreCase("gbk")) {
-				FileOutputStream fos = new FileOutputStream(FILENAME);
-				OutputStreamWriter osw = new OutputStreamWriter(fos, "gbk");
-				bw = new BufferedWriter(osw);
+        try {
+            if(encoding.equalsIgnoreCase("utf8") || encoding.equalsIgnoreCase("utf-8")) {
+                bw = new BufferedWriter
+                        (new OutputStreamWriter(new FileOutputStream(FILENAME), Charset.forName("UTF-8")));
+                for(String line: myData) {
+                    bw.write(line+"\n");
+                }
+            } else if(encoding.equalsIgnoreCase("gbk")) {
+                FileOutputStream fos = new FileOutputStream(FILENAME);
+                OutputStreamWriter osw = new OutputStreamWriter(fos, "gbk");
+                bw = new BufferedWriter(osw);
+                for(String str: myData) {
+                    bw.write(str + "\n");
+                }
+                bw.flush();
+            } else if(encoding.equals("gb2312") || encoding.equals("GB2312")) {
+                FileOutputStream fos = new FileOutputStream(FILENAME);
+                OutputStreamWriter osw = new OutputStreamWriter(fos, "gb2312");
+                bw = new BufferedWriter(osw);
 
-				for(String str: myData) {
-					bw.write(str + "\n");
-				}
-				bw.flush();
-				osw.flush();
-				fos.flush();
-			} else if(encoding.equals("gb2312") || encoding.equals("GB2312")) {
-				FileOutputStream fos = new FileOutputStream(FILENAME);
-				OutputStreamWriter osw = new OutputStreamWriter(fos, "gb2312");
-				bw = new BufferedWriter(osw);
-
-				for(String str: myData) {
-					bw.write(str + "\n");
-				}
-				bw.flush();
-				osw.flush();
-				fos.flush();
-			}
-			//System.out.println("Done Creating the file");
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				if (bw != null)
-					bw.close();
-				if (fw != null)
-					fw.close();
-			} catch (IOException ex) {
-				ex.printStackTrace();
-			}
-		}
+                for(String str: myData) {
+                    bw.write(str + "\n");
+                }
+                bw.flush();
+                osw.flush();
+                fos.flush();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (bw != null)
+                    bw.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
     }
 
     // read from hard-coded data, no encoding
@@ -1852,14 +1836,14 @@ public class TestCSVLoader {
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
             int validLineCnt, int validLineUpsertCnt, String[] validData, String encoding) throws Exception {
         try{
-        	BufferedWriter out_csv;
-        	if(encoding.equals("")) {
-        		out_csv = new BufferedWriter( new FileWriter( path_csv ) );
-        	} else {
-        		FileOutputStream fos = new FileOutputStream(path_csv);
-        		OutputStreamWriter osw = new OutputStreamWriter(fos, encoding);
-        		out_csv = new BufferedWriter(osw);
-        	}
+            BufferedWriter out_csv;
+            if(encoding.equals("")) {
+                out_csv = new BufferedWriter( new FileWriter( path_csv ) );
+            } else {
+                FileOutputStream fos = new FileOutputStream(path_csv);
+                OutputStreamWriter osw = new OutputStreamWriter(fos, encoding);
+                out_csv = new BufferedWriter(osw);
+            }
             for (String aMy_data : my_data) {
                 out_csv.write(aMy_data + "\n");
             }
