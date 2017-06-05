@@ -131,7 +131,6 @@ public class ImportProcessor implements ImportDataProcessor {
                         try {
                             bw.stop();
                         } catch (Exception ex) {
-                            ex.printStackTrace();
                             m_logger.error("Failed to stop the import handler: " + bw.m_importerFactory.getTypeName(), ex);
                         }
                     }
