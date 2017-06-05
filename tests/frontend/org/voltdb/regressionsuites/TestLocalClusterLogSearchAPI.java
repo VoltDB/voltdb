@@ -25,8 +25,6 @@ package org.voltdb.regressionsuites;
 
 import static org.junit.Assert.assertEquals;
 
-import java.io.File;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -45,8 +43,6 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     LocalCluster cluster;
     String listener;
     Client client;
-    String voltDbRootPath;
-    String voltDBRootParentPath;
 
     @Before
     public void setUp() throws Exception {
@@ -65,17 +61,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
                 SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         boolean success = cluster.compile(builder);
         assert (success);
-        File voltDbRoot;
         cluster.startUp(true);
-        //Get server specific root after startup.
-        if (cluster.isNewCli()) {
-            voltDbRoot = new File(cluster.getServerSpecificRoot("1"));
-        } else {
-            String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
-            voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
-        }
-        voltDbRootPath = voltDbRoot.getCanonicalPath();
-        voltDBRootParentPath = voltDbRoot.getParentFile().getCanonicalPath();
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
