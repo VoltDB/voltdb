@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -569,10 +570,20 @@ public class JdbcDatabaseMetaDataGenerator
                 {
                     for (ColumnRef column : c.getIndex().getColumns())
                     {
+                            String columnName;
+
+                            // ENG-6927
+                            // if the index type == "MATVIEW_PK_CONSTRAINT", the column name for the materialized view is obtained
+                            // after getting the column information and then its type name - one more level of indirection
+                            if( c.getTypeName().equals(HSQLInterface.AUTO_GEN_MATVIEW + HSQLInterface.AUTO_GEN_MATVIEW_CONST) ) {
+                                    columnName = column.getColumn().getTypeName();
+                            } else {
+                                    columnName = column.getTypeName();
+                            }
                         results.addRow(null,
                                        null, // table schema
                                        table.getTypeName(), // table name
-                                       c.getTypeName().equals("MATVIEW_PK_CONSTRAINT") ? column.getColumn().getTypeName() : column.getTypeName(), // column name
+                                       columnName, // column name
                                        column.getRelativeIndex(), // key_seq
                                        c.getTypeName() // PK_NAME
                                       );
