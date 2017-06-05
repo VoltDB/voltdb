@@ -612,7 +612,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
+                    m_committedBuffers.truncateToTxnId(txnId);
                     if (m_committedBuffers.isEmpty() && m_endOfStream) {
                         if (m_pollFuture != null) {
                             m_pollFuture.set(null);

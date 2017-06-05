@@ -271,7 +271,7 @@ public class StreamBlockQueue {
         }
     }
 
-    public void truncateToTxnId(final long txnId, final int nullArrayLength) throws IOException {
+    public void truncateToTxnId(final long txnId) throws IOException {
         assert(m_memoryDeque.isEmpty());
         m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
@@ -283,6 +283,7 @@ public class StreamBlockQueue {
                 b.position(b.position() + 8);//Don't need the USO
                 while (b.hasRemaining()) {
                     int rowLength = b.getInt();
+                    int nullArrayLength = b.get();
                     b.position(b.position() + nullArrayLength);
                     long rowTxnId = b.getLong();
                     exportLog.trace("Evaluating row with txnId " + rowTxnId + " for truncation");
@@ -292,7 +293,7 @@ public class StreamBlockQueue {
                         //The txnid of this row is the greater then the truncation txnid.
                         //Don't want this row, but want to preserve all rows before it.
                         //Move back before the row length prefix and txnId
-                        b.position(b.position() - (12 + nullArrayLength));
+                        b.position(b.position() - (12 + 1 + nullArrayLength));
 
                         //If the truncation point was the first row in the block, the entire block is to be discard
                         //We know it is the first row if the position before the row is after the uso (8 bytes)
@@ -309,7 +310,7 @@ public class StreamBlockQueue {
                         //Not the row we are looking to truncate at. Skip past it keeping in mind
                         //we read the first 8 bytes for the txn id, and the null array which
                         //is included in the length prefix
-                        b.position(b.position() + (rowLength - (8 + nullArrayLength)));
+                        b.position(b.position() + (rowLength - (8 + 1 + nullArrayLength)));
                     }
                 }
             } finally {

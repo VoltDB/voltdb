@@ -238,19 +238,13 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
 
     EXPECT_TRUE(allocatedByteCount == 0);
     std::ostringstream os;
-
     int cnt = 0;
     // Push 2 rows to fill the block less thn half
     for (cnt = 1; cnt < 3; cnt++) {
         appendTuple(cnt-1, cnt);
     }
 
-    os << " byte count before flush " << m_wrapper->allocatedByteCount() << " blocks:" << m_topend.blocks.size() << std::endl;
-    cout << os.str(); os.str("");
     m_wrapper->periodicFlush(-1, 2);
-    os << " after flush " << m_wrapper->allocatedByteCount()  << " blocks:" << m_topend.blocks.size() << std::endl;
-    cout << os.str(); os.str("");
-
     allocatedByteCount = m_tupleSize * 2 + 8;
     os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->allocatedByteCount();
     ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->allocatedByteCount(), os.str().c_str());
@@ -260,11 +254,8 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
     for (cnt = 3; cnt < 6; cnt++) {
         appendTuple(cnt-1, cnt);
     }
-//    os << "Second loop - before flush allocated bytes: " << m_wrapper->allocatedByteCount() << " blocks " << m_topend.blocks.size();
-//    cout << os.str(); os.str("");
     m_wrapper->periodicFlush(-1, 5);
-//    os << " after flush allocated bytes: " << m_wrapper->allocatedByteCount() << " blocks " << m_topend.blocks.size() << std::endl;
-//    cout << os.str(); os.str("");
+
     // 5 rows - 2 blocks (2, 3)
     allocatedByteCount = m_tupleSize * 5 + 2 * 8;
     os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->allocatedByteCount();
@@ -282,90 +273,16 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
     // now get the second
     ASSERT_FALSE(m_topend.blocks.empty());
     results = m_topend.blocks.front();
-    os << "Before pop: uso " << results->uso() << ", offset " << results->offset()
-                << " allocated bytes " << m_wrapper->allocatedByteCount() << " blocks " << m_topend.blocks.size() << "\n";
     m_topend.blocks.pop_front();
-    os << "After pop: uso " << results->uso() << ", offset " << results->offset()
-            << " allocated bytes " << m_wrapper->allocatedByteCount() << " blocks " << m_topend.blocks.size();
-    cout << os.str() << std::endl; os.str("");
-    EXPECT_EQ(results->uso(), (m_tupleSize * 2));
-    EXPECT_EQ(results->offset(), (m_tupleSize * 3));
+    os.str(""); os << "Second block uso - expected: " << (m_tupleSize * 2) << ", actual: " << results->uso();
+    ASSERT_TRUE_WITH_MESSAGE(results->uso() == (m_tupleSize * 2), os.str().c_str());
+    os.str(""); os << "Second block offset - expected: " << (m_tupleSize * 3) << ", actual: " << results->offset();
+    ASSERT_TRUE_WITH_MESSAGE(results->offset() == (m_tupleSize * 3), os.str().c_str());
 
     // ack all of the data and re-verify block count
-    allocatedByteCount = m_wrapper->allocatedByteCount();
-    EXPECT_TRUE(allocatedByteCount == 0);
+    os.str(""); os << "Allocated byte count - expected: " << 0 << ", actual: " << m_wrapper->allocatedByteCount();
+    EXPECT_TRUE(m_wrapper->allocatedByteCount()== 0);
 }
-
-#if 0
-/**
- * Test the really basic operation order
- */
-TEST_F(ExportTupleStreamTest, BasicOps_E)
-{
-
-    // verify the block count statistic.
-    size_t allocatedByteCount = m_wrapper->allocatedByteCount();
-    EXPECT_TRUE(allocatedByteCount == 0);
-    std::ostringstream os;
-
-    for (int i = 1; i < 10; i++) {
-        appendTuple(i-1, i);
-    }
-    // transaction committed 8
-    allocatedByteCount = 2040; // 2 filled blocks (2040)
-    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->allocatedByteCount();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->allocatedByteCount(), os.str().c_str());
-    os.str("");
-
-    os << " byte count before flush " << m_wrapper->allocatedByteCount() << " blocks:" << m_topend.blocks.size() << std::endl;
-    cout << os.str(); os.str("");
-    m_wrapper->periodicFlush(-1, 9);
-    os << " after flush " << m_wrapper->allocatedByteCount()  << " blocks:" << m_topend.blocks.size() << std::endl;
-    cout << os.str(); os.str("");
-
-    // transaction committed 9
-    allocatedByteCount = 2040; // 2 filled blocks (2040) + 1 row in 3rd block (253+8)
-    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->allocatedByteCount();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->allocatedByteCount(), os.str().c_str());
-    os.str("");
-    for (int i = 10; i < 20; i++)
-    {
-        appendTuple(i-1, i);
-    }
-    os << "Second loop - before flush allocated bytes: " << m_wrapper->allocatedByteCount() << " blocks " << m_topend.blocks.size();
-    cout << os.str(); os.str("");
-    m_wrapper->periodicFlush(-1, 19);
-    os << " after flush allocated bytes: " << m_wrapper->allocatedByteCount() << " blocks " << m_topend.blocks.size() << std::endl;
-    cout << os.str(); os.str("");
-
-    os << "Allocated byte count - expected: " << 1289 << ", actual: " << m_wrapper->allocatedByteCount();
-    ASSERT_TRUE_WITH_MESSAGE(1289 == m_wrapper->allocatedByteCount(), os.str().c_str());
-
-    // get the first buffer flushed
-    ASSERT_TRUE(m_topend.receivedExportBuffer);
-    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
-    m_topend.blocks.pop_front();
-    EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE + m_tableColumnNameLength + m_mdColumnNameLength) * 9);
-
-    // now get the second
-    ASSERT_FALSE(m_topend.blocks.empty());
-    results = m_topend.blocks.front();
-    os << "Before pop: uso " << results->uso() << ", offset " << results->offset()
-                << " allocated bytes " << m_wrapper->allocatedByteCount() << " blocks " << m_topend.blocks.size() << "\n";
-    m_topend.blocks.pop_front();
-    os << "After pop: uso " << results->uso() << ", offset " << results->offset()
-            << " allocated bytes " << m_wrapper->allocatedByteCount() << " blocks " << m_topend.blocks.size();
-    cout << os.str() << std::endl; os.str("");
-    EXPECT_EQ(results->uso(), (MAGIC_TUPLE_SIZE * 9));
-    EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
-
-    // ack all of the data and re-verify block count
-    allocatedByteCount = m_wrapper->allocatedByteCount();
-    EXPECT_TRUE(allocatedByteCount == 0);
-}
-
-#endif
 
 /**
  * Verify that a periodicFlush with distant TXN IDs works properly
