@@ -2333,6 +2333,12 @@ public class LocalCluster extends VoltServerConfig {
         return ifExist;
     }
 
+    public boolean onDiskHostLogContains(int HostId, String regex) {
+        assert(m_enableLogSearch);
+        String path = getHostLogPath(HostId);
+        return fileContains(path, regex);
+    }
+
     private String getHostLogPath(int HostId) {
         assert(m_enableLogSearch);
         String[] paths = m_initLogFilePath.get(HostId);

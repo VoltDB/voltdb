@@ -24,10 +24,8 @@
 package org.voltdb.regressionsuites;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
@@ -41,7 +39,7 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     static final int SITES_PER_HOST = 2;
-    static final int HOSTS = 3;
+    static final int HOSTS = 2;
     static final int K = 1;
     VoltProjectBuilder builder;
     LocalCluster cluster;
@@ -95,17 +93,18 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     @Test
     public void testLogSearch() throws Exception {
         // Test the log search utility
-        assertEquals(true, localClusterAllInitLogsContain("Initialized VoltDB root directory"));
-        assertEquals(true, localClusterAllHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
-        for (int i : getLocalClusterHostIds()) {
-            assertEquals(true, localClusterInitlogContains(i, "Initialized VoltDB .* directory"));
-            assertEquals(true, localClusterHostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
+        assertEquals(true, cluster.allInitLogsContain("Initialized VoltDB root directory"));
+        assertEquals(true, cluster.allHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
+        for (int i : cluster.getHostIds()) {
+            assertEquals(true, cluster.initLogContains(i, "Initialized VoltDB .* directory"));
+            assertEquals(true, cluster.hostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
         }
     }
 
     /*
      * Test the log search utility when a single host is shutdown
      */
+    @Test
     public void testHostShutDownLogSearch() throws Exception {
         // Shutdown a single host and restart
         cluster.killSingleHost(1);
@@ -117,67 +116,26 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
 
         // In community edition this should fail ? Since rejoin is only supported in enterprise
         // edition
-        boolean rejoinMsg = localClusterHostLogContains(1, "VoltDB Community Edition only supports .*") // failure
-                            || localClusterHostLogContains(1, "Initializing VoltDB .*");    // Success
+        boolean rejoinMsg = cluster.hostLogContains(1, "VoltDB Community Edition only supports .*") // failure
+                            || cluster.hostLogContains(1, "Initializing VoltDB .*");    // Success
         assertEquals(true, rejoinMsg);
     }
 
     /*
      * Test the log search utility when the whole LocalCluster is shutdown and restarted
      */
-    public void testClustShutdownLogSearch() throws Exception {
+    @Test
+    public void testClusterShutdownLogSearch() throws Exception {
         // Shutdown and startup the whole cluster
         cluster.shutDown();    // After shutdown the in-memory logs are cleared
-
-        // Check the on-disk files instead
-        // Note that host 1 is not successfully joined, therefore its log cannot be trusted
-        for (int i : getLocalClusterHostIds()) {
-            assertTrue(localClusterHostLogContains(i, "VoltDB has encountered an unrecoverable error and is exiting."));
-        }
         cluster.startUp();
 
         // Test the log search utility
-        assertEquals(true, localClusterAllInitLogsContain("Initialized VoltDB root directory"));
-        assertEquals(true, localClusterAllHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
-        for (int i : getLocalClusterHostIds()) {
+        assertEquals(true, cluster.allInitLogsContain("Initialized VoltDB root directory"));
+        assertEquals(true, cluster.allHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
+        for (int i : cluster.getHostIds()) {
             // No init log after restart (newCli == false)
-            assertEquals(true, localClusterHostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
+            assertEquals(true, cluster.hostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
         }
     }
-
-    /*
-     * Check for the existence of a regex expression in all the LocalCluster's
-     * init logs.
-     */
-    private boolean localClusterAllInitLogsContain(String regex) {
-        return cluster.allInitLogsContain(regex);
-    }
-
-    /*
-     * Check for the existence of a regex expression in all the LocalCluster's
-     * host logs.
-     */
-    private boolean localClusterAllHostLogsContain(String regex) {
-        return cluster.allHostLogsContain(regex);
-    }
-
-    /*
-     * Check the existence of a regex expression in a particular host's log
-     */
-    private boolean localClusterInitlogContains(int hostId, String regex) {
-        return cluster.initLogContains(hostId, regex);
-    }
-
-    private boolean localClusterHostLogContains(int hostId, String regex) {
-        return cluster.hostLogContains(hostId, regex);
-    }
-
-    /*
-     * Get HostIds in the LocalCluster, make sure the server configuration
-     * is an instance of LocalCluster
-     */
-    private Set<Integer> getLocalClusterHostIds() {
-        return cluster.getHostIds();
-    }
-
 }
