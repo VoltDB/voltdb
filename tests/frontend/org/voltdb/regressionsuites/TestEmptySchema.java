@@ -105,7 +105,7 @@ public class TestEmptySchema extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalCluster config = new LocalCluster(true, "decimal-default.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster("decimal-default.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         success = config.compile(project);
         assertTrue(success);
