@@ -584,9 +584,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof OrderByPlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
-        assertTrue(pn instanceof SeqScanPlanNode);
         aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
         assertNotNull(aggNode);
+        assertTrue(pn instanceof SeqScanPlanNode);
         checkSeqScan(pn, "R1");
 
 
@@ -595,9 +595,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "Group by SC");
 
         pn = pn.getChild(0);
-        assertTrue(pn instanceof SeqScanPlanNode);
         aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
         assertNotNull(aggNode);
+        assertTrue(pn instanceof SeqScanPlanNode);
         checkSeqScan(pn, "T1");
         pn = pn.getChild(0);
         if (pn instanceof ProjectionPlanNode) {
@@ -1805,10 +1805,16 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = compile(sql);
         pn = pn.getChild(0);
         if (pn instanceof ProjectionPlanNode) {
-            checkOutputSchema(pn.getOutputSchema(), outputColumns);
 
             pn = pn.getChild(0);
         }
+        // If we didn't see a projection plan node
+        // before pn, then it's been optimized away.  In
+        // this case the output schema should be identical
+        // to the output schema of the NestLoopPlanNode we
+        // expect here.  So checking the output schema should
+        // succeed here.
+        checkOutputSchema(pn.getOutputSchema(), outputColumns);
         assertTrue(pn instanceof NestLoopPlanNode);
         checkSeqScan(pn.getChild(0), table1, column1);
         if (subquery1 != null) {
