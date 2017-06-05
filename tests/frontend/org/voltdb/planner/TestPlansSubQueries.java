@@ -158,8 +158,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
     private void checkPrimaryKeyIndexScan(AbstractPlanNode indexNode, String tableName, String... columns) {
         // DDL use this pattern to define primary key
         // "CONSTRAINT P1_PK_TREE PRIMARY KEY"
-        String primaryKeyIndexName = HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX
-                + tableName + "_" + tableName + "_PK_TREE";
+        String primaryKeyIndexName = HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + tableName + "_PK_TREE";
 
         checkIndexScan(indexNode, tableName, primaryKeyIndexName, columns);
     }

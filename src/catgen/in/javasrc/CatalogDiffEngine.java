@@ -167,6 +167,7 @@ public class CatalogDiffEngine {
      * @param next Tip of the new catalog.
      */
     public CatalogDiffEngine(Catalog prev, Catalog next, boolean forceVerbose) {
+        initialize(prev, next);
         m_supported = true;
         if (forceVerbose) {
             m_triggeredVerbosity = true;
@@ -202,6 +203,13 @@ public class CatalogDiffEngine {
 
     public CatalogDiffEngine(Catalog prev, Catalog next) {
         this(prev, next, false);
+    }
+
+    /**
+     * Override this to do initializations before the diff is calculated.
+     * The parameters are the same catalog parameters passed into the constructor.
+     */
+    protected void initialize(Catalog prev, Catalog next) {
     }
 
     public String commands() {
@@ -1352,10 +1360,10 @@ public class CatalogDiffEngine {
     /**
      * Add a deletion
      */
-    private void writeDeletion(CatalogType prevType, CatalogType newlyChildlessParent, String mapName, String name)
+    private void writeDeletion(CatalogType prevType, CatalogType newlyChildlessParent, String mapName)
     {
         // Don't write deletions if the field can be ignored
-        if (checkDeleteIgnoreList(prevType, newlyChildlessParent, mapName, name)) {
+        if (checkDeleteIgnoreList(prevType, newlyChildlessParent, mapName, prevType.getTypeName())) {
             return;
         }
 
@@ -1378,12 +1386,16 @@ public class CatalogDiffEngine {
 
         // write the commands to make it so
         // they will be ignored if the change is unsupported
-        m_sb.append("delete ").append(prevType.getParent().getCatalogPath()).append(" ");
-        m_sb.append(mapName).append(" ").append(name).append("\n");
+        m_sb.append(getDeleteDiffStatement(prevType, mapName));
 
         // add it to the set of deletions to later compute descriptive text
         CatalogChangeGroup cgrp = m_changes.get(DiffClass.get(prevType));
         cgrp.processDeletion(prevType, newlyChildlessParent);
+    }
+
+    public static String getDeleteDiffStatement(CatalogType toDelete, String parentName) {
+        return "delete " + toDelete.getParent().getCatalogPath() + " " +
+            parentName + " " + toDelete.getTypeName() + "\n";
     }
 
     /**
@@ -1590,7 +1602,7 @@ public class CatalogDiffEngine {
             String name = prevType.getTypeName();
             CatalogType newType = newMap.get(name);
             if (newType == null) {
-                writeDeletion(prevType, newMap.m_parent, mapName, name);
+                writeDeletion(prevType, newMap.m_parent, mapName);
                 continue;
             }
 

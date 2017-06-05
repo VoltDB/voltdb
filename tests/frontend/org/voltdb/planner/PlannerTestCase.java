@@ -554,6 +554,9 @@ public class PlannerTestCase extends TestCase {
             for (Entry<PlanNodeType, AbstractPlanNode> entry : root.getInlinePlanNodes().entrySet()) {
                 System.out.printf("        Inline %s\n", entry.getKey());
             }
+            for (Entry<PlanNodeType, AbstractPlanNode> entry : root.getInlinePlanNodes().entrySet()) {
+                System.out.printf("        Inline %s\n", entry.getKey());
+            }
         }
     }
 
@@ -763,7 +766,7 @@ public class PlannerTestCase extends TestCase {
                     fail(String.format("Expected %d plan nodes, but found more.", types.length));
                 }
                 if (types[idx] instanceof PlanNodeType) {
-                    assertEquals(String.format("Expected %s plan node by found %s", types[idx], plan.getPlanNodeType()),
+                    assertEquals(String.format("Expected %s plan node but found %s", types[idx], plan.getPlanNodeType()),
                                  types[idx], plan.getPlanNodeType());
                 } else if (types[idx] instanceof PlanWithInlineNodes) {
                     PlanWithInlineNodes branch = (PlanWithInlineNodes)types[idx];

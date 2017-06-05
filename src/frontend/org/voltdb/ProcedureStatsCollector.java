@@ -28,7 +28,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.StatementStats.SingleCallStatsToken;
 import org.voltdb.StatementStats.StatsData;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.sysprocs.UpdateApplicationCatalog;
+import org.voltdb.sysprocs.UpdateCore;
 
 /**
  * Derivation of StatsSource to expose timing information of procedure invocations.
@@ -105,8 +105,8 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         }
         m_isTransactional = isTransactional;
 
-        // check if this proc is UpdateApplicationCatalog for 100% sampling rate
-        m_isUAC = (m_procName != null) && (m_procName.startsWith(UpdateApplicationCatalog.class.getName()));
+        // check if this proc is UpdateCore for 100% sampling rate
+        m_isUAC = (m_procName != null) && (m_procName.startsWith(UpdateCore.class.getName()));
     }
 
     // This is not the *real* invocation count, but a fuzzy one we keep to sample 5% of
@@ -450,7 +450,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
      * @return true if this procedure statistics should be reset
      */
     public boolean resetAfterCatalogChange() {
-        // UpdateApplicationCatalog system procedure statistics should be kept
+        // UpdateCore system procedure statistics should be kept
         if (m_isUAC) {
             return false;
         }

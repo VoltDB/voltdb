@@ -638,8 +638,12 @@ PRIMARY ENTRY POINTS
 
 <target name="killstragglers"
         description="Run the killstragglers script">
+    <condition property="set_port" value="-p ${port}" else="">
+        <isset property="port"/>
+    </condition>
     <exec executable="tools/killstragglers.sh"
           failonerror="true" timeout="1800000">
+        <arg value="${set_port}" />
     </exec>
 </target>
 
