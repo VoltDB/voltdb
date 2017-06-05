@@ -2332,7 +2332,7 @@ public class LocalCluster extends VoltServerConfig {
         return ifExist;
     }
 
-    public String getHostLogPath(int HostId) {
+    private String getHostLogPath(int HostId) {
         assert(m_enableLogSearch);
         String[] paths = m_initLogFilePath.get(HostId);
         assert (paths != null);
