@@ -68,6 +68,7 @@ class ProjectionPlanNode;
 class LimitPlanNode;
 
 class AggregateExecutorBase;
+class InsertExecutor;
 
 struct CountingPostfilter;
 
@@ -79,6 +80,7 @@ public:
         , m_projector()
         , m_searchKeyBackingStore(NULL)
         , m_aggExec(NULL)
+        , m_insertExec(NULL)
     {}
     ~IndexScanExecutor();
 
@@ -141,6 +143,7 @@ private:
     char* m_searchKeyBackingStore;
 
     AggregateExecutorBase* m_aggExec;
+    InsertExecutor *m_insertExec;
 };
 
 }

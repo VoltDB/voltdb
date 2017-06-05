@@ -1295,7 +1295,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.SEQSCAN,
                          PlanNodeType.PROJECTION,
                          PlanNodeType.WINDOWFUNCTION,
-                         new PlanNodeType[] {PlanNodeType.MERGERECEIVE, PlanNodeType.ORDERBY},
+                         new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE, PlanNodeType.ORDERBY),
                          PlanNodeType.INVALID,
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);

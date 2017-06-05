@@ -19,3 +19,7 @@ invoke the scripts without any arguments
   thousand messages
 * `kafka-reset-consumer-offset.groovy` it can be used to reset the
   consumer offset used by VoltDB importers.
+* `kafka10-offset-info.groovy` prints out topic partition offset
+  consumption statistics from Kafka 10 cluster
+* `kafka10-reset-consumer-offset.groovy` it can be used to reset the
+  consumer offset in Kafka 10 cluster used by VoltDB importers.

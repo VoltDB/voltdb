@@ -272,7 +272,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.worksWithElastic = diff.worksWithElastic();
         }
         catch (PrepareDiffFailureException e) {
-            compilerLog.warn(e.getMessage(), e);
             throw e;
         }
         catch (Exception e) {
