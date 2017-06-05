@@ -2278,10 +2278,7 @@ public class LocalCluster extends VoltServerConfig {
         Pattern pattern = Pattern.compile(regex);
         for (java.util.Map.Entry<Integer, StringBuffer> tuple : m_logs.entrySet()) {
             StringBuffer log = tuple.getValue();
-            // Strictly speaking this is not thread-safe, but since the buffer is
-            // always appended and its previous contents are never modified, this
-            // could actually work (the newly created matcher points to the previous
-            // range).
+            // This is indeed thread-safe (since all methods in StringBuffer is thread-safe).
             if (!pattern.matcher(log).find()) { return false; }
         }
         return true;
