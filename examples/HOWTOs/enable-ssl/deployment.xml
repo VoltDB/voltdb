@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!--
+    This deployment file has auth by user enabled.
+    See the HOWTO on enabling authentication for more.
+
+    This example works with the "SimpleSSL" example.
+    Please note that you will need to supply your own 
+
+    One user must have the "administrator" role.
+    All roles that aren't predefined are defined in DDL.
+-->
+<deployment>
+    <cluster hostcount="1" kfactor="0" />
+    <ssl enabled="true" external="true">
+        <keystore   path="example.keystore"   password="example"/>
+        <truststore path="example.truststore" password="example"/>
+    </ssl>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+</deployment>
