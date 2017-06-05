@@ -63,13 +63,13 @@ public:
     // compute # of bytes needed to serialize the meta data column names
     inline size_t getMDColumnNamesSerializedSize() const { return m_mdColumnNamesSerializedSize; }
 
-    int64_t allocatedByteCount(bool debug = true) const {
-//        if (debug) {
-//            std::cout <<  "m_pendingBlocks.size() " << m_pendingBlocks.size() << " * "
-//                    << "(m_defaultCapacity - m_headerSpace): " << (m_defaultCapacity - m_headerSpace)
-//                    << " +\n\t queued export bytes:"
-//                    << ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature) << std::endl;
-//        }
+    int64_t allocatedByteCount(bool debug = false) const {
+        if (debug) {
+            std::cout <<  "(m_pendingBlocks.size() " << m_pendingBlocks.size() << " * "
+                    << "(m_defaultCapacity - m_headerSpace): " << (m_defaultCapacity - m_headerSpace)
+                    << " ) + queued export bytes:"
+                    << ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature) << std::endl;
+        }
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
                 ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature);
     }

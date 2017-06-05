@@ -112,7 +112,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 {
     size_t rowHeaderSz = 0;
     size_t tupleMaxLength = 0;
-//    ostringstream os;
+    ostringstream os;
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
@@ -134,9 +134,9 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
 //    std::cout << "Hdr: " << rowHeaderSz << " TupleMax: " << tupleMaxLength << std::endl;
     if (!m_currBlock) {
-//        os << "Block null, allocated bytes:" << allocatedByteCount();
+        os << "Block null, allocated bytes:" << allocatedByteCount();
         extendBufferChain(m_defaultCapacity);
-//        os << "after extend allocated bytes:" << allocatedByteCount() << std::endl;
+        os << "after extend allocated bytes:" << allocatedByteCount() << std::endl;
 //        cout << os.str(); os.str("");
     }
     //Compute column names size
@@ -150,12 +150,12 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // include type byte - included in tuple max length
 //    colNamesLength += METADATA_COL_CNT + columnNames.size();
     if (m_currBlock->remaining() < (tupleMaxLength + colNamesLength)) {
-//        os << "remaining bytes in current block:" << m_currBlock->remaining()
-//                << " bytes needed:" << (tupleMaxLength + colNamesLength)
-//                << " allocated byte count:" << allocatedByteCount() << std::endl;
+        os << "remaining bytes in current block:" << m_currBlock->remaining()
+                << " bytes needed:" << (tupleMaxLength + colNamesLength)
+                << " allocated byte count:" << allocatedByteCount() << std::endl;
         extendBufferChain(tupleMaxLength + colNamesLength);
-//        os << "remaining bytes in current block:" << m_currBlock->remaining()
-//                << " new allocated-byte-count:" << allocatedByteCount() << std::endl;
+        os << "remaining bytes in current block:" << m_currBlock->remaining()
+                << " new allocated-byte-count:" << allocatedByteCount() << std::endl;
 //        cout << os.str(); os.str("");
     }
 
@@ -188,6 +188,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
         io.writeTextString(columnNames[i]);
     }
 //    std::cout << "before " << cachedSize << " after " << io.size() << " diff " << io.size() - cachedSize << std::endl;
+
     // write metadata columns
     io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(spHandle);
@@ -221,8 +222,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     const size_t startingUso = m_uso;
     m_uso += (rowHeaderSz + io.position());
-//    os << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso()
-//            << " offset " << m_currBlock->offset() << " m_uso " << m_uso << std::endl;
+    os << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+            << " offset " << m_currBlock->offset() << " m_uso " << m_uso << std::endl;
 //    cout << os.str();
     return startingUso;
 }
