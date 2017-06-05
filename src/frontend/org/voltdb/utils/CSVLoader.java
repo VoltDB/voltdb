@@ -21,7 +21,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -423,26 +422,17 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                         config.skip, config.header);
                 listReader = new CsvListReader(tokenizer, csvPreference);
             } else {
-            	if (null == config.characterSet || config.characterSet.trim().equals("")) {
-            		tokenizer = new Tokenizer(new FileReader(config.file),
-            		                          csvPreference,
-            		                          config.strictquotes,
-            		                          config.escape,
-            		                          config.columnsizelimit,
-            		                          config.skip,
-            		                          config.header);
-            	} else {
-            		FileInputStream fis = new FileInputStream(config.file);
-            		InputStreamReader isr = new InputStreamReader(fis, config.characterSet);
-            		tokenizer = new Tokenizer(isr,
-            		                          csvPreference,
-            		                          config.strictquotes,
-            		                          config.escape,
-            		                          config.columnsizelimit,
-            		                          config.skip,
-            		                          config.header);
-            	}
-           		listReader = new CsvListReader(tokenizer, csvPreference);
+                FileInputStream fis = new FileInputStream(config.file);
+                InputStreamReader isr = new InputStreamReader(fis, config.characterSet);
+                tokenizer = new Tokenizer(isr,
+                          csvPreference,
+                          config.strictquotes,
+                          config.escape,
+                          config.columnsizelimit,
+                          config.skip,
+                          config.header);
+
+                   listReader = new CsvListReader(tokenizer, csvPreference);
             }
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
