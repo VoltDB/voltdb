@@ -37,7 +37,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLContext;
@@ -450,6 +449,7 @@ public class RegressionSuite extends TestCase {
         m_config = config;
     }
 
+    
     @Override
     public String getName() {
         // munge the test name with the VoltServerConfig instance name
@@ -1340,45 +1340,5 @@ public class RegressionSuite extends TestCase {
                     alternatingKeysAndValues[ii+1]);
         }
         return properties;
-    }
-
-    /*
-     * Check for the existence of a regex expression in all the LocalCluster's
-     * init logs.
-     */
-    public boolean localClusterAllInitLogsContain(String regex) {
-        assertEquals(true, m_config instanceof LocalCluster);
-        return ((LocalCluster) m_config).allInitLogsContain(regex);
-    }
-
-    /*
-     * Check for the existence of a regex expression in all the LocalCluster's
-     * host logs.
-     */
-    public boolean localClusterAllHostLogsContain(String regex) {
-        assertEquals(true, m_config instanceof LocalCluster);
-        return ((LocalCluster) m_config).allHostLogsContain(regex);
-    }
-
-    /*
-     * Check the existence of a regex expression in a particular host's log
-     */
-    public boolean localClusterInitlogContains(int hostId, String regex) {
-        assertEquals(true, m_config instanceof LocalCluster);
-        return ((LocalCluster) m_config).initLogContains(hostId, regex);
-    }
-
-    public boolean localClusterHostLogContains(int hostId, String regex) {
-        assertEquals(true, m_config instanceof LocalCluster);
-        return ((LocalCluster) m_config).hostLogContains(hostId, regex);
-    }
-
-    /*
-     * Get HostIds in the LocalCluster, make sure the server configuration
-     * is an instance of LocalCluster
-     */
-    public Set<Integer> getLocalClusterHostIds() {
-        assertEquals(true, m_config instanceof LocalCluster);
-        return ((LocalCluster) m_config).getHostIds();
     }
 }
