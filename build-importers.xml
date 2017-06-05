@@ -5,7 +5,7 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
-    <target name="buildbundles" depends="junitimporter, socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, voltcsvformatter, kinesisstream, kafkastream10"/>
+    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, voltcsvformatter, kinesisstream, kafkastream10"/>
 
     <resources id="default.imports.resource">
         <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
@@ -128,21 +128,6 @@
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="slf4j-api-1.7.21.jar" />
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="slf4j-log4j12-1.7.21.jar" />
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="log4j-1.2.17.jar" />
-        </jar>
-    </target>
-
-    <target name="junitimporter">
-        <mkdir dir="${bundles.dir}" />
-        <jar destfile="${bundles.dir}/junitimporter.jar" basedir="${build.prod.dir}">
-            <include name="org/voltdb/importclient/junit/JUnitImporter*.class"/>
-            <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importclient.junit.JUnitImporterFactory" />
-                <attribute name="Bundle-ManifestVersion" value="2" />
-                <attribute name="Bundle-Name" value="Builtin JUnit Test Importer OSGi Bundle" />
-                <attribute name="Bundle-SymbolicName" value="JUnitImporter" />
-                <attribute name="Bundle-Version" value="1.0.0" />
-                <attribute name="DynamicImport-Package" value="*" />
-            </manifest>
         </jar>
     </target>
 

@@ -28,9 +28,7 @@ import java.util.Properties;
 
 /**
  * Manufactures fake importers used for testing the importer life cycle.
- * The produced importers move no data, but they report state changes to the test framework
- * and accept instructions on how to behave.
- * Created by bshaw on 5/31/17.
+ * The produced importers move no data, but they report state changes to the test framework.
  */
 public class JUnitImporterFactory extends AbstractImporterFactory {
 
@@ -52,6 +50,6 @@ public class JUnitImporterFactory extends AbstractImporterFactory {
 
     @Override
     public boolean isImporterRunEveryWhere() {
-        return true; // make this test controllable?
+        return true;
     }
 }

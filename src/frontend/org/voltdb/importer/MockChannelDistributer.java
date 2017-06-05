@@ -21,13 +21,10 @@ import java.net.URI;
 import java.util.Set;
 
 /**
- * A fake ChannelDistributer that allows tests to generate mesh events.
- * Created by bshaw on 5/26/17.
+ * A fake ChannelDistributer that fulfills ImportManager's dependencies without requiring a mocking framework.
+ * It was written so the ImportManager's importer restart logic could be unit tested.
  */
 public class MockChannelDistributer implements ChannelDistributer {
-
-    private ChannelChangeCallback m_callback = null;
-
 
     public MockChannelDistributer(String myHostId) {
 
@@ -40,7 +37,7 @@ public class MockChannelDistributer implements ChannelDistributer {
 
     @Override
     public void registerCallback(String m_distributerDesignation, ChannelChangeCallback importerLifeCycleManager) {
-        m_callback = importerLifeCycleManager;
+
     }
 
     @Override
@@ -50,7 +47,7 @@ public class MockChannelDistributer implements ChannelDistributer {
 
     @Override
     public void unregisterCallback(String m_distributerDesignation) {
-        m_callback = null;
+
     }
 
     @Override

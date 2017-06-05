@@ -110,6 +110,7 @@ public class JUnitImporter extends AbstractImporter {
 
     @Override
     protected void accept() {
+        info(null, "Test importer started");
         getMessenger().produceEvent(this, ACCEPT_CALLED);
         while (shouldRun()) {
             try {
@@ -118,6 +119,7 @@ public class JUnitImporter extends AbstractImporter {
             }
         }
         getMessenger().produceEvent(this, NO_LONGER_RUNNING);
+        info(null, "Test importer has stopped");
     }
 
     @Override

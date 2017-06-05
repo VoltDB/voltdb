@@ -280,7 +280,6 @@ public class ZKChannelDistributer implements ChannelDistributer {
      * </ul>
      * @param zk
      * @param hostId
-     * @param queue
      */
     public ZKChannelDistributer(ZooKeeper zk, String hostId) {
         Preconditions.checkArgument(
@@ -341,6 +340,7 @@ public class ZKChannelDistributer implements ChannelDistributer {
      * @param importer importer designation
      * @param uris list of channel URIs
      */
+    @Override
     public void registerChannels(String importer, Set<URI> uris) {
         NavigableSet<String> registered = m_callbacks.getReference().navigableKeySet();
         Preconditions.checkArgument(

@@ -35,10 +35,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.*;
-import org.voltdb.importclient.junit.JUnitImporter;
-import org.voltdb.importclient.junit.JUnitImporterConfig;
-import org.voltdb.importclient.junit.JUnitImporterEventExaminer;
-import org.voltdb.importclient.junit.JUnitImporterMessenger;
+import org.voltdb.importclient.junit.*;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.modular.ModuleManager;
@@ -76,52 +73,8 @@ public class TestImportManager {
 
     private static final int NUM_IMPORTERS_FOR_TEST = 2;
     private static final String SCHEMA = "CREATE TABLE test (foo BIGINT NOT NULL, bar VARCHAR(8) NOT NULL);\n"
-                                       + "CREATE PROCEDURE procedure1 AS INSERT INTO test VALUES (?, ?);\n"
-                                       + "CREATE PROCEDURE procedure2 AS INSERT INTO test VALUES (CAST(? AS BIGINT) * 2, lower(CAST(? AS VARCHAR(8))));";
-
-
-    /* ---- Event and state detectors ---- */
-
-    public class DetectImporterCount implements JUnitImporterEventExaminer {
-
-        private Optional<Integer> m_importerCount = Optional.empty();
-
-        @Override
-        public void examine(Map<URI, List<JUnitImporter.Event>> eventTracker) {
-            m_importerCount = Optional.of(eventTracker.keySet().size());
-        }
-
-        public int getImporterCount() {
-            assertTrue(m_importerCount.isPresent());
-            return m_importerCount.get();
-        }
-    }
-
-    public static class DetectImporterState implements JUnitImporterEventExaminer {
-
-        private final Set<URI> m_importersInState = new HashSet<>();
-        private final JUnitImporter.State m_expectedState;
-
-        public DetectImporterState(JUnitImporter.State expectedState) {
-            m_expectedState = expectedState;
-        }
-
-        @Override
-        public void examine(Map<URI, List<JUnitImporter.Event>> eventTracker) {
-            m_importersInState.clear();
-            for (Map.Entry<URI, List<JUnitImporter.Event>> entry : eventTracker.entrySet()) {
-                JUnitImporter.State actualState = JUnitImporter.computeStateFromEvents(entry.getValue());
-                if (m_expectedState.equals(actualState)) {
-                    m_importersInState.add(entry.getKey());
-                }
-            }
-        }
-
-        public Set<URI> getImporters() {
-            return m_importersInState;
-        }
-    }
-
+                                       + "CREATE PROCEDURE procedure0 AS INSERT INTO test VALUES (?, ?);\n"
+                                       + "CREATE PROCEDURE procedure1 AS INSERT INTO test VALUES (CAST(? AS BIGINT) * 2, lower(CAST(? AS VARCHAR(8))));";
 
     /* ---- Helper methods ---- */
 
@@ -147,7 +100,7 @@ public class TestImportManager {
             Properties importerProperties = new Properties();
             importerProperties.setProperty(ImportDataProcessor.IMPORT_PROCEDURE, "procedure" + i);
             importerProperties.setProperty(JUnitImporterConfig.IMPORTER_ID_PROPERTY, generateImporterID(i));
-            projectBuilder.addImport(true, "custom", null, JUnitImporterConfig.URI_SCHEME + ".jar", importerProperties);
+            projectBuilder.addImport(true, "custom", null, JUnitImporterFactory.class.getCanonicalName(), importerProperties);
         }
         projectBuilder.configureLogging(false, enableCommandLogs, 100, 1000, 10000);
         projectBuilder.setUseDDLSchema(true); // this makes manually debugging the test deployment easier
@@ -203,13 +156,17 @@ public class TestImportManager {
     }
 
     @After
-    public void tearDown() throws Exception {
+    public void tearDown() throws Throwable {
         try {
+            Throwable detectedException = JUnitImporterMessenger.instance().checkForAndClearExceptions();
+            if (detectedException != null) {
+                throw detectedException;
+            }
             m_manager = null;
             m_initialCatalogContext = null;
-            ModuleManager.resetCacheRoot();
             m_voltDbRoot.delete();
         } finally {
+            ModuleManager.resetCacheRoot();
             if (m_previousBundlePath == null) {
                 System.clearProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
             } else {
@@ -229,12 +186,10 @@ public class TestImportManager {
     private void checkImportersAreRunning(Set<URI> expectedImporters) throws Exception {
         System.out.println("Waiting up to " + TimeUnit.MILLISECONDS.toSeconds(RESTART_CHECK_MAX_MS) + " seconds for " + expectedImporters.size() + " importers to be running");
 
-        Set<URI> runningImporters = null;
+        Set<URI> runningImporters = new HashSet<>();
         for (int i = 0; i < RESTART_CHECK_MAX_MS / RESTART_CHECK_POLLING_INTERVAL_MS; i++) {
             Thread.sleep(RESTART_CHECK_POLLING_INTERVAL_MS);
-            DetectImporterState detector = new DetectImporterState(JUnitImporter.State.RUNNING);
-            JUnitImporterMessenger.instance().checkEventList(detector);
-            runningImporters = detector.getImporters();
+            JUnitImporterMessenger.instance().getRunningImporters(runningImporters, false);
             if (runningImporters.equals(expectedImporters)) {
                 return;
             }
@@ -243,9 +198,17 @@ public class TestImportManager {
     }
 
     private void checkImportersAreOff() throws Exception {
-        DetectImporterCount detector = new DetectImporterCount();
-        JUnitImporterMessenger.instance().checkEventList(detector);
-        assertEquals(0, detector.getImporterCount());
+        System.out.println("Waiting up to " + TimeUnit.MILLISECONDS.toSeconds(RESTART_CHECK_MAX_MS) + " seconds for importers to stop");
+
+        Set<URI> runningImporters = new HashSet<>();
+        for (int i = 0; i < RESTART_CHECK_MAX_MS / RESTART_CHECK_POLLING_INTERVAL_MS; i++) {
+            Thread.sleep(RESTART_CHECK_POLLING_INTERVAL_MS);
+            JUnitImporterMessenger.instance().getRunningImporters(runningImporters, true);
+            if (runningImporters.size() == 0) {
+                return;
+            }
+        }
+        throw new AssertionError("Expected importers to stop but found running importers " + runningImporters.toString());
     }
 
     /* ---- Tests ---- */

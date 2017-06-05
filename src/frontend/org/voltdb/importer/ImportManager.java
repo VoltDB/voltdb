@@ -132,6 +132,7 @@ public class ImportManager implements ChannelChangeCallback {
         m_self = em;
         em.initializeChannelDistributer(mockChannelDistributer);
         em.applyCatalogToImporters(initialCatalogCtxt, false);
+        em.readyForData(initialCatalogCtxt);
     }
 
     private void setupFormatterFactoryForConfig(Map<String, ImportConfiguration> processorConfig) {
@@ -330,7 +331,7 @@ public class ImportManager implements ChannelChangeCallback {
         m_self.applyCatalogToImporters(catalogContext, true);
     }
 
-    public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
+    public synchronized void readyForData(CatalogContext catalogContext) {
         m_serverStarted = true; // Note that server is ready, so that we know whether to process catalog updates
         readyForDataInternal(catalogContext);
     }

@@ -23,10 +23,7 @@ import com.google_voltpatches.common.eventbus.EventBus;
 import com.google_voltpatches.common.eventbus.Subscribe;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by bshaw on 5/31/17.
@@ -56,10 +53,6 @@ public class JUnitImporterMessenger {
         }
     }
 
-    private JUnitImporterMessenger() {
-
-    }
-
     public static JUnitImporterMessenger initialize() {
         if (m_self == null) {
             m_self = new JUnitImporterMessenger();
@@ -85,9 +78,38 @@ public class JUnitImporterMessenger {
         m_eventBus.post(t);
     }
 
+    /* ---- Methods for checking importer states from a test ---- */
+
+    public synchronized Set<URI> getRunningImporters(Set<URI> importers, boolean includeTransitioningImporters) {
+        importers.clear();
+        for (Map.Entry<URI, List<JUnitImporter.Event>> entry : m_eventTracker.entrySet()) {
+            boolean includeImporter;
+            switch (JUnitImporter.computeStateFromEvents(entry.getValue())) {
+                case RUNNING:
+                    includeImporter = true;
+                    break;
+                case STOPPING:
+                case STARTING:
+                    includeImporter = includeTransitioningImporters;
+                    break;
+                case STOPPED:
+                    includeImporter = false;
+                    break;
+                default:
+                    throw new IllegalStateException("Importer " + entry.getKey() + " state is unknown");
+            }
+            if (includeImporter) {
+                importers.add(entry.getKey());
+            }
+        }
+        return importers;
+    }
+
     /* ---- EventBus notification subscribers ---- */
 
     /** Main event tracking mechanism.
+     * @param stateChangeEvent
+     */
     @Subscribe
     public synchronized void handleImporterStateChange(Event stateChangeEvent) {
         List<JUnitImporter.Event> eventList = m_eventTracker.get(stateChangeEvent.getImporterID());
@@ -112,11 +134,6 @@ public class JUnitImporterMessenger {
     @Subscribe
     public synchronized void handleDeadEvent(DeadEvent deadEvent) {
         handleExceptionReport(new IllegalStateException("Got event with no subscribers with message: " + deadEvent.getEvent().toString()));
-    }
-
-    /** Allows for tests to safely examine and/or clear the events reported for each importer. */
-    public synchronized void checkEventList(JUnitImporterEventExaminer examiner) {
-        examiner.examine(m_eventTracker);
     }
 
     /** Allows access to any errors thrown by importers, and clears the (single entry) buffer where reported exceptions are kept */
