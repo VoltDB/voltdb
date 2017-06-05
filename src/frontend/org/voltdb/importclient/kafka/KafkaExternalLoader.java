@@ -134,7 +134,7 @@ public class KafkaExternalLoader implements ImporterSupport {
     }
 
     /*
-     * Error callback from the CSV loader
+     * Error callback from the CSV loader in case of trouble writing to Volt.
      */
     private class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler {
 
@@ -146,7 +146,8 @@ public class KafkaExternalLoader implements ImporterSupport {
                 if (status != ClientResponse.SUCCESS) {
                     m_log.error("Failed to Insert Row: " + metaData.rawLine);
                     long fc = m_failedCount.incrementAndGet();
-                    // If we've reached our max-error threshold, quit.
+                    // If we've reached our max-error threshold, quit. Use a different error message for the various cases for
+                    // troubleshooting purposes.
                     String errMsg = null;
                     if (m_config.maxerrors > 0 && fc > m_config.maxerrors) {
                         errMsg = "Max error count reached, exiting.";
