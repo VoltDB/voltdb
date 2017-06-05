@@ -212,6 +212,9 @@ public class LocalCluster extends VoltServerConfig {
     }
     public int getHttpOverridePort() { return m_httpOverridePort; };
 
+    /*
+     * Setup local cluster to enable log search so the logs are stored in buffers
+     */
     public LocalCluster(boolean enableLogSearch,
                         String jarFileName,
                         int siteCount,
@@ -2271,7 +2274,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
-     * Check if a regex string exists in all the host logs
+     * Check if a regex string exists in all the host logs' written content so far
      */
     public boolean allHostLogsContain(String regex) {
         assert(m_enableLogSearch);
@@ -2285,7 +2288,8 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
-     * Check the given regex in a server process with a given hostId
+     * Check the given regex in a server process with a given hostId (searching among
+     * the messages that have already been written)
      */
     public boolean hostLogContains(int hostId, String regex) {
         assert(m_enableLogSearch);
@@ -2296,7 +2300,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
-     * Check if the given regex exists in all the init logs
+     * Check if the given regex exists in all the init logs' written content
      */
     public boolean allInitLogsContain(String regex) {
         assert(m_enableLogSearch);
@@ -2310,7 +2314,8 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
-     * Check the given regex in a given host with a hostId
+     * Check the given regex in a given host with a hostId (searching among the
+     * messages that have already been written)
      */
     public boolean initLogContains(int hostId, String regex) {
         assert(m_enableLogSearch);
@@ -2334,6 +2339,7 @@ public class LocalCluster extends VoltServerConfig {
         return ifExist;
     }
 
+    // Check if the regex exists in a file's written content
     public boolean onDiskHostLogContains(int HostId, String regex) {
         assert(m_enableLogSearch);
         String path = getHostLogPath(HostId);
