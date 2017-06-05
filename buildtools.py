@@ -47,6 +47,9 @@ class BuildContext:
                 self.COVERAGE = True
             if arg in ["PROFILE"]:
                 self.PROFILE = True
+            if arg in ["CLANG", "CLANG++"]:
+                self.CC = "clang"
+                self.CXX = "clang++"
         # Exec build.local if available, a python script provided with this
         # BuildContext object as the update-able symbol BUILD.  These example
         # build.local lines force the use of clang instead of gcc/g++.
@@ -55,7 +58,7 @@ class BuildContext:
         buildLocal = os.path.join(os.path.dirname(__file__), "build.local")
         if os.path.exists(buildLocal):
             execfile(buildLocal, dict(BUILD = self))
-        
+
     def compilerName(self):
         self.getCompilerVersion()
         if self.COMPILER_NAME:
@@ -138,7 +141,7 @@ def replaceSuffix(name, suffix):
         return name + suffix;
     else:
         return name[:pos] + suffix;
-    
+
 def outputNamesForSource(filename):
     relativepath = "/".join(filename.split("/")[2:])
     jni_objname = "objects/" + replaceSuffix(relativepath, ".o")
@@ -316,7 +319,7 @@ def buildMakefile(CTX):
         IPC_EXENAME = "prod/voltdbipc "
     makefile.write(".PHONY: test\n")
     makefile.write("test: %s%s\n" % (IPC_EXENAME, formatList((namesForTestCode(test)[0] for test in tests))))
-        
+
     makefile.write("objects/volt.a: objects/harness.o %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
@@ -325,7 +328,7 @@ def buildMakefile(CTX):
     makefile.write("-include %s\n" % "objects/harness.d")
     makefile.write("\n")
     cleanobjs += ["objects/volt.a", "objects/harness.o", "objects/harness.d"]
-    
+
     makefile.write("########################################################################\n")
     makefile.write("#\n# %s\n#\n" % "Volt Files")
     makefile.write("########################################################################\n")
@@ -545,4 +548,3 @@ def runTests(CTX):
     print "==============================================================================="
 
     return failures
-

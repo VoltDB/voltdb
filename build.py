@@ -48,6 +48,10 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -fvisibility=default
             -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
 
+if CTX.PLATFORM == "Linux":
+    # must appear before other flags that suppress specific warnings
+    CTX.CPPFLAGS += " -Wconversion -Wcast-align"
+
 # clang doesn't seem to want this
 if CTX.compilerName() == 'gcc':
     CTX.CPPFLAGS += " -pthread"
@@ -62,8 +66,9 @@ if CTX.compilerName() == 'gcc':
 	    CTX.CPPFLAGS += " -Wno-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
-    CTX.CPPFLAGS += " -Wno-varargs"
+    CTX.CPPFLAGS += " -Wno-varargs -Wno-sign-conversion -Wno-cast-align"
 
+# latest version of clang is 4.0... following lines are unused?
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 7):
     CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
 
@@ -159,7 +164,7 @@ if CTX.PLATFORM == "Darwin":
     CTX.JNIFLAGS = "-framework JavaVM,1.7"
 
 if CTX.PLATFORM == "Linux":
-    CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic"
+    CTX.CPPFLAGS += " -Wno-attributes -DLINUX -fpic"
     CTX.NMFLAGS += " --demangle"
 
 ###############################################################################

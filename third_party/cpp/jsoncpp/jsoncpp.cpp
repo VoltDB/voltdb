@@ -2492,7 +2492,7 @@ Value::asBool() const
    case uintValue:
       return value_.uint_ ? true : false;
    case realValue:
-      return value_.real_ ? true : false;
+      return (value_.real_ != 0.0) ? true : false;
    default:
       break;
    }

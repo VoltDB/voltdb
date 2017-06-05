@@ -1512,7 +1512,7 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} test" />
+        <arg line="build.py ${build} ${compiler} test" />
     </exec>
 </target>
 
@@ -1522,7 +1522,7 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} build" />
+        <arg line="build.py ${build} ${compiler} build" />
     </exec>
 </target>
 
@@ -1530,7 +1530,7 @@ NATIVE EE STUFF
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} voltdbipc" />
+        <arg line="build.py ${build} ${compiler} voltdbipc" />
     </exec>
 </target>
 
@@ -1539,7 +1539,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <env key="EESKIPBUILDMAKEFILE" value="true" />
-        <arg line="build.py ${build}" />
+        <arg line="build.py ${build} ${compiler}" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1566,7 +1566,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="EEONLYBUILDMAKEFILE" value="true"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build}" />
+        <arg line="build.py ${build} ${compiler}" />
     </exec>
 </target>
 
@@ -1574,7 +1574,7 @@ NATIVE EE STUFF
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build}" />
+        <arg line="build.py ${build} ${compiler}" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1583,7 +1583,7 @@ NATIVE EE STUFF
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} profile" />
+        <arg line="build.py ${build} ${compiler} profile" />
     </exec>
 </target>
 
@@ -1591,7 +1591,7 @@ NATIVE EE STUFF
         description="Create test program that loads catalog and tables and executes a plan fragment.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py EXECPLANFRAG ${build}" />
+        <arg line="build.py EXECPLANFRAG ${build} ${compiler}" />
     </exec>
 </target>
 
@@ -2071,7 +2071,7 @@ TEST CASES
   <!-- Whether any work needs doing is left to the C++ makefile -->
   <exec dir='.' executable='python' failonerror='true'>
     <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-    <arg line="build.py ${build} coverage" />
+    <arg line="build.py ${build} ${compiler} coverage" />
   </exec>
   <mkdir dir="${lcov.dir}" />
   <!-- Reset all counters -->
@@ -2133,7 +2133,7 @@ TEST CASES
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} test coverage" />
+        <arg line="build.py ${build} ${compiler} test coverage" />
     </exec>
 </target>
 
