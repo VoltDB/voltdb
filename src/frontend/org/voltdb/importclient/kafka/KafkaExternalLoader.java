@@ -65,7 +65,7 @@ import kafka.cluster.Broker;
  */
 public class KafkaExternalLoader implements ImporterSupport {
 
-    private static final VoltLogger m_log = new VoltLogger("KAFKAEXTERNALLOADER");
+    private static final VoltLogger m_log = new VoltLogger(KafkaExternalLoader.class.getName());
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
 
@@ -146,9 +146,22 @@ public class KafkaExternalLoader implements ImporterSupport {
                 if (status != ClientResponse.SUCCESS) {
                     m_log.error("Failed to Insert Row: " + metaData.rawLine);
                     long fc = m_failedCount.incrementAndGet();
-                    if ((m_config.maxerrors > 0 && fc > m_config.maxerrors) || (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE)) {
-                        m_log.error("Max error count reached, exiting.");
-                        close();
+                    // If we've reached our max-error threshold, quit.
+                    String errMsg = null;
+                    if (m_config.maxerrors > 0 && fc > m_config.maxerrors) {
+                        errMsg = "Max error count reached, exiting.";
+                    }
+                    else if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
+                        errMsg = "Error response received from database, exiting; status=" + Byte.toString(status);
+                    }
+                    if (errMsg != null) {
+                        m_log.error(errMsg);
+                        try {
+                            closeExecutors();
+                        }
+                        catch (InterruptedException e) {
+                            // Ignore
+                        }
                         return true;
                     }
                 }
@@ -350,15 +363,19 @@ public class KafkaExternalLoader implements ImporterSupport {
     /*
      * Shut down, close connections, and clean up.
      */
-    private void close() {
-       try {
-            stop();
-            if (m_executorService != null) {
-                m_executorService.shutdownNow();
-                m_executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-                m_executorService = null;
-            }
 
+    private void closeExecutors() throws InterruptedException {
+        stop();
+        if (m_executorService != null) {
+            m_executorService.shutdownNow();
+            m_executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            m_executorService = null;
+        }
+    }
+
+    private void close() {
+        try {
+            closeExecutors();
             m_loader.close();
             if (m_client != null) {
                 m_client.close();
@@ -366,6 +383,7 @@ public class KafkaExternalLoader implements ImporterSupport {
             }
         }
         catch (Exception ex) {
+            // Ignore
         }
     }
 

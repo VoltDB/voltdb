@@ -77,8 +77,8 @@ public abstract class BaseKafkaTopicPartitionImporter {
     // CAUTION: m_pauseOffset is not reliable until all callbacks have completed.
     protected final AtomicLong m_pauseOffset = new AtomicLong(-1);
     private long m_lastCommittedOffset = -1;
-    private final AtomicReference<BlockingChannel> m_offsetManager = new AtomicReference<>();
-    private SimpleConsumer m_consumer = null;
+    protected final AtomicReference<BlockingChannel> m_offsetManager = new AtomicReference<>();
+    protected SimpleConsumer m_consumer = null;
     public final TopicAndPartition m_topicAndPartition;
     protected final CommitTracker m_gapTracker;
     private final int m_gapFullWait = Integer.getInteger("KAFKA_IMPORT_GAP_WAIT", 2_000);
@@ -359,7 +359,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
         return fetchFailedCount;
     }
 
-    private void resetLeader() {
+    protected void resetLeader() {
         KafkaStreamImporterConfig.closeConsumer(m_consumer);
         m_consumer = null;
         HostAndPort leaderBroker = findNewLeader();
