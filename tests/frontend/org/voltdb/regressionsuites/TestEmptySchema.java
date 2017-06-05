@@ -74,7 +74,6 @@ public class TestEmptySchema extends RegressionSuite
         System.out.println("TABLE RESULTS: " + results[0]);
         assertEquals(0, results[0].getRowCount());
         assertEquals(expectedSchema.length, results[0].getColumnCount());
-
         validateSchema(results[0], expectedTable);
 
         expectedSchema = new ColumnInfo[12];
@@ -106,7 +105,7 @@ public class TestEmptySchema extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalCluster config = new LocalCluster(true, "decimal-default.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster(true, "decimal-default.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         success = config.compile(project);
         assertTrue(success);
