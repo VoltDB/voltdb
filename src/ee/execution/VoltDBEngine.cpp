@@ -1139,7 +1139,18 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
     }
 
-    boost::shared_ptr<ExecutorVector> ev_guard = ExecutorVector::fromJsonPlan(this, plan, fragId);
+    boost::shared_ptr<ExecutorVector> ev_guard;
+    try {
+        ev_guard = ExecutorVector::fromJsonPlan(this, plan, fragId);
+    } catch (SerializableEEException &e) {
+        char msg[10240];
+        snprintf(msg, 10240, "Exception reading the json string from Java: %s", plan.c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, msg);
+
+        // rethrow the handled exception
+        throw;
+    }
+
 
     // add the plan to the back
     //
