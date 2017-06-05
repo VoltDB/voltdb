@@ -78,7 +78,8 @@ function alertNodeClicked(obj) {
         var alertCount = 0;
         var serverSettings = false;
         this.memoryDetails = [];
-
+        this.drTablesArray = [];
+        this.exportTablesArray = [];
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
         };
@@ -1152,6 +1153,18 @@ function alertNodeClicked(obj) {
             if (tableData == null || tableData == undefined) {
                 alert("Error: Unable to extract Table Data");
                 return;
+            } else {
+                voltDbRenderer.drTablesArray = [];
+                voltDbRenderer.exportTablesArray = [];
+                for (var key in tableData) {
+                    if (tableData[key]['drEnabled'] == "true") {
+                        voltDbRenderer.drTablesArray.push(tableData[key]['TABLE_NAME']);
+                    }
+
+                    if (tableData[key]['TABLE_TYPE1'] == "EXPORT") {
+                        voltDbRenderer.exportTablesArray.push(tableData[key]['TABLE_NAME']);
+                    }
+                }
             }
             callback(tableData);
         };

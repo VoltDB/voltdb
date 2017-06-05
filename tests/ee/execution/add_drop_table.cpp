@@ -54,7 +54,7 @@ class AddDropTableTest : public Test {
                              m_exceptionBuffer, 4096);
 
         m_engine->resetReusedResultOutputBuffer();
-        int partitionCount = 3;
+        int partitionCount = htonl(3);
         m_engine->initialize(m_clusterId,
                              m_siteId,
                              m_partitionId,

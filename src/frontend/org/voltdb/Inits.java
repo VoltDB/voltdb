@@ -42,16 +42,15 @@ import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.SslType;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -225,7 +224,6 @@ public class Inits {
         SetupAdminMode
         StartHTTPServer
         InitHashinator
-        InitAsyncCompilerAgent
         SetupReplicationRole
         CreateRestoreAgentAndPlan
         DistributeCatalog <- CreateRestoreAgentAndPlan
@@ -837,23 +835,6 @@ public class Inits {
             TheHashinator.initialize(
                 TheHashinator.getConfiguredHashinatorClass(),
                 TheHashinator.getConfigureBytes(partitionCount));
-        }
-    }
-
-    class InitAsyncCompilerAgent extends InitWork {
-        InitAsyncCompilerAgent() {
-        }
-
-        @Override
-        public void run() {
-            try {
-                m_rvdb.getAsyncCompilerAgent().createMailbox(
-                            VoltDB.instance().getHostMessenger(),
-                            m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));
-            } catch (Exception e) {
-                hostLog.fatal(null, e);
-                System.exit(-1);
-            }
         }
     }
 

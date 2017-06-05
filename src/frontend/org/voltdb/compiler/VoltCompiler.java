@@ -68,6 +68,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.utils.CatalogSchemaTools;
@@ -156,6 +157,9 @@ public class VoltCompiler {
     private final HashSet<Class<?>> m_cachedAddedClasses = new HashSet<>();
 
     private final boolean m_isXDCR;
+
+    // Whether or not to use SQLCommand as a pre-processor for DDL (in voltdb init --classes). Default is false.
+    private boolean m_filterWithSQLCommand = false;
 
     /**
      * Represents output from a compile. This works similarly to Log4j; there
@@ -401,10 +405,7 @@ public class VoltCompiler {
      * @return true if successful
      * @throws VoltCompilerException
      */
-    public boolean compileFromDDL(
-            final String jarOutputPath,
-            final String... ddlFilePaths)
-    {
+    public boolean compileFromDDL(final String jarOutputPath, final String... ddlFilePaths) {
         if (ddlFilePaths.length == 0) {
             compilerLog.error("At least one DDL file is required.");
             return false;
@@ -1009,7 +1010,6 @@ public class VoltCompiler {
         if (cannonicalDDLIfAny != null) {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
-
             ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
         }
 
@@ -1024,7 +1024,13 @@ public class VoltCompiler {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-                ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+                if (m_filterWithSQLCommand) {
+                    SQLParser.FileInfo fi = new SQLParser.FileInfo(schemaReader.getPath());
+                    ddlcompiler.loadSchemaWithFiltering(schemaReader, db, whichProcs, fi);
+                }
+                else {
+                    ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+                }
             }
             finally {
                 m_currentFilename = origFilename;
@@ -1705,6 +1711,10 @@ public class VoltCompiler {
      */
     public void setProcInfoOverrides(Map<String, ProcInfoData> procInfoOverrides) {
         m_procInfoOverrides = procInfoOverrides;
+    }
+
+    public void setInitializeDDLWithFiltering(boolean flag) {
+        m_filterWithSQLCommand = flag;
     }
 
     /**

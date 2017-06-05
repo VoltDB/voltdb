@@ -48,16 +48,16 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.concurrent.CountDownLatch;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
 
 public class UpdateClassesBenchmark {
 
@@ -239,42 +239,63 @@ public class UpdateClassesBenchmark {
         }
     }
 
-    static long uacBlockTime(Client client, int interval) throws Exception {
+    /**
+     * Returns Pair<NUMBER OF UPDATECORES FOUND, TIME SPENT IN UPDATECORE>
+     */
+    private static Pair<Integer, Long> uacBlockTimeCore(Client client, int interval) throws Exception {
+        int updateCoreCounts = 0;
+        long blockDuration = 0;
+
         VoltTable vt = client.callProcedure("@Statistics", "PROCEDURE", interval).getResults()[0];
-        long blockDuration = -1;
+        updateCoreCounts = 0;
         while(vt.advanceRow()) {
-            if ("org.voltdb.sysprocs.UpdateApplicationCatalog".equals(vt.getString(5))) {
-                blockDuration = vt.getLong(8);
-                break;
+            if ("org.voltdb.sysprocs.UpdateCore".equals(vt.getString(5))) {
+                blockDuration += vt.getLong(8);
+                updateCoreCounts++;
             }
         }
         if (blockDuration < 0) {
             System.err.println(vt);
-            throw new RuntimeException("Negative UpdateApplicationCatalog duration " + blockDuration);
+            throw new RuntimeException("Negative UpdateCore duration " + blockDuration);
         }
 
-        return blockDuration;
+        return new Pair<Integer, Long>(updateCoreCounts, blockDuration);
+    }
+
+    static long uacBlockTime(Client client, int interval, boolean requireFound) throws Exception {
+        Pair<Integer, Long> results = uacBlockTimeCore(client, interval);
+
+        while ((results.getFirst() < 1) && requireFound) {
+            Thread.sleep(100);
+            results = uacBlockTimeCore(client, interval);
+        }
+
+        return results.getSecond();
     }
 
     static UACTime doUpdateClassesWork(Client client, String prevStmts, byte[] jar,
             String delPattern, String stmts) throws Exception {
-        uacBlockTime(client, 0);
+        uacBlockTime(client, 0, false);
 
         long startTS = System.nanoTime();
         long sumBlockTime = 0;
+        ClientResponse cr = null;
         if (prevStmts != null && prevStmts.length() > 0) {
-            client.callProcedure("@AdHoc", prevStmts);
-            sumBlockTime += uacBlockTime(client, 1);
+            cr = client.callProcedure("@AdHoc", prevStmts);
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            sumBlockTime += uacBlockTime(client, 1, true);
         }
 
         if (jar != null || delPattern != null) {
-            client.callProcedure("@UpdateClasses", jar, delPattern);
-            sumBlockTime += uacBlockTime(client, 1);
+            cr = client.callProcedure("@UpdateClasses", jar, delPattern);
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            sumBlockTime += uacBlockTime(client, 1, true);
         }
 
         if (stmts != null && stmts.length() > 0) {
-            client.callProcedure("@AdHoc", stmts);
-            sumBlockTime += uacBlockTime(client, 1);
+            cr = client.callProcedure("@AdHoc", stmts);
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            sumBlockTime += uacBlockTime(client, 1, true);
         }
 
         return new UACTime(System.nanoTime() - startTS, sumBlockTime);

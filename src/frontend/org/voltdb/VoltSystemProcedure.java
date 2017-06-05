@@ -62,8 +62,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         new ColumnInfo("STATUS", VoltType.BIGINT);   // public to fix javadoc linking warning
 
     /** Standard success return value for sysprocs returning STATUS_SCHEMA */
-    protected static long STATUS_OK = 0L;
-    protected static long STATUS_FAILURE = 1L;
+    public static long STATUS_OK = 0L;
+    public static long STATUS_FAILURE = 1L;
 
     protected Cluster m_cluster;
     protected ClusterSettings m_clusterSettings;

@@ -39,7 +39,7 @@ public class ClassMatcher {
     }
 
     /** List of .class files found in the classpath */
-    String m_classList = null;
+    public String m_classList = null;
     /** List of matches found after applying patterns */
     SortedSet<String> m_classNameMatches = new TreeSet<String>();
 
