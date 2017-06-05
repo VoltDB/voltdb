@@ -664,7 +664,7 @@ public class LeaderAppointer implements Promotable
                 host.increasePartitionLeader();
                 host.addPartition(entry.getKey());
             }
-            calculateNewPartitionLeaders(hostLeaderMap);
+            determinePartitionLeaders(hostLeaderMap);
         }
         m_stats.setSafetySet(lackingReplication.build());
         return retval;
@@ -752,17 +752,19 @@ public class LeaderAppointer implements Promotable
 
     /**
      * On a partition call back, an accurate view of the whole topology is not guaranteed since every partition callback
-     * tries to determine its new leader. The placement of partition leaders is calculated before partition callback
-     * are triggered. If the topology is changed after the new leaders are calculated, the site with the lowest host id
-     * will be picked up as the new leader.
+     * tries to determine its own new leader. To ensure more even distribution of the partition leaders among the surviving nodes,
+     * the new partition leaders for the partitions are calculated here based on the topology view after nodes are down:
+     * place the leaders of partitions to hosts with the lowest leader count
+     * If the host determined to host the partition leader is down due to further topology change after the new leaders are calculated,
+     * the site with the lowest host id will be picked up as the new partition leader.
      * @param leaderHostMap the partition leader info
      */
-    private void calculateNewPartitionLeaders(Map<Integer, Host> leaderHostMap){
+    private void determinePartitionLeaders(Map<Integer, Host> leaderHostMap){
         if (leaderHostMap.isEmpty() || m_callbacks.isEmpty()) {
             return;
         }
 
-        tmLog.debug("[LeaderAppointer] calculating partition leaders.");
+        tmLog.info("Recalculating partition leaders after node down is detected.");
         // iterate through all partitions to see if its current leaders are on the failed hosts.
         for (PartitionCallback cb : m_callbacks.values()) {
             SortedSet<Host> hosts = new TreeSet<Host>();
@@ -781,6 +783,9 @@ public class LeaderAppointer implements Promotable
                 //find the host which has the lowest leader count.
                 host.increasePartitionLeader();
                 cb.newLeaderHostId = host.id;
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(String.format("Move partition leader to host %d from %d for partition %d.", host.id, hostId, cb.m_partitionId));
+                }
                 break;
             }
         }
