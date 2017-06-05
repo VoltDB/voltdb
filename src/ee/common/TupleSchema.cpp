@@ -279,6 +279,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
 std::string TupleSchema::ColumnInfo::debug() const {
     std::ostringstream buffer;
     buffer << "type = " << getTypeName(getVoltType()) << ", "
+           << "inBytes = " << inBytes << ", "
            << "offset = " << offset << ", "
            << "length = " << length << ", "
            << "nullable = " << (allowNull ? "true" : "false") << ", "
