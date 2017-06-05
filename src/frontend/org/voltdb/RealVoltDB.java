@@ -1354,13 +1354,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 try {
                     Class<?> ndrgwClass = null;
                     ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, boolean.class, boolean.class, int.class, int.class);
+                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, boolean.class, boolean.class, boolean.class, int.class, int.class);
                     m_producerDRGateway =
                             (ProducerDRGateway) ndrgwConstructor.newInstance(
                                     new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
                                     (m_config.m_startAction.doesRecover() && (durable || determination.terminusNonce != null)),
                                     m_config.m_startAction.doesRejoin(),
+                                    m_config.m_startAction == StartAction.JOIN,
                                     m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,
                                     (m_catalogContext.getClusterSettings().hostcount()-m_config.m_missingHostCount));
