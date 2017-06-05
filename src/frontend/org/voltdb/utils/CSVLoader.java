@@ -24,6 +24,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.FileInputStream;
 import java.util.TimeZone;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -292,6 +293,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(shortOpt = "n", desc = "Custom null string, overrides all other Null pattern matching")
         String customNullString = "";
 
+        @Option(shortOpt = "c", desc = "character set , default system character set")
+        String characterSet = "";
+        
         @Option(desc = "Disables the quote character. All characters between delimiters, including quote characters, are included in the input.",
                 hasArg = false)
         boolean noquotechar = false;
@@ -418,9 +422,16 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                         config.skip, config.header);
                 listReader = new CsvListReader(tokenizer, csvPreference);
             } else {
-                tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
+				if (null==config.characterSet||config.characterSet.trim().equals("")){
+				tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
                         config.strictquotes, config.escape, config.columnsizelimit,
-                        config.skip, config.header);
+                       config.skip, config.header);
+				}
+				else{
+				tokenizer = new Tokenizer(new InputStreamReader(new FileInputStream(config.file),config.characterSet), csvPreference,
+                        config.strictquotes, config.escape, config.columnsizelimit,
+                        config.skip, config.header);  	
+				}
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
         } catch (FileNotFoundException e) {
