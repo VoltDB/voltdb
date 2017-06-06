@@ -1646,7 +1646,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column",
                             var.length(), var, 2)));
         }
 
@@ -1659,7 +1659,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column",
                             6, var, 2)));
         }
 
@@ -1671,7 +1671,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d BYTES) column.",
+                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d BYTES) column",
                             var.length(), var.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
         }
 
@@ -1716,7 +1716,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
-                        String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                        String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column",
                                 var.length(), var, 2)));
                 // var.length is 26;
             }
@@ -1739,7 +1739,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
-                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
+                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column",
                                 var.length(), var.substring(0, 100), 80)));
             }
         }
@@ -1771,9 +1771,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
                 assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
                                       var1.length()*2, var1+var1, 10)));
-            assertTrue(ex.getMessage().contains("for column 'VAR1'"));
         }
 
         try {
@@ -1791,9 +1790,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
                             var1.length(), var1, 10)));
-            assertTrue(ex.getMessage().contains("for column 'VAR1'"));
         }
 
         // Test non-inlined varchar with stored procedure and threshold
@@ -1806,7 +1804,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
+                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column",
                             174, var2.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
         }
 
@@ -1819,7 +1817,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column",
                             86, var2, 80)));
         }
 
@@ -1831,7 +1829,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column",
                             var1.length(), var1, 10)));
         }
 
@@ -1854,7 +1852,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column.",
+                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column",
                             bin1.length()/2, 10)));
         }
 
@@ -1868,7 +1866,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column.",
+                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column",
                             bin2.length() / 2, 80)));
         }
 
@@ -1880,7 +1878,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column.",
+                    String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column",
                             bin1.length()/2, 10)));
         }
 
