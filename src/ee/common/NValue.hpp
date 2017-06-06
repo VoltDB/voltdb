@@ -1695,13 +1695,13 @@ private:
                 std::ostringstream oss;
                 oss <<  "The size " << objLength << " of the value exceeds the size of ";
                 if (type == VALUE_TYPE_VARBINARY) {
-                    oss << "the VARBINARY(" << maxLength << ") column.";
+                    oss << "the VARBINARY(" << maxLength << ") column";
                     throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                        oss.str().c_str(),
                                        SQLException::TYPE_VAR_LENGTH_MISMATCH);
                 }
                 else {
-                    oss << "the GEOGRAPHY column (" << maxLength << " bytes).";
+                    oss << "the GEOGRAPHY column (" << maxLength << " bytes)";
                     throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                        oss.str().c_str());
                 }
@@ -1718,7 +1718,7 @@ private:
                     }
                     char msg[1024];
                     snprintf(msg, 1024,
-                            "The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
+                            "The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column",
                             objLength, inputValue.c_str(), maxLength);
                     throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                        msg, SQLException::TYPE_VAR_LENGTH_MISMATCH);
@@ -1735,7 +1735,7 @@ private:
                     inputValue = std::string(ptr, objLength);
                 }
                 snprintf(msg, 1024,
-                        "The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
+                        "The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column",
                         charLength, inputValue.c_str(), maxLength);
 
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
