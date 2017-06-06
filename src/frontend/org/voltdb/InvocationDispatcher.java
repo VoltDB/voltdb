@@ -285,6 +285,9 @@ public final class InvocationDispatcher {
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
 
+        String clientInfo = ccxn.getHostnameAndIPAndPort();  // Storing the client's ip information
+        user.m_hostIP = clientInfo;
+
         final String procName = task.getProcName();
         final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final StoredProcedureInvocation finalTask = task;
@@ -397,7 +400,7 @@ public final class InvocationDispatcher {
             else if ("@StopNode".equals(procName)) {
                 CoreUtils.PrintGoodLookingLog(hostLog,
                                               "User: " +
-                                              ccxn.getHostnameAndIPAndPort() +
+                                              clientInfo +
                                               " issued a " + procName,
                                               Level.WARN);
                 return dispatchStopNode(task);
@@ -443,7 +446,7 @@ public final class InvocationDispatcher {
             else if ("@SnapshotDelete".equals(procName)) {
                 CoreUtils.PrintGoodLookingLog(hostLog,
                                               "User: " +
-                                              ccxn.getHostnameAndIPAndPort() +
+                                              clientInfo +
                                               " issued a " + procName,
                                               Level.WARN);
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
@@ -451,7 +454,7 @@ public final class InvocationDispatcher {
             else if ("@SnapshotRestore".equals(procName)) {
                 CoreUtils.PrintGoodLookingLog(hostLog,
                                               "User: " +
-                                              ccxn.getHostnameAndIPAndPort() +
+                                              clientInfo +
                                               " issued a " + procName,
                                               Level.WARN);
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
@@ -482,7 +485,7 @@ public final class InvocationDispatcher {
                     // After we verify the system command from an admin user, the detailed information
                     // should be printed out properly. The following message is printed at the node where
                     // the client is connected to.
-                    String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a " + procName;
+                    String msg = "Admin: " + clientInfo + " issued a " + procName;
                     CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
                 }
             }
