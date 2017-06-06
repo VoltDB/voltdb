@@ -64,9 +64,14 @@ StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
 }
 
 StreamedTable *
-StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
+StreamedTable::createForTest(size_t wrapperBufSize,
+        ExecutorContext *ctx,
+        TupleSchema *schema,
+        const std::vector<std::string> &columnNames,
+        bool takeOwnership) {
     StreamedTable * st = new StreamedTable(true);
     st->m_wrapper->setDefaultCapacity(wrapperBufSize);
+    st->initializeWithColumns(schema, columnNames, takeOwnership);
     return st;
 }
 
