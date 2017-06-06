@@ -309,7 +309,6 @@ public class TestImportManager {
         checkImporterRestartCountEquals(2, excludedImporter);
     }
 
-    /* FIXME - this test fails because partitioning procedure doesn't restart importers any more
     @Test
     public void testPartitionImporterProcedure() throws Exception {
         System.out.println("Partitioning a procedure that importers rely on should result in a restart");
@@ -333,12 +332,11 @@ public class TestImportManager {
         CatalogContext partitionedCatalog = buildMockCatalogContext(m_voltDbRoot, schemaFile, NUM_IMPORTERS_FOR_TEST, ENABLE_COMMAND_LOG);
         m_manager.updateCatalog(partitionedCatalog);
         checkImportersAreRunning(m_defaultImporters);
-        checkImporterRestartCountEquals(1);
+        checkImporterRestartCountEquals(0);
 
         System.out.println("Un-partitioning a procedure that importers rely on should result in a restart");
         m_manager.updateCatalog(m_initialCatalogContext);
         checkImportersAreRunning(m_defaultImporters);
-        checkImporterRestartCountEquals(2);
+        checkImporterRestartCountEquals(0);
     }
-    */
 }
