@@ -398,13 +398,15 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
             else if ("@StopNode".equals(procName)) {
-                CoreUtils.PrintGoodLookingLog(hostLog,
-                                              "User: " +
-                                              user.m_name +
-                                              " from " +
-                                              clientInfo +
-                                              " issued a " + procName,
-                                              Level.WARN);
+                if (user.isAuthEnabled()) {
+                    CoreUtils.PrintGoodLookingLog(hostLog,
+                                                  "User: " +
+                                                  user.m_name +
+                                                  " from " +
+                                                  clientInfo +
+                                                  " issued a " + procName,
+                                                  Level.WARN);
+                }
                 return dispatchStopNode(task);
             }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
@@ -446,23 +448,27 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.SNAPSHOTSCAN, task, ccxn);
             }
             else if ("@SnapshotDelete".equals(procName)) {
-                CoreUtils.PrintGoodLookingLog(hostLog,
-                                              "User: " +
-                                              user.m_name +
-                                              " from " +
-                                              clientInfo +
-                                              " issued a " + procName,
-                                              Level.WARN);
+                if (user.isAuthEnabled()) {
+                    CoreUtils.PrintGoodLookingLog(hostLog,
+                                                  "User: " +
+                                                  user.m_name +
+                                                  " from " +
+                                                  clientInfo +
+                                                  " issued a " + procName,
+                                                  Level.WARN);
+                }
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
             }
             else if ("@SnapshotRestore".equals(procName)) {
-                CoreUtils.PrintGoodLookingLog(hostLog,
-                                              "User: " +
-                                              user.m_name +
-                                              " from " +
-                                              clientInfo +
-                                              " issued a " + procName,
-                                              Level.WARN);
+                if (user.isAuthEnabled()) {
+                    CoreUtils.PrintGoodLookingLog(hostLog,
+                                                  "User: " +
+                                                  user.m_name +
+                                                  " from " +
+                                                  clientInfo +
+                                                  " issued a " + procName,
+                                                  Level.WARN);
+                }
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
                 if (retval != null) {
                     return retval;
