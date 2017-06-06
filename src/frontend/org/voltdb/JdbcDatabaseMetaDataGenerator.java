@@ -570,7 +570,7 @@ public class JdbcDatabaseMetaDataGenerator
                 {
                     for (ColumnRef column : c.getIndex().getColumns())
                     {
-                            String columnName;
+                        String columnName;
 
                         // if the index name is "MATVIEW_PK_CONSTRAINT", the column name for the materialized view is obtained
                         // from its column information - ENG-6927
