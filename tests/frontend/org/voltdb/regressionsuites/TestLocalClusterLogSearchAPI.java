@@ -38,7 +38,7 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     static final int SITES_PER_HOST = 2;
     static final int HOSTS = 2;
-    static final int K = 1;
+    static final int K = 0;
     VoltProjectBuilder builder;
     LocalCluster cluster;
     String listener;
