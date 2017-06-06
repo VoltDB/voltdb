@@ -101,6 +101,53 @@ public class PlannerTestAideDeCamp {
         return compile(sql, paramCount, joinOrder, inferPartitioning, singlePartition, DeterminismMode.SAFER);
     }
 
+    public CompiledPlan compileMe(String sql, String joinOrder, boolean inferPartitioning, boolean forceSingle, DeterminismMode detMode)
+    {
+        String stmtLabel = "stmt-" + String.valueOf(compileCounter++);
+
+        Statement catalogStmt = proc.getStatements().add(stmtLabel);
+        catalogStmt.setSqltext(sql);
+        catalogStmt.setSinglepartition(forceSingle);
+
+        // determine the type of the query
+        QueryType qtype = QueryType.SELECT;
+        catalogStmt.setReadonly(true);
+        if (sql.toLowerCase().startsWith("insert")) {
+            qtype = QueryType.INSERT;
+            catalogStmt.setReadonly(false);
+        }
+        if (sql.toLowerCase().startsWith("update")) {
+            qtype = QueryType.UPDATE;
+            catalogStmt.setReadonly(false);
+        }
+        if (sql.toLowerCase().startsWith("delete")) {
+            qtype = QueryType.DELETE;
+            catalogStmt.setReadonly(false);
+        }
+        catalogStmt.setQuerytype(qtype.getValue());
+        // name will look like "basename-stmt-#"
+        String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
+
+        DatabaseEstimates estimates = new DatabaseEstimates();
+        TrivialCostModel costModel = new TrivialCostModel();
+        StatementPartitioning partitioning;
+        if (inferPartitioning) {
+            partitioning = StatementPartitioning.inferPartitioning();
+        } else if (forceSingle) {
+            partitioning = StatementPartitioning.forceSP();
+        } else {
+            partitioning = StatementPartitioning.forceMP();
+        }
+        String procName = catalogStmt.getParent().getTypeName();
+        Cluster catalogCluster = catalog.getClusters().get("cluster");
+        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, catalogCluster, db,
+                                                partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                                                costModel, null, joinOrder, detMode);
+
+        planner.parse();
+        return planner.plan();
+    }
+
     /**
      * Compile and cache the statement and plan and return the final plan graph.
      */

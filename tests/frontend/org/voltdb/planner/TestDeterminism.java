@@ -23,7 +23,12 @@
 
 package org.voltdb.planner;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.plannodes.AbstractPlanNode;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class TestDeterminism extends PlannerTestCase {
 
@@ -31,6 +36,38 @@ public class TestDeterminism extends PlannerTestCase {
     protected void setUp() throws Exception {
         final boolean planForSinglePartitionFalse = false;
         setupSchema(TestDeterminism.class.getResource("testplans-determinism-ddl.sql"), "testdeterminism", planForSinglePartitionFalse);
+    }
+
+    public void testPlannerConcurrencyIssue() throws InterruptedException
+    {
+        final String desired = "{\"ID\":2,\"PLAN_NODE_TYPE\":\"MATERIALIZE\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"SEQ_NO\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":32,\"IN_BYTES\":true,\"PARAM_IDX\":0}},{\"COLUMN_NAME\":\"PID\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":20,\"IN_BYTES\":true,\"PARAM_IDX\":1}},{\"COLUMN_NAME\":\"UID\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":12,\"IN_BYTES\":true,\"PARAM_IDX\":2}},{\"COLUMN_NAME\":\"CLT_NUM\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":10,\"IN_BYTES\":true,\"PARAM_IDX\":3}},{\"COLUMN_NAME\":\"DD_APDATE\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":11,\"PARAM_IDX\":4}},{\"COLUMN_NAME\":\"ACCT_NO\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":32,\"IN_BYTES\":true,\"PARAM_IDX\":5}},{\"COLUMN_NAME\":\"AUTH_TYPE\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1,\"IN_BYTES\":true,\"PARAM_IDX\":6}},{\"COLUMN_NAME\":\"DEV_TYPE\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1,\"IN_BYTES\":true,\"PARAM_IDX\":7}},{\"COLUMN_NAME\":\"TRX_CODE\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":10,\"IN_BYTES\":true,\"PARAM_IDX\":8}},{\"COLUMN_NAME\":\"AUTH_ID_TYPE\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1,\"IN_BYTES\":true,\"PARAM_IDX\":9}},{\"COLUMN_NAME\":\"AUTH_ID\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":32,\"IN_BYTES\":true,\"PARAM_IDX\":10}},{\"COLUMN_NAME\":\"PHY_ID_TYPE\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":2,\"IN_BYTES\":true,\"PARAM_IDX\":11}},{\"COLUMN_NAME\":\"PHY_ID\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":250,\"IN_BYTES\":true,\"PARAM_IDX\":12}},{\"COLUMN_NAME\":\"CLIENT_IP\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":32,\"IN_BYTES\":true,\"PARAM_IDX\":13}},{\"COLUMN_NAME\":\"ACCT_TYPE\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":1,\"IN_BYTES\":true,\"PARAM_IDX\":14}},{\"COLUMN_NAME\":\"ACCT_BBK\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":4,\"IN_BYTES\":true,\"PARAM_IDX\":15}},{\"COLUMN_NAME\":\"TRX_CURRENCY\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":2,\"IN_BYTES\":true,\"PARAM_IDX\":16}},{\"COLUMN_NAME\":\"TRX_AMOUNT\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":22,\"PARAM_IDX\":17}},{\"COLUMN_NAME\":\"MCH_BBK\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":4,\"IN_BYTES\":true,\"PARAM_IDX\":18}},{\"COLUMN_NAME\":\"MCH_NO\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":10,\"IN_BYTES\":true,\"PARAM_IDX\":19}},{\"COLUMN_NAME\":\"BLL_NO\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":10,\"IN_BYTES\":true,\"PARAM_IDX\":20}},{\"COLUMN_NAME\":\"BLL_DATE\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":8,\"IN_BYTES\":true,\"PARAM_IDX\":21}},{\"COLUMN_NAME\":\"EXT_DATA\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":20,\"IN_BYTES\":true,\"PARAM_IDX\":22}},{\"COLUMN_NAME\":\"LBS_DISTANCE\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":22,\"PARAM_IDX\":23}},{\"COLUMN_NAME\":\"SAFE_DISTANCE_FLAG\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":2,\"IN_BYTES\":true,\"PARAM_IDX\":24}},{\"COLUMN_NAME\":\"LBS\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":64,\"IN_BYTES\":true,\"PARAM_IDX\":25}},{\"COLUMN_NAME\":\"LBS_CITY\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":6,\"IN_BYTES\":true,\"PARAM_IDX\":26}},{\"COLUMN_NAME\":\"LBS_COUNTRY\",\"EXPRESSION\":{\"TYPE\":31,\"VALUE_TYPE\":9,\"VALUE_SIZE\":3,\"IN_BYTES\":true,\"PARAM_IDX\":27}}],\"BATCHED\":false}";
+
+        final String sql = "INSERT INTO T_PAYMENT50 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+
+        final int totalThreads = 300;
+        final Runnable runnable = () -> {
+            System.err.println("Started");
+            while (true) {
+                final CompiledPlan plan = getmeaplan(sql);
+                assertEquals(plan.rootPlanGraph.getChild(0).toJSONString(), desired, plan.rootPlanGraph.getChild(0).toJSONString());
+            }
+        };
+
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 0; i < totalThreads; i++) {
+            final Thread t = new Thread(runnable);
+            t.start();
+            threads.add(t);
+        }
+
+        for (Thread t : threads) {
+            t.join();
+        }
+    }
+
+    private synchronized CompiledPlan getmeaplan(String sql)
+    {
+        return m_aide.compileMe(sql, null, true, false, DeterminismMode.FASTER);
     }
 
     private final static boolean m_staticRetryForDebugOnFailure = /**/ false; //*/ = true;//to debug
