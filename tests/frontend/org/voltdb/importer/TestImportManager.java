@@ -26,9 +26,7 @@ package org.voltdb.importer;
 import static org.junit.Assert.*;
 
 import com.google_voltpatches.common.io.Files;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.catalog.Catalog;
@@ -52,23 +50,25 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Tests importer state change logic.
+ * Tests importer restart behavior with respect to UpdateApplicationCatalog.
  */
 public class TestImportManager {
 
     private static final int HOSTID = 0;
     private static final int SITEID = 0;
 
+    private CatalogContext m_initialCatalogContext = null;
+    private File m_defaultSchemaFile = null;
+    private Set<URI> m_defaultImporters = null;
     private File m_voltDbRoot = null;
     private ImportManager m_manager = null;
     private MockChannelDistributer m_mockChannelDistributer = null;
     private ImporterStatsCollector m_statsCollector = null;
-    private CatalogContext m_initialCatalogContext = null;
 
     private static final int RESTART_CHECK_MAX_MS              = (int) TimeUnit.SECONDS.toMillis(5);
     private static final int RESTART_CHECK_POLLING_INTERVAL_MS = 500;
 
-    private static final boolean DEFAULT_CATALOG_ENABLES_COMMAND_LOG = false; // this is used to generate non-importer-related config changes
+    private static final boolean ENABLE_COMMAND_LOG = false; // this is used to generate non-importer-related config changes
     private static String m_previousBundlePath;
 
     private static final int NUM_IMPORTERS_FOR_TEST = 2;
@@ -88,10 +88,10 @@ public class TestImportManager {
      * @return Catalog context
      * @throws Exception upon error or test failure
      */
-    private static CatalogContext buildMockCatalogContext(File voltdbroot, int numImporters, boolean enableCommandLogs) throws Exception {
+    private static CatalogContext buildMockCatalogContext(File voltdbroot, File schemaFile, int numImporters, boolean enableCommandLogs) throws Exception {
 
-        File schemaFile = VoltProjectBuilder.createFileForSchema(SCHEMA);
         Catalog catalog = new VoltCompiler(false, false).compileCatalogFromDDL(schemaFile.getAbsolutePath());
+        assertNotNull("Catalog could not be compiled", catalog);
         HostMessenger dummyHostMessenger = new HostMessenger(new HostMessenger.Config(), null);
         DbSettings dbSettings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
 
@@ -126,53 +126,6 @@ public class TestImportManager {
                 0,
                 dummyHostMessenger);
         return context;
-    }
-
-    /** Before test setup code.
-     * NOTE: ImportManager is a singleton.
-     * @throws Exception upon error or test failure.
-     */
-    @Before
-    public void setUp() throws Exception {
-        m_previousBundlePath = System.getProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
-        m_voltDbRoot = Files.createTempDir();
-        ModuleManager.initializeCacheRoot(m_voltDbRoot);
-
-        String locationOfCatalogUtil = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-        int indexOfObj = locationOfCatalogUtil.indexOf("obj");
-        if (indexOfObj != -1) {
-            // for junits run from ant, VoltDB's default bundles directory is incorrect.
-            String pathToBundles = locationOfCatalogUtil.substring(0, indexOfObj) + File.separator + "bundles";
-            System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, pathToBundles);
-        }
-
-        CatalogContext catalogContextWith3Kafka = buildMockCatalogContext(m_voltDbRoot, NUM_IMPORTERS_FOR_TEST, false);
-        m_mockChannelDistributer = new MockChannelDistributer(Integer.toString(HOSTID));
-        m_statsCollector = new ImporterStatsCollector(SITEID);
-        ImportManager.initializeWithMocks(m_voltDbRoot, HOSTID, catalogContextWith3Kafka, m_mockChannelDistributer, m_statsCollector);
-        m_initialCatalogContext = catalogContextWith3Kafka;
-        m_manager = ImportManager.instance();
-        JUnitImporterMessenger.initialize(); // if initial config doesn't have importers which are enabled, this is required for checkForImporterRestart().
-    }
-
-    @After
-    public void tearDown() throws Throwable {
-        try {
-            Throwable detectedException = JUnitImporterMessenger.instance().checkForAndClearExceptions();
-            if (detectedException != null) {
-                throw detectedException;
-            }
-            m_manager = null;
-            m_initialCatalogContext = null;
-            m_voltDbRoot.delete();
-        } finally {
-            ModuleManager.resetCacheRoot();
-            if (m_previousBundlePath == null) {
-                System.clearProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
-            } else {
-                System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, m_previousBundlePath);
-            }
-        }
     }
 
     private Set<URI> generateExpectedImporters(int numImportersExpected) {
@@ -211,21 +164,181 @@ public class TestImportManager {
         throw new AssertionError("Expected importers to stop but found running importers " + runningImporters.toString());
     }
 
+    private void checkImporterRestartCountEquals(int expectedRestarts) throws Exception {
+        Map<URI, Integer> actualRestarts = JUnitImporterMessenger.instance().countRestarts();
+        for (Map.Entry<URI, Integer> importer : actualRestarts.entrySet()) {
+            assertEquals(importer.getKey() + " has restarted an unexpected number of times", expectedRestarts, importer.getValue().intValue());
+        }
+    }
+
+    private void checkImporterRestartCountEquals(int expectedRestarts, URI excludedImporter) throws Exception {
+        Map<URI, Integer> actualRestarts = JUnitImporterMessenger.instance().countRestarts();
+        for (Map.Entry<URI, Integer> importer : actualRestarts.entrySet()) {
+            if (!importer.getKey().equals(excludedImporter)) {
+                assertEquals(importer.getKey() + " has restarted an unexpected number of times", expectedRestarts, importer.getValue().intValue());
+            }
+        }
+    }
+
+    /* ---- Test setup and tear down ---- */
+
+    @BeforeClass
+    public static void setUp() throws Exception {
+        // Importers default to using a CSV formatter. Ensure it can be found.
+        m_previousBundlePath = System.getProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
+        String locationOfCatalogUtil = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+        int indexOfObj = locationOfCatalogUtil.indexOf("obj");
+        if (indexOfObj != -1) {
+            // for junits run from ant, VoltDB's default bundles directory is incorrect.
+            String pathToBundles = locationOfCatalogUtil.substring(0, indexOfObj) + File.separator + "bundles";
+            System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, pathToBundles);
+        }
+    }
+
+    @Before
+    public void beginTest() throws Exception {
+        m_voltDbRoot = Files.createTempDir();
+        ModuleManager.initializeCacheRoot(m_voltDbRoot);
+
+        m_defaultSchemaFile = VoltProjectBuilder.createFileForSchema(SCHEMA);
+        m_initialCatalogContext = buildMockCatalogContext(m_voltDbRoot, m_defaultSchemaFile, NUM_IMPORTERS_FOR_TEST, ENABLE_COMMAND_LOG);
+        m_defaultImporters = generateExpectedImporters(NUM_IMPORTERS_FOR_TEST);
+
+        m_statsCollector = new ImporterStatsCollector(SITEID);
+        m_mockChannelDistributer = new MockChannelDistributer(Integer.toString(HOSTID));
+        ImportManager.initializeWithMocks(m_voltDbRoot, HOSTID, m_initialCatalogContext, m_mockChannelDistributer, m_statsCollector);
+        m_manager = ImportManager.instance();
+        JUnitImporterMessenger.initialize();
+
+        checkImportersAreRunning(m_defaultImporters);
+        checkImporterRestartCountEquals(0);
+    }
+
+    @After
+    public void endTest() throws Throwable {
+        try {
+            m_manager.close();
+            m_defaultSchemaFile.delete();
+            m_voltDbRoot.delete();
+            Throwable detectedException = JUnitImporterMessenger.instance().checkForAndClearExceptions();
+            if (detectedException != null) {
+                throw detectedException;
+            }
+        } finally {
+            JUnitImporterMessenger.deinitialize();
+            ModuleManager.resetCacheRoot();
+        }
+    }
+
+    @AfterClass
+    public static void tearDown() throws Exception {
+        if (m_previousBundlePath == null) {
+            System.clearProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
+        } else {
+            System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, m_previousBundlePath);
+        }
+    }
+
     /* ---- Tests ---- */
 
-    /** Verify that removing and restoring importers in the deployment file results in the importers restarting.
-     * @throws Exception on failure
-     */
     @Test
-    public void testImporterRestartDeploymentChanges() throws Exception {
-        Set<URI> expectedImporters = generateExpectedImporters(NUM_IMPORTERS_FOR_TEST);
-        checkImportersAreRunning(expectedImporters);
-
-        CatalogContext catalogContextWithoutKafka = buildMockCatalogContext(m_voltDbRoot, 0, DEFAULT_CATALOG_ENABLES_COMMAND_LOG);
+    public void testImporterDeploymentChanges() throws Exception {
+        System.out.println("Removing and re-adding importers should cause them to restart");
+        CatalogContext catalogContextWithoutKafka = buildMockCatalogContext(m_voltDbRoot, m_defaultSchemaFile, 0, ENABLE_COMMAND_LOG);
         m_manager.updateCatalog(catalogContextWithoutKafka);
         checkImportersAreOff();
-
         m_manager.updateCatalog(m_initialCatalogContext);
-        checkImportersAreRunning(expectedImporters);
+        checkImportersAreRunning(m_defaultImporters);
+        checkImporterRestartCountEquals(1);
     }
+
+    @Test
+    public void testUnrelatedDeploymentChanges() throws Exception {
+        System.out.println("Unrelated change to deployment should not cause importers to restart");
+        CatalogContext catalogContextWithUnrelatedChange = buildMockCatalogContext(m_voltDbRoot, m_defaultSchemaFile, NUM_IMPORTERS_FOR_TEST, !ENABLE_COMMAND_LOG);
+        m_manager.updateCatalog(catalogContextWithUnrelatedChange);
+        checkImportersAreRunning(m_defaultImporters);
+        checkImporterRestartCountEquals(0);
+    }
+
+    @Test
+    public void testUnrelatedProcedureChanges() throws Exception {
+        System.out.println("Adding unrelated procedures and tables should not result in a restart");
+        String schemaWithExtraTable = SCHEMA;
+        schemaWithExtraTable += "CREATE TABLE dummy (key VARCHAR(30) PRIMARY KEY, value VARBINARY(64) NOT NULL, stamp TIMESTAMP NOT NULL);\n";
+        schemaWithExtraTable += "CREATE PROCEDURE AppendTo AS UPSERT INTO dummy VALUES(?, ?, CURRENT_TIMESTAMP());\n";
+        File schemaFile = VoltProjectBuilder.createFileForSchema(schemaWithExtraTable);
+        CatalogContext catalogWithExtraTableAndProcs = buildMockCatalogContext(m_voltDbRoot, schemaFile, NUM_IMPORTERS_FOR_TEST, ENABLE_COMMAND_LOG);
+        m_manager.updateCatalog(catalogWithExtraTableAndProcs);
+        checkImportersAreRunning(m_defaultImporters);
+        checkImporterRestartCountEquals(0);
+
+        System.out.println("Removing unrelated procedures and tables should not result in a restart");
+        m_manager.updateCatalog(m_initialCatalogContext);
+        checkImportersAreRunning(m_defaultImporters);
+        checkImporterRestartCountEquals(0);
+    }
+
+    @Test
+    public void testAddRemoveImporterProcedure() throws Exception {
+        System.out.println("Removing and adding procedures that the importers rely on should result in a restart");
+
+        // default schema includes all procedures importers expect, so remove one
+        String[] schemaLines = SCHEMA.split("\n");
+        StringBuilder builder = new StringBuilder();
+        for (String line : schemaLines) {
+            if (!line.contains("procedure1")) {
+                builder.append(line);
+            }
+        }
+        File schemaFile = VoltProjectBuilder.createFileForSchema(builder.toString());
+        CatalogContext catalogMissingProc1 = buildMockCatalogContext(m_voltDbRoot, schemaFile, NUM_IMPORTERS_FOR_TEST, ENABLE_COMMAND_LOG);
+        m_manager.updateCatalog(catalogMissingProc1);
+
+        Set<URI> importersWithoutProc1 = new HashSet<>(m_defaultImporters);
+        URI excludedImporter = JUnitImporterConfig.generateURIForImporter(generateImporterID(1));
+        final boolean removed = importersWithoutProc1.remove(excludedImporter);
+        assertTrue("Bug in test - unable to remove importer with procedure1 from set", removed);
+        checkImportersAreRunning(importersWithoutProc1);
+        // The importer with procedure 1 will restart one fewer times than everyone else, so don't check it.
+        checkImporterRestartCountEquals(1, excludedImporter);
+
+        System.out.println("Restoring missing procedure should result in a restart");
+        m_manager.updateCatalog(m_initialCatalogContext);
+        checkImportersAreRunning(m_defaultImporters);
+        checkImporterRestartCountEquals(2, excludedImporter);
+    }
+
+    /* FIXME - this test fails because partitioning procedure doesn't restart importers any more
+    @Test
+    public void testPartitionImporterProcedure() throws Exception {
+        System.out.println("Partitioning a procedure that importers rely on should result in a restart");
+        String[] schemaLines = SCHEMA.split("\n");
+        StringBuilder builder = new StringBuilder();
+        for (String line : schemaLines) {
+            if (line.contains("CREATE TABLE test")) {
+                builder.append(line);
+                builder.append("PARTITION TABLE test ON COLUMN foo;\n");
+            } else if (line.contains("procedure1")) {
+                String[] proc1parts = line.split("AS", 2);
+                assertEquals(2, proc1parts.length);
+                builder.append(proc1parts[0]);
+                builder.append("PARTITION ON TABLE test COLUMN foo AS");
+                builder.append(proc1parts[1]);
+            } else {
+                builder.append(line);
+            }
+        }
+        File schemaFile = VoltProjectBuilder.createFileForSchema(builder.toString());
+        CatalogContext partitionedCatalog = buildMockCatalogContext(m_voltDbRoot, schemaFile, NUM_IMPORTERS_FOR_TEST, ENABLE_COMMAND_LOG);
+        m_manager.updateCatalog(partitionedCatalog);
+        checkImportersAreRunning(m_defaultImporters);
+        checkImporterRestartCountEquals(1);
+
+        System.out.println("Un-partitioning a procedure that importers rely on should result in a restart");
+        m_manager.updateCatalog(m_initialCatalogContext);
+        checkImportersAreRunning(m_defaultImporters);
+        checkImporterRestartCountEquals(2);
+    }
+    */
 }

@@ -67,6 +67,10 @@ public class JUnitImporterMessenger {
         return m_self;
     }
 
+    public static void deinitialize() {
+        m_self = null;
+    }
+
     public static JUnitImporterMessenger instance() {
         Preconditions.checkState(m_self != null, "JUnitImporterMessenger is not initialized");
         return m_self;
@@ -90,7 +94,7 @@ public class JUnitImporterMessenger {
         importers.clear();
         for (Map.Entry<URI, List<JUnitImporter.Event>> entry : m_eventTracker.entrySet()) {
             boolean includeImporter;
-            switch (JUnitImporter.computeStateFromEvents(entry.getValue())) {
+            switch (JUnitImporter.computeCurrentState(entry.getValue())) {
                 case RUNNING:
                     includeImporter = true;
                     break;
@@ -109,6 +113,16 @@ public class JUnitImporterMessenger {
             }
         }
         return importers;
+    }
+
+    public Map<URI,Integer> countRestarts() {
+        Map<URI, Integer> restartMap = new HashMap<>();
+        synchronized (this) {
+            for (Map.Entry<URI, List<JUnitImporter.Event>> entry : m_eventTracker.entrySet()) {
+                restartMap.put(entry.getKey(), JUnitImporter.computeRestartCount(entry.getValue()));
+            }
+        }
+        return restartMap;
     }
 
     /* ---- EventBus notification subscribers ---- */

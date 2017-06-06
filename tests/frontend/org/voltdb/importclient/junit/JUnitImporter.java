@@ -55,14 +55,7 @@ public class JUnitImporter extends AbstractImporter {
         STOPPED
     }
 
-    public static State computeStateFromEvents(List<Event> eventList) {
-        if (eventList.size() == 0) {
-            return State.UNKNOWN; // assume test cleared the event list - this should not be an importer whose constructor isn't done!
-        }
-
-        Event mostRecentEvent = eventList.get(eventList.size() - 1);
-        Event secondMostRecentEvent = eventList.size() > 1 ? eventList.get(eventList.size() - 2) : null;
-
+    private static State computeState(Event mostRecentEvent, Event secondMostRecentEvent) {
         switch (mostRecentEvent) {
             case CONSTRUCTED:
                 return State.STARTING;
@@ -92,6 +85,30 @@ public class JUnitImporter extends AbstractImporter {
         throw new RuntimeException("We cannot get here but the compiler requires a return statement");
     }
 
+    public static State computeCurrentState(List<Event> eventList) {
+        if (eventList.size() == 0) {
+            return State.UNKNOWN; // assume test cleared the event list - this should not be an importer whose constructor isn't done!
+        }
+
+        Event mostRecentEvent = eventList.get(eventList.size() - 1);
+        Event secondMostRecentEvent = eventList.size() > 1 ? eventList.get(eventList.size() - 2) : null;
+        return computeState(mostRecentEvent, secondMostRecentEvent);
+    }
+
+    public static Integer computeRestartCount(List<Event> eventList) {
+        int numRestarts = -1; // starting for the first time does not count as a restart
+        Event previousEvent = null;
+        for (Event currentEvent : eventList) {
+            State stateWithinList = computeState(currentEvent, previousEvent);
+            Preconditions.checkState(!stateWithinList.equals(State.UNKNOWN),
+                    "Importer transitioned from " + previousEvent + " to " + currentEvent + " putting it in an unknown state");
+            if (stateWithinList.equals(State.RUNNING)){
+                numRestarts++;
+            }
+            previousEvent = currentEvent;
+        }
+        return numRestarts;
+    }
 
     private JUnitImporterMessenger getMessenger() {
         JUnitImporterMessenger messenger = JUnitImporterMessenger.instance();
