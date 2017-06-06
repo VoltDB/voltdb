@@ -63,8 +63,10 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
                 LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
                 new String[] { user.m_name, invocation.getProcName() },
                 null);
+        // ============================= ENG-12592 ================================
         // The non-authenticated information is logged on the host to indicate that
         // a user has tried to run a system procedure without proper authentication
+        // (e.g. Pause, Resume, StopNode, Shutdown, Quiesce, SnapshotDelete, etc.)
         CoreUtils.PrintGoodLookingLog(new VoltLogger("HOST"),
                                       "User " + user.m_name +
                                       " from " + user.m_hostIP +
