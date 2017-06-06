@@ -400,6 +400,8 @@ public final class InvocationDispatcher {
             else if ("@StopNode".equals(procName)) {
                 CoreUtils.PrintGoodLookingLog(hostLog,
                                               "User: " +
+                                              user.m_name +
+                                              " from " +
                                               clientInfo +
                                               " issued a " + procName,
                                               Level.WARN);
@@ -446,6 +448,8 @@ public final class InvocationDispatcher {
             else if ("@SnapshotDelete".equals(procName)) {
                 CoreUtils.PrintGoodLookingLog(hostLog,
                                               "User: " +
+                                              user.m_name +
+                                              " from " +
                                               clientInfo +
                                               " issued a " + procName,
                                               Level.WARN);
@@ -454,6 +458,8 @@ public final class InvocationDispatcher {
             else if ("@SnapshotRestore".equals(procName)) {
                 CoreUtils.PrintGoodLookingLog(hostLog,
                                               "User: " +
+                                              user.m_name +
+                                              " from " +
                                               clientInfo +
                                               " issued a " + procName,
                                               Level.WARN);
@@ -485,7 +491,7 @@ public final class InvocationDispatcher {
                     // After we verify the system command from an admin user, the detailed information
                     // should be printed out properly. The following message is printed at the node where
                     // the client is connected to.
-                    String msg = "Admin: " + clientInfo + " issued a " + procName;
+                    String msg = "Admin: " + user.m_name + " from " + clientInfo + " issued a " + procName;
                     CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
                 }
             }
