@@ -68,10 +68,12 @@ package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Vector;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -468,16 +470,18 @@ public class Expression {
 
     @Override
     public int hashCode() {
+        int val = Integer.hashCode(opType) + Integer.hashCode(exprSubType) + Objects.hashCode(dataType);
+        switch (opType) {
 
-        int val = opType + exprSubType;
+            case OpTypes.SIMPLE_COLUMN :
+                return val + Integer.hashCode(columnIndex);
 
-        for (int i = 0; i < nodes.length; i++) {
-            if (nodes[i] != null) {
-                val += nodes[i].hashCode();
-            }
+            case OpTypes.VALUE:
+                return val + Objects.hashCode(valueData);
+
+            default:
+                return val + Arrays.hashCode(nodes) + Objects.hashCode(subQuery);
         }
-
-        return val;
     }
 
     static boolean equals(Object o1, Object o2) {
@@ -1938,7 +1942,7 @@ public class Expression {
         // If object is a leaf node, then we'll use John's original code...
         //
         if (getType() == OpTypes.VALUE || getType() == OpTypes.COLUMN) {
-            hashCode = super.hashCode();
+            hashCode = hashCode();
         //
         // Otherwise we need to generate and Id based on what our children are
         //
@@ -1963,7 +1967,7 @@ public class Expression {
                 hashCode = this.cached_id.intern().hashCode();
             }
             else
-                hashCode = super.hashCode();
+                hashCode = hashCode();
         }
 
         long id = session.getNodeIdForExpression(hashCode);

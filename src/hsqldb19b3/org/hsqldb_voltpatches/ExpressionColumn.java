@@ -31,6 +31,9 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
@@ -811,6 +814,30 @@ public class ExpressionColumn extends Expression {
         return false;
     }
 
+    @Override
+    public int hashCode() {
+        int val = Integer.hashCode(opType);
+        switch (opType) {
+        case OpTypes.SIMPLE_COLUMN :
+            return val + Integer.hashCode(columnIndex) ;
+
+        case OpTypes.COALESCE :
+            return val + Arrays.hashCode(nodes);
+
+        case OpTypes.COLUMN :
+            return super.hashCode() + val + Objects.hashCode(column);
+
+        // A VoltDB extension
+        case OpTypes.ASTERISK :
+            return val;
+        // End of VoltDB extension
+
+        default :
+            return super.hashCode();
+    }
+    }
+
+    @Override
     public boolean equals(Expression other) {
 
         if (other == this) {
@@ -834,6 +861,9 @@ public class ExpressionColumn extends Expression {
                 return nodes == other.nodes;
 
             case OpTypes.COLUMN :
+                if (!super.equals(other)) {
+                    return false;
+                }
                 return column == other.getColumn();
 
             // A VoltDB extension

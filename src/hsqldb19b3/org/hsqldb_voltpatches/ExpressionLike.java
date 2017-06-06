@@ -424,4 +424,23 @@ public final class ExpressionLike extends ExpressionLogical {
 
         return sb.toString();
     }
+
+    @Override
+    public boolean equals(Object other) {
+        if (!super.equals(other)) {
+            return false;
+        }
+
+        if (other instanceof ExpressionLike) {
+            if (noOptimisation == ((ExpressionLike)other).noOptimisation) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode() + Boolean.hashCode(noOptimisation);
+    }
 }
