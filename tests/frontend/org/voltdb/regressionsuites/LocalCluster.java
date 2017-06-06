@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import org.voltcore.logging.VoltLogger;
@@ -110,6 +111,29 @@ public class LocalCluster extends VoltServerConfig {
     private boolean m_expectedToCrash = false;
     private boolean m_expectedToInitialize = true;
     int m_replicationPort = -1;
+
+    /**
+     * There are 2 types of utilities provided for searching regex in logs
+     *
+     * 1. SLOW, HEAVY yet more flexible: Storing the logs in in-memory buffers,
+     * all logs will also be appended to the buffer while being written to on-disk
+     * log files.
+     *
+     * 2. Fast & light-weight: All the regex will be pre-compiled and the patterns
+     * will be searched on the fly for each line of the logs
+     *
+     * IMPORTANT: The log search utility only searches for any patterns that have
+     * already appeared in the logs. After shutdown the in-memory logs and info
+     * are cleared.
+     *
+     * WARNING: The log search utility searches for logs that are written to disks.
+     * The LocalServer's logs are not included. m_hasLocalServer should be
+     * disabled when using this utility.
+     */
+
+    /*
+     * Storing logs in buffers
+     */
     // Storing the paths of both the init and host logs for each host, the 1st string is
     // the init log path, the 2nd is the host log path. The full file paths are stored to
     // ease future maintenance.
@@ -121,6 +145,19 @@ public class LocalCluster extends VoltServerConfig {
     // Determine whether the log regex search utility is enabled, since it may impact performance
     // for large test cases. It is not enabled by default
     private boolean m_enableLogSearch = false;
+
+    /*
+     * Patterns are searched on the fly
+     */
+    // Set to indicate whether searching for a list of pre-compiled regexes is enabled
+    private boolean m_enablePreCompileRegex = false;
+    // The regexes are used to search within each generated line of logs on the fly
+    private List<Pattern> m_regexes = null; // read-only after setup
+    // The array to store the results of matches (2-dimensional since for each host we may have
+    // multiple patterns to search for)
+    // The boolean results are stored in the same order as the provided regexes list for each
+    // host
+    private AtomicBoolean[][] m_regexResults = null;
 
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
@@ -230,6 +267,33 @@ public class LocalCluster extends VoltServerConfig {
         if (m_enableLogSearch) {
             m_logs = new HashMap<>();
             m_initLogFilePath = new HashMap<>();
+        }
+    }
+
+    /*
+     * Enable pre-compiled regex for log search
+     */
+    public LocalCluster(String jarFileName,
+                        boolean hasLocalServer,
+                        List<String> regexes,
+                        int siteCount,
+                        int hostCount,
+                        int kfactor,
+                        BackendTarget target)
+    {
+        this(jarFileName, siteCount, hostCount, kfactor, target, null);
+        m_hasLocalServer = hasLocalServer;
+        m_enablePreCompileRegex = true;
+        m_regexResults = new AtomicBoolean[hostCount][regexes.size()];
+        for (int i = 0; i < hostCount; i++) {
+            for (int j = 0; j < regexes.size(); j++) {
+                m_regexResults[i][j] = new AtomicBoolean(false);
+            }
+        }
+        m_regexes = new ArrayList<>();
+        for (String s : regexes) {
+            Pattern p = Pattern.compile(s);
+            m_regexes.add(p);
         }
     }
 
@@ -877,6 +941,9 @@ public class LocalCluster extends VoltServerConfig {
             m_logs.clear();
             m_initLogFilePath.clear();
         }
+        if (m_enablePreCompileRegex) {
+            resetRegexResults();
+        }
         int oopStartIndex = 0;
 
         // create the in-process server instance.
@@ -1088,7 +1155,10 @@ public class LocalCluster extends VoltServerConfig {
                     proc.getInputStream(),
                     String.valueOf(hostId),
                     false,
-                    proc);
+                    proc,
+                    null,
+                    m_regexes,
+                    m_regexResults);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
             proc.waitFor(); // Wait for the server initialization to finish ?
@@ -1279,14 +1349,19 @@ public class LocalCluster extends VoltServerConfig {
                         PipeToFile.m_initToken,
                         false,
                         proc,
-                        sBuffer);
+                        sBuffer,
+                        m_regexes,
+                        m_regexResults);
             } else {
                 ptf = new PipeToFile(
                         fileName,
                         proc.getInputStream(),
                         PipeToFile.m_initToken,
                         false,
-                        proc);
+                        proc,
+                        null,
+                        m_regexes,
+                        m_regexResults);
             }
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
@@ -1572,13 +1647,13 @@ public class LocalCluster extends VoltServerConfig {
                         filePath,
                         proc.getInputStream(),
                         PipeToFile.m_initToken,
-                        true, proc, sBuffer);
+                        true, proc, sBuffer, m_regexes, m_regexResults);
             } else {
                 ptf = new PipeToFile(
                         filePath,
                         proc.getInputStream(),
                         PipeToFile.m_initToken,
-                        true, proc);
+                        true, proc, null, m_regexes, m_regexResults);
             }
 
             synchronized (this) {
@@ -1662,6 +1737,14 @@ public class LocalCluster extends VoltServerConfig {
         }
         shutDownExternal();
 
+        if (m_enableLogSearch) {
+            m_logs.clear();
+            m_initLogFilePath.clear();
+        }
+        if (m_enablePreCompileRegex) {
+            resetRegexResults();
+        }
+
         VoltServerConfig.removeInstance(this);
     }
 
@@ -1707,6 +1790,11 @@ public class LocalCluster extends VoltServerConfig {
                     // Free the memory right away
                     ptf.m_log = null;
                     buffer.delete(0, buffer.length());
+                }
+            }
+            if (m_enablePreCompileRegex) {
+                for (AtomicBoolean bool : m_regexResults[hostNum]) {
+                    bool.set(false);
                 }
             }
         }
@@ -2364,6 +2452,39 @@ public class LocalCluster extends VoltServerConfig {
 
     // Return the set of host IDs
     public Set<Integer> getHostIds() {
+        assert(m_enableLogSearch);
         return m_logs.keySet();
+    }
+
+    // Reset all the regex results to false
+    public void resetRegexResults() {
+        for (int i = 0; i < m_regexResults.length; i++) {
+            for (int j = 0; j < m_regexes.size(); j++) {
+                m_regexResults[i][j].set(false);
+            }
+        }
+    }
+
+    /*
+     * Helper functions when pre-compiled regex search is enabled
+     */
+
+    // Reset the host's regex search result
+    public void resetHostRegexResult(int hostNum, int regexId) {
+        assert(m_enablePreCompileRegex);
+        m_regexResults[hostNum][regexId].set(false);
+    }
+
+    public boolean logContains(int hostNum, int regexId) {
+        assert(m_enablePreCompileRegex);
+        return m_regexResults[hostNum][regexId].get();
+    }
+
+    public boolean allLogsContain(int regexId) {
+        assert(m_enablePreCompileRegex);
+        for (int i = 0; i < m_regexResults.length; i++) {
+            if (!m_regexResults[i][regexId].get()) { return false; }
+        }
+        return true;
     }
 }

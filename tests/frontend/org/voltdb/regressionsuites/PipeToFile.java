@@ -28,7 +28,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 /* class pipes a process's output to a file name.
  * Also watches for "Server completed initialization"
@@ -42,6 +44,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
         BufferedReader m_input;
         String m_filename;
         StringBuffer m_log = null;
+        AtomicBoolean[][] m_regexResults = null;
+        List<Pattern> m_regexes = null;
 
         // set m_witnessReady when the m_token byte sequence is seen.
         AtomicBoolean m_witnessedReady;
@@ -72,10 +76,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
         }
 
         PipeToFile(String filename, InputStream stream, String token,
-                boolean appendLog, Process proc, StringBuffer log) {
-            this(filename, stream, token, appendLog, proc);
-            m_log = log;
-        }
+                   boolean appendLog, Process proc, StringBuffer log, List<Pattern> patterns,
+                   AtomicBoolean[][] results) {
+         this(filename, stream, token, appendLog, proc);
+         m_log = log;
+         m_regexResults = results;
+         m_regexes = patterns;
+     }
 
         /**
          * Allow callers to get the process object to double check for death
@@ -147,6 +154,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
                     // Write to StringBuffer as well for easy search of strings
                     StringBuffer buffer = m_log;  // avoid race when m_log is set to null upon shutdown
                     if (buffer != null) { buffer.append(data + "\n"); }
+
+                    // Check for patterns on the fly
+                    if (m_regexResults != null) {
+                        for (int i = 0; i < m_regexes.size(); i++) {
+//                            System.err.println("=========== host id : " + m_hostId);
+//                            System.err.println("=========== m_regexes size: " + m_regexes.size());
+//                            System.err.println("=========== m_regexResults: " + m_regexResults.length + " " + m_regexResults[0].length);
+                            // if the pattern still has not appeared in the current host log
+                            if (m_hostId != Integer.MAX_VALUE && !m_regexResults[m_hostId][i].get()) {
+                                boolean r = m_regexes.get(i).matcher(data).find();
+                                m_regexResults[m_hostId][i].set(r);
+                            }
+                        }
+                    }
                 }
                 catch (IOException ex) {
                     m_eof.set(true);
