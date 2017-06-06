@@ -56,9 +56,12 @@ public:
         extendBufferChain(0);
     }
 
-    inline size_t getTextStringSerializedSize(const std::string &value) {
+    inline size_t getTextStringSerializedSize(const std::string &value) const {
         return value.length() + sizeof(int32_t);
     }
+
+    // compute # of bytes needed to serialize the meta data column names
+    inline size_t getMDColumnNamesSerializedSize() const { return m_mdColumnNamesSerializedSize; }
 
     int64_t allocatedByteCount() const {
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
@@ -69,26 +72,41 @@ public:
 
     /** write a tuple to the stream */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
-                       int64_t spHandle,
-                       int64_t seqNo,
-                       int64_t uniqueId,
-                       int64_t timestamp,
-                       TableTuple &tuple,
-                       std::vector<std::string> const& columnNames,
-                       int partitionColumn,
-                       ExportTupleStream::Type type);
+            int64_t spHandle,
+            int64_t seqNo,
+            int64_t uniqueId,
+            int64_t timestamp,
+            const TableTuple &tuple,
+            const std::vector<std::string> &columnNames,
+            int partitionColumn,
+            ExportTupleStream::Type type);
 
-    size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
+    size_t computeOffsets(const TableTuple &tuple,size_t *rowHeaderSz) const;
 
     virtual int partitionId() { return m_partitionId; }
 
+private:
     // cached catalog values
     const CatalogId m_partitionId;
     const int64_t m_siteId;
 
     std::string m_signature;
     int64_t m_generation;
+    const size_t m_mdColumnNamesSerializedSize;
+
+    // meta-data column count
+    static const int METADATA_COL_CNT = 6;
+
+    // column names of meta data columns
+    static const std::string VOLT_TRANSACTION_ID;
+    static const std::string VOLT_EXPORT_TIMESTAMP;
+    static const std::string VOLT_EXPORT_SEQUENCE_NUMBER;
+    static const std::string VOLT_PARTITION_ID;
+    static const std::string VOLT_SITE_ID;
+    static const std::string VOLT_EXPORT_OPERATION;
 };
+
+
 
 }
 

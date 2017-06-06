@@ -511,6 +511,7 @@ enum DREventType {
     CATALOG_UPDATE = 2,
     DR_STREAM_START = 3,
     SWAP_TABLE = 4,
+    DR_STREAM_END = 5,
 };
 
 

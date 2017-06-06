@@ -36,13 +36,26 @@
 using namespace std;
 using namespace voltdb;
 
-const int METADATA_COL_CNT = 6;
+const std::string ExportTupleStream::VOLT_TRANSACTION_ID = "VOLT_TRANSACTION_ID";
+const std::string ExportTupleStream::VOLT_EXPORT_TIMESTAMP = "VOLT_EXPORT_TIMESTAMP";
+const std::string ExportTupleStream::VOLT_EXPORT_SEQUENCE_NUMBER = "VOLT_EXPORT_SEQUENCE_NUMBER";
+const std::string ExportTupleStream::VOLT_PARTITION_ID = "VOLT_PARTITION_ID";
+const std::string ExportTupleStream::VOLT_SITE_ID = "VOLT_SITE_ID";
+const std::string ExportTupleStream::VOLT_EXPORT_OPERATION = "VOLT_EXPORT_OPERATION";
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId,
                                        int64_t siteId)
     : TupleStreamBase(EL_BUFFER_SIZE),
-      m_partitionId(partitionId), m_siteId(siteId),
-      m_signature(""), m_generation(0)
+      m_partitionId(partitionId),
+      m_siteId(siteId),
+      m_signature(""),
+      m_generation(0),
+      m_mdColumnNamesSerializedSize(getTextStringSerializedSize(VOLT_TRANSACTION_ID)
+              + getTextStringSerializedSize(VOLT_EXPORT_TIMESTAMP)
+              + getTextStringSerializedSize(VOLT_EXPORT_SEQUENCE_NUMBER)
+              + getTextStringSerializedSize(VOLT_PARTITION_ID)
+              + getTextStringSerializedSize(VOLT_SITE_ID)
+              + getTextStringSerializedSize(VOLT_EXPORT_OPERATION))
 {}
 
 void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t generation) {
@@ -78,6 +91,8 @@ void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t
     m_generation = generation;
 }
 
+#include <sstream>
+
 /*
  * If SpHandle represents a new transaction, commit previous data.
  * Always serialize the supplied tuple in to the stream.
@@ -86,15 +101,16 @@ void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t
  * should be rolled back.
  */
 size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
-                                       int64_t spHandle,
-                                       int64_t seqNo,
-                                       int64_t uniqueId,
-                                       int64_t timestamp,
-                                       TableTuple &tuple,
-                                       std::vector<std::string> const& columnNames,
-                                       int partitionColumn,
-                                       ExportTupleStream::Type type)
+        int64_t spHandle,
+        int64_t seqNo,
+        int64_t uniqueId,
+        int64_t timestamp,
+        const TableTuple &tuple,
+        const std::vector<std::string> &columnNames,
+        int partitionColumn,
+        ExportTupleStream::Type type)
 {
+    assert(columnNames.size() == tuple.sizeInValues());
     size_t rowHeaderSz = 0;
     size_t tupleMaxLength = 0;
 
@@ -116,25 +132,15 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
-//    std::cout << "Hdr: " << rowHeaderSz << " TupleMax: " << tupleMaxLength << "\n";
-//    std::cout.flush();
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
     //Compute column names size
-    size_t colNamesLength = 0;
-    colNamesLength += getTextStringSerializedSize("VOLT_TRANSACTION_ID");
-    colNamesLength += getTextStringSerializedSize("VOLT_EXPORT_TIMESTAMP");
-    colNamesLength += getTextStringSerializedSize("VOLT_EXPORT_SEQUENCE_NUMBER");
-    colNamesLength += getTextStringSerializedSize("VOLT_PARTITION_ID");
-    colNamesLength += getTextStringSerializedSize("VOLT_SITE_ID");
-    colNamesLength += getTextStringSerializedSize("VOLT_EXPORT_OPERATION");
-    //Treat column count as hash and only allow ADD/DROP column? What about width of columns?
+    size_t colNamesLength = m_mdColumnNamesSerializedSize;
     for (int i = 0; i < columnNames.size(); i++) {
         colNamesLength += getTextStringSerializedSize(columnNames[i]);
     }
-    // include type byte
-    colNamesLength += METADATA_COL_CNT + columnNames.size();
+
     if (m_currBlock->remaining() < (tupleMaxLength + colNamesLength)) {
         extendBufferChain(tupleMaxLength + colNamesLength);
     }
@@ -143,26 +149,24 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // has the effect of setting each column non-null.
     ::memset(m_currBlock->mutableDataPtr(), 0, rowHeaderSz);
 
-    // the nullarray lives in rowheader after the 4 byte header length prefix
+    // the nullarray lives in rowheader after the 4 byte header length prefix + 4 bytes for column count
     uint8_t *nullArray =
-      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof (int32_t));
+      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof (int32_t) + sizeof (int32_t));
 
     // position the serializer after the full rowheader
     ExportSerializeOutput io(m_currBlock->mutableDataPtr() + rowHeaderSz,
                              m_currBlock->remaining() - rowHeaderSz);
 
-    //Write column Count
-    io.writeInt(METADATA_COL_CNT + columnNames.size());
     //Write partition column index
     io.writeInt(METADATA_COL_CNT + partitionColumn);
-    //Write column Names
-    io.writeTextString("VOLT_TRANSACTION_ID");
-    io.writeTextString("VOLT_EXPORT_TIMESTAMP");
-    io.writeTextString("VOLT_EXPORT_SEQUENCE_NUMBER");
-    io.writeTextString("VOLT_PARTITION_ID");
-    io.writeTextString("VOLT_SITE_ID");
-    io.writeTextString("VOLT_EXPORT_OPERATION");
-    //Treat column count as hash and only allow ADD/DROP column? What about width of columns?
+    // write metadata column names
+    io.writeTextString(VOLT_TRANSACTION_ID);
+    io.writeTextString(VOLT_EXPORT_TIMESTAMP);
+    io.writeTextString(VOLT_EXPORT_SEQUENCE_NUMBER);
+    io.writeTextString(VOLT_PARTITION_ID);
+    io.writeTextString(VOLT_SITE_ID);
+    io.writeTextString(VOLT_EXPORT_OPERATION);
+    // write table column names
     for (int i = 0; i < columnNames.size(); i++) {
         io.writeTextString(columnNames[i]);
     }
@@ -182,11 +186,12 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
     io.writeEnumInSingleByte(VALUE_TYPE_TINYINT);
     io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
-
-    nullArray[0] = (uint8_t) (METADATA_COL_CNT + tuple.sizeInValues());
-    //Write partition column index
     // write the tuple's data
-    tuple.serializeToExport(io, METADATA_COL_CNT, &nullArray[1], true);
+    tuple.serializeToExport(io, METADATA_COL_CNT, nullArray, true);
+
+    // write column count - after row size and before null array
+    ExportSerializeOutput columnCount(m_currBlock->mutableDataPtr() + 4, sizeof(int32_t));
+    columnCount.writeInt(METADATA_COL_CNT + tuple.sizeInValues());
 
     // write the row size in to the row header
     // rowlength does not include the 4 byte row header
@@ -200,23 +205,22 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     const size_t startingUso = m_uso;
     m_uso += (rowHeaderSz + io.position());
-//    std::cout << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso() << " offset " << m_currBlock->offset() << std::endl;
+//    cout << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+//            << " offset " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
 
 size_t
-ExportTupleStream::computeOffsets(TableTuple &tuple,
-                                   size_t *rowHeaderSz)
-{
+ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *rowHeaderSz) const {
     // round-up columncount to next multiple of 8 and divide by 8
     int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
-    // row header is 32-bit length of row plus null mask + sizeof(uint8_t) for columncount
-    *rowHeaderSz = sizeof (int32_t) + nullMaskLength + sizeof(uint8_t);
+    // row header is 32-bit length of row plus null mask plus four bytes for storing column-count
+    *rowHeaderSz = sizeof (int32_t) + nullMaskLength + sizeof(int32_t);
 
-    // metadata column width: 5 int64_ts plus CHAR(1) + 6 bytes for type.
-    size_t metadataSz = (sizeof (int64_t) * 5) + 6 + 1;
+    // size needed for storing values (data + type) of metadata column: 5 int64_ts plus CHAR(1) + 6 bytes for type.
+    size_t metadataSz = (sizeof (int64_t) * 5) + 1 + 6;
 
     // returns 0 if corrupt tuple detected
     size_t dataSz = tuple.maxExportSerializationSize();
@@ -224,31 +228,9 @@ ExportTupleStream::computeOffsets(TableTuple &tuple,
         throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
     }
 
+    // row header + metadata value size + tuple column count for types + max export serialization size
     return *rowHeaderSz + metadataSz + tuple.sizeInValues() + dataSz;
 }
-
-//size_t
-//ExportTupleStream::computeOffsets(TableTuple &tuple,
-//                                   size_t *rowHeaderSz)
-//{
-//    // round-up columncount to next multiple of 8 and divide by 8
-//    int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
-//    int nullMaskLength = ((columnCount + 7) & -8) >> 3;
-//
-//    // row header is 32-bit length of row plus null mask
-//    *rowHeaderSz = sizeof (int32_t) + nullMaskLength;
-//
-//    // metadata column width: 5 int64_ts plus CHAR(1).
-//    size_t metadataSz = (sizeof (int64_t) * 5) + 1;
-//
-//    // returns 0 if corrupt tuple detected
-//    size_t dataSz = tuple.maxExportSerializationSize();
-//    if (dataSz == 0) {
-//        throwFatalException("Invalid tuple passed to computeTupleMaxLength. Crashing System.");
-//    }
-//
-//    return *rowHeaderSz + metadataSz + dataSz;
-//}
 
 void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(

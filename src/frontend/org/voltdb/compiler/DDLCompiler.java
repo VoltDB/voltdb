@@ -102,7 +102,7 @@ import org.voltdb.utils.SQLCommand;
  */
 public class DDLCompiler {
 
-    private static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
+    public static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
     private static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
     private static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 

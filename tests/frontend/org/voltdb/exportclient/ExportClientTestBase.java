@@ -90,7 +90,7 @@ public class ExportClientTestBase {
         vtable.clearRowData();
         AdvertisedDataSource source = new AdvertisedDataSource(partition, "foo", tableName,
                 partCol, 0, 32, col_names, col_types, Arrays.asList(COLUMN_LENGTHS),
-                AdvertisedDataSource.ExportFormat.FOURDOTFOUR);
+                AdvertisedDataSource.ExportFormat.SEVENDOTX);
         return source;
     }
 

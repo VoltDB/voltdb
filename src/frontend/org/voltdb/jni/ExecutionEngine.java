@@ -85,7 +85,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         POISON_PILL(1),
         CATALOG_UPDATE(2),
         DR_STREAM_START(3),
-        SWAP_TABLE(4);
+        SWAP_TABLE(4),
+        DR_STREAM_END(5);
 
         private EventType(int typeId) {
             this.typeId = typeId;
