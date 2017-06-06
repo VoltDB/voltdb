@@ -136,9 +136,10 @@ public class LocalCluster extends VoltServerConfig {
         return m_subRoots;
     }
 
-    // Should this be set to false so that all the logs are written to files?
-    // There is no easy way to duplicate i/o in Java apart from brutal-force
-    boolean m_hasLocalServer = false;
+    // This should be set to true by default, otherwise the client interface
+    // may throw different types of exception in other tests, which results
+    // to failure
+    boolean m_hasLocalServer = true;
     public void setHasLocalServer(boolean hasLocalServer) {
         m_hasLocalServer = hasLocalServer;
     }
@@ -215,7 +216,8 @@ public class LocalCluster extends VoltServerConfig {
     /*
      * Setup local cluster to enable log search so the logs are stored in buffers
      */
-    public LocalCluster(boolean enableLogSearch,
+    public LocalCluster(boolean hasLocalServer,
+                        boolean enableLogSearch,
                         String jarFileName,
                         int siteCount,
                         int hostCount,
@@ -223,6 +225,7 @@ public class LocalCluster extends VoltServerConfig {
                         BackendTarget target)
     {
         this(jarFileName, siteCount, hostCount, kfactor, target, null);
+        m_hasLocalServer = hasLocalServer;
         m_enableLogSearch = enableLogSearch;
         if (m_enableLogSearch) {
             m_logs = new HashMap<>();

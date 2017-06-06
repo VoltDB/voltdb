@@ -57,7 +57,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         builder.addProcedures(CrashVoltDBProc.class);
         builder.setUseDDLSchema(true);
 
-        cluster = new LocalCluster(true, "collect.jar",
+        cluster = new LocalCluster(false, true, "collect.jar",
                 SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         boolean success = cluster.compile(builder);
         assert (success);
