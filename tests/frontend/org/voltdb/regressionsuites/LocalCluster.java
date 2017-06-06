@@ -113,11 +113,11 @@ public class LocalCluster extends VoltServerConfig {
     // Storing the paths of both the init and host logs for each host, the 1st string is
     // the init log path, the 2nd is the host log path. The full file paths are stored to
     // ease future maintenance.
-    private Map<Integer, String[]> m_initLogFilePath = new HashMap<>();
+    private Map<Integer, String[]> m_initLogFilePath = null;
     // Copy of the host logs stored in memory (the init logs are still left on disk, since
     // they are small anyway)
     // Use StringBuffer for thread-safety
-    private Map<Integer, StringBuffer> m_logs = new HashMap<>();
+    private Map<Integer, StringBuffer> m_logs = null;
     // Determine whether the log regex search utility is enabled, since it may impact performance
     // for large test cases. It is not enabled by default
     private boolean m_enableLogSearch = false;
@@ -224,6 +224,10 @@ public class LocalCluster extends VoltServerConfig {
     {
         this(jarFileName, siteCount, hostCount, kfactor, target, null);
         m_enableLogSearch = enableLogSearch;
+        if (m_enableLogSearch) {
+            m_logs = new HashMap<>();
+            m_initLogFilePath = new HashMap<>();
+        }
     }
 
     public LocalCluster(String jarFileName,
@@ -866,8 +870,10 @@ public class LocalCluster extends VoltServerConfig {
         m_pipes.clear();
         m_cluster.clear();
         m_cmdLines.clear();
-        m_logs.clear();
-        m_initLogFilePath.clear();
+        if (m_enableLogSearch) {
+            m_logs.clear();
+            m_initLogFilePath.clear();
+        }
         int oopStartIndex = 0;
 
         // create the in-process server instance.
