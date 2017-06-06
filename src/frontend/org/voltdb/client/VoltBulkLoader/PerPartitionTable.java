@@ -101,6 +101,23 @@ public class PerPartitionTable {
                 });
             }
             else {
+
+                // For each row in the batch, notify the caller of success, so it can do any
+                // necessary bookkeeping (like managing offsets, for example). Do this in the executor service
+                // so as not to hold up the callback.
+                m_es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            for (VoltBulkLoaderRow r : m_batchRowList) {
+                                r.m_loader.m_notificationCallBack.failureCallback(r.m_rowHandle, null, response);
+                            }
+                        } catch (Exception e) {
+                            loaderLog.error("Failed to re-insert failed batch", e);
+                        }
+                    }
+                });
+
                 m_batchRowList.get(0).m_loader.m_loaderCompletedCnt.addAndGet(m_batchRowList.size());
                 m_batchRowList.get(0).m_loader.m_outstandingRowCount.addAndGet(-1 * m_batchRowList.size());
             }

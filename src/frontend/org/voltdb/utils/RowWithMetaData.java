@@ -16,14 +16,24 @@
  */
 package org.voltdb.utils;
 
+import org.voltdb.client.ProcedureCallback;
+
 //Processor queue to keep track of line data and number and such.
 public class RowWithMetaData {
 
     final public Object rawLine;
     final public long lineNumber;
+    final public ProcedureCallback procedureCallback;
 
     public RowWithMetaData(Object rawLine, long ln) {
         this.rawLine = rawLine;
-        lineNumber = ln;
+        this.lineNumber = ln;
+        this.procedureCallback = null;
+    }
+
+    public RowWithMetaData(Object rawLine, long ln, ProcedureCallback cb) {
+        this.rawLine = rawLine;
+        this.lineNumber = ln;
+        this.procedureCallback = cb;
     }
 }

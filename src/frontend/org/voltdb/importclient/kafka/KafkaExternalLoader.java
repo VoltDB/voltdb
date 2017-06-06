@@ -37,7 +37,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -164,6 +163,16 @@ public class KafkaExternalLoader implements ImporterSupport {
                             // Ignore
                         }
                         return true;
+                    }
+                }
+                else {
+                    if (metaData.procedureCallback != null) {
+                        try {
+                            metaData.procedureCallback.clientCallback(response);
+                        }
+                        catch (Exception e) {
+                            // Failure in processing success callback, ignore.
+                        }
                     }
                 }
             }
@@ -400,49 +409,7 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Override
         public boolean executeVolt(Object[] params, TopicPartitionInvocationCallback cb) {
            try {
-               m_loader.insertRow(new RowWithMetaData(StringUtils.join(params, ","), cb.getOffset()), params);
-               cb.clientCallback(new ClientResponse() {
-                   @Override
-                   public int getClientRoundtrip() {
-                       return 0;
-                   }
-
-                   @Override
-                   public int getClusterRoundtrip() {
-                       return 0;
-                   }
-
-                   @Override
-                   public String getStatusString() {
-                       return null;
-                   }
-
-                   @Override
-                   public VoltTable[] getResults() {
-                       return new VoltTable[0];
-                   }
-
-                   @Override
-                   public byte getStatus() {
-                       return ClientResponse.SUCCESS;
-                   }
-
-                   @Override
-                   public byte getAppStatus() {
-                       return 0;
-                   }
-
-                   @Override
-                   public String getAppStatusString() {
-                       return null;
-                   }
-
-                   @Override
-                   public long getClientRoundtripNanos() {
-                       return 0;
-                   }
-               });
-
+               m_loader.insertRow(new RowWithMetaData(StringUtils.join(params, ","), cb.getOffset(), cb), params);
            }
            catch (Exception e) {
                m_log.error(e);
