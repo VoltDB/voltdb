@@ -572,10 +572,9 @@ public class JdbcDatabaseMetaDataGenerator
                     {
                             String columnName;
 
-                            // ENG-6927
-                            // if the index type == "MATVIEW_PK_CONSTRAINT", the column name for the materialized view is obtained
-                            // after getting the column information and then its type name - one more level of indirection
-                            if( c.getTypeName().equals(HSQLInterface.AUTO_GEN_MATVIEW_CONST) ) {
+                            // if the index name is "MATVIEW_PK_CONSTRAINT", the column name for the materialized view is obtained
+                            // from its column information - ENG-6927
+                            if (c.getTypeName().equals(HSQLInterface.AUTO_GEN_MATVIEW_CONST) ) {
                                     columnName = column.getColumn().getTypeName();
                             } else {
                                     columnName = column.getTypeName();
