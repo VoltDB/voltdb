@@ -72,16 +72,16 @@ public:
 
     /** write a tuple to the stream */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
-                       int64_t spHandle,
-                       int64_t seqNo,
-                       int64_t uniqueId,
-                       int64_t timestamp,
-                       TableTuple &tuple,
-                       std::vector<std::string> const& columnNames,
-                       int partitionColumn,
-                       ExportTupleStream::Type type);
+            int64_t spHandle,
+            int64_t seqNo,
+            int64_t uniqueId,
+            int64_t timestamp,
+            const TableTuple &tuple,
+            const std::vector<std::string> &columnNames,
+            int partitionColumn,
+            ExportTupleStream::Type type);
 
-    size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
+    size_t computeOffsets(const TableTuple &tuple,size_t *rowHeaderSz) const;
 
     virtual int partitionId() { return m_partitionId; }
 

@@ -38,10 +38,10 @@
 #include "common/executorcontext.hpp"
 #include "boost/smart_ptr.hpp"
 
-using namespace std;
 using namespace voltdb;
 
-const int COLUMN_COUNT = 5;
+static const int COLUMN_COUNT = 5;
+
 // Annoyingly, there's no easy way to compute the exact Exported tuple
 // size without incestuously using code we're trying to test.  I've
 // pre-computed this magic size for an Exported tuple of 5 integer
@@ -52,25 +52,19 @@ const int COLUMN_COUNT = 5;
 // 5 Export type columns * sizeof (uint_8) = 5
 // 1 Export header column * sizeof(int8_t) = 1
 // 1 Export type columns for export-op type * sizeof (uint_8) = 1
-
+// 4 bytes for storing column count - 4
 // null array
 // 2 bytes for null mask (10 columns rounds to 16, /8 = 2) = 2
-// 1 byte for null mask for storing column name = 1
-
-// 1 Export header column to store number of metadata+table columns * sizeof(int32_t) = 4
 // 1 Export header column to store number of partition index * sizeof(int32_t) = 4
 // seriailized size for column name and meta-data column names will get computed in the logic
-
 // sizeof(int32_t) for row header = 4
-
 // table data
 // 5 * sizeof(int32_t) for tuple data = 20
 // 5 * types of columns sizeof(uint8_t) = 5
-// total: 67
-//const int MAGIC_TUPLE_SIZE = 67;
-const int MAGIC_TUPLE_SIZE = 87;
+static const int MAGIC_TUPLE_SIZE = 86;
+
 // 1k buffer
-const int BUFFER_SIZE = 1024;
+static const int BUFFER_SIZE = 1024;
 
 class ExportTupleStreamTest : public Test {
 public:
@@ -84,11 +78,13 @@ public:
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
+        std::ostringstream os;
         for (int i = 0; i < COLUMN_COUNT; i++) {
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             columnAllowNull.push_back(false);
-            m_columnNames.push_back(std::to_string(i));
+            os.str(""); os << std::dec << i;
+            m_columnNames.push_back(os.str());
         }
         m_schema =
           TupleSchema::createTupleSchemaForTest(columnTypes,
@@ -147,11 +143,8 @@ protected:
     TableTuple* m_tuple;
     DummyTopend m_topend;
     Pool m_pool;
-    UndoQuantum* m_quantum;
     std::vector<std::string> m_columnNames;
     boost::scoped_ptr<ExecutorContext> m_context;
-//    size_t m_mdColumnNameLength;
-//    size_t m_tableColumnNameLength;
     size_t m_tupleSize;
 };
 

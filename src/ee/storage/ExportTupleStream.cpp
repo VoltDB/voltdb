@@ -101,18 +101,18 @@ void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t
  * should be rolled back.
  */
 size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
-                                       int64_t spHandle,
-                                       int64_t seqNo,
-                                       int64_t uniqueId,
-                                       int64_t timestamp,
-                                       TableTuple &tuple,
-                                       const std::vector<std::string>& columnNames,
-                                       int partitionColumn,
-                                       ExportTupleStream::Type type)
+        int64_t spHandle,
+        int64_t seqNo,
+        int64_t uniqueId,
+        int64_t timestamp,
+        const TableTuple &tuple,
+        const std::vector<std::string> &columnNames,
+        int partitionColumn,
+        ExportTupleStream::Type type)
 {
+    assert(columnNames.size() == tuple.sizeInValues());
     size_t rowHeaderSz = 0;
     size_t tupleMaxLength = 0;
-    ostringstream os;
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
@@ -132,51 +132,34 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
-//    std::cout << "Hdr: " << rowHeaderSz << " TupleMax: " << tupleMaxLength << std::endl;
     if (!m_currBlock) {
-//        os << "Block null, allocated bytes:" << allocatedByteCount();
         extendBufferChain(m_defaultCapacity);
-//        os << "after extend allocated bytes:" << allocatedByteCount() << std::endl;
-//        cout << os.str(); os.str("");
     }
     //Compute column names size
-    size_t colNamesLength = 0;
-    colNamesLength += m_mdColumnNamesSerializedSize;
-    //Treat column count as hash and only allow ADD/DROP column? What about width of columns?
+    size_t colNamesLength = m_mdColumnNamesSerializedSize;
     for (int i = 0; i < columnNames.size(); i++) {
         colNamesLength += getTextStringSerializedSize(columnNames[i]);
     }
 
-    // include type byte - included in tuple max length
-//    colNamesLength += METADATA_COL_CNT + columnNames.size();
     if (m_currBlock->remaining() < (tupleMaxLength + colNamesLength)) {
-//        os << "remaining bytes in current block:" << m_currBlock->remaining()
-//                << " bytes needed:" << (tupleMaxLength + colNamesLength)
-//                << " allocated byte count:" << allocatedByteCount() << std::endl;
         extendBufferChain(tupleMaxLength + colNamesLength);
-//        os << "remaining bytes in current block:" << m_currBlock->remaining()
-//                << " new allocated-byte-count:" << allocatedByteCount() << std::endl;
-//        cout << os.str(); os.str("");
     }
 
     // initialize the full row header to 0. This also
     // has the effect of setting each column non-null.
     ::memset(m_currBlock->mutableDataPtr(), 0, rowHeaderSz);
 
-    // the nullarray lives in rowheader after the 4 byte header length prefix
+    // the nullarray lives in rowheader after the 4 byte header length prefix + 4 bytes for column count
     uint8_t *nullArray =
-      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof (int32_t));
+      reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + sizeof (int32_t) + sizeof (int32_t));
 
     // position the serializer after the full rowheader
     ExportSerializeOutput io(m_currBlock->mutableDataPtr() + rowHeaderSz,
                              m_currBlock->remaining() - rowHeaderSz);
 
-    //Write column Count
-    io.writeInt(METADATA_COL_CNT + columnNames.size());
     //Write partition column index
     io.writeInt(METADATA_COL_CNT + partitionColumn);
     // write metadata column names
-//    size_t cachedSize = io.size();
     io.writeTextString(VOLT_TRANSACTION_ID);
     io.writeTextString(VOLT_EXPORT_TIMESTAMP);
     io.writeTextString(VOLT_EXPORT_SEQUENCE_NUMBER);
@@ -187,7 +170,6 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     for (int i = 0; i < columnNames.size(); i++) {
         io.writeTextString(columnNames[i]);
     }
-//    std::cout << "before " << cachedSize << " after " << io.size() << " diff " << io.size() - cachedSize << std::endl;
 
     // write metadata columns
     io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
@@ -204,11 +186,12 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
     io.writeEnumInSingleByte(VALUE_TYPE_TINYINT);
     io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
-
-    nullArray[0] = (uint8_t) (METADATA_COL_CNT + tuple.sizeInValues());
-    //Write partition column index
     // write the tuple's data
-    tuple.serializeToExport(io, METADATA_COL_CNT, &nullArray[1], true);
+    tuple.serializeToExport(io, METADATA_COL_CNT, nullArray, true);
+
+    // write column count - after row size and before null array
+    ExportSerializeOutput columnCount(m_currBlock->mutableDataPtr() + 4, sizeof(int32_t));
+    columnCount.writeInt(METADATA_COL_CNT + tuple.sizeInValues());
 
     // write the row size in to the row header
     // rowlength does not include the 4 byte row header
@@ -222,27 +205,22 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     const size_t startingUso = m_uso;
     m_uso += (rowHeaderSz + io.position());
-    os << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso()
-            << " offset " << m_currBlock->offset() << " m_uso " << m_uso << std::endl;
-//    cout << os.str();
+//    cout << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+//            << " offset " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
 
 size_t
-ExportTupleStream::computeOffsets(TableTuple &tuple,
-                                   size_t *rowHeaderSz)
-{
+ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *rowHeaderSz) const {
     // round-up columncount to next multiple of 8 and divide by 8
     int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
-    // row header is 32-bit length of row plus null mask plus one byte for storing column count
-    *rowHeaderSz = sizeof (int32_t) + nullMaskLength + sizeof(uint8_t);
+    // row header is 32-bit length of row plus null mask plus four bytes for storing column-count
+    *rowHeaderSz = sizeof (int32_t) + nullMaskLength + sizeof(int32_t);
 
-    // metadata column width: 5 int64_ts plus CHAR(1) + 6 bytes for type.
-    // TODO: remove above comment
     // size needed for storing values (data + type) of metadata column: 5 int64_ts plus CHAR(1) + 6 bytes for type.
-    size_t metadataSz = (sizeof (int64_t) * 5) + 6 + 1;
+    size_t metadataSz = (sizeof (int64_t) * 5) + 1 + 6;
 
     // returns 0 if corrupt tuple detected
     size_t dataSz = tuple.maxExportSerializationSize();
