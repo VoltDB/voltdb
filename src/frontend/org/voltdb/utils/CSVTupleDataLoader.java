@@ -20,9 +20,11 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -45,6 +47,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     private final String m_insertProcedure;
     private final VoltType[] m_columnTypes;
     private final BulkLoaderErrorHandler m_errHandler;
+    private final ExecutorService m_es;
 
     final AtomicLong m_processedCount = new AtomicLong(0);
     final AtomicLong m_failedCount = new AtomicLong(0);
@@ -78,9 +81,23 @@ public class CSVTupleDataLoader implements CSVDataLoader {
 
         //one insert at a time callback
         @Override
-        public void clientCallback(ClientResponse response) throws Exception {
+        public void clientCallback(final ClientResponse response) throws Exception {
             byte status = response.getStatus();
-            if (status != ClientResponse.SUCCESS) {
+            if (status == ClientResponse.SUCCESS && m_csvLine.procedureCallback != null) {
+                // If the client is keeping track of offsets, notify it (but run on a service thread)
+                m_es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            m_csvLine.procedureCallback.clientCallback(response);
+                        } catch (Exception e) {
+                            m_log.error("Exception in success client callback", e);
+                        }
+                    }
+                });
+
+            }
+            else {
                 m_failedCount.incrementAndGet();
                 m_errHandler.handleError(m_csvLine, response, response.getStatusString());
             }
@@ -98,6 +115,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
         m_client = client;
         m_insertProcedure = procName;
         m_errHandler = errHandler;
+        m_es = CoreUtils.getSingleThreadExecutor(procName + "-" + Thread.currentThread().getName());
 
         List<VoltType> typeList = Lists.newArrayList();
         VoltTable procInfo = client.callProcedure("@SystemCatalog", "PROCEDURECOLUMNS").getResults()[0];

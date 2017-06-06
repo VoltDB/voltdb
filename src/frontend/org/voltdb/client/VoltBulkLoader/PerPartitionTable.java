@@ -86,7 +86,7 @@ public class PerPartitionTable {
 
         // Called by Client to inform us of the status of the bulk insert.
         @Override
-        public void clientCallback(ClientResponse response) throws InterruptedException {
+        public void clientCallback(final ClientResponse response) throws InterruptedException {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 // Queue up all rows for individual processing by originating BulkLoader's FailureProcessor.
                 m_es.execute(new Runnable() {
@@ -109,7 +109,7 @@ public class PerPartitionTable {
                     public void run() {
                         try {
                             for (VoltBulkLoaderRow r : m_batchRowList) {
-                                r.m_loader.m_notificationCallBack.failureCallback(r.m_rowHandle, null, response);
+                                r.m_loader.m_notificationCallBack.callback(r.m_rowHandle, null, response);
                             }
                         } catch (Exception e) {
                             loaderLog.error("Failed to re-insert failed batch", e);
@@ -228,7 +228,7 @@ public class PerPartitionTable {
 
                     //one insert at a time callback
                     if (response.getStatus() != ClientResponse.SUCCESS) {
-                        row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
+                        row.m_loader.m_notificationCallBack.callback(row.m_rowHandle, row.m_rowData, response);
                     }
                 }
             };

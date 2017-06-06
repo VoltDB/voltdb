@@ -37,7 +37,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -88,10 +88,10 @@ public class TestVoltBulkLoader extends TestCase {
     protected static String geo = "polygon((0 0, 1 0, 1 1, 0 1, 0 0))";
     protected static String geopt = "point(0 0)";
 
-    public class TestFailureCallback implements BulkLoaderFailureCallBack {
+    public class TestFailureCallback implements BulkLoaderCallback {
         ArrayList<Integer> failureRows = new ArrayList<Integer>(20);
         @Override
-        public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
+        public void callback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             failureRows.add((Integer)rowHandle);
         }
 
