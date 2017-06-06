@@ -395,6 +395,11 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
             else if ("@StopNode".equals(procName)) {
+                CoreUtils.PrintGoodLookingLog(hostLog,
+                                              "User: " +
+                                              ccxn.getHostnameAndIPAndPort() +
+                                              " issued a " + procName,
+                                              Level.WARN);
                 return dispatchStopNode(task);
             }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
@@ -436,9 +441,19 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.SNAPSHOTSCAN, task, ccxn);
             }
             else if ("@SnapshotDelete".equals(procName)) {
+                CoreUtils.PrintGoodLookingLog(hostLog,
+                                              "User: " +
+                                              ccxn.getHostnameAndIPAndPort() +
+                                              " issued a " + procName,
+                                              Level.WARN);
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
             }
             else if ("@SnapshotRestore".equals(procName)) {
+                CoreUtils.PrintGoodLookingLog(hostLog,
+                                              "User: " +
+                                              ccxn.getHostnameAndIPAndPort() +
+                                              " issued a " + procName,
+                                              Level.WARN);
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
                 if (retval != null) {
                     return retval;
@@ -455,22 +470,21 @@ public final class InvocationDispatcher {
 
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
-            if ((   "@Pause".equals(procName)
+            if (    "@Pause".equals(procName)
                  || "@Resume".equals(procName)
                  || "@PrepareShutdown".equals(procName))
-               && !handler.isAdmin())
             {
-                return unexpectedFailureResponse(
-                        procName + " is not available to this client",
-                        task.clientHandle);
-            }
-
-            // After we verify the shutdown command from an admin user, the detailed information
-            // should be printed out properly. The following message is printed at the node where
-            // the client is connected to.
-            if ("@PrepareShutdown".equals(procName)) {
-                String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a PrepareShutdown.";
-                CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
+                if (!handler.isAdmin()) {
+                    return unexpectedFailureResponse(
+                            procName + " is not available to this client",
+                            task.clientHandle);
+                } else {
+                    // After we verify the system command from an admin user, the detailed information
+                    // should be printed out properly. The following message is printed at the node where
+                    // the client is connected to.
+                    String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a " + procName;
+                    CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
+                }
             }
         }
         // If you're going to copy and paste something, CnP the pattern
