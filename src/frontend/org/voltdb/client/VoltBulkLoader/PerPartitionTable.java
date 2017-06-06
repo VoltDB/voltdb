@@ -101,9 +101,8 @@ public class PerPartitionTable {
                 });
             }
             else {
-
                 // For each row in the batch, notify the caller of success, so it can do any
-                // necessary bookkeeping (like managing offsets, for example). Do this in the executor service
+                // necessary bookkeeping (like managing offsets, for example). Do this in the executor
                 // so as not to hold up the callback.
                 m_es.execute(new Runnable() {
                     @Override
