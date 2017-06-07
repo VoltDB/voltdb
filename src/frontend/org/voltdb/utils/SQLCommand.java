@@ -622,23 +622,25 @@ public class SQLCommand
 
                 // if it is a batch option, get all contents from all the files and send it as a string
                 if (fileInfo.getOption() == FileOption.BATCH) {
-                        String line;
-                        // use the current reader we obtained to read from the file
-                        // and append to existing statements
-                        while ((line = reader.readBatchLine()) != null)
-                        {
-                            statements.append(line).append("\n");
-                        }
+                    String line;
+                    // use the current reader we obtained to read from the file
+                    // and append to existing statements
+                    while ((line = reader.readBatchLine()) != null)
+                    {
+                        statements.append(line).append("\n");
+                    }
+                    // set reader to null since we finish reading from the file
+                    reader = null;
 
-                        // if it is the last file, create a reader to read from the string of all files contents
-                        if ( ii == filesInfo.size() - 1 ) {
-                            String allStatements = statements.toString();
-                            byte[] bytes = allStatements.getBytes("UTF-8");
-                            ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-                            // reader LineReaderAdapter needs an input stream reader
-                            reader = adapter = new LineReaderAdapter(new InputStreamReader( bais ) );
-                        }
-                        // NOTE - fileInfo has the last file info for batch with multiple files
+                    // if it is the last file, create a reader to read from the string of all files contents
+                    if ( ii == filesInfo.size() - 1 ) {
+                        String allStatements = statements.toString();
+                        byte[] bytes = allStatements.getBytes("UTF-8");
+                        ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+                        // reader LineReaderAdapter needs an input stream reader
+                        reader = adapter = new LineReaderAdapter(new InputStreamReader( bais ) );
+                    }
+                    // NOTE - fileInfo has the last file info for batch with multiple files
                 }
             }
             try {
@@ -666,6 +668,11 @@ public class SQLCommand
 
     public static void executeScriptFromReader(FileInfo fileInfo, SQLCommandLineReader reader, DDLParserCallback callback)
             throws Exception {
+
+        // return back in case of multiple batch files
+        if (reader == null)
+            return;
+
         StringBuilder statement = new StringBuilder();
         // non-interactive modes need to be more careful about discarding blank lines to
         // keep from throwing off diagnostic line numbers. So "statement" may be non-empty even
