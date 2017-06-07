@@ -1318,6 +1318,9 @@ public abstract class CatalogUtil {
 
         @Override
         public boolean equals(Object o) {
+            if (o == this) {
+                return true;
+            }
             if (!(o instanceof ImportConfiguration)) {
                 return false;
             }

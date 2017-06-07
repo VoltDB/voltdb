@@ -37,7 +37,6 @@ import java.util.concurrent.CountDownLatch;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.net.SocketAppender;
-import org.junit.Test;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
@@ -59,7 +58,6 @@ public class TestImportSuite extends RegressionSuite {
         { Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.TRACE, Level.WARN };
 
     private Boolean m_socketHandlerInitialized = false;
-    private Client m_client;
 
     @Override
     public void setUp() throws Exception
@@ -69,12 +67,6 @@ public class TestImportSuite extends RegressionSuite {
         f.mkdirs();
 
         super.setUp();
-
-        m_client = getClient();
-        while (!((ClientImpl) m_client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
     }
 
     private void setupLog4jSocketHandler() {
@@ -93,7 +85,6 @@ public class TestImportSuite extends RegressionSuite {
 
     @Override
     public void tearDown() throws Exception {
-        m_client.close();
         super.tearDown();
     }
 
@@ -274,48 +265,70 @@ public class TestImportSuite extends RegressionSuite {
         }
     }
 
-    @Test
     public void testImportSimpleData() throws Exception {
         System.out.println("testImportSimpleData");
+        Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
 
         pushDataToImporters(100, 1);
-        verifyData(m_client, 100);
+        verifyData(client, 100);
+        client.close();
     }
 
-    @Test
     public void testImportMultipleTimes() throws Exception {
         System.out.println("testImportUpdateApplicationCatalog");
+        Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
 
         pushDataToImporters(100, 1);
-        verifyData(m_client, 100);
+        verifyData(client, 100);
 
         Thread.sleep(0, 1);
 
         pushDataToImporters(100, 1);
-        verifyData(m_client, 200);
+        verifyData(client, 200);
+
+        client.close();
     }
 
-    @Test
     public void testImportMultipleClientsInParallel() throws Exception {
         System.out.println("testImportMultipleClientsInParallel");
+        Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
 
         pushDataToImporters(100, 2);
-        verifyData(m_client, 100*2);
+        verifyData(client, 100*2);
+        client.close();
     }
 
-    @Test
     public void testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing() throws Exception {
         System.out.println("testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing");
+        Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
 
         pushDataToImporters(1000, 3);
-        verifyData(m_client, 3000);
+        verifyData(client, 3000);
 
-        ClientResponse response = m_client.callProcedure("@AdHoc", "create table nudge(id integer);");
+        ClientResponse response = client.callProcedure("@AdHoc", "create table nudge(id integer);");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         pushDataToImporters(1000, 4);
         // log4j will lose some events because of reconnection delay
-        verifyData(m_client, 7000, 3001);
+        verifyData(client, 7000, 3001);
+
+        client.close();
     }
 
     /** Verify that importer can withstand unrelated UACs without restarting.
@@ -326,30 +339,37 @@ public class TestImportSuite extends RegressionSuite {
      */
     public void testImportUnrelatedUACWhilePushing() throws Exception {
         System.out.println("testImportUnrelatedUpdateApplicationCatalogWhilePushing");
+        Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
 
         // Count was chosen to keep importers busy during all UACs without making the test take much longer than necessary.
         CountDownLatch dataGenerationAwaiter = asyncPushDataToImporters(4000, 3);
 
-        ClientResponse response = m_client.callProcedure("@AdHoc", "create table nudge(id integer);");
+        ClientResponse response = client.callProcedure("@AdHoc", "create table nudge(id integer);");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         Thread.sleep(200);
 
-        response = m_client.callProcedure("@AdHoc", "create procedure NudgeThatDB as INSERT INTO nudge VALUES (?);");
+        response = client.callProcedure("@AdHoc", "create procedure NudgeThatDB as INSERT INTO nudge VALUES (?);");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         Thread.sleep(1000);
 
-        response = m_client.callProcedure("@AdHoc", "drop procedure NudgeThatDB;");
+        response = client.callProcedure("@AdHoc", "drop procedure NudgeThatDB;");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         Thread.sleep(200);
 
-        response = m_client.callProcedure("@AdHoc", "drop table nudge;");
+        response = client.callProcedure("@AdHoc", "drop table nudge;");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         dataGenerationAwaiter.await();
-        verifyData(m_client, 12000);
+        verifyData(client, 12000);
+
+        client.close();
     }
 
     /**

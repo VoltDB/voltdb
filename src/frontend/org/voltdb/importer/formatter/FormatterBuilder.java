@@ -68,6 +68,9 @@ public class FormatterBuilder<T> {
 
     @Override
     public boolean equals(Object o) {
+        if (o == this) {
+            return true;
+        }
         if (!(o instanceof FormatterBuilder)) {
             return false;
         }
