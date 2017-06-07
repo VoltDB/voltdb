@@ -74,7 +74,6 @@ import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltcore.utils.ssl.SSLConfiguration;
-import org.voltcore.zk.CoreZK;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -2129,39 +2128,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Repeatedly call this task until no qualified partition is available.
      * @param hostId  The local host id
      */
-    public void balanceSPI(int hostId) {
-
-        Pair<Integer, Integer> target = m_cartographer.getPartitionForMigration();
-        if (target == null) {
-            return;
-        }
-
-        int partitionId = target.getFirst();
-        int targetHostId = target.getSecond();
-        int partitionKey = -1;
-
-        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
-        ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
-        partitionKeys.flattenToBuffer(buf);
-        buf.flip();
-        VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
-        keyCopy.resetRowPosition();
-        while (keyCopy.advanceRow()) {
-            if (partitionId == keyCopy.getLong("PARTITION_ID")) {
-                partitionKey = (int)(keyCopy.getLong("PARTITION_KEY"));
-                break;
-            }
-        }
-
-        if (partitionKey == -1) {
-            hostLog.warn("Could not find the partition key for partition " + partitionId);
-            return;
-        }
-
-        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
-            return;
-        }
-
+    public void balanceSPI(int partitionId, int targetHostId, int partitionKey) {
         try {
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
             final String procedureName = "@BalanceSPI";
@@ -2199,8 +2166,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         } catch (IOException | InterruptedException e) {
             hostLog.error(String.format("Fail to process mastership change. %s", e.getMessage()));
-        } finally {
-            CoreZK.removeSPIBalanceIndicator(m_zk);
         }
     }
 }

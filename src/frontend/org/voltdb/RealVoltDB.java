@@ -41,6 +41,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,7 +58,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -2092,23 +2092,64 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
-    // The latest joined host will take over partition leader migration. The task is executed every minute by default
-    private void scheduleBalanceSpiTask() {
+    // The join or rejoin host will take over partition leader migration.
+    private void performSpiBalance() {
         final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
         if (disableSpiTask) {
             hostLog.info("SPI balance task is not scheduled.");
             return;
         }
         final long interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
-        final long delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "10"));
-        Runnable task = () -> {
-            TreeSet<Integer> hosts = (TreeSet<Integer>)(getHostMessenger().getLiveHostIds());
-            if (m_myHostId == hosts.pollLast()) {
-                m_clientInterface.balanceSPI(m_myHostId);
+        final ScheduledExecutorService ex = getSES(true);
+        Pair<Integer, Integer> target = m_cartographer.getPartitionForMigration();
+        while (target != null) {
+            int partitionId = target.getFirst();
+            int targetHostId = target.getSecond();
+            int partitionKey = getPartitionKey(partitionId);
+            if (partitionKey == -1) {
+                hostLog.warn("Could not find the partition key for partition " + partitionId);
+                break;
             }
-        };
+            ex.submit(new Runnable() {
+                @Override
+                public void run() {
+                    m_clientInterface.balanceSPI(partitionId, targetHostId, partitionKey);
+                }
+            });
+            final long maxWaitTime = TimeUnit.MINUTES.toSeconds(5); // 5 minutes
+            long remainingWaitTime = maxWaitTime;
+            boolean success = false;
+            while (remainingWaitTime > 0 && !success) {
+                try {
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(interval));
+                } catch (InterruptedException ignoreIt) {
+                }
+                remainingWaitTime -= interval;
+                success = (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId);
+            }
 
-        m_periodicWorks.add(scheduleWork(task, delay, interval, TimeUnit.SECONDS));
+            //There are failures
+            if (!success) {
+                break;
+            }
+            target = m_cartographer.getPartitionForMigration();
+        }
+    }
+
+    //get partition key for a partition from hashinator
+    private int getPartitionKey(int partitionId) {
+        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+        ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
+        partitionKeys.flattenToBuffer(buf);
+        buf.flip();
+        VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+        keyCopy.resetRowPosition();
+        while (keyCopy.advanceRow()) {
+            if (partitionId == keyCopy.getLong("PARTITION_ID")) {
+                return (int)(keyCopy.getLong("PARTITION_KEY"));
+            }
+        }
+        return -1;
     }
 
     private void startHealthMonitor() {
@@ -3742,6 +3783,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     megabytesPerSecond + " megabytes/sec");
         }
 
+        //start balance spi
+        performSpiBalance();
         try {
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
@@ -3772,9 +3815,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_joining = false;
                 consoleLog.info(String.format("Node %s completed", actionName));
             }
-
-            //start balance spi task
-            scheduleBalanceSpiTask();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
@@ -3964,9 +4004,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData(m_catalogContext, m_messenger);
-
-            // start balance spi task
-            scheduleBalanceSpiTask();
         }
 
         try {
