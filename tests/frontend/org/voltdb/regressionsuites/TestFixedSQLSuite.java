@@ -1739,7 +1739,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
-                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column 'VAR2'",
+                        String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column 'VAR80'",
                                 var.length(), var.substring(0, 100), 80)));
             }
         }
