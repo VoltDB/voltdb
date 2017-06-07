@@ -621,7 +621,7 @@ public class SQLCommand
                 }
 
                 // if it is a batch option, get all contents from all the files and send it as a string
-                if(fileInfo.getOption() == FileOption.BATCH) {
+                if (fileInfo.getOption() == FileOption.BATCH) {
                         String line;
                         // use the current reader we obtained to read from the file
                         // and append to existing statements
@@ -631,7 +631,7 @@ public class SQLCommand
                         }
 
                         // if it is the last file, create a reader to read from the string of all files contents
-                        if( ii == filesInfo.size()-1 ) {
+                        if ( ii == filesInfo.size() - 1 ) {
                             String allStatements = statements.toString();
                             byte[] bytes = allStatements.getBytes("UTF-8");
                             ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
@@ -733,7 +733,7 @@ public class SQLCommand
                 // Recursively process FILE commands, any failure will cause a recursive failure
                 List<FileInfo> nestedFilesInfo = SQLParser.parseFileStatement(fileInfo, line);
 
-                if ( nestedFilesInfo != null) {
+                if (nestedFilesInfo != null) {
                     // Guards must be added for FILE Batch containing batches.
                     if (batch != null) {
                         stopOrContinue(new RuntimeException(
