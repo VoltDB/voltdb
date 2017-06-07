@@ -2518,13 +2518,13 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
-     * The host Ids (or hostNums) are 0,1,2...m_hostCount-1
+     * verify that none of the patterns exist in any of the existing hosts
      */
     public boolean verifyRegexesExistInAllHosts(List<String> patterns) {
         return IntStream.range(0, m_hostCount).allMatch(id -> preCompLogContains(id, patterns));
     }
 
-    public boolean verifyRegexesNotExistInAllHosts(List<String> patterns) {
+    public boolean verifyRegexesNotExistInAnyHosts(List<String> patterns) {
         return IntStream.range(0, m_hostCount).allMatch(id -> preCompLogNotContains(id, patterns));
     }
 }

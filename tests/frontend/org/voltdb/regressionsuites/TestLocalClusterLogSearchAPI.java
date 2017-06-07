@@ -138,6 +138,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
             cluster.verifyRegexesExist(Arrays.asList(new Integer[] {i}),
                     Arrays.asList(new String[] {".*VoltDB [a-zA-Z]* Edition.*"}));
         }
+        cluster.verifyRegexesNotExistInAnyHosts(Arrays.asList(new String[] {".*FATAL.*"}));
     }
 
     /*
