@@ -30,6 +30,7 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
+import org.voltdb.UserDefinedFunctionManager.UserDefinedFunctionRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
@@ -92,8 +93,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** Create a ByteBuffer (in a container) for the C++ side to share time measurements and
         the success / fail status for fragments in a batch. */
-    private BBContainer perFragmentStatsBufferC = null;
-    private ByteBuffer perFragmentStatsBuffer = null;
+    private BBContainer m_perFragmentStatsBufferC = null;
+    private ByteBuffer m_perFragmentStatsBuffer = null;
+
+    // This a shared buffer for UDFs. The top end and the EE use this buffer to exchange the
+    // function parameters and the return value.
+    private BBContainer m_udfBufferC = null;
+    private ByteBuffer m_udfBuffer = null;
 
     /**
      * A deserializer backed by a direct byte buffer, for fast access from C++.
@@ -170,6 +176,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         setupPsetBuffer(smallBufferSize);
         setupPerFragmentStatsBuffer(smallBufferSize);
+        setupUDFBuffer(2 * 1024 * 1024);
         updateEEBufferPointers();
 
         updateHashinator(hashinatorConfig);
@@ -179,7 +186,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     final void updateEEBufferPointers() {
         int errorCode = nativeSetBuffers(pointer,
                 m_psetBuffer, m_psetBuffer.capacity(),
-                perFragmentStatsBuffer, perFragmentStatsBuffer.capacity(),
+                m_perFragmentStatsBuffer, m_perFragmentStatsBuffer.capacity(),
+                m_udfBuffer, m_udfBuffer.capacity(),
                 m_firstDeserializer.buffer(), m_firstDeserializer.buffer().capacity(),
                 m_nextDeserializer.buffer(), m_nextDeserializer.buffer().capacity(),
                 m_exceptionBuffer, m_exceptionBuffer.capacity());
@@ -197,13 +205,23 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     final void setupPerFragmentStatsBuffer(int size) {
-        if (perFragmentStatsBuffer != null) {
-            perFragmentStatsBufferC.discard();
-            perFragmentStatsBuffer = null;
+        if (m_perFragmentStatsBuffer != null) {
+            m_perFragmentStatsBufferC.discard();
+            m_perFragmentStatsBuffer = null;
         }
 
-        perFragmentStatsBufferC = DBBPool.allocateDirect(size);
-        perFragmentStatsBuffer = perFragmentStatsBufferC.b();
+        m_perFragmentStatsBufferC = DBBPool.allocateDirect(size);
+        m_perFragmentStatsBuffer = m_perFragmentStatsBufferC.b();
+    }
+
+    final void setupUDFBuffer(int size) {
+        if (m_udfBuffer != null) {
+            m_udfBufferC.discard();
+            m_udfBuffer = null;
+        }
+
+        m_udfBufferC = DBBPool.allocateDirect(size);
+        m_udfBuffer = m_udfBufferC.b();
     }
 
     final void clearPsetAndEnsureCapacity(int size) {
@@ -224,18 +242,29 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     final void clearPerFragmentStatsAndEnsureCapacity(int batchSize) {
-        assert(perFragmentStatsBuffer != null);
+        assert(m_perFragmentStatsBuffer != null);
         // Determine the required size of the per-fragment stats buffer:
         // int8_t perFragmentTimingEnabled
         // int32_t succeededFragmentsCount
         // succeededFragmentsCount * sizeof(int64_t) for duration time numbers.
         int size = 1 + 4 + batchSize * 8;
-        if (size > perFragmentStatsBuffer.capacity()) {
+        if (size > m_perFragmentStatsBuffer.capacity()) {
             setupPerFragmentStatsBuffer(size);
             updateEEBufferPointers();
         }
         else {
-            perFragmentStatsBuffer.clear();
+            m_perFragmentStatsBuffer.clear();
+        }
+    }
+
+    final void clearUDFBufferAndEnsureCapacity(int size) {
+        assert(m_udfBuffer != null);
+        if (size > m_udfBuffer.capacity()) {
+            setupUDFBuffer(size);
+            updateEEBufferPointers();
+        }
+        else {
+            m_udfBuffer.clear();
         }
     }
 
@@ -278,8 +307,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_emptyDeserializerBuffer.discard();
         m_psetBufferC.discard();
         m_psetBuffer = null;
-        perFragmentStatsBufferC.discard();
-        perFragmentStatsBuffer = null;
+        m_perFragmentStatsBufferC.discard();
+        m_perFragmentStatsBuffer = null;
+        m_udfBufferC.discard();
+        m_udfBuffer = null;
         LOG.trace("Released Execution Engine.");
     }
 
@@ -312,25 +343,25 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     // The timing is off by default.
     @Override
     public void setPerFragmentTimingEnabled(boolean enabled) {
-        perFragmentStatsBuffer.clear();
-        perFragmentStatsBuffer.put((byte)(enabled ? 1 : 0));
+        m_perFragmentStatsBuffer.clear();
+        m_perFragmentStatsBuffer.put((byte)(enabled ? 1 : 0));
     }
 
     // Extract the per-fragment stats from the buffer.
     @Override
     public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
-        perFragmentStatsBuffer.clear();
+        m_perFragmentStatsBuffer.clear();
         // Discard the first byte since it is the timing on/off switch.
-        perFragmentStatsBuffer.get();
-        int succeededFragmentsCount = perFragmentStatsBuffer.getInt();
+        m_perFragmentStatsBuffer.get();
+        int succeededFragmentsCount = m_perFragmentStatsBuffer.getInt();
         if (executionTimesOut != null) {
             assert(executionTimesOut.length >= succeededFragmentsCount);
             for (int i = 0; i < succeededFragmentsCount; i++) {
-                executionTimesOut[i] = perFragmentStatsBuffer.getLong();
+                executionTimesOut[i] = m_perFragmentStatsBuffer.getLong();
             }
             // This is the time for the failed fragment.
             if (succeededFragmentsCount < executionTimesOut.length) {
-                executionTimesOut[succeededFragmentsCount] = perFragmentStatsBuffer.getLong();
+                executionTimesOut[succeededFragmentsCount] = m_perFragmentStatsBuffer.getLong();
             }
         }
         return succeededFragmentsCount;
@@ -450,7 +481,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("Retrieving VoltTable:" + tableId);
         }
-        //Clear is destructive, do it before the native call
+        // Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
         final int errorCode = nativeSerializeTable(pointer, tableId, m_nextDeserializer.buffer(),
                 m_nextDeserializer.buffer().capacity());
@@ -713,6 +744,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         assert(buffer != null);
         assert(m_fallbackBuffer == null);
         m_fallbackBuffer = buffer;
+    }
+
+    public int callJavaUserDefinedFunction(int functionId) {
+        UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
+        assert(udfRunner != null);
+        udfRunner.call(m_udfBuffer);
+        return 0;
     }
 
     @Override

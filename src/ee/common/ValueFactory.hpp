@@ -211,6 +211,11 @@ public:
         return value.castAsString();
     }
 
+    static NValue getNValueOfType(const ValueType type) {
+        NValue retval(type);
+        return retval;
+    }
+
     static NValue nvalueFromSQLDefaultType(const ValueType type, const std::string &value, Pool* pool) {
         switch (type) {
             case VALUE_TYPE_NULL:

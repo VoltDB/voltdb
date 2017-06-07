@@ -93,6 +93,9 @@ class Topend {
     /** Delete any data for the specified block that is stored on disk. */
     virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
 
+    // Call into Java top end to execute a user-defined function
+    virtual int callJavaUserDefinedFunction(int32_t functionId) = 0;
+
     virtual ~Topend()
     {
     }
@@ -137,6 +140,8 @@ public:
     virtual bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block);
 
     virtual bool releaseLargeTempTableBlock(int64_t blockId);
+
+    int callJavaUserDefinedFunction(int32_t functionId);
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;

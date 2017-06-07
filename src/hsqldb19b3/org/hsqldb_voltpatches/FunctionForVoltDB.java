@@ -426,7 +426,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         private static int udfCount = 0;
 
-        static void addUserDefinedFunctionId(String functionName, Type returnType, Type[] parameterTypes, short[] syntax) {
+        static int addUserDefinedFunctionId(String functionName, Type returnType, Type[] parameterTypes, short[] syntax) {
             FunctionId fid = by_LC_name.get(functionName);
             if (fid == null) {
                 int seqId = udfCount + FUNC_VOLT_UDF_ID_START;
@@ -434,6 +434,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 fid = new FunctionId(functionName, returnType, seqId, -1, parameterTypes, syntax);
                 by_LC_name.put(functionName, fid);
             }
+            return fid.m_id;
         }
     }
 
@@ -825,7 +826,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         return sb.toString();
     }
 
-    public static void registerUserDefinedFunction(String functionName, Class<?> returnTypeClass, Class<?>[] parameterTypeClasses) {
+    public static int registerUserDefinedFunction(String functionName, Class<?> returnTypeClass, Class<?>[] parameterTypeClasses) {
         Type returnType = Type.getDefaultTypeWithSize(Types.getParameterSQLTypeNumber(returnTypeClass));
         Type[] parameterTypes = new Type[parameterTypeClasses.length];
         for (int i = 0; i < parameterTypeClasses.length; i++) {
@@ -848,7 +849,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             syntax[idx++] = Tokens.QUESTION;
         }
         syntax[syntax.length - 1] = Tokens.CLOSEBRACKET;
-        FunctionId.addUserDefinedFunctionId(functionName, returnType, parameterTypes, syntax);
+        return FunctionId.addUserDefinedFunctionId(functionName, returnType, parameterTypes, syntax);
     }
 
     public static void deregisterUserDefinedFunction(String functionName) {

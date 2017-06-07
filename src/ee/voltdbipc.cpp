@@ -649,7 +649,8 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_exceptionBuffer = new char[MAX_MSG_SZ];
         m_engine->setBuffers(NULL, 0,
                              m_perFragmentStatsBuffer, MAX_MSG_SZ,
-                             NULL, 0,
+                             NULL, 0, // udfBuffer, we will come back to this part later.
+                             NULL, 0, // firstResultBuffer
                              m_reusedResultBuffer, MAX_MSG_SZ,
                              m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
