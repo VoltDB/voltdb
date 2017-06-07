@@ -1530,7 +1530,8 @@ public class LocalCluster extends VoltServerConfig {
         }
 
         // For some mythical reason rejoinHostId is not actually used for the newly created host,
-        // hostNum is used by default
+        // hostNum is used by default (in fact hostNum should equal to hostId, otherwise some tests
+        // may fail)
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
@@ -2475,6 +2476,7 @@ public class LocalCluster extends VoltServerConfig {
         m_regexResults[hostNum][regexId].set(false);
     }
 
+    // hostNum = hostId in all cases
     public boolean logContains(int hostNum, int regexId) {
         assert(m_enablePreCompileRegex);
         return m_regexResults[hostNum][regexId].get();

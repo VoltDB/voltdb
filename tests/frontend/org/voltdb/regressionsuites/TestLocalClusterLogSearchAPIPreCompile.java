@@ -23,8 +23,6 @@
 
 package org.voltdb.regressionsuites;
 
-import static org.junit.Assert.assertEquals;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,9 +59,10 @@ public class TestLocalClusterLogSearchAPIPreCompile extends JUnit4LocalClusterTe
         builder.setUseDDLSchema(true);
 
         List<String> patterns = new ArrayList<>();
-        patterns.add("Initialized VoltDB root directory");
-        patterns.add(".*VoltDB [a-zA-Z]* Edition.*");
-        patterns.add("VoltDB Community Edition only supports .*");
+        patterns.add("Initialized VoltDB root directory");  // pattern #0
+        patterns.add(".*VoltDB [a-zA-Z]* Edition.*");   // pattern #1
+        patterns.add("Host 1 failed");  // pattern #2
+        patterns.add("VoltDB Community Edition only supports .*");  // pattern #3
 
         cluster = new LocalCluster("collect.jar", false, patterns,
                 SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
@@ -98,38 +97,35 @@ public class TestLocalClusterLogSearchAPIPreCompile extends JUnit4LocalClusterTe
     /*
      * Test the log search utility when a single host is shutdown
      */
-    // @Test
+    @Test
     public void testHostShutDownLogSearch() throws Exception {
         // Shutdown a single host and restart
         cluster.killSingleHost(1);
 
-        cluster.allHostLogsContain("Host 1 failed");
+        cluster.allLogsContain(2);
+        // cluster.allHostLogsContain("Host 1 failed");
 
         cluster.setNewCli(false);  // This is needed to perform rejoin
         cluster.recoverOne(1, 1, "");
 
         // In community edition this should fail ? Since rejoin is only supported in enterprise
         // edition
-        boolean rejoinMsg = cluster.hostLogContains(1, "VoltDB Community Edition only supports .*") // failure
-                            || cluster.hostLogContains(1, "Initializing VoltDB .*");    // Success
-        assertEquals(true, rejoinMsg);
+        cluster.allLogsContain(3);
     }
 
     /*
      * Test the log search utility when the whole LocalCluster is shutdown and restarted
      */
-    // @Test
+    @Test
     public void testClusterShutdownLogSearch() throws Exception {
         // Shutdown and startup the whole cluster
         cluster.shutDown();    // After shutdown the in-memory logs are cleared
         cluster.startUp();
 
-        // Test the log search utility
-        assertEquals(true, cluster.allInitLogsContain("Initialized VoltDB root directory"));
-        assertEquals(true, cluster.allHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
-        for (int i : cluster.getHostIds()) {
-            // No init log after restart (newCli == false)
-            assertEquals(true, cluster.hostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
+        cluster.allLogsContain(0);
+        cluster.allLogsContain(1);
+        for (int i = 0; i < HOSTS; i++) {
+            cluster.logContains(i, 1);
         }
     }
 }
