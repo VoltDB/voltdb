@@ -149,8 +149,6 @@ public class LocalCluster extends VoltServerConfig {
     /*
      * Patterns are searched on the fly
      */
-    // Set to indicate whether searching for a list of pre-compiled regexes is enabled
-    private boolean m_enablePreCompileRegex = false;
     // The regexes are used to search within each generated line of logs on the fly
     private List<Pattern> m_regexes = null; // read-only after setup
     // The array to store the results of matches (2-dimensional since for each host we may have
@@ -283,7 +281,6 @@ public class LocalCluster extends VoltServerConfig {
     {
         this(jarFileName, siteCount, hostCount, kfactor, target, null);
         m_hasLocalServer = hasLocalServer;
-        m_enablePreCompileRegex = true;
         m_regexResults = new AtomicBoolean[hostCount][regexes.size()];
         for (int i = 0; i < hostCount; i++) {
             for (int j = 0; j < regexes.size(); j++) {
@@ -941,7 +938,7 @@ public class LocalCluster extends VoltServerConfig {
             m_logs.clear();
             m_initLogFilePath.clear();
         }
-        if (m_enablePreCompileRegex) {
+        if (m_regexes != null) {
             resetRegexResults();
         }
         int oopStartIndex = 0;
@@ -1742,7 +1739,7 @@ public class LocalCluster extends VoltServerConfig {
             m_logs.clear();
             m_initLogFilePath.clear();
         }
-        if (m_enablePreCompileRegex) {
+        if (m_regexes != null) {
             resetRegexResults();
         }
 
@@ -1793,7 +1790,7 @@ public class LocalCluster extends VoltServerConfig {
                     buffer.delete(0, buffer.length());
                 }
             }
-            if (m_enablePreCompileRegex) {
+            if (m_regexes != null) {
                 for (AtomicBoolean bool : m_regexResults[hostNum]) {
                     bool.set(false);
                 }
@@ -2472,18 +2469,18 @@ public class LocalCluster extends VoltServerConfig {
 
     // Reset the host's regex search result
     public void resetHostRegexResult(int hostNum, int regexId) {
-        assert(m_enablePreCompileRegex);
+        assert(m_regexes != null);
         m_regexResults[hostNum][regexId].set(false);
     }
 
     // hostNum = hostId in all cases
     public boolean logContains(int hostNum, int regexId) {
-        assert(m_enablePreCompileRegex);
+        assert(m_regexes != null);
         return m_regexResults[hostNum][regexId].get();
     }
 
     public boolean allLogsContain(int regexId) {
-        assert(m_enablePreCompileRegex);
+        assert(m_regexes != null);
         for (int i = 0; i < m_regexResults.length; i++) {
             if (!m_regexResults[i][regexId].get()) { return false; }
         }

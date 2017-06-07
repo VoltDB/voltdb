@@ -25,6 +25,9 @@ package org.voltdb.regressionsuites;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -56,15 +59,6 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         builder.addProcedures(CrashJVM.class);
         builder.addProcedures(CrashVoltDBProc.class);
         builder.setUseDDLSchema(true);
-
-        cluster = new LocalCluster(false, true, "collect.jar",
-                SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        boolean success = cluster.compile(builder);
-        assert (success);
-        cluster.startUp(true);
-        listener = cluster.getListenerAddresses().get(0);
-        client = ClientFactory.createClient();
-        client.createConnection(listener);
     }
 
     @After
@@ -78,6 +72,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
      */
     @Test
     public void testLogSearch() throws Exception {
+        setupLogSearch();
         // Test the log search utility
         assertEquals(true, cluster.allInitLogsContain("Initialized VoltDB root directory"));
         assertEquals(true, cluster.allHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
@@ -92,6 +87,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
      */
     @Test
     public void testHostShutDownLogSearch() throws Exception {
+        setupLogSearch();
         // Shutdown a single host and restart
         cluster.killSingleHost(1);
 
@@ -112,6 +108,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
      */
     @Test
     public void testClusterShutdownLogSearch() throws Exception {
+        setupLogSearch();
         // Shutdown and startup the whole cluster
         cluster.shutDown();    // After shutdown the in-memory logs are cleared
         cluster.startUp();
@@ -123,5 +120,85 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
             // No init log after restart (newCli == false)
             assertEquals(true, cluster.hostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
         }
+    }
+
+    /*
+     * Conventional test to check the logs when the cluster is correctly initialized and running
+     */
+    @Test
+    public void testPreCompiledLogSearch() throws Exception {
+        setupPreCompiledLogSearch();
+        cluster.allLogsContain(0);
+        cluster.allLogsContain(1);
+
+        for (int i = 0; i < HOSTS; i++) {
+            cluster.logContains(i, 0);
+            cluster.logContains(i, 1);
+        }
+    }
+
+    /*
+     * Test the log search utility when a single host is shutdown
+     */
+    @Test
+    public void testPreCompiledHostShutDownLogSearch() throws Exception {
+        setupPreCompiledLogSearch();
+        // Shutdown a single host and restart
+        cluster.killSingleHost(1);
+
+        cluster.allLogsContain(2);
+        // cluster.allHostLogsContain("Host 1 failed");
+
+        cluster.setNewCli(false);  // This is needed to perform rejoin
+        cluster.recoverOne(1, 1, "");
+
+        // In community edition this should fail ? Since rejoin is only supported in enterprise
+        // edition
+        cluster.allLogsContain(3);
+    }
+
+    /*
+     * Test the log search utility when the whole LocalCluster is shutdown and restarted
+     */
+    @Test
+    public void testPreCompiledClusterShutdownLogSearch() throws Exception {
+        setupPreCompiledLogSearch();
+        // Shutdown and startup the whole cluster
+        cluster.shutDown();
+        cluster.startUp();
+
+        cluster.allLogsContain(0);
+        cluster.allLogsContain(1);
+        for (int i = 0; i < HOSTS; i++) {
+            cluster.logContains(i, 1);
+        }
+    }
+
+    private void setupLogSearch() throws Exception {
+        cluster = new LocalCluster(false, true, "collect.jar",
+                SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compile(builder);
+        assert (success);
+        cluster.startUp(true);
+        listener = cluster.getListenerAddresses().get(0);
+        client = ClientFactory.createClient();
+        client.createConnection(listener);
+    }
+
+    private void setupPreCompiledLogSearch() throws Exception {
+        List<String> patterns = new ArrayList<>();
+        patterns.add("Initialized VoltDB root directory");  // pattern #0
+        patterns.add(".*VoltDB [a-zA-Z]* Edition.*");   // pattern #1
+        patterns.add("Host 1 failed");  // pattern #2
+        patterns.add("VoltDB Community Edition only supports .*");  // pattern #3
+
+        cluster = new LocalCluster("collect.jar", false, patterns,
+                SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compile(builder);
+        assert (success);
+        cluster.startUp(true);
+        listener = cluster.getListenerAddresses().get(0);
+        client = ClientFactory.createClient();
+        client.createConnection(listener);
     }
 }
