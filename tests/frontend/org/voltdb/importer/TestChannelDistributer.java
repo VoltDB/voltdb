@@ -55,7 +55,7 @@ public class TestChannelDistributer extends ZKTestBase {
     private final static String YO   = "yo";
 
     Map<String, ZooKeeper> zks;
-    Map<String, ZKChannelDistributer> distributers;
+    Map<String, ChannelDistributer> distributers;
     BlockingDeque<ImporterChannelAssignment> queue;
 
     public class Collector implements ChannelChangeCallback {
@@ -115,10 +115,10 @@ public class TestChannelDistributer extends ZKTestBase {
                 .put(UNO,  getClient(1))
                 .put(DUE,  getClient(2))
                 .build();
-        distributers = ImmutableMap.<String, ZKChannelDistributer>builder()
-                .put(ZERO, new ZKChannelDistributer(zks.get(ZERO), ZERO))
-                .put(UNO,  new ZKChannelDistributer(zks.get(UNO), UNO))
-                .put(DUE,  new ZKChannelDistributer(zks.get(DUE), DUE))
+        distributers = ImmutableMap.<String, ChannelDistributer>builder()
+                .put(ZERO, new ChannelDistributer(zks.get(ZERO), ZERO))
+                .put(UNO,  new ChannelDistributer(zks.get(UNO), UNO))
+                .put(DUE,  new ChannelDistributer(zks.get(DUE), DUE))
                 .build();
         for (ChannelDistributer cd: distributers.values()) {
             cd.registerCallback(YO, new Collector());
@@ -162,7 +162,7 @@ public class TestChannelDistributer extends ZKTestBase {
         assertEquals(expected, actual);
 
         int leaderCount = 0;
-        for (ZKChannelDistributer distributer: distributers.values()) {
+        for (ChannelDistributer distributer: distributers.values()) {
             if (distributer.m_isLeader) {
                 ++leaderCount;
             }
@@ -187,7 +187,7 @@ public class TestChannelDistributer extends ZKTestBase {
             Thread.sleep(50);
             settled = true;
             int stamp = distributers.get(ZERO).m_specs.getStamp();
-            for (ZKChannelDistributer distributer: distributers.values()) {
+            for (ChannelDistributer distributer: distributers.values()) {
                 settled = settled && stamp == distributer.m_specs.getStamp();
             }
         }
@@ -207,7 +207,7 @@ public class TestChannelDistributer extends ZKTestBase {
 
     @After
     public void tearDown() throws Exception {
-        for (ZKChannelDistributer distributer: distributers.values()) {
+        for (ChannelDistributer distributer: distributers.values()) {
             distributer.shutdown();
         }
         tearDownZK();

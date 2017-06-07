@@ -27,6 +27,7 @@ import static org.junit.Assert.*;
 
 import com.google_voltpatches.common.io.Files;
 import org.junit.*;
+import org.mockito.Mockito;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.catalog.Catalog;
@@ -62,7 +63,7 @@ public class TestImportManager {
     private Set<URI> m_defaultImporters = null;
     private File m_voltDbRoot = null;
     private ImportManager m_manager = null;
-    private MockChannelDistributer m_mockChannelDistributer = null;
+    private ChannelDistributer m_mockChannelDistributer = null;
     private ImporterStatsCollector m_statsCollector = null;
 
     private static final int RESTART_CHECK_MAX_MS              = (int) TimeUnit.SECONDS.toMillis(5);
@@ -205,7 +206,7 @@ public class TestImportManager {
         m_defaultImporters = generateExpectedImporters(NUM_IMPORTERS_FOR_TEST);
 
         m_statsCollector = new ImporterStatsCollector(SITEID);
-        m_mockChannelDistributer = new MockChannelDistributer(Integer.toString(HOSTID));
+        m_mockChannelDistributer = Mockito.mock(ChannelDistributer.class);
         ImportManager.initializeWithMocks(m_voltDbRoot, HOSTID, m_initialCatalogContext, m_mockChannelDistributer, m_statsCollector);
         m_manager = ImportManager.instance();
         JUnitImporterMessenger.initialize();

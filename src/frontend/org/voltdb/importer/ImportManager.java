@@ -59,7 +59,6 @@ public class ImportManager implements ChannelChangeCallback {
 
     /** Obtain the global ImportManager via its instance() method */
     protected static ImportManager m_self;
-    private final HostMessenger m_messenger;
 
     protected final int m_myHostId;
     protected ChannelDistributer m_distributer;
@@ -87,9 +86,8 @@ public class ImportManager implements ChannelChangeCallback {
         return ModuleManager.instance();
     }
 
-    protected ImportManager(int myHostId, HostMessenger messenger, ImporterStatsCollector statsCollector) {
+    private ImportManager(int myHostId, ImporterStatsCollector statsCollector) {
         m_myHostId = myHostId;
-        m_messenger = messenger;
         m_statsCollector = statsCollector;
         m_moduleManager = getModuleManager();
     }
@@ -109,26 +107,26 @@ public class ImportManager implements ChannelChangeCallback {
      */
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
         ImporterStatsCollector statsCollector = new ImporterStatsCollector(myHostId);
-        ImportManager em = new ImportManager(myHostId, messenger, statsCollector);
+        ImportManager em = new ImportManager(myHostId, statsCollector);
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 StatsSelector.IMPORTER,
                 myHostId,
                 statsCollector);
 
         m_self = em;
-        em.initializeChannelDistributer(new ZKChannelDistributer(messenger.getZK(), String.valueOf(myHostId)));
+        em.initializeChannelDistributer(new ChannelDistributer(messenger.getZK(), String.valueOf(myHostId)));
         em.applyCatalogToImporters(catalogContext, false);
     }
 
-    /** FOR UNIT TESTING ONLY: creates an ImportManager with fewer dependencies (no VoltDB, HostMessenger, or Zookeeper).
-     * @param myHostId
-     * @param initialCatalogCtxt
-     * @param mockChannelDistributer
-     * @param myStatsCollector
+    /** Creates an ImportManager that allows unit tests to control or mock its dependencies.
+     * @param myHostId host id in cluster
+     * @param initialCatalogCtxt current catalog context
+     * @param mockChannelDistributer Channel Distributer to use. Must not be null, but can be mocked.
+     * @param myStatsCollector Stats collector to use
      */
     public static synchronized void initializeWithMocks(File voltDbRoot, int myHostId, CatalogContext initialCatalogCtxt, ChannelDistributer mockChannelDistributer, ImporterStatsCollector myStatsCollector) {
         ModuleManager.initializeCacheRoot(new File(voltDbRoot, VoltDB.MODULE_CACHE));
-        ImportManager em = new ImportManagerWithMocks(myHostId, myStatsCollector);
+        ImportManager em = new ImportManager(myHostId, myStatsCollector);
         m_self = em;
         em.initializeChannelDistributer(mockChannelDistributer);
         em.applyCatalogToImporters(initialCatalogCtxt, false);
