@@ -158,9 +158,6 @@ import java.util.regex.Pattern;
                     // Check for patterns on the fly
                     if (m_regexResults != null) {
                         for (int i = 0; i < m_regexes.size(); i++) {
-//                            System.err.println("=========== host id : " + m_hostId);
-//                            System.err.println("=========== m_regexes size: " + m_regexes.size());
-//                            System.err.println("=========== m_regexResults: " + m_regexResults.length + " " + m_regexResults[0].length);
                             // if the pattern still has not appeared in the current host log
                             if (m_hostId != Integer.MAX_VALUE && !m_regexResults[m_hostId][i].get()) {
                                 boolean r = m_regexes.get(i).matcher(data).find();
