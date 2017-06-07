@@ -23,6 +23,7 @@
 package org.voltdb.regressionsuites;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,6 +38,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -156,6 +158,8 @@ public class LocalCluster extends VoltServerConfig {
     // The boolean results are stored in the same order as the provided regexes list for each
     // host
     private AtomicBoolean[][] m_regexResults = null;
+    // Store the pre-compiled regex strings
+    private HashMap<String, Integer> m_regexStrings = null;
 
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
@@ -282,15 +286,18 @@ public class LocalCluster extends VoltServerConfig {
         this(jarFileName, siteCount, hostCount, kfactor, target, null);
         m_hasLocalServer = hasLocalServer;
         m_regexResults = new AtomicBoolean[hostCount][regexes.size()];
+        m_regexStrings = new HashMap<>();
         for (int i = 0; i < hostCount; i++) {
             for (int j = 0; j < regexes.size(); j++) {
                 m_regexResults[i][j] = new AtomicBoolean(false);
             }
         }
         m_regexes = new ArrayList<>();
-        for (String s : regexes) {
+        for (int i = 0; i < regexes.size(); i++) {
+            String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
             m_regexes.add(p);
+            m_regexStrings.put(s, i);
         }
     }
 
@@ -939,7 +946,7 @@ public class LocalCluster extends VoltServerConfig {
             m_initLogFilePath.clear();
         }
         if (m_regexes != null) {
-            resetRegexResults();
+            resetAllPreCompRegexResults();
         }
         int oopStartIndex = 0;
 
@@ -1740,7 +1747,7 @@ public class LocalCluster extends VoltServerConfig {
             m_initLogFilePath.clear();
         }
         if (m_regexes != null) {
-            resetRegexResults();
+            resetAllPreCompRegexResults();
         }
 
         VoltServerConfig.removeInstance(this);
@@ -2454,8 +2461,21 @@ public class LocalCluster extends VoltServerConfig {
         return m_logs.keySet();
     }
 
+    /*
+     * Helper functions when pre-compiled regex search is enabled.
+     * The patterns to be checked must have been added in the constructor.
+     */
+
+    // Reset the host's regex search result
+    public void resetPreCompRegexResult(int hostNum, String regex) {
+        assert(m_regexes != null);
+        assert(hostNum < m_hostCount);
+        assert(m_regexStrings.containsKey(regex));
+        m_regexResults[hostNum][m_regexStrings.get(regex)].set(false);
+    }
+
     // Reset all the regex results to false
-    public void resetRegexResults() {
+    public void resetAllPreCompRegexResults() {
         for (int i = 0; i < m_regexResults.length; i++) {
             for (int j = 0; j < m_regexes.size(); j++) {
                 m_regexResults[i][j].set(false);
@@ -2464,26 +2484,47 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
-     * Helper functions when pre-compiled regex search is enabled
+     * Helper function to check all patterns appear in the specified host
+     * Maybe all of them should be set to public ?
      */
-
-    // Reset the host's regex search result
-    public void resetHostRegexResult(int hostNum, int regexId) {
-        assert(m_regexes != null);
-        m_regexResults[hostNum][regexId].set(false);
-    }
-
     // hostNum = hostId in all cases
-    public boolean logContains(int hostNum, int regexId) {
-        assert(m_regexes != null);
-        return m_regexResults[hostNum][regexId].get();
+    private boolean regexInHost(int hostNum, String regex) {
+        assertTrue(m_regexes != null);
+        assertTrue(hostNum >=0 && hostNum < m_hostCount);
+        assertTrue(m_regexStrings.containsKey(regex));
+        return m_regexResults[hostNum][m_regexStrings.get(regex)].get();
     }
 
-    public boolean allLogsContain(int regexId) {
-        assert(m_regexes != null);
-        for (int i = 0; i < m_regexResults.length; i++) {
-            if (!m_regexResults[i][regexId].get()) { return false; }
-        }
-        return true;
+    private boolean  preCompLogContains(int hostId, List<String> patterns) {
+        return patterns.stream().allMatch(s -> regexInHost(hostId, s));
+    }
+
+    /*
+     * Helper function to check non of the patterns appear in the specified host
+     */
+    private boolean preCompLogNotContains(int hostId, List<String> patterns) {
+        return patterns.stream().allMatch(s -> !regexInHost(hostId, s));
+    }
+
+    // Verify that the patterns provided exist in all the specified hosts
+    // These patterns should have been added when constructing the class
+    public boolean verifyRegexesExist(List<Integer> hostIds, List<String> patterns) {
+        return hostIds.stream().allMatch(id -> preCompLogContains(id, patterns));
+    }
+
+    // Verify that none of the patterns provided exist in any of the specified hosts
+    public boolean verifyRegexesNotExist(List<Integer> hostIds, List<String> patterns) {
+        return hostIds.stream().allMatch(id -> preCompLogNotContains(id, patterns));
+    }
+
+    /*
+     * The host Ids (or hostNums) are 0,1,2...m_hostCount-1
+     */
+    public boolean verifyRegexesExistInAllHosts(List<String> patterns) {
+        return IntStream.range(0, m_hostCount).allMatch(id -> preCompLogContains(id, patterns));
+    }
+
+    public boolean verifyRegexesNotExistInAllHosts(List<String> patterns) {
+        return IntStream.range(0, m_hostCount).allMatch(id -> preCompLogNotContains(id, patterns));
     }
 }

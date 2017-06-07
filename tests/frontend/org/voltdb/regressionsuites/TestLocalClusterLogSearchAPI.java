@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.After;
@@ -128,12 +129,14 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     @Test
     public void testPreCompiledLogSearch() throws Exception {
         setupPreCompiledLogSearch();
-        cluster.allLogsContain(0);
-        cluster.allLogsContain(1);
+        cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {"Initialized VoltDB root directory"}));
+        cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {".*VoltDB [a-zA-Z]* Edition.*"}));
 
         for (int i = 0; i < HOSTS; i++) {
-            cluster.logContains(i, 0);
-            cluster.logContains(i, 1);
+            cluster.verifyRegexesExist(Arrays.asList(new Integer[] {i}),
+                    Arrays.asList(new String[] {"Initialized VoltDB root directory"}));
+            cluster.verifyRegexesExist(Arrays.asList(new Integer[] {i}),
+                    Arrays.asList(new String[] {".*VoltDB [a-zA-Z]* Edition.*"}));
         }
     }
 
@@ -146,16 +149,17 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         // Shutdown a single host and restart
         cluster.killSingleHost(1);
 
-        cluster.allLogsContain(2);
+        cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {"Host 1 failed"}));
 
-        cluster.resetRegexResults();
+        cluster.resetAllPreCompRegexResults();
 
         cluster.setNewCli(false);  // This is needed to perform rejoin
         cluster.recoverOne(1, 1, "");
 
         // In community edition this should fail ? Since rejoin is only supported in enterprise
         // edition
-        cluster.allLogsContain(3);
+        cluster.verifyRegexesExistInAllHosts(Arrays
+                .asList(new String[] {"VoltDB Community Edition only supports .*"}));
     }
 
     /*
@@ -168,10 +172,10 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         cluster.shutDown();
         cluster.startUp();
 
-        cluster.allLogsContain(0);
-        cluster.allLogsContain(1);
+        cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {".*VoltDB [a-zA-Z]* Edition.*"}));
         for (int i = 0; i < HOSTS; i++) {
-            cluster.logContains(i, 1);
+            cluster.verifyRegexesExist(Arrays.asList(new Integer[] {i}),
+                    Arrays.asList(new String[] {".*VoltDB [a-zA-Z]* Edition.*"}));
         }
     }
 
