@@ -399,7 +399,7 @@ public final class InvocationDispatcher {
             }
             else if ("@StopNode".equals(procName)) {
                 if (user.isAuthEnabled()) {
-                    CoreUtils.PrintGoodLookingLog(hostLog,
+                    CoreUtils.printAsciiArtLog(hostLog,
                                                   "User: " +
                                                   user.m_name +
                                                   " from " +
@@ -449,7 +449,7 @@ public final class InvocationDispatcher {
             }
             else if ("@SnapshotDelete".equals(procName)) {
                 if (user.isAuthEnabled()) {
-                    CoreUtils.PrintGoodLookingLog(hostLog,
+                    CoreUtils.printAsciiArtLog(hostLog,
                                                   "User: " +
                                                   user.m_name +
                                                   " from " +
@@ -461,7 +461,7 @@ public final class InvocationDispatcher {
             }
             else if ("@SnapshotRestore".equals(procName)) {
                 if (user.isAuthEnabled()) {
-                    CoreUtils.PrintGoodLookingLog(hostLog,
+                    CoreUtils.printAsciiArtLog(hostLog,
                                                   "User: " +
                                                   user.m_name +
                                                   " from " +
@@ -498,7 +498,7 @@ public final class InvocationDispatcher {
                     // should be printed out properly. The following message is printed at the node where
                     // the client is connected to.
                     String msg = "Admin: " + user.m_name + " from " + clientInfo + " issued a " + procName;
-                    CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
+                    CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
                 }
             }
         }

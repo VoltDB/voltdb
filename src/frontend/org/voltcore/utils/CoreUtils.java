@@ -1211,7 +1211,7 @@ public class CoreUtils {
      * @param msg   Message to be printed out beautifully
      * @param level Logging level
      */
-    public static void PrintGoodLookingLog(VoltLogger vLogger, String msg, Level level)
+    public static void printAsciiArtLog(VoltLogger vLogger, String msg, Level level)
     {
         if (vLogger == null || msg == null || level == Level.OFF) { return; }
 

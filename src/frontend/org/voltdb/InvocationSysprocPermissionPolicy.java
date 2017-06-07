@@ -67,7 +67,7 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
         // The non-authenticated information is logged on the host to indicate that
         // a user has tried to run a system procedure without proper authentication
         // (e.g. Pause, Resume, StopNode, Shutdown, Quiesce, SnapshotDelete, etc.)
-        CoreUtils.PrintGoodLookingLog(new VoltLogger("HOST"),
+        CoreUtils.printAsciiArtLog(new VoltLogger("HOST"),
                                       "User " + user.m_name +
                                       " from " + user.m_hostIP +
                                       " issued a non-authenticated " +
