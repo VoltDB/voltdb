@@ -24,12 +24,8 @@
 package org.voltdb.regressionsuites;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -37,12 +33,8 @@ import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster.FailureState;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.VoltFile;
 
 
 /** Tests that 'start' works with initialized schemas
@@ -54,36 +46,6 @@ final public class TestStartWithClassesOnly {
     static final int hostCount = 3;
     static final int kfactor   = 0;
     static final int clusterID = 0;
-
-    static void ensureAllCatalogDefaultArtifactsExists(InMemoryJarfile jarFile, String nameForDebugging) {
-        Set<String> files = jarFile.keySet();
-        assertTrue(nameForDebugging + " is empty!", files.size() > 0);
-        for (String artifact : CatalogUtil.CATALOG_DEFAULT_ARTIFACTS) {
-            // NOTE: autogen-ddl.sql IS required, as it contains the schema
-            if (!artifact.equals(CatalogUtil.CATALOG_EMPTY_DDL_FILENAME)) {
-                assertTrue(nameForDebugging + " does not contain " + artifact, files.contains(artifact));
-            }
-        }
-    }
-
-    /** Counts how many nodes contain staged catalogs (user-initialized schemas)
-     * @param cluster
-     * @return number of nodes in cluster that have staged catalogs
-     */
-    static int countNodesWithStagedCatalog(LocalCluster cluster) throws IOException {
-        final String pathWithinSubroot = File.separator + Constants.DBROOT + File.separator + CatalogUtil.STAGED_CATALOG_PATH;
-        int total = 0;
-        for (Map.Entry<String, String> entry : cluster.getHostRoots().entrySet()) {
-            assert( entry.getValue().contains(Constants.DBROOT) == false ) : entry.getValue();
-            File testFile = new VoltFile(entry.getValue() + pathWithinSubroot);
-            if (testFile.canRead() && (testFile.length() > 0)) {
-                InMemoryJarfile jar = new InMemoryJarfile(testFile);
-                ensureAllCatalogDefaultArtifactsExists(jar, testFile.getAbsolutePath());
-                total++;
-            }
-        }
-        return total;
-    }
 
     LocalCluster cluster = null;
 
@@ -144,7 +106,7 @@ final public class TestStartWithClassesOnly {
         assertEquals(1, response.getResults()[0].getRowCount());
 
         // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
-        int nodesWithStagedCatalog = TestStartWithClassesOnly.countNodesWithStagedCatalog(cluster);
+        int nodesWithStagedCatalog = TestStartWithSchema.countNodesWithStagedCatalog(cluster);
         assertEquals(hostCount, nodesWithStagedCatalog);
 
         client.close();

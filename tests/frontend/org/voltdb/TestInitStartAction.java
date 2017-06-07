@@ -493,7 +493,7 @@ final public class TestInitStartAction {
         assertEquals(5, classesFound);
 
         System.out.println("Writing " + classesFound + " classes to jar file");
-        File classesJarfile = File.createTempFile("TestInitStartWithClasses-procedures", ".jar");
+        File classesJarfile = File.createTempFile("TestInitStartWithClassesNoSchema-procedures", ".jar");
         classesJarfile.deleteOnExit();
         originalInMemoryJar.writeToFile(classesJarfile);
 
