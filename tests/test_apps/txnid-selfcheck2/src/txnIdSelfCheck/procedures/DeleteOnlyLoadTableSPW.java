@@ -23,20 +23,25 @@
 
 package txnIdSelfCheck.procedures;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 
-public class DeleteOnlyLoadTableMP extends VoltProcedure {
+public class DeleteOnlyLoadTableSPW extends VoltProcedure {
 
-    private final SQLStmt selectStmt = new SQLStmt("SELECT * FROM loadmp WHERE cid=?;");
-    private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM loadmp WHERE cid=?;");
+    private final SQLStmt selectStmt = new SQLStmt("SELECT * FROM T_PAYMENT50 WHERE pid=? and seq_no=?;");
+    private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM T_PAYMENT50 WHERE pid=? and seq_no=?;");
 
-    public VoltTable[] run(long cid, VoltTable vt) {
+    public VoltTable[] run(String cid, VoltTable vt) {
         if (vt.getRowCount() != 1)
             throw new VoltAbortException("expected data exception");
         VoltTableRow vtrow = vt.fetchRow(0);
-        if (cid != vtrow.getLong(0))
-            throw new VoltAbortException("cid column exception");
-        voltQueueSQL(selectStmt, cid);
+        if (! cid.equals(vtrow.getString(1)))
+            throw new VoltAbortException("pid column exception");;
+        String seq_no = vtrow.getString(0);
+        voltQueueSQL(selectStmt, cid, seq_no);
         VoltTable[] results = voltExecuteSQL(false);
         if (results.length != 1)
             throw new VoltAbortException("length exception");
@@ -53,8 +58,8 @@ public class DeleteOnlyLoadTableMP extends VoltProcedure {
             Object actual = row.get(c, vtype);
             if (!expected.equals(actual))
                 throw new VoltAbortException("actual data wrong column " + c + " expected: " + expected.toString() + " actual: " + actual.toString());
-        }
-        voltQueueSQL(deleteStmt, cid);
-        return voltExecuteSQL();
+            }
+        voltQueueSQL(deleteStmt, cid, seq_no);
+        return voltExecuteSQL(true);
     }
 }

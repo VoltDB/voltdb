@@ -109,6 +109,17 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         VoltTable[] results = client.callProcedure("@SystemCatalog", "PRIMARYKEYS").getResults();
         assertEquals(6, results[0].getColumnCount());
         System.out.println(results[0]);
+
+        results[0].advanceRow();
+        assertEquals("AA_T", results[0].get("TABLE_NAME", VoltType.STRING));
+        assertEquals("VOLTDB_AUTOGEN_CT__PK_AA_T_A1", results[0].get("PK_NAME", VoltType.STRING));
+        assertEquals("A1", results[0].get("COLUMN_NAME", VoltType.STRING));
+
+        results[0].advanceRow();
+        assertEquals("BB_V", results[0].get("TABLE_NAME", VoltType.STRING));
+        assertEquals("MATVIEW_PK_CONSTRAINT", results[0].get("PK_NAME", VoltType.STRING));
+        // ENG 6927 - ensure PRIMARYKEYS return correct column names for matviews
+        assertEquals("A1", results[0].get("COLUMN_NAME", VoltType.STRING));
     }
 
     public void testProceduresSelector() throws IOException, ProcCallException
