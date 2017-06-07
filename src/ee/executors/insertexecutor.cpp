@@ -72,6 +72,15 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 {
     VOLT_TRACE("init Insert Executor");
 
+    // static int cntr = 0;
+
+    // ++cntr;
+    // if (cntr % 5000 == 0) {
+    //     int* p = new int(32);
+    //     delete p;
+    //     printf("%d\n", ++(*p));
+    // }
+
     m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
     assert(m_node);
     assert(m_node->getTargetTable());

@@ -38,6 +38,7 @@ class BuildContext:
         self.MAJORVERSION = 0
         self.MINORVERSION = 0
         self.PATCHLEVEL   = 0
+        self.SANITIZE = ""
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
@@ -50,6 +51,8 @@ class BuildContext:
             if arg in ["CLANG", "CLANG++"]:
                 self.CC = "clang"
                 self.CXX = "clang++"
+            if arg.startswith("SANITIZE"):
+                self.SANITIZE=(arg.lower().split("="))[1]
         # Exec build.local if available, a python script provided with this
         # BuildContext object as the update-able symbol BUILD.  These example
         # build.local lines force the use of clang instead of gcc/g++.

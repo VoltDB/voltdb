@@ -204,7 +204,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
 
     jobject java_ee = env->NewGlobalRef(obj);
     if (java_ee == NULL) {
-        assert(!"Failed to allocate global reference to java EE.");
+        //assert(!"Failed to allocate global reference to java EE.");
         throw std::exception();
         return 0;
     }

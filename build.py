@@ -72,8 +72,12 @@ if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 7):
     CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
 
+if (CTX.compilerName() == 'clang' and len(CTX.SANITIZE) > 0):
+    CTX.CPPFLAGS += (" -fsanitize=%s" % CTX.SANITIZE)
+
 if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() == 5):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
+
 
 
 if CTX.PROFILE:
@@ -108,8 +112,10 @@ CTX.THIRD_PARTY_INPUT_PREFIX = "third_party/cpp"
 CTX.TEST_PREFIX = "tests/ee/"
 
 # linker flags
-CTX.LDFLAGS += """ -g3"""
+CTX.LDFLAGS += """ -L/usr/lib/llvm-3.8/lib/clang/3.8.0/lib/linux  -g3 """
 CTX.LASTLDFLAGS += """ -lpcre2-8 """
+#CTX.LASTLDFLAGS += """ -lpcre2-8 -lclang_rt.asan-x86_64"""
+#CTX.LASTLDFLAGS += """ -lpcre2-8 /usr/lib/llvm-3.8/lib/clang/3.8.0/lib/linux/libclang_rt.asan-x86_64.a"""
 CTX.LASTIPCLDFLAGS = """ -ldl """
 
 ###############################################################################

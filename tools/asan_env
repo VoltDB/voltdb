@@ -1,0 +1,9 @@
+export LD_PRELOAD=/usr/lib/llvm-3.8/lib/clang/3.8.0/lib/linux/libclang_rt.asan-x86_64.so
+export ASAN_OPTIONS=suppressions=${VOLTDB_HOME}/tools/asan.supp:handle_segv=0
+export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-3.8/bin/llvm-symbolizer
+
+echo
+echo LD_PRELOAD=${LD_PRELOAD}
+echo ASAN_OPTIONS=${ASAN_OPTIONS}
+echo ASAN_SYMBOLIZER_PATH=${ASAN_SYMBOLIZER_PATH}
+echo
