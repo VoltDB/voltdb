@@ -35,12 +35,12 @@ class LargeTempTable : public Table {
 
 public:
 
-    TableIterator& iterator() {
+    TableIterator iterator() {
         m_iter.reset(m_blockIds.begin());
         return m_iter;
     }
 
-    TableIterator& iteratorDeletingAsWeGo() {
+    TableIterator iteratorDeletingAsWeGo() {
         m_iter.reset(m_blockIds.begin());
         m_iter.setTempTableDeleteAsGo(true);
         return m_iter;

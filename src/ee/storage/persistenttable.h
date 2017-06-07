@@ -241,13 +241,12 @@ public:
         }
     }
 
-    // Return a table iterator by reference
-    TableIterator& iterator() {
+    TableIterator iterator() {
         m_iter.reset(m_data.begin());
         return m_iter;
     }
 
-    TableIterator& iteratorDeletingAsWeGo() {
+    TableIterator iteratorDeletingAsWeGo() {
         m_iter.reset(m_data.begin());
         m_iter.setTempTableDeleteAsGo(false);
         return m_iter;
