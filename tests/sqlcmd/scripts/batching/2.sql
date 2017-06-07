@@ -1,3 +1,4 @@
+
 CREATE INDEX idx ON mt ( p );
 
 CREATE VIEW mt2 (a, p, n, ms)

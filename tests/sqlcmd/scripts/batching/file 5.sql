@@ -1,10 +1,11 @@
-CREATE TABLE t4 (
+
+CREATE TABLE t5 (
     c1 VARCHAR(16) NOT NULL,
     c2 BIGINT DEFAULT 0 NOT NULL,
     c3 VARCHAR(36) DEFAULT '' NOT NULL
 );
 
-CREATE VIEW vt4(c1, c2, total)
+CREATE VIEW vt5 (c1, c2, total)
     AS SELECT c1, c2, COUNT(*)
-    FROM t4
+    FROM t5
     GROUP BY c1, c2;
