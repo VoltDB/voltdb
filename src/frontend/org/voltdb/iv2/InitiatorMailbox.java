@@ -371,6 +371,11 @@ public class InitiatorMailbox implements Mailbox
         m_scheduler.m_isLeader = false;
         m_repairLog.setLeaderState(false);
 
+        final boolean unitTest = "true".equals(System.getProperty("TEST_DISABLE_SPI_BALANCE", "false"));
+        if (unitTest) {
+            return;
+        }
+
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
