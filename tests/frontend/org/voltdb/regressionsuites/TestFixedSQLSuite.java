@@ -1671,7 +1671,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d BYTES) column 'VAR2'",
+                    String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d BYTES) column 'VAR80'",
                             var.length(), var.substring(0, VARCHAR_VARBINARY_THRESHOLD), 80)));
         }
 
