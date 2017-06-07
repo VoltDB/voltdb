@@ -1304,7 +1304,7 @@ public class VoltProjectBuilder {
         }
 
         // Have some yummy boilerplate!
-        File file = File.createTempFile("vdbTestDeployment", ".xml");
+        File file = File.createTempFile("myAppDeployment", ".tmp");
         JAXBContext context = JAXBContext.newInstance(DeploymentType.class);
         Marshaller marshaller = context.createMarshaller();
         marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT,

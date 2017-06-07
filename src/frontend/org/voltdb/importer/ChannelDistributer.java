@@ -101,7 +101,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  *  channels in their respective /import/host/[host-name] nodes. When a node leaves the mesh
  *  its assigned channels are redistributed among the surviving nodes
  */
-public class ChannelDistributer {
+public class ChannelDistributer implements ChannelChangeCallback {
 
     private final static VoltLogger LOG = new VoltLogger("IMPORT");
 
@@ -280,6 +280,7 @@ public class ChannelDistributer {
      * </ul>
      * @param zk
      * @param hostId
+     * @param queue
      */
     public ChannelDistributer(ZooKeeper zk, String hostId) {
         Preconditions.checkArgument(
@@ -557,6 +558,7 @@ public class ChannelDistributer {
         }
     }
 
+    @Override
     @Subscribe
     public void onChange(ImporterChannelAssignment assignment) {
         if (m_done.get()) {
@@ -585,6 +587,7 @@ public class ChannelDistributer {
         }
     }
 
+    @Override
     @Subscribe
     public void onClusterStateChange(VersionedOperationMode mode) {
         Optional<DistributerException> fault = Optional.absent();
