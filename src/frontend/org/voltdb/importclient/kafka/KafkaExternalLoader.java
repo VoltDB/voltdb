@@ -96,10 +96,10 @@ public class KafkaExternalLoader implements ImporterSupport {
         c_config.setProcedureCallTimeout(0);
 
         // Create the Volt client:
-        if (m_config.hosts == null || m_config.hosts.trim().isEmpty()) {
-            m_config.hosts = "localhost:" + Client.VOLTDB_SERVER_PORT;
+        if (m_config.servers == null || m_config.servers.trim().isEmpty()) {
+            m_config.servers = "localhost:" + Client.VOLTDB_SERVER_PORT;
         }
-        String[] hosts = m_config.hosts.split(",");
+        String[] hosts = m_config.servers.split(",");
         m_client = getVoltClient(c_config, hosts);
 
         if (m_config.useSuppliedProcedure) {
@@ -448,8 +448,8 @@ public class KafkaExternalLoader implements ImporterSupport {
         @Option(shortOpt = "m", desc = "Maximum errors allowed before terminating import")
         int maxerrors = 100;
 
-        @Option(desc = "Comma separated list of VoltDB servers (host:port) to connect to")
-        String hosts = "";
+        @Option(shortOpt = "s", desc = "Comma separated list of VoltDB servers (host[:port]) to connect to")
+        String servers = "";
 
         @Option(desc = "Username for connecting to VoltDB servers")
         String user = "";
