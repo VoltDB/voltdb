@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -1009,7 +1009,10 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     }
 }
 
-void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
+void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
+    UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
+    bool createUndoAction = fallible && (uq != NULL);
+
     // May not delete an already deleted tuple.
     assert(target.isActive());
 
@@ -1027,14 +1030,21 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         size_t drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentSpHandle,
                                               currentUniqueId, target, DR_RECORD_DELETE);
 
-        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-        if (uq && fallible) {
+        if (createUndoAction) {
             uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_DELETE)));
         }
     }
 
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
+
+    if (createUndoAction) {
+        target.setPendingDeleteOnUndoReleaseTrue();
+        ++m_tuplesPinnedByUndo;
+        ++m_invisibleTuplesPendingDeleteCount;
+        // Create and register an undo action.
+        uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+    }
 
     // handle any materialized views, insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
@@ -1056,16 +1066,8 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         }
     }
 
-    if (fallible) {
-        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-        if (uq) {
-            target.setPendingDeleteOnUndoReleaseTrue();
-            ++m_tuplesPinnedByUndo;
-            ++m_invisibleTuplesPendingDeleteCount;
-            // Create and register an undo action.
-            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
-            return;
-        }
+    if (createUndoAction) {
+        return;
     }
 
     // Here, for reasons of infallibility or no active UndoLog, there is no undo, there is only DO.
