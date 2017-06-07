@@ -147,7 +147,8 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         cluster.killSingleHost(1);
 
         cluster.allLogsContain(2);
-        // cluster.allHostLogsContain("Host 1 failed");
+
+        cluster.resetRegexResults();
 
         cluster.setNewCli(false);  // This is needed to perform rejoin
         cluster.recoverOne(1, 1, "");
