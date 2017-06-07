@@ -23,7 +23,7 @@
 
 package org.voltdb.regressionsuites;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,7 +42,7 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     static final int SITES_PER_HOST = 2;
     static final int HOSTS = 2;
-    static final int K = 0;
+    static final int K = 1;
     VoltProjectBuilder builder;
     LocalCluster cluster;
     String listener;
@@ -60,6 +60,24 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         builder.addProcedures(CrashJVM.class);
         builder.addProcedures(CrashVoltDBProc.class);
         builder.setUseDDLSchema(true);
+
+        List<String> patterns = new ArrayList<>();
+        patterns.add("Initialized VoltDB root directory");  // pattern #0
+        patterns.add(".*VoltDB [a-zA-Z]* Edition.*");   // pattern #1
+        patterns.add("Cluster has become unviable");  // pattern #2
+        patterns.add("VoltDB Community Edition only supports .*");  // pattern #3
+        patterns.add(".*FATAL.*");  // pattern #4
+        patterns.add("Cluster has become unviable");
+        patterns.add("Some partitions have no replicas");
+
+        cluster = new LocalCluster("collect.jar", false, patterns,
+                SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compile(builder);
+        assert (success);
+        cluster.startUp(true);
+        listener = cluster.getListenerAddresses().get(0);
+        client = ClientFactory.createClient();
+        client.createConnection(listener);
     }
 
     @After
@@ -71,74 +89,18 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     /*
      * Conventional test to check the logs when the cluster is correctly initialized and running
      */
-    @Test
-    public void testLogSearch() throws Exception {
-        setupLogSearch();
-        // Test the log search utility
-        assertEquals(true, cluster.allInitLogsContain("Initialized VoltDB root directory"));
-        assertEquals(true, cluster.allHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
-        for (int i : cluster.getHostIds()) {
-            assertEquals(true, cluster.initLogContains(i, "Initialized VoltDB .* directory"));
-            assertEquals(true, cluster.hostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
-        }
-    }
-
-    /*
-     * Test the log search utility when a single host is shutdown
-     */
-    @Test
-    public void testHostShutDownLogSearch() throws Exception {
-        setupLogSearch();
-        // Shutdown a single host and restart
-        cluster.killSingleHost(1);
-
-        cluster.allHostLogsContain("Host 1 failed");
-
-        cluster.setNewCli(false);  // This is needed to perform rejoin
-        cluster.recoverOne(1, 1, "");
-
-        // In community edition this should fail ? Since rejoin is only supported in enterprise
-        // edition
-        boolean rejoinMsg = cluster.hostLogContains(1, "VoltDB Community Edition only supports .*") // failure
-                            || cluster.hostLogContains(1, "Initializing VoltDB .*");    // Success
-        assertEquals(true, rejoinMsg);
-    }
-
-    /*
-     * Test the log search utility when the whole LocalCluster is shutdown and restarted
-     */
-    @Test
-    public void testClusterShutdownLogSearch() throws Exception {
-        setupLogSearch();
-        // Shutdown and startup the whole cluster
-        cluster.shutDown();    // After shutdown the in-memory logs are cleared
-        cluster.startUp();
-
-        // Test the log search utility
-        assertEquals(true, cluster.allInitLogsContain("Initialized VoltDB root directory"));
-        assertEquals(true, cluster.allHostLogsContain(".*VoltDB [a-zA-Z]* Edition.*"));
-        for (int i : cluster.getHostIds()) {
-            // No init log after restart (newCli == false)
-            assertEquals(true, cluster.hostLogContains(i, "VoltDB [a-zA-Z]* Edition"));
-        }
-    }
-
-    /*
-     * Conventional test to check the logs when the cluster is correctly initialized and running
-     */
-    @Test
+    // @Test
     public void testPreCompiledLogSearch() throws Exception {
-        setupPreCompiledLogSearch();
-        cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {"Initialized VoltDB root directory"}));
-        cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {".*VoltDB [a-zA-Z]* Edition.*"}));
+        assertTrue(cluster.regexInAllHosts("Initialized VoltDB root directory"));
+        assertTrue(cluster.regexInAllHosts(".*VoltDB [a-zA-Z]* Edition.*"));
+        assertTrue(cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {"Initialized VoltDB root directory",
+                                                                                    ".*VoltDB [a-zA-Z]* Edition.*"})));
 
         for (int i = 0; i < HOSTS; i++) {
-            cluster.verifyRegexesExist(Arrays.asList(new Integer[] {i}),
-                    Arrays.asList(new String[] {"Initialized VoltDB root directory"}));
-            cluster.verifyRegexesExist(Arrays.asList(new Integer[] {i}),
-                    Arrays.asList(new String[] {".*VoltDB [a-zA-Z]* Edition.*"}));
+            assertTrue(cluster.regexInHost(i, "Initialized VoltDB root directory"));
+            assertTrue(cluster.regexInHost(i, ".*VoltDB [a-zA-Z]* Edition.*"));
         }
-        cluster.verifyRegexesNotExistInAnyHosts(Arrays.asList(new String[] {".*FATAL.*"}));
+        assertTrue(cluster.regexNotInAnyHosts(".*FATAL.*"));
     }
 
     /*
@@ -146,65 +108,38 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
      */
     @Test
     public void testPreCompiledHostShutDownLogSearch() throws Exception {
-        setupPreCompiledLogSearch();
         // Shutdown a single host and restart
         cluster.killSingleHost(1);
 
-        cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {"Host 1 failed"}));
+        // Since K-safety is violated and this is community edition, the cluster
+        // should shutdown by itself
+        for (int i = 0; i < HOSTS; i++) {
+            if (i != 1) {
+                assertTrue(cluster.regexInHost(i, "Cluster has become unviable"));
+                assertTrue(cluster.regexInHost(i, "Some partitions have no replicas"));
+            }
+        }
 
-        cluster.resetAllPreCompRegexResults();
-
-        cluster.setNewCli(false);  // This is needed to perform rejoin
-        cluster.recoverOne(1, 1, "");
+        // cluster.setNewCli(false);  // This is needed to perform rejoin
+        // cluster.recoverOne(1, 1, "");
 
         // In community edition this should fail ? Since rejoin is only supported in enterprise
         // edition
-        cluster.verifyRegexesExistInAllHosts(Arrays
-                .asList(new String[] {"VoltDB Community Edition only supports .*"}));
+        // assertTrue(cluster.regexInAllHosts("VoltDB Community Edition only supports .*"));
     }
 
     /*
      * Test the log search utility when the whole LocalCluster is shutdown and restarted
      */
-    @Test
+    // @Test
     public void testPreCompiledClusterShutdownLogSearch() throws Exception {
-        setupPreCompiledLogSearch();
         // Shutdown and startup the whole cluster
         cluster.shutDown();
         cluster.startUp();
 
-        cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {".*VoltDB [a-zA-Z]* Edition.*"}));
+        assertTrue(cluster.regexInAllHosts(".*VoltDB [a-zA-Z]* Edition.*"));
         for (int i = 0; i < HOSTS; i++) {
-            cluster.verifyRegexesExist(Arrays.asList(new Integer[] {i}),
-                    Arrays.asList(new String[] {".*VoltDB [a-zA-Z]* Edition.*"}));
+            assertTrue(cluster.regexInHost(i, ".*VoltDB [a-zA-Z]* Edition.*"));
         }
-    }
-
-    private void setupLogSearch() throws Exception {
-        cluster = new LocalCluster(false, true, "collect.jar",
-                SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        boolean success = cluster.compile(builder);
-        assert (success);
-        cluster.startUp(true);
-        listener = cluster.getListenerAddresses().get(0);
-        client = ClientFactory.createClient();
-        client.createConnection(listener);
-    }
-
-    private void setupPreCompiledLogSearch() throws Exception {
-        List<String> patterns = new ArrayList<>();
-        patterns.add("Initialized VoltDB root directory");  // pattern #0
-        patterns.add(".*VoltDB [a-zA-Z]* Edition.*");   // pattern #1
-        patterns.add("Host 1 failed");  // pattern #2
-        patterns.add("VoltDB Community Edition only supports .*");  // pattern #3
-
-        cluster = new LocalCluster("collect.jar", false, patterns,
-                SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        boolean success = cluster.compile(builder);
-        assert (success);
-        cluster.startUp(true);
-        listener = cluster.getListenerAddresses().get(0);
-        client = ClientFactory.createClient();
-        client.createConnection(listener);
     }
 }

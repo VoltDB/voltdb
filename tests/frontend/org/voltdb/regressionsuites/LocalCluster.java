@@ -27,12 +27,11 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
@@ -115,41 +114,14 @@ public class LocalCluster extends VoltServerConfig {
     int m_replicationPort = -1;
 
     /**
-     * There are 2 types of utilities provided for searching regex in logs
-     *
-     * 1. SLOW, HEAVY yet more flexible: Storing the logs in in-memory buffers,
-     * all logs will also be appended to the buffer while being written to on-disk
-     * log files.
-     *
-     * 2. Fast & light-weight: All the regex will be pre-compiled and the patterns
-     * will be searched on the fly for each line of the logs
-     *
-     * IMPORTANT: The log search utility only searches for any patterns that have
-     * already appeared in the logs. After shutdown the in-memory logs and info
-     * are cleared.
+     * Utility for regex search in logs: all the regex will be pre-compiled and the
+     * patterns will be searched on the fly for each line of the logs. If any of the
+     * patterns is found on a host, the corresponding boolean variable will be set.
      *
      * WARNING: The log search utility searches for logs that are written to disks.
      * The LocalServer's logs are not included. m_hasLocalServer should be
-     * disabled when using this utility.
-     */
-
-    /*
-     * Storing logs in buffers
-     */
-    // Storing the paths of both the init and host logs for each host, the 1st string is
-    // the init log path, the 2nd is the host log path. The full file paths are stored to
-    // ease future maintenance.
-    private Map<Integer, String[]> m_initLogFilePath = null;
-    // Copy of the host logs stored in memory (the init logs are still left on disk, since
-    // they are small anyway)
-    // Use StringBuffer for thread-safety
-    private Map<Integer, StringBuffer> m_logs = null;
-    // Determine whether the log regex search utility is enabled, since it may impact performance
-    // for large test cases. It is not enabled by default
-    private boolean m_enableLogSearch = false;
-
-    /*
-     * Patterns are searched on the fly
+     * disabled when using this utility. It also does not work with rejoin
+     * (recover node with same hostId is currently supported).
      */
     // The regexes are used to search within each generated line of logs on the fly
     private List<Pattern> m_regexes = null; // read-only after setup
@@ -253,27 +225,7 @@ public class LocalCluster extends VoltServerConfig {
     public int getHttpOverridePort() { return m_httpOverridePort; };
 
     /*
-     * Setup local cluster to enable log search so the logs are stored in buffers
-     */
-    public LocalCluster(boolean hasLocalServer,
-                        boolean enableLogSearch,
-                        String jarFileName,
-                        int siteCount,
-                        int hostCount,
-                        int kfactor,
-                        BackendTarget target)
-    {
-        this(jarFileName, siteCount, hostCount, kfactor, target, null);
-        m_hasLocalServer = hasLocalServer;
-        m_enableLogSearch = enableLogSearch;
-        if (m_enableLogSearch) {
-            m_logs = new HashMap<>();
-            m_initLogFilePath = new HashMap<>();
-        }
-    }
-
-    /*
-     * Enable pre-compiled regex for log search
+     * Enable pre-compiled regex search in logs
      */
     public LocalCluster(String jarFileName,
                         boolean hasLocalServer,
@@ -941,10 +893,6 @@ public class LocalCluster extends VoltServerConfig {
         m_pipes.clear();
         m_cluster.clear();
         m_cmdLines.clear();
-        if (m_enableLogSearch) {
-            m_logs.clear();
-            m_initLogFilePath.clear();
-        }
         if (m_regexes != null) {
             resetAllPreCompRegexResults();
         }
@@ -1147,22 +1095,15 @@ public class LocalCluster extends VoltServerConfig {
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
 
-            // Put the init log path into the map
-            if (m_enableLogSearch) {
-                String paths[] = new String[2];
-                paths[0] = fileName;
-                m_initLogFilePath.put(hostId, paths);
-            }
-
             ptf = new PipeToFile(
                     fileName,
                     proc.getInputStream(),
                     String.valueOf(hostId),
                     false,
                     proc,
-                    null,
                     m_regexes,
                     m_regexResults);
+            ptf.setHostId(hostId);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
             proc.waitFor(); // Wait for the server initialization to finish ?
@@ -1337,36 +1278,16 @@ public class LocalCluster extends VoltServerConfig {
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
 
-            // Put the host log path in the map
-            if (m_enableLogSearch) {
-                String[] paths = m_initLogFilePath.get(hostId);
-                // This shouldn't be null anyway
-                if (paths != null) {
-                    paths[1] = fileName;
-                }
-                StringBuffer sBuffer = new StringBuffer();
-                m_logs.put(hostId, sBuffer);
+            ptf = new PipeToFile(
+                    fileName,
+                    proc.getInputStream(),
+                    PipeToFile.m_initToken,
+                    false,
+                    proc,
+                    m_regexes,
+                    m_regexResults);
+            ptf.setHostId(hostId);
 
-                ptf = new PipeToFile(
-                        fileName,
-                        proc.getInputStream(),
-                        PipeToFile.m_initToken,
-                        false,
-                        proc,
-                        sBuffer,
-                        m_regexes,
-                        m_regexResults);
-            } else {
-                ptf = new PipeToFile(
-                        fileName,
-                        proc.getInputStream(),
-                        PipeToFile.m_initToken,
-                        false,
-                        proc,
-                        null,
-                        m_regexes,
-                        m_regexResults);
-            }
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
@@ -1639,27 +1560,13 @@ public class LocalCluster extends VoltServerConfig {
                               hostId + "-" +
                               "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
                               ".rejoined.txt";
-            // Setup in-memory log buffer
-            if (m_enableLogSearch) {
-                String[] paths = m_initLogFilePath.get(hostId);
-                // This shouldn't be null anyway
-                if (paths != null) {
-                    paths[1] = filePath;
-                }
-                StringBuffer sBuffer = new StringBuffer();
-                m_logs.put(hostId, sBuffer);
-                ptf = new PipeToFile(
-                        filePath,
-                        proc.getInputStream(),
-                        PipeToFile.m_initToken,
-                        true, proc, sBuffer, m_regexes, m_regexResults);
-            } else {
-                ptf = new PipeToFile(
-                        filePath,
-                        proc.getInputStream(),
-                        PipeToFile.m_initToken,
-                        true, proc, null, m_regexes, m_regexResults);
-            }
+
+            ptf = new PipeToFile(
+                    filePath,
+                    proc.getInputStream(),
+                    PipeToFile.m_initToken,
+                    true, proc, m_regexes, m_regexResults);
+            ptf.setHostId(hostId);
 
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
@@ -1742,10 +1649,6 @@ public class LocalCluster extends VoltServerConfig {
         }
         shutDownExternal();
 
-        if (m_enableLogSearch) {
-            m_logs.clear();
-            m_initLogFilePath.clear();
-        }
         if (m_regexes != null) {
             resetAllPreCompRegexResults();
         }
@@ -1786,17 +1689,6 @@ public class LocalCluster extends VoltServerConfig {
         if (proc != null) {
             proc.destroy();
             proc.waitFor();
-            // Remove the killed process's log from the in-memory list immediately
-            if (m_enableLogSearch && ptf != null) {
-                StringBuffer buffer = m_logs.get(ptf.getHostId());
-                if (buffer != null) {
-                    m_logs.remove(ptf.getHostId());
-
-                    // Free the memory right away
-                    ptf.m_log = null;
-                    buffer.delete(0, buffer.length());
-                }
-            }
             if (m_regexes != null) {
                 for (AtomicBoolean bool : m_regexResults[hostNum]) {
                     bool.set(false);
@@ -2376,92 +2268,6 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /*
-     * Check if a regex string exists in all the host logs' written content so far
-     */
-    public boolean allHostLogsContain(String regex) {
-        assert(m_enableLogSearch);
-        Pattern pattern = Pattern.compile(regex);
-        for (java.util.Map.Entry<Integer, StringBuffer> tuple : m_logs.entrySet()) {
-            StringBuffer log = tuple.getValue();
-            // This is indeed thread-safe (since all methods in StringBuffer is thread-safe).
-            if (!pattern.matcher(log).find()) { return false; }
-        }
-        return true;
-    }
-
-    /*
-     * Check the given regex in a server process with a given hostId (searching among
-     * the messages that have already been written)
-     */
-    public boolean hostLogContains(int hostId, String regex) {
-        assert(m_enableLogSearch);
-        StringBuffer log = m_logs.get(hostId);
-        assert(log != null);
-        Pattern pattern = Pattern.compile(regex);
-        return pattern.matcher(log).find();
-    }
-
-    /*
-     * Check if the given regex exists in all the init logs' written content
-     */
-    public boolean allInitLogsContain(String regex) {
-        assert(m_enableLogSearch);
-        for (Entry<Integer, String[]> tuple : m_initLogFilePath.entrySet()) {
-            String initLogFilePath = tuple.getValue()[0];
-            if (!fileContains(initLogFilePath, regex)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /*
-     * Check the given regex in a given host with a hostId (searching among the
-     * messages that have already been written)
-     */
-    public boolean initLogContains(int hostId, String regex) {
-        assert(m_enableLogSearch);
-        String[] paths = m_initLogFilePath.get(hostId);
-        assert (paths != null);
-        return fileContains(paths[0], regex);
-    }
-
-    /*
-     * Check the given regex in a given file path. This can be used to
-     * check in a given log file saved on disk.
-     */
-    public boolean fileContains(String filePath, String regex) {
-        assert(m_enableLogSearch);
-        boolean ifExist = false;
-        Pattern pattern = Pattern.compile(regex);
-        try {
-            String contents = new String(Files.readAllBytes(java.nio.file.Paths.get(filePath)));
-            ifExist = pattern.matcher(contents).find();
-        } catch (IOException e) {}
-        return ifExist;
-    }
-
-    // Check if the regex exists in a file's written content
-    public boolean onDiskHostLogContains(int HostId, String regex) {
-        assert(m_enableLogSearch);
-        String path = getHostLogPath(HostId);
-        return fileContains(path, regex);
-    }
-
-    private String getHostLogPath(int HostId) {
-        assert(m_enableLogSearch);
-        String[] paths = m_initLogFilePath.get(HostId);
-        assert (paths != null);
-        return paths[1];
-    }
-
-    // Return the set of host IDs
-    public Set<Integer> getHostIds() {
-        assert(m_enableLogSearch);
-        return m_logs.keySet();
-    }
-
-    /*
      * Helper functions when pre-compiled regex search is enabled.
      * The patterns to be checked must have been added in the constructor.
      */
@@ -2488,7 +2294,7 @@ public class LocalCluster extends VoltServerConfig {
      * Maybe all of them should be set to public ?
      */
     // hostNum = hostId in all cases
-    private boolean regexInHost(int hostNum, String regex) {
+    public boolean regexInHost(int hostNum, String regex) {
         assertTrue(m_regexes != null);
         assertTrue(hostNum >=0 && hostNum < m_hostCount);
         assertTrue(m_regexStrings.containsKey(regex));
@@ -2526,5 +2332,14 @@ public class LocalCluster extends VoltServerConfig {
 
     public boolean verifyRegexesNotExistInAnyHosts(List<String> patterns) {
         return IntStream.range(0, m_hostCount).allMatch(id -> preCompLogNotContains(id, patterns));
+    }
+
+    // Helper functions
+    public boolean regexInAllHosts(String regex) {
+        return verifyRegexesExistInAllHosts(Arrays.asList(new String[] {regex}));
+    }
+
+    public boolean regexNotInAnyHosts(String regex) {
+        return verifyRegexesNotExistInAnyHosts(Arrays.asList(new String[] {regex}));
     }
 }

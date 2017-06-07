@@ -43,7 +43,6 @@ import java.util.regex.Pattern;
         FileWriter m_writer ;
         BufferedReader m_input;
         String m_filename;
-        StringBuffer m_log = null;
         AtomicBoolean[][] m_regexResults = null;
         List<Pattern> m_regexes = null;
 
@@ -76,10 +75,9 @@ import java.util.regex.Pattern;
         }
 
         PipeToFile(String filename, InputStream stream, String token,
-                   boolean appendLog, Process proc, StringBuffer log, List<Pattern> patterns,
+                   boolean appendLog, Process proc, List<Pattern> patterns,
                    AtomicBoolean[][] results) {
          this(filename, stream, token, appendLog, proc);
-         m_log = log;
          m_regexResults = results;
          m_regexes = patterns;
      }
@@ -96,6 +94,12 @@ import java.util.regex.Pattern;
          */
         void setWatcher(OutputWatcher watcher) {
             m_watcher = watcher;
+        }
+
+        public void setHostId(int id) {
+            synchronized (this) {
+                m_hostId = id;
+            }
         }
 
         public int getHostId() {
@@ -151,9 +155,6 @@ import java.util.regex.Pattern;
 
                     m_writer.write(data + "\n");
                     m_writer.flush();
-                    // Write to StringBuffer as well for easy search of strings
-                    StringBuffer buffer = m_log;  // avoid race when m_log is set to null upon shutdown
-                    if (buffer != null) { buffer.append(data + "\n"); }
 
                     // Check for patterns on the fly
                     if (m_regexResults != null) {
