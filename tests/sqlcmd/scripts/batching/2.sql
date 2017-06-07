@@ -1,4 +1,4 @@
-CREATE INDEX idx ON mp ( p );
+CREATE INDEX idx ON mt ( p );
 
 CREATE VIEW mt2 (a, p, n, ms)
     AS SELECT a, p, COUNT(*), MIN(s)
