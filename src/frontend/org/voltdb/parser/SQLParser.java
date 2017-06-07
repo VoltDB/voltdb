@@ -523,7 +523,7 @@ public class SQLParser extends SQLPatternFactory
             Pattern.CASE_INSENSITIVE);
 
     private static final Pattern FilenameToken = Pattern.compile(
-            "\\s*" +       // required preceding whitespace -- UPDATED - need not be required since we trim before getting file name(s) string
+            "\\s*" +       // optional preceding whitespace
             "['\"]*" +     // optional opening quotes of either kind (ignored) (?)
             "([^;'\"]+)" + // file path assumed to end at the next quote or semicolon
             "['\"]*" +     // optional closing quotes -- assumed to match opening quotes (?)
@@ -1414,7 +1414,7 @@ public class SQLParser extends SQLPatternFactory
 
         String remainder = statement.substring(fileMatcher.end(), statement.length());
 
-        List<FileInfo> filesInfo = null;
+        List<FileInfo> filesInfo = new ArrayList<FileInfo>();
 
         Matcher inlineBatchMatcher = DashInlineBatchToken.matcher(remainder);
         if (inlineBatchMatcher.lookingAt()) {
@@ -1425,7 +1425,6 @@ public class SQLParser extends SQLPatternFactory
             // all of the remainder, not just beginning
             if (delimiterMatcher.matches()) {
                 String delimiter = delimiterMatcher.group(1);
-                filesInfo = new ArrayList<FileInfo>();
                 filesInfo.add(new FileInfo(parentContext, FileOption.INLINEBATCH, delimiter));
                 return filesInfo;
             }
@@ -1454,8 +1453,7 @@ public class SQLParser extends SQLPatternFactory
             filenames.add(regexMatcher.group());
         }
 
-        filesInfo = new ArrayList<FileInfo>();
-        for (String filename: filenames) {
+        for (String filename : filenames) {
             Matcher filenameMatcher = FilenameToken.matcher(filename);
             // Use matches to match all input, not just beginning
             if (filenameMatcher.matches()) {
@@ -1474,7 +1472,7 @@ public class SQLParser extends SQLPatternFactory
         }
 
         // If no filename, or a filename of only spaces, then throw an error.
-        if ( filesInfo.size() == 0 ) { //  filenames.length == 1 && filenames[0].length() == 0) {
+        if ( filesInfo.size() == 0 ) {
             String msg = String.format("Did not find valid file name in \"file%s\" command.",
                     option == FileOption.BATCH ? " -batch" : "");
             throw new SQLParser.Exception(msg);
