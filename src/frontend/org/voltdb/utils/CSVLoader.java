@@ -294,7 +294,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         // add a charset flag as "c"
         @Option(shortOpt = "c", desc = "character set , default system character set")
-        String characterSet = "utf-8";
+        String charset = "utf-8";
 
         @Option(desc = "Disables the quote character. All characters between delimiters, including quote characters, are included in the input.",
                 hasArg = false)
@@ -423,7 +423,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 listReader = new CsvListReader(tokenizer, csvPreference);
             } else {
                 FileInputStream fis = new FileInputStream(config.file);
-                InputStreamReader isr = new InputStreamReader(fis, config.characterSet);
+                InputStreamReader isr = new InputStreamReader(fis, config.charset);
                 tokenizer = new Tokenizer(isr,
                           csvPreference,
                           config.strictquotes,
