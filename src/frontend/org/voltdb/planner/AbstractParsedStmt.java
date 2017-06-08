@@ -258,10 +258,10 @@ public abstract class AbstractParsedStmt {
                 try {
                     expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
                 } catch (PlanningErrorException ex) {
-                        String errorMsg = ex.getMessage()
-                                              + " for column '" + col.getTypeName()
-                                              + "' in the table '" + table.getTypeName() + "'";
-                        throw new PlanningErrorException(errorMsg);
+                    String errorMsg = ex.getMessage()
+                                      + " for column '" + col.getTypeName()
+                                      + "' in the table '" + table.getTypeName() + "'";
+                    throw new PlanningErrorException(errorMsg);
                 }
                 ExpressionUtil.finalizeValueTypes(expr);
             }

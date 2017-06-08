@@ -1762,7 +1762,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "')");
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("Value ("+var1+") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
+            assertTrue(ex.getMessage().contains("Value (" + var1 + ") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
         }
 
         try {
@@ -1771,7 +1771,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
                 assertTrue(ex.getMessage().contains(
                     String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
-                                      var1.length()*2, var1+var1, 10)));
+                                      var1.length() * 2, var1 + var1, 10)));
         }
 
         try {
@@ -1779,7 +1779,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("Value ("+var1+"abc) is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
+            assertTrue(ex.getMessage().contains("Value (" + var1 + "abc) is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
         }
 
         // Test inlined varchar with stored procedure
@@ -1841,7 +1841,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("Value ("+bin1+") is too wide for a constant varbinary value of size 10 for column 'BIN1' in the table 'VARLENGTH'"));
+            assertTrue(ex.getMessage().contains("Value (" + bin1 + ") is too wide for a constant varbinary value of size 10 for column 'BIN1' in the table 'VARLENGTH'"));
         }
 
         // Test inlined varchar with stored procedure
@@ -1852,7 +1852,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
                     String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column 'BIN1'",
-                            bin1.length()/2, 10)));
+                            bin1.length() / 2, 10)));
         }
 
         // Test non-inlined varchar with stored procedure
@@ -1878,7 +1878,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             //* enable for debugging */ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains(
                     String.format("The size %d of the value exceeds the size of the VARBINARY(%d) column",
-                            bin1.length()/2, 10)));
+                            bin1.length() / 2, 10)));
         }
 
 
