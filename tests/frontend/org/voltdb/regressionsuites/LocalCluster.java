@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -117,21 +118,12 @@ public class LocalCluster extends VoltServerConfig {
      * Utility for regex search in logs: all the regex will be pre-compiled and the
      * patterns will be searched on the fly for each line of the logs. If any of the
      * patterns is found on a host, the corresponding boolean variable will be set.
-     *
-     * WARNING: The log search utility searches for logs that are written to disks.
-     * The LocalServer's logs are not included. m_hasLocalServer should be
-     * disabled when using this utility. It also does not work with rejoin
-     * (recover node with same hostId is currently supported).
      */
-    // The regexes are used to search within each generated line of logs on the fly
-    private List<Pattern> m_regexes = null; // read-only after setup
-    // The array to store the results of matches (2-dimensional since for each host we may have
+    // The 2d map to store the results of matches (2-dimensional since for each host we may have
     // multiple patterns to search for)
-    // The boolean results are stored in the same order as the provided regexes list for each
-    // host
-    private AtomicBoolean[][] m_regexResults = null;
+    private Map<Integer, Map<String, AtomicBoolean>> m_regexResults = null;
     // Store the pre-compiled regex strings
-    private HashMap<String, Integer> m_regexStrings = null;
+    private Map<String, Pattern> m_regexes = null;
 
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
@@ -228,7 +220,6 @@ public class LocalCluster extends VoltServerConfig {
      * Enable pre-compiled regex search in logs
      */
     public LocalCluster(String jarFileName,
-                        boolean hasLocalServer,
                         List<String> regexes,
                         int siteCount,
                         int hostCount,
@@ -236,20 +227,18 @@ public class LocalCluster extends VoltServerConfig {
                         BackendTarget target)
     {
         this(jarFileName, siteCount, hostCount, kfactor, target, null);
-        m_hasLocalServer = hasLocalServer;
-        m_regexResults = new AtomicBoolean[hostCount][regexes.size()];
-        m_regexStrings = new HashMap<>();
-        for (int i = 0; i < hostCount; i++) {
-            for (int j = 0; j < regexes.size(); j++) {
-                m_regexResults[i][j] = new AtomicBoolean(false);
-            }
-        }
-        m_regexes = new ArrayList<>();
+        m_hasLocalServer = false;
+        m_regexResults = new ConcurrentHashMap<>();
+        m_regexes = new ConcurrentHashMap<>();
+        ConcurrentHashMap<String, AtomicBoolean> temp = new ConcurrentHashMap<>();
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
-            m_regexes.add(p);
-            m_regexStrings.put(s, i);
+            m_regexes.put(s, p);
+            temp.put(s, new AtomicBoolean(false));
+        }
+        for (int i = 0; i < hostCount; i++) {
+            m_regexResults.put(i, new ConcurrentHashMap<>(temp));
         }
     }
 
@@ -484,6 +473,10 @@ public class LocalCluster extends VoltServerConfig {
 
         Thread shutdownThread = new Thread(new ShutDownHookThread());
         java.lang.Runtime.getRuntime().addShutdownHook(shutdownThread);
+
+        // DEBUG
+        log.info("==============================" + ServerThread.getTestLicensePath());
+
         this.templateCmdLine.
             addTestOptions(true).
             leader("").
@@ -1567,6 +1560,7 @@ public class LocalCluster extends VoltServerConfig {
                     PipeToFile.m_initToken,
                     true, proc, m_regexes, m_regexResults);
             ptf.setHostId(hostId);
+            resetHostRegexResults(hostId);
 
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
@@ -1689,11 +1683,6 @@ public class LocalCluster extends VoltServerConfig {
         if (proc != null) {
             proc.destroy();
             proc.waitFor();
-            if (m_regexes != null) {
-                for (AtomicBoolean bool : m_regexResults[hostNum]) {
-                    bool.set(false);
-                }
-            }
         }
 
         // if (ptf != null) {
@@ -2275,18 +2264,14 @@ public class LocalCluster extends VoltServerConfig {
     // Reset the host's regex search result
     public void resetPreCompRegexResult(int hostNum, String regex) {
         assert(m_regexes != null);
-        assert(hostNum < m_hostCount);
-        assert(m_regexStrings.containsKey(regex));
-        m_regexResults[hostNum][m_regexStrings.get(regex)].set(false);
+        assert(m_regexResults.containsKey(hostNum));
+        assert(m_regexes.containsKey(regex));
+        m_regexResults.get(hostNum).get(regex).set(false);
     }
 
     // Reset all the regex results to false
     public void resetAllPreCompRegexResults() {
-        for (int i = 0; i < m_regexResults.length; i++) {
-            for (int j = 0; j < m_regexes.size(); j++) {
-                m_regexResults[i][j].set(false);
-            }
-        }
+        m_regexResults.values().stream().flatMap(m -> m.values().stream()).forEach(b -> b.set(false));
     }
 
     /*
@@ -2296,9 +2281,9 @@ public class LocalCluster extends VoltServerConfig {
     // hostNum = hostId in all cases
     public boolean regexInHost(int hostNum, String regex) {
         assertTrue(m_regexes != null);
-        assertTrue(hostNum >=0 && hostNum < m_hostCount);
-        assertTrue(m_regexStrings.containsKey(regex));
-        return m_regexResults[hostNum][m_regexStrings.get(regex)].get();
+        assertTrue(m_regexResults.containsKey(hostNum));
+        assertTrue(m_regexes.containsKey(regex));
+        return m_regexResults.get(hostNum).get(regex).get();
     }
 
     private boolean preCompLogContains(int hostId, List<String> patterns) {
@@ -2342,5 +2327,10 @@ public class LocalCluster extends VoltServerConfig {
 
     public boolean regexNotInAnyHosts(String regex) {
         return verifyRegexesNotExistInAnyHosts(Arrays.asList(new String[] {regex}));
+    }
+
+    private void resetHostRegexResults(int hostId) {
+        assertTrue(m_regexResults.containsKey(hostId));
+        m_regexResults.get(hostId).values().stream().forEach(b -> b.set(false));
     }
 }

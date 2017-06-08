@@ -28,7 +28,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -43,8 +44,8 @@ import java.util.regex.Pattern;
         FileWriter m_writer ;
         BufferedReader m_input;
         String m_filename;
-        AtomicBoolean[][] m_regexResults = null;
-        List<Pattern> m_regexes = null;
+        Map<Integer, Map<String, AtomicBoolean>> m_regexResults = null;
+        Map<String, Pattern> m_regexes = null;
 
         // set m_witnessReady when the m_token byte sequence is seen.
         AtomicBoolean m_witnessedReady;
@@ -75,8 +76,8 @@ import java.util.regex.Pattern;
         }
 
         PipeToFile(String filename, InputStream stream, String token,
-                   boolean appendLog, Process proc, List<Pattern> patterns,
-                   AtomicBoolean[][] results) {
+                   boolean appendLog, Process proc, Map<String, Pattern> patterns,
+                   Map<Integer, Map<String, AtomicBoolean>> results) {
          this(filename, stream, token, appendLog, proc);
          m_regexResults = results;
          m_regexes = patterns;
@@ -157,12 +158,12 @@ import java.util.regex.Pattern;
                     m_writer.flush();
 
                     // Check for patterns on the fly
-                    if (m_regexResults != null) {
-                        for (int i = 0; i < m_regexes.size(); i++) {
+                    if (m_regexResults != null && getHostId() != Integer.MAX_VALUE) {
+                        for (Entry<String, Pattern> tuple : m_regexes.entrySet()) {
                             // if the pattern still has not appeared in the current host log
-                            if (m_hostId != Integer.MAX_VALUE && !m_regexResults[m_hostId][i].get()) {
-                                boolean r = m_regexes.get(i).matcher(data).find();
-                                m_regexResults[m_hostId][i].set(r);
+                            if (!m_regexResults.get(getHostId()).get(tuple.getKey()).get()) {
+                                boolean r = tuple.getValue().matcher(data).find();
+                                m_regexResults.get(getHostId()).get(tuple.getKey()).set(r);
                             }
                         }
                     }

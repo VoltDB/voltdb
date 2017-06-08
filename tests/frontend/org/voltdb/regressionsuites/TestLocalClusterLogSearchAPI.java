@@ -36,12 +36,13 @@ import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     static final int SITES_PER_HOST = 2;
-    static final int HOSTS = 2;
+    static final int HOSTS = 4;
     static final int K = 1;
     VoltProjectBuilder builder;
     LocalCluster cluster;
@@ -72,7 +73,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         patterns.add("Cluster has become unviable");
         patterns.add("Some partitions have no replicas");
 
-        cluster = new LocalCluster("collect.jar", false, patterns,
+        cluster = new LocalCluster("collect.jar", patterns,
                 SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         boolean success = cluster.compile(builder);
         assert (success);
@@ -113,8 +114,9 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         // Shutdown a single host and restart
         cluster.killSingleHost(1);
 
-        // Since K-safety is violated and this is community edition, the cluster
+        // For community edition: since K-safety is violated, the cluster
         // should shutdown by itself
+        // For pro edition: the host fail message should show on other hosts
         for (int i = 0; i < HOSTS; i++) {
             if (i != 1) {
                 // In community edition the feature is not enabled, in pro version
@@ -126,12 +128,11 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
             }
         }
 
-        // cluster.setNewCli(false);  // This is needed to perform rejoin
-        // cluster.recoverOne(1, 1, "");
-
-        // In community edition this should fail ? Since rejoin is only supported in enterprise
-        // edition
-        // assertTrue(cluster.regexInAllHosts("VoltDB Community Edition only supports .*"));
+        // For pro edition, try rejoin
+        if (MiscUtils.isPro()) {
+            cluster.setNewCli(false);  // This is needed to perform rejoin
+            cluster.recoverOne(1, 1, "");
+        }
     }
 
     /*
