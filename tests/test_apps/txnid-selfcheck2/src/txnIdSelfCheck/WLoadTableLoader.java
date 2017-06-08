@@ -29,6 +29,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.*;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -41,19 +42,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * The LoadTableLoader gets passed in with tableName for which the thread does loading of data using sysproc. For MP
+ * The WLoadTableLoader gets passed in with tableName for which the thread does loading of data using sysproc. For MP
  * LoadMultiPartitionTable is used and for SP LaodSinglePartitionTable is used. The thread also launches a CopyAndDelete
  * thread which copies and deletes data from Load*Table tables 1/3rd of the time. This is to sprinkle other
  * transactions. The CopyAndDelete also servers the purpose of verification that the Load*Table data got indeed loaded.
  *
  * Any procedure failure will fail the test and exit.
  */
-public class LoadTableLoader extends BenchmarkThread {
+public class WLoadTableLoader extends BenchmarkThread {
 
     final Client client;
     final long targetCount;
     final String m_tableName;
     final int batchSize;
+    final Random r;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final boolean m_isMP;
     final Semaphore m_permits;
@@ -61,15 +63,15 @@ public class LoadTableLoader extends BenchmarkThread {
     //Column information
     private VoltTable.ColumnInfo m_colInfo[];
     //Zero based index of the partitioned column
+    private short[] m_col_len = {32, 20, 12, 10, -1, 32, 1, 1, 10, 1, 32, 2, 250, 32, 1, 4, 2, -2, 4, 10, 10, 8, 20, -2, 2, 64, 6, 3};
     private int m_partitionedColumnIndex = -1;
     //proc name
     final String m_procName;
     //proc name for load table row delete
-    final String m_onlydelprocName;
+    private String m_onlydelprocName;
     //Table that keeps building.
     final VoltTable m_table;
     final Random m_random;
-    final Random g_random;
     final AtomicLong currentRowCount = new AtomicLong(0);
 
     // Q for cids which were inserted that should be copied
@@ -91,30 +93,98 @@ public class LoadTableLoader extends BenchmarkThread {
     private long[] upsertTxnCount = {0};
     private long copyTxnCount = 0;
     private long deleteTxnCount = 0;
+    private String m_randomString;
+    private long m_seqno = 0;
 
 
-    LoadTableLoader(Client client, String tableName, long targetCount, int batchSize, Semaphore permits, boolean isMp, int pcolIdx)
+    WLoadTableLoader(Client client, String tableName, long targetCount, int batchSize, Semaphore permits, boolean isMp, int pcolIdx)
             throws IOException, ProcCallException {
-        setName("LoadTableLoader-" + tableName);
+        setName("WLoadTableLoader-" + tableName);
         this.client = client;
         this.m_tableName = tableName;
         this.targetCount = targetCount;
         this.batchSize = batchSize;
         m_permits = permits;
         m_partitionedColumnIndex = pcolIdx;
+        assert m_partitionedColumnIndex == 1;
         m_isMP = isMp;
         //Build column info so we can build VoltTable
-        m_colInfo = new VoltTable.ColumnInfo[3];
-        m_colInfo[0] = new VoltTable.ColumnInfo("cid", VoltType.BIGINT);
-        m_colInfo[1] = new VoltTable.ColumnInfo("txnid", VoltType.BIGINT);
-        m_colInfo[2] = new VoltTable.ColumnInfo("rowid", VoltType.BIGINT);
-        m_procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
-        m_onlydelprocName = (m_isMP ? "DeleteOnlyLoadTableMP" : "DeleteOnlyLoadTableSP");
-        m_table = new VoltTable(m_colInfo);
-        m_random = new Random();  // for the loadsptable thread
-        g_random = new Random();  // for the data generator
+        m_colInfo = new VoltTable.ColumnInfo[28];
+        //SEQ_NO varchar(32 BYTES) NOT NULL,
+        m_colInfo[0] = new VoltTable.ColumnInfo("SEQ_NO", VoltType.STRING);  //32 bytes
+        //PID varchar(20 BYTES) NOT NULL,   !!!!!PARTITION COLUMN!!!!!
+        m_colInfo[1] = new VoltTable.ColumnInfo("PID", VoltType.STRING);  // 20 bytes
+        //UID varchar(12 BYTES),
+        m_colInfo[2] = new VoltTable.ColumnInfo("UID", VoltType.STRING);  // 12 bytes
+        //CLT_NUM varchar(10 BYTES)
+        m_colInfo[3] = new VoltTable.ColumnInfo("CLT_NUM", VoltType.STRING);  // 10 bytes
+        //DD_APDATE timestamp,
+        m_colInfo[4] = new VoltTable.ColumnInfo("DD_APDATE", VoltType.TIMESTAMP);  // timestamp
+        //ACCT_NO varchar(32 BYTES) NOT NULL,
+        m_colInfo[5] = new VoltTable.ColumnInfo("ACCT_NO", VoltType.STRING);  // 32 bytes
+        //AUTH_TYPE varchar(1 BYTES),
+        m_colInfo[6] = new VoltTable.ColumnInfo("AUTH_TYPE", VoltType.STRING);  // 32 bytes
+        //DEV_TYPE varchar(1 BYTES),
+        m_colInfo[7] = new VoltTable.ColumnInfo("DEV_TYPE", VoltType.STRING);  // 1 bytes
+        //TRX_CODE varchar(10 BYTES),
+        m_colInfo[8] = new VoltTable.ColumnInfo("TRX_CODE", VoltType.STRING);  // 10 bytes
+        //AUTH_ID_TYPE varchar(1 BYTES),
+        m_colInfo[9] = new VoltTable.ColumnInfo("AUTH_ID_TYPE", VoltType.STRING);  // 1 bytes
+        // AUTH_ID varchar(32 BYTES)
+        m_colInfo[10] = new VoltTable.ColumnInfo("AUTH_ID", VoltType.STRING);  // 32 bytes
+        //PHY_ID_TYPE varchar(2 BYTES),
+        m_colInfo[11] = new VoltTable.ColumnInfo("PHY_ID_TYPE", VoltType.STRING);  // 2 bytes
+        //PHY_ID varchar(250 BYTES),
+        m_colInfo[12] = new VoltTable.ColumnInfo("PHY_ID", VoltType.STRING);  // 250 bytes
+        //CLIENT_IP varchar(32 BYTES),
+        m_colInfo[13] = new VoltTable.ColumnInfo("CLIENT_IP", VoltType.STRING);  // 32 bytes
+        //ACCT_TYPE varchar(1 BYTES),
+        m_colInfo[14] = new VoltTable.ColumnInfo("ACCT_TYPE", VoltType.STRING);  // 1 bytes
+        //ACCT_BBK varchar(4 BYTES),
+        m_colInfo[15] = new VoltTable.ColumnInfo("ACCT_BBK", VoltType.STRING);  // 4 bytes
+        //TRX_CURRENCY varchar(2 BYTES)
+        m_colInfo[16] = new VoltTable.ColumnInfo("TRX_CURRENCY", VoltType.STRING);  // 4 bytes
+        //TRX_AMOUNT decimal,
+        m_colInfo[17] = new VoltTable.ColumnInfo("TRX_AMOUNT", VoltType.DECIMAL);  // decimal
+        // MCH_BBK varchar(4 BYTES),
+        m_colInfo[18] = new VoltTable.ColumnInfo("MCH_BBK", VoltType.STRING);  // 4 bytes
+        //MCH_NO varchar(10 BYTES),
+        m_colInfo[19] = new VoltTable.ColumnInfo("MCH_NO", VoltType.STRING);  // 10 bytes
+        //BLL_NO varchar(10 BYTES)
+        m_colInfo[20] = new VoltTable.ColumnInfo("BLL_NO", VoltType.STRING);  // 10 bytes
+        //BLL_DATE varchar(8 BYTES),
+        m_colInfo[21] = new VoltTable.ColumnInfo("BLL_DATE", VoltType.STRING);  // 10 bytes
+        //EXT_DATA varchar(20 BYTES),
+        m_colInfo[22] = new VoltTable.ColumnInfo("EXT_DATA", VoltType.STRING);  // 20 bytes
+        //LBS_DISTANCE decimal,
+        m_colInfo[23] = new VoltTable.ColumnInfo("LBS_DISTANCE", VoltType.DECIMAL);  // decimal
+        //SAFE_DISTANCE_FLAG varchar(2 BYTES),
+        m_colInfo[24] = new VoltTable.ColumnInfo("SAFE_DISTANCE_FLAG", VoltType.STRING);  // 2 bytes
+        //LBS varchar(64 BYTES),
+        m_colInfo[25] = new VoltTable.ColumnInfo("LBS", VoltType.STRING);  // 64 bytes
+        //LBS_CITY varchar(6 BYTES),
+        m_colInfo[26] = new VoltTable.ColumnInfo("LBS_CITY", VoltType.STRING);  // 6 bytes
+        //LBS_COUNTRY varchar(3 BYTES)
+        m_colInfo[27] = new VoltTable.ColumnInfo("LBS_CITY", VoltType.STRING);  // 3 bytes
+        // -1 is timestamp field, -2 is decimal fields
+        assert m_col_len.length == 28;
 
-        log.info("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
+        int nmax = Integer.MIN_VALUE;
+        for (int i = 0; i< m_col_len.length; i++) {
+            if (m_col_len[i] > nmax)
+                nmax = m_col_len[i];
+        }
+        // generate a new string
+        m_randomString = TxnId2Utils.randomString(nmax*100);
+
+        m_procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
+        m_onlydelprocName = (m_isMP ? "nyi" : "DeleteOnlyLoadTableSPW");
+        m_table = new VoltTable(m_colInfo);
+        long curtmms = Calendar.getInstance().getTimeInMillis();
+        m_random = new Random(curtmms);
+        r = new Random(curtmms + 1);
+
+        log.info("WLoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
         // make this run more than other threads
         setPriority(getPriority() + 1);
     }
@@ -167,7 +237,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     && status != ClientResponse.SERVER_UNAVAILABLE
                     && status != ClientResponse.RESPONSE_UNKNOWN) {
                 // log what happened status will be logged in json error log.
-                hardStop("LoadTableLoader failed to insert into table " + m_tableName
+                hardStop("WLoadTableLoader failed to insert into table " + m_tableName
                         + " and this shoudn't happen, source "
                         + source + ". Exiting.", clientResponse);
             }
@@ -178,7 +248,7 @@ public class LoadTableLoader extends BenchmarkThread {
             //Connection loss node failure will come down here along with user aborts from procedure.
             else if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.warn("LoadTableLoader ungracefully failed to insert into table " + m_tableName + " lcid: " + p
+                log.warn("WLoadTableLoader ungracefully failed to insert into table " + m_tableName + " lcid: " + p
                         + " source " + source);
                 log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 if (status == ClientResponse.SERVER_UNAVAILABLE)
@@ -190,6 +260,7 @@ public class LoadTableLoader extends BenchmarkThread {
                 Benchmark.txnCount.incrementAndGet();
                 // add the lcid to the next queue
                 outQueue.add(p);
+                log.debug("insert success: " + p + " source " +  source);
             }
         }
     }
@@ -215,7 +286,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     && status != ClientResponse.SERVER_UNAVAILABLE
                     && status != ClientResponse.RESPONSE_UNKNOWN) {
                 // log what happened
-                hardStop("LoadTableLoader gracefully failed to copy from table " + m_tableName
+                hardStop("WLoadTableLoader gracefully failed to copy from table " + m_tableName
                         + " and this shoudn't happen. Exiting.", clientResponse);
             }
             if (status == ClientResponse.RESPONSE_UNKNOWN
@@ -224,13 +295,14 @@ public class LoadTableLoader extends BenchmarkThread {
                 cpyUnkQueue.add(lcid);
             else if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.warn("LoadTableLoader ungracefully failed to copy from table " + m_tableName + " lcid " + lcid);
+                log.warn("WLoadTableLoader ungracefully failed to copy from table " + m_tableName + " lcid " + lcid);
                 log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 cpyQueue.add(lcid);
                 if (status == ClientResponse.SERVER_UNAVAILABLE)
                     setSlowFlight();
             }
             else {
+                log.debug("copy success: " + lcid);
                 cpDelQueue.add(lcid);
                 copyTxnCount++;
                 setFastFlight();
@@ -273,7 +345,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     && status != ClientResponse.SERVER_UNAVAILABLE
                     && status != ClientResponse.RESPONSE_UNKNOWN) {
                 // log what happened
-                hardStop("LoadTableLoader gracefully failed to delete from table " + m_tableName
+                hardStop("WLoadTableLoader gracefully failed to delete from table " + m_tableName
                         + " and this shoudn't happen. " + source + " Exiting.", clientResponse);
             }
             if (status == ClientResponse.RESPONSE_UNKNOWN
@@ -282,7 +354,7 @@ public class LoadTableLoader extends BenchmarkThread {
                 delUnkQueue.add(lcid);
             else if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.warn("LoadTableLoader ungracefully failed to delete from table " + m_tableName
+                log.warn("WLoadTableLoader ungracefully failed to delete from table " + m_tableName
                             + " lcid " + lcid + " source " + source);
                 log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 wrkQueue.add(lcid);
@@ -317,7 +389,7 @@ public class LoadTableLoader extends BenchmarkThread {
                         }
                     }
                     if ((cnt & mask) != (expected_delete & mask)) {
-                        hardStop("LoadTableLoader ungracefully failed to delete lcid " + lcid + " from "
+                        hardStop("WLoadTableLoader ungracefully failed to delete lcid " + lcid + " from "
                                 + m_tableName + " count=" + cnt + " Expected: " + expected_delete + " mask " + mask
                                 + " source " + source);
                     }
@@ -336,7 +408,6 @@ public class LoadTableLoader extends BenchmarkThread {
         //proc name for 2 delete
         final String m_delprocName;
         final Random r2;
-        final Random gr;
 
         void shutdown() {
             m_shouldContinue.set(false);
@@ -348,7 +419,6 @@ public class LoadTableLoader extends BenchmarkThread {
             m_cpprocName = (m_isMP ? "CopyLoadPartitionedMP" : "CopyLoadPartitionedSP");
             m_delprocName = (m_isMP ? "DeleteLoadPartitionedMP" : "DeleteLoadPartitionedSP");
             r2 = new Random();
-            gr = new Random();
         }
 
         @Override
@@ -363,8 +433,8 @@ public class LoadTableLoader extends BenchmarkThread {
                     List<Long> workList = new ArrayList<Long>();
                     cpyQueue.drainTo(workList, 10);
                     if (workList.size() > 0) {
-                        //log.info("from copyqueue to copy: " + workList.toString());
-                        //log.debug("WorkList Size: " + workList.size());
+                        log.debug("from copyqueue to copy: " + workList.toString());
+                        log.debug("WorkList Size: " + workList.size());
                         CountDownLatch clatch = new CountDownLatch(workList.size());
                         boolean success;
                         for (Long lcid : workList) {
@@ -394,17 +464,13 @@ public class LoadTableLoader extends BenchmarkThread {
 
                     cpDelQueue.drainTo(workList, 10);
                     if (workList.size() > 0) {
-                        //log.info("from copydeleteq to delete: " + workList.toString());
+                        log.debug("from copydeleteq to delete: " + workList.toString());
                         CountDownLatch dlatch = new CountDownLatch(workList.size());
                         boolean success;
-                        VoltTable vtable = new VoltTable(m_colInfo);
                         for (Long lcid : workList) {
-                            ArrayList<Object> row = nextRow(gr, lcid);
-                            vtable.clearRowData();
-                            vtable.addRow(row.toArray(new Object[row.size()]));
                             try {
                                 success = client.callProcedure(new DeleteCallback(dlatch, lcid, cpDelQueue, unkQueue,
-                                        cpyUnkQueue, delUnkQueue, 3, (byte) 2), m_delprocName, lcid, vtable);
+                                        cpyUnkQueue, delUnkQueue, 3, (byte) 2), m_delprocName, lcid);
                                 if (!success) {
                                     hardStop("Failed to delete (copy) for: " + lcid);
                                 }
@@ -432,12 +498,33 @@ public class LoadTableLoader extends BenchmarkThread {
         }
     }
 
-    private ArrayList<Object> nextRow(Random random, long seq) {
+    private String getKey(Long seq_no) {
+        m_random.setSeed(seq_no);
+        int origin = m_random.nextInt(m_randomString.length() - m_col_len[1]);
+        return m_randomString.substring(origin, origin + m_col_len[1]);
+    }
+
+    private String formatSeqNo(Long seq_no) {
+        return String.format("%032d", seq_no);
+    }
+
+    private ArrayList<Object> nextRow(long seq) {
         ArrayList<Object> newRow = new ArrayList<Object>();
-        random.setSeed(seq);
-        newRow.add(seq);
-        newRow.add(random.nextInt());
-        newRow.add(random.nextInt());
+        m_random.setSeed(seq);
+        for (int i = 0; i< m_col_len.length; i++) {
+            if (m_col_len[i] > 0) {
+                if (i == 0)
+                    newRow.add(formatSeqNo(seq));
+                else {
+                    int origin = m_random.nextInt(m_randomString.length() - m_col_len[i]);
+                    newRow.add((String) m_randomString.substring(origin, origin + m_col_len[i]));
+                }
+            }
+            else if (m_col_len[i] == -1)
+                newRow.add(new Long(seq));
+            else if (m_col_len[i] == -2)
+                newRow.add( new BigDecimal(seq));
+        }
         return newRow;
     }
 
@@ -449,23 +536,26 @@ public class LoadTableLoader extends BenchmarkThread {
         final float upserthitratio = 0.20F;
 
         CopyAndDeleteDataTask cdtask = new CopyAndDeleteDataTask();
-        cdtask.start();
+        //cdtask.start();
         long p;
         List<Long> cidList = new ArrayList<Long>(batchSize);
+        List<Long> timeList = new ArrayList<Long>(batchSize);
         try {
             // pick up where we left off
-            ClientResponse cr = TxnId2Utils.doAdHoc(client, "select nvl(max(cid)+1,0) from " + m_tableName + ";");
-            p = cr.getResults()[0].asScalarLong();
+            //ClientResponse cr = TxnId2Utils.doAdHoc(client, "select nvl(max(cid)+1,0) from " + m_tableName + ";");
+            ClientResponse cr = TxnId2Utils.doAdHoc(client, "truncate table " + m_tableName + ";");
+            p = 0; //cr.getResults()[0].asScalarLong();
 
             while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
-                byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
-                byte upsertMode = (byte) (m_random.nextFloat() < upsertratio ? 1: 0);
-                byte upsertHitMode = (byte) ((upsertMode != 0) && (m_random.nextFloat() < upserthitratio) ? 1: 0);
+                byte shouldCopy = (byte) 0; /// (m_random.nextInt(3) == 0 ? 1 : 0);
+                byte upsertMode = (byte) 0; ///(m_random.nextFloat() < upsertratio ? 1: 0);
+                byte upsertHitMode = (byte) 0; ///((upsertMode != 0) && (m_random.nextFloat() < upserthitratio) ? 1: 0);
 
                 CountDownLatch latch = new CountDownLatch(batchSize);
                 final BlockingQueue<Long> lcpDelQueue = new LinkedBlockingQueue<Long>();
                 cidList.clear();
+                timeList.clear();
 
                 // try to insert/upsert batchSize random rows
                 for (int i = 0; i < batchSize; i++) {
@@ -473,8 +563,10 @@ public class LoadTableLoader extends BenchmarkThread {
                     m_permits.acquire();
                     //Increment p so that we always get new key.
                     p++;
-                    ArrayList<Object> nextrow = nextRow(g_random, p);
+                    //m_table.addRow(p, p + nanotime, nanotime);
+                    ArrayList<Object> nextrow = nextRow(++m_seqno);
                     m_table.addRow(nextrow.toArray(new Object[nextrow.size()]));
+                    //p = m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.STRING).toString();
                     cidList.add(p);
                     BlockingQueue<Long> wrkQueue;
                     if (shouldCopy != 0) {
@@ -483,10 +575,11 @@ public class LoadTableLoader extends BenchmarkThread {
                         wrkQueue = onlyDelQueue;
                     }
                     boolean success;
+                    log.debug ("insert: " + p + " " + m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.STRING));
                     try {
                         if (!m_isMP) {
                             Object rpartitionParam
-                                    = VoltType.valueToBytes(m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.BIGINT));
+                                    = VoltType.valueToBytes(m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.STRING));
                             if (upsertHitMode != 0) {// for test upsert an existing row, insert it and then upsert same row again.
                                 // only insert
                                 success = client.callProcedure(new InsertCallback(latch, p, shouldCopy, wrkQueue, unkQueue, loadTxnCount, (byte)1), m_procName, rpartitionParam, m_tableName, (byte) 0, m_table);
@@ -522,18 +615,17 @@ public class LoadTableLoader extends BenchmarkThread {
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
                 log.debug("Done Waiting for all inserts for @Load* done.");
-                //log.info("unknown status for these: " + unkQueue.toString());
+                log.debug("unknown status for these: " + unkQueue.toString());
 
                 // try to upsert if want the collision
-                if (upsertHitMode != 0) {
+                /*if (upsertHitMode != 0) {
                     CountDownLatch upserHitLatch = new CountDownLatch(batchSize * upsertHitMode);
                     BlockingQueue<Long> cpywrkQueue = new LinkedBlockingQueue<Long>();
                     BlockingQueue<Long> cpyunkQueue = new LinkedBlockingQueue<Long>();
                     for (int i = 0; i < batchSize; i++) {
                         m_table.clearRowData();
                         m_permits.acquire();
-                        ArrayList<Object> nextrow = nextRow(g_random, cidList.get(i));
-                        m_table.addRow(nextrow.toArray(new Object[nextrow.size()]));
+                        m_table.addRow(cidList.get(i), cidList.get(i) + timeList.get(i), timeList.get(i));
                         boolean success;
                         try {
                             if (!m_isMP) {
@@ -566,14 +658,15 @@ public class LoadTableLoader extends BenchmarkThread {
                     log.debug("Done Waiting for all upsert for @Load* done.");
                 }
 
-                //log.info("to copy: " + lcpDelQueue.toString());
+                log.debug("to copy: " + lcpDelQueue.toString());
                 cpyQueue.addAll(lcpDelQueue);
+                */
 
                 try {
                     long nextRowCount = TxnId2Utils.getRowCount(client, m_tableName);
-                    long nextCpRowCount = TxnId2Utils.getRowCount(client, "cp"+m_tableName);
+                    //long nextCpRowCount = TxnId2Utils.getRowCount(client, "cp"+m_tableName);
                     // report counts of successful txns
-                    log.info("LoadTableLoader rowcounts " + nextRowCount + "/"+ nextCpRowCount
+                    log.info("WLoadTableLoader rowcounts " + nextRowCount //+ "/"+ nextCpRowCount
                             + " Insert/Upsert txs: " + loadTxnCount[0]
                             + " UpsertHit txs: " + upsertTxnCount[0]
                             + " Copy txs: " + copyTxnCount
@@ -585,18 +678,19 @@ public class LoadTableLoader extends BenchmarkThread {
                 if (onlyDelQueue.size() > 0 && m_shouldContinue.get()) {
                     List<Long> workList = new ArrayList<Long>();
                     onlyDelQueue.drainTo(workList);
-                    //log.info("from deleteonly to delete: " + workList.toString());
+                    log.debug("from deleteonly to delete: " + workList.toString());
                     CountDownLatch odlatch = new CountDownLatch(workList.size());
                     VoltTable vtable = new VoltTable(m_colInfo);
                     for (Long lcid : workList) {
-                        ArrayList<Object> row = nextRow(g_random, lcid);
+                        ArrayList<Object> row = nextRow(lcid);
                         vtable.clearRowData();
                         vtable.addRow(row.toArray(new Object[row.size()]));
                         try {
                             boolean success;
+                            log.debug("delete: " + lcid + " " + getKey(lcid));
                             success = client.callProcedure(new DeleteCallback(odlatch, lcid, onlyDelQueue, unkQueue,
                                     null, delUnkQueue, 1, (byte)1), m_onlydelprocName,
-                                     lcid, vtable);
+                                    getKey(lcid), vtable);
                             if (!success) {
                                 hardStop("Failed to invoke delete for: " + lcid);
                             }
@@ -618,18 +712,18 @@ public class LoadTableLoader extends BenchmarkThread {
                 if (unkQueue.size() > 0 && m_shouldContinue.get()) {
                     List<Long> workList = new ArrayList<Long>();
                     unkQueue.drainTo(workList);
-                    //log.info("from unknownqueue to delete: " + workList.toString());
+                    log.debug("from unknownqueue to delete: " + workList.toString());
                     CountDownLatch odlatch = new CountDownLatch(workList.size());
                     VoltTable vtable = new VoltTable(m_colInfo);
                     for (Long lcid : workList) {
-                        ArrayList<Object> row = nextRow(g_random, lcid);
+                        ArrayList<Object> row = nextRow(lcid);
                         vtable.clearRowData();
                         vtable.addRow(row.toArray(new Object[row.size()]));
                         try {
                             boolean success;
                             success = client.callProcedure(new DeleteCallback(odlatch, lcid, unkQueue, null,
                                     null, unkQueue, -1, (byte)3), m_onlydelprocName,
-                                     lcid, vtable);
+                                    getKey(lcid), vtable);
                             if (!success) {
                                 hardStop("Failed to invoke delete for: " + lcid);
                             }
@@ -653,7 +747,7 @@ public class LoadTableLoader extends BenchmarkThread {
             // on exception, log and end the thread, but don't kill the process
             if (e instanceof ProcCallException)
                 log.error(((ProcCallException)e).getClientResponse().toString());
-            hardStop("LoadTableLoader failed a procedure call for table " + m_tableName
+            hardStop("WLoadTableLoader failed a procedure call for table " + m_tableName
                     + " and the thread will now stop.", e);
         } finally {
             cdtask.shutdown();

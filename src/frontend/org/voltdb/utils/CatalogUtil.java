@@ -59,6 +59,7 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -1233,11 +1234,15 @@ public abstract class CatalogUtil {
                 for( PropertyType configProp: configProperties) {
                     String key = configProp.getName();
                     String value = configProp.getValue();
-                    if (!key.toLowerCase().contains("passw")) {
-                        processorProperties.setProperty(key, value.trim());
-                    } else {
-                        //Dont trim passwords
+                    if (key.toLowerCase().contains("passw")) {
+                        // Don't trim password
                         processorProperties.setProperty(key, value);
+                    } else if (key.toLowerCase().contains("delim")){
+                        // Don't trim \n in delimiters
+                        String trimmedDelimiters = value.replaceAll("^(\r|\f|\t| )+", "").replaceAll("(\r|\f|\t| )+$", "");
+                        processorProperties.setProperty(key, StringEscapeUtils.escapeJava(trimmedDelimiters));
+                    } else {
+                        processorProperties.setProperty(key, value.trim());
                     }
                 }
             }
@@ -1411,7 +1416,7 @@ public abstract class CatalogUtil {
                 if (!key.toLowerCase().contains("passw")) {
                     moduleProps.setProperty(key, value.trim());
                 } else {
-                    //Dont trim passwords
+                    //Don't trim passwords
                     moduleProps.setProperty(key, value);
                 }
             }
