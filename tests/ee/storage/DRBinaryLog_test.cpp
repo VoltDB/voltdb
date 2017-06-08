@@ -76,6 +76,7 @@ public:
                                            int64_t seqNo,
                                            int64_t uniqueId,
                                            int64_t timestamp,
+                                           const std::string &tableName,
                                            const TableTuple &tuple,
                                            const std::vector<std::string> &columnNames,
                                            int partitionColumn,

@@ -52,6 +52,7 @@ static const int COLUMN_COUNT = 5;
 // 5 Export type columns * sizeof (uint_8) = 5
 // 1 Export header column * sizeof(int8_t) = 1
 // 1 Export type columns for export-op type * sizeof (uint_8) = 1
+// 6 Export header column length 6*sizeof(int32_t) = 24
 // 4 bytes for storing column count - 4
 // null array
 // 2 bytes for null mask (10 columns rounds to 16, /8 = 2) = 2
@@ -61,7 +62,8 @@ static const int COLUMN_COUNT = 5;
 // table data
 // 5 * sizeof(int32_t) for tuple data = 20
 // 5 * types of columns sizeof(uint8_t) = 5
-static const int MAGIC_TUPLE_SIZE = 86;
+// 5 * sizeof(int32_t) = 20
+static const int MAGIC_TUPLE_SIZE = 138;
 
 // 1k buffer
 static const int BUFFER_SIZE = 1024;
@@ -71,6 +73,7 @@ public:
     ExportTupleStreamTest()
       : m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool, (VoltDBEngine*)NULL,
                                     "localhost", 2, NULL, NULL, 0))
+        , m_tableName("FOO")
     {
         srand(0);
 
@@ -79,6 +82,8 @@ public:
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
         std::ostringstream os;
+        std::string tableName = "FOO";
+
         for (int i = 0; i < COLUMN_COUNT; i++) {
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
@@ -106,11 +111,12 @@ public:
         *(reinterpret_cast<bool*>(m_tupleMemory)) = true;
         m_tuple = new TableTuple(m_schema);
         m_tuple->move(m_tupleMemory);
-        size_t columnNamesLength = 0;
+        size_t namesLength = 0;
         for (int i = 0; i < m_columnNames.size(); ++i) {
-            columnNamesLength += m_wrapper->getTextStringSerializedSize(m_columnNames[i]);
+            namesLength += m_wrapper->getTextStringSerializedSize(m_columnNames[i]);
         }
-        m_tupleSize = MAGIC_TUPLE_SIZE + m_wrapper->getMDColumnNamesSerializedSize() + columnNamesLength;
+        namesLength += m_wrapper->getTextStringSerializedSize(m_tableName);
+        m_tupleSize = MAGIC_TUPLE_SIZE + m_wrapper->getMDColumnNamesSerializedSize() + namesLength;
 //        cout << "tuple size: " << m_tupleSize << " column name size: metadata - " << m_wrapper->getMDColumnNamesSerializedSize()
 //                << ", column names - " << columnNamesLength << std::endl;
     }
@@ -123,7 +129,7 @@ public:
         }
         // append into the buffer
         m_wrapper->appendTuple(lastCommittedTxnId,
-                               currentTxnId, 1, 1, 1, *m_tuple,
+                               currentTxnId, 1, 1, 1, m_tableName, *m_tuple,
                                 m_columnNames,
                                 1,
                                ExportTupleStream::INSERT);
@@ -146,6 +152,7 @@ protected:
     std::vector<std::string> m_columnNames;
     boost::scoped_ptr<ExecutorContext> m_context;
     size_t m_tupleSize;
+    std::string m_tableName;
 };
 
 // Several of these cases were move to TestExportDataSource in Java

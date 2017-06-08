@@ -69,7 +69,7 @@ StreamedTable::createForTest(size_t wrapperBufSize,
         TupleSchema *schema,
         const std::vector<std::string> &columnNames,
         bool takeOwnership) {
-    StreamedTable * st = new StreamedTable(true);
+    StreamedTable *st = new StreamedTable(true);
     st->m_wrapper->setDefaultCapacity(wrapperBufSize);
     st->initializeWithColumns(schema, columnNames, takeOwnership);
     return st;
@@ -152,6 +152,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       m_sequenceNo++,
                                       m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
+                                      name(),
                                       source,
                                       getColumnNames(),
                                       partitionColumn(),
