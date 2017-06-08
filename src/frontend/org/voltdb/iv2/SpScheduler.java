@@ -958,6 +958,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("[handleFragmentTaskMessage] Site:" + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " is leader:" + m_isLeader + "\n" + msg);
             }
+
+            //debug
+            if (TxnEgo.getSequence(msg.getSpHandle())< TxnEgo.SEQUENCE_ZERO) {
+                System.out.println("INVALID SEQUENCE[handleFragmentTaskMessage]:" + msg + "\nisLeader:" + m_isLeader);
+            }
             setMaxSeenTxnId(newSpHandle);
         }
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
