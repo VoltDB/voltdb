@@ -61,12 +61,14 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         builder.addProcedures(CrashVoltDBProc.class);
         builder.setUseDDLSchema(true);
 
+        // Add the patterns to be searched for in advance
         List<String> patterns = new ArrayList<>();
-        patterns.add("Initialized VoltDB root directory");  // pattern #0
-        patterns.add(".*VoltDB [a-zA-Z]* Edition.*");   // pattern #1
-        patterns.add("Cluster has become unviable");  // pattern #2
-        patterns.add("VoltDB Community Edition only supports .*");  // pattern #3
-        patterns.add(".*FATAL.*");  // pattern #4
+        patterns.add("Initialized VoltDB root directory");
+        patterns.add(".*VoltDB [a-zA-Z]* Edition.*");
+        patterns.add("Cluster has become unviable");
+        patterns.add("VoltDB Community Edition only supports .*");
+        patterns.add("Host 1 failed");
+        patterns.add(".*FATAL.*");
         patterns.add("Cluster has become unviable");
         patterns.add("Some partitions have no replicas");
 
@@ -89,7 +91,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     /*
      * Conventional test to check the logs when the cluster is correctly initialized and running
      */
-    // @Test
+    @Test
     public void testPreCompiledLogSearch() throws Exception {
         assertTrue(cluster.regexInAllHosts("Initialized VoltDB root directory"));
         assertTrue(cluster.regexInAllHosts(".*VoltDB [a-zA-Z]* Edition.*"));
@@ -115,8 +117,12 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         // should shutdown by itself
         for (int i = 0; i < HOSTS; i++) {
             if (i != 1) {
-                assertTrue(cluster.regexInHost(i, "Cluster has become unviable"));
-                assertTrue(cluster.regexInHost(i, "Some partitions have no replicas"));
+                // In community edition the feature is not enabled, in pro version
+                // the cluster should still be running
+                boolean r = (cluster.regexInHost(i, "Cluster has become unviable") &&
+                             cluster.regexInHost(i, "Some partitions have no replicas")) ||
+                             cluster.regexInHost(i, "Host 1 failed");
+                assertTrue(r);
             }
         }
 
@@ -131,7 +137,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
     /*
      * Test the log search utility when the whole LocalCluster is shutdown and restarted
      */
-    // @Test
+    @Test
     public void testPreCompiledClusterShutdownLogSearch() throws Exception {
         // Shutdown and startup the whole cluster
         cluster.shutDown();
