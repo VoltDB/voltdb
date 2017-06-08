@@ -145,15 +145,15 @@ public class LeaderAppointer implements Promotable
         public void run(List<String> children)
         {
             List<Long> updatedHSIds = VoltZK.childrenToReplicaHSIds(children);
-            // compute previously unseen HSId set in the callback list
-            Set<Long> newHSIds = new HashSet<Long>(updatedHSIds);
-            newHSIds.removeAll(m_replicas);
             // compute previously seen but now vanished from the callback list HSId set
             Set<Long> missingHSIds = new HashSet<Long>(m_replicas);
             missingHSIds.removeAll(updatedHSIds);
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " + CoreUtils.hsIdCollectionToString(updatedHSIds));
-                tmLog.debug(String.format("Newly seen replicas:%s,Newly dead replicas:%s", CoreUtils.hsIdCollectionToString(newHSIds),
+                // compute previously unseen HSId set in the callback list
+                Set<Long> newHSIds = new HashSet<Long>(updatedHSIds);
+                newHSIds.removeAll(m_replicas);
+                tmLog.debug(String.format("Newly seen replicas:%s, Newly dead replicas:%s", CoreUtils.hsIdCollectionToString(newHSIds),
                         CoreUtils.hsIdCollectionToString(missingHSIds)));
             }
             if (m_state.get() == AppointerState.CLUSTER_START) {
@@ -259,10 +259,8 @@ public class LeaderAppointer implements Promotable
             } else {
                 //node down
                 masterHostId = newLeaderHostId;
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.info("[assignLeader]moving leader of partition " + m_partitionId + " to host " + newLeaderHostId + " ["
+                tmLog.debug("[assignLeader]moving leader of partition " + m_partitionId + " to host " + newLeaderHostId + " ["
                         + CoreUtils.hsIdCollectionToString(children) + "]");
-                }
                 newLeaderHostId = -1;
             }
 
@@ -593,32 +591,42 @@ public class LeaderAppointer implements Promotable
         final long statTs = System.currentTimeMillis();
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+            if (pid == MpInitiator.MP_INIT_PID) continue;
+
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
+                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
+                //These partitions can fail, just cleanup and remove the partition from the system
+                if (partitionNotOnHashRing) {
+                    removeAndCleanupPartition(pid);
+                    continue;
+                }
+
                 // The data of the partition dir indicates whether the partition has finished
                 // initializing or not. If not, the replicas may still be in the process of
                 // adding themselves to the dir. So don't check for k-safety if that's the case.
                 byte[] partitionState = dataCallbacks.poll().getData();
-                boolean isInitializing = false;
+                boolean isInitialized = true;
+                assert(partitionState != null && partitionState.length == 1);
                 if (partitionState != null && partitionState.length == 1) {
-                    isInitializing = partitionState[0] == LeaderElector.INITIALIZING;
+                    isInitialized = partitionState[0] == LeaderElector.INITIALIZED;
+                }
+
+                if (!isInitialized) {
+                    // The replicas may still be in the process of adding themselves to the dir.
+                    // So don't check for k-safety if that's the case.
+                    continue;
                 }
 
                 List<String> replicas = childrenCallbacks.poll().getChildren();
-                if (pid == MpInitiator.MP_INIT_PID) continue;
-                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
-                if (!isInitializing && replicas.isEmpty()) {
-                    //These partitions can fail, just cleanup and remove the partition from the system
-                    if (partitionNotOnHashRing) {
-                        removeAndCleanupPartition(pid);
-                        continue;
-                    }
+                if (replicas.isEmpty()) {
                     tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
                     retval = false;
-                } else if (!partitionNotOnHashRing) {
+                } else {
                     //Record host ids for all partitions that are on the ring
                     //so they are considered for partition detection
                     for (String replica : replicas) {
+                        // TODO: better to have an example path here or wrap them into a ZKUtil
                         final String split[] = replica.split("/");
                         final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                         final int hostId = CoreUtils.getHostIdFromHSId(hsId);
@@ -634,24 +642,25 @@ public class LeaderAppointer implements Promotable
                         }
                     }
                 }
-                if (!isInitializing && !partitionNotOnHashRing) {
-                    lackingReplication.add(
-                            new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size())
-                            );
-                }
-            }
+                // update k-safety statistics for initialized partitions
+                // TODO: the missing partition count may be incorrect if the failed hosts contain any of the replicas?
+                lackingReplication.add(new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size()));
+                            }
             catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
+        // update the statistics
+        m_stats.setSafetySet(lackingReplication.build());
 
         //calculate partition leaders when RealVoltDB.hostsFailed in invoked.
         if (!hostLeaderMap.isEmpty() && failedHosts != null) {
             for (Map.Entry<Integer, Long> entry: masters.entrySet()) {
-
+                Integer pid = entry.getKey();
+                Long hsId = entry.getValue();
                 //ignore MPI
-                if (entry.getKey() == MpInitiator.MP_INIT_PID) continue;
-                int hostId = CoreUtils.getHostIdFromHSId(entry.getValue());
+                if (pid == MpInitiator.MP_INIT_PID) continue;
+                int hostId = CoreUtils.getHostIdFromHSId(hsId);
 
                 //ignore the failed hosts
                 if (failedHosts.contains(hostId)) continue;
@@ -662,11 +671,11 @@ public class LeaderAppointer implements Promotable
                 }
 
                 host.increasePartitionLeader();
-                host.addPartition(entry.getKey());
+                host.addPartition(pid);
             }
             determinePartitionLeaders(hostLeaderMap);
         }
-        m_stats.setSafetySet(lackingReplication.build());
+
         return retval;
     }
 
@@ -753,29 +762,29 @@ public class LeaderAppointer implements Promotable
     /**
      * On a partition call back, an accurate view of the whole topology is not guaranteed since every partition callback
      * tries to determine its own new leader. To ensure more even distribution of the partition leaders among the surviving nodes,
-     * the new partition leaders for the partitions are calculated here based on the topology view after nodes are down:
+     * the new partition leaders for the partitions are calculated based on the topology view when nodes are down:
      * place the leaders of partitions to hosts with the lowest leader count
+     *
      * If the host determined to host the partition leader is down due to further topology change after the new leaders are calculated,
      * the site with the lowest host id will be picked up as the new partition leader.
-     * @param leaderHostMap the partition leader info
+     * @param hostLeaderMap the partition leader info
      */
-    private void determinePartitionLeaders(Map<Integer, Host> leaderHostMap){
-        if (leaderHostMap.isEmpty() || m_callbacks.isEmpty()) {
+    private void determinePartitionLeaders(Map<Integer, Host> hostLeaderMap){
+        if (hostLeaderMap.isEmpty() || m_callbacks.isEmpty()) {
             return;
         }
-
         tmLog.info("Recalculating partition leaders after node down is detected.");
         // iterate through all partitions to see if its current leaders are on the failed hosts.
         for (PartitionCallback cb : m_callbacks.values()) {
             SortedSet<Host> hosts = new TreeSet<Host>();
-            hosts.addAll(leaderHostMap.values());
+            hosts.addAll(hostLeaderMap.values());
             int hostId = CoreUtils.getHostIdFromHSId(cb.m_currentLeader);
-            //The partition has a valid leader
-            if (leaderHostMap.containsKey(hostId)) {
+            //This partition has a valid leader
+            if (hostLeaderMap.containsKey(hostId)) {
                 continue;
             }
             for (Host host : hosts) {
-                //The host does not have this partition
+                //The host does not have a replica of this partition
                 if (!(host.partitions.contains(cb.m_partitionId))) {
                     continue;
                 }
@@ -783,9 +792,8 @@ public class LeaderAppointer implements Promotable
                 //find the host which has the lowest leader count.
                 host.increasePartitionLeader();
                 cb.newLeaderHostId = host.id;
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug(String.format("Move partition leader to host %d from %d for partition %d.", host.id, hostId, cb.m_partitionId));
-                }
+                tmLog.debug(String.format("Move partition leader to host %d from %d for partition %d.",
+                        host.id, hostId, cb.m_partitionId));
                 break;
             }
         }
