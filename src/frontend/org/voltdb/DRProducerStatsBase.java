@@ -94,11 +94,11 @@ public class DRProducerStatsBase {
             columns.add(new ColumnInfo(Columns.TOTAL_BUFFERS, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.LAST_QUEUED_DRID, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.LAST_ACK_DRID, VoltType.BIGINT));
-            columns.add(new ColumnInfo(Columns.QUEUE_GAP, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.LAST_QUEUED_TIMESTAMP, VoltType.TIMESTAMP));
             columns.add(new ColumnInfo(Columns.LAST_ACK_TIMESTAMP, VoltType.TIMESTAMP));
             columns.add(new ColumnInfo(Columns.IS_SYNCED, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.MODE, VoltType.STRING));
+            columns.add(new ColumnInfo(Columns.QUEUE_GAP, VoltType.BIGINT));
         }
 
         @Override
