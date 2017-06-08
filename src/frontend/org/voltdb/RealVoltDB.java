@@ -3429,7 +3429,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 // Update catalog for import processor this should be just/stop start and updat partitions.
-                ImportManager.instance().updateCatalog(m_catalogContext);
+                ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
                 // 6. Perform updates required by the DR subsystem
 
@@ -3713,7 +3713,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ExportManager.instance().startPolling(m_catalogContext);
 
         //Tell import processors that they can start ingesting data.
-        ImportManager.instance().readyForData(m_catalogContext);
+        ImportManager.instance().readyForData(m_catalogContext, m_messenger);
 
         if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
@@ -3939,7 +3939,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ExportManager.instance().startPolling(m_catalogContext);
 
             //Tell import processors that they can start ingesting data.
-            ImportManager.instance().readyForData(m_catalogContext);
+            ImportManager.instance().readyForData(m_catalogContext, m_messenger);
         }
 
         try {

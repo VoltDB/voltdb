@@ -58,10 +58,11 @@ public class ImportManager implements ChannelChangeCallback {
     private final Map<String, AbstractFormatterFactory> m_formatterFactories = new HashMap<String, AbstractFormatterFactory>();
 
     /** Obtain the global ImportManager via its instance() method */
-    protected static ImportManager m_self;
+    private static ImportManager m_self;
+    private final HostMessenger m_messenger;
 
-    protected final int m_myHostId;
-    protected ChannelDistributer m_distributer;
+    private final int m_myHostId;
+    private ChannelDistributer m_distributer;
     private volatile boolean m_serverStarted;
     private final ImporterStatsCollector m_statsCollector;
     private final ModuleManager m_moduleManager;
@@ -86,14 +87,17 @@ public class ImportManager implements ChannelChangeCallback {
         return ModuleManager.instance();
     }
 
-    private ImportManager(int myHostId, ImporterStatsCollector statsCollector) {
+    protected ImportManager(int myHostId, HostMessenger messenger, ImporterStatsCollector statsCollector) throws IOException {
         m_myHostId = myHostId;
+        m_messenger = messenger;
         m_statsCollector = statsCollector;
         m_moduleManager = getModuleManager();
     }
 
-    private void initializeChannelDistributer(ChannelDistributer distributer) {
-        m_distributer = distributer;
+    private void initializeChannelDistributer() throws BundleException {
+        if (m_distributer != null) return;
+
+        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
         m_distributer.registerCallback("__IMPORT_MANAGER__", this);
     }
 
@@ -101,57 +105,21 @@ public class ImportManager implements ChannelChangeCallback {
      * Create the singleton ImportManager and initialize.
      * @param myHostId my host id in cluster
      * @param catalogContext current catalog context
-     * @param messenger used to obtain access to ZK
+     * @param messenger messenger to get to ZK
      * @throws org.osgi.framework.BundleException
      * @throws java.io.IOException
      */
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
         ImporterStatsCollector statsCollector = new ImporterStatsCollector(myHostId);
-        ImportManager em = new ImportManager(myHostId, statsCollector);
+        ImportManager em = new ImportManager(myHostId, messenger, statsCollector);
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 StatsSelector.IMPORTER,
                 myHostId,
                 statsCollector);
 
         m_self = em;
-        em.initializeChannelDistributer(new ChannelDistributer(messenger.getZK(), String.valueOf(myHostId)));
+        em.initializeChannelDistributer();
         em.applyCatalogToImporters(catalogContext, false);
-    }
-
-    /** Creates an ImportManager that allows unit tests to control or mock its dependencies.
-     * @param myHostId host id in cluster
-     * @param initialCatalogCtxt current catalog context
-     * @param mockChannelDistributer Channel Distributer to use. Must not be null, but can be mocked.
-     * @param myStatsCollector Stats collector to use
-     */
-    public static synchronized void initializeWithMocks(File voltDbRoot, int myHostId, CatalogContext initialCatalogCtxt, ChannelDistributer mockChannelDistributer, ImporterStatsCollector myStatsCollector) {
-        ModuleManager.initializeCacheRoot(new File(voltDbRoot, VoltDB.MODULE_CACHE));
-        ImportManager em = new ImportManager(myHostId, myStatsCollector);
-        m_self = em;
-        em.initializeChannelDistributer(mockChannelDistributer);
-        em.applyCatalogToImporters(initialCatalogCtxt, false);
-        em.readyForData(initialCatalogCtxt);
-    }
-
-    private void setupFormatterFactoryForConfig(Map<String, ImportConfiguration> processorConfig) {
-        for (ImportConfiguration config : processorConfig.values()) {
-            Properties prop = config.getformatterProperties();
-            String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
-            try {
-                AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
-                if (formatterFactory == null) {
-                    URI moduleURI = URI.create(module);
-                    formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
-                    if (formatterFactory == null) {
-                        VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
-                    }
-                    m_formatterFactories.put(module, formatterFactory);
-                }
-                config.setFormatterFactory(formatterFactory);
-            } catch(Throwable t) {
-                VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
-            }
-        }
     }
 
     /** Creates an import connector if required by the provided configuration.
@@ -190,11 +158,32 @@ public class ImportManager implements ChannelChangeCallback {
                 }
 
                 if (start) {
-                    readyForDataInternal(catalogContext);
+                    readyForDataInternal(catalogContext, m_messenger);
                 }
             }
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
+        }
+    }
+
+    private synchronized void setupFormatterFactoryForConfig(Map<String, ImportConfiguration> processorConfig) {
+        for (ImportConfiguration config : processorConfig.values()) {
+            Properties prop = config.getformatterProperties();
+            String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+            try {
+                AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
+                if (formatterFactory == null) {
+                    URI moduleURI = URI.create(module);
+                    formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
+                    if (formatterFactory == null) {
+                        VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                    }
+                    m_formatterFactories.put(module, formatterFactory);
+                }
+                config.setFormatterFactory(formatterFactory);
+            } catch(Throwable t) {
+                VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
+            }
         }
     }
 
@@ -247,8 +236,10 @@ public class ImportManager implements ChannelChangeCallback {
         return newProcessorConfig;
     }
 
+
+
     /**
-     * Checks if the module for importer has been loaded in the memory. If bundle doesn't exists, it loads one and
+     * Checks if the module for importer has been loaded in the memory. If bundle doesn't exists, it loades one and
      * updates the mapping records of the bundles.
      *
      * @param moduleProperties
@@ -321,20 +312,16 @@ public class ImportManager implements ChannelChangeCallback {
         m_processor.set(null);
     }
 
-    public synchronized void resume() {
-        m_self.applyCatalogToImporters(VoltDB.instance().getCatalogContext(), true);
-    }
-
-    public synchronized void updateCatalog(CatalogContext catalogContext) {
+    public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
         m_self.applyCatalogToImporters(catalogContext, true);
     }
 
-    public synchronized void readyForData(CatalogContext catalogContext) {
+    public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
         m_serverStarted = true; // Note that server is ready, so that we know whether to process catalog updates
-        readyForDataInternal(catalogContext);
+        readyForDataInternal(catalogContext, messenger);
     }
 
-    public synchronized void readyForDataInternal(CatalogContext catalogContext) {
+    public synchronized void readyForDataInternal(CatalogContext catalogContext, HostMessenger messenger) {
         if (!m_serverStarted) {
             if (importLog.isDebugEnabled()) {
                 importLog.debug("Server not started. Not sending readyForData to ImportProcessor");
@@ -347,7 +334,7 @@ public class ImportManager implements ChannelChangeCallback {
             return;
         }
         //Tell import processors and in turn ImportHandlers that we are ready to take in data.
-        m_processor.get().readyForData(catalogContext);
+        m_processor.get().readyForData(catalogContext, messenger);
     }
 
     @Override
@@ -365,7 +352,7 @@ public class ImportManager implements ChannelChangeCallback {
                 break;
             case RUNNING:
                 importLog.info("Cluster is resumed STARTING all importers.");
-                resume();
+                m_self.applyCatalogToImporters(VoltDB.instance().getCatalogContext(), true);
                 importLog.info("Cluster is resumed STARTED all importers.");
                 break;
             default:

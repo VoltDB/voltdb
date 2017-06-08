@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ImporterServerAdapterImpl;
@@ -102,7 +103,7 @@ public class ImportProcessor implements ImportDataProcessor {
     }
 
     @Override
-    public synchronized void readyForData(final CatalogContext catContext) {
+    public synchronized void readyForData(final CatalogContext catContext, final HostMessenger messenger) {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
