@@ -1831,13 +1831,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // Test update
         client.callProcedure("VARLENGTH.insert", 1, "voltdb", null, null, null);
         try {
-            client.callProcedure("VARLENGTH.update", 1, var1, null, null, null, 1);
+            client.callProcedure("@AdHoc", "Update VARLENGTH set var2 = '" + var2 + "' where var2 = 'voltdb'");
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column",
-                            var1.length(), var1, 10)));
+            assertTrue(ex.getMessage().contains("Value (" + var2 + ") is too wide for a constant varchar value of size 80 for column 'VAR2' in the table 'VARLENGTH'"));
         }
 
 
