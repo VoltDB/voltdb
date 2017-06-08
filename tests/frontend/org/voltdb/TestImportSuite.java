@@ -58,6 +58,7 @@ public class TestImportSuite extends RegressionSuite {
         { Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.TRACE, Level.WARN };
 
     private Boolean m_socketHandlerInitialized = false;
+    private Client m_client;
 
     @Override
     public void setUp() throws Exception
@@ -67,6 +68,12 @@ public class TestImportSuite extends RegressionSuite {
         f.mkdirs();
 
         super.setUp();
+
+        m_client = getClient();
+        while (!((ClientImpl) m_client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
     }
 
     private void setupLog4jSocketHandler() {
@@ -85,7 +92,47 @@ public class TestImportSuite extends RegressionSuite {
 
     @Override
     public void tearDown() throws Exception {
+        m_client.close();
         super.tearDown();
+    }
+
+    /** Allows the test thread to check if the importer is alive by writing data to it. */
+    static class ImporterConnector {
+        private final String m_server;
+        private final int m_port;
+        private final char m_separator;
+        private final int m_counter = 0;
+
+        public ImporterConnector(String server, int port, char separator) {
+            m_separator = separator;
+            m_server = server;
+            m_port = port;
+        }
+
+        /** Tries to write data to the importer, but may fail. */
+        public void tryPush(int maxAttempts) throws IOException {
+            int numConnectAttempts = 0;
+            do {
+                try {
+                    Socket pushSocket = new Socket(m_server, m_port);
+                    OutputStream socketStream = pushSocket.getOutputStream();
+                    System.out.printf("Connected to VoltDB socket importer at: %s.\n", m_server + ":" + m_port);
+                    String s = String.valueOf(m_counter) + m_separator + System.currentTimeMillis() + "\n";
+                    socketStream.write(s.getBytes());
+                    pushSocket.close();
+                    return;
+                } catch (IOException e) {
+                    numConnectAttempts++;
+                    if (numConnectAttempts < maxAttempts) {
+                        throw e;
+                    }
+                    try {
+                        Thread.sleep((int) (Math.random() * 1000) + 500);
+                    } catch (InterruptedException ignore) {
+                    }
+                }
+            } while (true);
+        }
     }
 
     abstract class DataPusher extends Thread {
@@ -267,109 +314,124 @@ public class TestImportSuite extends RegressionSuite {
 
     public void testImportSimpleData() throws Exception {
         System.out.println("testImportSimpleData");
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         pushDataToImporters(100, 1);
-        verifyData(client, 100);
-        client.close();
+        verifyData(m_client, 100);
     }
 
     public void testImportMultipleTimes() throws Exception {
         System.out.println("testImportUpdateApplicationCatalog");
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         pushDataToImporters(100, 1);
-        verifyData(client, 100);
+        verifyData(m_client, 100);
 
         Thread.sleep(0, 1);
 
         pushDataToImporters(100, 1);
-        verifyData(client, 200);
-
-        client.close();
+        verifyData(m_client, 200);
     }
 
     public void testImportMultipleClientsInParallel() throws Exception {
         System.out.println("testImportMultipleClientsInParallel");
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         pushDataToImporters(100, 2);
-        verifyData(client, 100*2);
-        client.close();
+        verifyData(m_client, 100*2);
     }
 
     public void testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing() throws Exception {
         System.out.println("testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing");
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         pushDataToImporters(1000, 3);
-        verifyData(client, 3000);
+        verifyData(m_client, 3000);
 
-        ClientResponse response = client.callProcedure("@AdHoc", "create table nudge(id integer);");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        applySchemaChange("create table nudge(id integer);");
 
         pushDataToImporters(1000, 4);
         // log4j will lose some events because of reconnection delay
-        verifyData(client, 7000, 3001);
-
-        client.close();
+        verifyData(m_client, 7000, 3001);
     }
 
-    /** Verify that importer can withstand unrelated UACs without restarting.
-     * We don't expect the importers to be restarted during this test;
-     * the pushers will get IOExceptions if the importers restart.
+    /** Verify that importer stays running during unrelated schema changes.
+     * The data pushers will get IOExceptions if the importers restart.
      * It's possible to get a false pass if the data finishes before the UACs and importers restart anyway,
      * but manual runs indicate that the data outlasts the UACs by 2-3 seconds.
      */
     public void testImportUnrelatedUACWhilePushing() throws Exception {
-        System.out.println("testImportUnrelatedUpdateApplicationCatalogWhilePushing");
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
+        System.out.println("Schema changes that don't affect importers should not result in importer restarts.");
 
         // Count was chosen to keep importers busy during all UACs without making the test take much longer than necessary.
         CountDownLatch dataGenerationAwaiter = asyncPushDataToImporters(4000, 3);
 
-        ClientResponse response = client.callProcedure("@AdHoc", "create table nudge(id integer);");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
+        applySchemaChange("CREATE TABLE nudge(id integer);");
         Thread.sleep(200);
-
-        response = client.callProcedure("@AdHoc", "create procedure NudgeThatDB as INSERT INTO nudge VALUES (?);");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
+        applySchemaChange("CREATE PROCEDURE NudgeThatDB AS INSERT INTO nudge VALUES (?);");
         Thread.sleep(1000);
-
-        response = client.callProcedure("@AdHoc", "drop procedure NudgeThatDB;");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
+        applySchemaChange("DROP PROCEDURE NudgeThatDB;");
         Thread.sleep(200);
-
-        response = client.callProcedure("@AdHoc", "drop table nudge;");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        applySchemaChange("DROP TABLE nudge;");
 
         dataGenerationAwaiter.await();
-        verifyData(client, 12000);
+        verifyData(m_client, 12000);
+    }
 
-        client.close();
+    /** Verify that importer can withstand unrelated UACs without restarting.
+     * The data pushers will get IOExceptions if the importers restart.
+     * It's possible but unlikely to get a false pass if the data finishes before the deployment changes and importers restart anyway.
+     */
+    public void testImportUnrelatedDeploymentChangesWhilePushing() throws Exception {
+        System.out.println("Deployment changes that don't affect importers should not result in them restarting.");
+
+        // Count was selected to keep importers busy during all UACs without making the test take much longer than necessary.
+        CountDownLatch dataGenerationAwaiter = asyncPushDataToImporters(4000, 3);
+
+        updateDeploymentFile(true, true);
+        Thread.sleep(1000);
+        updateDeploymentFile(true, false);
+
+        dataGenerationAwaiter.await();
+        verifyData(m_client, 12000);
+    }
+
+    /** Verify that importer restarts if it is removed from the configuration and then restored.
+     */
+    public void testImporterDeploymentChanges() throws Exception {
+        System.out.println("Removing and re-adding importers should cause them to restart");
+
+        ImporterConnector testConnector = new ImporterConnector("localhost", 7001, '\t');
+        testConnector.tryPush(5);
+
+        updateDeploymentFile(false, false);
+        Thread.sleep(1000);
+        try {
+            testConnector.tryPush(5);
+            fail("Importer is still running even though it is no longer configured");
+        } catch (IOException expected) {
+        }
+
+        updateDeploymentFile(true, false);
+        Thread.sleep(1000);
+        testConnector.tryPush(5);
+    }
+
+    /** Verify that importer restarts if the procedure it uses is removed from the configuration and then restored.
+     */
+    public void testAddRemoveImporterProcedure() throws Exception {
+        System.out.println("Removing and adding procedures that the importers rely on should result in a restart");
+
+        ImporterConnector testConnector = new ImporterConnector("localhost", 7001, '\t');
+        testConnector.tryPush(5);
+
+        // importer uses CRUD procedure associated with this table.
+        applySchemaChange("DROP TABLE importTable;");
+        Thread.sleep(1000);
+        try {
+            testConnector.tryPush(5);
+            fail("Importer is still running even though its procedure is disabled");
+        } catch (IOException expected) {
+        }
+
+        applySchemaChange("CREATE TABLE IMPORTTABLE (PKEY bigint NOT NULL, A_INTEGER_VALUE bigint); PARTITION TABLE IMPORTTABLE ON COLUMN PKEY;");
+        testConnector.tryPush(5);
     }
 
     /**
@@ -400,6 +462,51 @@ public class TestImportSuite extends RegressionSuite {
         super(name);
     }
 
+    private void applySchemaChange(String adhocddl) throws Exception {
+        ClientResponse response = m_client.callProcedure("@AdHoc", adhocddl);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+    }
+
+    /** Builds a CatalogContext for the import manager to use.
+     * @param includeImporters Whether or not to include the importers associated with this test.
+     * @param unrelatedChange Whether or not to make a change that has no impact on the importer.
+     * @return New deployment file
+     * @throws Exception upon error or test failure
+     */
+    private void updateDeploymentFile(boolean includeImporters, boolean unrelatedChange) throws Exception {
+        VoltProjectBuilder projectBuilder = generateVoltProject(includeImporters, unrelatedChange);
+        File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly(null, 1, 1, 0, 0));
+        System.out.println("Deployment file " + (includeImporters ? "with" : "without") + " importers, " +
+                (unrelatedChange ? "with" : "without") + " command logs written to " + deploymentFilePath.getCanonicalPath());
+        deploymentFilePath.deleteOnExit();
+        ClientResponse response = m_client.updateApplicationCatalog(null, deploymentFilePath);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+    }
+
+    private static VoltProjectBuilder generateVoltProject(boolean includeImporters, boolean unrelatedChange) throws Exception {
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.setUseDDLSchema(true);
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
+
+        // configure socket importer
+        Properties props = buildProperties(
+                "port", "7001",
+                "decode", "true",
+                "procedure", "importTable.insert");
+        project.addImport(includeImporters, "custom", "tsv", "socketstream.jar", props);
+        project.addPartitionInfo("importTable", "PKEY");
+
+        // configure log4j socket handler importer
+        props = buildProperties(
+                "port", "6060",
+                "procedure", "log_events.insert",
+                "log-event-table", "log_events");
+        project.addImport(includeImporters, "custom", null, "log4jsocketimporter.jar", props);
+
+        project.setHeartbeatTimeoutSeconds(5 + (unrelatedChange ? 1 : 0));
+        return project;
+    }
+
     static public junit.framework.Test suite() throws Exception
     {
         LocalCluster config;
@@ -412,24 +519,7 @@ public class TestImportSuite extends RegressionSuite {
         final MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestImportSuite.class);
 
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.setUseDDLSchema(true);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
-
-        // configure socket importer
-        Properties props = buildProperties(
-                "port", "7001",
-                "decode", "true",
-                "procedure", "importTable.insert");
-        project.addImport(true, "custom", "tsv", "socketstream.jar", props);
-        project.addPartitionInfo("importTable", "PKEY");
-
-        // configure log4j socket handler importer
-        props = buildProperties(
-                "port", "6060",
-                "procedure", "log_events.insert",
-                "log-event-table", "log_events");
-        project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
+        VoltProjectBuilder project = generateVoltProject(true, false);
 
         /*
          * compile the catalog all tests start with
