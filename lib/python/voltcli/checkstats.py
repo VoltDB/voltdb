@@ -137,10 +137,10 @@ def dr_producer_stats(runner, partition_min_host, partition_min, partition_max, 
             last_acked = -1
         else:
             last_acked = row[11]
-        if str(row[12]) == 'None':
+        if str(row[16]) == 'None':
             queue_gap = 0
         else:
-            queue_gap = row[12]
+            queue_gap = row[16]
 
         # Initial state, no transactions are queued and acknowledged.
         if last_queued == -1 and last_acked == -1:

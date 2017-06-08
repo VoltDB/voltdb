@@ -25,36 +25,12 @@ package txnIdSelfCheck.procedures;
 
 import org.voltdb.*;
 
-public class DeleteOnlyLoadTableSP extends VoltProcedure {
+public class DeleteOnlyLoadTableSP extends DeleteOnlyLoadBase {
 
-    private final SQLStmt selectStmt = new SQLStmt("SELECT * FROM loadp WHERE cid=?;");
+    private final SQLStmt selectStmt = new SQLStmt("SELECT cid,txnid,rowid FROM loadp WHERE cid=?;");
     private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM loadp WHERE cid=?;");
 
     public VoltTable[] run(long cid, VoltTable vt) {
-        if (vt.getRowCount() != 1)
-            throw new VoltAbortException("expected data exception");
-        VoltTableRow vtrow = vt.fetchRow(0);
-        if (cid != vtrow.getLong(0))
-            throw new VoltAbortException("cid column exception");
-        voltQueueSQL(selectStmt, cid);
-        VoltTable[] results = voltExecuteSQL(false);
-        if (results.length != 1)
-            throw new VoltAbortException("length exception");
-        VoltTable data = results[0];
-        if (data.getRowCount() != 1)
-            throw new VoltAbortException("rowcount exception");
-        VoltTableRow row = data.fetchRow(0);
-        int ncol = row.getColumnCount();
-        if (vtrow.getColumnCount() != ncol)
-            throw new VoltAbortException("column count exception expected: " + vtrow.getColumnCount() + " actual: " + ncol);
-        for (int c = 0; c < ncol; c++) {
-            VoltType vtype = vtrow.getColumnType(c);
-            Object expected = vtrow.get(c, vtype);
-            Object actual = row.get(c, vtype);
-            if (!expected.equals(actual))
-                throw new VoltAbortException("actual data wrong column " + c + " expected: " + expected.toString() + " actual: " + actual.toString());
-        }
-        voltQueueSQL(deleteStmt, cid);
-        return voltExecuteSQL();
+        return doWork(selectStmt, deleteStmt, cid, vt);
     }
 }

@@ -54,7 +54,6 @@ public class LoadTableLoader extends BenchmarkThread {
     final long targetCount;
     final String m_tableName;
     final int batchSize;
-    final Random r;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final boolean m_isMP;
     final Semaphore m_permits;
@@ -70,6 +69,7 @@ public class LoadTableLoader extends BenchmarkThread {
     //Table that keeps building.
     final VoltTable m_table;
     final Random m_random;
+    final Random g_random;
     final AtomicLong currentRowCount = new AtomicLong(0);
 
     // Q for cids which were inserted that should be copied
@@ -111,9 +111,8 @@ public class LoadTableLoader extends BenchmarkThread {
         m_procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
         m_onlydelprocName = (m_isMP ? "DeleteOnlyLoadTableMP" : "DeleteOnlyLoadTableSP");
         m_table = new VoltTable(m_colInfo);
-        long curtmms = Calendar.getInstance().getTimeInMillis();
-        m_random = new Random(curtmms);
-        r = new Random(curtmms + 1);
+        m_random = new Random();  // for the loadsptable thread
+        g_random = new Random();  // for the data generator
 
         log.info("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
         // make this run more than other threads
@@ -337,6 +336,7 @@ public class LoadTableLoader extends BenchmarkThread {
         //proc name for 2 delete
         final String m_delprocName;
         final Random r2;
+        final Random gr;
 
         void shutdown() {
             m_shouldContinue.set(false);
@@ -348,6 +348,7 @@ public class LoadTableLoader extends BenchmarkThread {
             m_cpprocName = (m_isMP ? "CopyLoadPartitionedMP" : "CopyLoadPartitionedSP");
             m_delprocName = (m_isMP ? "DeleteLoadPartitionedMP" : "DeleteLoadPartitionedSP");
             r2 = new Random();
+            gr = new Random();
         }
 
         @Override
@@ -396,10 +397,14 @@ public class LoadTableLoader extends BenchmarkThread {
                         //log.info("from copydeleteq to delete: " + workList.toString());
                         CountDownLatch dlatch = new CountDownLatch(workList.size());
                         boolean success;
+                        VoltTable vtable = new VoltTable(m_colInfo);
                         for (Long lcid : workList) {
+                            ArrayList<Object> row = nextRow(gr, lcid);
+                            vtable.clearRowData();
+                            vtable.addRow(row.toArray(new Object[row.size()]));
                             try {
                                 success = client.callProcedure(new DeleteCallback(dlatch, lcid, cpDelQueue, unkQueue,
-                                        cpyUnkQueue, delUnkQueue, 3, (byte) 2), m_delprocName, lcid);
+                                        cpyUnkQueue, delUnkQueue, 3, (byte) 2), m_delprocName, lcid, vtable);
                                 if (!success) {
                                     hardStop("Failed to delete (copy) for: " + lcid);
                                 }
@@ -427,12 +432,12 @@ public class LoadTableLoader extends BenchmarkThread {
         }
     }
 
-    private ArrayList<Object> nextRow(long seq) {
+    private ArrayList<Object> nextRow(Random random, long seq) {
         ArrayList<Object> newRow = new ArrayList<Object>();
-        m_random.setSeed(seq);
+        random.setSeed(seq);
         newRow.add(seq);
-        newRow.add(m_random.nextInt());
-        newRow.add(m_random.nextInt());
+        newRow.add(random.nextInt());
+        newRow.add(random.nextInt());
         return newRow;
     }
 
@@ -467,7 +472,8 @@ public class LoadTableLoader extends BenchmarkThread {
                     m_table.clearRowData();
                     m_permits.acquire();
                     //Increment p so that we always get new key.
-                    ArrayList<Object> nextrow = nextRow(++p);
+                    p++;
+                    ArrayList<Object> nextrow = nextRow(g_random, p);
                     m_table.addRow(nextrow.toArray(new Object[nextrow.size()]));
                     cidList.add(p);
                     BlockingQueue<Long> wrkQueue;
@@ -526,7 +532,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     for (int i = 0; i < batchSize; i++) {
                         m_table.clearRowData();
                         m_permits.acquire();
-                        ArrayList<Object> nextrow = nextRow(cidList.get(i));
+                        ArrayList<Object> nextrow = nextRow(g_random, cidList.get(i));
                         m_table.addRow(nextrow.toArray(new Object[nextrow.size()]));
                         boolean success;
                         try {
@@ -583,7 +589,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     CountDownLatch odlatch = new CountDownLatch(workList.size());
                     VoltTable vtable = new VoltTable(m_colInfo);
                     for (Long lcid : workList) {
-                        ArrayList<Object> row = nextRow(lcid);
+                        ArrayList<Object> row = nextRow(g_random, lcid);
                         vtable.clearRowData();
                         vtable.addRow(row.toArray(new Object[row.size()]));
                         try {
@@ -616,7 +622,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     CountDownLatch odlatch = new CountDownLatch(workList.size());
                     VoltTable vtable = new VoltTable(m_colInfo);
                     for (Long lcid : workList) {
-                        ArrayList<Object> row = nextRow(lcid);
+                        ArrayList<Object> row = nextRow(g_random, lcid);
                         vtable.clearRowData();
                         vtable.addRow(row.toArray(new Object[row.size()]));
                         try {
