@@ -1774,6 +1774,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
                                       var1.length() * 2, var1 + var1, 10)));
         }
 
+        // test error message for upsert
+        try {
+            client.callProcedure("@AdHoc", "Upsert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "')");
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains("Value (" + var1 + ") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
+        }
+
         try {
             client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "' || 'abc')");
             fail();
