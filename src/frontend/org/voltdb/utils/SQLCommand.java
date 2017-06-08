@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
@@ -282,16 +284,18 @@ public class SQLCommand
                 }
 
                 // If the line is a FILE command - execute the content of the file
-                FileInfo fileInfo = null;
+                List<FileInfo> filesInfo = null;
                 try {
-                    fileInfo = SQLParser.parseFileStatement(line);
+                    filesInfo = SQLParser.parseFileStatement(line);
                 }
                 catch (SQLParser.Exception e) {
                     stopOrContinue(e);
                     continue;
                 }
-                if (fileInfo != null) {
-                    executeScriptFile(fileInfo, interactiveReader, null);
+
+                if (filesInfo != null && filesInfo.size() != 0) {
+                    executeScriptFiles(filesInfo, interactiveReader, null);
+
                     if (m_returningToPromptAfterError) {
                         // executeScriptFile stopped because of an error. Wipe the slate clean.
                         m_returningToPromptAfterError = false;
@@ -572,47 +576,86 @@ public class SQLCommand
      *
      * @param fileInfo    Info on the file directive being processed
      * @param parentLineReader  The current input stream, to be used for "here documents".
+     * @throws IOException
      */
-    static void executeScriptFile(FileInfo fileInfo, SQLCommandLineReader parentLineReader, DDLParserCallback callback)
+
+    static void executeScriptFiles(List<FileInfo> filesInfo, SQLCommandLineReader parentLineReader, DDLParserCallback callback) throws IOException
     {
         LineReaderAdapter adapter = null;
         SQLCommandLineReader reader = null;
+        StringBuilder statements = new StringBuilder();
 
         if ( ! m_interactive && callback == null) {
             // We have to check for the callback to avoid spewing to System.out in the "init --classes" filtering codepath.
             // Better logging/output handling in general would be nice to have here -- output on System.out will be consumed
             // by the test generators (build_eemakefield) and cause build failures.
             System.out.println();
-            System.out.println(fileInfo.toString());
+
+            StringBuilder commandString = new StringBuilder();
+            commandString.append(filesInfo.get(0).toString());
+            for (int ii = 1; ii < filesInfo.size(); ii++) {
+                    commandString.append(" " + filesInfo.get(ii).getFile().toString());
+            }
+            System.out.println(commandString.toString());
         }
 
-        if (fileInfo.getOption() == FileOption.INLINEBATCH) {
-            // File command is a "here document" so pass in the current
-            // input stream.
-            reader = parentLineReader;
-        }
-        else {
+        for (int ii = 0; ii < filesInfo.size(); ii++) {
+
+            FileInfo fileInfo = filesInfo.get(ii);
+            adapter = null;
+            reader = null;
+
+            if (fileInfo.getOption() == FileOption.INLINEBATCH) {
+                // File command is a "here document" so pass in the current
+                // input stream.
+                reader = parentLineReader;
+            }
+            else {
+                try {
+                    reader = adapter = new LineReaderAdapter(new FileReader(fileInfo.getFile()));
+                }
+                catch (FileNotFoundException e) {
+                    System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
+                    stopOrContinue(e);
+                    return; // continue to the next line after the FILE command
+                }
+
+                // if it is a batch option, get all contents from all the files and send it as a string
+                if (fileInfo.getOption() == FileOption.BATCH) {
+                    String line;
+                    // use the current reader we obtained to read from the file
+                    // and append to existing statements
+                    while ((line = reader.readBatchLine()) != null)
+                    {
+                        statements.append(line).append("\n");
+                    }
+                    // set reader to null since we finish reading from the file
+                    reader = null;
+
+                    // if it is the last file, create a reader to read from the string of all files contents
+                    if ( ii == filesInfo.size() - 1 ) {
+                        String allStatements = statements.toString();
+                        byte[] bytes = allStatements.getBytes("UTF-8");
+                        ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+                        // reader LineReaderAdapter needs an input stream reader
+                        reader = adapter = new LineReaderAdapter(new InputStreamReader( bais ) );
+                    }
+                    // NOTE - fileInfo has the last file info for batch with multiple files
+                }
+            }
             try {
-                reader = adapter = new LineReaderAdapter(new FileReader(fileInfo.getFile()));
+                executeScriptFromReader(fileInfo, reader, callback);
             }
-            catch (FileNotFoundException e) {
-                System.err.println("Script file '" + fileInfo.getFile() + "' could not be found.");
-                stopOrContinue(e);
-                return; // continue to the next line after the FILE command
+            catch (SQLCmdEarlyExitException e) {
+                throw e;
             }
-        }
-        try {
-            executeScriptFromReader(fileInfo, reader, callback);
-        }
-        catch (SQLCmdEarlyExitException e) {
-            throw e;
-        }
-        catch (Exception x) {
-            stopOrContinue(x);
-        }
-        finally {
-            if (adapter != null) {
-                adapter.close();
+            catch (Exception x) {
+                stopOrContinue(x);
+            }
+            finally {
+                if (adapter != null) {
+                    adapter.close();
+                }
             }
         }
     }
@@ -625,6 +668,11 @@ public class SQLCommand
 
     public static void executeScriptFromReader(FileInfo fileInfo, SQLCommandLineReader reader, DDLParserCallback callback)
             throws Exception {
+
+        // return back in case of multiple batch files
+        if (reader == null)
+            return;
+
         StringBuilder statement = new StringBuilder();
         // non-interactive modes need to be more careful about discarding blank lines to
         // keep from throwing off diagnostic line numbers. So "statement" may be non-empty even
@@ -690,8 +738,9 @@ public class SQLCommand
                     continue;
                 }
                 // Recursively process FILE commands, any failure will cause a recursive failure
-                FileInfo nestedFileInfo = SQLParser.parseFileStatement(fileInfo, line);
-                if (nestedFileInfo != null) {
+                List<FileInfo> nestedFilesInfo = SQLParser.parseFileStatement(fileInfo, line);
+
+                if (nestedFilesInfo != null) {
                     // Guards must be added for FILE Batch containing batches.
                     if (batch != null) {
                         stopOrContinue(new RuntimeException(
@@ -701,7 +750,9 @@ public class SQLCommand
 
                     // Execute the file content or fail to but only set m_returningToPromptAfterError
                     // if the intent is to cause a recursive failure, stopOrContinue decided to stop.
-                    executeScriptFile(nestedFileInfo, reader, callback);
+
+                    executeScriptFiles(nestedFilesInfo, reader, callback);
+
                     if (m_returningToPromptAfterError) {
                         // The recursive readScriptFile stopped because of an error.
                         // Escape to the outermost readScriptFile caller so it can exit or
