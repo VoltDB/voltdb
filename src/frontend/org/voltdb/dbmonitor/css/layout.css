@@ -3471,6 +3471,78 @@ label.errorTimeOut {
     word-break: break-all;
     line-height: 22px!important;
 }
+/********************analysis*****************/
+.analysisContainer {    
+    margin: 0 auto;
+    padding: 0;
+    width: 98%;
+    }
+.analysisMenu {overflow: hidden;
+    background: #FFFFFF;
+    margin: 0 0 20px 0;
+    
+
+} 
+ul.analysisNav { overflow: hidden; float:left;
+    margin:0; padding:0; background:#ffffff;
+}   
+ul.analysisNav li {
+    float: left;
+    margin: 0;
+    padding: 0;
+    line-height: 53px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    border-right: 1px solid #CCCCCC;
+}
+ul.analysisNav li a { margin:0; padding:0 10px; color:#32323a; display:block;}
+ul.analysisNav li a:hover { background:#AA1F2F; display:block; color:#FFFFFF; }
+ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
+    background: #76bd1d;
+    display: block;
+    color: #FFFFFF !important;
+}
+.analyzeBtn {
+    float: right;
+    background: #AA1F2F;
+    padding: 5px 10px;
+    border: 1px solid #AA1F2F;
+    color: #FFFFFF;
+    cursor: pointer;
+    margin:12px;
+}
+.analyzeBtn:hover {
+    float: right;
+    background: #C12026;
+    padding: 5px 10px;
+    border: 1px solid #C12026;
+    color: #FFFFFF;
+    cursor: pointer;
+    margin:12px;
+}
+.analysisBody {
+    padding: 0;
+    background: #fff;
+    padding:20px;
+    height:calc(100vh - 290px);
+    
+}
+.mainContent { 
+    margin:0 auto;
+    margin-top:10%;
+    padding:30px;
+    width:300px;    
+    -moz-box-shadow:    1px 1px 4px 0px #716f6f;
+    -webkit-box-shadow: 1px 1px 4px 0px #716f6f;
+    box-shadow:         1px 1px 4px 0px #716f6f;
+    border:1px solid #7d7d7d;
+}
+.mainContent p { font-size:16px; text-align: center; line-height:30px;}
+.mainContent p span{ color:#AA1F2F;font-weight:bold;}
+.analysisSubTab ul.tabs li a {
+       padding: 0 20px; 
+}
+/********************analysis End *****************/
 /********************jquery us css override*****************/
 
 #worktabs .ui-widget-header {
@@ -3944,6 +4016,8 @@ ul#shutdownMsg li {
     ul.catalogNav {
         margin: 0 0 20px 0;
     }
+    ul.analysisNav { width:100%;}
+    ul.analysisNav li { float:none; border-bottom: 1px solid #CCCCCC; line-height: 50px;}
     ul.catalogNav li {
         float: none;
         background: #FFFFFF;
@@ -3954,7 +4028,7 @@ ul#shutdownMsg li {
         font-size: 16px;
         border-bottom: 1px solid #CCCCCC;
     }
-    ul.catalogNav li a {
+    ul.catalogNav li a{
         margin: 0;
         padding: 0 10px;
         color: #32323a;
