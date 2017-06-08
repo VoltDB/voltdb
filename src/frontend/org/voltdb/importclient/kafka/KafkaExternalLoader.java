@@ -17,6 +17,7 @@
 package org.voltdb.importclient.kafka;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URI;
@@ -26,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +35,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -64,8 +69,9 @@ import kafka.cluster.Broker;
  */
 public class KafkaExternalLoader implements ImporterSupport {
 
-    private static final VoltLogger m_log = new VoltLogger(KafkaExternalLoader.class.getName());
+    private static final VoltLogger m_log = new VoltLogger("KAFKA-EXTERNAL-LOADER");
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
+    private static final int ZK_CONNECTION_TIMEOUT_SECONDS = 10;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
 
     private final KafkaExternalLoaderCLIArguments m_config;
@@ -353,21 +359,70 @@ public class KafkaExternalLoader implements ImporterSupport {
     /*
      * Fetch the list of brokers from Zookeeper, and return a list of their URIs.
      */
+    static private class ZooKeeperConnection {
+
+        private ZooKeeper zoo;
+        private boolean connected = false;
+        /*
+         * Connect to Zookeeper. Throws an exception if we can't connect for any reason.
+         */
+        public ZooKeeper connect(String host) throws IOException, InterruptedException {
+
+            final CountDownLatch latch = new CountDownLatch(1);
+            Watcher w = new Watcher() {
+                @Override
+                public void process(WatchedEvent event) {
+                    if (event.getState() == KeeperState.SyncConnected) {
+                        connected = true;
+                        latch.countDown();
+                     }
+                }
+            };
+
+            try {
+                zoo = new ZooKeeper(host, 10000, w, new HashSet<Long>());
+                latch.await(ZK_CONNECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            }
+            catch (InterruptedException e) {
+            }
+
+            if (connected) {
+                return zoo;
+            }
+            else {
+                throw new RuntimeException("Could not connect to Zookeeper at host:" + host);
+            }
+
+        }
+
+        public void close() throws InterruptedException {
+            zoo.close();
+        }
+
+     }
+
     private static List<HostAndPort> getBrokersFromZookeeper(String zookeeperHost) throws Exception {
 
-        ZooKeeper zk = new ZooKeeper(zookeeperHost, 10000, null, new HashSet<Long>());
-        ArrayList<HostAndPort> brokers = new ArrayList<HostAndPort>();
-        List<String> ids = zk.getChildren("/brokers/ids", false);
+        ZooKeeperConnection zkConnection = new ZooKeeperConnection();
 
-        for (String id : ids) {
-            String brokerInfo = new String(zk.getData("/brokers/ids/" + id, false, null));
-            Broker broker = Broker.createBroker(Integer.valueOf(id), brokerInfo);
-            if (broker != null) {
-                m_log.warn("Adding broker: " + broker.connectionString());
-                brokers.add(new HostAndPort(broker.host(), broker.port()));
+        try {
+            ZooKeeper zk = zkConnection.connect(zookeeperHost);
+            List<String> ids = zk.getChildren("/brokers/ids", false);
+            ArrayList<HostAndPort> brokers = new ArrayList<HostAndPort>();
+
+            for (String id : ids) {
+                String brokerInfo = new String(zk.getData("/brokers/ids/" + id, false, null));
+                Broker broker = Broker.createBroker(Integer.valueOf(id), brokerInfo);
+                if (broker != null) {
+                    m_log.warn("Adding broker: " + broker.connectionString());
+                    brokers.add(new HostAndPort(broker.host(), broker.port()));
+                }
             }
+            return brokers;
         }
-        return brokers;
+        finally {
+            zkConnection.close();
+        }
     }
 
     /*
