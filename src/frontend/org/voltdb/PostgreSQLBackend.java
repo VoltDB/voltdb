@@ -994,7 +994,6 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 Thread.sleep(1000*i);
             }
             dbconn = null;
-            System.gc();
             for (int i=1; i<=3; i++) {
                 if (i > 1) {
                     System.err.println("In PostgreSQLBackend.shutdown(): attempt #"+i+" ...");
@@ -1009,7 +1008,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                     ex.printStackTrace();
                 }
             }
-            // Also close the "permanent" connection
+
+            // Also close the connection to the "permanent" database
             try {
                 m_permanent_db_backend.getConnection().close();
             } catch (SQLException ex) {
@@ -1017,11 +1017,19 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                         + ", caught exception:\n" + ex);
                 ex.printStackTrace();
             }
+            // Make sure the "permanent" connection is closed, before proceeding
+            for (int i=1; m_permanent_db_backend.getConnection().isValid(i) && i<=10; i++) {
+                Thread.sleep(1000*i);
+            }
+            m_permanent_db_backend.dbconn = null;
+            m_permanent_db_backend = null;
+
             // And close the FileWriter (for printing modified SQL)
             if (transformedSqlFileWriter != null) {
                 transformedSqlFileWriter.close();
                 transformedSqlFileWriter = null;
             }
+            System.gc();
         } catch (Exception e) {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);
         }
