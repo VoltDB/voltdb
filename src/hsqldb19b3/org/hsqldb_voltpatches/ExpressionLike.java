@@ -36,6 +36,8 @@ import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.Type;
 
+import java.util.Objects;
+
 /**
  * Implementation of LIKE operations
  *
@@ -438,5 +440,24 @@ public final class ExpressionLike extends ExpressionLogical {
         sb.append(likeObject.describe(session));
 
         return sb.toString();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (!super.equals(other)) {
+            return false;
+        }
+
+        if (other instanceof ExpressionLike) {
+            if (noOptimisation == ((ExpressionLike)other).noOptimisation) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode() + Objects.hashCode(noOptimisation);
     }
 }

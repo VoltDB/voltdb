@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.Objects;
+
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -245,20 +247,24 @@ public class ExpressionAggregate extends Expression {
     }
 
     @Override
-    public boolean equals(Expression other) {
+    public int hashCode() {
+        return super.hashCode() * 31 + Objects.hashCode(isDistinctAggregate);
+    }
 
+    @Override
+    public boolean equals(Object other) {
         if (other == this) {
             return true;
         }
 
-        if (other == null) {
+        if (!super.equals(other)) {
             return false;
         }
-
-        return opType == other.opType && exprSubType == other.exprSubType
-               && isDistinctAggregate
-                  == ((ExpressionAggregate) other)
-                      .isDistinctAggregate && equals(nodes, other.nodes);
+        if (other instanceof ExpressionAggregate) {
+            return isDistinctAggregate ==
+                    ((ExpressionAggregate) other).isDistinctAggregate;
+        }
+        return false;
     }
 
     public Object updateAggregatingValue(Session session, Object currValue) {
