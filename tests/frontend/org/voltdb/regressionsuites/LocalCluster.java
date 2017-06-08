@@ -473,10 +473,6 @@ public class LocalCluster extends VoltServerConfig {
 
         Thread shutdownThread = new Thread(new ShutDownHookThread());
         java.lang.Runtime.getRuntime().addShutdownHook(shutdownThread);
-
-        // DEBUG
-        log.info("==============================" + ServerThread.getTestLicensePath());
-
         this.templateCmdLine.
             addTestOptions(true).
             leader("").
@@ -1280,6 +1276,15 @@ public class LocalCluster extends VoltServerConfig {
                     m_regexes,
                     m_regexResults);
             ptf.setHostId(hostId);
+            if (!m_regexResults.containsKey(hostId)) {
+                Map<String, AtomicBoolean> temp = new ConcurrentHashMap<>();
+                for (String s : m_regexes.keySet()) {
+                    temp.put(s, new AtomicBoolean(false));
+                }
+                m_regexResults.put(hostId, temp);
+            } else {
+                resetHostRegexResults(hostId);
+            }
 
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
@@ -1560,7 +1565,16 @@ public class LocalCluster extends VoltServerConfig {
                     PipeToFile.m_initToken,
                     true, proc, m_regexes, m_regexResults);
             ptf.setHostId(hostId);
-            resetHostRegexResults(hostId);
+            if (!m_regexResults.containsKey(hostId)) {
+                Map<String, AtomicBoolean> temp = new ConcurrentHashMap<>();
+                for (String s : m_regexes.keySet()) {
+                    temp.put(s, new AtomicBoolean(false));
+                }
+                m_regexResults.put(hostId, temp);
+            } else {
+                resetHostRegexResults(hostId);
+            }
+
 
             synchronized (this) {
                 m_pipes.set(hostId, ptf);

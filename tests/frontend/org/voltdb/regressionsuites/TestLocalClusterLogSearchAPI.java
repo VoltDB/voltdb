@@ -131,7 +131,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         // For pro edition, try rejoin
         if (MiscUtils.isPro()) {
             cluster.setNewCli(false);  // This is needed to perform rejoin
-            cluster.recoverOne(1, 1, "");
+            cluster.recoverOne(1, 1, "");   // may fail in pro version for using deprecated api
         }
     }
 
