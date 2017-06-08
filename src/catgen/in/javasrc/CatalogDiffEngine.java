@@ -1287,7 +1287,7 @@ public class CatalogDiffEngine {
             return true;
         }
 
-        // Information about user-defined functions need to be applied to EE. 
+        // Information about user-defined functions need to be applied to EE.
         if (suspect instanceof Function) {
             return true;
         }

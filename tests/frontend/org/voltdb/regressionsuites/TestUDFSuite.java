@@ -75,7 +75,7 @@ public class TestUDFSuite extends RegressionSuite {
                 assert(results != null);
                 assertEquals(1, results.length);
                 VoltTable t = results[0];
-                assertContentOfTable(new Object[][] {{null}, {null}}, t);
+                assertContentOfTable(new Object[][] {{i}, {i}}, t);
                 try {
                     client.callProcedure("@AdHoc",
                         String.format("DROP FUNCTION %s;", functionName));
