@@ -47,8 +47,8 @@ public class CopyLoadPartitionedBase extends VoltProcedure {
             long rowid = data.getLong(2);
             voltQueueSQL(insert, rcid, txnid, rowid);
             return voltExecuteSQL();
-        } else { // use insert into
-            voltQueueSQL(insert,cid);
+        } else { // use insert into select
+            voltQueueSQL(insert, cid);
             VoltTable[] results = voltExecuteSQL();
             VoltTable data = results[0];
             int cnt = (int) data.fetchRow(0).getLong(0);

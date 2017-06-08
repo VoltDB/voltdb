@@ -201,6 +201,7 @@ CREATE TABLE loadp
 , CONSTRAINT pkey_id_forLoadPartitionSP PRIMARY KEY (cid)
 );
 PARTITION TABLE loadp ON COLUMN cid;
+
 CREATE TABLE cploadp
 (
   cid    BIGINT NOT NULL
@@ -208,7 +209,6 @@ CREATE TABLE cploadp
 , rowid  BIGINT NOT NULL
 );
 PARTITION TABLE cploadp ON COLUMN cid;
-
 
 -- For loadmultiplepartition
 CREATE TABLE loadmp
@@ -218,6 +218,7 @@ CREATE TABLE loadmp
 , rowid  BIGINT NOT NULL
 , CONSTRAINT pkey_id_forLoadPartitionMP PRIMARY KEY (cid)
 );
+
 CREATE TABLE cploadmp
 (
   cid    BIGINT NOT NULL
