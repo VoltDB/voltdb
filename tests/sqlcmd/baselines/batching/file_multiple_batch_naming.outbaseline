@@ -23,4 +23,14 @@ CREATE VIEW vt5 (c1, c2, total)
 
 Batch command succeeded.
 
+DROP PROCEDURE testp;
+Command succeeded.
+
 DROP TABLE t3;
+Command succeeded.
+
+DROP TABLE t4 CASCADE;
+Command succeeded.
+
+DROP TABLE t5 CASCADE;
+Command succeeded.
