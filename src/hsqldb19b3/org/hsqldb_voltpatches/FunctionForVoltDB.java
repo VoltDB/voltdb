@@ -34,6 +34,7 @@ package org.hsqldb_voltpatches;
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.hsqldb_voltpatches.types.Type;
 
@@ -865,6 +866,28 @@ public class FunctionForVoltDB extends FunctionSQL {
 
     public static boolean isUserDefinedFunctionId(int functionId) {
         return functionId >= FunctionId.FUNC_VOLT_UDF_ID_START;
+    }
+
+    public FunctionId getFunctionId() {
+        return m_def;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (!super.equals(other)) return false;
+        if (other instanceof FunctionForVoltDB == false) return false;
+
+        FunctionForVoltDB function = (FunctionForVoltDB) other;
+        if (function.getFunctionId().getId() != m_def.getId()) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int val = super.hashCode();
+        val += Objects.hashCode(m_def.getId());
+        return val;
     }
 
 }
