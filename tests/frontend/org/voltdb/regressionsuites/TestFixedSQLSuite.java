@@ -1762,7 +1762,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "')");
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("Value (" + var1 + ") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
+            assertTrue(ex.getMessage().contains(
+                    "Value (" + var1 + ") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
         }
 
         try {
@@ -1779,7 +1780,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Upsert into VARLENGTH (id, var1) VALUES (2,'" + var1 + "')");
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("Value (" + var1 + ") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
+            assertTrue(ex.getMessage().contains(
+                    "Value (" + var1 + ") is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
         }
 
         try {
@@ -1787,7 +1789,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("Value (" + var1 + "abc) is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
+            assertTrue(ex.getMessage().contains(
+                    "Value (" + var1 + "abc) is too wide for a constant varchar value of size 10 for column 'VAR1' in the table 'VARLENGTH'"));
         }
 
         // Test inlined varchar with stored procedure
@@ -1829,15 +1832,25 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
 
         // Test update
-        client.callProcedure("VARLENGTH.insert", 1, "voltdb", null, null, null);
+        client.callProcedure("VARLENGTH.insert", 1, null, "voltdb", null, null);
         try {
             client.callProcedure("@AdHoc", "Update VARLENGTH set var2 = '" + var2 + "' where var2 = 'voltdb'");
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("Value (" + var2 + ") is too wide for a constant varchar value of size 80 for column 'VAR2' in the table 'VARLENGTH'"));
+            assertTrue(ex.getMessage().contains(
+                    "Value (" + var2 + ") is too wide for a constant varchar value of size 80 for column 'VAR2' in the table 'VARLENGTH'"));
         }
 
+        try {
+            client.callProcedure("@AdHoc", "Update VARLENGTH set var1 = repeat('" + var1 + "', 2) where var2 = 'voltdb'");
+            fail();
+        } catch(Exception ex) {
+            //* enable for debugging */ System.out.println(ex.getMessage());
+            assertTrue(ex.getMessage().contains(
+                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
+                                      var1.length() * 2, var1 + var1, 10)));
+        }
 
         // Test varbinary
         // Test AdHoc
@@ -1847,7 +1860,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         } catch(Exception ex) {
             //* enable for debugging */ System.out.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("Value (" + bin1 + ") is too wide for a constant varbinary value of size 10 for column 'BIN1' in the table 'VARLENGTH'"));
+            assertTrue(ex.getMessage().contains(
+                    "Value (" + bin1 + ") is too wide for a constant varbinary value of size 10 for column 'BIN1' in the table 'VARLENGTH'"));
         }
 
         // Test inlined varchar with stored procedure
