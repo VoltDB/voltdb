@@ -2301,7 +2301,7 @@ public class LocalCluster extends VoltServerConfig {
         return m_regexResults[hostNum][m_regexStrings.get(regex)].get();
     }
 
-    private boolean  preCompLogContains(int hostId, List<String> patterns) {
+    private boolean preCompLogContains(int hostId, List<String> patterns) {
         return patterns.stream().allMatch(s -> regexInHost(hostId, s));
     }
 
@@ -2319,6 +2319,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     // Verify that none of the patterns provided exist in any of the specified hosts
+    // These patterns should have been added when constructing the class
     public boolean verifyRegexesNotExist(List<Integer> hostIds, List<String> patterns) {
         return hostIds.stream().allMatch(id -> preCompLogNotContains(id, patterns));
     }
