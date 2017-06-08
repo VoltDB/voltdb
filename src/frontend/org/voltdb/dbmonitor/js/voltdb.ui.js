@@ -750,6 +750,9 @@ var loadPage = function (serverName, portid) {
                 }
             } else if (curTab == NavigationTabs.DR){
                 //Do nothing
+            }  else if (curTab == NavigationTabs.Analysis) {
+                $("#overlay").show();
+                setTimeout(function () { $("#navAnalysis > a").trigger("click"); }, 100);
             } else{
                 setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
             }
@@ -2487,7 +2490,8 @@ var NavigationTabs = {
     Schema: 3,
     SQLQuery: 4,
     DR: 5,
-    Importer: 6
+    Importer: 6,
+    Analysis: 7
 };
 
 var getCurrentTab = function () {
@@ -2511,6 +2515,9 @@ var getCurrentTab = function () {
     } else if (activeLinkId ==  "navImporter"){
         $(".nvtooltip").show();
         return NavigationTabs.Importer;
+    } else if(activeLinkId == "navAnalysis"){
+        $(".nvtooltip").show();
+        return NavigationTabs.Analysis;
     }
     $(".nvtooltip").show();
     return NavigationTabs.DBMonitor;
