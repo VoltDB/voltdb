@@ -35,6 +35,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster.FailureState;
+import org.voltdb.utils.InMemoryJarfile;
 
 
 /** Tests that 'start' works with initialized schemas
@@ -43,7 +44,7 @@ import org.voltdb.regressionsuites.LocalCluster.FailureState;
 final public class TestStartWithClassesOnly {
 
     static final int siteCount = 1;
-    static final int hostCount = 3;
+    static final int hostCount = 1;
     static final int kfactor   = 0;
     static final int clusterID = 0;
 
@@ -52,18 +53,22 @@ final public class TestStartWithClassesOnly {
     @Before
     public void setUp() throws Exception
     {
+        InMemoryJarfile classesFile = new InMemoryJarfile();
+        String cpath = File.createTempFile("preloaded-classes", ".jar").getCanonicalPath();
+        classesFile.writeToFile(new File(cpath));
+
         // Creates a cluster on the local machine using NewCLI, staging the specified schema.
         // Catalog compilation is taken care of by VoltDB itself - no need to do so explicitly.
         cluster = new LocalCluster(
                 null,
-                null,
+                cpath,
                 siteCount,
                 hostCount,
                 kfactor,
                 clusterID,
                 BackendTarget.NATIVE_EE_JNI,
                 FailureState.ALL_RUNNING, false, false, null);
-        cluster.setHasLocalServer(false);
+        cluster.setHasLocalServer(true);
         cluster.overrideAnyRequestForValgrind();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.setUseDDLSchema(true);
@@ -88,7 +93,7 @@ final public class TestStartWithClassesOnly {
 
         System.out.println("Verifying schema and classes are present");
         Client client = ClientFactory.createClient();
-        client.createConnection("localhost", cluster.port(1));
+        client.createConnection("localhost", cluster.port(0));
         ClientResponse response;
 
         //Now load the table and procedure should be successful as classes should be present.

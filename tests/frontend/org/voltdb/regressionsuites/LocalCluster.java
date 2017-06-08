@@ -312,6 +312,9 @@ public class LocalCluster extends VoltServerConfig {
                 throw new RuntimeException(e);
             }
         }
+        if (catalogJarFileName != null) {
+            m_usesStagedSchema = true;
+        }
         assert siteCount > 0 : "site count is less than 0";
         assert hostCount > 0 : "host count is less than 0";
 
@@ -612,6 +615,9 @@ public class LocalCluster extends VoltServerConfig {
         // Make the local Configuration object...
         CommandLine cmdln = (templateCmdLine.makeCopy());
         cmdln.startCommand(action);
+        if (m_usesStagedSchema) {
+            cmdln.m_pathToCatalog = null;
+        }
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (this.m_additionalProcessEnv != null) {
             for (String name : this.m_additionalProcessEnv.keySet()) {
@@ -1071,6 +1077,9 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.voltdbRoot(root);
             cmdln.pathToDeployment(null);
             cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
+        }
+        if (m_usesStagedSchema) {
+            cmdln.m_pathToCatalog = null;
         }
 
         if (this.m_additionalProcessEnv != null) {
