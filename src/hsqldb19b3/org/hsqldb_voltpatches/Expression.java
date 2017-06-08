@@ -68,11 +68,11 @@ package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
@@ -468,16 +468,27 @@ public class Expression {
 
     @Override
     public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + opType;
+        result = prime * result + exprSubType;
+        result = prime * result
+                + ((dataType == null) ? 0 : dataType.hashCode());
+        switch (opType) {
 
-        int val = opType + exprSubType;
+            case OpTypes.SIMPLE_COLUMN :
+                result = prime * result + columnIndex;
 
-        for (int i = 0; i < nodes.length; i++) {
-            if (nodes[i] != null) {
-                val += nodes[i].hashCode();
-            }
+            case OpTypes.VALUE:
+                result = prime * result
+                         + ((valueData == null) ? 0 : valueData.hashCode());
+
+            default:
+                result = prime * result + Arrays.hashCode(nodes);
+                result = prime * result
+                        + ((subQuery == null) ? 0 : subQuery.hashCode());
         }
-
-        return val;
+        return result;
     }
 
     static boolean equals(Object o1, Object o2) {
@@ -489,6 +500,7 @@ public class Expression {
         return (o1 == null) ? o2 == null
                             : o1.equals(o2);
     }
+
 
     static boolean equals(Expression[] row1, Expression[] row2) {
 
@@ -1916,6 +1928,13 @@ public class Expression {
 
     protected String cached_id = null;
 
+    private void traverse(Expression exp, final Session session) {
+        for (Expression expr : exp.nodes) {
+            if (expr != null)
+                expr.getUniqueId(session);
+        }
+    }
+
     /**
      * Get the hex address of this Expression Object in memory,
      * to be used as a unique identifier.
@@ -1933,41 +1952,20 @@ public class Expression {
         // this line ripped from the "describe" method
         // seems to help with some types like "equal"
         cached_id = new String();
-        int hashCode = 0;
         //
         // If object is a leaf node, then we'll use John's original code...
-        //
-        if (getType() == OpTypes.VALUE || getType() == OpTypes.COLUMN) {
-            hashCode = super.hashCode();
-        //
         // Otherwise we need to generate and Id based on what our children are
         //
-        } else {
+        if (getType() != OpTypes.VALUE && getType() != OpTypes.COLUMN) {
             //
             // Horribly inefficient, but it works for now...
             //
-            final List<String> id_list = new Vector<String>();
-            new Object() {
-                public void traverse(Expression exp) {
-                    for (Expression expr : exp.nodes) {
-                        if (expr != null)
-                            id_list.add(expr.getUniqueId(session));
-                    }
-                }
-            }.traverse(this);
-
-            if (id_list.size() > 0) {
-                // Flatten the id list, intern it, and then do the same trick from above
-                for (String temp : id_list)
-                    this.cached_id += "+" + temp;
-                hashCode = this.cached_id.intern().hashCode();
-            }
-            else
-                hashCode = super.hashCode();
+            traverse(this, session);
         }
 
-        long id = session.getNodeIdForExpression(hashCode);
-        cached_id = Long.toString(id);
+        long nodeId = session.getNodeIdForExpression(this);
+
+        cached_id = Long.toString(nodeId);
         return cached_id;
     }
 
