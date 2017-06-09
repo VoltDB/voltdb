@@ -62,6 +62,7 @@ final public class TestStartWithClassesOnly {
         cluster = new LocalCluster(
                 null,
                 cpath,
+                true,
                 siteCount,
                 hostCount,
                 kfactor,

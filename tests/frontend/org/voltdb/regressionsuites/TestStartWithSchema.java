@@ -103,6 +103,7 @@ final public class TestStartWithSchema {
         cluster = new LocalCluster(
                 schema,
                 null,
+                true,
                 siteCount,
                 hostCount,
                 kfactor,

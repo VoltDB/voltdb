@@ -286,11 +286,12 @@ public class LocalCluster extends VoltServerConfig {
             boolean debug,
             boolean isRejoinTest,
             Map<String, String> env) {
-        this(null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
+        this(null, jarFileName, false, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
     }
 
     public LocalCluster(String schemaToStage,
                         String catalogJarFileName,
+                        boolean useStagedSchema,
                         int siteCount,
                         int hostCount,
                         int kfactor,
@@ -302,8 +303,6 @@ public class LocalCluster extends VoltServerConfig {
                         Map<String, String> env)
     {
         if (schemaToStage != null) {
-            assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
-            setNewCli(true);
             m_usesStagedSchema = true;
             try {
                 templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
@@ -312,9 +311,11 @@ public class LocalCluster extends VoltServerConfig {
                 throw new RuntimeException(e);
             }
         }
-        if (catalogJarFileName != null) {
-            m_usesStagedSchema = true;
+        m_usesStagedSchema = useStagedSchema;
+        if (m_usesStagedSchema) {
+            setNewCli(true);
         }
+
         assert siteCount > 0 : "site count is less than 0";
         assert hostCount > 0 : "host count is less than 0";
 
