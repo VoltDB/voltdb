@@ -28,7 +28,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
@@ -58,8 +60,14 @@ public class TestImportSuite extends RegressionSuite {
     private static final Level[] s_levels =
         { Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.TRACE, Level.WARN };
 
+    private static final String SERVER = "localhost";
+    private static final int SOCKET_IMPORTER_PORT = 7001;
+    private static final char DELIMITER = '\t';
+
     private Boolean m_socketHandlerInitialized = false;
     private Client m_client;
+    private List<DataPusher> m_dataPushers = new ArrayList<>();
+    private CountDownLatch m_dataAwaiter = null;
 
     @Override
     public void setUp() throws Exception
@@ -81,7 +89,7 @@ public class TestImportSuite extends RegressionSuite {
         synchronized(m_socketHandlerInitialized) {
             if (m_socketHandlerInitialized) return;
 
-            SocketAppender appender = new SocketAppender("localhost", 6060);
+            SocketAppender appender = new SocketAppender(SERVER, 6060);
             appender.setReconnectionDelay(50);
             s_testSocketLogger.setAdditivity(false);
             s_testSocketLogger.removeAllAppenders();
@@ -93,6 +101,7 @@ public class TestImportSuite extends RegressionSuite {
 
     @Override
     public void tearDown() throws Exception {
+        m_dataPushers.clear();
         m_client.close();
         super.tearDown();
     }
@@ -102,7 +111,7 @@ public class TestImportSuite extends RegressionSuite {
         private final String m_server;
         private final int m_port;
         private final char m_separator;
-        private final int m_counter = 0;
+        private int m_counter = 0;
 
         public ImporterConnector(String server, int port, char separator) {
             m_separator = separator;
@@ -121,6 +130,7 @@ public class TestImportSuite extends RegressionSuite {
                     String s = String.valueOf(m_counter) + m_separator + System.currentTimeMillis() + "\n";
                     socketStream.write(s.getBytes());
                     pushSocket.close();
+                    m_counter++;
                     return;
                 } catch (IOException e) {
                     numConnectAttempts++;
@@ -137,14 +147,17 @@ public class TestImportSuite extends RegressionSuite {
     }
 
     abstract class DataPusher extends Thread {
-        private final int m_count;
         private final CountDownLatch m_latch;
         private final char m_separator;
+        private volatile int m_totalCount;
+        private volatile int m_currentCount = 0;
+        private volatile Exception m_error = null;
 
         public DataPusher(int count, CountDownLatch latch, char separator) {
-            m_count = count;
+            m_totalCount = count;
             m_latch = latch;
             m_separator = separator;
+            m_dataPushers.add(this);
         }
 
         protected abstract void initialize();
@@ -154,21 +167,33 @@ public class TestImportSuite extends RegressionSuite {
         @Override
         public void run() {
             initialize();
-
+            if (m_totalCount == 0) {
+                m_totalCount = Integer.MAX_VALUE; // keep running until explicitly stopped
+            }
             try {
-                for (int icnt = 0; icnt < m_count; icnt++) {
-                    String s = String.valueOf(System.nanoTime() + icnt) + m_separator + System.currentTimeMillis() + "\n";
+                while (m_currentCount < m_totalCount) {
+                    String s = String.valueOf(System.nanoTime() + m_currentCount) + m_separator + System.currentTimeMillis() + "\n";
                     pushData(s);
                     Thread.sleep(0, 1);
+                    m_currentCount++;
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
+                m_error = ex;
             } finally {
                 close();
                 m_latch.countDown();
             }
         }
 
+        public void shutDown() throws Exception {
+            if (m_totalCount == Integer.MAX_VALUE) {
+                m_totalCount = 0; // this will stop the pusher's forever loop
+            }
+            if (m_error != null) {
+                throw m_error;
+            }
+        }
     }
 
     class SocketDataPusher extends DataPusher {
@@ -226,18 +251,24 @@ public class TestImportSuite extends RegressionSuite {
         }
     }
 
-    private CountDownLatch asyncPushDataToImporters(int count, int loops) throws Exception {
-        CountDownLatch latch = new CountDownLatch(2*loops);
+    private void asyncPushDataToImporters(int count, int loops) throws Exception {
+        m_dataAwaiter = new CountDownLatch(2*loops);
         for (int i=0; i<loops; i++) {
-            (new SocketDataPusher("localhost", 7001, count, latch, '\t')).start();
-            (new Log4jDataPusher(count, latch, ',')).start();
+            (new SocketDataPusher(SERVER, SOCKET_IMPORTER_PORT, count, m_dataAwaiter, DELIMITER)).start();
+            (new Log4jDataPusher(count, m_dataAwaiter, ',')).start();
         }
-        return latch;
+    }
+
+    private void waitForData() throws Exception {
+        for (DataPusher pusher : m_dataPushers) {
+            pusher.shutDown();
+        }
+        m_dataAwaiter.await();
     }
 
     private void pushDataToImporters(int count, int loops) throws Exception {
-        CountDownLatch latch = asyncPushDataToImporters(count, loops);
-        latch.await();
+        asyncPushDataToImporters(count, loops);
+        waitForData();
     }
 
     private static Map<String, String> expectedStatRows = new HashMap<>();
@@ -354,43 +385,34 @@ public class TestImportSuite extends RegressionSuite {
 
     /** Verify that importer stays running during unrelated schema changes.
      * The data pushers will get IOExceptions if the importers restart.
-     * It's possible to get a false pass if the data finishes before the UACs and importers restart anyway,
-     * but manual runs indicate that the data outlasts the UACs by 2-3 seconds.
      */
     public void testImportUnrelatedUACWhilePushing() throws Exception {
         System.out.println("Schema changes that don't affect importers should not result in importer restarts.");
 
-        // Count was chosen to keep importers busy during all UACs without making the test take much longer than necessary.
-        CountDownLatch dataGenerationAwaiter = asyncPushDataToImporters(4000, 3);
+        // Run data pushers until they are explicitly stopped.
+        asyncPushDataToImporters(0, 3);
 
         applySchemaChange("CREATE TABLE nudge(id integer);");
-        Thread.sleep(200);
         applySchemaChange("CREATE PROCEDURE NudgeThatDB AS INSERT INTO nudge VALUES (?);");
-        Thread.sleep(1000);
         applySchemaChange("DROP PROCEDURE NudgeThatDB;");
-        Thread.sleep(200);
         applySchemaChange("DROP TABLE nudge;");
 
-        dataGenerationAwaiter.await();
-        verifyData(m_client, 12000);
+        waitForData();
     }
 
     /** Verify that importer can withstand unrelated UACs without restarting.
      * The data pushers will get IOExceptions if the importers restart.
-     * It's possible but unlikely to get a false pass if the data finishes before the deployment changes and importers restart anyway.
      */
     public void testImportUnrelatedDeploymentChangesWhilePushing() throws Exception {
         System.out.println("Deployment changes that don't affect importers should not result in them restarting.");
 
-        // Count was selected to keep importers busy during all UACs without making the test take much longer than necessary.
-        CountDownLatch dataGenerationAwaiter = asyncPushDataToImporters(4000, 3);
+        // Run data pushers until they are explicitly stopped.
+        asyncPushDataToImporters(0, 3);
 
         updateDeploymentFile(true, true);
-        Thread.sleep(1000);
         updateDeploymentFile(true, false);
 
-        dataGenerationAwaiter.await();
-        verifyData(m_client, 12000);
+        waitForData();
     }
 
     /** Verify that importer restarts if it is removed from the configuration and then restored.
@@ -398,7 +420,7 @@ public class TestImportSuite extends RegressionSuite {
     public void testImporterDeploymentChanges() throws Exception {
         System.out.println("Removing and re-adding importers should cause them to restart");
 
-        ImporterConnector testConnector = new ImporterConnector("localhost", 7001, '\t');
+        ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
         testConnector.tryPush(5);
 
         updateDeploymentFile(false, false);
@@ -419,7 +441,7 @@ public class TestImportSuite extends RegressionSuite {
     public void testAddRemoveImporterProcedure() throws Exception {
         System.out.println("Removing and adding procedures that the importers rely on should result in a restart");
 
-        ImporterConnector testConnector = new ImporterConnector("localhost", 7001, '\t');
+        ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
         testConnector.tryPush(5);
 
         // importer uses CRUD procedure associated with this table.
@@ -490,7 +512,7 @@ public class TestImportSuite extends RegressionSuite {
 
         // configure socket importer
         Properties props = buildProperties(
-                "port", "7001",
+                "port", Integer.toString(SOCKET_IMPORTER_PORT),
                 "decode", "true",
                 "procedure", "importTable.insert");
         project.addImport(includeImporters, "custom", "tsv", "socketstream.jar", props);

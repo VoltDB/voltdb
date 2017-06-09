@@ -150,22 +150,10 @@ public class ImportManager implements ChannelChangeCallback {
         }
     }
 
-    /** Creates an import connector if required by the provided configuration.
-     * If this catalog represents a change to any aspect of the importer configuration (such as the deployment file or procedure availability):
-     * - Shut down any existing importers
-     * - Create importers for the new catalog
-     * - Start new importers
-     * If this catalog does not represent a change:
-     * - Do nothing
-     * During manager initialization, the initial catalog context is compared to an empty one with no importers.
-     *
-     * @param catalogContext
-     * @return whether or not the importers were affected by the catalog change (on startup, this comparison is with an empty importer config)
-     */
     /**
-     * Parses importer configs and loads the bundle needed for importer into memory. Updates
-     * mapping of active importer bundle to the bundle jar needed by the importer
-     * @param catalogContext
+     * Parses importer configs and loads the formatters and bundles needed into memory.
+     * This is used to generate a new configuration either to load or to compare with existing.
+     * @param catalogContext new catalog context
      * @return new importer configuration
      */
     private synchronized Map<String, ImportConfiguration> loadNewConfigAndBundles(CatalogContext catalogContext) {
@@ -319,7 +307,6 @@ public class ImportManager implements ChannelChangeCallback {
                 readyForDataInternal(catalogContext, messenger);
             }
         } catch (final Exception e) {
-            // TODO do I need Andrew to review error message changes?
             VoltDB.crashLocalVoltDB("Error updating importers with new DDL and/or deployment.", true, e);
         }
     }
