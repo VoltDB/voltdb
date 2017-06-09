@@ -32,9 +32,9 @@ public class CopyLoadPartitionedSP extends CopyLoadPartitionedBase {
     private final SQLStmt insertStmt = new SQLStmt("INSERT INTO  cploadp (cid, txnid, rowid) VALUES (?, ?, ?);");
     private final SQLStmt insertIntoStmt = new SQLStmt("INSERT INTO cploadp SELECT cid,txnid,rowid FROM loadp WHERE cid=? ORDER BY cid;");
 
-    public VoltTable[] run(long cid, int useSelect) {
+    public VoltTable[] run(long cid, int useSelect, VoltTable vtable) {
         if (useSelect == 0)
-            return doWork(selectStmt, insertStmt, cid);
-        return doWork(null, insertIntoStmt, cid);
+            return doWork(selectStmt, insertStmt, cid, vtable);
+        return doWork(selectStmt, insertIntoStmt, cid, vtable);
     }
 }
