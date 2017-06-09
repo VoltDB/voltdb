@@ -476,7 +476,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         child.m_parents.add(this);
     }
 
-    // called by PushDownLimit, re-link the child without changing the order
+    /**
+     * Used to re-link the child without changing the order.
+     *
+     * This is called by PushDownLimit and RemoveUnnecessaryProjectNodes.
+     * @param index
+     * @param child
+     */
     public void setAndLinkChild(int index, AbstractPlanNode child) {
         assert(child != null);
         m_children.set(index, child);

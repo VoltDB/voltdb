@@ -241,12 +241,17 @@ public class PlannerTestCase extends TestCase {
      */
     protected AbstractPlanNode compileToTopDownTree(String sql,
             int nOutputColumns, PlanNodeType... nodeTypes) {
+        return compileToTopDownTree(sql, nOutputColumns, false, nodeTypes);
+    }
+
+    protected AbstractPlanNode compileToTopDownTree(String sql,
+            int nOutputColumns, boolean hasOptionalSelectProjection, PlanNodeType... nodeTypes) {
         // Yes, we ARE assuming that test queries don't
         // contain quoted question marks.
         int paramCount = StringUtils.countMatches(sql, "?");
         AbstractPlanNode result = compileSPWithJoinOrder(sql, paramCount, null);
         assertEquals(nOutputColumns, result.getOutputSchema().size());
-        assertTopDownTree(result, nodeTypes);
+        assertTopDownTree(result, hasOptionalSelectProjection, nodeTypes);
         return result;
     }
 
@@ -439,12 +444,28 @@ public class PlannerTestCase extends TestCase {
     protected static AbstractPlanNode followAssertedLeftChain(
             AbstractPlanNode start,
             PlanNodeType startType, PlanNodeType... nodeTypes) {
+        return followAssertedLeftChain(start, false, startType, nodeTypes);
+    }
+
+    protected static AbstractPlanNode followAssertedLeftChain(
+            AbstractPlanNode start,
+            boolean hasOptionalProjection,
+            PlanNodeType startType,
+            PlanNodeType... nodeTypes)
+    {
         AbstractPlanNode result = start;
         assertEquals(startType, result.getPlanNodeType());
-        for (PlanNodeType type : nodeTypes) {
+        for (int nodeNumber = 0; nodeNumber < nodeTypes.length; nodeNumber += 1) {
+            PlanNodeType type = nodeTypes[nodeNumber];
             assertTrue(result.getChildCount() > 0);
             result = result.getChild(0);
-            assertEquals(type, result.getPlanNodeType());
+            if (hasOptionalProjection
+                    && (nodeNumber == 0)
+                    && (result.getPlanNodeType() == PlanNodeType.PROJECTION)) {
+                nodeNumber -= 1;
+            } else {
+                assertEquals(type, result.getPlanNodeType());
+            }
         }
         return result;
     }
@@ -475,14 +496,14 @@ public class PlannerTestCase extends TestCase {
 
     /**
      * Assert that a two-fragment plan's coordinator fragment does a simple
-     * projection.
+     * projection.  Sometimes the projection is optimized away, and
+     * that's ok.
      **/
     protected static void assertProjectingCoordinator(
             List<AbstractPlanNode> lpn) {
         AbstractPlanNode pn;
         pn = lpn.get(0);
-        assertTopDownTree(pn, PlanNodeType.SEND,
-                PlanNodeType.PROJECTION,
+        assertTopDownTreeWithOptionalSelectProjection(pn, PlanNodeType.SEND,
                 PlanNodeType.RECEIVE);
     }
 
@@ -497,13 +518,14 @@ public class PlannerTestCase extends TestCase {
         NestLoopPlanNode nlj;
         SeqScanPlanNode seqScan;
         pn = lpn.get(0);
-        assertTopDownTree(pn, PlanNodeType.SEND,
-                PlanNodeType.PROJECTION,
+        assertTopDownTree(pn,
+                true,
+                PlanNodeType.SEND,
                 PlanNodeType.NESTLOOP,
                 PlanNodeType.SEQSCAN,
                 PlanNodeType.RECEIVE);
-        node = followAssertedLeftChain(pn, PlanNodeType.SEND,
-                PlanNodeType.PROJECTION,
+        node = followAssertedLeftChain(pn, true,
+                PlanNodeType.SEND,
                 PlanNodeType.NESTLOOP);
         nlj = (NestLoopPlanNode) node;
         assertEquals(JoinType.LEFT, nlj.getJoinType());
@@ -528,6 +550,9 @@ public class PlannerTestCase extends TestCase {
             System.out.printf("      Node type %s\n", root.getPlanNodeType());
             for (int idx = 1; idx < root.getChildCount(); idx += 1) {
                 System.out.printf("        Child %d: %s\n", idx, root.getChild(idx).getPlanNodeType());
+            }
+            for (Entry<PlanNodeType, AbstractPlanNode> entry : root.getInlinePlanNodes().entrySet()) {
+                System.out.printf("        Inline %s\n", entry.getKey());
             }
             for (Entry<PlanNodeType, AbstractPlanNode> entry : root.getInlinePlanNodes().entrySet()) {
                 System.out.printf("        Inline %s\n", entry.getKey());
@@ -598,9 +623,22 @@ public class PlannerTestCase extends TestCase {
      **/
     protected static void assertTopDownTree(AbstractPlanNode start,
             PlanNodeType... nodeTypes) {
+        assertTopDownTree(start, false, nodeTypes);
+    }
+
+    protected static void assertTopDownTreeWithOptionalSelectProjection(AbstractPlanNode start,
+            PlanNodeType... nodeTypes) {
+        assertTopDownTree(start, true, nodeTypes);
+    }
+
+    protected static void assertTopDownTree(AbstractPlanNode start,
+                                            boolean hasOptionalProjection,
+                                            PlanNodeType ... nodeTypes) {
         Stack<AbstractPlanNode> stack = new Stack<>();
         stack.push(start);
-        for (PlanNodeType type : nodeTypes) {
+
+        for (int nodeNumber = 0; nodeNumber < nodeTypes.length; nodeNumber += 1) {
+            PlanNodeType type = nodeTypes[nodeNumber];
             // Process each node before its children or later siblings.
             AbstractPlanNode parent;
             try {
@@ -617,6 +655,21 @@ public class PlannerTestCase extends TestCase {
                         parent.getPlanNodeType() +
                         " with " + childCount + " direct children.");
                 continue;
+            }
+            // If we have specified that this has an optional
+            // projection node, then we may find a projection
+            // node at node number 1.  This is from the select
+            // list projection, but we may have optimized it away.
+            if (nodeNumber == 1 && hasOptionalProjection) {
+                if (PlanNodeType.PROJECTION == parent.getPlanNodeType()) {
+                    assertEquals(1, parent.getChildCount());
+                    // We don't actually want to use up this
+                    // type from nodeTypes.  So undo the increment
+                    // we are about to do.
+                    nodeNumber -= 1;
+                    stack.push(parent.getChild(0));
+                    continue;
+                }
             }
             assertEquals(type, parent.getPlanNodeType());
             // Iterate from the last child to the first.
