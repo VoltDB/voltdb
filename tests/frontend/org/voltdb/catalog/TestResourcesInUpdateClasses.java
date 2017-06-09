@@ -28,6 +28,7 @@ import java.net.URL;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
@@ -47,24 +48,30 @@ import com.google_voltpatches.common.io.Resources;
 
 public class TestResourcesInUpdateClasses extends TestCase {
 
+    private Pair<File, String> buildJarFile(byte[] rawCatalog, String resourceFile) throws Exception {
+        // turn it into an in memory JarFile
+        InMemoryJarfile IMJF = new InMemoryJarfile(rawCatalog);
+
+        // get a resource from our filesystem and add that resource to the jar
+        URL resourceURL = UseResourceProc.class.getResource("resource1.txt");
+        byte[] resourceContents = Resources.toByteArray(resourceURL);
+        String resourceContentsString = Resources.toString(resourceURL, Charsets.UTF_8);
+        IMJF.put("org/voltdb_testprocs/catalog/resourceuse/resource.txt", resourceContents);
+
+        // write the new jar to disk
+        File jarPath = new File(Configuration.getPathToCatalogForTest("jarWithResource1.jar"));
+        IMJF.writeToFile(jarPath);
+        return Pair.of(jarPath, resourceContentsString);
+    }
+
     public void testBasic() throws Exception {
         // create a catalog jarfile with one class, the UseResourceProc
         CatalogBuilder builder = new CatalogBuilder();
         builder.addProcedures(UseResourceProc.class);
         byte[] rawCatalog = builder.compileToBytes();
 
-        // turn it into an in memory JarFile
-        InMemoryJarfile IMJF1 = new InMemoryJarfile(rawCatalog);
-
-        // get a resource from our filesystem and add that resource to the jar
-        URL resourceURL = UseResourceProc.class.getResource("resource.txt");
-        byte[] resourceContents = Resources.toByteArray(resourceURL);
-        String resourceContentsString = Resources.toString(resourceURL, Charsets.UTF_8);
-        IMJF1.put("org/voltdb_testprocs/catalog/resourceuse/resource.txt", resourceContents);
-
-        // write the new jar to disk
-        File jarPath = new File(Configuration.getPathToCatalogForTest("jarWithResource.jar"));
-        IMJF1.writeToFile(jarPath);
+        Pair<File, String> ucChange1 = buildJarFile(rawCatalog, "resource1.txt");
+        Pair<File, String> ucChange2 = buildJarFile(rawCatalog, "resource2.txt");
 
         // start voltdb
         VoltProjectBuilder vpb = new VoltProjectBuilder();
@@ -82,7 +89,7 @@ public class TestResourcesInUpdateClasses extends TestCase {
             client.createConnection(server.getListenerAddress(0));
 
             // load the new jar
-            client.updateClasses(jarPath, "");
+            client.updateClasses(ucChange1.getFirst(), "");
 
             // create the procedure from loaded jar
             ClientResponse cr = client.callProcedure(
@@ -101,7 +108,23 @@ public class TestResourcesInUpdateClasses extends TestCase {
 
             VoltTableRow row = t.fetchRow(0);
             String resourceContentsStringRT = row.getString(0);
-            assertTrue(resourceContentsString.equals(resourceContentsStringRT));
+            assertTrue(ucChange1.getSecond().equals(resourceContentsStringRT));
+
+            // load the second jar to replace the resource
+            client.updateClasses(ucChange2.getFirst(), "");
+
+            // check the proc can be called and that it uses the resource correctly
+            cr = client.callProcedure(UseResourceProc.class.getSimpleName());
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            assertEquals(1, cr.getResults().length);
+            t = cr.getResults()[0];
+            assertEquals(1, t.getRowCount());
+            assertEquals(1, t.getColumnCount());
+            assertEquals(VoltType.STRING, t.getColumnType(0));
+
+            row = t.fetchRow(0);
+            resourceContentsStringRT = row.getString(0);
+            assertTrue(ucChange2.getSecond().equals(resourceContentsStringRT));
         }
         finally {
             if (client != null) {
