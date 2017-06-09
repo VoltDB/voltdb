@@ -68,6 +68,8 @@ public enum ExpressionType {
     // unary null evaluation
     OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS", true),
     // unary exists evaluation
+    OPERATOR_UNARY_MINUS           (OperatorExpression.class, 22, "UNARY MINUS", true),
+    // unary exists evaluation
 
     // ----------------------------
     // Binary Comparison
@@ -215,6 +217,7 @@ public enum ExpressionType {
         ExpressionType.name_lookup.put("add", ExpressionType.OPERATOR_PLUS);
         ExpressionType.name_lookup.put("sub", ExpressionType.OPERATOR_MINUS);
         ExpressionType.name_lookup.put("subtract", ExpressionType.OPERATOR_MINUS);
+        ExpressionType.name_lookup.put("negate", ExpressionType.OPERATOR_UNARY_MINUS);
     }
 
     public int getValue() {

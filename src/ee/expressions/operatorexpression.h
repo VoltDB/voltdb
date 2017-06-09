@@ -112,6 +112,30 @@ class OperatorIsNullExpression : public AbstractExpression {
    }
 };
 
+class OperatorUnaryMinusExpression : public AbstractExpression {
+  public:
+    OperatorUnaryMinusExpression(AbstractExpression *left)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS) {
+            m_left = left;
+    };
+
+   NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
+   //  {
+   //     assert(m_left);
+   //     NValue tmp = m_left->eval(tuple1, tuple2);
+   //     if (tmp.isNull()) {
+   //         return NValue::getTrue();
+   //     }
+   //     else {
+   //         return NValue::getFalse();
+   //     }
+   // }
+
+   std::string debugInfo(const std::string &spacer) const {
+       return (spacer + "OperatorUnaryMinusExpression");
+   }
+};
+
 class OperatorCastExpression : public AbstractExpression {
 public:
     OperatorCastExpression(ValueType vt, AbstractExpression *left)
@@ -250,7 +274,6 @@ class OperatorExistsExpression : public AbstractExpression {
         return (spacer + "OperatorExistsExpression");
     }
 };
-
 
 }
 #endif

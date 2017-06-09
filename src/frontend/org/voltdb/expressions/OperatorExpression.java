@@ -33,6 +33,7 @@ import org.voltdb.utils.VoltTypeUtil;
  *   - not
  *   - cast(... as type)
  *   - case when
+ *   - - (unary minus)
  *   - alternative (unsupported?)
  */
 public class OperatorExpression extends AbstractExpression {
@@ -60,6 +61,7 @@ public class OperatorExpression extends AbstractExpression {
         case OPERATOR_IS_NULL:
         case OPERATOR_CAST:
         case OPERATOR_EXISTS:
+        case OPERATOR_UNARY_MINUS:
             return false;
         default: return true;
         }
