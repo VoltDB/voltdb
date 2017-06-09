@@ -38,7 +38,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
-import java.util.stream.IntStream;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -1084,15 +1083,25 @@ public class LocalCluster extends VoltServerConfig {
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
 
-            ptf = new PipeToFile(
-                    fileName,
-                    proc.getInputStream(),
-                    String.valueOf(hostId),
-                    false,
-                    proc,
-                    m_regexes,
-                    m_regexResults.get(hostId));
-            ptf.setHostId(hostId);
+            if (m_regexes == null) {
+                ptf = new PipeToFile(
+                        fileName,
+                        proc.getInputStream(),
+                        String.valueOf(hostId),
+                        false,
+                        proc);
+            } else {
+                assert(m_regexResults.get(hostId) != null);
+                ptf = new PipeToFile(
+                        fileName,
+                        proc.getInputStream(),
+                        String.valueOf(hostId),
+                        false,
+                        proc,
+                        m_regexes,
+                        m_regexResults.get(hostId));
+                ptf.setHostId(hostId);
+            }
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
             proc.waitFor(); // Wait for the server initialization to finish ?
@@ -1267,23 +1276,28 @@ public class LocalCluster extends VoltServerConfig {
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
 
-            ptf = new PipeToFile(
-                    fileName,
-                    proc.getInputStream(),
-                    PipeToFile.m_initToken,
-                    false,
-                    proc,
-                    m_regexes,
-                    m_regexResults.get(hostId));
-            ptf.setHostId(hostId);
-            if (!m_regexResults.containsKey(hostId)) {
-                Map<String, AtomicBoolean> temp = new ConcurrentHashMap<>();
-                for (String s : m_regexes.keySet()) {
-                    temp.put(s, new AtomicBoolean(false));
-                }
-                m_regexResults.put(hostId, temp);
+            if (m_regexes == null) {
+                ptf = new PipeToFile(
+                        fileName,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        false,
+                        proc);
             } else {
-                resetHostRegexResults(hostId);
+                if (m_regexResults.containsKey(hostId)) {
+                    resetHostRegexResults(hostId);
+                } else {
+                    m_regexResults.put(hostId, new ConcurrentHashMap<>());
+                }
+                ptf = new PipeToFile(
+                        fileName,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        false,
+                        proc,
+                        m_regexes,
+                        m_regexResults.get(hostId));
+                ptf.setHostId(hostId);
             }
 
             m_pipes.add(ptf);
@@ -1559,22 +1573,29 @@ public class LocalCluster extends VoltServerConfig {
                               "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
                               ".rejoined.txt";
 
-            ptf = new PipeToFile(
-                    filePath,
-                    proc.getInputStream(),
-                    PipeToFile.m_initToken,
-                    true, proc, m_regexes, m_regexResults.get(hostId));
-            ptf.setHostId(hostId);
-            if (!m_regexResults.containsKey(hostId)) {
-                Map<String, AtomicBoolean> temp = new ConcurrentHashMap<>();
-                for (String s : m_regexes.keySet()) {
-                    temp.put(s, new AtomicBoolean(false));
-                }
-                m_regexResults.put(hostId, temp);
+            if (m_regexes == null) {
+                ptf = new PipeToFile(
+                        filePath,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        false,
+                        proc);
             } else {
-                resetHostRegexResults(hostId);
+                if (m_regexResults.containsKey(hostId)) {
+                    resetHostRegexResults(hostId);
+                } else {
+                    m_regexResults.put(hostId, new ConcurrentHashMap<>());
+                }
+                ptf = new PipeToFile(
+                        filePath,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        false,
+                        proc,
+                        m_regexes,
+                        m_regexResults.get(hostId));
+                ptf.setHostId(hostId);
             }
-
 
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
@@ -2327,11 +2348,11 @@ public class LocalCluster extends VoltServerConfig {
      * verify that none of the patterns exist in any of the existing hosts
      */
     public boolean verifyLogMessages(List<String> patterns) {
-        return IntStream.range(0, m_hostCount).allMatch(id -> preCompLogContains(id, patterns));
+        return m_regexResults.keySet().stream().allMatch(id -> preCompLogContains(id, patterns));
     }
 
     public boolean verifyLogMessagesNotExist(List<String> patterns) {
-        return IntStream.range(0, m_hostCount).allMatch(id -> preCompLogNotContains(id, patterns));
+        return m_regexResults.keySet().stream().allMatch(id -> preCompLogNotContains(id, patterns));
     }
 
     // Helper functions

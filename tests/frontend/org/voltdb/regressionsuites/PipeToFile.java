@@ -158,7 +158,7 @@ import java.util.regex.Pattern;
                     m_writer.flush();
 
                     // Check for patterns on the fly
-                    if (m_regexResults != null) {
+                    if (m_regexes != null) {
                         for (Entry<String, Pattern> tuple : m_regexes.entrySet()) {
                             // if the pattern still has not appeared in the current host log
                             if (!m_regexResults.get(tuple.getKey()).get()) {
