@@ -94,16 +94,16 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
      */
     @Test
     public void testPreCompiledLogSearch() throws Exception {
-        assertTrue(cluster.regexInAllHosts("Initialized VoltDB root directory"));
-        assertTrue(cluster.regexInAllHosts(".*VoltDB [a-zA-Z]* Edition.*"));
-        assertTrue(cluster.verifyRegexesExistInAllHosts(Arrays.asList(new String[] {"Initialized VoltDB root directory",
+        assertTrue(cluster.verifyLogMessage("Initialized VoltDB root directory"));
+        assertTrue(cluster.verifyLogMessage(".*VoltDB [a-zA-Z]* Edition.*"));
+        assertTrue(cluster.verifyLogMessages(Arrays.asList(new String[] {"Initialized VoltDB root directory",
                                                                                     ".*VoltDB [a-zA-Z]* Edition.*"})));
 
         for (int i = 0; i < HOSTS; i++) {
-            assertTrue(cluster.regexInHost(i, "Initialized VoltDB root directory"));
-            assertTrue(cluster.regexInHost(i, ".*VoltDB [a-zA-Z]* Edition.*"));
+            assertTrue(cluster.verifyLogMessage(i, "Initialized VoltDB root directory"));
+            assertTrue(cluster.verifyLogMessage(i, ".*VoltDB [a-zA-Z]* Edition.*"));
         }
-        assertTrue(cluster.regexNotInAnyHosts(".*FATAL.*"));
+        assertTrue(cluster.verifyLogMessageNotExist(".*FATAL.*"));
     }
 
     /*
@@ -121,9 +121,9 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
             if (i != 1) {
                 // In community edition the feature is not enabled, in pro version
                 // the cluster should still be running
-                boolean r = (cluster.regexInHost(i, "Cluster has become unviable") &&
-                             cluster.regexInHost(i, "Some partitions have no replicas")) ||
-                             cluster.regexInHost(i, "Host 1 failed");
+                boolean r = (cluster.verifyLogMessage(i, "Cluster has become unviable") &&
+                             cluster.verifyLogMessage(i, "Some partitions have no replicas")) ||
+                             cluster.verifyLogMessage(i, "Host 1 failed");
                 assertTrue(r);
             }
         }
@@ -144,9 +144,9 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         cluster.shutDown();
         cluster.startUp();
 
-        assertTrue(cluster.regexInAllHosts(".*VoltDB [a-zA-Z]* Edition.*"));
+        assertTrue(cluster.verifyLogMessage(".*VoltDB [a-zA-Z]* Edition.*"));
         for (int i = 0; i < HOSTS; i++) {
-            assertTrue(cluster.regexInHost(i, ".*VoltDB [a-zA-Z]* Edition.*"));
+            assertTrue(cluster.verifyLogMessage(i, ".*VoltDB [a-zA-Z]* Edition.*"));
         }
     }
 }

@@ -44,7 +44,7 @@ import java.util.regex.Pattern;
         FileWriter m_writer ;
         BufferedReader m_input;
         String m_filename;
-        Map<Integer, Map<String, AtomicBoolean>> m_regexResults = null;
+        Map<String, AtomicBoolean> m_regexResults = null;
         Map<String, Pattern> m_regexes = null;
 
         // set m_witnessReady when the m_token byte sequence is seen.
@@ -77,7 +77,7 @@ import java.util.regex.Pattern;
 
         PipeToFile(String filename, InputStream stream, String token,
                    boolean appendLog, Process proc, Map<String, Pattern> patterns,
-                   Map<Integer, Map<String, AtomicBoolean>> results) {
+                   Map<String, AtomicBoolean> results) {
          this(filename, stream, token, appendLog, proc);
          m_regexResults = results;
          m_regexes = patterns;
@@ -158,12 +158,12 @@ import java.util.regex.Pattern;
                     m_writer.flush();
 
                     // Check for patterns on the fly
-                    if (m_regexResults != null && getHostId() != Integer.MAX_VALUE) {
+                    if (m_regexResults != null) {
                         for (Entry<String, Pattern> tuple : m_regexes.entrySet()) {
                             // if the pattern still has not appeared in the current host log
-                            if (!m_regexResults.get(getHostId()).get(tuple.getKey()).get()) {
+                            if (!m_regexResults.get(tuple.getKey()).get()) {
                                 boolean r = tuple.getValue().matcher(data).find();
-                                m_regexResults.get(getHostId()).get(tuple.getKey()).set(r);
+                                m_regexResults.get(tuple.getKey()).set(r);
                             }
                         }
                     }

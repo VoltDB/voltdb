@@ -1091,7 +1091,7 @@ public class LocalCluster extends VoltServerConfig {
                     false,
                     proc,
                     m_regexes,
-                    m_regexResults);
+                    m_regexResults.get(hostId));
             ptf.setHostId(hostId);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
@@ -1274,7 +1274,7 @@ public class LocalCluster extends VoltServerConfig {
                     false,
                     proc,
                     m_regexes,
-                    m_regexResults);
+                    m_regexResults.get(hostId));
             ptf.setHostId(hostId);
             if (!m_regexResults.containsKey(hostId)) {
                 Map<String, AtomicBoolean> temp = new ConcurrentHashMap<>();
@@ -1563,7 +1563,7 @@ public class LocalCluster extends VoltServerConfig {
                     filePath,
                     proc.getInputStream(),
                     PipeToFile.m_initToken,
-                    true, proc, m_regexes, m_regexResults);
+                    true, proc, m_regexes, m_regexResults.get(hostId));
             ptf.setHostId(hostId);
             if (!m_regexResults.containsKey(hostId)) {
                 Map<String, AtomicBoolean> temp = new ConcurrentHashMap<>();
@@ -2293,7 +2293,7 @@ public class LocalCluster extends VoltServerConfig {
      * Maybe all of them should be set to public ?
      */
     // hostNum = hostId in all cases
-    public boolean regexInHost(int hostNum, String regex) {
+    public boolean verifyLogMessage(int hostNum, String regex) {
         assertTrue(m_regexes != null);
         assertTrue(m_regexResults.containsKey(hostNum));
         assertTrue(m_regexes.containsKey(regex));
@@ -2301,46 +2301,46 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     private boolean preCompLogContains(int hostId, List<String> patterns) {
-        return patterns.stream().allMatch(s -> regexInHost(hostId, s));
+        return patterns.stream().allMatch(s -> verifyLogMessage(hostId, s));
     }
 
     /*
      * Helper function to check non of the patterns appear in the specified host
      */
     private boolean preCompLogNotContains(int hostId, List<String> patterns) {
-        return patterns.stream().allMatch(s -> !regexInHost(hostId, s));
+        return patterns.stream().allMatch(s -> !verifyLogMessage(hostId, s));
     }
 
     // Verify that the patterns provided exist in all the specified hosts
     // These patterns should have been added when constructing the class
-    public boolean verifyRegexesExist(List<Integer> hostIds, List<String> patterns) {
+    public boolean verifyLogMessages(List<Integer> hostIds, List<String> patterns) {
         return hostIds.stream().allMatch(id -> preCompLogContains(id, patterns));
     }
 
     // Verify that none of the patterns provided exist in any of the specified hosts
     // These patterns should have been added when constructing the class
-    public boolean verifyRegexesNotExist(List<Integer> hostIds, List<String> patterns) {
+    public boolean verifyLogMessagesNotExist(List<Integer> hostIds, List<String> patterns) {
         return hostIds.stream().allMatch(id -> preCompLogNotContains(id, patterns));
     }
 
     /*
      * verify that none of the patterns exist in any of the existing hosts
      */
-    public boolean verifyRegexesExistInAllHosts(List<String> patterns) {
+    public boolean verifyLogMessages(List<String> patterns) {
         return IntStream.range(0, m_hostCount).allMatch(id -> preCompLogContains(id, patterns));
     }
 
-    public boolean verifyRegexesNotExistInAnyHosts(List<String> patterns) {
+    public boolean verifyLogMessagesNotExist(List<String> patterns) {
         return IntStream.range(0, m_hostCount).allMatch(id -> preCompLogNotContains(id, patterns));
     }
 
     // Helper functions
-    public boolean regexInAllHosts(String regex) {
-        return verifyRegexesExistInAllHosts(Arrays.asList(new String[] {regex}));
+    public boolean verifyLogMessage(String regex) {
+        return verifyLogMessages(Arrays.asList(new String[] {regex}));
     }
 
-    public boolean regexNotInAnyHosts(String regex) {
-        return verifyRegexesNotExistInAnyHosts(Arrays.asList(new String[] {regex}));
+    public boolean verifyLogMessageNotExist(String regex) {
+        return verifyLogMessagesNotExist(Arrays.asList(new String[] {regex}));
     }
 
     private void resetHostRegexResults(int hostId) {
