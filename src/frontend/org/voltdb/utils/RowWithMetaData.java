@@ -16,10 +16,12 @@
  */
 package org.voltdb.utils;
 
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.VoltBulkLoader.ImportSuccessCallback;
 
 //Processor queue to keep track of line data and number and such.
-public class RowWithMetaData {
+public class RowWithMetaData implements ImportSuccessCallback {
 
     final public Object rawLine;
     final public long lineNumber;
@@ -36,4 +38,13 @@ public class RowWithMetaData {
         this.lineNumber = ln;
         this.procedureCallback = cb;
     }
+
+    @Override
+    public void success(ClientResponse response) throws Exception {
+        if (procedureCallback != null) {
+            procedureCallback.clientCallback(response);
+        }
+    }
+
+
 }

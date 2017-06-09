@@ -34,6 +34,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.VoltBulkLoader.ImportSuccessCallback;
 
 import com.google_voltpatches.common.collect.Lists;
 
@@ -83,19 +84,20 @@ public class CSVTupleDataLoader implements CSVDataLoader {
         @Override
         public void clientCallback(final ClientResponse response) throws Exception {
             byte status = response.getStatus();
-            if (status == ClientResponse.SUCCESS && m_csvLine.procedureCallback != null) {
-                // If the client is keeping track of offsets, notify it (but run on a service thread)
-                m_es.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            m_csvLine.procedureCallback.clientCallback(response);
-                        } catch (Exception e) {
-                            m_log.error("Exception in success client callback", e);
+            if (status == ClientResponse.SUCCESS) {
+                if (m_csvLine instanceof ImportSuccessCallback) {
+                    // If the client is keeping track of offsets, notify it (but run on a service thread)
+                    m_es.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                m_csvLine.success(response);
+                            } catch (Exception e) {
+                                m_log.error("Exception in success client callback", e);
+                            }
                         }
-                    }
-                });
-
+                    });
+                }
             }
             else {
                 m_failedCount.incrementAndGet();

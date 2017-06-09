@@ -109,10 +109,16 @@ public class PerPartitionTable {
                     public void run() {
                         try {
                             for (VoltBulkLoaderRow r : m_batchRowList) {
-                                r.m_loader.m_notificationCallBack.callback(r.m_rowHandle, null, response);
+                                // If the row has a per-row success callback, invoke it. This lets us track things like
+                                // Kafka offsets.  We might  be able to optimize this by bringing the metadata outside of the
+                                // row and calling back on a batch  basis, but for now this will work.
+                                if (r.m_rowHandle != null && r.m_rowHandle instanceof ImportSuccessCallback) {
+                                    ((ImportSuccessCallback) r.m_rowHandle).success(response);
+                                }
                             }
-                        } catch (Exception e) {
-                            loaderLog.error("Failed to re-insert failed batch", e);
+                        }
+                        catch (Exception e) {
+                           loaderLog.error("Success callback failed", e);
                         }
                     }
                 });
