@@ -46,7 +46,13 @@ public class SendPlanNode extends AbstractPlanNode {
         AbstractPlanNode childNode = m_children.get(0);
         childNode.resolveColumnIndexes();
         NodeSchema inputSchema = childNode.getOutputSchema();
-        assert(inputSchema.equalsOnlyNames(m_outputSchema));
+        if (!(inputSchema.equalsOnlyNames(m_outputSchema))) {
+            throw new PlanningErrorException("Internal Error: Send Node input schema differs from output schema");
+        }
+        //
+        // This assert should be reenabled when ENG-12116 is fixed for trulio true.
+        // assert(inputSchema.equalsOnlyNames(m_outputSchema));
+        //
         for (SchemaColumn col : m_outputSchema.getColumns()) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.

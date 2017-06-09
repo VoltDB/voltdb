@@ -155,7 +155,7 @@ public:
                              m_exception_buffer.get(), m_smallBufferSize);
         m_engine->resetReusedResultOutputBuffer();
         m_engine->resetPerFragmentStatsOutputBuffer();
-        int partitionCount = htonl(1);
+        int partitionCount = 3;
         m_engine->initialize(m_cluster_id, m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
@@ -351,21 +351,21 @@ public:
     void executeFragment(fragmentId_t fragmentId, const char *plan) {
         m_topend->addPlan(fragmentId, plan);
 
-        // Make sure the parameter buffer is filled
-        // with healthful zeros, and then create an input
-        // deserializer.
-        memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
-        voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), m_smallBufferSize);
+            // Make sure the parameter buffer is filled
+            // with healthful zeros, and then create an input
+            // deserializer.
+            memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
+            voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), m_smallBufferSize);
 
-        //
-        // Execute the plan.  You'd think this would be more
-        // impressive.
-        //
-        try {
-            m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1, false);
-        } catch (voltdb::SerializableEEException &ex) {
-            throw;
-        }
+            //
+            // Execute the plan.  You'd think this would be more
+            // impressive.
+            //
+            try {
+                m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1, false);
+            } catch (voltdb::SerializableEEException &ex) {
+                throw;
+            }
     }
 
     /**
@@ -389,16 +389,7 @@ public:
             printf("No results!!\n");
             ASSERT_FALSE(true);
         }
-        int32_t resColCount = result->columnCount();
-        if (nCols != resColCount) {
-            std::cerr << "Error: nCols = "
-                      << nCols
-                      << " != resColCount = "
-                      << resColCount
-                      << "."
-                      << std::endl;
-        }
-        ASSERT_EQ(nCols, resColCount);
+        ASSERT_EQ(nCols, result->columnCount());
         bool failed = false;
         for (int32_t row = 0; row < nRows; row += 1) {
             ASSERT_TRUE(iter.next(tuple));

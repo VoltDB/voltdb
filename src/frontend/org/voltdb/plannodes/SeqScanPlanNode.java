@@ -24,13 +24,12 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.planner.ScanPlanNodeWithInlineInsert;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
-public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNodeWithInlineInsert {
+public class SeqScanPlanNode extends AbstractScanPlanNode {
 
     public SeqScanPlanNode() {
         super();
@@ -120,13 +119,4 @@ public class SeqScanPlanNode extends AbstractScanPlanNode implements ScanPlanNod
         return "SEQUENTIAL SCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
     }
 
-    @Override
-    public boolean hasInlineAggregateNode() {
-        return AggregatePlanNode.getInlineAggregationNode(this) != null;
-    }
-
-    @Override
-    public AbstractPlanNode getAbstractNode() {
-        return this;
-    }
 }
