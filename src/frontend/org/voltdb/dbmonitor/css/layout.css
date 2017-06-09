@@ -3509,7 +3509,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     border: 1px solid #AA1F2F;
     color: #FFFFFF;
     cursor: pointer;
-    margin:12px;
+
 }
 .analyzeBtn:hover {
     float: right;
@@ -3518,13 +3518,14 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     border: 1px solid #C12026;
     color: #FFFFFF;
     cursor: pointer;
-    margin:12px;
+
 }
 .analysisBody {
+    overflow:hidden;
     padding: 0;
     background: #fff;
     padding:20px;
-    height:calc(100vh - 290px);
+    height:calc(100vh - 200px);
     
 }
 .mainContent { 
@@ -3542,6 +3543,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .analysisSubTab ul.tabs li a {
        padding: 0 20px; 
 }
+.dataTab { height:420px;}
 /********************analysis End *****************/
 /********************jquery us css override*****************/
 
