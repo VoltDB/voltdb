@@ -834,7 +834,7 @@ public class VoltProjectBuilder {
             final int replication,
             final String voltRoot,
             final int clusterId) {
-        VoltCompiler compiler = new VoltCompiler(false);
+        VoltCompiler compiler = new VoltCompiler(m_drRole == DrRoleType.XDCR);
         if (compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
@@ -851,7 +851,7 @@ public class VoltProjectBuilder {
             final boolean ppdEnabled, final String snapshotPath,
             final String ppdPrefix)
     {
-        VoltCompiler compiler = new VoltCompiler(false);
+        VoltCompiler compiler = new VoltCompiler(m_drRole == DrRoleType.XDCR);
         return compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        ppdEnabled, snapshotPath, ppdPrefix);
