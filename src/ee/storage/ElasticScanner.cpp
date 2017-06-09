@@ -46,7 +46,7 @@ ElasticScanner::~ElasticScanner()
 bool ElasticScanner::continueScan() {
     if (!m_scanComplete) {
         // First block or end of block?
-        if (m_currentBlockPtr == NULL || m_tupleIndex >= m_currentBlockPtr->unusedTupleBoundry()) {
+        if (m_currentBlockPtr == NULL || m_tupleIndex >= m_currentBlockPtr->unusedTupleBoundary()) {
             // No more blocks?
             m_scanComplete = (m_blockIterator == m_blockEnd);
             if (!m_scanComplete) {

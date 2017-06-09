@@ -137,6 +137,8 @@ public interface ProducerDRGateway {
 
     public void cacheSnapshotRestoreTruncationPoint(Map<Integer, Long> sequenceNumbers);
 
+    public void cacheRejoinStartDRSNs(Map<Integer, Long> sequenceNumbers);
+
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
      */
@@ -190,4 +192,6 @@ public interface ProducerDRGateway {
     public void resumeAllReadersAsync();
 
     public void pauseAllReadersAsync();
+
+    public void dropLocal();
 }

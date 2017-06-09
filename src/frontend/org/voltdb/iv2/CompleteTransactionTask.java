@@ -175,12 +175,7 @@ public class CompleteTransactionTask extends TransactionTask
                               "fragment: " + fragment.toString());
             }
             StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
-            drGateway.onSuccessfulMPCall(m_txnState.m_spHandle,
-                    m_txnState.txnId,
-                    m_txnState.uniqueId,
-                    m_completeMsg.getHash(),
-                    invocation,
-                    m_txnState.getResults());
+            drGateway.onSuccessfulMPCall(invocation);
         }
     }
 
