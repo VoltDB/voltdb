@@ -48,18 +48,18 @@ import com.google_voltpatches.common.io.Resources;
 
 public class TestResourcesInUpdateClasses extends TestCase {
 
-    private Pair<File, String> buildJarFile(byte[] rawCatalog, String resourceFile) throws Exception {
+    private Pair<File, String> buildJarFile(byte[] rawCatalog, String resourceFileVersion) throws Exception {
         // turn it into an in memory JarFile
         InMemoryJarfile IMJF = new InMemoryJarfile(rawCatalog);
 
         // get a resource from our filesystem and add that resource to the jar
-        URL resourceURL = UseResourceProc.class.getResource("resource1.txt");
+        URL resourceURL = UseResourceProc.class.getResource("resource" + resourceFileVersion + ".txt");
         byte[] resourceContents = Resources.toByteArray(resourceURL);
         String resourceContentsString = Resources.toString(resourceURL, Charsets.UTF_8);
         IMJF.put("org/voltdb_testprocs/catalog/resourceuse/resource.txt", resourceContents);
 
         // write the new jar to disk
-        File jarPath = new File(Configuration.getPathToCatalogForTest("jarWithResource1.jar"));
+        File jarPath = new File(Configuration.getPathToCatalogForTest("jarWithResource" + resourceFileVersion + ".jar"));
         IMJF.writeToFile(jarPath);
         return Pair.of(jarPath, resourceContentsString);
     }
@@ -70,8 +70,9 @@ public class TestResourcesInUpdateClasses extends TestCase {
         builder.addProcedures(UseResourceProc.class);
         byte[] rawCatalog = builder.compileToBytes();
 
-        Pair<File, String> ucChange1 = buildJarFile(rawCatalog, "resource1.txt");
-        Pair<File, String> ucChange2 = buildJarFile(rawCatalog, "resource2.txt");
+        Pair<File, String> ucChange1 = buildJarFile(rawCatalog, "1");
+        Pair<File, String> ucChange2 = buildJarFile(rawCatalog, "2");
+        assertFalse(ucChange1.getSecond().equals(ucChange2.getSecond()));
 
         // start voltdb
         VoltProjectBuilder vpb = new VoltProjectBuilder();
