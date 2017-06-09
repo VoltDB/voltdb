@@ -555,7 +555,7 @@ public abstract class ProcedureCompiler {
         compiler.addClassToJar(jarOutput, ancestor);
     }
 
-    private static void compileNTProcedure(VoltCompiler compiler,
+    public static void compileNTProcedure(VoltCompiler compiler,
                                            Class<?> procClass,
                                            Procedure procedure,
                                            InMemoryJarfile jarOutput)
@@ -689,7 +689,7 @@ public abstract class ProcedureCompiler {
         }
     }
 
-    private static void checkForDeterminismWarnings(VoltCompiler compiler, String shortName, final Procedure procedure,
+    public static void checkForDeterminismWarnings(VoltCompiler compiler, String shortName, final Procedure procedure,
                                          boolean procHasWriteStmts) {
         for (Statement catalogStmt : procedure.getStatements()) {
             if (catalogStmt.getIscontentdeterministic() == false) {
@@ -858,7 +858,7 @@ public abstract class ProcedureCompiler {
     /**
      * Determine which parameter is the partition indicator
      */
-    static void parsePartitionInfo(VoltCompiler compiler, Database db,
+    public static void parsePartitionInfo(VoltCompiler compiler, Database db,
             Procedure procedure, String info) throws VoltCompilerException {
 
         assert(procedure.getSinglepartition() == true);

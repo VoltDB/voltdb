@@ -1389,7 +1389,7 @@ JAVA COMPILATION
 	 -->
     <copy flatten='false' todir='${build.testproc.dir}'>
         <fileset dir="${src.testproc.dir}">
-            <include name="**/*jar"/>
+            <include name="**/*.jar"/>
         </fileset>
     </copy>
 

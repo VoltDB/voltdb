@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
@@ -100,7 +101,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             // or null if it still needs to be filled in.
             InMemoryJarfile newCatalogJar = null;
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
-            boolean updatedClass = false;
             String deploymentString = operationString;
             if ("@UpdateApplicationCatalog".equals(invocationName)) {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
@@ -120,12 +120,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 }
                 try {
                     InMemoryJarfile modifiedJar = modifyCatalogClasses(context.catalog, oldJar, operationString,
-                            newCatalogJar, drRole == DrRoleType.XDCR);
+                            newCatalogJar, drRole == DrRoleType.XDCR, context.m_ptool.getHSQLInterface());
                     if (modifiedJar == null) {
                         newCatalogJar = oldJar;
                     } else {
                         newCatalogJar = modifiedJar;
-                        updatedClass = true;
                     }
                 }
                 catch (ClassNotFoundException e) {
@@ -214,33 +213,40 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 }
             }
 
-            DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
-            if (dt == null) {
-                throw new PrepareDiffFailureException(
-                        ClientResponse.GRACEFUL_FAILURE,
-                        "Unable to update deployment configuration: Error parsing deployment string");
-            }
-            if (isPromotion && drRole == DrRoleType.REPLICA) {
-                assert dt.getDr().getRole() == DrRoleType.REPLICA;
-                dt.getDr().setRole(DrRoleType.MASTER);
+            if ("@UpdateClasses".equals(invocationName)) {
+                retval.deploymentString = deploymentString;
+            } else {
+                DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
+                if (dt == null) {
+                    throw new PrepareDiffFailureException(
+                            ClientResponse.GRACEFUL_FAILURE,
+                            "Unable to update deployment configuration: Error parsing deployment string");
+                }
+                if (isPromotion && drRole == DrRoleType.REPLICA) {
+                    assert dt.getDr().getRole() == DrRoleType.REPLICA;
+                    dt.getDr().setRole(DrRoleType.MASTER);
+                }
+
+                String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
+                if (result != null) {
+                    throw new PrepareDiffFailureException(
+                            ClientResponse.GRACEFUL_FAILURE,
+                            "Unable to update deployment configuration: " + result);
+                }
+
+                //In non legacy mode discard the path element.
+                if (!VoltDB.instance().isRunningWithOldVerbs()) {
+                    dt.setPaths(null);
+                }
+
+                //Always get deployment after its adjusted.
+                retval.deploymentString = CatalogUtil.getDeployment(dt, true);
             }
 
-            String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
-            if (result != null) {
-                throw new PrepareDiffFailureException(
-                        ClientResponse.GRACEFUL_FAILURE,
-                        "Unable to update deployment configuration: " + result);
-            }
-
-            //In non legacy mode discard the path element.
-            if (!VoltDB.instance().isRunningWithOldVerbs()) {
-                dt.setPaths(null);
-            }
-            //Always get deployment after its adjusted.
-            retval.deploymentString = CatalogUtil.getDeployment(dt, true);
-
+            // make deployment hash from string
             retval.deploymentHash =
-                CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
+                    CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
+
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify
@@ -256,7 +262,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
 
             String commands = diff.commands();
-            compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
+            compilerLog.info(diff.getDescriptionOfChanges("@UpdateClasses".equals(invocationName)));
 
             retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
             // since diff commands can be stupidly big, compress them here
@@ -313,7 +319,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * @throws IOException
      */
     private static InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
-            InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException, IOException
+            InMemoryJarfile newJarfile, boolean isXDCR, HSQLInterface hsql) throws Exception
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
@@ -355,7 +361,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         compilerLog.info("Updating java classes available to stored procedures");
         VoltCompiler compiler = new VoltCompiler(isXDCR);
-        compiler.compileInMemoryJarfile(jarfile);
+        try {
+            compiler.compileInMemoryJarfileForUpdateClasses(jarfile, catalog, hsql);
+        } catch (Exception ex) {
+            throw ex;
+        }
 
         return jarfile;
     }

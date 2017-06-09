@@ -22,6 +22,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -53,8 +55,14 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
+import org.voltdb.SQLStmt;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.VoltNonTransactionalProcedure;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -62,15 +70,20 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
+import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
+import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -82,6 +95,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
@@ -639,7 +653,7 @@ public class VoltCompiler {
         return true;
     }
 
-    private void generateCatalogReport( String ddlWithBatchSupport ) throws IOException {
+    private void generateCatalogReport(Catalog catalog, String ddlWithBatchSupport) throws IOException {
         VoltDBInterface voltdb = VoltDB.instance();
         // try to get a catalog context
         CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
@@ -655,7 +669,7 @@ public class VoltCompiler {
         boolean isPro = MiscUtils.isPro();
 
         long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
-        m_report = ReportMaker.report(m_catalog, minHeapRqt, isPro, hostcount,
+        m_report = ReportMaker.report(catalog, minHeapRqt, isPro, hostcount,
                 sitesPerHost, kfactor, m_warnings, ddlWithBatchSupport);
         m_reportPath = null;
         File file = null;
@@ -730,7 +744,7 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            generateCatalogReport(ddlWithBatchSupport);
+            generateCatalogReport(m_catalog, ddlWithBatchSupport);
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -1842,55 +1856,450 @@ public class VoltCompiler {
      * Compile the provided jarfile.  Basically, treat the jarfile as a staging area
      * for the artifacts to be included in the compile, and then compile it in place.
      *
-     * *NOTE*: Does *NOT* work with project.xml jarfiles.
-     *
-     * @return the compiled catalog is contained in the provided jarfile.
+     * @throws ClassNotFoundException
+     * @throws VoltCompilerException
      *
      */
-    public void compileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
+    public void compileInMemoryJarfileForUpdateClasses(InMemoryJarfile jarOutput,
+            Catalog currentCatalog, HSQLInterface hsql)
+                    throws IOException, ClassNotFoundException, VoltCompilerException
     {
-        // Gather DDL files for recompilation
-        List<VoltCompilerReader> ddlReaderList = new ArrayList<>();
-        Entry<String, byte[]> entry = jarfile.firstEntry();
-        while (entry != null) {
-            String path = entry.getKey();
-            // SOMEDAY: It would be better to have a manifest that explicitly lists
-            // ddl files instead of using a brute force *.sql glob.
-            if (path.toLowerCase().endsWith(".sql")) {
-                ddlReaderList.add(new VoltCompilerJarFileReader(jarfile, path));
-                compilerLog.trace("Added SQL file from jarfile to compilation: " + path);
-            }
-            entry = jarfile.higherEntry(entry.getKey());
-        }
-
         // Use the in-memory jarfile-provided class loader so that procedure
         // classes can be found and copied to the new file that gets written.
-        ClassLoader originalClassLoader = m_classLoader;
+
+        // clear out the warnings and errors
+        m_warnings.clear();
+        m_infos.clear();
+        m_errors.clear();
+
+        // do all the work to get the catalog
+        m_catalog = new Catalog();
+        // Initialize the catalog for one cluster
+        m_catalog.execute("add / clusters cluster");
+        m_catalog.getClusters().get("cluster").setSecurityenabled(false);
+
+        Catalog catalog = currentCatalog.deepCopy();
+        Database previousDB = catalog.getClusters().get("cluster").getDatabases().get("database");
+
         try {
-            m_classLoader = jarfile.getLoader();
-            // Do the compilation work.
-            InMemoryJarfile jarOut = compileInternal(null, null, ddlReaderList, jarfile);
-            // Trim the compiler output to try to provide a concise failure
-            // explanation
-            if (jarOut != null) {
-                compilerLog.debug("Successfully recompiled InMemoryJarfile");
-            }
-            else {
-                String errString = "Adhoc DDL failed";
-                if (m_errors.size() > 0) {
-                    errString = m_errors.get(m_errors.size() - 1).getLogString();
+            final ArrayList<Class<?>> classDependencies = new ArrayList<>();
+            final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
+
+            Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
+            CatalogMap<Procedure> previousProcs = previousDB.getProcedures();
+
+            // build a cache of previous SQL stmts
+            m_previousCatalogStmts.clear();
+            for (Procedure prevProc : previousProcs) {
+                for (Statement prevStmt : prevProc.getStatements()) {
+                    addStatementToCache(prevStmt);
                 }
-                int fronttrim = errString.indexOf("DDL Error");
-                if (fronttrim < 0) { fronttrim = 0; }
-                int endtrim = errString.indexOf(" in statement starting");
-                if (endtrim < 0) { endtrim = errString.length(); }
-                String trimmed = errString.substring(fronttrim, endtrim);
-                throw new IOException(trimmed);
             }
+
+            ClassLoader classLoader = jarOutput.getLoader();
+
+            for (Procedure procedure : previousProcs) {
+                if (!procedure.getHasjava()) {
+                    // skip the single statement stored procedures as @UpdateClasses does not affect them
+                    continue;
+                }
+                // default procedure is also a single statement procedure
+                assert(procedure.getDefaultproc() == false);
+
+                if (procedure.getSystemproc()) {
+                    // UpdateClasses does not need to update system procedures
+                    continue;
+                }
+
+//              ProcedureCompiler.compileJavaProcedure(this, hsql, m_estimates, previousDB, procedureDescriptor, jarOutput);
+
+                final String className = procedure.getClassname();
+
+                // Load the class given the class name
+                Class<?> procClass = classLoader.loadClass(className);
+                // get the short name of the class (no package)
+                String shortName = ProcedureCompiler.deriveShortProcedureName(className);
+
+                ProcedureAnnotation pa = (ProcedureAnnotation) procedure.getAnnotation();
+                if (pa == null) {
+                    pa = new ProcedureAnnotation();
+                    procedure.setAnnotation(pa);
+                }
+
+                // TODO(xin): deal with the annotation
+                // ...
+                // ...
+
+                // TODO(xin): deal with NT procedure
+                // ...
+                // if the procedure is non-transactional, then take this special path here
+                if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
+                    ProcedureCompiler.compileNTProcedure(this, procClass, procedure, jarOutput);
+                    continue;
+                }
+
+                // if still here, that means the procedure is transactional
+                procedure.setTransactional(true);
+
+                // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
+                boolean procHasWriteStmts = false;
+                boolean procHasSeqScans = false;
+                // procWantsCommonPartitioning == true but commonPartitionExpression == null signifies a proc
+                // for which the planner was requested to attempt to find an SP plan, but that was not possible
+                // -- it had a replicated write or it had one or more partitioned reads that were not all
+                // filtered by the same partition key value -- so it was planned as an MP proc.
+                boolean procWantsCommonPartitioning = true;
+                AbstractExpression commonPartitionExpression = null;
+                String exampleSPstatement = null;
+                Object exampleSPvalue = null;
+
+                // iterate through the fields and get valid sql statements
+
+                VoltProcedure procInstance;
+                try {
+                    procInstance = (VoltProcedure) procClass.newInstance();
+                } catch (InstantiationException | IllegalAccessException e) {
+                    throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
+                }
+                Map<String, SQLStmt> stmtMap = ProcedureCompiler.getValidSQLStmts(this, procClass.getSimpleName(), procClass, procInstance, true);
+
+                ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+                builder.putAll(stmtMap);
+
+                // find the run() method and get the params
+                Method procMethod = null;
+                Method[] methods = procClass.getDeclaredMethods();
+                for (final Method m : methods) {
+                    String name = m.getName();
+                    if (name.equals("run")) {
+                        assert (m.getDeclaringClass() == procClass);
+
+                        // if not null, then we've got more than one run method
+                        if (procMethod != null) {
+                            String msg = "Procedure: " + shortName + " has multiple public run(...) methods. ";
+                            msg += "Only a single run(...) method is supported.";
+                            throw new VoltCompilerException(msg);
+                        }
+
+                        if (Modifier.isPublic(m.getModifiers())) {
+                            // found it!
+                            procMethod = m;
+                        }
+                        else {
+                            addWarn("Procedure: " + shortName + " has non-public run(...) method.");
+                        }
+                    }
+                }
+                if (procMethod == null) {
+                    String msg = "Procedure: " + shortName + " has no run(...) method.";
+                    throw new VoltCompilerException(msg);
+                }
+                // check the return type of the run method
+                if ((procMethod.getReturnType() != VoltTable[].class) &&
+                   (procMethod.getReturnType() != VoltTable.class) &&
+                   (procMethod.getReturnType() != long.class) &&
+                   (procMethod.getReturnType() != Long.class)) {
+
+                    String msg = "Procedure: " + shortName + " has run(...) method that doesn't return long, Long, VoltTable or VoltTable[].";
+                    throw new VoltCompilerException(msg);
+                }
+
+                builder.put("@run",procMethod);
+
+                Map<String, Object> fields = builder.build();
+
+                // determine if proc is read or read-write by checking if the proc contains any write sql stmts
+                boolean readWrite = false;
+                for (Object field : fields.values()) {
+                    if (!(field instanceof SQLStmt)) continue;
+                    SQLStmt stmt = (SQLStmt)field;
+                    QueryType qtype = QueryType.getFromSQL(stmt.getText());
+                    if (!qtype.isReadOnly()) {
+                        readWrite = true;
+                        break;
+                    }
+                }
+
+                // default to FASTER determinism mode, which may favor non-deterministic plans
+                // but if it's a read-write proc, use a SAFER planning mode wrt determinism.
+                final DeterminismMode detMode = readWrite ? DeterminismMode.SAFER : DeterminismMode.FASTER;
+
+                CatalogMap<Statement> statements = procedure.getStatements();
+                statements.clear();
+
+                for (Entry<String, Object> entry : fields.entrySet()) {
+                    if (!(entry.getValue() instanceof SQLStmt)) continue;
+
+                    String stmtName = entry.getKey();
+                    SQLStmt stmt = (SQLStmt)entry.getValue();
+
+                    // add the statement to the catalog
+                    Statement catalogStmt = statements.add(stmtName);
+
+                    procedure.getPartitioncolumn();
+
+                    // compile the statement
+                    StatementPartitioning partitioning = procedure.getSinglepartition() ?
+                            StatementPartitioning.forceSP() : StatementPartitioning.forceMP();
+
+                    boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(this, hsql, previousDB,
+                            m_estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
+                            detMode, partitioning);
+
+                    // if this was a cache hit or specified single, don't worry about figuring out more partitioning
+                    if (partitioning.wasSpecifiedAsSingle() || cacheHit) {
+                        procWantsCommonPartitioning = false; // Don't try to infer what's already been asserted.
+                        // The planner does not currently attempt to second-guess a plan declared as single-partition, maybe some day.
+                        // In theory, the PartitioningForStatement would confirm the use of (only) a parameter as a partition key --
+                        // or if the partition key was determined to be some other constant (expression?) it might display an informational
+                        // message that the passed parameter is assumed to be equal to the hard-coded partition key constant (expression).
+
+                        // Validate any inferred statement partitioning given the statement's possible usage, until a contradiction is found.
+                    }
+                    else if (procWantsCommonPartitioning) {
+                        // Only consider statements that are capable of running SP with a partitioning parameter that does not seem to
+                        // conflict with the partitioning of prior statements.
+                        if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
+                            AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
+                            if (statementPartitionExpression != null) {
+                                if (commonPartitionExpression == null) {
+                                    commonPartitionExpression = statementPartitionExpression;
+                                    exampleSPstatement = stmt.getText();
+                                    exampleSPvalue = partitioning.getInferredPartitioningValue();
+                                }
+                                else if (commonPartitionExpression.equals(statementPartitionExpression) ||
+                                           (statementPartitionExpression instanceof ParameterValueExpression &&
+                                            commonPartitionExpression instanceof ParameterValueExpression)) {
+                                    // Any constant used for partitioning would have to be the same for all statements, but
+                                    // any statement parameter used for partitioning MIGHT come from the same proc parameter as
+                                    // any other statement's parameter used for partitioning.
+                                }
+                                else {
+                                    procWantsCommonPartitioning = false; // appears to be different partitioning for different statements
+                                }
+                            }
+                            else {
+                                // There is a statement with a partitioned table whose partitioning column is
+                                // not equality filtered with a constant or param. Abandon all hope.
+                                procWantsCommonPartitioning = false;
+                            }
+
+                        // Usually, replicated-only statements in a mix with others have no effect on the MP/SP decision
+                        }
+                        else if (partitioning.getCountOfPartitionedTables() == 0) {
+                            // but SP is strictly forbidden for DML, to maintain the consistency of the replicated data.
+                            if (partitioning.getIsReplicatedTableDML()) {
+                                procWantsCommonPartitioning = false;
+                            }
+
+                        }
+                        else {
+                            // There is a statement with a partitioned table whose partitioning column is
+                            // not equality filtered with a constant or param. Abandon all hope.
+                            procWantsCommonPartitioning = false;
+                        }
+                    }
+
+                    // if a single stmt is not read only, then the proc is not read only
+                    if (catalogStmt.getReadonly() == false) {
+                        procHasWriteStmts = true;
+                    }
+
+                    if (catalogStmt.getSeqscancount() > 0) {
+                        procHasSeqScans = true;
+                    }
+                }
+
+                // MIGHT the planner have uncovered an overlooked opportunity to run all statements SP?
+                if (procWantsCommonPartitioning && (commonPartitionExpression != null)) {
+                    String msg = null;
+                    if (commonPartitionExpression instanceof ParameterValueExpression) {
+                        msg = "This procedure might benefit from an @ProcInfo annotation designating parameter " +
+                                ((ParameterValueExpression) commonPartitionExpression).getParameterIndex() +
+                                " of statement '" + exampleSPstatement + "'";
+                    } else {
+                        String valueDescription = null;
+                        if (exampleSPvalue == null) {
+                            // Statements partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
+                            valueDescription = "of " + commonPartitionExpression.explain("");
+                        } else {
+                            valueDescription = exampleSPvalue.toString(); // A simple constant value COULD have been a parameter.
+                        }
+                        msg = "This procedure might benefit from an @ProcInfo annotation referencing an added parameter passed the value " +
+                                valueDescription;
+                    }
+                    addInfo(msg);
+                }
+
+                // set the read onlyness of a proc
+                procedure.setReadonly(procHasWriteStmts == false);
+
+                procedure.setHasseqscans(procHasSeqScans);
+
+                ProcedureCompiler.checkForDeterminismWarnings(this, shortName, procedure, procHasWriteStmts);
+
+                // set procedure parameter types
+                CatalogMap<ProcParameter> params = procedure.getParameters();
+                params.clear();
+                Class<?>[] paramTypes = procMethod.getParameterTypes();
+
+                for (int i = 0; i < paramTypes.length; i++) {
+                    Class<?> cls = paramTypes[i];
+                    ProcParameter param = params.add(String.valueOf(i));
+                    param.setIndex(i);
+
+                    // handle the case where the param is an array
+                    if (cls.isArray()) {
+                        param.setIsarray(true);
+                        cls = cls.getComponentType();
+                    }
+                    else
+                        param.setIsarray(false);
+
+                    // boxed types are not supported parameters at this time
+                    if ((cls == Long.class) || (cls == Integer.class) || (cls == Short.class) ||
+                        (cls == Byte.class) || (cls == Double.class) ||
+                        (cls == Character.class) || (cls == Boolean.class))
+                    {
+                        String msg = "Procedure: " + shortName + " has a parameter with a boxed type: ";
+                        msg += cls.getSimpleName();
+                        msg += ". Replace this parameter with the corresponding primitive type and the procedure may compile.";
+                        throw new VoltCompilerException(msg);
+                    } else if ((cls == Float.class) || (cls == float.class)) {
+                        String msg = "Procedure: " + shortName + " has a parameter with type: ";
+                        msg += cls.getSimpleName();
+                        msg += ". Replace this parameter type with double and the procedure may compile.";
+                        throw new VoltCompilerException(msg);
+
+                    }
+
+                    VoltType type;
+                    try {
+                        type = VoltType.typeFromClass(cls);
+                    }
+                    catch (VoltTypeException e) {
+                        // handle the case where the type is invalid
+                        String msg = "Procedure: " + shortName + " has a parameter with invalid type: ";
+                        msg += cls.getSimpleName();
+                        throw new VoltCompilerException(msg);
+                    }
+                    catch (RuntimeException e) {
+                        String msg = "Procedure: " + shortName + " unexpectedly failed a check on a parameter of type: ";
+                        msg += cls.getSimpleName();
+                        msg += " with error: ";
+                        msg += e.toString();
+                        throw new VoltCompilerException(msg);
+                    }
+
+                    param.setType(type.getValue());
+                }
+
+                // parse the procinfo and update the procedure
+                // TODO:
+//                procedure.setSinglepartition(info.singlePartition);
+//                if (procedure.getSinglepartition()) {
+//                  ProcedureCompiler.parsePartitionInfo(this, previousDB, procedure, info.partitionInfo);
+//                    if (procedure.getPartitionparameter() >= paramTypes.length) {
+//                        String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
+//                        throw new VoltCompilerException(msg);
+//                    }
+//
+//                    // check the type of partition parameter meets our high standards
+//                    Class<?> partitionType = paramTypes[procedure.getPartitionparameter()];
+//                    Class<?>[] validPartitionClzzes = {
+//                            Long.class, Integer.class, Short.class, Byte.class,
+//                            long.class, int.class, short.class, byte.class,
+//                            String.class, byte[].class
+//                    };
+//                    boolean found = false;
+//                    for (Class<?> candidate : validPartitionClzzes) {
+//                        if (partitionType == candidate)
+//                            found = true;
+//                    }
+//                    if (!found) {
+//                        String msg = "PartitionInfo parameter must be a String or Number for procedure: " + procedure.getClassname();
+//                        throw new VoltCompilerException(msg);
+//                    }
+//
+//                    VoltType columnType = VoltType.get((byte)procedure.getPartitioncolumn().getType());
+//                    VoltType paramType = VoltType.typeFromClass(partitionType);
+//                    if ( ! columnType.canExactlyRepresentAnyValueOf(paramType)) {
+//                        String msg = "Type mismatch between partition column and partition parameter for procedure " +
+//                            procedure.getClassname() + " may cause overflow or loss of precision.\nPartition column is type " + columnType +
+//                            " and partition parameter is type " + paramType;
+//                        throw new VoltCompilerException(msg);
+//                    } else if ( ! paramType.canExactlyRepresentAnyValueOf(columnType)) {
+//                        String msg = "Type mismatch between partition column and partition parameter for procedure " +
+//                                procedure.getClassname() + " does not allow the full range of partition key values.\nPartition column is type " + columnType +
+//                                " and partition parameter is type " + paramType;
+//                        addWarn(msg);
+//                    }
+//                }
+
+                // put the compiled code for this procedure into the jarfile
+                // need to find the outermost ancestor class for the procedure in the event
+                // that it's actually an inner (or inner inner...) class.
+                // addClassToJar recursively adds all the children, which should include this
+                // class
+                Class<?> ancestor = procClass;
+                while (ancestor.getEnclosingClass() != null) {
+                    ancestor = ancestor.getEnclosingClass();
+                }
+                addClassToJar(jarOutput, ancestor);
+            }
+
+            ////////////////////////////////////////////
+            // allow gc to reclaim any cache memory here
+            m_previousCatalogStmts.clear();
+
+        } catch (final VoltCompilerException e) {
+            throw e;
         }
-        finally {
-            // Restore the original class loader
-            m_classLoader = originalClassLoader;
+
+        Cluster cluster = catalog.getClusters().get("cluster");
+        assert(cluster != null);
+        Database database = cluster.getDatabases().get("database");
+        assert(database != null);
+
+        // update table annotation for procedure statement
+
+        // Get DDL from InMemoryJar
+        byte[] ddlBytes = jarOutput.get(AUTOGEN_DDL_FILE_NAME);
+        m_canonicalDDL = new String(ddlBytes, Constants.UTF8ENCODING);
+
+        // Build DDL from Catalog Data
+//        String ddlWithBatchSupport = CatalogSchemaTools.toSchema(catalog, m_importLines);
+//        m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
+
+        // generate the catalog report and write it to disk
+        generateCatalogReport(catalog, m_canonicalDDL);
+
+        jarOutput.put(AUTOGEN_DDL_FILE_NAME, m_canonicalDDL.getBytes(Constants.UTF8ENCODING));
+        if (DEBUG_VERIFY_CATALOG) {
+            debugVerifyCatalog(jarOutput, catalog);
+        }
+
+        // WRITE CATALOG TO JAR HERE
+        final String catalogCommands = catalog.serialize();
+
+        byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
+
+        // Don't update buildinfo if it's already present, e.g. while upgrading.
+        // Note when upgrading the version has already been updated by the caller.
+        if (!jarOutput.containsKey(CatalogUtil.CATALOG_BUILDINFO_FILENAME)) {
+            addBuildInfo(jarOutput);
+        }
+        jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
+        // put the compiler report into the jarfile
+        jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
+
+        assert(!hasErrors());
+        if (hasErrors()) {
+            StringBuilder sb = new StringBuilder();
+            for (Feedback fb : m_errors) {
+                sb.append(fb.getLogString());
+            }
+            throw new VoltCompilerException(sb.toString());
         }
     }
 

@@ -189,6 +189,14 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         }
     }
 
+    /**
+     * Clear the contents of the map
+     */
+    public void clear() {
+        if (m_items == null) return;
+        m_items.clear();
+    }
+
     void writeCommandsForMembers(StringBuilder sb, Set<String> whiteListFields) {
         for (T type : this) {
             type.writeCreationCommand(sb);
@@ -198,7 +206,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     }
 
     @SuppressWarnings("unchecked")
-    void copyFrom(CatalogMap<? extends CatalogType> catalogMap) {
+    public void copyFrom(CatalogMap<? extends CatalogType> catalogMap) {
         CatalogMap<T> castedMap = (CatalogMap<T>) catalogMap;
         m_hasComputedOrder = castedMap.m_hasComputedOrder;
         if (castedMap.m_items == null) {

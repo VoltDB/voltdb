@@ -128,7 +128,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         m_attachment = attachment;
     }
 
-    int getDepth() {
+    public int getDepth() {
         return m_parentMap.m_depth;
     }
 
