@@ -36,9 +36,9 @@ import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.EELibraryLoader;
@@ -120,7 +120,7 @@ public class LocalCluster extends VoltServerConfig {
      */
     // The 2d map to store the results of matches (2-dimensional since for each host we may have
     // multiple patterns to search for)
-    private Map<Integer, Map<String, AtomicBoolean>> m_regexResults = null;
+    private Map<Integer, Set<String>> m_regexResults = null;
     // Store the pre-compiled regex strings
     private Map<String, Pattern> m_regexes = null;
 
@@ -229,15 +229,13 @@ public class LocalCluster extends VoltServerConfig {
         m_hasLocalServer = false;
         m_regexResults = new ConcurrentHashMap<>();
         m_regexes = new ConcurrentHashMap<>();
-        ConcurrentHashMap<String, AtomicBoolean> temp = new ConcurrentHashMap<>();
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
             m_regexes.put(s, p);
-            temp.put(s, new AtomicBoolean(false));
         }
         for (int i = 0; i < hostCount; i++) {
-            m_regexResults.put(i, new ConcurrentHashMap<>(temp));
+            m_regexResults.put(i, new ConcurrentHashSet<>());
         }
     }
 
@@ -1287,7 +1285,7 @@ public class LocalCluster extends VoltServerConfig {
                 if (m_regexResults.containsKey(hostId)) {
                     resetHostRegexResults(hostId);
                 } else {
-                    m_regexResults.put(hostId, new ConcurrentHashMap<>());
+                    m_regexResults.put(hostId, new ConcurrentHashSet<>());
                 }
                 ptf = new PipeToFile(
                         fileName,
@@ -1584,7 +1582,7 @@ public class LocalCluster extends VoltServerConfig {
                 if (m_regexResults.containsKey(hostId)) {
                     resetHostRegexResults(hostId);
                 } else {
-                    m_regexResults.put(hostId, new ConcurrentHashMap<>());
+                    m_regexResults.put(hostId, new ConcurrentHashSet<>());
                 }
                 ptf = new PipeToFile(
                         filePath,
@@ -2301,12 +2299,12 @@ public class LocalCluster extends VoltServerConfig {
         assert(m_regexes != null);
         assert(m_regexResults.containsKey(hostNum));
         assert(m_regexes.containsKey(regex));
-        m_regexResults.get(hostNum).get(regex).set(false);
+        m_regexResults.get(hostNum).remove(regex);
     }
 
     // Reset all the regex results to false
     public void resetAllPreCompRegexResults() {
-        m_regexResults.values().stream().flatMap(m -> m.values().stream()).forEach(b -> b.set(false));
+        m_regexResults.values().stream().forEach(m -> m.clear());
     }
 
     /*
@@ -2318,7 +2316,7 @@ public class LocalCluster extends VoltServerConfig {
         assertTrue(m_regexes != null);
         assertTrue(m_regexResults.containsKey(hostNum));
         assertTrue(m_regexes.containsKey(regex));
-        return m_regexResults.get(hostNum).get(regex).get();
+        return m_regexResults.get(hostNum).contains(regex);
     }
 
     private boolean preCompLogContains(int hostId, List<String> patterns) {
@@ -2366,6 +2364,6 @@ public class LocalCluster extends VoltServerConfig {
 
     private void resetHostRegexResults(int hostId) {
         assertTrue(m_regexResults.containsKey(hostId));
-        m_regexResults.get(hostId).values().stream().forEach(b -> b.set(false));
+        m_regexResults.get(hostId).clear();
     }
 }

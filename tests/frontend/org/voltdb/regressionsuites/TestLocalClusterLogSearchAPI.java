@@ -104,6 +104,9 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
             assertTrue(cluster.verifyLogMessage(i, ".*VoltDB [a-zA-Z]* Edition.*"));
         }
         assertTrue(cluster.verifyLogMessageNotExist(".*FATAL.*"));
+
+        cluster.resetAllPreCompRegexResults();
+        assertTrue(!cluster.verifyLogMessage(".*VoltDB [a-zA-Z]* Edition.*"));
     }
 
     /*
@@ -130,7 +133,7 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
 
         // For pro edition, try rejoin
         if (MiscUtils.isPro()) {
-            cluster.setNewCli(false);  // This is needed to perform rejoin
+            // cluster.setNewCli(false);  // This is needed to perform rejoin
             cluster.recoverOne(1, 1, "");   // may fail in pro version for using deprecated api
         }
     }
