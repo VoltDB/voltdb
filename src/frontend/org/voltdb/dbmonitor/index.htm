@@ -410,45 +410,42 @@
                                                  
                     </div> -->
                     <div class="analysisBody">
-                     <button class="analyzeBtn" style="display: block;">Analyze Now</button>
-                       <div class="subTabSection" >
+                        <button class="analyzeBtn" style="display: block;">Analyze Now</button>
+                        <div class="subTabSection" >
                             <!--tab-->
-                            <div class="tabContant analysisSubTab" id="">
-                                <ul class="tabs">
-                                    <li><a href="#tab1">Data</a></li>
-                                    <li><a href="#tab2">Procedures</a></li>
-                                   
+                            <div class="tabContant analysisSubTab" id="divAnalysis">
+                                <ul id="tabAnalysis" class="tabs">
+                                    <li><a href="#tabData">Data</a></li>
+                                    <li><a href="#tabProcedure">Procedures</a></li>
                                 </ul>
                                 <div class="tab_container">                                  
-                                        <div id="tab1" class="tab_content dataTab">
-                                            <div class="mainContent">
-                                                <p>Click the <span>Analyze Now</span> Button to start</p>
-                                                <p> the analysis of your database</p>
+                                    <div id="tabData" class="tab_content dataTab tab_content_data ">
+                                        <div class="mainContentAnalysis">
+                                            <p>Click the <span>Analyze Now</span> Button to start</p>
+                                            <p> the analysis of your database</p>
+                                        </div>
+                                    </div>
+                                    <div id="tabProcedure" class="tab_content dataTab tab_content_data">
+                                        <div class="tabContant analysisSubTab">
+                                            <ul id="ulProcedure" class="tabs">
+                                                <li><a href="#tabLatency">Latency</a></li>
+                                                <li><a href="#tabFrequency">Frequency</a></li>
+                                                <li><a href="#tabCombined">Combined</a></li>
+                                            </ul>
+                                            <div class="tab_container">
+                                                <div id="tabLatency" class="tab_content tab_content_procedure">
+                                                 <p>This is tab 3</p>
+                                                </div>
+                                                <div id="tabFrequency" class="tab_content tab_content_procedure">
+                                                    <p>This is tab 4</p>
+                                                </div>
+                                                <div id="tabCombined" class="tab_content tab_content_procedure">
+                                                    <p>This is tab 5</p>
+                                                </div>
+
                                             </div>
                                         </div>
-                                        <div id="tab2" class="tab_content dataTab">
-                                              <!--tab-->
-                                            <div class="tabContant analysisSubTab">
-                                                <ul class="tabs">
-                                                    <li><a href="#tab3">Latency</a></li>
-                                                    <li><a href="#tab4">Frequency</a></li>
-                                                    <li><a href="#tab5">Combined</a></li>
-                                                </ul>
-                                            <div class="tab_container">
-
-                                                <div id="tab1" class="tab_content">
-                                                 <p>This is tab 3/p>
-                                                </div>
-                                                <div id="tab2" class="tab_content">
-                                                    <p>This is tab 4/p>
-                                                </div>
-                                                <div id="tab3" class="tab_content">
-                                                    <p>This is tab 5/p>
-                                                </div>
-
-                                            </div>
-                                            </div>     
-                                        </div>                                    
+                                    </div>
                                    
                                 </div>
                             </div>                 
@@ -1089,7 +1086,7 @@
                             <!--tab-->
                             <div class="tabContant" id="tabMain">
                                 <button class="refreshBtn">Refresh</button>
-                                <ul class="tabs refreshList">
+                                <ul id="tabSQL" class="tabs refreshList">
                                     <li><a href="#tab1">Tables</a></li>
                                     <li><a href="#tab2">Streams</a></li>
                                     <li><a href="#tab3">Views</a></li>
@@ -1097,17 +1094,17 @@
                                 </ul>
                                 <div class="tab_container">
                                     <div id="tabScroller" class="tabScroller">
-                                        <div id="tab1" class="tab_content">
+                                        <div id="tab1" class="tab_content tab_contentSQL">
                                             <div id="accordionTable">
                                             </div>
                                         </div>
-                                        <div id="tab2" class="tab_content">
+                                        <div id="tab2" class="tab_content tab_contentSQL">
                                             <div id="accordionStreamedTable">streams</div>
                                         </div>
-                                        <div id="tab3" class="tab_content">
+                                        <div id="tab3" class="tab_content tab_contentSQL">
                                             <div id="accordionViews"></div>
                                         </div>
-                                        <div id="tab4" class="tab_content">
+                                        <div id="tab4" class="tab_content tab_contentSQL">
                                             <div id="accordionProcedures"></div>
                                         </div>
                                     </div>
