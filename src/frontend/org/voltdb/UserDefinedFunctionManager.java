@@ -258,7 +258,7 @@ public class UserDefinedFunctionManager {
             }
         }
 
-        public void call(ByteBuffer udfBuffer) {
+        public void call(ByteBuffer udfBuffer) throws Throwable {
             udfBuffer.clear();
             Object[] paramsIn = new Object[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
@@ -268,9 +268,9 @@ public class UserDefinedFunctionManager {
                 Object returnValue = m_functionMethod.invoke(m_functionInstance, paramsIn);
                 udfBuffer.clear();
                 writeValueToBuffer(udfBuffer, m_returnType, returnValue);
-            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+            }
+            catch (InvocationTargetException ex) {
+                throw ex.getCause();
             }
         }
     }

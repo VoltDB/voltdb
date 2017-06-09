@@ -746,7 +746,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_fallbackBuffer = buffer;
     }
 
-    public int callJavaUserDefinedFunction(int functionId) {
+    public int callJavaUserDefinedFunction(int functionId) throws Throwable {
         UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
         assert(udfRunner != null);
         udfRunner.call(m_udfBuffer);

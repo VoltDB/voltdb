@@ -40,9 +40,9 @@ public class TestUDFSuite extends RegressionSuite {
     public void testFunctionNameCaseInsensitivity() throws IOException, ProcCallException {
         Client client = getClient();
         ClientResponse cr = client.callProcedure("@AdHoc",
-                "CREATE FUNCTION testfunc FROM METHOD org.voltdb_testfuncs.IntFunction.constantIntFunction;");
+                "CREATE FUNCTION testfunc FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.constantIntFunction;");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
-        verifyStmtFails(client, "CREATE FUNCTION testFUNC FROM METHOD org.voltdb_testfuncs.IntFunction.constantIntFunction;",
+        verifyStmtFails(client, "CREATE FUNCTION testFUNC FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.constantIntFunction;",
                 "Function \"testfunc\" is already defined");
         cr = client.callProcedure("@AdHoc", "DROP FUNCTION testfunc;");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
@@ -63,10 +63,10 @@ public class TestUDFSuite extends RegressionSuite {
                         "user lacks privilege or object not found: TESTFUNC");
                 try {
                     client.callProcedure("@AdHoc",
-                        String.format("CREATE FUNCTION %s FROM METHOD org.voltdb_testfuncs.IntFunction.%s;", functionName, methodName));
+                        String.format("CREATE FUNCTION %s FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.%s;", functionName, methodName));
                 } catch (ProcCallException pce) {
                     pce.printStackTrace();
-                    fail(String.format("Should be able to CREATE FUNCTION %s FROM METHOD org.voltdb_testfuncs.IntFunction.%s;",
+                    fail(String.format("Should be able to CREATE FUNCTION %s FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.%s;",
                             functionName, methodName));
                 }
                 VoltTable[] results = client.callProcedure("@AdHoc",
@@ -91,11 +91,15 @@ public class TestUDFSuite extends RegressionSuite {
         }
     }
 
+    public void testParamAndReturnValueSerialization() {
+
+    }
+
     public TestUDFSuite(String name) {
         super(name);
     }
 
-    static Class<?>[] UDF_CLASSES = {org.voltdb_testfuncs.IntFunction.class};
+    static Class<?>[] UDF_CLASSES = {org.voltdb_testfuncs.BasicTestUDFSuite.class};
 
     static public Test suite() {
         // the suite made here will all be using the tests from this class

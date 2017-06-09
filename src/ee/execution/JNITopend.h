@@ -101,9 +101,11 @@ private:
     jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jmethodID m_callJavaUserDefinedFunctionMID;
+    jmethodID m_getMessageFromThrowableMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_encoderClass;
+    jclass m_throwableClass;
 };
 
 }

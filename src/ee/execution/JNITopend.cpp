@@ -93,10 +93,31 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
 
     m_callJavaUserDefinedFunctionMID = m_jniEnv->GetMethodID(
             jniClass, "callJavaUserDefinedFunction", "(I)I");
-
     if (m_callJavaUserDefinedFunctionMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_callJavaUserDefinedFunctionMID != 0);
+        throw std::exception();
+    }
+
+    m_throwableClass = m_jniEnv->FindClass("java/lang/Throwable");
+    if (m_throwableClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_throwableClass != NULL);
+        throw std::exception();
+    }
+
+    m_throwableClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_throwableClass));
+    if (m_throwableClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_throwableClass != NULL);
+        throw std::exception();
+    }
+
+    m_getMessageFromThrowableMID = m_jniEnv->GetMethodID(
+            m_throwableClass, "getMessage", "()Ljava/lang/String;");
+    if (m_getMessageFromThrowableMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_getMessageFromThrowableMID != 0);
         throw std::exception();
     }
 
@@ -377,9 +398,24 @@ std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
 }
 
 int JNITopend::callJavaUserDefinedFunction(int32_t functionId) {
-    return (int)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
-                                        m_callJavaUserDefinedFunctionMID,
-                                        functionId);
+    JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 1);
+    if (jni_frame.checkResult() < 0) {
+        VOLT_ERROR("Unable to load dependency: jni frame error.");
+        throw std::exception();
+    }
+
+    int retval = (int)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
+                                              m_callJavaUserDefinedFunctionMID,
+                                              functionId);
+    jthrowable exception = m_jniEnv->ExceptionOccurred();
+    if (exception) {
+        m_jniEnv->ExceptionClear();
+        jstring exceptionMsg = (jstring)m_jniEnv->CallObjectMethod(exception, m_getMessageFromThrowableMID);
+        const char* errorMsg = m_jniEnv->GetStringUTFChars(exceptionMsg, NULL);
+        std::string strErrorMsg(errorMsg);
+        throw SQLException(SQLException::volt_user_defined_function_error, strErrorMsg);
+    }
+    return retval;
 }
 
 void JNITopend::crashVoltDB(FatalException e) {
@@ -430,6 +466,7 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_exportManagerClass);
     m_jniEnv->DeleteGlobalRef(m_partitionDRGatewayClass);
     m_jniEnv->DeleteGlobalRef(m_encoderClass);
+    m_jniEnv->DeleteGlobalRef(m_throwableClass);
 }
 
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
