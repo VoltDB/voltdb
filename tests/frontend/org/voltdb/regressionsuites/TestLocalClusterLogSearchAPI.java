@@ -72,6 +72,10 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
         patterns.add(".*FATAL.*");
         patterns.add("Cluster has become unviable");
         patterns.add("Some partitions have no replicas");
+        patterns.add("Received request type .*_.*");
+        patterns.add("REJOIN: Joining site \\d");
+        patterns.add("join");
+        patterns.add("Node rejoin completed");
 
         cluster = new LocalCluster("collect.jar", patterns,
                 SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
@@ -133,8 +137,15 @@ public class TestLocalClusterLogSearchAPI extends JUnit4LocalClusterTest {
 
         // For pro edition, try rejoin
         if (MiscUtils.isPro()) {
+            cluster.resetAllPreCompRegexResults();
             // cluster.setNewCli(false);  // This is needed to perform rejoin
             cluster.recoverOne(1, 1, "");   // may fail in pro version for using deprecated api
+            for (int i = 0; i < HOSTS; i++) {
+                if (i != 1) {
+                    assertTrue(cluster.verifyLogMessage(i, "Received request type .*_.*"));
+                }
+            }
+            assertTrue(cluster.verifyLogMessage(1, "Node rejoin completed"));
         }
     }
 
