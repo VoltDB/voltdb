@@ -30,7 +30,6 @@ import org.voltdb.client.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
@@ -367,12 +366,16 @@ public class LoadTableLoader extends BenchmarkThread {
                         //log.debug("WorkList Size: " + workList.size());
                         CountDownLatch clatch = new CountDownLatch(workList.size());
                         boolean success;
+                        VoltTable vtable = new VoltTable(m_colInfo);
                         for (Long lcid : workList) {
+                            ArrayList<Object> row = nextRow(gr, lcid);
+                            vtable.clearRowData();
+                            vtable.addRow(row.toArray(new Object[row.size()]));
                             try {
                                 /* copy proc can use select then insert (0) or insert into select from (1)
                                    the random variable determines which one is used.
                                  */
-                                success = client.callProcedure(new InsertCopyCallback(clatch, lcid), m_cpprocName, lcid, r2.nextInt(2));
+                                success = client.callProcedure(new InsertCopyCallback(clatch, lcid), m_cpprocName, lcid, r2.nextInt(2), vtable);
                                 if (!success) {
                                     hardStop("Failed to copy upsert for: " + lcid);
                                 }
