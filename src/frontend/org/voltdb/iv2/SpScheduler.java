@@ -449,14 +449,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * it does looser tracking of client handles since it can't be
              * partitioned from the local replica.
              */
+
+            //When this site is marked as non-leader, m_isLeader will be immediately set to false.
+            //Before new leader is installed, read-only messages may come from local (safe or fast read) and other CIs (safe read)
+            //
             boolean balanceSPI = (message.getStoredProcedureInvocation() != null &&
                     "@BalanceSPI".equals(message.getStoredProcedureName()));
-            if (!m_isLeader && !balanceSPI &&
+            final ReadLevel level = VoltDB.Configuration.getDefaultReadConsistencyLevel();
+            if (!m_isLeader && !balanceSPI && level == ReadLevel.FAST && message.isReadOnly() &&
                     CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
                     CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("[handleIv2InitiateTaskMessage]ShortCircuit read error:" + message);
-                }
                 VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
             }
 
