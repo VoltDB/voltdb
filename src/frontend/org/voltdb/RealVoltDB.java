@@ -1238,8 +1238,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
                     (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
 
-            if (m_joining && getReplicationRole() == ReplicationRole.REPLICA) {
-                VoltDB.crashLocalVoltDB("Elastic join is prohibited on a replica cluster.", false, null);
+            if (m_joining) {
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Elastic join happened on a cluster of DR Role:" + getReplicationRole());
+                }
             }
 
             collectLocalNetworkMetadata();
@@ -4087,7 +4089,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_consumerDRGateway.setInitialConversationMembership(expectedClusterMembers.getFirst(),
                             expectedClusterMembers.getSecond());
                 }
-
                 m_consumerDRGateway.initialize(m_config.m_startAction.doesRejoin() || willDoActualRecover());
             }
             if (m_producerDRGateway != null) {
