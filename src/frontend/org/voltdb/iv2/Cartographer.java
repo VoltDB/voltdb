@@ -793,10 +793,6 @@ public class Cartographer extends StatsSource
         Collections.sort(hostsListAsc);
         Collections.reverse(hostsListAsc);
 
-        if (hostLog.isDebugEnabled()) {
-            VoltTable vt = peekTopology(this);
-            hostLog.debug("[getPartitionForMigration]\n" + vt.toFormattedString());
-        }
         //move one master from a host with most masters to a host with least masters
         for (Host srcHost : hostsListDesc) {
             for (Host targetHost : hostsListAsc) {
@@ -804,6 +800,8 @@ public class Cartographer extends StatsSource
                 if (partitionCandidate > -1) {
                     Pair<Integer, Integer> pair = new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
                     hostLog.info(String.format("Moving mastership of partition %d to host %d.", pair.getFirst(), pair.getSecond()));
+                    VoltTable vt = peekTopology(this);
+                    hostLog.info("[getPartitionForMigration]\n" + vt.toFormattedString());
                     return pair;
                 }
             }
