@@ -38,7 +38,17 @@ public class UseResourceProc extends VoltProcedure {
     public VoltTable run() {
 
         URL resourceURL = this.getClass().getResource("resource.txt");
+        URL missingURL = this.getClass().getResource("missing.txt");
         String resourceContents = null;
+        boolean exceptionCaught = false;
+        try {
+            resourceContents = Resources.toString(missingURL, Charsets.UTF_8);
+        } catch (IOException e) {
+            exceptionCaught = true;
+        }
+        if (!exceptionCaught) {
+            throw new VoltAbortException("Missing resources should throw a IOException");
+        }
         try {
             resourceContents = Resources.toString(resourceURL, Charsets.UTF_8);
         } catch (IOException e) {

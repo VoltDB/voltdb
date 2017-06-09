@@ -308,6 +308,9 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         remove(classToFileName(classname));
     }
 
+    /**
+     * Used to map connection in a URL back to the InMemoryJarfile
+     */
     class InMemoryJarHandler extends URLStreamHandler {
         @Override
         protected URLConnection openConnection(URL u) throws IOException {
@@ -315,6 +318,9 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         }
     }
 
+    /**
+     * Used to map a URL for a resource to the byte array representing that file in the InMemoryJarfile
+     */
     class InMemoryJarUrlConnection extends URLConnection {
         public InMemoryJarUrlConnection(URL url) {
             super(url);
@@ -417,6 +423,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
         @Override
         protected URL findResource(String name) {
+            // Redirect all resource requests to the InMemoryJarFile through the InMemoryJarHandler
             try {
                 return new URL(null, "inmemoryjar:///" + name, new InMemoryJarHandler());
             } catch (MalformedURLException e) {
