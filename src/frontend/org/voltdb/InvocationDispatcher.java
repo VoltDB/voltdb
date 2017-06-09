@@ -84,6 +84,7 @@ public final class InvocationDispatcher {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final RateLimitedLogger rateHostLogger = new RateLimitedLogger(10 * 1000, hostLog, Level.WARN);
 
     public enum OverrideCheck {
         NONE(false, false, false),
@@ -356,6 +357,11 @@ public final class InvocationDispatcher {
         // note that we also need to check for java for now as transactional flag is
         // only 100% when we're talking Java
         if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
+            // NT procs are logged (@UAC, @AdHoc, etc.)
+            if (user.isAuthEnabled()) {
+                rateHostLogger.log("User: " + user.m_name + " from " + clientInfo +
+                                   " issued a " + procName, EstTime.currentTimeMillis());
+            }
             return dispatchNTProcedure(handler, task, user, ccxn, nowNanos, ntPriority);
         }
 
@@ -399,13 +405,8 @@ public final class InvocationDispatcher {
             }
             else if ("@StopNode".equals(procName)) {
                 if (user.isAuthEnabled()) {
-                    CoreUtils.printAsciiArtLog(hostLog,
-                                                  "User: " +
-                                                  user.m_name +
-                                                  " from " +
-                                                  clientInfo +
-                                                  " issued a " + procName,
-                                                  Level.WARN);
+                    rateHostLogger.log("User: " + user.m_name + " from " + clientInfo +
+                                       " issued a " + procName, EstTime.currentTimeMillis());
                 }
                 return dispatchStopNode(task);
             }
@@ -449,25 +450,15 @@ public final class InvocationDispatcher {
             }
             else if ("@SnapshotDelete".equals(procName)) {
                 if (user.isAuthEnabled()) {
-                    CoreUtils.printAsciiArtLog(hostLog,
-                                                  "User: " +
-                                                  user.m_name +
-                                                  " from " +
-                                                  clientInfo +
-                                                  " issued a " + procName,
-                                                  Level.WARN);
+                    rateHostLogger.log("User: " + user.m_name + " from " + clientInfo +
+                                       " issued a " + procName, EstTime.currentTimeMillis());
                 }
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
             }
             else if ("@SnapshotRestore".equals(procName)) {
                 if (user.isAuthEnabled()) {
-                    CoreUtils.printAsciiArtLog(hostLog,
-                                                  "User: " +
-                                                  user.m_name +
-                                                  " from " +
-                                                  clientInfo +
-                                                  " issued a " + procName,
-                                                  Level.WARN);
+                    rateHostLogger.log("User: " + user.m_name + " from " + clientInfo +
+                                       " issued a " + procName, EstTime.currentTimeMillis());
                 }
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
                 if (retval != null) {
@@ -489,16 +480,16 @@ public final class InvocationDispatcher {
                  || "@Resume".equals(procName)
                  || "@PrepareShutdown".equals(procName))
             {
-                if (!handler.isAdmin()) {
-                    return unexpectedFailureResponse(
-                            procName + " is not available to this client",
-                            task.clientHandle);
-                } else {
+                if (handler.isAdmin()) {
                     // After we verify the system command from an admin user, the detailed information
                     // should be printed out properly. The following message is printed at the node where
                     // the client is connected to.
                     String msg = "Admin: " + user.m_name + " from " + clientInfo + " issued a " + procName;
                     CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
+                } else {
+                    return unexpectedFailureResponse(
+                            procName + " is not available to this client",
+                            task.clientHandle);
                 }
             }
         }
