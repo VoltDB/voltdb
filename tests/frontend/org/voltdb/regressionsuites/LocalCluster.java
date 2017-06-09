@@ -313,6 +313,9 @@ public class LocalCluster extends VoltServerConfig {
         }
         m_usesStagedSchema = useStagedSchema;
         if (m_usesStagedSchema) {
+            if (catalogJarFileName != null) {
+                templateCmdLine.m_stagedClassesPath = new VoltFile(catalogJarFileName);
+            }
             setNewCli(true);
         }
 
@@ -618,6 +621,7 @@ public class LocalCluster extends VoltServerConfig {
         cmdln.startCommand(action);
         if (m_usesStagedSchema) {
             cmdln.m_pathToCatalog = null;
+            cmdln.m_stagedClassesPath = null;
         }
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (this.m_additionalProcessEnv != null) {
@@ -1081,6 +1085,7 @@ public class LocalCluster extends VoltServerConfig {
         }
         if (m_usesStagedSchema) {
             cmdln.m_pathToCatalog = null;
+            cmdln.m_stagedClassesPath = null;
         }
 
         if (this.m_additionalProcessEnv != null) {
