@@ -147,15 +147,17 @@ public class TestImportSuite extends RegressionSuite {
     }
 
     abstract class DataPusher extends Thread {
-        private final CountDownLatch m_latch;
+        private final CountDownLatch m_startupLatch;
+        private final CountDownLatch m_shutdownLatch;
         private final char m_separator;
         private volatile int m_totalCount;
         private volatile int m_currentCount = 0;
         private volatile Exception m_error = null;
 
-        public DataPusher(int count, CountDownLatch latch, char separator) {
+        public DataPusher(int count, CountDownLatch startupLatch, CountDownLatch shutdownLatch, char separator) {
             m_totalCount = count;
-            m_latch = latch;
+            m_startupLatch = startupLatch;
+            m_shutdownLatch = shutdownLatch;
             m_separator = separator;
             m_dataPushers.add(this);
         }
@@ -170,6 +172,7 @@ public class TestImportSuite extends RegressionSuite {
             if (m_totalCount == 0) {
                 m_totalCount = Integer.MAX_VALUE; // keep running until explicitly stopped
             }
+            m_startupLatch.countDown();
             try {
                 while (m_currentCount < m_totalCount) {
                     String s = String.valueOf(System.nanoTime() + m_currentCount) + m_separator + System.currentTimeMillis() + "\n";
@@ -182,7 +185,7 @@ public class TestImportSuite extends RegressionSuite {
                 m_error = ex;
             } finally {
                 close();
-                m_latch.countDown();
+                m_shutdownLatch.countDown();
             }
         }
 
@@ -201,8 +204,8 @@ public class TestImportSuite extends RegressionSuite {
         private final int m_port;
         private OutputStream m_sout;
 
-        public SocketDataPusher(String server, int port, int count, CountDownLatch latch, char separator) {
-            super(count, latch, separator);
+        public SocketDataPusher(String server, int port, int count, CountDownLatch startupLatch, CountDownLatch shutdownLatch, char separator) {
+            super(count, startupLatch, shutdownLatch, separator);
             m_server = server;
             m_port = port;
         }
@@ -232,8 +235,8 @@ public class TestImportSuite extends RegressionSuite {
 
         private final Random random = new Random();
 
-        public Log4jDataPusher(int count, CountDownLatch latch, char separator) {
-            super(count, latch, separator);
+        public Log4jDataPusher(int count, CountDownLatch startupLatch, CountDownLatch shutdownLatch, char separator) {
+            super(count, startupLatch, shutdownLatch, separator);
         }
 
         @Override
@@ -252,11 +255,14 @@ public class TestImportSuite extends RegressionSuite {
     }
 
     private void asyncPushDataToImporters(int count, int loops) throws Exception {
+        CountDownLatch startupAwaiter = new CountDownLatch(2*loops);
         m_dataAwaiter = new CountDownLatch(2*loops);
         for (int i=0; i<loops; i++) {
-            (new SocketDataPusher(SERVER, SOCKET_IMPORTER_PORT, count, m_dataAwaiter, DELIMITER)).start();
-            (new Log4jDataPusher(count, m_dataAwaiter, ',')).start();
+            (new SocketDataPusher(SERVER, SOCKET_IMPORTER_PORT, count, startupAwaiter, m_dataAwaiter, DELIMITER)).start();
+            (new Log4jDataPusher(count, startupAwaiter, m_dataAwaiter, ',')).start();
         }
+        // ensure pushers are running before test begins
+        startupAwaiter.await();
     }
 
     private void waitForData() throws Exception {
