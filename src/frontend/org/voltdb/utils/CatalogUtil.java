@@ -196,7 +196,7 @@ public abstract class CatalogUtil {
     private static boolean m_exportEnabled = false;
     public static final String CATALOG_FILE_NAME = "catalog.jar";
     public static final String STAGED_CATALOG_PATH = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
-    public static final java.lang.String VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME = "voltdbbundlelocation";
+    public static final String VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME = "voltdbbundlelocation";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;

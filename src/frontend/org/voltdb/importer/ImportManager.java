@@ -17,7 +17,6 @@
 
 package org.voltdb.importer;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
@@ -118,8 +117,37 @@ public class ImportManager implements ChannelChangeCallback {
                 statsCollector);
 
         m_self = em;
-        em.initializeChannelDistributer();
-        em.applyCatalogToImporters(catalogContext, false);
+        em.create(catalogContext);
+    }
+
+    /**
+     * This creates a import connector from configuration provided.
+     * @param catalogContext
+     */
+    private synchronized void create(CatalogContext catalogContext) {
+        try {
+            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
+            startImporters(newProcessorConfig);
+        } catch (final Exception e) {
+            VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
+        }
+    }
+
+    private synchronized void startImporters(Map<String, ImportConfiguration> newProcessorConfig) throws BundleException {
+        Preconditions.checkState(m_processor.get() == null, "Attempt to start importers when they may already be running");
+        m_processorConfig = newProcessorConfig;
+        importLog.info("Currently loaded importer modules: " + m_loadedBundles.keySet() + ", types: " + m_importersByType.keySet());
+
+        if (!newProcessorConfig.isEmpty()) {
+            initializeChannelDistributer();
+            final String clusterTag = m_distributer.getClusterTag();
+            ImportDataProcessor newProcessor = new ImportProcessor(
+                    m_myHostId, m_distributer, m_statsCollector, clusterTag);
+            newProcessor.setProcessorConfig(newProcessorConfig, m_loadedBundles);
+            m_processor.set(newProcessor);
+        } else {
+            m_processor.set(null);
+        }
     }
 
     /** Creates an import connector if required by the provided configuration.
@@ -132,61 +160,8 @@ public class ImportManager implements ChannelChangeCallback {
      * During manager initialization, the initial catalog context is compared to an empty one with no importers.
      *
      * @param catalogContext
-     * @param start Whether or not to signal importers that we are ready for data.
      * @return whether or not the importers were affected by the catalog change (on startup, this comparison is with an empty importer config)
      */
-    private synchronized void applyCatalogToImporters(CatalogContext catalogContext, boolean start) {
-        try {
-            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
-            final boolean changeOccurred = !m_processorConfig.equals(newProcessorConfig);
-            if (changeOccurred) {
-                // Need to shut down any existing importers and create anew.
-                close();
-                assert(m_processor.get() == null);
-
-                m_processorConfig = newProcessorConfig;
-                importLog.info("Currently loaded importer modules: " + m_loadedBundles.keySet() + ", types: " + m_importersByType.keySet());
-
-                if (!newProcessorConfig.isEmpty()) {
-                    final String clusterTag = m_distributer.getClusterTag();
-                    ImportDataProcessor newProcessor = new ImportProcessor(
-                            m_myHostId, m_distributer, m_statsCollector, clusterTag);
-                    newProcessor.setProcessorConfig(newProcessorConfig, m_loadedBundles);
-                    m_processor.set(newProcessor);
-                } else {
-                    m_processor.set(null);
-                }
-
-                if (start) {
-                    readyForDataInternal(catalogContext, m_messenger);
-                }
-            }
-        } catch (final Exception e) {
-            VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
-        }
-    }
-
-    private synchronized void setupFormatterFactoryForConfig(Map<String, ImportConfiguration> processorConfig) {
-        for (ImportConfiguration config : processorConfig.values()) {
-            Properties prop = config.getformatterProperties();
-            String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
-            try {
-                AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
-                if (formatterFactory == null) {
-                    URI moduleURI = URI.create(module);
-                    formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
-                    if (formatterFactory == null) {
-                        VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
-                    }
-                    m_formatterFactories.put(module, formatterFactory);
-                }
-                config.setFormatterFactory(formatterFactory);
-            } catch(Throwable t) {
-                VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
-            }
-        }
-    }
-
     /**
      * Parses importer configs and loads the bundle needed for importer into memory. Updates
      * mapping of active importer bundle to the bundle jar needed by the importer
@@ -232,7 +207,25 @@ public class ImportManager implements ChannelChangeCallback {
             }
         }
 
-        setupFormatterFactoryForConfig(newProcessorConfig);
+        m_formatterFactories.clear();
+        for (ImportConfiguration config : newProcessorConfig.values()) {
+            Properties prop = config.getformatterProperties();
+            String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+            try {
+                AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
+                if (formatterFactory == null) {
+                    URI moduleURI = URI.create(module);
+                    formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
+                    if (formatterFactory == null) {
+                        VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                    }
+                    m_formatterFactories.put(module, formatterFactory);
+                }
+                config.setFormatterFactory(formatterFactory);
+            } catch(Throwable t) {
+                VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
+            }
+        }
         return newProcessorConfig;
     }
 
@@ -312,8 +305,23 @@ public class ImportManager implements ChannelChangeCallback {
         m_processor.set(null);
     }
 
+    public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
+        m_self.create(catalogContext);
+        m_self.readyForDataInternal(catalogContext, messenger);
+    }
+
     public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
-        m_self.applyCatalogToImporters(catalogContext, true);
+        try {
+            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
+            if (m_processorConfig == null || !m_processorConfig.equals(newProcessorConfig)) {
+                close();
+                startImporters(newProcessorConfig);
+                readyForDataInternal(catalogContext, messenger);
+            }
+        } catch (final Exception e) {
+            // TODO do I need Andrew to review error message changes?
+            VoltDB.crashLocalVoltDB("Error updating importers with new DDL and/or deployment.", true, e);
+        }
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
@@ -352,7 +360,7 @@ public class ImportManager implements ChannelChangeCallback {
                 break;
             case RUNNING:
                 importLog.info("Cluster is resumed STARTING all importers.");
-                m_self.applyCatalogToImporters(VoltDB.instance().getCatalogContext(), true);
+                start(VoltDB.instance().getCatalogContext(), VoltDB.instance().getHostMessenger());
                 importLog.info("Cluster is resumed STARTED all importers.");
                 break;
             default:

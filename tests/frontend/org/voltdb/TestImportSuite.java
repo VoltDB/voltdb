@@ -45,6 +45,7 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -123,7 +124,7 @@ public class TestImportSuite extends RegressionSuite {
                     return;
                 } catch (IOException e) {
                     numConnectAttempts++;
-                    if (numConnectAttempts < maxAttempts) {
+                    if (numConnectAttempts >= maxAttempts) {
                         throw e;
                     }
                     try {
@@ -423,7 +424,6 @@ public class TestImportSuite extends RegressionSuite {
 
         // importer uses CRUD procedure associated with this table.
         applySchemaChange("DROP TABLE importTable;");
-        Thread.sleep(1000);
         try {
             testConnector.tryPush(5);
             fail("Importer is still running even though its procedure is disabled");
@@ -514,7 +514,7 @@ public class TestImportSuite extends RegressionSuite {
         //Specify bundle location
         String bundleLocation = System.getProperty("user.dir") + "/bundles";
         System.out.println("Bundle location is: " + bundleLocation);
-        additionalEnv.put("voltdbbundlelocation", bundleLocation);
+        additionalEnv.put(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, bundleLocation);
 
         final MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestImportSuite.class);
