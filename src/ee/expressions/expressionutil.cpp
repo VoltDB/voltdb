@@ -353,7 +353,7 @@ operatorFactory(ExpressionType et,
          break;
 
      case (EXPRESSION_TYPE_OPERATOR_UNARY_MINUS):
-         ret = new OperatorUnaryMinus(lc);
+         ret = new OperatorUnaryMinusExpression(lc);
          break;
 
      case (EXPRESSION_TYPE_OPERATOR_MOD):

@@ -59,7 +59,7 @@ namespace voltdb {
 
 
 /*
- * Unary operators. (NOT and IS_NULL)
+ * Unary operators. (NOT and IS_NULL and UNARY_MINUS)
  */
 
 class OperatorNotExpression : public AbstractExpression {
@@ -119,17 +119,21 @@ class OperatorUnaryMinusExpression : public AbstractExpression {
             m_left = left;
     };
 
-   NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
-   //  {
-   //     assert(m_left);
-   //     NValue tmp = m_left->eval(tuple1, tuple2);
-   //     if (tmp.isNull()) {
-   //         return NValue::getTrue();
-   //     }
-   //     else {
-   //         return NValue::getFalse();
-   //     }
-   // }
+   NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+       assert(m_left);
+       NValue tmp = m_left->eval(tuple1, tuple2);
+       //return m_left->op_unary_minus();
+       //if (tmp.isNull()) {
+       return tmp.op_unary_minus();
+       //}
+       //else {
+       //     return NValue::getFalse();
+       // }
+   }
+   // class OpPlus {
+   //  public:
+   //      inline NValue op(NValue left, NValue right) const { return left.op_add(right); }
+   //  };
 
    std::string debugInfo(const std::string &spacer) const {
        return (spacer + "OperatorUnaryMinusExpression");
