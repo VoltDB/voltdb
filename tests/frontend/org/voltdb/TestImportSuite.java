@@ -430,7 +430,6 @@ public class TestImportSuite extends RegressionSuite {
         testConnector.tryPush(5);
 
         updateDeploymentFile(false, false);
-        Thread.sleep(1000);
         try {
             testConnector.tryPush(5);
             fail("Importer is still running even though it is no longer configured");
@@ -438,7 +437,6 @@ public class TestImportSuite extends RegressionSuite {
         }
 
         updateDeploymentFile(true, false);
-        Thread.sleep(1000);
         testConnector.tryPush(5);
     }
 
