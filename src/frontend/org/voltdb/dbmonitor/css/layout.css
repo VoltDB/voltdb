@@ -3509,7 +3509,9 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     border: 1px solid #AA1F2F;
     color: #FFFFFF;
     cursor: pointer;
-    margin:12px;
+    position:relative;
+    top:20px;
+
 }
 .analyzeBtn:hover {
     float: right;
@@ -3518,18 +3520,19 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     border: 1px solid #C12026;
     color: #FFFFFF;
     cursor: pointer;
-    margin:12px;
+
 }
 .analysisBody {
+    overflow:hidden;
     padding: 0;
     background: #fff;
-    padding:20px;
-    height:calc(100vh - 290px);
+    padding:0 20px 20px 20px;
+   /* height:calc(100vh - 200px);*/
     
 }
-.mainContent { 
+.mainContentAnalysis {
     margin:0 auto;
-    margin-top:10%;
+    margin-top:11%;
     padding:30px;
     width:300px;    
     -moz-box-shadow:    1px 1px 4px 0px #716f6f;
@@ -3537,10 +3540,14 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     box-shadow:         1px 1px 4px 0px #716f6f;
     border:1px solid #7d7d7d;
 }
-.mainContent p { font-size:16px; text-align: center; line-height:30px;}
-.mainContent p span{ color:#AA1F2F;font-weight:bold;}
+.mainContentAnalysis p { font-size:16px; text-align: center; line-height:30px;}
+.mainContentAnalysis p span{ color:#AA1F2F;font-weight:bold;}
 .analysisSubTab ul.tabs li a {
        padding: 0 20px; 
+}
+.dataTab { height:470px; padding-bottom:10px;}
+.tab_content_procedure {
+    height:390px;
 }
 /********************analysis End *****************/
 /********************jquery us css override*****************/
