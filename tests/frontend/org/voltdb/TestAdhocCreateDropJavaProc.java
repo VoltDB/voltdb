@@ -129,7 +129,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
-                assertTrue(pce.getMessage().contains("modifying classes from catalog"));
+                assertTrue(pce.getMessage().contains("Cannot load class for procedure: org.voltdb_testprocs.updateclasses.testImportProc"));
                 threw = true;
             }
             assertTrue("Shouldn't be able to rip a class out from under an active proc",
