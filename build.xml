@@ -1393,6 +1393,11 @@ JAVA COMPILATION
             <include name="**/*.sql"/>
         </fileset>
     </copy>
+    <copy flatten='false' todir='${build.testproc.dir}'>
+        <fileset dir="${src.testproc.dir}">
+            <include name="**/*.jar"/>
+        </fileset>
+    </copy>
 
     <!-- Compressed resources for tests -->
     <copy flatten='false' todir='${build.test.dir}'>
