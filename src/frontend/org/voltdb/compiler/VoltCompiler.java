@@ -24,6 +24,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1861,7 +1862,9 @@ public class VoltCompiler {
             String path = entry.getKey();
             // SOMEDAY: It would be better to have a manifest that explicitly lists
             // ddl files instead of using a brute force *.sql glob.
-            if (path.toLowerCase().endsWith(".sql")) {
+            // Ignore non-root level sql
+            boolean isRootFile = Paths.get(path).getNameCount() == 1;
+            if (isRootFile && path.toLowerCase().endsWith(".sql")) {
                 ddlReaderList.add(new VoltCompilerJarFileReader(jarfile, path));
                 compilerLog.trace("Added SQL file from jarfile to compilation: " + path);
             }
