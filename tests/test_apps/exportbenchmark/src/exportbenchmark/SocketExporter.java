@@ -105,7 +105,7 @@ public class SocketExporter extends ExportClientBase {
                     message.put("decodeTime", totalDecodeTime);
                     message.put("startTime", timerStart);
                     message.put("endTime", endTime);
-                    message.put("partitionId", m_source.partitionId);
+                    message.put("partitionId", getPartition());
                 } catch (JSONException e) {
                     m_logger.error("Couldn't create JSON object: " + e.getLocalizedMessage());
                 }
@@ -151,7 +151,7 @@ public class SocketExporter extends ExportClientBase {
             // Time decodeRow
             try {
                 long startTime = System.nanoTime();
-                decodeRow(rowData);
+                ExportRowData r = decodeRow(rowData);
                 long endTime = System.nanoTime();
 
                 totalDecodeTime += endTime - startTime;
