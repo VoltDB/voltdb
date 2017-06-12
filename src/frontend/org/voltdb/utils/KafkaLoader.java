@@ -434,7 +434,9 @@ public class KafkaLoader {
             }
         }
         if (client.getConnectedHostList().isEmpty()) {
-            client.close();
+            try {
+                client.close();
+            } catch (Exception ignore) {}
             throw new Exception("Unable to connect to any servers");
         }
         return client;
