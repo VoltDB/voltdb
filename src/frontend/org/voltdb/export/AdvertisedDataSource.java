@@ -28,14 +28,13 @@ import org.voltdb.VoltType;
 public class AdvertisedDataSource
 {
     final public int partitionId;
-    final public String signature;
     final public String tableName;
     //Set to other than partition column in case of kafka.
     private String m_partitionColumnName = "";
     final public long m_generation;
     final public long systemStartTimestamp;
-    final public ArrayList<String> columnNames = new ArrayList<String>();
-    final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
+    final public List<String> columnNames = new ArrayList<String>();
+    final public List<VoltType> columnTypes = new ArrayList<VoltType>();
     final public List<Integer> columnLengths = new ArrayList<Integer>();
     final public ExportFormat exportFormat;
 
@@ -51,7 +50,7 @@ public class AdvertisedDataSource
 
     @Override
     public int hashCode() {
-        return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId + signature.hashCode();
+        return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId;
     }
 
     @Override
@@ -59,7 +58,6 @@ public class AdvertisedDataSource
         if (o instanceof AdvertisedDataSource) {
             AdvertisedDataSource other = (AdvertisedDataSource)o;
             if (other.m_generation == m_generation &&
-                    other.signature.equals(signature) &&
                     other.partitionId == partitionId) {
                 return true;
                     }
@@ -71,13 +69,12 @@ public class AdvertisedDataSource
             String partitionColumnName,
             long systemStartTimestamp,
             long generation,
-            ArrayList<String> names,
-            ArrayList<VoltType> types,
+            List<String> names,
+            List<VoltType> types,
             List<Integer> lengths,
             ExportFormat exportFormat)
     {
         partitionId = p_id;
-        signature = t_signature;
         tableName = t_name;
         m_partitionColumnName = partitionColumnName;
         m_generation = generation;
@@ -119,7 +116,7 @@ public class AdvertisedDataSource
     @Override
     public String toString() {
         return "Generation: " + m_generation + " Table: " + tableName
-                + " partition " + partitionId + " signature " + signature
+                + " partition " + partitionId
                 + " partitionColumn " + m_partitionColumnName;
     }
 }
