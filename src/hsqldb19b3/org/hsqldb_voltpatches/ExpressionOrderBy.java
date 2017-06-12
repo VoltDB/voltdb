@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.Objects;
+
 /**
  * Implementation of ORDER BY operations
  *
@@ -132,4 +134,26 @@ public class ExpressionOrderBy extends Expression {
 
         return sb.toString();
     }
+
+    /************************* Volt DB Extensions *************************/
+    @Override
+    public boolean equals(Object other) {
+        if (!super.equals(other)) return false;
+        if (other instanceof ExpressionOrderBy == false) return false;
+
+        ExpressionOrderBy orderby = (ExpressionOrderBy) other;
+        if (orderby.isNullsLast() != isNullsLast()) return false;
+        if (orderby.isDescending() != isDescending()) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int val = super.hashCode();
+        val += Objects.hashCode(isDescending);
+        val += Objects.hashCode(isNullsLast);
+        return val;
+    }
+    /**********************************************************************/
 }
