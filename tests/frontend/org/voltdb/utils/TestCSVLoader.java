@@ -1384,7 +1384,7 @@ public class TestCSVLoader {
 
         String []myOptions = {
                 "-f" + path_csv,
-                "--characterSet=utf8",
+                "--charset=utf8",
                 "--reportdir=" + reportDir,
                 "--maxerrors=50",
                 "--user=",
@@ -1458,7 +1458,7 @@ public class TestCSVLoader {
 
         String []myOptions = {
                 "-f" + path_csv,
-                "--characterSet=gbk",
+                "--charset=gbk",
                 "--reportdir=" + reportDir,
                 "--maxerrors=50",
                 "--user=",
@@ -1536,7 +1536,7 @@ public class TestCSVLoader {
 
         String []myOptions = {
                 "-f" + path_csv,
-                "--characterSet=gbk",    // use gbk to decode it
+                "--charset=gbk",    // use gbk to decode it
                 "--reportdir=" + reportDir,
                 "--maxerrors=50",
                 "--user=",
@@ -1614,7 +1614,7 @@ public class TestCSVLoader {
 
         String []myOptions = {
                 "-f" + path_csv,
-                "--characterSet=gbk",
+                "--charset=gbk",
                 "--reportdir=" + reportDir,
                 "--maxerrors=50",
                 "--user=",
@@ -1687,7 +1687,7 @@ public class TestCSVLoader {
 
         String []myOptions = {
                 "-f" + path_csv,
-                "--characterSet=gb2312",
+                "--charset=gb2312",
                 "--reportdir=" + reportDir,
                 "--maxerrors=50",
                 "--user=",
