@@ -466,14 +466,15 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
          // Try connecting servers one by one until we have a success
             try {
                 client.createConnection(server.trim(), port);
-                break;
             } catch (IOException e) {
                 // Only swallow the exceptions from Java network or connection problems
                 // Unresolved hostname exceptions will be thrown
             }
         }
         if (client.getConnectedHostList().isEmpty()) {
-            client.close();
+            try {
+                client.close();
+            } catch (Exception ignore) {}
             throw new Exception("Unable to connect to any servers.");
         }
         return client;
