@@ -83,10 +83,26 @@ public class KafkaExternalLoader implements ImporterSupport {
         m_config = config;
     }
 
-    /*
-     * Construct the infrastructure and start processing messages from Kafka
-     */
-    private void processKafkaMessages() throws Exception {
+    public void initialize() throws Exception {
+
+        // Try and load classes we need and not packaged.
+        try {
+            KafkaExternalLoader.class.getClassLoader().loadClass("org.I0Itec.zkclient.IZkStateListener");
+            KafkaExternalLoader.class.getClassLoader().loadClass("org.apache.zookeeper.Watcher");
+        }
+        catch (ClassNotFoundException cnfex) {
+            throw new RuntimeException("Cannot find the Zookeeper client libraries, zkclient-0.3.jar and zookeeper-3.3.4.jar. Use the ZKLIB environment variable to specify the path to the Zookeeper jars files.");
+        }
+
+        // Load up any supplied formatter
+        if (!m_config.formatter.trim().isEmpty()) {
+            InputStream pfile = new FileInputStream(m_config.formatter);
+            m_config.m_formatterProperties.load(pfile);
+            String formatter = m_config.m_formatterProperties.getProperty("formatter");
+            if (formatter == null || formatter.trim().isEmpty()) {
+                throw new RuntimeException("Formatter class must be specified in formatter file as formatter=<class>: " + m_config.formatter);
+            }
+        }
 
         // If we need to prompt the user for a VoltDB password, do so.
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
@@ -101,12 +117,9 @@ public class KafkaExternalLoader implements ImporterSupport {
         // Set procedure call timeout to forever:
         c_config.setProcedureCallTimeout(0);
 
-        // Create the Volt client:
-        if (m_config.servers == null || m_config.servers.trim().isEmpty()) {
-            m_config.servers = "localhost:" + Client.VOLTDB_SERVER_PORT;
-        }
-        String[] hosts = m_config.servers.split(",");
-        m_client = getVoltClient(c_config, hosts);
+        // Get the Volt host:port strings from the config, handling deprecated and default values.
+        List<String> hostPorts = m_config.getVoltHosts();
+        m_client = getVoltClient(c_config, hostPorts);
 
         if (m_config.useSuppliedProcedure) {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback());
@@ -115,7 +128,12 @@ public class KafkaExternalLoader implements ImporterSupport {
         }
 
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
+    }
 
+    /*
+     * Construct the infrastructure and start processing messages from Kafka
+     */
+    private void processKafkaMessages() throws Exception {
         try {
             m_executorService = createImporterExecutor(m_loader, this);
 
@@ -348,7 +366,7 @@ public class KafkaExternalLoader implements ImporterSupport {
     /*
      * Create a Volt client from the supplied configuration and list of servers.
      */
-    private static Client getVoltClient(ClientConfig config, String[] hosts) throws Exception {
+    private static Client getVoltClient(ClientConfig config, List<String> hosts) throws Exception {
         final Client client = ClientFactory.createClient(config);
         for (String host : hosts) {
             client.createConnection(host);
@@ -480,139 +498,18 @@ public class KafkaExternalLoader implements ImporterSupport {
 
     }
 
-    /*
-     * Process command line arguments and do some validation.
-     */
-    private static class KafkaExternalLoaderCLIArguments extends CLIConfig {
-
-        @Option(shortOpt = "p", desc = "Procedure name to insert the data into the database")
-        String procedure = "";
-
-        // This is set to true when -p option is used.
-        boolean useSuppliedProcedure = false;
-
-        // Input formatter properties
-        Properties m_formatterProperties = new Properties();
-
-        @Option(shortOpt = "t", desc = "Kafka Topic to subscribe to")
-        String topic = "";
-
-        @Option(shortOpt = "g", desc = "Kafka group-id")
-        String groupid = "";
-
-        @Option(shortOpt = "m", desc = "Maximum errors allowed before terminating import")
-        int maxerrors = 100;
-
-        @Option(shortOpt = "s", desc = "Comma separated list of VoltDB servers (host[:port]) to connect to")
-        String servers = "";
-
-        @Option(desc = "Username for connecting to VoltDB servers")
-        String user = "";
-
-        @Option(desc = "Password for connecting to VoltDB servers")
-        String password = "";
-
-        @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to (format: host:port)")
-        String zookeeper = ""; //No default here as default will clash with local voltdb cluster
-
-        @Option(shortOpt = "b", desc = "Comma-separated list of Kafka brokers (host:port) to connect to")
-        String brokers = "";
-
-        @Option(shortOpt = "f", desc = "Periodic flush interval in seconds. (default: 10)")
-        int flush = 10;
-
-        @Option(desc = "Formatter configuration file. (Optional) .")
-        String formatter = "";
-
-        @Option(desc = "Batch size for writing to VoltDB.")
-        int batchsize = 200;
-
-        @AdditionalArgs(desc = "Insert the data into this table.")
-        String table = "";
-
-        @Option(desc = "Use upsert instead of insert", hasArg = false)
-        boolean update = false;
-
-        @Option(desc = "Enable SSL, optionally provide configuration file.")
-        String ssl = "";
-
-        @Option(desc = "Kafka consumer buffer size (default 65536).")
-        int buffersize = 65536;
-
-        @Option(desc = "Kafka consumer socket timeout, in milliseconds (default 30000, or thirty seconds)")
-        int timeout = 30000;
-
-        @Option(desc = "Kafka time-based commit policy interval in milliseconds.  Default is to use manual offset commit.")
-        String commitPolicy = "";
-
-        @Override
-        public void validate() {
-
-            if (batchsize < 0) {
-                exitWithMessageAndUsage("batch size number must be >= 0");
-            }
-            if (flush <= 0) {
-                exitWithMessageAndUsage("Periodic Flush Interval must be > 0");
-            }
-            if (topic.trim().isEmpty()) {
-                exitWithMessageAndUsage("Topic must be specified.");
-            }
-            if (zookeeper.trim().isEmpty() && brokers.trim().isEmpty()) {
-                exitWithMessageAndUsage("Either Kafka Zookeeper or list of brokers must be specified.");
-            }
-            if (!zookeeper.trim().isEmpty() && !brokers.trim().isEmpty()) {
-                exitWithMessageAndUsage("Only one of Kafka Zookeeper or list of brokers can be specified.");
-            }
-            if (procedure.trim().isEmpty() && table.trim().isEmpty()) {
-                exitWithMessageAndUsage("procedure name or a table name required");
-            }
-            if (!procedure.trim().isEmpty() && !table.trim().isEmpty()) {
-                exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
-            }
-            if (!procedure.trim().isEmpty()) {
-                useSuppliedProcedure = true;
-            }
-            if ((useSuppliedProcedure) && (update)){
-                update = false;
-                exitWithMessageAndUsage("update is not applicable when stored procedure specified");
-            }
-            if (commitPolicy.trim().isEmpty()) {
-                commitPolicy = KafkaImporterCommitPolicy.NONE.name();
-            }
-
-            // Try and load classes we need and not packaged.
-            try {
-                KafkaExternalLoader.class.getClassLoader().loadClass("org.I0Itec.zkclient.IZkStateListener");
-                KafkaExternalLoader.class.getClassLoader().loadClass("org.apache.zookeeper.Watcher");
-            }
-            catch (ClassNotFoundException cnfex) {
-                System.out.println("Cannot find the Zookeeper libraries, zkclient-0.3.jar and zookeeper-3.3.4.jar.");
-                System.out.println("Use the ZKLIB environment variable to specify the path to the Zookeeper jars files.");
-                System.exit(1);
-            }
-        }
-    }
-
     public static void main(String[] args) {
 
         final KafkaExternalLoaderCLIArguments cfg = new KafkaExternalLoaderCLIArguments();
         cfg.parse(KafkaExternalLoader.class.getName(), args);
 
         try {
-            if (!cfg.formatter.trim().isEmpty()) {
-                InputStream pfile = new FileInputStream(cfg.formatter);
-                cfg.m_formatterProperties.load(pfile);
-                String formatter = cfg.m_formatterProperties.getProperty("formatter");
-                if (formatter == null || formatter.trim().isEmpty()) {
-                    m_log.error("formatter class must be specified in formatter file as formatter=<class>: " + cfg.formatter);
-                    System.exit(-1);
-                }
-            }
             KafkaExternalLoader kloader = new KafkaExternalLoader(cfg);
+            kloader.initialize();
             kloader.processKafkaMessages();
         }
         catch (Exception e) {
-            m_log.error("Failure in kafkaloader", e);
+            m_log.error("Exception in KafkaExternalLoader", e);
             System.exit(-1);
         }
 

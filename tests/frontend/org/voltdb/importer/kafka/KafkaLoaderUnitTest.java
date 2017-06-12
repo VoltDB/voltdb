@@ -23,7 +23,11 @@
 
 package org.voltdb.importer.kafka;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.junit.Test;
+import org.voltdb.importclient.kafka.KafkaExternalLoaderCLIArguments;
 import org.voltdb.importclient.kafka.KafkaImporterCommitPolicy;
 
 import junit.framework.Assert;
@@ -42,4 +46,76 @@ public class KafkaLoaderUnitTest {
         Assert.assertEquals(3000, KafkaImporterCommitPolicy.fromStringTriggerValue("3000ms",KafkaImporterCommitPolicy.TIME));
     }
 
+
+    @Test
+    public void testHostPortArgsDefault() throws Exception {
+
+        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        List<String> hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"localhost:21212"}), hosts);
+
+        args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "--servers", "host1:100,host2:200", "--host", "host3,host4", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host3:21212", "host4:21212"}), hosts);
+
+    }
+
+    @Test
+    public void testHostPortArgsServer() throws Exception {
+
+        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "-s", "host1,host2", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        List<String> hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host1:21212", "host2:21212"}), hosts);
+
+        args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "--servers", "host1:100,host2:200", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host1:100", "host2:200"}), hosts);
+
+        args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "--servers", "host1,host2:200", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host1:21212", "host2:200"}), hosts);
+    }
+
+    @Test
+    public void testHostPortArgsHost() throws Exception {
+
+        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "--host", "host1,host2", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        List<String> hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host1:21212", "host2:21212"}), hosts);
+
+        args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "--host", "host1:100,host2:200", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host1:100", "host2:200"}), hosts);
+
+        args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "--host", "host1,host2:200", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host1:21212", "host2:200"}), hosts);
+    }
+
+    @Test
+    public void testDefaultPort() throws Exception {
+
+        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "--port", "999", "--host", "host1,host2", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        List<String> hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host1:999", "host2:999"}), hosts);
+
+        args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "--port", "999", "--host", "host1:100,host2", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host1:100", "host2:999"}), hosts);
+
+        args = new KafkaExternalLoaderCLIArguments();
+        args.parse("KafaExternalLoader", new String[] { "--port", "999", "--servers", "host1", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        hosts = args.getVoltHosts();
+        Assert.assertEquals(Arrays.asList(new String[]{"host1:999"}), hosts);
+    }
 }
