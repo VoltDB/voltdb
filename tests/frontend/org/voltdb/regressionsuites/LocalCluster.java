@@ -1129,6 +1129,13 @@ public class LocalCluster extends VoltServerConfig {
     void startOne(int hostId, boolean clearLocalDataDirectories,
             StartAction startAction, boolean waitForReady, String placementGroup) throws IOException
     {
+        startOne(hostId, clearLocalDataDirectories, startAction, waitForReady, placementGroup, false);
+    }
+
+    void startOne(int hostId, boolean clearLocalDataDirectories,
+            StartAction startAction, boolean waitForReady, String placementGroup,
+            boolean resetHostRegexResults) throws IOException
+    {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
@@ -1295,7 +1302,9 @@ public class LocalCluster extends VoltServerConfig {
                         proc);
             } else {
                 if (m_regexResults.containsKey(hostId)) {
-                    resetHostRegexResults(hostId);
+                    if (resetHostRegexResults) {
+                        resetHostRegexResults(hostId);
+                    }
                 } else {
                     m_regexResults.put(hostId, new ConcurrentHashSet<>());
                 }

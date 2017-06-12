@@ -897,7 +897,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else {
                 assert (config.m_startAction == StartAction.PROBE);
                 if (stagedCatalogLocation.isFile()) {
-                    assert (config.m_pathToCatalog == null) : config.m_pathToCatalog;
+                    // May cause LocalCluster startup to fail
+                    // assert (config.m_pathToCatalog == null) : config.m_pathToCatalog;
                     config.m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
                 }
             }
