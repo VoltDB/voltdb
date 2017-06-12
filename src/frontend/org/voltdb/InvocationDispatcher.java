@@ -359,7 +359,7 @@ public final class InvocationDispatcher {
         if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
             // NT procs are logged (@UAC, @AdHoc, etc.)
             if (user.isAuthEnabled()) {
-                rateHostLogger.log("User: " + user.m_name + " from " + clientInfo +
+                rateHostLogger.log("User " + user.m_name + " from " + clientInfo +
                                    " issued a " + procName, EstTime.currentTimeMillis());
             }
             return dispatchNTProcedure(handler, task, user, ccxn, nowNanos, ntPriority);
@@ -405,7 +405,7 @@ public final class InvocationDispatcher {
             }
             else if ("@StopNode".equals(procName)) {
                 if (user.isAuthEnabled()) {
-                    rateHostLogger.log("User: " + user.m_name + " from " + clientInfo +
+                    rateHostLogger.log("User " + user.m_name + " from " + clientInfo +
                                        " issued a " + procName, EstTime.currentTimeMillis());
                 }
                 return dispatchStopNode(task);
@@ -450,14 +450,14 @@ public final class InvocationDispatcher {
             }
             else if ("@SnapshotDelete".equals(procName)) {
                 if (user.isAuthEnabled()) {
-                    rateHostLogger.log("User: " + user.m_name + " from " + clientInfo +
+                    rateHostLogger.log("User " + user.m_name + " from " + clientInfo +
                                        " issued a " + procName, EstTime.currentTimeMillis());
                 }
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
             }
             else if ("@SnapshotRestore".equals(procName)) {
                 if (user.isAuthEnabled()) {
-                    rateHostLogger.log("User: " + user.m_name + " from " + clientInfo +
+                    rateHostLogger.log("User " + user.m_name + " from " + clientInfo +
                                        " issued a " + procName, EstTime.currentTimeMillis());
                 }
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
@@ -484,7 +484,7 @@ public final class InvocationDispatcher {
                     // After we verify the system command from an admin user, the detailed information
                     // should be printed out properly. The following message is printed at the node where
                     // the client is connected to.
-                    String msg = "Admin: " + user.m_name + " from " + clientInfo + " issued a " + procName;
+                    String msg = "Admin user " + user.m_name + " from " + clientInfo + " issued a " + procName;
                     CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
                 } else {
                     return unexpectedFailureResponse(
