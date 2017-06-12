@@ -1081,6 +1081,17 @@ public abstract class CatalogUtil {
         }
     }
 
+    public static boolean catalogContainsDeploymentType(Catalog catalog) {
+        if (catalog == null) return false;
+
+        Cluster catCluster = catalog.getClusters().get("cluster");
+        if (catCluster == null) return false;
+
+        // check deployment exists
+        Deployment catDeploy = catCluster.getDeployment().get("deployment");
+        return catDeploy != null;
+    }
+
     public final static Map<String, String> asClusterSettingsMap(DeploymentType depl) {
         return ImmutableMap.<String,String>builder()
                 .put(ClusterSettings.HOST_COUNT, Integer.toString(depl.getCluster().getHostcount()))

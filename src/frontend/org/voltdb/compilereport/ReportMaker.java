@@ -461,7 +461,10 @@ public class ReportMaker {
             Table t = tables.get(tableName);
             assert(t != null);
             TableAnnotation ta = (TableAnnotation) t.getAnnotation();
-            assert(ta != null);
+            if (ta == null) {
+                ta = new TableAnnotation();
+                t.setAnnotation(ta);
+            }
             ta.statementsThatReadThis.add(statement);
             ta.proceduresThatReadThis.add(procedure);
             procAnnotation.tablesRead.add(t);
@@ -478,7 +481,10 @@ public class ReportMaker {
             Table t = tables.get(tableName);
             assert(t != null);
             TableAnnotation ta = (TableAnnotation) t.getAnnotation();
-            assert(ta != null);
+            if (ta == null) {
+                ta = new TableAnnotation();
+                t.setAnnotation(ta);
+            }
             ta.statementsThatUpdateThis.add(statement);
             ta.proceduresThatUpdateThis.add(procedure);
             procAnnotation.tablesUpdated.add(t);

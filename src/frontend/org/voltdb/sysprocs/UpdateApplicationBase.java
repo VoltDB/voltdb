@@ -213,9 +213,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 }
             }
 
-            if ("@UpdateClasses".equals(invocationName)) {
+            // Retrieve the original deployment string, if necessary
+            if (CatalogUtil.catalogContainsDeploymentType(newCatalog)) {
+                // use current deployment
                 retval.deploymentString = deploymentString;
+                retval.deploymentHash = context.getCatalogHash();
             } else {
+                // recompile deployment and add to catalog
                 DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
                 if (dt == null) {
                     throw new PrepareDiffFailureException(
@@ -241,12 +245,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
                 //Always get deployment after its adjusted.
                 retval.deploymentString = CatalogUtil.getDeployment(dt, true);
+                // make deployment hash from string
+                retval.deploymentHash =
+                        CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
             }
-
-            // make deployment hash from string
-            retval.deploymentHash =
-                    CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
-
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify
