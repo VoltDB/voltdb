@@ -467,7 +467,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             try {
                 client.createConnection(server.trim(), port);
                 break;
-            } catch(IOException e) {
+            } catch (IOException e) {
                 // Only swallow the exceptions from Java network or connection problems
                 // Unresolved hostname exceptions will be thrown
             }
