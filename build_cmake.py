@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import os, sys, subprocess
 import argparse
+import re
+import multiprocessing
 
 parser = argparse.ArgumentParser(description='Build VoltDB EE Engine.')
 #
@@ -40,6 +42,14 @@ parser.add_argument('--source-directory',
                     default=os.getcwd(),
                     help='''
                     Root of Voltdb source tree.''')
+parser.add_argument('--max-processors',
+                    dest='max_processors',
+                    type=int,
+                    default=8,
+                    help='''
+                    Maximum number of processors used.  Default is 8.  In any case,
+                    we use at most the number of hardware processors.
+                    ''')
 #
 # Build Steps.
 #
@@ -73,7 +83,8 @@ parser.add_argument('--install',
 #
 # Testing.
 #
-parser.add_argument('--runalltests',
+parser.add_argument('--run-all-tests',
+                    dest='runalltests',
                     action='store_true',
                     help='''
                     Build and run the EE unit tests.  Use valgrind for memcheck or memcheck_nofreelist.
@@ -100,10 +111,11 @@ def makeDirectory(prefix, config):
         subprocess.call('mkdir -p %s' % prefix, shell = True)
 
 def makeGeneratorCommand(config):
+    np = getNumberProcessors(config)
     if config.generator.endswith('Unix Makefiles'):
-        return "make -j "
+        return "make -j%d " % np
     elif config.generator.endswith('Ninja'):
-        return "ninja"
+        return "ninja -j %d" % np
     else:
         print('Unknown generator \'%s\'' % config.generator)
 
@@ -117,22 +129,26 @@ def cmakeCommandString(config):
     return 'cmake -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s %s' \
              % (config.buildtype, config.generator, coverage, profile, config.sourcedir)
 
+def getNumberProcessors(config):
+    np = multiprocessing.cpu_count()
+    if np < 1:
+        np = 1
+    if config.max_processors < np:
+        np = config.max_processors
+    return np
+
 def makeCommandString(config):
-    # Calculate implications between the input parameters.
-    if config.runalltests:
-        config.buildtests = True
-    # Now, calculate the build target.
-    #
-    # We always want to do a build if we are called here.
     target='build'
+    if config.install:
+        target += ' install'
     if config.buildtests:
         target += ' build-tests'
     if config.buildipc:
         target += ' voltdbipc'
-    if config.install:
-        target += ' install'
-    makeCmd = makeGeneratorCommand(config)
-    return ("%s %s" % (makeCmd, target))
+    if config.runalltests:
+        target += ' build-tests'
+    cmdstr = "%s %s" % (makeGeneratorCommand(config), target)
+    return cmdstr
 
 def runCommand(commandStr, config):
     if config.debug:
@@ -181,9 +197,9 @@ if not runCommand(buildCmd, config):
 # Do testing if requested.
 #
 if config.runalltests:
-    testCmd = "ctest --output-on-failure"
+    testCmd = "ctest --output-on-failure -j %d" % getNumberProcessors(config)
     if config.eetestsuite:
-        testCmd += " --label-regex %s" % config.eetestsuite
+        testCmd += " -R %s" % config.eetestsuite
     if not runCommand(testCmd, config):
         print("Test command \"%s\" failed." % testCmd)
         system.exit(100)

@@ -1,6 +1,9 @@
 ########################################################################
 #
-# A CMake build configuration for VoltDB.
+# A CMake build configuration for VoltDB.  The commands for the ant
+# targets in build.xml call build_cmake.py, which calls cmake and
+# make here, so you don't really know how to use this.  But for
+# special cases this may be useful.
 #
 # To use this, in the root of the voltdb hierarchy, run
 #   1.) mkdir obj/${BUILD_TYPE}
@@ -8,13 +11,15 @@
 #   2.) cd obj/${BUILD_TYPE}
 #   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE} ${SRC_DIR}
 #       where ${SRC_DIR} is the pathname of the voltdb
-#       source directory, where file is.
+#       source directory, where file is.  There are other
+#       definitions which could be added.  See build.xml.
 #   4.) make -j<N> -k install
 #       where, as usual, <N> is number telling make how much parallelism
 #       to use.  Values between 1 and 8 are typical.  Higher values
 #       may produce faster builds, or they may just gum things up.
 # If this succeeds, then the build artifacts will be placed in
 # obj/${BUILD}/prod.
+#
 #
 # The two artifacts are:
 #   1.) The jni library, which will be in
@@ -26,8 +31,43 @@
 #       and to debug this EE.  This will be found in prod/voltdbipcrun
 #       on both Linux and Darwin.
 #
-# Note that only GCC is supported on Linux, and only Clang is
-# supported on Darwin.
+########################################################################
+#
+# Tests
+#
+########################################################################
+#
+# In addition to making the libraries, this file describes all the
+# C++ unit tests.
+#   0.) Tests are either generated or hand written tests.
+#       a.) The hand written tests are checked in to github,
+#           and are listed in the variable VOLTDB_TEST_PROGRAMS
+#           below.  Their names have the form TEST_DIR/TEST_NAME.
+#           Both of these should be a simple name, and not a path.
+#       b.) Generated tests are generated from java sources.  These
+#           don't currently work now.
+#   1.) To build the tests run "make build-tests".  You
+#       can use the usual -jN and -k options, of course.
+#       The tests will all go into cpptests/TEST_DIR/TEST_NAME.
+#   2.) To run the tests run "make run-all-tests."
+#   3.) To make one test executable, say
+#           cpptests/plannodes/PlanNodeFragmentTest,
+#       run "make plannodes__PlanNodeFragmentTest.  All directories
+#       will be made.
+#   4.) To delete all test binaries, just delete cpptests.  The
+#       build system will recreate what it needed. 
+#
+########################################################################
+#
+# Dependences
+#
+########################################################################
+#
+# Note that by default only GCC is supported on Linux, and only Clang is
+# supported on Darwin.  By redefining CMAKE_CXX_COMPILER one can
+# change this.  New C++ compilation flags can be added by defining
+# the cmake variable VOLTDB_CXXFLAGS.  New libraries can be added
+# to the link line for libvolt-*.so by defining VOLTDB_LDFLAGS.
 #
 # This requires a gcc compiler version of at least 4.4.7, and a cmake
 # version of at least 2.8.12.  It's possible that older versions of
@@ -43,18 +83,7 @@
 # and automake.
 #
 ########################################################################
-# Testing
-#
-# In addition to making the libraries, this file describes all the
-# C++ unit tests.  To build the tests run "make build-tests".  You
-# can use the usual -jN and -k options, of course.  To
-# run the tests, after building them, run the command "ctest".  This
-# will run the tests in parallel. The option --output-on-failure
-# will only dump output if the test fails to meet its specification.
-# Note that some tests are expected to fail.
-#
-#
-########################################################################
+
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.12 FATAL_ERROR)
 PROJECT(VoltDB_EE)
 INCLUDE(ExternalProject)
@@ -140,9 +169,10 @@ ENDIF()
 ########################################################################
 # This is for our sources, relative to the source directory.
 SET (VOLTDB_EE_SRC_DIR src/ee)
-# This is for output names, relative to the binary directory.
-SET(VOLTDB_EE_OBJ_DIR obj/ee)
+# This is for test sources, relative to the source directory.
 SET(VOLTDB_EE_TEST_DIR tests/ee)
+# This is where test object files go, relative to the binary directory.
+SET(VOLTDB_EE_TEST_PROGRAM_DIR cpptests)
 
 # This is for third party sources, relative to the source directory.
 SET (VOLTDB_THIRD_PARTY_CPP_DIR third_party/cpp)
@@ -262,6 +292,11 @@ ENDIF ()
 
 ADD_COMPILE_OPTIONS(${CXX_VERSION_FLAG})
 
+#
+# Add VOLTDB_CXXFLAGS, supplied by the user.
+#
+ADD_COMPILE_OPTIONS(${VOLTDB_CXXFLAGS})
+
 IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" )
   ADD_COMPILE_OPTIONS(-Wno-attributes -Wcast-align -DLINUX -fpic)
   SET (VOLTDB_NM_OPTIONS "-n --demangle")
@@ -368,12 +403,17 @@ ADD_COMPILE_OPTIONS(
 
 # Set coverage and profiling options
 IF ( ${VOLTDB_USE_COVERAGE} )
-  SET (VOLTDB_LINK_FLAGS "${VOLTDB_LINK_FLAGS} -ftest-coverage -fprofile-arcs")
+  SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} -ftest-coverage -fprofile-arcs)
 ENDIF ()
 
 IF ( ${VOLTDB_USE_PROFILING} )
-  SET (VOLTDB_LINK_FLAGS "${VOLTDB_LINK_FLAGS} -L/usr/local/lib -g3 -lprofiler -lunwind")
+  SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} -L/usr/local/lib -g3 -lprofiler -lunwind)
 ENDIF ()
+
+#
+# Add VOLTDB_LDFLAGS, which is supplied by the user.
+#
+SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} ${VOLTDB_LDFLAGS})
 
 SET (VOLTDB_SRC
   ${VOLTDB_EE_SRC_DIR}/catalog/catalog.cpp
@@ -783,7 +823,7 @@ ENDFUNCTION()
 
 #
 # Calculate if this is a python test.  If there is a python script
-# in the source foldter called TEST_DIR/TEST_NAME.py, then we
+# in the source folder called TEST_DIR/TEST_NAME.py, then we
 # wrap the test command with that script by putting the command
 # in the script's argument list.
 #
@@ -801,34 +841,35 @@ ADD_CUSTOM_TARGET(build-tests
   COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_TEST_WORKING_DIR})
 FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
   ADD_CUSTOM_TARGET(make_${TEST_DIR}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_EE_TEST_DIR}/${TEST_DIR})
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_EE_TEST_PROGRAM_DIR}/${TEST_DIR})
   FOREACH (TEST_NAME ${VOLTDB_TEST_DIR_${TEST_DIR}})
+    SET(CTEST_TEST_NAME ${TEST_DIR}__${TEST_NAME})
     #
     # Define the test executable, and set the build-tests
     # depends on the test.  Remember the necessary include
     # directories and link libraries.
     #
-    SET(TEST_OUTPUT_NAME ${VOLTDB_EE_TEST_DIR}/${TEST_DIR}/${TEST_NAME})
-    ADD_EXECUTABLE(${TEST_NAME}
+    SET(TEST_OUTPUT_NAME ${VOLTDB_EE_TEST_PROGRAM_DIR}/${TEST_DIR}/${TEST_NAME})
+    ADD_EXECUTABLE(${CTEST_TEST_NAME}
       $<TARGET_OBJECTS:voltdb_test_harness>
       $<TARGET_OBJECTS:voltdbobjs>
       $<TARGET_OBJECTS:third_party_objs>
       ${VOLTDB_TEST_SRC}/${TEST_DIR}/${TEST_NAME}.cpp)
-    SET_TARGET_PROPERTIES(${TEST_NAME}
+    SET_TARGET_PROPERTIES(${CTEST_TEST_NAME}
       PROPERTIES
       OUTPUT_NAME ${TEST_OUTPUT_NAME}
       EXCLUDE_FROM_ALL TRUE)
-    ADD_DEPENDENCIES(${TEST_NAME}
+    ADD_DEPENDENCIES(${CTEST_TEST_NAME}
       pcre2 crypto s2geo
       make_${TEST_DIR})
-    ADD_DEPENDENCIES(build-tests ${TEST_NAME})
-    TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
+    ADD_DEPENDENCIES(build-tests ${CTEST_TEST_NAME})
+    TARGET_INCLUDE_DIRECTORIES(${CTEST_TEST_NAME}
       PUBLIC
       ${VOLTDB_EE_SRC_DIR}
       ${VOLTDB_THIRD_PARTY_CPP_DIR}
       ${VOLTDB_THIRD_PARTY_INCLUDE_DIR}
       ${VOLTDB_TEST_SRC})
-    TARGET_LINK_LIBRARIES(${TEST_NAME}
+    TARGET_LINK_LIBRARIES(${CTEST_TEST_NAME}
       ${VOLTDB_LINK_FLAGS}
       -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
       -lpcre2-8 -ls2geo -lcrypto
@@ -841,7 +882,6 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     # valgrind command.
     VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} VALGRIND_EXE_CMD)
     PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD)
-    SET(CTEST_TEST_NAME ${TEST_DIR}-${TEST_NAME})
     ADD_TEST(NAME ${CTEST_TEST_NAME}
       WORKING_DIRECTORY ${VOLTDB_TEST_WORKING_DIR}
       COMMAND ${CTEST_EXE_CMD})
@@ -869,7 +909,7 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
   ENDFOREACH()
 ENDFOREACH()
 
-ADD_CUSTOM_TARGET(runalltests
+ADD_CUSTOM_TARGET(run-all-tests
   DEPENDS build-tests
   COMMAND ctest --output-on-fail -j 4
   )

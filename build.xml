@@ -1540,7 +1540,7 @@ NATIVE EE STUFF
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
 
-        <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} --runalltests" />
+        <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} --run-all-tests" />
     </exec>
 </target>
 
@@ -1562,7 +1562,7 @@ NATIVE EE STUFF
     </exec>
 </target>
 
-<target name='ee' depends="ee_buildmakefile, catalog, jnicompile, buildinfo"
+<target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
@@ -1570,15 +1570,6 @@ NATIVE EE STUFF
         <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} --install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
-</target>
-
-<target name='ee_buildmakefile' depends="catalog, jnicompile, buildinfo"
-    description="Just make the makefile for the C++ JNI library.">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="EEONLYBUILDMAKEFILE" value="true"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} --configure" />
-    </exec>
 </target>
 
 <target name='recompile_ee_nodepends'
@@ -2123,7 +2114,7 @@ TEST CASES
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build_cmake.py ${build} test coverage" />
+        <arg line="build_cmake.py --build-type=${build} test coverage" />
     </exec>
 </target>
 
