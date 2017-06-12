@@ -199,10 +199,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // write the tuple's data
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray, true);
 
-    // write column count - after row size and before null array
-//    ExportSerializeOutput columnCount(m_currBlock->mutableDataPtr() + 4, sizeof(int32_t));
-//    columnCount.writeInt(METADATA_COL_CNT + tuple.sizeInValues());
-
+    // row size, generation, partition-index n column count
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);
     // write the row size in to the row header rowlength does not include
     // the 4 byte row header but does include the null array.
