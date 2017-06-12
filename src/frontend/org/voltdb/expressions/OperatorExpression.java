@@ -147,6 +147,11 @@ public class OperatorExpression extends AbstractExpression {
                 m_valueType = VoltType.BOOLEAN;
                 m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             }
+
+            if (type == ExpressionType.OPERATOR_UNARY_MINUS) {
+                m_valueType = m_left.getValueType();
+                m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+            }
             return;
         }
         if (type == ExpressionType.OPERATOR_CASE_WHEN || type == ExpressionType.OPERATOR_ALTERNATIVE) {
