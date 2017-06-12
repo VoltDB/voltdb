@@ -54,6 +54,7 @@
         var ChartOutTrans = nv.models.lineChart();
         var ChartSuccessRate =  nv.models.lineChart();
         var ChartFailureRate = nv.models.lineChart();
+        var ChartLatencyAnalysis = nv.models.multiBarHorizontalChart();
         var drChartList = {}
         var ChartCommandlog = nv.models.lineChart();
         var dataMapperSec = {};
@@ -80,6 +81,65 @@
             minGraph: 1800000,
             dayGraph: 27000000
         }
+
+        this.barHeight = 0;
+        function exampleData() {
+            return  [
+                {
+                    key: "Latency",
+                    values: [
+                        {
+                          "label" : "procedure1" ,
+                          "value" : 4921
+                        } ,
+                        {
+                          "label" : "procedure2" ,
+                          "value" : 4921
+                        } ,
+                        {
+                          "label" : "procedure3" ,
+                          "value" : 4921
+                        } ,
+                        {
+                          "label" : "procedure4" ,
+                          "value" : 4921
+                        } ,
+                        {
+                          "label" : "procedure5" ,
+                          "value" : 4921
+                        } ,
+                        {
+                          "label" : "procedure6" ,
+                          "value" : 4921
+                        } ,
+                        {
+                          "label" : "procedure7" ,
+                          "value" : 4921
+                        } ,
+                        {
+                          "label" : "procedure1" ,
+                          "value" : 4921
+                        } ,
+                        {
+                          "label" : "procedure1" ,
+                          "value" : 4921
+                        } ,
+                    ],
+                    "color": "rgb(27, 135, 200)"
+                }
+              ]
+
+        }
+
+        this.refreshGraphLatency = function(){
+            ChartLatencyAnalysis.update;
+
+            d3.select('#visualiseLatencyAnalysis')
+                .datum(exampleData())
+                .transition().duration(350)
+                .call(ChartLatencyAnalysis);
+        }
+
         this.GetPartitionDetailData = function (partitionDetails) {
             dataParitionDetails = partitionDetails;
         };
@@ -341,6 +401,49 @@
         var dataPartitionIdleTime = [];
 
         var dataParitionDetails = [];
+
+        nv.addGraph(function() {
+            var dataSet = exampleData()[0].values.length;
+            if(dataSet < 3){
+                MonitorGraphUI.barHeight = 300;
+                ChartLatencyAnalysis.groupSpacing(.5);
+            }
+            else if(dataSet < 5){
+                MonitorGraphUI.barHeight = 400;
+                ChartLatencyAnalysis.groupSpacing(0.4);
+            }
+             else if(dataSet < 7){
+                MonitorGraphUI.barHeight = 400;
+                ChartLatencyAnalysis.groupSpacing(0.3);
+            }
+            else{
+                MonitorGraphUI.barHeight = 60 * dataSet;
+                ChartLatencyAnalysis.groupSpacing(0.2);
+            }
+
+            ChartLatencyAnalysis.tooltips(true).x(function(d) { return d.label })
+              .y(function(d) { return d.value }).height( MonitorGraphUI.barHeight)
+              .showValues(true).showControls(false).tooltip.enabled(true);
+
+            ChartLatencyAnalysis.showLegend(false);
+
+            $("#chartLatencyAnalysis").css("height", MonitorGraphUI.barHeight-10)
+
+            ChartLatencyAnalysis.tooltips(true)
+            ChartLatencyAnalysis.yAxis
+                .tickFormat(d3.format(',.1f'));
+            ChartLatencyAnalysis.xAxis
+                .axisLabelDistance(10)
+            ChartLatencyAnalysis.yAxis.axisLabelDistance(10)
+            ChartLatencyAnalysis.margin({"left":150})
+            d3.select('#visualiseLatencyAnalysis')
+                .datum(exampleData())
+                .transition().duration(350)
+                .call(ChartLatencyAnalysis);
+
+            nv.utils.windowResize(ChartLatencyAnalysis.update);
+            return ChartLatencyAnalysis;
+        });
 
         nv.addGraph({
             generate: function() {
