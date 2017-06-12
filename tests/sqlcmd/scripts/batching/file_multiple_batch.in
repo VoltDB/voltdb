@@ -1,0 +1,5 @@
+
+FILE -batch ./scripts/batching/1.sql ./scripts/batching/2.sql
+
+DROP TABLE t CASCADE;
+DROP TABLE t2 CASCADE;

@@ -122,7 +122,7 @@ public class SpProcedureTask extends ProcedureTask
             traceLog.add(VoltTrace::endDuration);
         }
 
-        logToDR(siteConnection.getDRGateway(), txnState, response);
+        logToDR(siteConnection.getDRGateway(), txnState);
     }
 
     @Override
@@ -196,15 +196,14 @@ public class SpProcedureTask extends ProcedureTask
             hostLog.trace("COMPLETE replaying txn: " + this);
         }
 
-        logToDR(siteConnection.getDRGateway(), txnState, response);
+        logToDR(siteConnection.getDRGateway(), txnState);
     }
 
-    private void logToDR(PartitionDRGateway drGateway, SpTransactionState txnState, InitiateResponseMessage response)
+    private void logToDR(PartitionDRGateway drGateway, SpTransactionState txnState)
     {
         // Log invocation to DR
         if (drGateway != null && !txnState.isReadOnly() && !txnState.needsRollback()) {
-            drGateway.onSuccessfulProcedureCall(txnState.txnId, txnState.uniqueId, txnState.getHash(),
-                    txnState.getInvocation(), response.getClientResponseData());
+            drGateway.onSuccessfulProcedureCall(txnState.getInvocation());
         }
     }
 

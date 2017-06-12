@@ -1,0 +1,29 @@
+
+FILE ./scripts/batching/1.sql ./scripts/batching/2.sql
+
+CREATE TABLE t (p INTEGER NOT NULL, i INTEGER ASSUMEUNIQUE, a INTEGER, s FLOAT, PRIMARY KEY(i, p));
+Command succeeded.
+
+CREATE VIEW mt (a, p, n, s) AS
+    SELECT a, p, COUNT(*), SUM(s)
+    FROM t WHERE a > 5
+    GROUP BY a, p;
+Command succeeded.
+
+CREATE TABLE t2 (p INTEGER NOT NULL, a INTEGER, s FLOAT, PRIMARY KEY(p));
+Command succeeded.
+
+CREATE INDEX idx ON mt ( p );
+Command succeeded.
+
+CREATE VIEW mt2 (a, p, n, ms)
+    AS SELECT a, p, COUNT(*), MIN(s)
+    FROM t2
+    GROUP BY a, p;
+Command succeeded.
+
+DROP TABLE t CASCADE;
+Command succeeded.
+
+DROP TABLE t2 CASCADE;
+Command succeeded.

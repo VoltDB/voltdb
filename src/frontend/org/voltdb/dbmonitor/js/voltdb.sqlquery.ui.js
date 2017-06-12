@@ -1502,7 +1502,20 @@ function loadSQLQueryPage(serverName, portid, userName) {
         });
     };
 
+    var toggleSpinner = function (show) {
+            if (!show) {
+                $("#sqlQueryOverlay").hide();
+                $(".slimScrollBar").css('z-index', '99');
+            }
+            else if (show) {
+                $("#tabScroller").css("height", "");
+                $(".slimScrollBar").css('z-index', '-9999');
+                $("#sqlQueryOverlay").show();
+            }
+        };
+
     var populateTablesAndViews = function () {
+        toggleSpinner(true);
         voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData, exportTableData) {
             var tables = tablesData['tables'];
             populateTableData(tables);
@@ -1514,7 +1527,9 @@ function loadSQLQueryPage(serverName, portid, userName) {
             var procedureColumns = procedureColumnsData['procedureColumns'];
             var sysProcedure = sysProcedureData['sysProcedures'];
             populateStoredProcedure(procedures, procedureColumns, sysProcedure);
+            toggleSpinner(false);
         });
+        voltDbRenderer.GetTableInformationClientPort();
     };
     populateTablesAndViews();
     $("#overlay").hide();
