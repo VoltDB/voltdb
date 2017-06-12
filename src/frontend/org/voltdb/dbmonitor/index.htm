@@ -32,6 +32,7 @@
     <script type="text/javascript" src="js/voltdb.render.js"></script>
     <script type="text/javascript" src="js/split.js"></script>
     <script type="text/javascript" src="js/voltdb.ui.js"></script>
+    <script type="text/javascript" src="js/voltdb.analysis.js"></script>
     <script type="text/javascript" src="js/voltdb.graph.js"></script>
     <script type="text/javascript" src="js/jquery.tooltipster.js"></script>
     <script type="text/javascript" src="js/voltdb.sqlquery.ui.js"></script>
@@ -410,7 +411,7 @@
                                                  
                     </div> -->
                     <div class="analysisBody">
-                        <button class="analyzeBtn" style="display: block;">Analyze Now</button>
+                        <button class="analyzeBtn" style="display: block;" onClick="fetchData()">Analyze Now</button>
                         <div class="subTabSection" >
                             <!--tab-->
                             <div class="tabContant analysisSubTab" id="divAnalysis">
@@ -434,7 +435,7 @@
                                             </ul>
                                             <div class="tab_container">
                                                 <div id="tabLatency" class="tab_content tab_content_procedure">
-                                                 <p>This is tab 3</p>
+                                                 <p><div id="chart"><svg></svg></div></p>
                                                 </div>
                                                 <div id="tabFrequency" class="tab_content tab_content_procedure">
                                                     <p>This is tab 4</p>
