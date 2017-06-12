@@ -17,7 +17,9 @@
 
 package org.voltdb.importclient.kafka;
 
+import java.io.FileInputStream;
 import java.io.FileReader;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +32,9 @@ import org.voltdb.client.Client;
  * Process command line arguments and do some validation.
  */
 public class KafkaExternalLoaderCLIArguments extends CLIConfig {
+
+    public static int KAFKA_TIMEOUT_DEFAULT = 30000;
+    public static int KAFKA_BUFFER_SIZE_DEFAULT = 65536;
 
     @Option(shortOpt = "c", desc = "Kafka consumer properties file (deprecated)")
     public String config = "";
@@ -92,10 +97,10 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     public String ssl = "";
 
     @Option(desc = "Kafka consumer buffer size (default 65536).")
-    public int buffersize = 65536;
+    public int buffersize = 0;
 
     @Option(desc = "Kafka consumer socket timeout, in milliseconds (default 30000, or thirty seconds)")
-    public int timeout = 30000;
+    public int timeout = 0;
 
     @Option(desc = "Kafka time-based commit policy interval in milliseconds.  Default is to use manual offset commit.")
     public String commitPolicy = "";
@@ -136,30 +141,69 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         return hostPorts;
     }
 
-    public String getGroupId() throws Exception {
-        String groupId;
+    private void initializeCustomFormatter() throws Exception {
+        // Load up any supplied formatter
+        if (!formatter.trim().isEmpty()) {
+            InputStream pfile = new FileInputStream(formatter);
+            m_formatterProperties.load(pfile);
+            String formatter = m_formatterProperties.getProperty("formatter");
+            if (formatter == null || formatter.trim().isEmpty()) {
+                throw new RuntimeException("Formatter class must be specified in formatter file as formatter=<class>: " + formatter);
+            }
+        }
+    }
+
+    private void initializeDefaultsFromPropertiesFile() throws Exception {
+
+        if (config.trim().isEmpty()) {
+            timeout = KAFKA_TIMEOUT_DEFAULT;
+            buffersize = KAFKA_BUFFER_SIZE_DEFAULT;
+            return;
+        }
+
+        Properties props = new Properties();
+        try (FileReader fr = new FileReader(config.trim())) {
+            props.load(fr);
+        }
+
+        // group.id
         if (groupid == null || groupid.trim().length() == 0) {
-            // Look into the (deprecated) config file, if present, and try to get it from there. This will help with
-            // compatibility.
-            if (!config.trim().isEmpty()) {
-                try (FileReader fr = new FileReader(config.trim())) {
-                    Properties props = new Properties();
-                    props.load(fr);
-                    groupid = props.getProperty("group.id", "");
-                    if (!groupid.isEmpty()) {
-                        warningWriter.println("Warning: Kafka group.id property extracted from properties file, which is deprecated.  Use --groupid argument instead.");
-                    }
-                }
+            // If it's not on the command line, look in the properties file:
+            groupid = props.getProperty("group.id", "");
+            if (groupid.isEmpty()) {
+                // Not in the property file, compute it
+                groupid = "voltdb-" + (useSuppliedProcedure ? procedure : table);
+            }
+            else {
+                warningWriter.println("Warning: Kafka group.id property extracted from properties file, which is deprecated.  Use --groupid argument instead.");
             }
         }
 
-        if (groupid == null || groupid.trim().length() == 0) {
-            groupId = "voltdb-" + (useSuppliedProcedure ? procedure : table);
+        // socket.timeout.ms
+        if (timeout == 0) {
+            String t = props.getProperty("socket.timeout.ms", null);
+
+            if (t != null) {
+                timeout = Integer.parseInt(t);
+                warningWriter.println("Warning: Kafka 'socket.timeout.ms' property extracted from properties file, which is deprecated.  Use --timeout argument instead.");
+            }
+            else {
+                timeout = KAFKA_TIMEOUT_DEFAULT;
+            }
         }
-        else {
-            groupId = groupid.trim();
+
+        // socket.receive.buffer.bytes
+        if (buffersize == 0) {
+            String t = props.getProperty("socket.receive.buffer.bytes", null);
+            if (t != null) {
+                buffersize = Integer.parseInt(t);
+                warningWriter.println("Warning: Kafka 'socket.receive.buffer.bytes' property extracted from properties file, which is deprecated.  Use --buffersize argument instead.");
+            }
+            else {
+                buffersize = KAFKA_BUFFER_SIZE_DEFAULT;
+            }
         }
-        return groupId;
+
     }
 
     @Override
@@ -204,6 +248,16 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         }
         if (!port.trim().isEmpty()) {
             warningWriter.println("Warning: --port argument is deprecated, please use --host with <host:port> URIs instead.");
+        }
+
+        try {
+            initializeCustomFormatter();
+            initializeDefaultsFromPropertiesFile();
+        }
+        catch (Exception e) {
+            System.err.println("Exception processing commandline arguments");
+            e.printStackTrace();
+            System.exit(-1);
         }
     }
 }

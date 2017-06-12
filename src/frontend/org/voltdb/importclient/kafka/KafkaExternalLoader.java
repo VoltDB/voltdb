@@ -16,9 +16,7 @@
  */
 package org.voltdb.importclient.kafka;
 
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.util.ArrayList;
@@ -94,16 +92,6 @@ public class KafkaExternalLoader implements ImporterSupport {
             throw new RuntimeException("Cannot find the Zookeeper client libraries, zkclient-0.3.jar and zookeeper-3.3.4.jar. Use the ZKLIB environment variable to specify the path to the Zookeeper jars files.");
         }
 
-        // Load up any supplied formatter
-        if (!m_config.formatter.trim().isEmpty()) {
-            InputStream pfile = new FileInputStream(m_config.formatter);
-            m_config.m_formatterProperties.load(pfile);
-            String formatter = m_config.m_formatterProperties.getProperty("formatter");
-            if (formatter == null || formatter.trim().isEmpty()) {
-                throw new RuntimeException("Formatter class must be specified in formatter file as formatter=<class>: " + m_config.formatter);
-            }
-        }
-
         // If we need to prompt the user for a VoltDB password, do so.
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
 
@@ -134,6 +122,7 @@ public class KafkaExternalLoader implements ImporterSupport {
      * Construct the infrastructure and start processing messages from Kafka
      */
     private void processKafkaMessages() throws Exception {
+
         try {
             m_executorService = createImporterExecutor(m_loader, this);
 
@@ -303,13 +292,10 @@ public class KafkaExternalLoader implements ImporterSupport {
         // Derive the key from the list of broker URIs:
         String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokerListString);
 
-        // GroupId can be specified by the command line, or derived from the table/procedure:
-        String groupId = properties.getGroupId();
-
         // Create the input formatter:
         FormatterBuilder fb = createFormatterBuilder(properties);
 
-        return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokerList, properties.topic, groupId,
+        return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokerList, properties.topic, properties.groupid,
                                                 properties.procedure, properties.timeout, properties.buffersize, properties.commitPolicy, fb);
     }
 
