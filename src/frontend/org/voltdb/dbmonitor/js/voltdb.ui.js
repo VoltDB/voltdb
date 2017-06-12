@@ -677,6 +677,13 @@ function changePassword(obj) {
 }
 
 var loadPage = function (serverName, portid) {
+    $("#tabAnalysis li a").on("click", function(){
+        setInterval(function(){
+            window.dispatchEvent(new Event('resize'));
+        },10)
+
+    })
+
     $(".drShowHide").show();
     $(".clpShowHide").show();
     $("#showHideDrBlock").removeClass('collapsed');

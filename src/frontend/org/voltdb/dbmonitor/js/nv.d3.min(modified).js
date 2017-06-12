@@ -638,7 +638,7 @@
                     else if (d.series[0].key == "RAM") {
                         unit = 'GB';
                     }
-                    else if (d.series[0].key == "Latency") {
+                    else if (d.series[0].key == "Latency" && chartContainer != null) {
                         unit = 'ms';
                     }
                     else if (d.series[0].key == "Transactions") {
@@ -655,6 +655,9 @@
                             unit = 'Transactions'
                         else
                             unit = "Transactions/s"
+                    }
+                    else if(chartContainer == null){
+                        unit = 'Number'
                     }
                     else {
                         unit = '%';
@@ -924,7 +927,7 @@
                     // generate data and set it into tooltip
                     // Bonus - If you override contentGenerator and return falsey you can use something like
                     //         React or Knockout to bind the data for your tooltip
-                    var newContent = contentGenerator(data, chartContainer.id);
+                    var newContent = contentGenerator(data, chartContainer == undefined ? null : chartContainer.id);
 
                     if (data.series[0].value == null) {
                         tooltipElem.className = "";

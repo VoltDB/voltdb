@@ -471,7 +471,6 @@ $(document).ready(function () {
 
     //On Click Event
     $("ul#ulProcedure li").click(function () {
-        debugger;
         $("ul#ulProcedure li").removeClass("active"); //Remove any "active" class
         $(this).addClass("active"); //Add "active" class to selected tab
         $(".tab_content_procedure").hide(); //Hide all tab content

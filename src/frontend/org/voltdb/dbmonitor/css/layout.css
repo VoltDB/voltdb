@@ -704,6 +704,10 @@ html ul.tabs li.active a:hover {
     background: #fff;
     overflow: auto;
 }
+.subAnalysisTab_container {
+    overflow:initial;
+    padding-bottom:10px;
+}
 .tab_content {
     padding: 20px;
     font-size: 1.2em;
@@ -3548,7 +3552,23 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .dataTab { height:470px; padding-bottom:10px;}
 .tab_content_procedure {
     height:390px;
+    padding:10px 10px 0;
 }
+svg.nvd3-svg {height:98% !important}
+.legendAnalysis { float:right;margin:15px 120px 0 0;}
+.circle {
+    display:block;
+	width: 12px;
+	height: 12px;
+	background: rgb(27, 135, 200);
+	-moz-border-radius: 50px;
+	-webkit-border-radius: 50px;
+	border-radius: 50px;
+	float:left;
+	margin:0 2px 0 0;
+}
+
+
 /********************analysis End *****************/
 /********************jquery us css override*****************/
 
