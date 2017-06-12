@@ -1873,24 +1873,16 @@ public class VoltCompiler {
         m_errors.clear();
 
         // do all the work to get the catalog
-        m_catalog = new Catalog();
-        // Initialize the catalog for one cluster
-        m_catalog.execute("add / clusters cluster");
-        m_catalog.getClusters().get("cluster").setSecurityenabled(false);
-
         Catalog catalog = currentCatalog.deepCopy();
-        Database previousDB = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Cluster cluster = catalog.getClusters().get("cluster");
+        Database db = cluster.getDatabases().get("database");
 
         try {
-            final ArrayList<Class<?>> classDependencies = new ArrayList<>();
-            final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
-
-            Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
-            CatalogMap<Procedure> previousProcs = previousDB.getProcedures();
+            CatalogMap<Procedure> procedures = db.getProcedures();
 
             // build a cache of previous SQL stmts
             m_previousCatalogStmts.clear();
-            for (Procedure prevProc : previousProcs) {
+            for (Procedure prevProc : procedures) {
                 for (Statement prevStmt : prevProc.getStatements()) {
                     addStatementToCache(prevStmt);
                 }
@@ -1898,7 +1890,7 @@ public class VoltCompiler {
 
             ClassLoader classLoader = jarOutput.getLoader();
 
-            for (Procedure procedure : previousProcs) {
+            for (Procedure procedure : procedures) {
                 if (!procedure.getHasjava()) {
                     // skip the single statement stored procedures as @UpdateClasses does not affect them
                     continue;
@@ -2042,7 +2034,7 @@ public class VoltCompiler {
                     StatementPartitioning partitioning = procedure.getSinglepartition() ?
                             StatementPartitioning.forceSP() : StatementPartitioning.forceMP();
 
-                    boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(this, hsql, previousDB,
+                    boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(this, hsql, db,
                             m_estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                             detMode, partitioning);
 
@@ -2255,11 +2247,6 @@ public class VoltCompiler {
         } catch (final VoltCompilerException e) {
             throw e;
         }
-
-        Cluster cluster = catalog.getClusters().get("cluster");
-        assert(cluster != null);
-        Database database = cluster.getDatabases().get("database");
-        assert(database != null);
 
         // update table annotation for procedure statement
 
