@@ -739,30 +739,6 @@ public class GenerateEETests extends EEPlanGenerator {
         generateTests("executors", "TestGeneratedString", GSDB);
     }
 
-    public void generatedInlineInsertPlan() throws Exception {
-        Database db = getDatabase();
-
-        final TableConfig T2Config = new TableConfig("T2",
-                                                     db,
-                                                     new Object[][] {
-            { 100, 100, 100 }
-        });
-        final TableConfig answerConfig = new TableConfig("IIANSWER",
-                                                     db,
-                                                     new Object[][] {
-            { 1 }
-        });
-        DBConfig IIDB = new DBConfig(getClass(),
-                                     GenerateEETests.class.getResource(DDL_FILENAME),
-                                     getCatalogString(),
-                                     T2Config,
-                                     answerConfig);
-        IIDB.addTest(new TestConfig("test_inline_insert",
-                                    "INSERT INTO P1 SELECT * FROM T2",
-                                    false,
-                                    answerConfig).setPlanFragment(1));
-        generateTests("executors", "TestInlineInsert", IIDB);
-    }
 
     @Override
     protected void tearDown() throws Exception {
@@ -781,7 +757,6 @@ public class GenerateEETests extends EEPlanGenerator {
             tg.generatedSumPlan();
             tg.generatedRankPlan();
             tg.generatedStringPlan();
-            tg.generatedInlineInsertPlan();
         } catch (Exception e) {
             System.err.printf("Unexpected exception: %s\n", e.getMessage());
             e.printStackTrace();
