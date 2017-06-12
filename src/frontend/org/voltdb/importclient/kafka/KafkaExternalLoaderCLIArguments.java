@@ -155,16 +155,14 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
 
     private void initializeDefaultsFromPropertiesFile() throws Exception {
 
-        if (config.trim().isEmpty()) {
-            timeout = KAFKA_TIMEOUT_DEFAULT;
-            buffersize = KAFKA_BUFFER_SIZE_DEFAULT;
-            return;
-        }
-
         Properties props = new Properties();
         try (FileReader fr = new FileReader(config.trim())) {
             props.load(fr);
         }
+        catch (Exception e) {
+            // Ignore, it's ok
+        }
+
 
         // group.id
         if (groupid == null || groupid.trim().length() == 0) {
