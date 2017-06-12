@@ -23,8 +23,13 @@
 
 package org.voltdb.importer.kafka;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 
 import org.junit.Test;
 import org.voltdb.importclient.kafka.KafkaExternalLoaderCLIArguments;
@@ -55,27 +60,30 @@ public class KafkaLoaderUnitTest {
         List<String> hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"localhost:21212"}), hosts);
 
-        args = new KafkaExternalLoaderCLIArguments();
+        StringWriter sw = new StringWriter();
+        args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
         args.parse("KafaExternalLoader", new String[] { "--servers", "host1:100,host2:200", "--host", "host3,host4", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
         hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"host3:21212", "host4:21212"}), hosts);
+        Assert.assertTrue(sw.toString().startsWith("Warning: --servers argument is deprecated; please use --host instead"));
 
     }
 
     @Test
     public void testHostPortArgsServer() throws Exception {
 
-        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments();
+
+        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments(new PrintWriter(new StringWriter()));
         args.parse("KafaExternalLoader", new String[] { "-s", "host1,host2", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
         List<String> hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"host1:21212", "host2:21212"}), hosts);
 
-        args = new KafkaExternalLoaderCLIArguments();
+        args = new KafkaExternalLoaderCLIArguments(new PrintWriter(new StringWriter()));
         args.parse("KafaExternalLoader", new String[] { "--servers", "host1:100,host2:200", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
         hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"host1:100", "host2:200"}), hosts);
 
-        args = new KafkaExternalLoaderCLIArguments();
+        args = new KafkaExternalLoaderCLIArguments(new PrintWriter(new StringWriter()));
         args.parse("KafaExternalLoader", new String[] { "--servers", "host1,host2:200", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
         hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"host1:21212", "host2:200"}), hosts);
@@ -103,19 +111,66 @@ public class KafkaLoaderUnitTest {
     @Test
     public void testDefaultPort() throws Exception {
 
-        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments();
+        StringWriter sw = new StringWriter();
+        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
         args.parse("KafaExternalLoader", new String[] { "--port", "999", "--host", "host1,host2", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
         List<String> hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"host1:999", "host2:999"}), hosts);
+        Assert.assertTrue(sw.toString().startsWith("Warning: --port argument is deprecated, please use --host with <host:port> URIs instead."));
 
-        args = new KafkaExternalLoaderCLIArguments();
+        sw = new StringWriter();
+        args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
         args.parse("KafaExternalLoader", new String[] { "--port", "999", "--host", "host1:100,host2", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
         hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"host1:100", "host2:999"}), hosts);
+        Assert.assertTrue(sw.toString().startsWith("Warning: --port argument is deprecated, please use --host with <host:port> URIs instead."));
 
-        args = new KafkaExternalLoaderCLIArguments();
+        sw = new StringWriter();
+        args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
         args.parse("KafaExternalLoader", new String[] { "--port", "999", "--servers", "host1", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
         hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"host1:999"}), hosts);
+        Assert.assertTrue(sw.toString().contains("Warning: --port argument is deprecated, please use --host with <host:port> URIs instead."));
+        Assert.assertTrue(sw.toString().startsWith("Warning: --servers argument is deprecated; please use --host instead"));
+
+    }
+
+    @Test
+    public void testDeprecatedConfigFile() throws Exception {
+
+        Properties props = new Properties();
+        props.setProperty("group.id", "myGroup");
+        props.setProperty("ignored", "foo");
+
+        File tempFile = File.createTempFile(this.getClass().getName(), ".properties");
+        tempFile.deleteOnExit();
+        props.store(new FileOutputStream(tempFile), "KafkaLoaderUnitTest.testDeprecatedConfigFile");
+
+        StringWriter sw = new StringWriter();
+        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
+        args.parse("KafaExternalLoader", new String[] { "--config", tempFile.getAbsolutePath(), "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        String groupId = args.getGroupId();
+        Assert.assertEquals("myGroup", groupId);
+        Assert.assertTrue(sw.toString().contains("Warning: --config argument is deprecated, please consult the documentation"));
+        Assert.assertTrue(sw.toString().contains("Warning: Kafka group.id property extracted from properties file, which is deprecated.  Use --groupid argument instead"));
+    }
+
+    @Test
+    public void testDeprecatedConfigFileIgnored() throws Exception {
+
+        Properties props = new Properties();
+        props.setProperty("group.id", "myGroup");
+        props.setProperty("ignored", "foo");
+
+        File tempFile = File.createTempFile(this.getClass().getName(), ".properties");
+        tempFile.deleteOnExit();
+        props.store(new FileOutputStream(tempFile), "KafkaLoaderUnitTest.testDeprecatedConfigFile");
+
+        StringWriter sw = new StringWriter();
+        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
+        args.parse("KafaExternalLoader", new String[] { "--groupid", "groupIdFromArgs", "--config", tempFile.getAbsolutePath(), "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        String groupId = args.getGroupId();
+        Assert.assertEquals("groupIdFromArgs", groupId);
+        Assert.assertTrue(sw.toString().startsWith("Warning: --config argument is deprecated, please consult the documentation"));
     }
 }

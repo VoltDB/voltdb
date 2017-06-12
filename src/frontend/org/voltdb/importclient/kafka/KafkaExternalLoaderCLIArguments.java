@@ -1,5 +1,24 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.voltdb.importclient.kafka;
 
+import java.io.FileReader;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -81,12 +100,22 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     @Option(desc = "Kafka time-based commit policy interval in milliseconds.  Default is to use manual offset commit.")
     public String commitPolicy = "";
 
+    private PrintWriter warningWriter = null;
+
+    public KafkaExternalLoaderCLIArguments(PrintWriter pw) {
+        this.warningWriter = pw;
+    }
+
+    public KafkaExternalLoaderCLIArguments() {
+        this.warningWriter = new PrintWriter(System.err, true); // Auto-flush
+    }
+
     public List<String> getVoltHosts() throws Exception {
 
         ArrayList<String> hostPorts = new ArrayList<String>();
         int defaultVoltPort = port.trim().isEmpty() ? Client.VOLTDB_SERVER_PORT : Integer.parseInt(port.trim());
 
-        // Create the Volt client. If nothing is specified, default to localhost. Otherwise, the 'host' argument takes
+        // Normalize the host:port URIs for Volt. If nothing is specified, default to localhost. Otherwise, the 'host' argument takes
         // precedence over the deprecated (as of 7.5) 'server' argument
         String hostPortArg = "localhost" + ":" + defaultVoltPort;
         if (!host.trim().isEmpty()) {
@@ -105,6 +134,32 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         }
 
         return hostPorts;
+    }
+
+    public String getGroupId() throws Exception {
+        String groupId;
+        if (groupid == null || groupid.trim().length() == 0) {
+            // Look into the (deprecated) config file, if present, and try to get it from there. This will help with
+            // compatibility.
+            if (!config.trim().isEmpty()) {
+                try (FileReader fr = new FileReader(config.trim())) {
+                    Properties props = new Properties();
+                    props.load(fr);
+                    groupid = props.getProperty("group.id", "");
+                    if (!groupid.isEmpty()) {
+                        warningWriter.println("Warning: Kafka group.id property extracted from properties file, which is deprecated.  Use --groupid argument instead.");
+                    }
+                }
+            }
+        }
+
+        if (groupid == null || groupid.trim().length() == 0) {
+            groupId = "voltdb-" + (useSuppliedProcedure ? procedure : table);
+        }
+        else {
+            groupId = groupid.trim();
+        }
+        return groupId;
     }
 
     @Override
@@ -142,8 +197,13 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
             commitPolicy = KafkaImporterCommitPolicy.NONE.name();
         }
         if (!servers.trim().isEmpty()) {
-            System.err.println("Warning: --servers argument is deprecated; please use --host instead.");
+            warningWriter.println("Warning: --servers argument is deprecated; please use --host instead.");
         }
-
+        if (!config.trim().isEmpty()) {
+            warningWriter.println("Warning: --config argument is deprecated, please consult the documentation.");
+        }
+        if (!port.trim().isEmpty()) {
+            warningWriter.println("Warning: --port argument is deprecated, please use --host with <host:port> URIs instead.");
+        }
     }
 }

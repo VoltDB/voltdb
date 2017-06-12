@@ -304,13 +304,7 @@ public class KafkaExternalLoader implements ImporterSupport {
         String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokerListString);
 
         // GroupId can be specified by the command line, or derived from the table/procedure:
-        String groupId;
-        if (properties.groupid == null || properties.groupid.trim().length() == 0) {
-            groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
-        }
-        else {
-            groupId = properties.groupid.trim();
-        }
+        String groupId = properties.getGroupId();
 
         // Create the input formatter:
         FormatterBuilder fb = createFormatterBuilder(properties);
