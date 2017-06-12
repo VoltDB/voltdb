@@ -429,11 +429,12 @@ public class KafkaLoader {
             try {
                 client.createConnection(server.trim(), port);
             } catch (IOException e) {
-             // Only swallow exceptions caused by Java network or connection problem
-             // Unresolved hostname exceptions will be thrown
+                // Only swallow exceptions caused by Java network or connection problem
+                // Unresolved hostname exceptions will be thrown
             }
         }
         if (client.getConnectedHostList().isEmpty()) {
+            client.close();
             throw new Exception("Unable to connect to any servers");
         }
         return client;
