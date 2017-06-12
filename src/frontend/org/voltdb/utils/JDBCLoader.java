@@ -473,6 +473,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             }
         }
         if (client.getConnectedHostList().isEmpty()) {
+            client.close();
             throw new Exception("Unable to connect to any servers.");
         }
         return client;
