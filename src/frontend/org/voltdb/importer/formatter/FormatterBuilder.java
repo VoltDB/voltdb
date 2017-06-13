@@ -17,6 +17,7 @@
 
 package org.voltdb.importer.formatter;
 
+import java.util.Objects;
 import java.util.Properties;
 
 /**
@@ -28,7 +29,7 @@ public class FormatterBuilder<T> {
 
     private final String m_formatterName;
     private final Properties m_formatterProps;
-    private AbstractFormatterFactory  m_formatterFcatory;
+    private AbstractFormatterFactory m_formatterFactory;
 
     /**
      * Constructor
@@ -44,11 +45,11 @@ public class FormatterBuilder<T> {
      * @return formatter instance created by its factory
      */
     public Formatter create(){
-        return m_formatterFcatory.create(m_formatterName, m_formatterProps);
+        return m_formatterFactory.create(m_formatterName, m_formatterProps);
     }
 
-    public void setFormatterFactory(AbstractFormatterFactory  formatterFcatory){
-        m_formatterFcatory = formatterFcatory;
+    public void setFormatterFactory(AbstractFormatterFactory formatterFactory){
+        m_formatterFactory = formatterFactory;
     }
 
     public String getFormatterName(){
@@ -58,5 +59,24 @@ public class FormatterBuilder<T> {
     public Properties getFormatterProperties()
     {
         return m_formatterProps;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_formatterName, m_formatterProps, m_formatterFactory);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) {
+            return true;
+        }
+        if (!(o instanceof FormatterBuilder)) {
+            return false;
+        }
+        FormatterBuilder<?> other = (FormatterBuilder<?>) o;
+        return ((m_formatterName == null && other.m_formatterName == null) || m_formatterName.equalsIgnoreCase(other.m_formatterName))
+            && ((m_formatterProps == null && other.m_formatterProps == null) || m_formatterProps.equals(other.m_formatterProps))
+            && ((m_formatterFactory == null && other.m_formatterFactory == null) || m_formatterFactory.equals(other.m_formatterFactory));
     }
 }

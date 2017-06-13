@@ -24,6 +24,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -427,14 +428,19 @@ public class VoltCompiler {
             final File classesJarPath,
             final File catalogOutputPath)
     {
-        if (schemaPath == null || !schemaPath.exists()) {
+        if (schemaPath != null && !schemaPath.exists()) {
             compilerLog.error("Cannot compile nonexistent or missing schema.");
             return false;
         }
 
         List<VoltCompilerReader> ddlReaderList;
         try {
-            ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+            if (schemaPath == null) {
+                ddlReaderList = new ArrayList<>(1);
+                ddlReaderList.add(new VoltCompilerStringReader("ddl.sql", m_emptyDDLComment));
+            } else {
+                ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+            }
         }
         catch (VoltCompilerException e) {
             compilerLog.error("Unable to open schema file \"" + schemaPath + "\"", e);
@@ -1856,7 +1862,9 @@ public class VoltCompiler {
             String path = entry.getKey();
             // SOMEDAY: It would be better to have a manifest that explicitly lists
             // ddl files instead of using a brute force *.sql glob.
-            if (path.toLowerCase().endsWith(".sql")) {
+            // Ignore non-root level sql
+            boolean isRootFile = Paths.get(path).getNameCount() == 1;
+            if (isRootFile && path.toLowerCase().endsWith(".sql")) {
                 ddlReaderList.add(new VoltCompilerJarFileReader(jarfile, path));
                 compilerLog.trace("Added SQL file from jarfile to compilation: " + path);
             }
