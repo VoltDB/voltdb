@@ -362,6 +362,11 @@ public class InitiatorMailbox implements Mailbox
 
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
         int hostId = Integer.parseInt(params[2].toString());
+
+        if (!(VoltDB.instance().getHostMessenger().getLiveHostIds().contains(hostId))){
+            tmLog.warn(String.format("@BalanceSPI host %d is not in the cluster.", hostId));
+            return;
+        }
         Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, pid);
         if (newLeaderHSId == null || newLeaderHSId == m_hsId) {
             tmLog.warn(String.format("@BalanceSPI the partition leader is already on the host %d or the host id is invalid.", hostId));

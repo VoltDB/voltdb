@@ -953,19 +953,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
                 safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), newSpHandle), counter);
             }
-        }
-        else {
+        } else {
             logRepair(msg);
             newSpHandle = msg.getSpHandle();
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[handleFragmentTaskMessage] Site:" + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " is leader:" + m_isLeader + "\n" + msg);
+            try {
+                setMaxSeenTxnId(newSpHandle);
+            } catch (IllegalArgumentException e){
+                tmLog.error("INVALID SEQUENCE[handleFragmentTaskMessage] site:" +
+                        CoreUtils.hsIdToString(m_mailbox.getHSId()) + " is leader:" + m_isLeader + "\n" + msg);
+                throw e;
             }
-
-            //debug
-            if (TxnEgo.getSequence(msg.getSpHandle())< TxnEgo.SEQUENCE_ZERO) {
-                System.out.println("INVALID SEQUENCE[handleFragmentTaskMessage]:" + msg + "\nisLeader:" + m_isLeader);
-            }
-            setMaxSeenTxnId(newSpHandle);
         }
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
         doLocalFragmentOffer(msg);
