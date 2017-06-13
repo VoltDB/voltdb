@@ -73,6 +73,7 @@ import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -133,8 +134,10 @@ class Distributer {
         }
     }
 
-    private final Map<Integer, NodeConnection> m_partitionMasters = new HashMap<>();
-    private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>();
+    private final AtomicReference<ImmutableMap<Integer, NodeConnection>> m_partitionMasters =
+            new AtomicReference<ImmutableMap<Integer, NodeConnection>>();
+    private final AtomicReference<ImmutableMap<Integer, HashSet<NodeConnection>>> m_partitionReplicas =
+            new AtomicReference<ImmutableMap<Integer, HashSet<NodeConnection>>>();
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
     private final AtomicReference<ImmutableSortedMap<String, Procedure>> m_procedureInfo =
                                 new AtomicReference<ImmutableSortedMap<String, Procedure>>();
@@ -743,7 +746,18 @@ class Distributer {
                 /*
                  * Repair all cluster topology data with the node connection removed
                  */
-                Iterator<Map.Entry<Integer, NodeConnection>> i = m_partitionMasters.entrySet().iterator();
+                final ImmutableMap<Integer, NodeConnection> masterConnectionMap = m_partitionMasters.get();
+                if (masterConnectionMap != null) {
+                    Map<Integer, NodeConnection> masterConns = Maps.newHashMap();
+                    for ( Map.Entry<Integer, NodeConnection> entry : masterConnectionMap.entrySet()) {
+                        if (entry.getValue() != this) {
+                            masterConns.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    m_partitionMasters.compareAndSet(masterConnectionMap, ImmutableMap.copyOf(masterConns));
+                }
+
+                Iterator<Map.Entry<Integer, NodeConnection>> i = m_hostIdToConnection.entrySet().iterator();
                 while (i.hasNext()) {
                     Map.Entry<Integer, NodeConnection> entry = i.next();
                     if (entry.getValue() == this) {
@@ -751,38 +765,24 @@ class Distributer {
                     }
                 }
 
-                i = m_hostIdToConnection.entrySet().iterator();
-                while (i.hasNext()) {
-                    Map.Entry<Integer, NodeConnection> entry = i.next();
-                    if (entry.getValue() == this) {
-                        i.remove();
-                    }
-                }
-
-                Iterator<Map.Entry<Integer, NodeConnection[]>> i2 = m_partitionReplicas.entrySet().iterator();
-                List<Pair<Integer, NodeConnection[]>> entriesToRewrite = new ArrayList<>();
-                while (i2.hasNext()) {
-                    Map.Entry<Integer, NodeConnection[]> entry = i2.next();
-                    for (NodeConnection nc : entry.getValue()) {
-                        if (nc == this) {
-                            entriesToRewrite.add(Pair.of(entry.getKey(), entry.getValue()));
+                final ImmutableMap<Integer, HashSet<NodeConnection>> replicaConnectionMap = m_partitionReplicas.get();
+                if (replicaConnectionMap != null ) {
+                    Map<Integer, HashSet<NodeConnection>> replicaConns = Maps.newHashMap();
+                    if (replicaConnectionMap != null) {
+                        for (Map.Entry<Integer, HashSet<NodeConnection>> entry : replicaConnectionMap.entrySet()) {
+                            for (NodeConnection nc : entry.getValue()) {
+                                if (nc != this) {
+                                    HashSet<NodeConnection> nodes = replicaConns.get(entry.getKey());
+                                    if (nodes == null) {
+                                        nodes = Sets.newHashSet();
+                                        replicaConns.put(entry.getKey(), nodes);
+                                    }
+                                    nodes.add(nc);
+                                }
+                            }
                         }
                     }
-                }
-
-                for (Pair<Integer, NodeConnection[]> entry : entriesToRewrite) {
-                    m_partitionReplicas.remove(entry.getFirst());
-                    NodeConnection survivors[] = new NodeConnection[entry.getSecond().length - 1];
-                    if (survivors.length == 0) {
-                        break;
-                    }
-                    int zz = 0;
-                    for (int ii = 0; ii < entry.getSecond().length; ii++) {
-                        if (entry.getSecond()[ii] != this) {
-                            survivors[zz++] = entry.getSecond()[ii];
-                        }
-                    }
-                    m_partitionReplicas.put(entry.getFirst(), survivors);
+                    m_partitionReplicas.compareAndSet(replicaConnectionMap, ImmutableMap.copyOf(replicaConnectionMap));
                 }
 
                 m_connections.remove(this);
@@ -1174,29 +1174,36 @@ class Distributer {
                      * This is probably slower for SAFE consistency.
                      */
                     if (!procedureInfo.multiPart && procedureInfo.readOnly && m_sendReadsToReplicasBytDefaultIfCAEnabled) {
-                        NodeConnection partitionReplicas[] = m_partitionReplicas.get(hashedPartition);
-                        if (partitionReplicas != null && partitionReplicas.length > 0) {
-                            cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
-                            if (cxn.hadBackPressure()) {
-                                //See if there is one without backpressure, make sure it's still connected
-                                for (NodeConnection nc : partitionReplicas) {
-                                    if (!nc.hadBackPressure() && nc.m_isConnected) {
-                                        cxn = nc;
-                                        break;
+                        final ImmutableMap<Integer, HashSet<NodeConnection>> replicaConnectionMap = m_partitionReplicas.get();
+                        if (replicaConnectionMap != null) {
+                            HashSet<NodeConnection> connSet = replicaConnectionMap.get(hashedPartition);
+                            if (connSet != null && !connSet.isEmpty()) {
+                                NodeConnection partitionReplicas[] = connSet.toArray(new NodeConnection[0]);
+                                cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
+                                if (cxn.hadBackPressure()) {
+                                    //See if there is one without backpressure, make sure it's still connected
+                                    for (NodeConnection nc : partitionReplicas) {
+                                        if (!nc.hadBackPressure() && nc.m_isConnected) {
+                                            cxn = nc;
+                                            break;
+                                        }
                                     }
                                 }
-                            }
-                            if (!cxn.hadBackPressure() || ignoreBackpressure) {
-                                backpressure = false;
+                                if (!cxn.hadBackPressure() || ignoreBackpressure) {
+                                    backpressure = false;
+                                }
                             }
                         }
                     } else {
                         /*
                          * For writes or SAFE reads, this is the best way to go
                          */
-                        cxn = m_partitionMasters.get(hashedPartition);
-                        if (cxn != null && !cxn.hadBackPressure() || ignoreBackpressure) {
-                            backpressure = false;
+                        final ImmutableMap<Integer, NodeConnection> masterConnectionMap = m_partitionMasters.get();
+                        if (masterConnectionMap != null) {
+                            cxn = masterConnectionMap.get(hashedPartition);
+                            if (cxn != null && !cxn.hadBackPressure() || ignoreBackpressure) {
+                                backpressure = false;
+                            }
                         }
                     }
                 }
@@ -1436,11 +1443,12 @@ class Distributer {
                     tables[1].getVarbinary("HASHCONFIG"),
                     cooked);
         }
-        m_partitionMasters.clear();
-        m_partitionReplicas.clear();
         // The MPI's partition ID is 16383 (MpInitiator.MP_INIT_PID), so we shouldn't inadvertently
         // hash to it.  Go ahead and include it in the maps, we can use it at some point to
         // route MP transactions directly to the MPI node.
+        Map<Integer, HashSet<NodeConnection>> replicaConnectionMap = Maps.newHashMap();
+        Map<Integer, NodeConnection> masterConnectionMap = Maps.newHashMap();
+
         Set<Integer> unconnected = new HashSet<Integer>();
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
@@ -1455,13 +1463,16 @@ class Distributer {
                     unconnected.add(hostId);
                }
             }
-            m_partitionReplicas.put(partition, connections.toArray(new NodeConnection[0]));
-
+            replicaConnectionMap.put(partition, new HashSet<NodeConnection>(connections));
             Integer leaderHostId = Integer.valueOf(vt.getString("Leader").split(":")[0]);
             if (m_hostIdToConnection.containsKey(leaderHostId)) {
-                m_partitionMasters.put(partition, m_hostIdToConnection.get(leaderHostId));
+                masterConnectionMap.put(partition, m_hostIdToConnection.get(leaderHostId));
             }
         }
+
+        m_partitionMasters.set(ImmutableMap.copyOf(masterConnectionMap));
+        m_partitionReplicas.set(ImmutableMap.copyOf(replicaConnectionMap));
+
         if (m_topologyChangeAware) {
             m_unconnectedHosts.set(ImmutableSet.copyOf(unconnected));
         }
