@@ -116,8 +116,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) );
         */
 
-        //client.callProcedure("@AdHoc", "CREATE TABLE T (a integer);");
-        //client.callProcedure("@AdHoc", "INSERT INTO P1 values(1);");
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
 
         VoltTable rA;
@@ -186,6 +184,44 @@ public class TestFunctionsSuite extends RegressionSuite {
         r = cr.getResults()[0];
         r.advanceRow();
         assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= -Double.MIN_VALUE );
+
+        //VoltTable results = client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+        //results = client.callProcedure("@AdHoc", "SELECT * FROM NUMBER_TYPES").getResults()[0];
+        //System.out.println(results);
+        /*
+         * //Another table that has all numeric types, for testing numeric column functions.
+                "CREATE TABLE NUMBER_TYPES ( " +
+                "INTEGERNUM INTEGER DEFAULT 0 NOT NULL, " +
+                "TINYNUM TINYINT, " +
+                "SMALLNUM SMALLINT, " +
+                "BIGNUM BIGINT, " +
+                "FLOATNUM FLOAT, " +
+                "DECIMALNUM DECIMAL, " +
+                "PRIMARY KEY (INTEGERNUM) );"
+         */
+        client.callProcedure("@AdHoc", "INSERT INTO NUMBER_TYPES VALUES (1, 2, 3, 4, 1.523, 2.53E09)");
+
+        cr = client.callProcedure("@AdHoc", "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        rA = cr.getResults()[0];
+        System.out.println(rA);
+        assertEquals(1, rA.getRowCount());
+
+        cr = client.callProcedure("@AdHoc", "select 0-integernum, 0-tinynum, 0-smallnum, 0-bignum, 0-floatnum, 0-decimalnum from NUMBER_TYPES");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        rB = cr.getResults()[0];
+        System.out.println(rB);
+        assertEquals(1, rB.getRowCount());
+
+        rA.advanceRow();
+        rB.advanceRow();
+        // check if unary minus equals 0-value
+        assertEquals(rA.get("C1", VoltType.INTEGER), rB.get("C1", VoltType.INTEGER));
+        assertEquals(rA.get("C2", VoltType.TINYINT), rB.get("C2", VoltType.TINYINT));
+        assertEquals(rA.get("C3", VoltType.SMALLINT), rB.get("C3", VoltType.SMALLINT));
+        assertEquals(rA.get("C4", VoltType.BIGINT), rB.get("C4", VoltType.BIGINT));
+        assertEquals(rA.get("C5", VoltType.FLOAT), rB.get("C5", VoltType.FLOAT));
+        assertEquals(rA.get("C6", VoltType.DECIMAL), rB.get("C6", VoltType.DECIMAL));
 
     }
 
