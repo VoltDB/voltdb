@@ -98,7 +98,6 @@ public class TestFunctionsSuite extends RegressionSuite {
     public void testUnaryMinus() throws Exception {
         System.out.println("STARTING testUnaryMinus");
         Client client = getClient();
-        //initialLoad(client, "P1");
 
         ClientResponse cr = null;
         /*
@@ -122,49 +121,29 @@ public class TestFunctionsSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
         //client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
 
-        VoltTable r;
-        long resultA;
-        long resultB;
+        VoltTable rA;
+        VoltTable rB;
 
-        cr = client.callProcedure("@AdHoc", "SELECT -id from P1;");
+        cr = client.callProcedure("@AdHoc", "SELECT -id, -num, -ratio from P1;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.out.println(r);
-        assertEquals(1, r.getRowCount());
-        resultA = r.asScalarLong();
+        rA = cr.getResults()[0];
+        System.out.println(rA);
+        assertEquals(1, rA.getRowCount());
 
-        cr = client.callProcedure("@AdHoc", "SELECT 0-id from P1;");
+        cr = client.callProcedure("@AdHoc", "SELECT 0-id, 0-num, 0-ratio from P1;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.out.println(r);
-        assertEquals(1, r.getRowCount());
-        resultB = r.asScalarLong();
+        rB = cr.getResults()[0];
+        System.out.println(rB);
+        assertEquals(1, rB.getRowCount());
 
-        assertEquals(resultA, resultB);
-
-
-        cr = client.callProcedure("@AdHoc", "SELECT -num from P1;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.out.println(r);
-        assertEquals(1, r.getRowCount());
-        resultA = r.asScalarLong();
-
-        cr = client.callProcedure("@AdHoc", "SELECT 0-num from P1;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.out.println(r);
-        assertEquals(1, r.getRowCount());
-        resultB = r.asScalarLong();
-
-        assertEquals(resultA, resultB);
-
-
-        cr = client.callProcedure("@AdHoc", "SELECT * from P1;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        r.advanceRow();
-        assertEquals(405636, r.get("NUM", VoltType.INTEGER));
+        rA.advanceRow();
+        rB.advanceRow();
+        // check if unary minus equals 0-value
+        // EDGE CASE -0 integer
+        assertEquals(rA.get("C1", VoltType.INTEGER), rB.get("C1", VoltType.INTEGER));
+        // unary minus for integer and float
+        assertEquals(rA.get("C2", VoltType.INTEGER), rB.get("C2", VoltType.INTEGER));
+        assertEquals(rA.get("C3", VoltType.FLOAT), rB.get("C3", VoltType.FLOAT));
 //
 //        // Filters intended to be close enough to bring two different indexes to the same result as no index at all.
 //        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7 order by NUM, ID");
