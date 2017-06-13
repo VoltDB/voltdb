@@ -134,10 +134,14 @@ class Distributer {
         }
     }
 
+    //partition to master connection
     private final AtomicReference<ImmutableMap<Integer, NodeConnection>> m_partitionMasters =
             new AtomicReference<ImmutableMap<Integer, NodeConnection>>();
+
+    //partition to replica connection
     private final AtomicReference<ImmutableMap<Integer, HashSet<NodeConnection>>> m_partitionReplicas =
             new AtomicReference<ImmutableMap<Integer, HashSet<NodeConnection>>>();
+
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
     private final AtomicReference<ImmutableSortedMap<String, Procedure>> m_procedureInfo =
                                 new AtomicReference<ImmutableSortedMap<String, Procedure>>();
@@ -1448,7 +1452,6 @@ class Distributer {
         // route MP transactions directly to the MPI node.
         Map<Integer, HashSet<NodeConnection>> replicaConnectionMap = Maps.newHashMap();
         Map<Integer, NodeConnection> masterConnectionMap = Maps.newHashMap();
-
         Set<Integer> unconnected = new HashSet<Integer>();
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
@@ -1461,7 +1464,7 @@ class Distributer {
                     connections.add(m_hostIdToConnection.get(hostId));
                 } else {
                     unconnected.add(hostId);
-               }
+                }
             }
             replicaConnectionMap.put(partition, new HashSet<NodeConnection>(connections));
             Integer leaderHostId = Integer.valueOf(vt.getString("Leader").split(":")[0]);
