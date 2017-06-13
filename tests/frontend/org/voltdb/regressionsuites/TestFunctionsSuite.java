@@ -118,33 +118,21 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
 
-        VoltTable rA;
-        VoltTable rB;
-
-        cr = client.callProcedure("@AdHoc", "SELECT -id, -num, -ratio from P1;");
+        VoltTable r;
+        cr = client.callProcedure("@AdHoc", "SELECT -id from P1;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        rA = cr.getResults()[0];
-        assertEquals(1, rA.getRowCount());
+        r = cr.getResults()[0];
+        assertEquals(1, r.getRowCount());
 
-        cr = client.callProcedure("@AdHoc", "SELECT 0-id, 0-num, 0-ratio from P1;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        rB = cr.getResults()[0];
-        assertEquals(1, rB.getRowCount());
-
-        rA.advanceRow();
-        rB.advanceRow();
+        r.advanceRow();
         // check if unary minus equals 0-value
         // EDGE CASE -0 integer
-        assertEquals(rA.get("C1", VoltType.INTEGER), rB.get("C1", VoltType.INTEGER));
-        // unary minus for integer and float
-        assertEquals(rA.get("C2", VoltType.INTEGER), rB.get("C2", VoltType.INTEGER));
-        assertEquals(rA.get("C3", VoltType.FLOAT), rB.get("C3", VoltType.FLOAT));
+        assertEquals( 0, r.get("C1", VoltType.INTEGER));
 
         // invalid data type for unary minus
         verifyStmtFails(client, "select -desc from P1", "incompatible data type in operation");
 
         // check -(-var) = var
-        VoltTable r;
         cr = client.callProcedure("@AdHoc", "select num, -(-num) from P1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
@@ -183,9 +171,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         r.advanceRow();
         assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= -Double.MIN_VALUE );
 
-        //VoltTable results = client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
-        //results = client.callProcedure("@AdHoc", "SELECT * FROM NUMBER_TYPES").getResults()[0];
-        //System.out.println(results);
         /*
          * //Another table that has all numeric types, for testing numeric column functions.
                 "CREATE TABLE NUMBER_TYPES ( " +
@@ -199,6 +184,8 @@ public class TestFunctionsSuite extends RegressionSuite {
          */
         client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, 1.523, 2.53E09);
 
+        VoltTable rA;
+        VoltTable rB;
         cr = client.callProcedure("@AdHoc", "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         rA = cr.getResults()[0];
@@ -212,33 +199,36 @@ public class TestFunctionsSuite extends RegressionSuite {
         rA.advanceRow();
         rB.advanceRow();
         // check if unary minus equals 0-value
-        assertEquals( rA.get( "C1", VoltType.INTEGER), rB.get( "C1", VoltType.INTEGER));
-        assertEquals( rA.get( "C2", VoltType.TINYINT), rB.get( "C2", VoltType.TINYINT));
-        assertEquals( rA.get( "C3", VoltType.SMALLINT), rB.get( "C3", VoltType.SMALLINT));
-        assertEquals( rA.get( "C4", VoltType.BIGINT), rB.get( "C4", VoltType.BIGINT));
-        assertEquals( rA.get( "C5", VoltType.FLOAT), rB.get( "C5", VoltType.FLOAT));
-        assertEquals( rA.get( "C6", VoltType.DECIMAL), rB.get( "C6", VoltType.DECIMAL));
+        assertEquals( rA.get( "C1", VoltType.INTEGER), rB.get( "C1", VoltType.INTEGER ));
+        assertEquals( rA.get( "C2", VoltType.TINYINT), rB.get( "C2", VoltType.TINYINT ));
+        assertEquals( rA.get( "C3", VoltType.SMALLINT), rB.get( "C3", VoltType.SMALLINT ));
+        assertEquals( rA.get( "C4", VoltType.BIGINT), rB.get( "C4", VoltType.BIGINT ));
+        assertEquals( rA.get( "C5", VoltType.FLOAT), rB.get( "C5", VoltType.FLOAT ));
+        assertEquals( rA.get( "C6", VoltType.DECIMAL), rB.get( "C6", VoltType.DECIMAL ));
 
-        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM=1");
+        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM = 1");
         client.callProcedure("NUMBER_TYPES.insert", Integer.MAX_VALUE, Byte.MAX_VALUE, Short.MAX_VALUE,
                 Long.MAX_VALUE, 0, 0);
 
-//        cr = client.callProcedure("@AdHoc", "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES");
+        String sql = "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES;";
+        validateTableOfLongs(client, sql, new long[][]{{ -Integer.MAX_VALUE, -Byte.MAX_VALUE,
+            -Short.MAX_VALUE, -Long.MAX_VALUE, 0, 0 }});
+
+//        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM = " + Integer.MAX_VALUE);
+//        client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, Double.MIN_VALUE, -9999999999999999999999.999999999999);
 //        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        VoltTable[] rs = client.callProcedure("@AdHoc", "SELECT * FROM NUMBER_TYPES").getResults();
+//        System.out.println(rs[0]);
+//
 //        r = cr.getResults()[0];
 //        System.out.println(r);
 //        assertEquals(1, r.getRowCount());
 //
 //        r.advanceRow();
-//        assertEquals( -Integer.MAX_VALUE , r.get("C1" , VoltType.INTEGER ));
-//        assertEquals( -Byte.MAX_VALUE , r.get("C2" , VoltType.TINYINT ));
-//        assertEquals( -Short.MAX_VALUE  , r.get("C3" , VoltType.SMALLINT ));
-//        assertEquals( -Long.MAX_VALUE , r.get("C4" , VoltType.BIGINT ));
-//        assertEquals( -Double.MAX_VALUE , r.get("C5" , VoltType.FLOAT ));
-        //assertEquals(-99999999999999999999999.999999999999, r.get("C6", VoltType.DECIMAL));
-        String sql = "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES;";
-        validateTableOfLongs(client, sql, new long[][]{{ -Integer.MAX_VALUE, -Byte.MAX_VALUE,
-            -Short.MAX_VALUE, -Long.MAX_VALUE, 0, 0 }});
+//
+//        assertEquals( 9999999999999999999.999999999999, r.get("C6", VoltType.DECIMAL));
+//        assertEquals( -Double.MIN_VALUE , r.get("C5" , VoltType.FLOAT ));
+
     }
 
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
