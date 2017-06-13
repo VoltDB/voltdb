@@ -126,6 +126,9 @@ public class VoltZK {
     // Shutdown save snapshot guard
     public static final String shutdown_save_guard = "/db/shutdown_save_guard";
 
+    // Host ids that be stopped by calling @StopNode
+    public static final String host_ids_be_stopped = "/db/host_ids_be_stopped";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
@@ -143,7 +146,8 @@ public class VoltZK {
             settings_base,
             cluster_settings,
             catalogUpdateBlockers,
-            request_truncation_snapshot
+            request_truncation_snapshot,
+            host_ids_be_stopped
     };
 
     /**

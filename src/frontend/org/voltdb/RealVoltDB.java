@@ -1618,7 +1618,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void hostsFailed(Set<Integer> failedHosts)
+    public void hostsFailed(Set<Integer> previousHosts, Set<Integer> failedHosts)
     {
         final ScheduledExecutorService es = getSES(true);
         if (es != null && !es.isShutdown()) {
@@ -1626,6 +1626,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 @Override
                 public void run()
                 {
+                    // Decide if the failures given could put the cluster in a split-brain
+                    // Then decide if we should shut down to ensure that at a MAXIMUM, only
+                    // one viable cluster is running.
+                    // This feature is called "Partition Detection" in the docs.
+                    m_messenger.detectNetworkPartitions(previousHosts, failedHosts);
+
                     // First check to make sure that the cluster still is viable before
                     // before allowing the fault log to be updated by the notifications
                     // generated below.

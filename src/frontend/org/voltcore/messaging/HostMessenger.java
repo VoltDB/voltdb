@@ -71,6 +71,7 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
+import org.voltdb.VoltZK;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -106,9 +107,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public interface HostWatcher {
         /**
          * Called when host failures are detected.
+         * @param previousHosts  List of hosts alive before failures.
          * @param failedHosts    List of failed hosts, including hosts currently unknown to this host.
          */
-        void hostsFailed(Set<Integer> failedHosts);
+        void hostsFailed(Set<Integer> preivousHosts, Set<Integer> failedHosts);
     }
 
     /**
@@ -472,7 +474,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return false; // partition detection not triggered
     }
 
-    private void doPartitionDetectionActivities(Set<Integer> failedHostIds)
+    public void detectNetworkPartitions(Set<Integer> previousHosts, Set<Integer> failedHostIds) {
+        Set<Integer> unexpectedFailHostIds = ignoreIntendedShutdown(failedHostIds);
+        // Don't trigger partition detection work if the node is killed by @StopNode
+        doPartitionDetectionActivities(previousHosts, unexpectedFailHostIds);
+    }
+
+    private void doPartitionDetectionActivities(Set<Integer> previousHosts, Set<Integer> failedHostIds)
     {
         if (m_shuttingDown) {
             return;
@@ -481,8 +489,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         // We should never re-enter here once we've decided we're partitioned and doomed
         Preconditions.checkState(!m_partitionDetected, "Partition detection triggered twice.");
 
-        // figure out previous and current cluster memberships
-        Set<Integer> previousHosts = getLiveHostIds();
+        // figure out current cluster memberships
         Set<Integer> currentHosts = new HashSet<>(previousHosts);
         currentHosts.removeAll(failedHostIds);
 
@@ -496,7 +503,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             // record here so we can ensure this only happens once for this node
             m_partitionDetected = true;
             org.voltdb.VoltDB.crashLocalVoltDB("Partition detection logic will stop this process to ensure against split brains.",
-                        false, null);
+                    false, null);
         }
     }
 
@@ -504,12 +511,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         @Override
         public void disconnect(Set<Integer> failedHostIds) {
             synchronized(HostMessenger.this) {
-
-                // Decide if the failures given could put the cluster in a split-brain
-                // Then decide if we should shut down to ensure that at a MAXIMUM, only
-                // one viable cluster is running.
-                // This feature is called "Partition Detection" in the docs.
-                doPartitionDetectionActivities(failedHostIds);
+                final Set<Integer> previousHosts = getLiveHostIds();
                 addFailedHosts(failedHostIds);
 
                 for (int hostId: failedHostIds) {
@@ -524,7 +526,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 // notifying any watchers who are interested in failure -- used
                 // initially to do ZK cleanup when rejoining nodes die
                 if (m_hostWatcher != null) {
-                    m_hostWatcher.hostsFailed(failedHostIds);
+                    m_hostWatcher.hostsFailed(previousHosts, failedHostIds);
                 }
             }
         }
@@ -1723,6 +1725,26 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
         }
         m_hasAllSecondaryConnectionCreated = true;
+    }
+
+    private Set<Integer> ignoreIntendedShutdown(Set<Integer> failedHostIds) {
+        try {
+            List<String> children = m_zk.getChildren(VoltZK.host_ids_be_stopped, false);
+            Set<Integer> waivedHostIds = new HashSet<Integer>();
+            for (String child : children) {
+                int hostId = Integer.parseInt(child);
+                waivedHostIds.add(hostId);
+            }
+            Set<Integer> hostIds = new HashSet<Integer>(failedHostIds);
+            hostIds.removeAll(waivedHostIds);
+            return hostIds;
+        } catch (KeeperException e) {
+            m_hostLog.warn("Failed to filter out the nodes that be shutdown on purpose from failed nodes.");
+            return failedHostIds;
+        } catch (InterruptedException e) {
+            m_hostLog.warn("The ZK read has been interrupted. Failed to filter out the nodes that be shutdown on purpose from failed nodes.");
+            return failedHostIds;
+        }
     }
 
 }

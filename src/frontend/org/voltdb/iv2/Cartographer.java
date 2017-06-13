@@ -533,9 +533,8 @@ public class Cartographer extends StatsSource
             return m_es.submit(new Callable<Boolean>() {
                 @Override
                 public Boolean call() throws Exception {
-                    if (m_configuredReplicationFactor == 0
-                            || (m_configuredReplicationFactor == 1 && liveHids.size() == 2 && m_partitionDetectionEnabled)) {
-                        //Dont die in k=0 cluster or 2node k1 (with partition detection on)
+                    if (m_configuredReplicationFactor == 0) {
+                        //Dont die in k=0 cluster
                         return false;
                     }
                     // check if any node still in rejoin status

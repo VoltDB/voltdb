@@ -26,9 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
-
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -37,6 +34,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.Test;
 
 public class TestStopNode extends RegressionSuite
 {
@@ -73,6 +72,12 @@ public class TestStopNode extends RegressionSuite
             assertEquals(m_status, clientResponse.getStatus());
         }
 
+    }
+
+    public void waitForHostToBeGone(int[] hids) {
+        for (int hsId : hids) {
+            waitForHostToBeGone(hsId);
+        }
     }
 
     public void waitForHostToBeGone(int hid) {
@@ -161,6 +166,49 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    public void testStopThreeNodesSimultaneously() throws Exception {
+        if (kfactor < 1) return;
+
+        Client client = ClientFactory.createClient();
+
+        client.createConnection("localhost", m_config.port(0));
+
+        try {
+            CountDownLatch cdl = new CountDownLatch(1);
+            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 4), "@StopNode", 4);
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 3), "@StopNode", 3);
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
+            cdl.await();
+            if (expectedResponse == ClientResponse.SUCCESS) {
+                waitForHostToBeGone(new int[] {4, 3, 2});
+            }
+            client.callProcedure("@SystemInformation", "overview");
+        } catch (Exception ex) {
+            //We should not get here
+            fail();
+            ex.printStackTrace();
+        }
+        boolean lostConnect = false;
+        try {
+            CountDownLatch cdl = new CountDownLatch(3);
+            //Stop a node that should stay up
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 1), "@StopNode", 1);
+            //Stop already stopped node.
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
+            //Stop a node that should stay up
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
+            client.callProcedure("@SystemInformation", "overview");
+            client.drain();
+            cdl.await();
+        } catch (Exception pce) {
+            pce.printStackTrace();
+            lostConnect = pce.getMessage().contains("was lost before a response was received");
+        }
+        //We should never lose contact.
+        assertFalse(lostConnect);
+    }
+
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
@@ -179,6 +227,7 @@ public class TestStopNode extends RegressionSuite
         }
         m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(true);
+        project.setPartitionDetectionEnabled(true);
         success = m_config.compile(project);
         assertTrue(success);
 

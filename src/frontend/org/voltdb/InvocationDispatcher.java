@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -682,15 +683,26 @@ public final class InvocationDispatcher {
                   + " Use shutdown to stop the cluster.", task.clientHandle);
         }
 
+        VoltDB.instance().getSES(false).submit(() -> {
+            ZooKeeper zk = hostMessenger.getZK();
+            int hid = hostMessenger.getHostId();
+            try {
+                System.out.println("Write node to ZK:" + ZKUtil.joinZKPath(VoltZK.host_ids_be_stopped, Integer.toString(ihid)));
+                ZKUtil.addIfMissing(zk, ZKUtil.joinZKPath(VoltZK.host_ids_be_stopped, Integer.toString(ihid)), CreateMode.PERSISTENT, null);
+            } catch (KeeperException e) {
+                hostLog.warn("Failed to write the node id to be stopped to ZK");
+            } catch (InterruptedException e) {
+                hostLog.warn("Thread is interrupted. Failed to write the node id to be stopped to ZK");
+            }
+            if (hid == ihid) {
+                //Killing myself no pill needs to be sent
+                VoltDB.instance().halt();
+            } else {
+                //Send poison pill with target to kill
+                hostMessenger.sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
+            }
+        });
 
-        int hid = hostMessenger.getHostId();
-        if (hid == ihid) {
-            //Killing myself no pill needs to be sent
-            VoltDB.instance().halt();
-        } else {
-            //Send poison pill with target to kill
-            hostMessenger.sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
-        }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
