@@ -206,19 +206,21 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][]{{ -Integer.MAX_VALUE, -Byte.MAX_VALUE,
             -Short.MAX_VALUE, -Long.MAX_VALUE, 0, 0 }});
 
-//        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM = " + Integer.MAX_VALUE);
-//        client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, Double.MIN_VALUE, -9999999999999999999999.999999999999);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM = " + Integer.MAX_VALUE);
+        client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, Double.MIN_VALUE, -9999999999999999999999.999999999999);
+
 //        VoltTable[] rs = client.callProcedure("@AdHoc", "SELECT * FROM NUMBER_TYPES").getResults();
 //        System.out.println(rs[0]);
-//
-//        r = cr.getResults()[0];
-//        System.out.println(r);
-//        assertEquals(1, r.getRowCount());
-//
+
+        cr = client.callProcedure("@AdHoc", "select -decimalnum from NUMBER_TYPES");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(1, r.getRowCount());
+        // no error thrown
+
 //        r.advanceRow();
-//
-//        assertEquals( 9999999999999999999.999999999999, r.get("C6", VoltType.DECIMAL));
+//        assertEquals( BigDecimal.valueOf(9999999999999999999.999999999999), r.get("C1", VoltType.DECIMAL));
 //        assertEquals( -Double.MIN_VALUE , r.get("C5" , VoltType.FLOAT ));
 
     }
