@@ -199,7 +199,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "DECIMALNUM DECIMAL, " +
                 "PRIMARY KEY (INTEGERNUM) );"
          */
-        client.callProcedure("@AdHoc", "INSERT INTO NUMBER_TYPES VALUES (1, 2, 3, 4, 1.523, 2.53E09)");
+        client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, 1.523, 2.53E09);
 
         cr = client.callProcedure("@AdHoc", "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
