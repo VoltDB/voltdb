@@ -39,12 +39,18 @@ public abstract class MicroOptimization {
             AbstractPlanNode planGraph = plan.rootPlanGraph;
             planGraph = recursivelyApply(planGraph);
             plan.rootPlanGraph = planGraph;
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
         finally {
             // Avoid leaking a long-term reference from static optimizations
             // to a large parsed statement structure.
             m_parsedStmt = null;
         }
+    }
+
+    MicroOptimizationRunner.Phases getPhase() {
+        return MicroOptimizationRunner.Phases.SELECT_CONSTRUCTION_PHASE;
     }
 
     protected abstract AbstractPlanNode recursivelyApply(AbstractPlanNode plan);

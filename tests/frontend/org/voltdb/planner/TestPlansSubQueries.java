@@ -387,8 +387,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertEquals(2, planNodes.size());
 
         pn = planNodes.get(0).getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof ReceivePlanNode);
 
         pn = planNodes.get(1);
@@ -484,8 +485,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertNotNull(aggNode);
         checkSeqScan(pn, "T1" );
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
@@ -504,8 +506,12 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertNotNull(aggNode);
         assertNotNull(((HashAggregatePlanNode)aggNode).getPostPredicate());
         checkSeqScan(pn, "T1" );
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
+        assertTrue(((SeqScanPlanNode)pn).isSubQuery());
+        // SeqScan with an order by node.  The order by
+        // comes from the subquery.
         pn = pn.getChild(0);
         // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
@@ -527,8 +533,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         checkSeqScan(pn, "T1");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
@@ -550,8 +557,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         checkSeqScan(pn, "T1");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
@@ -569,8 +577,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof SeqScanPlanNode);
         checkSeqScan(pn, "T1", "A");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
@@ -591,8 +600,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof SeqScanPlanNode);
         checkSeqScan(pn, "T1");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
@@ -654,8 +664,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         planNodes = compileToFragments(sqlNoSimplification);
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof ReceivePlanNode);
         pn = planNodes.get(1).getChild(0);
         checkSeqScan(pn, "T1",  "A1", "C" );
@@ -974,8 +985,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "SELECT * FROM (SELECT A FROM P1 GROUP BY A) T1");
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        assertTrue(pn.getChild(0) instanceof ReceivePlanNode);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
+        assertTrue(pn instanceof ReceivePlanNode);
 
         pn = planNodes.get(1).getChild(0);
         checkSeqScan(pn, "T1");
@@ -1041,8 +1054,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof ReceivePlanNode);
 
         pn = planNodes.get(1);
@@ -1103,8 +1117,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof ReceivePlanNode);
 
         pn = planNodes.get(1);
@@ -1132,8 +1147,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof ReceivePlanNode);
 
         pn = planNodes.get(1);
@@ -1162,8 +1178,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof ReceivePlanNode);
 
         pn = planNodes.get(1);
@@ -1191,8 +1208,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        nlpn = pn.getChild(0);
+        nlpn = pn;
+        if (nlpn instanceof ProjectionPlanNode) {
+            nlpn = nlpn.getChild(0);
+        }
         assertTrue(nlpn instanceof NestLoopIndexPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopIndexPlanNode) nlpn).getJoinType());
         pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
@@ -1214,9 +1233,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        nlpn = pn.getChild(0);
+        nlpn = pn = pn.getChild(0);
+        if (nlpn instanceof ProjectionPlanNode) {
+            nlpn = nlpn.getChild(0);
+        }
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
@@ -1238,9 +1258,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        nlpn = pn.getChild(0);
+        nlpn = pn = pn.getChild(0);
+        if (nlpn instanceof ProjectionPlanNode) {
+            nlpn = nlpn.getChild(0);
+        }
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
@@ -1263,9 +1284,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         pn = planNodes.get(0);
         assertTrue(pn instanceof SendPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
         nlpn = pn.getChild(0);
+        if (nlpn instanceof ProjectionPlanNode) {
+            nlpn = nlpn.getChild(0);
+        }
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
@@ -1319,9 +1341,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertEquals(2, planNodes.size());
         //* enable to debug */ System.out.println(planNodes.get(0).toExplainPlanString());
         //* enable to debug */ System.out.println(planNodes.get(1).toExplainPlanString());
-        pn = planNodes.get(0).getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        nlpn = pn.getChild(0);
+        nlpn = pn = planNodes.get(0).getChild(0);
+        if (nlpn instanceof ProjectionPlanNode) {
+            nlpn = nlpn.getChild(0);
+        }
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
 
@@ -1781,18 +1804,26 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         pn = compile(sql);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        checkOutputSchema(pn.getOutputSchema(), outputColumns);
+        if (pn instanceof ProjectionPlanNode) {
 
-        pn = pn.getChild(0);
+            pn = pn.getChild(0);
+        }
+        // If we didn't see a projection plan node
+        // before pn, then it's been optimized away.  In
+        // this case the output schema should be identical
+        // to the output schema of the NestLoopPlanNode we
+        // expect here.  So checking the output schema should
+        // succeed here.
+        checkOutputSchema(pn.getOutputSchema(), outputColumns);
         assertTrue(pn instanceof NestLoopPlanNode);
         checkSeqScan(pn.getChild(0), table1, column1);
         if (subquery1 != null) {
             checkSeqScan(pn.getChild(0).getChild(0), subquery1, column1);
         }
         checkSeqScan(pn.getChild(1), table2, column2);
-        if (subquery2 != null)
-        checkSeqScan(pn.getChild(1).getChild(0), subquery2, column2);
+        if (subquery2 != null) {
+            checkSeqScan(pn.getChild(1).getChild(0), subquery2, column2);
+        }
     }
 
     public void testEdgeCases() {
@@ -1842,10 +1873,11 @@ public class TestPlansSubQueries extends PlannerTestCase {
         sqlNoSimplification = "select A, C FROM (SELECT A FROM R1 LIMIT 10) T1, (SELECT C FROM R2 LIMIT 10) T2 WHERE T1.A = T2.C";
         equivalentSql = "select T1.A, T2.C FROM R1 T1, R2 T2 WHERE T1.A = T2.C";
         pn = compile(sqlNoSimplification);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn = pn.getChild(0);
+        if (nlpn instanceof ProjectionPlanNode) {
+            nlpn = nlpn.getChild(0);
+        }
 
-        nlpn = pn.getChild(0);
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(2, nlpn.getChildCount());
         pn = nlpn.getChild(0);
@@ -1865,11 +1897,11 @@ public class TestPlansSubQueries extends PlannerTestCase {
         sql = "select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM R2) T2 WHERE A = C";
         sqlNoSimplification = "select A, C FROM (SELECT A FROM R1 LIMIT 10) T1, (SELECT C FROM R2 LIMIT 10) T2 WHERE A = C";
         equivalentSql = "select T1.A, T2.C FROM R1 T1, R2 T2 WHERE T1.A = T2.C";
-        pn = compile(sqlNoSimplification);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-
-        nlpn = pn.getChild(0);
+        nlpn = compile(sqlNoSimplification);
+        nlpn = nlpn.getChild(0);
+        if (nlpn instanceof ProjectionPlanNode) {
+            nlpn = nlpn.getChild(0);
+        }
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(2, nlpn.getChildCount());
         pn = nlpn.getChild(0);
@@ -2062,8 +2094,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         planNodes = compileToFragments(sqlNoSimplification);
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof ReceivePlanNode);
 
         pn = planNodes.get(1);
@@ -2125,8 +2158,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = compile("select A, C FROM (SELECT A, C FROM R1 UNION SELECT A, C FROM R2 UNION SELECT A, C FROM R3) T1 order by A ");
 
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
         checkSeqScan(pn, "T1",  "A", "C");
