@@ -185,7 +185,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
-        assertEquals( -Double.MIN_VALUE, r.get("C1", VoltType.FLOAT));
+        assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= -Double.MIN_VALUE );
 
     }
 
