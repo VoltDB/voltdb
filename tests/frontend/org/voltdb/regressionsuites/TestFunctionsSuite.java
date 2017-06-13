@@ -163,6 +163,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "SELECT * from P1;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals(405636, r.get("NUM", VoltType.INTEGER));
 //
 //        // Filters intended to be close enough to bring two different indexes to the same result as no index at all.
 //        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7 order by NUM, ID");
