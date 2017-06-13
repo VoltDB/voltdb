@@ -213,42 +213,38 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 }
             }
 
-            // Retrieve the original deployment string, if necessary
-            if (CatalogUtil.catalogContainsDeploymentType(newCatalog)) {
-                // use current deployment
-                retval.deploymentString = deploymentString;
-                retval.deploymentHash = context.getCatalogHash();
-            } else {
-                // recompile deployment and add to catalog
-                DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
-                if (dt == null) {
-                    throw new PrepareDiffFailureException(
-                            ClientResponse.GRACEFUL_FAILURE,
-                            "Unable to update deployment configuration: Error parsing deployment string");
-                }
-                if (isPromotion && drRole == DrRoleType.REPLICA) {
-                    assert dt.getDr().getRole() == DrRoleType.REPLICA;
-                    dt.getDr().setRole(DrRoleType.MASTER);
-                }
-
-                String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
-                if (result != null) {
-                    throw new PrepareDiffFailureException(
-                            ClientResponse.GRACEFUL_FAILURE,
-                            "Unable to update deployment configuration: " + result);
-                }
-
-                //In non legacy mode discard the path element.
-                if (!VoltDB.instance().isRunningWithOldVerbs()) {
-                    dt.setPaths(null);
-                }
-
-                //Always get deployment after its adjusted.
-                retval.deploymentString = CatalogUtil.getDeployment(dt, true);
-                // make deployment hash from string
-                retval.deploymentHash =
-                        CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
+            // recompile deployment and add to catalog
+            // this is necessary, even for @UpdateClasses that does not change deployment
+            // because the catalog bytes does not contain any deployments but only schema related contents
+            // the command log reply needs it to generate a correct catalog diff
+            DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
+            if (dt == null) {
+                throw new PrepareDiffFailureException(
+                        ClientResponse.GRACEFUL_FAILURE,
+                        "Unable to update deployment configuration: Error parsing deployment string");
             }
+            if (isPromotion && drRole == DrRoleType.REPLICA) {
+                assert dt.getDr().getRole() == DrRoleType.REPLICA;
+                dt.getDr().setRole(DrRoleType.MASTER);
+            }
+
+            String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
+            if (result != null) {
+                throw new PrepareDiffFailureException(
+                        ClientResponse.GRACEFUL_FAILURE,
+                        "Unable to update deployment configuration: " + result);
+            }
+
+            //In non legacy mode discard the path element.
+            if (!VoltDB.instance().isRunningWithOldVerbs()) {
+                dt.setPaths(null);
+            }
+
+            //Always get deployment after its adjusted.
+            retval.deploymentString = CatalogUtil.getDeployment(dt, true);
+            // make deployment hash from string
+            retval.deploymentHash =
+                    CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify
