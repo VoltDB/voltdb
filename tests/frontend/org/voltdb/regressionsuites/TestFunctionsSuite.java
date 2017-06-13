@@ -147,21 +147,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         r.advanceRow();
         assertEquals( VoltType.NULL_INTEGER, r.get("C1", VoltType.INTEGER));
 
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (3, 'maxvalues', " + Integer.MAX_VALUE + ","+ Double.MAX_VALUE +", NULL)");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (3, 'maxvalues', 0, " + Double.MAX_VALUE + " , NULL)");
         cr = client.callProcedure("@AdHoc", "select -ratio from P1 where desc='maxvalues'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
         // actually returns NULL but when we do r.get("C1", VoltType.FLOAT) it returns more precision
         assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= VoltType.NULL_FLOAT );
-
-        cr = client.callProcedure("@AdHoc", "select -num from P1 where desc='maxvalues'");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        r.advanceRow();
-        // https://docs.voltdb.com/UsingVoltDB/ddlref_createtable.php
-        // For integer and floating-point datatypes, VoltDB reserves the largest possible negative value to denote a null value.
-        assertEquals( -Integer.MIN_VALUE+1 , r.get("C1", VoltType.INTEGER));
 
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'minvalues', 0 , " + Double.MIN_VALUE + " , NULL)");
 
