@@ -95,6 +95,120 @@ public class TestFunctionsSuite extends RegressionSuite {
         verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "incompatible data type in operation");
     }
 
+    public void testUnaryMinus() throws Exception {
+        System.out.println("STARTING testUnaryMinus");
+        Client client = getClient();
+        //initialLoad(client, "P1");
+
+        ClientResponse cr = null;
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID) );
+                // Test generalized indexes on a string function and combos.
+        CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) );
+        CREATE INDEX P1_SUBSTRING_WITH_COL_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), DESC );
+        CREATE INDEX P1_NUM_EXPR_WITH_STRING_COL ON P1 ( DESC, ABS(ID) );
+        CREATE INDEX P1_MIXED_TYPE_EXPRS1 ON P1 ( ABS(ID+2), SUBSTRING(DESC FROM 1 FOR 2) );
+        CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) );
+        */
+
+        //client.callProcedure("@AdHoc", "CREATE TABLE T (a integer);");
+        //client.callProcedure("@AdHoc", "INSERT INTO P1 values(1);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+        //client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
+
+        VoltTable r;
+        long resultA;
+        long resultB;
+
+        cr = client.callProcedure("@AdHoc", "SELECT -id from P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(1, r.getRowCount());
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "SELECT 0-id from P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(1, r.getRowCount());
+        resultB = r.asScalarLong();
+
+        assertEquals(resultA, resultB);
+
+
+        cr = client.callProcedure("@AdHoc", "SELECT -num from P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(1, r.getRowCount());
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "SELECT 0-num from P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(1, r.getRowCount());
+        resultB = r.asScalarLong();
+
+        assertEquals(resultA, resultB);
+
+
+        cr = client.callProcedure("@AdHoc", "SELECT * from P1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+//
+//        // Filters intended to be close enough to bring two different indexes to the same result as no index at all.
+//        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7 order by NUM, ID");
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        r = cr.getResults()[0];
+//        resultA = r.asScalarLong();
+//
+//        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        r = cr.getResults()[0];
+//        resultB = r.asScalarLong();
+//        assertEquals(resultA, resultB);
+//        Client client = getClient();
+//
+//        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (2, '', -10, 2.3, NULL)");
+//
+//        // integral types
+//        validateTableOfScalarLongs(client, "select MOD(25,7) from R1", new long[]{4});
+//        validateTableOfScalarLongs(client, "select MOD(25,-7) from R1", new long[]{4});
+//        validateTableOfScalarLongs(client, "select MOD(-25,7) from R1", new long[]{-4});
+//        validateTableOfScalarLongs(client, "select MOD(-25,-7) from R1", new long[]{-4});
+//
+//        validateTableOfScalarLongs(client, "select MOD(id,7) from R1", new long[]{2});
+//        validateTableOfScalarLongs(client, "select MOD(id * 4,id+2) from R1", new long[]{0});
+//
+//        // Edge case: MOD 0
+//        verifyStmtFails(client, "select MOD(-25,0) from R1", "division by zero");
+//
+//        validateTableOfScalarDecimals(client, "select MOD(CAST(3.0 as decimal), CAST(2.0 as decimal)) from R1",  new BigDecimal[]{new BigDecimal("1.000000000000")});
+//        validateTableOfScalarDecimals(client, "select MOD(CAST(-25.32 as decimal), CAST(ratio as decimal)) from R1",  new BigDecimal[]{new BigDecimal("-0.020000000000")});
+//
+//        // Test MOD with NULL values
+//        validateTableOfScalarDecimals(client, "select MOD(NULL, CAST(ratio as decimal)) from R1",  new BigDecimal[]{null});
+//        validateTableOfScalarDecimals(client, "select MOD(CAST(3.12 as decimal), NULL) from R1",  new BigDecimal[]{null});
+//        validateTableOfScalarDecimals(client, "select MOD(CAST(NULL AS decimal), CAST(ratio as decimal)) from R1",  new BigDecimal[]{null});
+//        verifyStmtFails(client, "select MOD(NULL, NULL) from R1", "data type cast needed for parameter or null literal");
+//
+//        // Mix of decimal and ints
+//        verifyStmtFails(client, "select MOD(25.32, 2) from R1", "incompatible data type in operation");
+//        verifyStmtFails(client, "select MOD(2, 25.32) from R1", "incompatible data type in operation");
+//
+//        // Test guards on other types
+//        verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1", "incompatible data type in operation");
+//        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "incompatible data type in operation");
+    }
+
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
     public void testFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
         System.out.println("STARTING testFoundHSQLBackendOutOfRange");
