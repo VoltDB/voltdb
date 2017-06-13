@@ -209,4 +209,12 @@ public class KafkaLoaderUnitTest {
         Assert.assertEquals(args.buffersize, KafkaExternalLoaderCLIArguments.KAFKA_BUFFER_SIZE_DEFAULT);
 
     }
+
+    @Test
+    public void testKPartitionsArgumentDeprecated() throws Exception {
+        StringWriter sw = new StringWriter();
+        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
+        args.parse("KafaExternalLoader", new String[] { "-kpartitions", "10", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
+        Assert.assertTrue(sw.toString().contains("Warning: --kpartions argument is deprecated, value is ignored."));
+    }
 }

@@ -105,6 +105,9 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     @Option(desc = "Kafka time-based commit policy interval in milliseconds.  Default is to use manual offset commit.")
     public String commitPolicy = "";
 
+    @Option(shortOpt = "k", desc = "Number of Kafka Topic Partitions. Deprecated; value is ignored")
+    int kpartitions = 0;
+
     private PrintWriter warningWriter = null;
 
     public KafkaExternalLoaderCLIArguments(PrintWriter pw) {
@@ -246,6 +249,9 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         }
         if (!port.trim().isEmpty()) {
             warningWriter.println("Warning: --port argument is deprecated, please use --host with <host:port> URIs instead.");
+        }
+        if (kpartitions !=0) {
+            warningWriter.println("Warning: --kpartions argument is deprecated, value is ignored.");
         }
 
         try {
