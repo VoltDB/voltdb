@@ -1060,6 +1060,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         synchronized(m_executorLock) {
+            exportLog.info("Activating ExportDataSource gen " + m_generation
+                                + " table " + m_tableName + " partition " + m_partitionId + "FirstAction: " + (m_firstAction != null ? "true" : "false"));
             if (m_executor==null) {
                 ListeningExecutorService es = CoreUtils.getListeningExecutorService(
                             "ExportDataSource gen " + m_generation
