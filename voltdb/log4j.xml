@@ -23,7 +23,7 @@
             value="%p: %m%n"/>
         </layout>
         <filter class="org.apache.log4j.varia.LevelRangeFilter">
-            <param name="levelMin" value="WARN"/>
+            <param name="levelMin" value="DEBUG"/>
             <param name="levelMax" value="FATAL"/>
         </filter>
     </appender>
@@ -80,9 +80,9 @@
         <level value="TRACE"/>
     </logger -->
 
-    <!-- logger name="TM">
-        <level value="INFO"/>
-    </logger -->
+    <logger name="TM">
+        <level value="DEBUG"/>
+    </logger>
 
     <!-- logger name="REJOIN">
         <level value="INFO"/>
