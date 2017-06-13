@@ -124,13 +124,11 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "SELECT -id, -num, -ratio from P1;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         rA = cr.getResults()[0];
-        System.out.println(rA);
         assertEquals(1, rA.getRowCount());
 
         cr = client.callProcedure("@AdHoc", "SELECT 0-id, 0-num, 0-ratio from P1;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         rB = cr.getResults()[0];
-        System.out.println(rB);
         assertEquals(1, rB.getRowCount());
 
         rA.advanceRow();
@@ -204,25 +202,43 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         rA = cr.getResults()[0];
-        System.out.println(rA);
         assertEquals(1, rA.getRowCount());
 
         cr = client.callProcedure("@AdHoc", "select 0-integernum, 0-tinynum, 0-smallnum, 0-bignum, 0-floatnum, 0-decimalnum from NUMBER_TYPES");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         rB = cr.getResults()[0];
-        System.out.println(rB);
         assertEquals(1, rB.getRowCount());
 
         rA.advanceRow();
         rB.advanceRow();
         // check if unary minus equals 0-value
-        assertEquals(rA.get("C1", VoltType.INTEGER), rB.get("C1", VoltType.INTEGER));
-        assertEquals(rA.get("C2", VoltType.TINYINT), rB.get("C2", VoltType.TINYINT));
-        assertEquals(rA.get("C3", VoltType.SMALLINT), rB.get("C3", VoltType.SMALLINT));
-        assertEquals(rA.get("C4", VoltType.BIGINT), rB.get("C4", VoltType.BIGINT));
-        assertEquals(rA.get("C5", VoltType.FLOAT), rB.get("C5", VoltType.FLOAT));
-        assertEquals(rA.get("C6", VoltType.DECIMAL), rB.get("C6", VoltType.DECIMAL));
+        assertEquals( rA.get( "C1", VoltType.INTEGER), rB.get( "C1", VoltType.INTEGER));
+        assertEquals( rA.get( "C2", VoltType.TINYINT), rB.get( "C2", VoltType.TINYINT));
+        assertEquals( rA.get( "C3", VoltType.SMALLINT), rB.get( "C3", VoltType.SMALLINT));
+        assertEquals( rA.get( "C4", VoltType.BIGINT), rB.get( "C4", VoltType.BIGINT));
+        assertEquals( rA.get( "C5", VoltType.FLOAT), rB.get( "C5", VoltType.FLOAT));
+        assertEquals( rA.get( "C6", VoltType.DECIMAL), rB.get( "C6", VoltType.DECIMAL));
 
+        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM=1");
+        client.callProcedure("NUMBER_TYPES.insert", Integer.MAX_VALUE, Byte.MAX_VALUE, Short.MAX_VALUE,
+                Long.MAX_VALUE, 0, 0);
+
+//        cr = client.callProcedure("@AdHoc", "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES");
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        r = cr.getResults()[0];
+//        System.out.println(r);
+//        assertEquals(1, r.getRowCount());
+//
+//        r.advanceRow();
+//        assertEquals( -Integer.MAX_VALUE , r.get("C1" , VoltType.INTEGER ));
+//        assertEquals( -Byte.MAX_VALUE , r.get("C2" , VoltType.TINYINT ));
+//        assertEquals( -Short.MAX_VALUE  , r.get("C3" , VoltType.SMALLINT ));
+//        assertEquals( -Long.MAX_VALUE , r.get("C4" , VoltType.BIGINT ));
+//        assertEquals( -Double.MAX_VALUE , r.get("C5" , VoltType.FLOAT ));
+        //assertEquals(-99999999999999999999999.999999999999, r.get("C6", VoltType.DECIMAL));
+        String sql = "select -integernum, -tinynum, -smallnum, -bignum, -floatnum, -decimalnum from NUMBER_TYPES;";
+        validateTableOfLongs(client, sql, new long[][]{{ -Integer.MAX_VALUE, -Byte.MAX_VALUE,
+            -Short.MAX_VALUE, -Long.MAX_VALUE, 0, 0 }});
     }
 
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
