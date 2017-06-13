@@ -1,3 +1,6 @@
+drop procedure p if exists;
+drop procedure max_predicates if exists;
+drop procedure max_plus_predicates if exists;
 drop table t if exists;
 drop table t2 if exists;
 
