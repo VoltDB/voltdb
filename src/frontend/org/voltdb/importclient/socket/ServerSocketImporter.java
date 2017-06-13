@@ -120,6 +120,9 @@ public class ServerSocketImporter extends AbstractImporter {
                 Object params[] = null;
                 while (shouldRun()) {
                     String line = in.readLine();
+                    if (line == null) {
+                        break; // end of stream
+                    }
                     try{
                         params = formatter.transform(ByteBuffer.wrap(line.getBytes()));
                         //You should convert your data to params here.
