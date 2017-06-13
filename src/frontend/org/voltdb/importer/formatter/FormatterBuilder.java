@@ -74,7 +74,7 @@ public class FormatterBuilder {
         if (!(o instanceof FormatterBuilder)) {
             return false;
         }
-        FormatterBuilder<?> other = (FormatterBuilder<?>) o;
+        FormatterBuilder other = (FormatterBuilder) o;
         return ((m_formatterName == null && other.m_formatterName == null) || m_formatterName.equalsIgnoreCase(other.m_formatterName))
             && ((m_formatterProps == null && other.m_formatterProps == null) || m_formatterProps.equals(other.m_formatterProps))
             && ((m_formatterFactory == null && other.m_formatterFactory == null) || m_formatterFactory.equals(other.m_formatterFactory));

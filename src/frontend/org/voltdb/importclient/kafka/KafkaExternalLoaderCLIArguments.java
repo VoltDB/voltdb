@@ -36,52 +36,54 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     public static int KAFKA_TIMEOUT_DEFAULT = 30000;
     public static int KAFKA_BUFFER_SIZE_DEFAULT = 65536;
 
-    @Option(shortOpt = "c", desc = "Kafka consumer properties file (deprecated)")
-    public String config = "";
-
-    @Option(shortOpt = "p", desc = "Procedure name to insert the data into the database")
-    public String procedure = "";
-
     // This is set to true when -p option is used.
     public boolean useSuppliedProcedure = false;
+
+    // These values can be supplied in the properties file.
+    public String groupid = "";
+    public int buffersize = KAFKA_BUFFER_SIZE_DEFAULT;
+    public int timeout = KAFKA_TIMEOUT_DEFAULT;
+
+    @Option(shortOpt = "c", desc = "Kafka consumer properties file.")
+    public String config = "";
+
+    @Option(shortOpt = "p", desc = "Procedure name to insert the data into the database.")
+    public String procedure = "";
 
     // Input formatter properties
     public Properties m_formatterProperties = new Properties();
 
-    @Option(shortOpt = "t", desc = "Kafka Topic to subscribe to")
+    @Option(shortOpt = "t", desc = "Kafka Topic to subscribe to.")
     public String topic = "";
 
-    @Option(shortOpt = "g", desc = "Kafka group-id")
-    public String groupid = "";
-
-    @Option(shortOpt = "m", desc = "Maximum errors allowed before terminating import")
+    @Option(shortOpt = "m", desc = "Maximum errors allowed before terminating import.")
     public int maxerrors = 100;
 
-    @Option(desc = "Default port for VoltDB servers")
+    @Option(desc = "Default port for VoltDB servers.")
     public String port = "";
 
-    @Option(desc = "Comma separated list of VoltDB servers (host[:port]) to connect to")
+    @Option(desc = "Comma separated list of VoltDB servers (host[:port]) to connect to.")
     public String host = "";
 
     @Option(shortOpt = "s", desc = "Comma separated list of VoltDB servers (host[:port]) to connect to. Deprecated; use 'host' instead.")
     public String servers = "";
 
-    @Option(desc = "Username for connecting to VoltDB servers")
+    @Option(desc = "Username for connecting to VoltDB servers.")
     public String user = "";
 
-    @Option(desc = "Password for connecting to VoltDB servers")
+    @Option(desc = "Password for connecting to VoltDB servers.")
     public String password = "";
 
-    @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to (format: host:port)")
+    @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to in the format (host:port).")
     public String zookeeper = ""; //No default here as default will clash with local voltdb cluster
 
-    @Option(shortOpt = "b", desc = "Comma-separated list of Kafka brokers (host:port) to connect to")
+    @Option(shortOpt = "b", desc = "Comma-separated list of Kafka brokers (host:port) to connect to.")
     public String brokers = "";
 
-    @Option(shortOpt = "f", desc = "Periodic flush interval in seconds. (default: 10)")
+    @Option(shortOpt = "f", desc = "Periodic flush interval in seconds (default: 10).")
     public int flush = 10;
 
-    @Option(desc = "Formatter configuration file. (Optional) .")
+    @Option(desc = "Formatter configuration file (optional).")
     public String formatter = "";
 
     @Option(desc = "Batch size for writing to VoltDB.")
@@ -90,22 +92,16 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     @AdditionalArgs(desc = "Insert the data into this table.")
     public String table = "";
 
-    @Option(desc = "Use upsert instead of insert", hasArg = false)
+    @Option(desc = "Use upsert instead of insert.", hasArg = false)
     public boolean update = false;
 
     @Option(desc = "Enable SSL, optionally provide configuration file.")
     public String ssl = "";
 
-    @Option(desc = "Kafka consumer buffer size (default 65536).")
-    public int buffersize = 0;
-
-    @Option(desc = "Kafka consumer socket timeout, in milliseconds (default 30000, or thirty seconds)")
-    public int timeout = 0;
-
     @Option(desc = "Kafka time-based commit policy interval in milliseconds.  Default is to use manual offset commit.")
     public String commitPolicy = "";
 
-    @Option(shortOpt = "k", desc = "Number of Kafka Topic Partitions. Deprecated; value is ignored")
+    @Option(shortOpt = "k", desc = "Number of Kafka Topic Partitions. Deprecated; value is ignored.")
     int kpartitions = 0;
 
     private PrintWriter warningWriter = null;
@@ -166,43 +162,26 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
             // Ignore, it's ok
         }
 
-
-        // group.id
-        if (groupid == null || groupid.trim().length() == 0) {
-            // If it's not on the command line, look in the properties file:
-            groupid = props.getProperty("group.id", "");
-            if (groupid.isEmpty()) {
-                // Not in the property file, compute it
-                groupid = "voltdb-" + (useSuppliedProcedure ? procedure : table);
-            }
-            else {
-                warningWriter.println("Warning: Kafka group.id property extracted from properties file, which is deprecated.  Use --groupid argument instead.");
-            }
+        String prop = props.getProperty("group.id", "");
+        if (prop.isEmpty()) {
+            groupid = "voltdb-" + (useSuppliedProcedure ? procedure : table);
+        }
+        else {
+            groupid = prop;
         }
 
         // socket.timeout.ms
-        if (timeout == 0) {
-            String t = props.getProperty("socket.timeout.ms", null);
-
-            if (t != null) {
-                timeout = Integer.parseInt(t);
-                warningWriter.println("Warning: Kafka 'socket.timeout.ms' property extracted from properties file, which is deprecated.  Use --timeout argument instead.");
-            }
-            else {
-                timeout = KAFKA_TIMEOUT_DEFAULT;
-            }
+        prop = props.getProperty("socket.timeout.ms", null);
+        if (prop != null) {
+            timeout = Integer.parseInt(prop);
+            warningWriter.println("Warning: Kafka 'socket.timeout.ms' property extracted from properties file, which is deprecated.  Use --timeout argument instead.");
         }
 
         // socket.receive.buffer.bytes
-        if (buffersize == 0) {
-            String t = props.getProperty("socket.receive.buffer.bytes", null);
-            if (t != null) {
-                buffersize = Integer.parseInt(t);
-                warningWriter.println("Warning: Kafka 'socket.receive.buffer.bytes' property extracted from properties file, which is deprecated.  Use --buffersize argument instead.");
-            }
-            else {
-                buffersize = KAFKA_BUFFER_SIZE_DEFAULT;
-            }
+        prop = props.getProperty("socket.receive.buffer.bytes", null);
+        if (prop != null) {
+            buffersize = Integer.parseInt(prop);
+            warningWriter.println("Warning: Kafka 'socket.receive.buffer.bytes' property extracted from properties file, which is deprecated.  Use --buffersize argument instead.");
         }
 
     }

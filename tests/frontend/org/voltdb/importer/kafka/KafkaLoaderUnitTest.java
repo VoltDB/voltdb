@@ -136,7 +136,7 @@ public class KafkaLoaderUnitTest {
     }
 
     @Test
-    public void testDeprecatedConfigFile() throws Exception {
+    public void testConfigFile() throws Exception {
 
         Properties props = new Properties();
         props.setProperty("group.id", "myGroup");
@@ -151,27 +151,6 @@ public class KafkaLoaderUnitTest {
         args.parse("KafaExternalLoader", new String[] { "--config", tempFile.getAbsolutePath(), "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
 
         Assert.assertEquals("myGroup", args.groupid);
-        Assert.assertTrue(sw.toString().contains("Warning: --config argument is deprecated, please consult the documentation"));
-        Assert.assertTrue(sw.toString().contains("Warning: Kafka group.id property extracted from properties file, which is deprecated.  Use --groupid argument instead"));
-    }
-
-    @Test
-    public void testConfigFileIgnored() throws Exception {
-
-        Properties props = new Properties();
-        props.setProperty("group.id", "myGroup");
-        props.setProperty("ignored", "foo");
-
-        File tempFile = File.createTempFile(this.getClass().getName(), ".properties");
-        tempFile.deleteOnExit();
-        props.store(new FileOutputStream(tempFile), "KafkaLoaderUnitTest.testDeprecatedConfigFile");
-
-        StringWriter sw = new StringWriter();
-        KafkaExternalLoaderCLIArguments args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
-        args.parse("KafaExternalLoader", new String[] { "--groupid", "groupIdFromArgs", "--config", tempFile.getAbsolutePath(), "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
-
-        Assert.assertEquals("groupIdFromArgs", args.groupid);
-        Assert.assertTrue(sw.toString().startsWith("Warning: --config argument is deprecated, please consult the documentation"));
     }
 
     @Test
@@ -192,14 +171,6 @@ public class KafkaLoaderUnitTest {
 
         Assert.assertEquals(111, args.timeout);
         Assert.assertEquals(222, args.buffersize);
-        Assert.assertTrue(sw.toString().contains("Kafka 'socket.timeout.ms' property extracted from properties file, which is deprecated.  Use --timeout argument instead."));
-        Assert.assertTrue(sw.toString().contains("Kafka 'socket.receive.buffer.bytes' property extracted from properties file, which is deprecated.  Use --buffersize argument instead."));
-
-        // Values on the command line win, regardless of whether they are in the properties file.
-        args = new KafkaExternalLoaderCLIArguments(new PrintWriter(sw));
-        args.parse("KafaExternalLoader", new String[] { "--timeout", "100", "--buffersize", "200", "--config", tempFile.getAbsolutePath(), "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
-        Assert.assertEquals(100, args.timeout);
-        Assert.assertEquals(200, args.buffersize);
 
         // No config file, make sure we get the defaults
         args = new KafkaExternalLoaderCLIArguments();
@@ -207,7 +178,6 @@ public class KafkaLoaderUnitTest {
 
         Assert.assertEquals(args.timeout, KafkaExternalLoaderCLIArguments.KAFKA_TIMEOUT_DEFAULT);
         Assert.assertEquals(args.buffersize, KafkaExternalLoaderCLIArguments.KAFKA_BUFFER_SIZE_DEFAULT);
-
     }
 
     @Test
