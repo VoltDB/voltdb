@@ -145,7 +145,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(rA.get("C2", VoltType.INTEGER), rB.get("C2", VoltType.INTEGER));
         assertEquals(rA.get("C3", VoltType.FLOAT), rB.get("C3", VoltType.FLOAT));
 
+        // invalid data type for unary minus
         verifyStmtFails(client, "select -desc from P1", "incompatible data type in operation");
+
+        // check -(-var) = var
+        VoltTable r;
+        cr = client.callProcedure("@AdHoc", "select num, -(-num) from P1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals(r.get("NUM", VoltType.INTEGER), r.get("C2", VoltType.INTEGER));
+
 //        try {
 //            cr = client.callProcedure("@AdHoc", "select -desc from P1");
 //            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
