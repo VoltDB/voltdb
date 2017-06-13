@@ -441,9 +441,18 @@
                 .transition().duration(350)
                 .call(ChartLatencyAnalysis);
 
-            nv.utils.windowResize(ChartLatencyAnalysis.update);
+            nv.utils.windowResize(updateLatencyAnalysis);
             return ChartLatencyAnalysis;
         });
+
+        function updateLatencyAnalysis(){
+            ChartLatencyAnalysis.update();
+            d3.selectAll(".nv-bar").on('click',
+                function(data){
+                    alert(data.label)
+                }
+            );
+        }
 
         nv.addGraph({
             generate: function() {
