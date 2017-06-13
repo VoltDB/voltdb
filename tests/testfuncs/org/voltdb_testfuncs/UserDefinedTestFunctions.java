@@ -30,21 +30,23 @@ import java.util.Date;
 import java.util.List;
 
 import org.voltdb.VoltType;
+import org.voltdb.VoltTypeException;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
-public class TestUserDefinedFunctions {
+/** Contains a bunch of UDF's (user-defined functions) used for testing. */
+public class UserDefinedTestFunctions {
 
     // We start with private methods that are called by (some of) the test
     // UDF's (user-defined functions) below:
 
     /**
-     * Returns the VoltDB <b>null</n> value that corresponds to the data type
-     * of the input <i>value</i>; for example, -128 for a TINYINT (Byte) value,
-     * or -32768 for a SMALLINT (Short) value. However, if <i>useTrueNullValue</i>
+     * Returns the VoltDB <b>null</b> value that corresponds to the data type
+     * of the input <i>value</i>; for example, -128 for a TINYINT (byte) value,
+     * or -32768 for a SMALLINT (short) value. However, if <i>useTrueNullValue</i>
      * is true, or if the <i>value</i> is not of a recognized numeric type, a
-     * true Java <b>null</n> is returned.
+     * true Java <b>null</b> is returned.
      */
     private Number getNullValue(Number value, boolean useTrueNullValue) {
         if (useTrueNullValue) {
@@ -56,11 +58,32 @@ public class TestUserDefinedFunctions {
         case "class java.lang.Short":       return VoltType.NULL_SMALLINT;  // the SMALLINT (short) null value (-32768)
         case "class java.lang.Integer":     return VoltType.NULL_INTEGER;   // the INTEGER (int) null value (-2147483648)
         case "class java.lang.Long":        return VoltType.NULL_BIGINT;    // the BIGINT (long) null value (-9223372036854775808L)
-//      case "class java.math.BigDecimal":  return VoltType.NULL_DECIMAL;   // the DECIMAL null value - does not work, not numeric
-        case "class java.math.BigDecimal":
         case "class java.lang.Double":      return VoltType.NULL_FLOAT;     // the FLOAT (double) null value (-1.7E+308D)
+        case "class java.math.BigDecimal":  return new BigDecimal("-100000000000000000000000000");  // a DECIMAL (BigDecimal) null value
         default:                            return null;
         }
+    }
+
+    public static class UDF_TEST {
+        public static final int RETURN_DATA_TYPE_NULL = -100;
+        public static final int RETURN_JAVA_NULL      = -101;
+        public static final int RETURN_TINYINT_NULL   = -102;
+        public static final int RETURN_SMALLINT_NULL  = -103;
+        public static final int RETURN_INTEGER_NULL   = -104;
+        public static final int RETURN_BIGINT_NULL    = -105;
+        public static final int RETURN_FLOAT_NULL     = -106;
+        public static final int RETURN_DECIMAL_NULL   = -107;
+        public static final int RETURN_DECIMAL_MIN    = -108;
+        public static final int RETURN_NaN            = -109;
+        public static final int THROW_NullPointerException           = -110;
+        public static final int THROW_IllegalArgumentException       = -111;
+        public static final int THROW_NumberFormatException          = -112;
+        public static final int THROW_ArrayIndexOutOfBoundsException = -113;
+        public static final int THROW_ClassCastException             = -114;
+        public static final int THROW_ArithmeticException            = -115;
+        public static final int THROW_UnsupportedOperationException  = -116;
+        public static final int THROW_VoltTypeException              = -117;
+        public static final int THROW_UserDefinedTestException       = -118;
     }
 
     /** Usually just returns the input value; but certain special input values
@@ -84,31 +107,26 @@ public class TestUserDefinedFunctions {
         int intValue = value.intValue();
 
         switch (intValue) {
-        case -100:  return getNullValue(value, useTrueNullValue);
-        case -101:  return null;
-        case -102:  return VoltType.NULL_TINYINT;   // the TINYINT (byte) null value (-128)
-        case -103:  return VoltType.NULL_SMALLINT;  // the SMALLINT (short) null value (-32768)
-        case -104:  return VoltType.NULL_INTEGER;   // the INTEGER (int) null value (-2147483648)
-        case -105:  return VoltType.NULL_BIGINT;    // the BIGINT (long) null value (-9223372036854775808L)
-        case -106:  return VoltType.NULL_FLOAT;     // the FLOAT (double) null value (-1.7E+308D)
-        case -107:  return new BigDecimal("-99999999999999999999999999.999999999999");  // the DECIMAL (BigDecimal) minimum value
-        case -108:  return new BigDecimal("-100000000000000000000000000");  // a DECIMAL (BigDecimal) null value (??)
-        case -109:  return Math.log(value.doubleValue());   // Return NaN
-        case -110:  return uninitialized.intValue();        // Throw a NullPointerException (NPE)
-        case -111:  Character.toChars(intValue);            // Throw an IllegalArgumentException
-        case -112:  return new Byte("nonnumeric");          // Throw a NumberFormatException
-        case -113:  return array[-1];                       // Throw an ArrayIndexOutOfBoundsException
-        case -114:  return (Byte) value;                    // Throw a ClassCastException (if value is not of class Byte)
-        case -115:  return (Short) value;                   // Throw a ClassCastException (if value is not of class Short)
-        case -116:  return intValue / 0;                    // Throw an ArithmeticException (/ by zero)
-        case -117:  Arrays.asList(array).add(0);            // Throw an UnsupportedOperationException
-        // TODO: these 2 (Overflow & Underflow) need work (or remove them??):
-        case -118:  intValue -= Integer.MAX_VALUE;          // Throw an Overflow??
-        case -119:  intValue += Integer.MIN_VALUE;          // Throw an Underflow??
-        // TODO: some other common exceptions, which I should probably test:
-        // VoltTypeException
-        // User-defined!
-        default:    return value;
+        case UDF_TEST.RETURN_DATA_TYPE_NULL:    return getNullValue(value, useTrueNullValue);
+        case UDF_TEST.RETURN_JAVA_NULL:         return null;
+        case UDF_TEST.RETURN_TINYINT_NULL:      return VoltType.NULL_TINYINT;   // the TINYINT (byte) null value (-128)
+        case UDF_TEST.RETURN_SMALLINT_NULL:     return VoltType.NULL_SMALLINT;  // the SMALLINT (short) null value (-32768)
+        case UDF_TEST.RETURN_INTEGER_NULL:      return VoltType.NULL_INTEGER;   // the INTEGER (int) null value (-2147483648)
+        case UDF_TEST.RETURN_BIGINT_NULL:       return VoltType.NULL_BIGINT;    // the BIGINT (long) null value (-9223372036854775808L)
+        case UDF_TEST.RETURN_FLOAT_NULL:        return VoltType.NULL_FLOAT;     // the FLOAT (double) null value (-1.7E+308D)
+        case UDF_TEST.RETURN_DECIMAL_NULL:      return new BigDecimal("-100000000000000000000000000");  // a DECIMAL (BigDecimal) null value
+        case UDF_TEST.RETURN_DECIMAL_MIN:       return new BigDecimal("-99999999999999999999999999.999999999999");  // the DECIMAL (BigDecimal) minimum value
+        case UDF_TEST.RETURN_NaN:               return Math.log(value.doubleValue());   // Return NaN
+        case UDF_TEST.THROW_NullPointerException:           return uninitialized.intValue();        // Throw a NullPointerException (NPE)
+        case UDF_TEST.THROW_IllegalArgumentException:       Character.toChars(intValue);            // Throw an IllegalArgumentException
+        case UDF_TEST.THROW_NumberFormatException:          return new Byte("nonnumeric");          // Throw a NumberFormatException
+        case UDF_TEST.THROW_ArrayIndexOutOfBoundsException: return array[-1];                       // Throw an ArrayIndexOutOfBoundsException
+        case UDF_TEST.THROW_ClassCastException:             return (Byte) value + (Short) value;    // Throw a ClassCastException
+        case UDF_TEST.THROW_ArithmeticException:            return intValue / 0;                    // Throw an ArithmeticException (/ by zero)
+        case UDF_TEST.THROW_UnsupportedOperationException:  Arrays.asList(array).add(0);            // Throw an UnsupportedOperationException
+        case UDF_TEST.THROW_VoltTypeException:              throw new VoltTypeException("Test UDF's that throw a VoltTypeException.");
+        case UDF_TEST.THROW_UserDefinedTestException:       throw new UserDefinedTestException("Test UDF's that throw a user-defined (runtime) exception.");
+        default:                                return value;
         }
     }
 
@@ -630,7 +648,7 @@ public class TestUserDefinedFunctions {
 
     // Functions with two arguments...
 
-    // TODO: add more test UDF's: LATITUDE, LONGITUDE, AsText?; MOD, DECODE, ENCODE;
+    // TODO: add more test UDF's: LATITUDE, LONGITUDE, AsText?; DECODE, ENCODE;
     // and perhaps: ZERO, EMPTY (0 args); DISTANCE, STRPOS, POSITION (2 args);
     // TRANSLATE, WIDTH_BUCKET, SUBSTR, MAKE_TIMESTAMP (3+ args)
 
@@ -724,21 +742,21 @@ public class TestUserDefinedFunctions {
     }
 
 
-    // This main method is just used to test the example UDF's (user defined
-    // functions) above, until they are fully supported in VoltDB.
+    // This main method is just used for manual testing of the example UDF's
+    // (user defined functions) above, until they are fully supported in VoltDB.
     public static void main(String[] args) {
-        TestUserDefinedFunctions tudf = new TestUserDefinedFunctions();
+        UserDefinedTestFunctions udtf = new UserDefinedTestFunctions();
         Integer[] intInputs = {0, 0, 2, 2, 4, 4, 7, 5, 9, 5,
                 -100, 0, -101, 0, -102, 0, -103, 0, -104, 0, -105, 0, -106, 0, -107, 0, -108, 0, -109, 0,
                 -110, 0, -111, 0, -112, 0, -113, 0, -114, 0, -115, 0, -116, 0, -117, 0, -118, 0, -119, 0};
         int NUM_SIMPLE_TESTS = 16;
 
-        System.out.println("Running tests in TestUserDefinedFunctions.main...");
+        System.out.println("Running tests in UserDefinedTestFunctions.main...");
 
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2Bigint("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2Bigint(intInputs[i].longValue(), intInputs[i+1].longValue()));
+                System.out.println("add2Bigint("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Bigint(intInputs[i].longValue(), intInputs[i+1].longValue()));
             } catch (Throwable e) {
                 System.out.println("add2Bigint("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -747,13 +765,13 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2BigintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2BigintBoxed((Long)intInputs[i].longValue(), (Long)intInputs[i+1].longValue()));
+                System.out.println("add2BigintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2BigintBoxed((Long)intInputs[i].longValue(), (Long)intInputs[i+1].longValue()));
             } catch (Throwable e) {
                 System.out.println("add2BigintBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2BigintBoxed(null,null): " + tudf.add2BigintBoxed(null, null));
+            System.out.println("add2BigintBoxed(null,null): " + udtf.add2BigintBoxed(null, null));
         } catch (Throwable e) {
             System.out.println("add2BigintBoxed(null,null) threw Exception:\n"+e);
         }
@@ -761,7 +779,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2Integer("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2Integer(intInputs[i], intInputs[i+1]));
+                System.out.println("add2Integer("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Integer(intInputs[i], intInputs[i+1]));
             } catch (Throwable e) {
                 System.out.println("add2Integer("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -770,13 +788,13 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2IntegerBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2IntegerBoxed(intInputs[i], intInputs[i+1]));
+                System.out.println("add2IntegerBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2IntegerBoxed(intInputs[i], intInputs[i+1]));
             } catch (Throwable e) {
                 System.out.println("add2IntegerBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2IntegerBoxed(null,null): " + tudf.add2IntegerBoxed(null, null));
+            System.out.println("add2IntegerBoxed(null,null): " + udtf.add2IntegerBoxed(null, null));
         } catch (Throwable e) {
             System.out.println("add2IntegerBoxed(null,null) threw Exception:\n"+e);
         }
@@ -784,7 +802,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2Smallint("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2Smallint(intInputs[i].shortValue(), intInputs[i+1].shortValue()));
+                System.out.println("add2Smallint("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Smallint(intInputs[i].shortValue(), intInputs[i+1].shortValue()));
             } catch (Throwable e) {
                 System.out.println("add2Smallint("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -793,13 +811,13 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2SmallintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2SmallintBoxed((Short)intInputs[i].shortValue(), (Short)intInputs[i+1].shortValue()));
+                System.out.println("add2SmallintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2SmallintBoxed((Short)intInputs[i].shortValue(), (Short)intInputs[i+1].shortValue()));
             } catch (Throwable e) {
                 System.out.println("add2SmallintBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2SmallintBoxed(null,null): " + tudf.add2SmallintBoxed(null, null));
+            System.out.println("add2SmallintBoxed(null,null): " + udtf.add2SmallintBoxed(null, null));
         } catch (Throwable e) {
             System.out.println("add2SmallintBoxed(null,null) threw Exception:\n"+e);
         }
@@ -807,7 +825,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2Tinyint("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2Tinyint(intInputs[i].byteValue(), intInputs[i+1].byteValue()));
+                System.out.println("add2Tinyint("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Tinyint(intInputs[i].byteValue(), intInputs[i+1].byteValue()));
             } catch (Throwable e) {
                 System.out.println("add2Tinyint("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -816,13 +834,13 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2TinyintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2TinyintBoxed((Byte)intInputs[i].byteValue(), (Byte)intInputs[i+1].byteValue()));
+                System.out.println("add2TinyintBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2TinyintBoxed((Byte)intInputs[i].byteValue(), (Byte)intInputs[i+1].byteValue()));
             } catch (Throwable e) {
                 System.out.println("add2TinyintBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2TinyintBoxed(null,null): " + tudf.add2TinyintBoxed(null, null));
+            System.out.println("add2TinyintBoxed(null,null): " + udtf.add2TinyintBoxed(null, null));
         } catch (Throwable e) {
             System.out.println("add2TinyintBoxed(null,null) threw Exception:\n"+e);
         }
@@ -830,7 +848,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2Float("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2Float(intInputs[i].doubleValue(), intInputs[i+1].doubleValue()));
+                System.out.println("add2Float("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Float(intInputs[i].doubleValue(), intInputs[i+1].doubleValue()));
             } catch (Throwable e) {
                 System.out.println("add2Float("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -839,13 +857,13 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2FloatBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2FloatBoxed((Double)intInputs[i].doubleValue(), (Double)intInputs[i+1].doubleValue()));
+                System.out.println("add2FloatBoxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2FloatBoxed((Double)intInputs[i].doubleValue(), (Double)intInputs[i+1].doubleValue()));
             } catch (Throwable e) {
                 System.out.println("add2FloatBoxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2FloatBoxed(null,null): " + tudf.add2FloatBoxed(null, null));
+            System.out.println("add2FloatBoxed(null,null): " + udtf.add2FloatBoxed(null, null));
         } catch (Throwable e) {
             System.out.println("add2FloatBoxed(null,null) threw Exception:\n"+e);
         }
@@ -853,13 +871,13 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < intInputs.length; i+=2) {
             try {
-                System.out.println("add2Decimal("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.add2Decimal(new BigDecimal(intInputs[i]), new BigDecimal(intInputs[i+1])));
+                System.out.println("add2Decimal("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.add2Decimal(new BigDecimal(intInputs[i]), new BigDecimal(intInputs[i+1])));
             } catch (Throwable e) {
                 System.out.println("add2Decimal("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2Decimal(null,null): " + tudf.add2Decimal(null, null));
+            System.out.println("add2Decimal(null,null): " + udtf.add2Decimal(null, null));
         } catch (Throwable e) {
             System.out.println("add2Decimal(null,null) threw Exception:\n"+e);
         }
@@ -869,13 +887,13 @@ public class TestUserDefinedFunctions {
             String s = intInputs[i].toString();
             String t = intInputs[i+1].toString();
             try {
-                System.out.println("add2Varchar("+s+","+t+"): " + tudf.add2Varchar(s, t));
+                System.out.println("add2Varchar("+s+","+t+"): " + udtf.add2Varchar(s, t));
             } catch (Throwable e) {
                 System.out.println("add2Varchar("+s+","+t+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2Varchar(null,null): " + tudf.add2Varchar(null, null));
+            System.out.println("add2Varchar(null,null): " + udtf.add2Varchar(null, null));
         } catch (Throwable e) {
             System.out.println("add2Varchar(null,null) threw Exception:\n"+e);
         }
@@ -892,13 +910,13 @@ public class TestUserDefinedFunctions {
                 b[j] = (byte) ( intInputs[i+1].byteValue() + j );
             }
             try {
-                System.out.println("add2Varbinary("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(tudf.add2Varbinary(a, b)));
+                System.out.println("add2Varbinary("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(udtf.add2Varbinary(a, b)));
             } catch (Throwable e) {
                 System.out.println("add2Varbinary("+Arrays.toString(a)+","+Arrays.toString(b)+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2Varbinary(null,null): " + tudf.add2Varbinary(null, null));
+            System.out.println("add2Varbinary(null,null): " + udtf.add2Varbinary(null, null));
         } catch (Throwable e) {
             System.out.println("add2Varbinary(null,null) threw Exception:\n"+e);
         }
@@ -915,13 +933,13 @@ public class TestUserDefinedFunctions {
                 b[j] = (byte) ( intInputs[i+1].byteValue() + j );
             }
             try {
-                System.out.println("add2VarbinaryBoxed("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(tudf.add2VarbinaryBoxed(a, b)));
+                System.out.println("add2VarbinaryBoxed("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(udtf.add2VarbinaryBoxed(a, b)));
             } catch (Throwable e) {
                 System.out.println("add2VarbinaryBoxed("+Arrays.toString(a)+","+Arrays.toString(b)+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2VarbinaryBoxed(null,null): " + tudf.add2VarbinaryBoxed(null, null));
+            System.out.println("add2VarbinaryBoxed(null,null): " + udtf.add2VarbinaryBoxed(null, null));
         } catch (Throwable e) {
             System.out.println("add2VarbinaryBoxed(null,null) threw Exception:\n"+e);
         }
@@ -931,13 +949,13 @@ public class TestUserDefinedFunctions {
             Date d = new Date();
             d.setYear(intInputs[i]);
             try {
-                System.out.println("addYearsToTimestamp("+d+","+intInputs[i+1]+"): " + tudf.addYearsToTimestamp(d, intInputs[i+1]));
+                System.out.println("addYearsToTimestamp("+d+","+intInputs[i+1]+"): " + udtf.addYearsToTimestamp(d, intInputs[i+1]));
             } catch (Throwable e) {
                 System.out.println("addYearsToTimestamp("+d+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("addYearsToTimestamp(null,null): " + tudf.addYearsToTimestamp(null, null));
+            System.out.println("addYearsToTimestamp(null,null): " + udtf.addYearsToTimestamp(null, null));
         } catch (Throwable e) {
             System.out.println("addYearsToTimestamp(null,null) threw Exception:\n"+e);
         }
@@ -947,13 +965,13 @@ public class TestUserDefinedFunctions {
             GeographyPointValue p = new GeographyPointValue(intInputs[i],   -intInputs[i]/2);
             GeographyPointValue q = new GeographyPointValue(intInputs[i+1], -intInputs[i+1]/2);
             try {
-                System.out.println("add2GeographyPoint("+p+","+q+"): " + tudf.add2GeographyPoint(p, q));
+                System.out.println("add2GeographyPoint("+p+","+q+"): " + udtf.add2GeographyPoint(p, q));
             } catch (Throwable e) {
                 System.out.println("add2GeographyPoint("+p+","+q+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("add2GeographyPoint(null,null): " + tudf.add2GeographyPoint(null, null));
+            System.out.println("add2GeographyPoint(null,null): " + udtf.add2GeographyPoint(null, null));
         } catch (Throwable e) {
             System.out.println("add2GeographyPoint(null,null) threw Exception:\n"+e);
         }
@@ -963,13 +981,13 @@ public class TestUserDefinedFunctions {
             GeographyValue      g = new GeographyValue("POLYGON((0 0, "+intInputs[i]+" 0, 0 "+intInputs[i]/2+", 0 0))");
             GeographyPointValue p = new GeographyPointValue(intInputs[i+1], -intInputs[i+1]/2);
             try {
-                System.out.println("addGeographyPointToGeography("+g+","+p+"): " + tudf.addGeographyPointToGeography(g, p));
+                System.out.println("addGeographyPointToGeography("+g+","+p+"): " + udtf.addGeographyPointToGeography(g, p));
             } catch (Throwable e) {
                 System.out.println("addGeographyPointToGeography("+g+","+p+") threw Exception:\n"+e);
             }
         }
         try {
-            System.out.println("addGeographyPointToGeography(null,null): " + tudf.addGeographyPointToGeography(null, null));
+            System.out.println("addGeographyPointToGeography(null,null): " + udtf.addGeographyPointToGeography(null, null));
         } catch (Throwable e) {
             System.out.println("addGeographyPointToGeography(null,null) threw Exception:\n"+e);
         }
@@ -977,36 +995,36 @@ public class TestUserDefinedFunctions {
         System.out.println();
         System.out.println("Tests of (PostgreSQL-compatible) UDF's with 0 or 1 args:");
         System.out.println();
-        System.out.println("pi_UDF(): " + tudf.pi_UDF());
+        System.out.println("pi_UDF(): " + udtf.pi_UDF());
 
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("abs_BIGINT("+intInputs[i]+"): " + tudf.abs_BIGINT(intInputs[i].longValue()));
+            System.out.println("abs_BIGINT("+intInputs[i]+"): " + udtf.abs_BIGINT(intInputs[i].longValue()));
         }
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("abs_INTEGER("+intInputs[i]+"): " + tudf.abs_INTEGER(intInputs[i]));
+            System.out.println("abs_INTEGER("+intInputs[i]+"): " + udtf.abs_INTEGER(intInputs[i]));
         }
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("abs_SMALLINT("+intInputs[i]+"): " + tudf.abs_SMALLINT(intInputs[i].shortValue()));
+            System.out.println("abs_SMALLINT("+intInputs[i]+"): " + udtf.abs_SMALLINT(intInputs[i].shortValue()));
         }
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("abs_TINYINT("+intInputs[i]+"): " + tudf.abs_TINYINT(intInputs[i].byteValue()));
+            System.out.println("abs_TINYINT("+intInputs[i]+"): " + udtf.abs_TINYINT(intInputs[i].byteValue()));
         }
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("abs_FLOAT("+intInputs[i]+"): " + tudf.abs_FLOAT(intInputs[i].doubleValue()));
+            System.out.println("abs_FLOAT("+intInputs[i]+"): " + udtf.abs_FLOAT(intInputs[i].doubleValue()));
         }
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("abs_DECIMAL("+intInputs[i]+"): " + tudf.abs_DECIMAL(new BigDecimal(intInputs[i])));
+            System.out.println("abs_DECIMAL("+intInputs[i]+"): " + udtf.abs_DECIMAL(new BigDecimal(intInputs[i])));
         }
 
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
-            System.out.println("reverse("+intInputs[i]+"): " + tudf.reverse(intInputs[i].toString()));
+            System.out.println("reverse("+intInputs[i]+"): " + udtf.reverse(intInputs[i].toString()));
         }
 
         System.out.println();
@@ -1016,8 +1034,8 @@ public class TestUserDefinedFunctions {
                 polygon = polygon.replace("))", "),("+j+" "+j+", "+intInputs[i]/2+" "+j+", "+j+" "+intInputs[i]/4+", "+j+" "+j+"))");
             }
             GeographyValue g = new GeographyValue(polygon);
-            System.out.println("numRings ( "+g+" ): " + tudf.numRings(g));
-            System.out.println("numPoints( "+g+" ): " + tudf.numPoints(g));
+            System.out.println("numRings ( "+g+" ): " + udtf.numRings(g));
+            System.out.println("numPoints( "+g+" ): " + udtf.numPoints(g));
         }
 
         System.out.println();
@@ -1025,7 +1043,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
             try {
-                System.out.println("mod_BIGINT("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.mod_BIGINT(intInputs[i].longValue(), intInputs[i+1].longValue()));
+                System.out.println("mod_BIGINT("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_BIGINT(intInputs[i].longValue(), intInputs[i+1].longValue()));
             } catch (Throwable e) {
                 System.out.println("mod_BIGINT("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -1034,7 +1052,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
             try {
-                System.out.println("mod_INTEGER("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.mod_INTEGER(intInputs[i], intInputs[i+1]));
+                System.out.println("mod_INTEGER("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_INTEGER(intInputs[i], intInputs[i+1]));
             } catch (Throwable e) {
                 System.out.println("mod_INTEGER("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -1043,7 +1061,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
             try {
-                System.out.println("mod_SMALLINT("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.mod_SMALLINT(intInputs[i].shortValue(), intInputs[i+1].shortValue()));
+                System.out.println("mod_SMALLINT("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_SMALLINT(intInputs[i].shortValue(), intInputs[i+1].shortValue()));
             } catch (Throwable e) {
                 System.out.println("mod_SMALLINT("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -1052,7 +1070,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
             try {
-                System.out.println("mod_TINYINT("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.mod_TINYINT(intInputs[i].byteValue(), intInputs[i+1].byteValue()));
+                System.out.println("mod_TINYINT("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_TINYINT(intInputs[i].byteValue(), intInputs[i+1].byteValue()));
             } catch (Throwable e) {
                 System.out.println("mod_TINYINT("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -1061,7 +1079,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
             try {
-                System.out.println("mod_FLOAT("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.mod_FLOAT(intInputs[i].doubleValue(), intInputs[i+1].doubleValue()));
+                System.out.println("mod_FLOAT("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_FLOAT(intInputs[i].doubleValue(), intInputs[i+1].doubleValue()));
             } catch (Throwable e) {
                 System.out.println("mod_FLOAT("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -1070,7 +1088,7 @@ public class TestUserDefinedFunctions {
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
             try {
-                System.out.println("mod_DECIMAL("+intInputs[i]+","+intInputs[i+1]+"): " + tudf.mod_DECIMAL(new BigDecimal(intInputs[i]), new BigDecimal(intInputs[i+1])));
+                System.out.println("mod_DECIMAL("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_DECIMAL(new BigDecimal(intInputs[i]), new BigDecimal(intInputs[i+1])));
             } catch (Throwable e) {
                 System.out.println("mod_DECIMAL("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
             }
@@ -1090,16 +1108,16 @@ public class TestUserDefinedFunctions {
             for (byte j=0; j < b.length; j++) {
                 b[j] = (byte) j;
             }
-            System.out.println("btrim("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(tudf.btrim(a, b)));
+            System.out.println("btrim("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(udtf.btrim(a, b)));
         }
 
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
             String s1 = intInputs[i].toString();
             String s2 = intInputs[i+1].toString();
-            System.out.println("concat2Varchar("+s1+","+s2+"): " + tudf.concat2Varchar(s1, s2));
+            System.out.println("concat2Varchar("+s1+","+s2+"): " + udtf.concat2Varchar(s1, s2));
         }
-        System.out.println("concat2Varchar(null,null): " + tudf.concat2Varchar(null, null));
+        System.out.println("concat2Varchar(null,null): " + udtf.concat2Varchar(null, null));
 
         System.out.println();
         System.out.println("Tests of (PostgreSQL-compatible) UDF's with 3+ args:");
@@ -1108,9 +1126,9 @@ public class TestUserDefinedFunctions {
             String s1 = intInputs[i].toString();
             String s2 = intInputs[i+1].toString();
             String s3 = intInputs[i].toString();
-            System.out.println("concat3Varchar("+s1+","+s2+","+s3+"): " + tudf.concat3Varchar(s1, s2, s3));
+            System.out.println("concat3Varchar("+s1+","+s2+","+s3+"): " + udtf.concat3Varchar(s1, s2, s3));
         }
-        System.out.println("concat3Varchar(null,null,null): " + tudf.concat3Varchar(null, null, null));
+        System.out.println("concat3Varchar(null,null,null): " + udtf.concat3Varchar(null, null, null));
 
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
@@ -1118,9 +1136,9 @@ public class TestUserDefinedFunctions {
             String s2 = intInputs[i+1].toString();
             String s3 = intInputs[i].toString();
             String s4 = intInputs[i+1].toString();
-            System.out.println("concat4Varchar("+s1+","+s2+","+s3+","+s4+"): " + tudf.concat4Varchar(s1, s2, s3, s4));
+            System.out.println("concat4Varchar("+s1+","+s2+","+s3+","+s4+"): " + udtf.concat4Varchar(s1, s2, s3, s4));
         }
-        System.out.println("concat4Varchar(null,null,null,null): " + tudf.concat4Varchar(null, null, null, null));
+        System.out.println("concat4Varchar(null,null,null,null): " + udtf.concat4Varchar(null, null, null, null));
 
     }
 
