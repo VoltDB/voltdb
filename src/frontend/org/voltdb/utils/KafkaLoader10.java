@@ -34,8 +34,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -45,12 +50,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /**
@@ -153,6 +152,9 @@ public class KafkaLoader10 {
 
         @Option(desc = "Formatter configuration file (optional)")
         String formatter = "";
+
+        @Option(desc = "Kafka SSL configuration file (optional")
+        String kafkassl = "";
 
         /**
          * Batch size for processing batched operations.
@@ -283,6 +285,12 @@ public class KafkaLoader10 {
             if ( deserializer != null && VALUE_DESERIALIZER.equals(deserializer.trim())) {
                 m_log.warn("Value deserializer \'" + deserializer.trim() + "\' not supported. \'"
                         + VALUE_DESERIALIZER + "\' will be used for deserializering values");
+            }
+        }
+
+        if (!m_cliOptions.kafkassl.trim().isEmpty()) {
+            try (FileInputStream fis = new FileInputStream(new File(m_cliOptions.kafkassl))) {
+                props.load(fis);
             }
         }
 
