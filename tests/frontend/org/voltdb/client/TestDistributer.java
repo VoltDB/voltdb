@@ -354,6 +354,33 @@ public class TestDistributer extends TestCase {
     }
 
     @Test
+    public void testAuthenticationTimeout() throws Exception {
+        MockVolt volt0 = null;
+        try {
+            // create a fake server but don't start it.
+            // It will not read anything from the socket.
+            volt0 = new MockVolt(20000);
+
+            // Create a new distributor with a short connection timeout.
+            // Authentication should time out because the server is not
+            // reading anything.
+            Distributer dist = new Distributer(false,
+                                               ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+                                               10,
+                                               false, false, null);
+            dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
+
+            fail("Should have timed out");
+        } catch (IOException e) {
+            assertTrue(e.getMessage().contains("timed out"));
+        } finally {
+            if (volt0 != null) {
+                volt0.shutdown();
+            }
+        }
+    }
+
+    @Test
     public void testCreateConnectionSha256() throws Exception {
         MockVolt volt0 = null;
         MockVolt volt1 = null;
@@ -887,7 +914,7 @@ public class TestDistributer extends TestCase {
         final String hostname = "doesnotexist";
         boolean threwException = false;
         try {
-            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32, null, ClientAuthScheme.HASH_SHA1);
+            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32, null, ClientAuthScheme.HASH_SHA1, 0);
         } catch (java.net.UnknownHostException e) {
             threwException = true;
             assertTrue(e.getMessage().equals(hostname));

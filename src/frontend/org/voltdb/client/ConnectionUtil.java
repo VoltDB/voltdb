@@ -31,6 +31,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -44,6 +46,7 @@ import org.ietf.jgss.GSSName;
 import org.ietf.jgss.MessageProp;
 import org.ietf.jgss.Oid;
 import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
@@ -94,6 +97,10 @@ public class ConnectionUtil {
 
     private static final GSSManager m_gssManager = GSSManager.getInstance();
 
+    // Thread pool for checking authentication timeout
+    private static final ScheduledThreadPoolExecutor m_periodicWorkThread =
+        CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 0, CoreUtils.SMALL_STACK_SIZE);
+
     /**
      * Get a hashed password using SHA-1 in a consistent way.
      * @param password The password to encode.
@@ -140,17 +147,18 @@ public class ConnectionUtil {
      */
     public static Object[] getAuthenticatedConnection(String host, String username,
                                                       byte[] hashedPassword, int port,
-                                                      final Subject subject, ClientAuthScheme scheme) throws IOException {
+                                                      final Subject subject, ClientAuthScheme scheme,
+                                                      long timeoutMillis) throws IOException {
         String service = subject == null ? "database" : Constants.KERBEROS;
-        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme);
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme, timeoutMillis);
     }
 
     private static Object[] getAuthenticatedConnection(
             String service, String host,
-            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme)
+            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme, long timeoutMillis)
     throws IOException {
         InetSocketAddress address = new InetSocketAddress(host, port);
-        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme);
+        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme, timeoutMillis);
     }
 
     private final static Function<Principal, DelegatePrincipal> narrowPrincipal = new Function<Principal, DelegatePrincipal>() {
@@ -171,7 +179,7 @@ public class ConnectionUtil {
 
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username,
-            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme)
+            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme, long timeoutMillis)
     throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
@@ -185,6 +193,24 @@ public class ConnectionUtil {
             // TODO Can open() be asynchronous if configureBlocking(true)?
             throw new IOException("Failed to open host " + ReverseDNSCache.hostnameOrAddress(addr.getAddress()));
         }
+
+        // Setup a timer that times out the authentication if it is stuck (server dies, connection drops, etc.)
+        final ScheduledFuture<?> timeoutFuture;
+        if (timeoutMillis > 0) {
+            timeoutFuture = m_periodicWorkThread.schedule(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        aChannel.close();
+                    } catch (IOException e) {
+                        // Ignore
+                    }
+                }
+            }, timeoutMillis, TimeUnit.MILLISECONDS);
+        } else {
+            timeoutFuture = null;
+        }
+
         final long retvals[] = new long[4];
         returnArray[1] = retvals;
         try {
@@ -307,10 +333,14 @@ public class ConnectionUtil {
             loginResponse.get(buildStringBytes);
             returnArray[2] = new String(buildStringBytes, Constants.UTF8ENCODING);
 
-            aChannel.configureBlocking(false);
             aChannel.socket().setKeepAlive(true);
             success = true;
         } finally {
+            if (timeoutFuture != null && !timeoutFuture.cancel(false)) {
+                // Failed to cancel, which means the timeout task must have run
+                throw new IOException("Authentication timed out");
+            }
+
             if (!success) {
                 aChannel.close();
             }
