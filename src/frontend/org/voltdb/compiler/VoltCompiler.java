@@ -1864,9 +1864,6 @@ public class VoltCompiler {
             Catalog currentCatalog, HSQLInterface hsql)
                     throws IOException, ClassNotFoundException, VoltCompilerException
     {
-        // Use the in-memory jarfile-provided class loader so that procedure
-        // classes can be found and copied to the new file that gets written.
-
         // clear out the warnings and errors
         m_warnings.clear();
         m_infos.clear();
@@ -1888,6 +1885,8 @@ public class VoltCompiler {
                 }
             }
 
+            // Use the in-memory jarfile-provided class loader so that procedure
+            // classes can be found and copied to the new file that gets written.
             ClassLoader classLoader = jarOutput.getLoader();
 
             for (Procedure procedure : procedures) {
@@ -1903,8 +1902,6 @@ public class VoltCompiler {
                     continue;
                 }
 
-//              ProcedureCompiler.compileJavaProcedure(this, hsql, m_estimates, previousDB, procedureDescriptor, jarOutput);
-
                 final String className = procedure.getClassname();
 
                 // Load the class given the class name
@@ -1919,11 +1916,9 @@ public class VoltCompiler {
                 }
 
                 // TODO(xin): deal with the annotation
-                // ...
+                // check whether DDL and annotation conflicts or not
                 // ...
 
-                // TODO(xin): deal with NT procedure
-                // ...
                 // if the procedure is non-transactional, then take this special path here
                 if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
                     ProcedureCompiler.compileNTProcedure(this, procClass, procedure, jarOutput);
@@ -2262,9 +2257,6 @@ public class VoltCompiler {
         generateCatalogReport(catalog, m_canonicalDDL);
 
         jarOutput.put(AUTOGEN_DDL_FILE_NAME, m_canonicalDDL.getBytes(Constants.UTF8ENCODING));
-        if (DEBUG_VERIFY_CATALOG) {
-            debugVerifyCatalog(jarOutput, catalog);
-        }
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();

@@ -252,7 +252,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.expectedCatalogVersion = context.catalogVersion;
 
             // compute the diff in StringBuilder
-            CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);
+            CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog, true);
             if (!diff.supported()) {
                 throw new PrepareDiffFailureException(
                         ClientResponse.GRACEFUL_FAILURE,
