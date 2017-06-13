@@ -119,7 +119,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         //client.callProcedure("@AdHoc", "CREATE TABLE T (a integer);");
         //client.callProcedure("@AdHoc", "INSERT INTO P1 values(1);");
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
-        //client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
 
         VoltTable rA;
         VoltTable rB;
@@ -156,6 +155,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         r.advanceRow();
         assertEquals(r.get("NUM", VoltType.INTEGER), r.get("C2", VoltType.INTEGER));
 
+        // unary minus returns NULL for NULL numeric values like other arithmetic operators
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'nulltest', NULL,"+ Float.MAX_VALUE +", NULL)");
+        cr = client.callProcedure("@AdHoc", "select -num from P1 where desc='nulltest'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals( VoltType.NULL_INTEGER, r.get("C1", VoltType.INTEGER));
 //        try {
 //            cr = client.callProcedure("@AdHoc", "select -desc from P1");
 //            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
