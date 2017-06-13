@@ -29,31 +29,22 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.LocalCluster.FailureState;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Digester;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.io.Files;
 
 /** Tests that 'start' works with initialized schemas
  * 'init' tests can be found in TestInitStartAction
@@ -112,6 +103,7 @@ final public class TestStartWithSchema {
         cluster = new LocalCluster(
                 schema,
                 null,
+                true,
                 siteCount,
                 hostCount,
                 kfactor,

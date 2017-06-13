@@ -553,6 +553,7 @@ public class Benchmark {
     CappedTableLoader partCappedlt = null;
     CappedTableLoader replCappedlt = null;
     LoadTableLoader partLoadlt = null;
+    WLoadTableLoader partLoadltW = null;
     LoadTableLoader replLoadlt = null;
     ReadThread readThread = null;
     AdHocMayhemThread adHocMayhemThread = null;
@@ -703,14 +704,17 @@ public class Benchmark {
         }
 
         if (!(config.disabledThreads.contains("partLoadlt") || config.disabledThreads.contains("Loadlt"))) {
+            partLoadltW = new WLoadTableLoader(client, "T_PAYMENT50",
+                    (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 500, permits, false, 1);
+            partLoadltW.start();
             partLoadlt = new LoadTableLoader(client, "loadp",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
+                    (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 500, permits, false, 0);
             partLoadlt.start();
         }
         replLoadlt = null;
         if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replLoadlt") || config.disabledThreads.contains("Loadlt"))) {
             replLoadlt = new LoadTableLoader(client, "loadmp",
-                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
+                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 30, permits, true, -1);
             replLoadlt.start();
         }
         if (!config.disabledThreads.contains("readThread")) {

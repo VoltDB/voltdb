@@ -349,6 +349,10 @@ public class ParameterConverter {
         else if (inputClz == BigDecimal.class) {
             // Only conversion to primitive numeric types are considered
             BigDecimal pBigDecimal = (BigDecimal) param;
+            if (expectedClz == BigDecimal.class) {
+                return VoltDecimalHelper.setDefaultScale(pBigDecimal);
+            }
+
             if (expectedClz == long.class) {
                 try {
                     long result = pBigDecimal.longValueExact();

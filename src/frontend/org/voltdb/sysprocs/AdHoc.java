@@ -151,13 +151,14 @@ public class AdHoc extends AdHocNTBase {
 
         CatalogChangeResult ccr = null;
         try {
+            DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
             ccr = prepareApplicationCatalogDiff(invocationName,
                                                 null,
                                                 null,
                                                 sqlStatements.toArray(new String[0]),
                                                 null,
                                                 false,
-                                                DrRoleType.NONE,
+                                                drRole,
                                                 true,
                                                 false,
                                                 getHostname(),

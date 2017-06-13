@@ -23,34 +23,25 @@
 
 package txnIdSelfCheck.procedures;
 
-import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
 
-public class CopyLoadPartitionedBase extends VoltProcedure {
+public class CopyLoadPartitionedBase extends ValidateLoadBase {
 
-    public VoltTable[] doWork(SQLStmt select, SQLStmt insert, long cid) {
-        if (select != null) { // use select / insert
-            // Get row for cid and copy to new table.
-            voltQueueSQL(select, cid);
-            VoltTable[] results = voltExecuteSQL();
-            VoltTable data = results[0];
-            if (data.getRowCount() != 1) {
-                throw new VoltAbortException("Failed to find cid that should exist: cid=" + cid);
-            }
-            data.advanceRow();
-            long rcid = data.getLong(0);
-            if (rcid != cid) {
-                throw new VoltAbortException("Failed to find cid does not match. (" + rcid + ":" + cid + ")");
-            }
+    public VoltTable[] doWork(SQLStmt select, SQLStmt insert, long cid, VoltTable vt) {
+
+        VoltTable[] results = doValidate(select, cid, vt);
+        VoltTable data = results[0];
+        data.advanceRow();
+        if (!insert.getText().contains("SELECT")) {
             long txnid = data.getLong(1);
             long rowid = data.getLong(2);
-            voltQueueSQL(insert, rcid, txnid, rowid);
+            voltQueueSQL(insert, cid, txnid, rowid);
             return voltExecuteSQL();
-        } else { // use insert into
-            voltQueueSQL(insert,cid);
-            VoltTable[] results = voltExecuteSQL();
-            VoltTable data = results[0];
+
+        } else { // use insert into select
+            voltQueueSQL(insert, cid);
+            results = voltExecuteSQL();
+            data = results[0];
             int cnt = (int) data.fetchRow(0).getLong(0);
             if (cnt != 1) {
                 throw new VoltAbortException("incorrect number of inserted rows=" + cnt + " for cid=" + cid);
