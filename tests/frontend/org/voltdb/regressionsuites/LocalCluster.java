@@ -116,7 +116,8 @@ public class LocalCluster extends VoltServerConfig {
     /**
      * Utility for regex search in logs: all the regex will be pre-compiled and the
      * patterns will be searched on the fly for each line of the logs. If any of the
-     * patterns is found on a host, the corresponding boolean variable will be set.
+     * patterns is found on a host, the corresponding  set will be updated (all found
+     * regexes will be inserted into the set)
      */
     // The 2d map to store the results of matches (2-dimensional since for each host we may have
     // multiple patterns to search for)
@@ -233,9 +234,6 @@ public class LocalCluster extends VoltServerConfig {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
             m_regexes.put(s, p);
-        }
-        for (int i = 0; i < hostCount; i++) {
-            m_regexResults.put(i, new ConcurrentHashSet<>());
         }
     }
 
@@ -2310,12 +2308,7 @@ public class LocalCluster extends VoltServerConfig {
         m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
     }
 
-    /*
-     * Helper functions when pre-compiled regex search is enabled.
-     * The patterns to be checked must have been added in the constructor.
-     */
-
-    // Reset the host's regex search result
+    // Reset the host's regex search result (removing from the set)
     public void resetPreCompRegexResult(int hostNum, String regex) {
         assert(m_regexes != null);
         assert(m_regexResults.containsKey(hostNum));
@@ -2330,7 +2323,6 @@ public class LocalCluster extends VoltServerConfig {
 
     /*
      * Helper function to check all patterns appear in the specified host
-     * Maybe all of them should be set to public ?
      */
     // hostNum = hostId in all cases
     public boolean verifyLogMessage(int hostNum, String regex) {
@@ -2340,13 +2332,12 @@ public class LocalCluster extends VoltServerConfig {
         return m_regexResults.get(hostNum).contains(regex);
     }
 
+    // Check that all the patterns exist in the specified host
     private boolean preCompLogContains(int hostId, List<String> patterns) {
         return patterns.stream().allMatch(s -> verifyLogMessage(hostId, s));
     }
 
-    /*
-     * Helper function to check non of the patterns appear in the specified host
-     */
+    // Helper function to check non of the patterns appear in the specified host
     private boolean preCompLogNotContains(int hostId, List<String> patterns) {
         return patterns.stream().allMatch(s -> !verifyLogMessage(hostId, s));
     }
@@ -2363,26 +2354,27 @@ public class LocalCluster extends VoltServerConfig {
         return hostIds.stream().allMatch(id -> preCompLogNotContains(id, patterns));
     }
 
-    /*
-     * verify that none of the patterns exist in any of the existing hosts
-     */
+    // verify that all the patterns exist in every host
     public boolean verifyLogMessages(List<String> patterns) {
         return m_regexResults.keySet().stream().allMatch(id -> preCompLogContains(id, patterns));
     }
 
+    // verify that none of the patterns exist in any of the host
     public boolean verifyLogMessagesNotExist(List<String> patterns) {
         return m_regexResults.keySet().stream().allMatch(id -> preCompLogNotContains(id, patterns));
     }
 
-    // Helper functions
+    // verify a single pattern exists in every host
     public boolean verifyLogMessage(String regex) {
         return verifyLogMessages(Arrays.asList(new String[] {regex}));
     }
 
+    // verify the regex does not exist in any host
     public boolean verifyLogMessageNotExist(String regex) {
         return verifyLogMessagesNotExist(Arrays.asList(new String[] {regex}));
     }
 
+    // clear the result sets of a given host
     private void resetHostRegexResults(int hostId) {
         assertTrue(m_regexResults.containsKey(hostId));
         m_regexResults.get(hostId).clear();
