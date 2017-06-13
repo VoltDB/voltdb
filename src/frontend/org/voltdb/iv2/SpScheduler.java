@@ -459,6 +459,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (!m_isLeader && !balanceSPI && level == ReadLevel.FAST && message.isReadOnly() &&
                     CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
                     CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
+                hostLog.error("site:" + CoreUtils.hsIdToString(m_mailbox.getHSId())+ " is leader:" + m_isLeader + "\n" + message);
                 VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
             }
 
