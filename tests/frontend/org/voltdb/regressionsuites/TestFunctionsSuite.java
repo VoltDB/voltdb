@@ -144,7 +144,16 @@ public class TestFunctionsSuite extends RegressionSuite {
         // unary minus for integer and float
         assertEquals(rA.get("C2", VoltType.INTEGER), rB.get("C2", VoltType.INTEGER));
         assertEquals(rA.get("C3", VoltType.FLOAT), rB.get("C3", VoltType.FLOAT));
-//
+
+        verifyStmtFails(client, "select -desc from P1", "incompatible data type in operation");
+//        try {
+//            cr = client.callProcedure("@AdHoc", "select -desc from P1");
+//            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+//        } catch (ProcCallException e) {
+//            String msg = e.getMessage();
+//            assertTrue(msg.indexOf("incompatible data type") != -1);
+//            caught = true;
+//        }
 //        // Filters intended to be close enough to bring two different indexes to the same result as no index at all.
 //        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7 order by NUM, ID");
 //        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
