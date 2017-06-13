@@ -1095,7 +1095,9 @@ public class LocalCluster extends VoltServerConfig {
                         false,
                         proc);
             } else {
-                assert(m_regexResults.get(hostId) != null);
+                if (m_regexResults.get(hostId) == null) {
+                    m_regexResults.put(hostId, new ConcurrentHashSet<>());
+                }
                 ptf = new PipeToFile(
                         fileName,
                         proc.getInputStream(),
@@ -2321,10 +2323,7 @@ public class LocalCluster extends VoltServerConfig {
         m_regexResults.values().stream().forEach(m -> m.clear());
     }
 
-    /*
-     * Helper function to check all patterns appear in the specified host
-     */
-    // hostNum = hostId in all cases
+    // check that the string exists in the specified host
     public boolean verifyLogMessage(int hostNum, String regex) {
         assertTrue(m_regexes != null);
         assertTrue(m_regexResults.containsKey(hostNum));
