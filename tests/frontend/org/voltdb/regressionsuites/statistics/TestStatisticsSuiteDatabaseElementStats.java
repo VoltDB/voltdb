@@ -29,8 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import junit.framework.Test;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -39,6 +37,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.Test;
 
 public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuiteBase {
 
@@ -166,11 +166,11 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
             validateSchema(results[0], expectedTable);
             if (success) {
                 success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "W_PK_TREE", true);
+                        HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "W_PK_TREE", true);
             }
             if (success) {
                 success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "I_PK_TREE", true);
+                        HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "I_PK_TREE", true);
             }
             if (success) break;
         }

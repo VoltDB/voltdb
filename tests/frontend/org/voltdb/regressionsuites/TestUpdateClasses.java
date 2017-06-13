@@ -50,6 +50,7 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb_testprocs.updateclasses.jars.TestProcedure;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -743,7 +744,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             assertEquals(1, vt.getRowCount());
             vt.advanceRow();
-            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+            assertEquals("org.voltdb.sysprocs.UpdateCore", vt.getString(5));
 
             // create procedure 0
             resp = m_client.callProcedure("@AdHoc", "create procedure from class " +
@@ -752,7 +753,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             assertEquals(vt.getRowCount(), 1);
             vt.advanceRow();
-            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+            assertEquals("org.voltdb.sysprocs.UpdateCore", vt.getString(5));
 
             // invoke a new user procedure
             vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
@@ -766,7 +767,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             assertEquals(2, vt.getRowCount());
             assertTrue(vt.toString().contains("org.voltdb_testprocs.updateclasses.testImportProc"));
-            assertTrue(vt.toString().contains("org.voltdb.sysprocs.UpdateApplicationCatalog"));
+            assertTrue(vt.toString().contains("org.voltdb.sysprocs.UpdateCore"));
 
             // create procedure 1
             resp = m_client.callProcedure("@AdHoc", "create procedure from class " +
@@ -775,7 +776,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
             assertEquals(1, vt.getRowCount());
             vt.advanceRow();
-            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+            assertEquals("org.voltdb.sysprocs.UpdateCore", vt.getString(5));
 
             resp = m_client.callProcedure(PROC_CLASSES[1].getSimpleName(), 1l, "", "");
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
@@ -827,6 +828,81 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 fail("@UpdateClasses should not fail with message: " + pce.getMessage());
+            }
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    // See ENG-12536: Test UpdateClasses with changed SQLStmts
+    @Test
+    public void testUpdateClassesWithSQLStmtChanges() throws Exception {
+        System.out.println("\n\n-----\n testUpdateClassesWithSQLStmtChanges \n-----\n\n");
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table tt (PID varchar(20 BYTES) NOT NULL, CITY varchar(6 BYTES), " +
+                "CONSTRAINT IDX_TT_PKEY PRIMARY KEY (PID)); \n" +
+                "PARTITION TABLE TT ON COLUMN PID;\n");
+
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = pathToCatalog;
+            config.m_pathToDeployment = pathToDeployment;
+            startSystem(config);
+
+            ClientResponse resp;
+
+            // Testing system can load jar file from class path, but not the internal class files
+            try {
+                resp = m_client.callProcedure("TestProcedure", "12345", "boston");
+                fail("TestProcedure is not loaded");
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("Procedure TestProcedure was not found"));
+            }
+
+            try {
+                Class.forName("voter.TestProcedure");
+                fail("Should not load the class file from the jar file on disk automatically");
+            } catch (ClassNotFoundException e) {
+                assertTrue(e.getMessage().contains("voter.TestProcedure"));
+            }
+
+            InMemoryJarfile boom = new InMemoryJarfile(TestProcedure.class.getResource("addSQLStmt.jar"));
+            resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = m_client.callProcedure("@AdHoc", "create procedure partition ON TABLE tt COLUMN pid from class voter.TestProcedure;");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = m_client.callProcedure("TestProcedure", "12345", "boston");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            // UpdateClass with the new changed StmtSQL jar
+            boom = new InMemoryJarfile(TestProcedure.class.getResource("addSQLStmtNew.jar"));
+            resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            // run with a new query without problems
+            resp = m_client.callProcedure("TestProcedure", "12345", "boston");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            // Invalid SQLStmt should fail during UpdateClasses
+            boom = new InMemoryJarfile(TestProcedure.class.getResource("addSQLStmtInvalid.jar"));
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+                fail("Invalid SQLStmt should fail during UpdateClasses");
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("Failed to plan for statement"));
+                assertTrue(e.getMessage().contains("user lacks privilege or object not found: TT_INVALID_QUERY"));
             }
         }
         finally {

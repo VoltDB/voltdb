@@ -6,9 +6,13 @@ Expect to fail because the jar has not been loaded yet.
    java.lang.ClassNotFoundException: sqlcmdtest.Trivial"
 Expect to fail as Trivial should have failed proc creation.
 Undefined procedure: Trivial
+Expect to fail because we can't call "@SwapClasses" as a SQLStmt.
+[BadSwap.class]: Failed to plan for statement (badswap) "@SwapTables t1 t2;". Error: "Error in "@SwapTables t1 t2;" unknown token"
 Expect to fail because of failure to "redefine" the Trivial proc with its
     underlying class removed. The error message could be better here.
-Unexpected error in @UpdateClasses modifying classes from catalog: Cannot load class for procedure sqlcmdtest.Trivial
+Unexpected error in adhoc or catalog update: class java.io.IOException, DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
+   caused by:
+   java.lang.ClassNotFoundException: sqlcmdtest.Trivial"
 Expect to fail now that class has been successfully removed
 [Ad Hoc DDL Input]: VoltDB DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
    caused by:
@@ -40,7 +44,7 @@ Expect to fail because the jar has been killed by dropping a statically
     dependent class.
 VOLTDB ERROR: UNEXPECTED FAILURE:
   org.voltdb.VoltProcedure$VoltAbortException: sqlcmdtest/Breakable1$NestedGetsKilled
-	at org.voltdb.sysprocs.UpdateApplicationCatalog.executePlanFragment(UpdateApplicationCatalog.java:#)
+	at org.voltdb.sysprocs.UpdateCore.executePlanFragment(UpdateCore.java:#)
 	at org.voltdb.ProcedureRunner.executeSysProcPlanFragment(ProcedureRunner.java:#)
 	at org.voltdb.iv2.Site.executeSysProcPlanFragment(Site.java:#)
 	at org.voltdb.iv2.SysprocFragmentTask.processFragmentTask(SysprocFragmentTask.java:#)
@@ -52,8 +56,8 @@ Caused by: java.lang.NoClassDefFoundError: sqlcmdtest/Breakable1$NestedGetsKille
 	at java.lang.Class.forName0(Native Method)
 	at java.lang.Class.forName(Class.java:#)
 	at org.voltdb.CatalogContext.classForProcedure(CatalogContext.java:#)
-	at org.voltdb.sysprocs.UpdateApplicationCatalog$JavaClassForTest.forName(UpdateApplicationCatalog.java:#)
-	at org.voltdb.sysprocs.UpdateApplicationCatalog.executePlanFragment(UpdateApplicationCatalog.java:#)
+	at org.voltdb.sysprocs.UpdateCore$JavaClassForTest.forName(UpdateCore.java:#)
+	at org.voltdb.sysprocs.UpdateCore.executePlanFragment(UpdateCore.java:#)
 	... 6 more
 Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable1$NestedGetsKilled
 	at java.net.URLClassLoader.findClass(URLClassLoader.java:#)
@@ -88,3 +92,5 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 
 
 End of error output.
+Expect to fail because we can't create a single statement procedure with @SwapTables.
+[badswap]: Failed to plan for statement (sql) "@SwapTables swap2 swap1;". Error: "Error in "@SwapTables swap2 swap1;" unknown token"

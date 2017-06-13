@@ -43,6 +43,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CommandLine;
@@ -51,7 +52,6 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
-import org.voltdb.common.Constants;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -286,11 +286,12 @@ public class LocalCluster extends VoltServerConfig {
             boolean debug,
             boolean isRejoinTest,
             Map<String, String> env) {
-        this(null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
+        this(null, jarFileName, false, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
     }
 
     public LocalCluster(String schemaToStage,
                         String catalogJarFileName,
+                        boolean useStagedSchema,
                         int siteCount,
                         int hostCount,
                         int kfactor,
@@ -301,12 +302,7 @@ public class LocalCluster extends VoltServerConfig {
                         boolean isRejoinTest,
                         Map<String, String> env)
     {
-        if (schemaToStage == null) {
-            assert catalogJarFileName != null : "Catalog jar file name is null";
-            setNewCli(isNewCli);
-        } else {
-            assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
-            setNewCli(true);
+        if (schemaToStage != null) {
             m_usesStagedSchema = true;
             try {
                 templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
@@ -315,6 +311,14 @@ public class LocalCluster extends VoltServerConfig {
                 throw new RuntimeException(e);
             }
         }
+        m_usesStagedSchema = useStagedSchema;
+        if (m_usesStagedSchema) {
+            if (catalogJarFileName != null) {
+                templateCmdLine.m_stagedClassesPath = new VoltFile(catalogJarFileName);
+            }
+            setNewCli(true);
+        }
+
         assert siteCount > 0 : "site count is less than 0";
         assert hostCount > 0 : "host count is less than 0";
 
@@ -497,8 +501,9 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public boolean compile(VoltProjectBuilder builder, final String voltRootPath) {
-        if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, voltRootPath, m_clusterId) != null;
+        if (! m_compiled) {
+            m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, voltRootPath, m_clusterId);
+            m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -508,7 +513,8 @@ public class LocalCluster extends VoltServerConfig {
     @Override
     public boolean compile(VoltProjectBuilder builder) {
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, null, m_clusterId) != null;
+            m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, null, m_clusterId);
+            m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -534,7 +540,8 @@ public class LocalCluster extends VoltServerConfig {
         }
 
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, m_clusterId);
+            m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, m_clusterId);
+            m_compiled = m_initialCatalog != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -612,6 +619,10 @@ public class LocalCluster extends VoltServerConfig {
         // Make the local Configuration object...
         CommandLine cmdln = (templateCmdLine.makeCopy());
         cmdln.startCommand(action);
+        if (m_usesStagedSchema) {
+            cmdln.m_pathToCatalog = null;
+            cmdln.m_stagedClassesPath = null;
+        }
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (this.m_additionalProcessEnv != null) {
             for (String name : this.m_additionalProcessEnv.keySet()) {
@@ -652,6 +663,7 @@ public class LocalCluster extends VoltServerConfig {
         if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
             assert(m_modeOverrides[hostId] != null);
             cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
+            cmdln.m_isPaused = true;
         }
 
         if ((m_sitesperhostOverrides != null) && (m_sitesperhostOverrides.size() > hostId)) {
@@ -1070,6 +1082,10 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.voltdbRoot(root);
             cmdln.pathToDeployment(null);
             cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
+        }
+        if (m_usesStagedSchema) {
+            cmdln.m_pathToCatalog = null;
+            cmdln.m_stagedClassesPath = null;
         }
 
         if (this.m_additionalProcessEnv != null) {
@@ -2150,6 +2166,7 @@ public class LocalCluster extends VoltServerConfig {
         if (remoteReplicationPort != 0) {
             builder.setDRMasterHost("localhost:" + remoteReplicationPort);
         }
+        builder.setUseDDLSchema(true);
         LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI, false);
         lc.setReplicationPort(replicationPort);
         if (callingMethodName != null) {

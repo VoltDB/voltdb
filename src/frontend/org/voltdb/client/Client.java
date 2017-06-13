@@ -198,9 +198,13 @@ public interface Client {
      * result is available. A {@link ProcCallException} is thrown if the
      * response is anything other then success.</p>
      *
+     * <p>Deprecated to be removed in 8.0. Note, you can still call the UpdateApplicationCatalog
+     * system procedure directly using the {@link #callProcedure(String, Object...)} family of
+     * methods.</p>
+     *
      * <p>This method is a convenience method that is equivalent to reading the catalog
      * file into a byte array in Java code, then calling {@link #callProcedure(String, Object...)}
-     * with "@UpdateApplicationCatalog" as the procedure name, followed by they bytes of the catalog
+     * with "@UpdateApplicationCatalog" as the procedure name, followed by the bytes of the catalog
      * and the string value of the deployment file.</p>
      *
      * @param catalogPath Path to the catalog jar file.
@@ -210,6 +214,7 @@ public interface Client {
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws ProcCallException on any VoltDB specific failure.
      */
+    @Deprecated
     public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
     throws IOException, NoConnectionsException, ProcCallException;
 
@@ -220,10 +225,14 @@ public interface Client {
      * not be queued. Check the return value to determine if queuing actually
      * took place.</p>
      *
+     * <p>Deprecated to be removed in 8.0. Note, you can still call the UpdateApplicationCatalog
+     * system procedure directly using the {@link #callProcedure(String, Object...)} family of
+     * methods.</p>
+     *
      * <p>This method is a convenience method that is equivalent to reading the catalog
      * file into a byte array in Java code, then calling
      * {@link #callProcedure(ProcedureCallback, String, Object...)} with
-     * "@UpdateApplicationCatalog" as the procedure name, followed by they bytes of the catalog
+     * "@UpdateApplicationCatalog" as the procedure name, followed by the bytes of the catalog
      * and the string value of the deployment file.</p>
      *
      * @param callback ProcedureCallback that will be invoked with procedure results.
@@ -233,6 +242,7 @@ public interface Client {
      * @throws IOException If the files cannot be serialized or if there is a Java network error.
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      */
+    @Deprecated
     public boolean updateApplicationCatalog(ProcedureCallback callback,
                                             File catalogPath,
                                             File deploymentPath)

@@ -57,7 +57,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -70,6 +69,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.FileAppender;
@@ -103,15 +103,18 @@ import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Deployment;
+import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
@@ -123,9 +126,9 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
-import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
+import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
@@ -213,8 +216,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "</deployment>"
     };
 
-    private final VoltLogger hostLog = new VoltLogger("HOST");
-    private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
@@ -226,9 +229,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "7.2";
+    static final String m_defaultVersionString = "7.4";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q7.2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q7.4\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -237,9 +240,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
-    private AsyncCompilerAgent m_asyncCompilerAgent = null;
-
-    public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
@@ -794,7 +794,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (config.m_isEnterprise) {
                     if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
                     if (m_licenseApi.isPro()) edition = "Pro Edition";
-                    if (m_licenseApi.isTrial()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isEnterpriseTrial()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isProTrial()) edition = "Pro Edition";
                     if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
                 }
 
@@ -893,12 +894,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (stagedCatalogLocation.isFile()) {
                     hostLog.warn("Initialized schema is present, but is being ignored and may be removed.");
                 }
-            } else {
-                assert (config.m_startAction == StartAction.PROBE);
-                if (stagedCatalogLocation.isFile()) {
-                    assert (config.m_pathToCatalog == null) : config.m_pathToCatalog;
-                    config.m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
-                }
             }
 
             List<String> failed = m_nodeSettings.ensureDirectoriesExist();
@@ -928,7 +923,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_snmp = new DummySnmpTrapSender();
             m_messenger = null;
             m_opsRegistrar = new OpsRegistrar();
-            m_asyncCompilerAgent = null;
             m_snapshotCompletionMonitor = null;
             m_catalogContext = null;
             m_partitionCountStats = null;
@@ -1086,12 +1080,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
-            m_asyncCompilerAgent = new AsyncCompilerAgent(m_licenseApi);
-
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
                 JSONObject jo = new JSONObject();
-                jo.put("trial", m_licenseApi.isTrial());
+                jo.put("trial", m_licenseApi.isAnyKindOfTrial());
                 jo.put("hostcount",m_licenseApi.maxHostcount());
                 jo.put("commandlogging", m_licenseApi.isCommandLoggingAllowed());
                 jo.put("wanreplication", m_licenseApi.isDrReplicationAllowed());
@@ -1249,7 +1241,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             /*
              * Construct an adhoc planner for the initial catalog
              */
-            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
+            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_catalogContext);
 
             // Initialize stats
             m_ioStats = new IOStats();
@@ -2211,10 +2203,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void stageSchemaFiles(Configuration config) {
-        if (config.m_userSchema == null) {
-            return; // nothing to do
-        }
-        assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
 
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
@@ -2223,7 +2211,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final boolean standalone = false;
         final boolean isXCDR = false;
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
-        if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())) {
+
+        compiler.setInitializeDDLWithFiltering(true);
+        if (!compiler.compileFromSchemaAndClasses(config.m_userSchema, config.m_stagedClassesPath, stagedCatalogFH)) {
             VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema);
         }
     }
@@ -2640,7 +2630,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             return new ReadDeploymentResults(deploymentBytes, deployment);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            /*
+             * When a settings exception is caught (e.g. reading a broken properties file),
+             * we probably just want to crash the DB anyway
+             */
+            consoleLog.fatal(e.getMessage());
+            VoltDB.crashLocalVoltDB(e.getMessage());
+            return null;
         }
     }
 
@@ -3230,11 +3226,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 }
 
-                if (m_asyncCompilerAgent != null) {
-                    m_asyncCompilerAgent.shutdown();
-                    m_asyncCompilerAgent = null;
-                }
-
                 ExportManager.instance().shutdown();
                 m_computationService.shutdown();
                 m_computationService.awaitTermination(1, TimeUnit.DAYS);
@@ -3305,6 +3296,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             long currentTxnUniqueId,
             byte[] deploymentBytes,
             byte[] deploymentHash,
+            boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration)
     {
@@ -3338,11 +3330,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
                 }
 
-                hostLog.info(String.format("Globally updating the current application catalog and deployment " +
-                            "(new hashes %s, %s).",
-                        Encoder.hexEncode(catalogBytesHash).substring(0, 10),
-                        Encoder.hexEncode(deploymentHash).substring(0, 10)));
-
                 // get old debugging info
                 SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
                 byte[] oldDeployHash = m_catalogContext.deploymentHash;
@@ -3360,7 +3347,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             deploymentBytes,
                             m_messenger,
                             hasSchemaChange);
-                final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
+                final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(/*m_asyncCompilerAgent,*/ m_catalogContext);
                 m_txnIdToContextTracker.put(currentTxnId,
                         new ContextTracker(
                                 m_catalogContext,
@@ -3388,7 +3375,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
 
                 // 1. update the export manager.
-                ExportManager.instance().updateCatalog(m_catalogContext, diffCommands, requiresNewExportGeneration, partitions);
+                ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration, partitions);
 
                 // 1.1 Update the elastic join throughput settings
                 if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
@@ -3427,7 +3414,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // this after flushing the stats -- this will re-register
                 // the MPI statistics.
                 if (m_MPI != null) {
-                    m_MPI.updateCatalog(diffCommands, m_catalogContext, csp, requiresNewExportGeneration);
+                    m_MPI.updateCatalog(diffCommands, m_catalogContext, csp,
+                            requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
                 }
 
                 // Update catalog for import processor this should be just/stop start and updat partitions.
@@ -3492,7 +3480,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(
             ClusterSettings settings, final int expectedVersionId)
     {
-        CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
+        CatalogSpecificPlanner csp = new CatalogSpecificPlanner(/*m_asyncCompilerAgent,*/ m_catalogContext);
         synchronized(m_catalogUpdateLock) {
             int stamp [] = new int[]{0};
             ClusterSettings expect = m_clusterSettings.get(stamp);
@@ -4494,5 +4482,60 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_consumerDRGateway.swapTables(swappedTables);
             }
         }
+    }
+
+    public static void printDiagnosticInformation(CatalogContext context, String procName, LoadedProcedureSet procSet) {
+        StringBuilder sb = new StringBuilder();
+        final CatalogMap<Procedure> catalogProcedures = context.database.getProcedures();
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        sb.append("Statements within " + procName + ": ").append("\n");
+        for (final Procedure proc : catalogProcedures) {
+            if (proc.getTypeName().equals(procName)) {
+                for (Statement stmt : proc.getStatements()) {
+                    // compute hash for determinism check
+                    crc.reset();
+                    String sqlText = stmt.getSqltext();
+                    crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+                    int hash = (int) crc.getValue();
+                    sb.append("Statement Hash: ").append(hash);
+                    sb.append(", Statement SQL: ").append(sqlText);
+                    for (PlanFragment frag : stmt.getFragments()) {
+                        byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                        long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                        String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                        byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                        sb.append(", Plan Fragment Id:").append(planId);
+                        sb.append(", Plan Stmt Text:").append(stmtText);
+                        sb.append(", Json Plan:").append(new String(jsonPlan));
+                    }
+                    sb.append("\n");
+                }
+            }
+        }
+        sb.append("Default CRUD Procedures: ").append("\n");
+        for (Entry<String, Procedure> pair : context.m_defaultProcs.m_defaultProcMap.entrySet()) {
+            crc.reset();
+            String sqlText = DefaultProcedureManager.sqlForDefaultProc(pair.getValue());
+            crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+            int hash = (int) crc.getValue();
+            sb.append("Statement Hash: ").append(hash);
+            sb.append(", Statement SQL: ").append(sqlText);
+            ProcedureRunner runner = procSet.getProcByName(pair.getValue().getTypeName());
+            for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
+                for (PlanFragment frag : stmt.getFragments()) {
+                    byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                    long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                    String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                    byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                    sb.append(", Plan Fragment Id:").append(planId);
+                    sb.append(", Plan Stmt Text:").append(stmtText);
+                    sb.append(", Json Plan:").append(new String(jsonPlan));
+                }
+            }
+            sb.append("\n");
+        }
+
+
+        hostLog.error(sb.toString());
     }
 }

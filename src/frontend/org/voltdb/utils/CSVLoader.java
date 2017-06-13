@@ -19,8 +19,8 @@ package org.voltdb.utils;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -276,8 +276,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
-        @Option(desc = "username when connecting to the servers")
 
+        @Option(desc = "username when connecting to the servers")
         String user = "";
 
         @Option(desc = "password to use when connecting to servers")
@@ -291,6 +291,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         @Option(shortOpt = "n", desc = "Custom null string, overrides all other Null pattern matching")
         String customNullString = "";
+
+        // add a charset flag as "c"
+        @Option(shortOpt = "c", desc = "character set , default system character set")
+        String charset = "utf-8";
 
         @Option(desc = "Disables the quote character. All characters between delimiters, including quote characters, are included in the input.",
                 hasArg = false)
@@ -407,8 +411,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             config.quotechar = '\u0000';
         }
 
-
         configuration();
+
         final Tokenizer tokenizer;
         ICsvListReader listReader = null;
         try {
@@ -418,10 +422,17 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                         config.skip, config.header);
                 listReader = new CsvListReader(tokenizer, csvPreference);
             } else {
-                tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
-                        config.strictquotes, config.escape, config.columnsizelimit,
-                        config.skip, config.header);
-                listReader = new CsvListReader(tokenizer, csvPreference);
+                FileInputStream fis = new FileInputStream(config.file);
+                InputStreamReader isr = new InputStreamReader(fis, config.charset);
+                tokenizer = new Tokenizer(isr,
+                          csvPreference,
+                          config.strictquotes,
+                          config.escape,
+                          config.columnsizelimit,
+                          config.skip,
+                          config.header);
+
+                   listReader = new CsvListReader(tokenizer, csvPreference);
             }
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
@@ -459,7 +470,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             final CSVDataLoader dataLoader;
 
             errHandler.launchErrorFlushProcessor();
-
 
             if (config.useSuppliedProcedure) {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
@@ -574,10 +584,20 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      */
     public static Client getClient(ClientConfig config, String[] servers,
             int port) throws Exception {
+        config.setTopologyChangeAware(true); // Set client to be topology-aware
         final Client client = ClientFactory.createClient(config);
-
         for (String server : servers) {
-            client.createConnection(server.trim(), port);
+            // Try connecting servers one by one until we have a success
+            try {
+                client.createConnection(server.trim(), port);
+                break;
+            } catch(IOException e) {
+                // Only swallow the exceptions from Java network or connection problems
+                // Unresolved hostname exceptions will be thrown
+            }
+        }
+        if (client.getConnectedHostList().isEmpty()) {
+            throw new Exception("Unable to connect to any servers.");
         }
         return client;
     }
@@ -640,7 +660,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         } catch (Exception x) {
             m_log.error(x.getMessage());
         }
-
     }
 
     private static void close_cleanup() throws IOException,

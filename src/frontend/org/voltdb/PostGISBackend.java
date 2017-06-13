@@ -252,11 +252,11 @@ public class PostGISBackend extends PostgreSQLBackend {
     static public PostGISBackend initializePostGISBackend(CatalogContext context)
     {
         synchronized(backendLock) {
-            if (m_backend == null) {
-                try {
-                    if (m_permanent_db_backend == null) {
-                        m_permanent_db_backend = new PostgreSQLBackend();
-                    }
+            try {
+                if (m_permanent_db_backend == null) {
+                    m_permanent_db_backend = new PostgreSQLBackend();
+                }
+                if (m_backend == null) {
                     Statement stmt = m_permanent_db_backend.getConnection().createStatement();
                     stmt.execute("drop database if exists " + m_database_name + ";");
                     stmt.execute("create database " + m_database_name + ";");
@@ -274,10 +274,10 @@ public class PostGISBackend extends PostgreSQLBackend {
                         m_backend.runDDL(decoded_cmd);
                     }
                 }
-                catch (final Exception e) {
-                    hostLog.fatal("Unable to construct PostGIS backend");
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
+            }
+            catch (final Exception e) {
+                hostLog.fatal("Unable to construct PostGIS backend");
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
             return (PostGISBackend) m_backend;
         }

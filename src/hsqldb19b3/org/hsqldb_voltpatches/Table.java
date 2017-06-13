@@ -66,9 +66,7 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -2685,7 +2683,6 @@ public class Table extends TableBase implements SchemaObject {
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement table = new VoltXMLElement("table");
-        Map<String, String> autoGenNameMap = new HashMap<String, String>();
 
         // add table metadata
         String tableName = getName().name;
@@ -2693,8 +2690,6 @@ public class Table extends TableBase implements SchemaObject {
 
         // read all the columns
         VoltXMLElement columns = new VoltXMLElement("columns");
-        // Hacky, need a "name" for the diffing stuff to work correctly
-        // See VoltXMLElement.java for further explanation of TEH HORROR
         columns.attributes.put("name", "columns");
         table.children.add(columns);
         int[] columnIndices = getColumnMap();
@@ -2706,66 +2701,32 @@ public class Table extends TableBase implements SchemaObject {
             assert(colChild != null);
         }
 
+        // read all the constraints
+        VoltXMLElement constraints = new VoltXMLElement("constraints");
+        constraints.attributes.put("name", "constraints");
+        Map<String, VoltXMLElement> indexConstraintMap = new HashMap<>();
+        for (Constraint constraint : getConstraints()) {
+            VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
+            constraints.children.add(constraintChild);
+            if (constraintChild.attributes.containsKey("index")) {
+                indexConstraintMap.put(constraintChild.attributes.get("index"), constraintChild);
+            }
+        }
+
         // read all the indexes
         VoltXMLElement indexes = new VoltXMLElement("indexes");
-        // Hacky, need a "name" for the diffing stuff to work correctly
-        // See VoltXMLElement.java for further explanation of TEH HORROR
         indexes.attributes.put("name", "indexes");
-        table.children.add(indexes);
         for (Index index : indexList) {
-            VoltXMLElement indexChild = index.voltGetIndexXML(session, tableName);
-            autoGenNameMap.put(index.getName().name, indexChild.attributes.get("name"));
+            VoltXMLElement indexChild = index.voltGetIndexXML(session, tableName, indexConstraintMap);
             indexes.children.add(indexChild);
             assert(indexChild != null);
         }
 
-        // read all the constraints
-        VoltXMLElement constraints = new VoltXMLElement("constraints");
-        // Hacky, need a "name" for the diffing stuff to work correctly
-        // See VoltXMLElement.java for further explanation of TEH HORROR
-        constraints.attributes.put("name", "constraints");
+        // Indexes must come before constraints when converting to the catalog.
+        table.children.add(indexes);
         table.children.add(constraints);
-        List<VoltXMLElement> revisitList = new ArrayList<VoltXMLElement>();
-        for (Constraint constraint : getConstraints()) {
-            VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
-            if (constraintChild != null) {
-                String constraintName = constraintChild.attributes.get("index");
-                String autoGenName = autoGenNameMap.get(constraintName);
-                if (autoGenName != null) {
-                    constraintChild.attributes.put("index", autoGenName);
-                    String constName;
-                    if (autoGenName.startsWith(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX)) {
-                        constName = autoGenName.substring(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX.length());
-                    }
-                    else {
-                        constName = autoGenName;
-                    }
-                    autoGenNameMap.put(constraintChild.attributes.get("name"), constName);
-                    constraintChild.attributes.put("name", constName);
-                }
-                else {
-                    int const_type = constraint.getConstraintType();
-                    if (const_type == Constraint.PRIMARY_KEY || const_type == Constraint.UNIQUE
-                            || const_type == Constraint.LIMIT || const_type == Constraint.FOREIGN_KEY) {
-                        revisitList.add(constraintChild);
-                        continue;
-                    }
-                }
-                constraints.children.add(constraintChild);
-            }
-        }
 
-        for (VoltXMLElement constraintChild : revisitList) {
-            String constraintName = constraintChild.attributes.get("index");
-            String autoGenName = autoGenNameMap.get(constraintName);
-            if (autoGenName != null) {
-                constraintChild.attributes.put("index", autoGenName);
-                String constName = HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX +
-                        autoGenName.substring(HSQLInterface.AUTO_GEN_PREFIX.length());
-                autoGenNameMap.put(constraintChild.attributes.get("name"), constName);
-            }
-            constraints.children.add(constraintChild);
-        }
+        assert(indexConstraintMap.isEmpty());
 
         return table;
     }

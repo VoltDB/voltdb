@@ -23,6 +23,10 @@
 
 package org.voltdb.compiler;
 
+import static org.mockito.Matchers.contains;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -39,6 +43,8 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
+import org.mockito.Mockito;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
@@ -83,6 +89,53 @@ public class TestVoltCompiler extends TestCase {
         njar.delete();
         File tjar = new File(testout_jar);
         tjar.delete();
+    }
+
+    public void testDDLFiltering() throws Exception {
+
+        String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +
+                     "-- This comment is inside a batch\n" +
+                     "DROP PROCEDURE Initialize                     IF EXISTS;\n" +
+                     "DROP PROCEDURE Results                         IF EXISTS;\n" +
+                     "\n" +
+                     "END_OF_DROP_BATCH\n" +
+                     "-- This command cannot be part of a DDL batch.\n" +
+                     "LOAD CLASSES voter-procs.jar\n";
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertTrue(success);
+
+        success = compileInitDDL(false, ddl, compiler);
+        assertFalse(success);
+    }
+
+    public void testDDLFilteringNoEndBatch() throws Exception {
+
+        String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +
+                     "-- This comment is inside a batch\n" +
+                     "DROP PROCEDURE Initialize                     IF EXISTS;\n" +
+                     "DROP PROCEDURE Results                         IF EXISTS;\n" +
+                     "\n";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertFalse(success);
+    }
+
+    public void testDDLFilteringCaseInsensitve() throws Exception {
+
+        String ddl = "FiLe -inlinebatch END_OF_DROP_BATCH\n" +
+                     "-- This comment is inside a batch\n" +
+                     "DROP PROCEDURE Initialize                     IF EXISTS;\n" +
+                     "DROP PROCEDURE Results                         IF EXISTS;\n" +
+                     "\n" +
+                     "END_OF_DROP_BATCH\n" +
+                     "-- This command cannot be part of a DDL batch.\n" +
+                     "Load Classes voter-procs.jar\n";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileInitDDL(true, ddl, compiler);
+        assertTrue(success);
     }
 
     public void testBrokenLineParsing() throws IOException {
@@ -456,6 +509,22 @@ public class TestVoltCompiler extends TestCase {
         Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
         Column var = db.getTables().get("BOOKS").getColumns().get("TITLE");
         assertTrue(var.getInbytes());
+    }
+
+    public void testDDLWithHashDeprecatedWarning() {
+        String schema =
+            "create table test (dummy int); " +
+            "create index hashidx on test(dummy);";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
+
+        // Check warnings
+        assertEquals(1, compiler.m_warnings.size());
+        String warningMsg = compiler.m_warnings.get(0).getMessage();
+        String expectedMsg = "Hash indexes are deprecated. In a future release, VoltDB will only support tree indexes, even if the index name contains the string \"hash\"";
+        assertEquals(expectedMsg, warningMsg);
     }
 
     public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
@@ -1370,6 +1439,7 @@ public class TestVoltCompiler extends TestCase {
     private static String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
             "Please use UNIQUE instead";
+    private static String msgPK = "Invalid use of PRIMARY KEY.";
 
     public void testColumnUniqueGiveException() {
         String schema;
@@ -1414,7 +1484,6 @@ public class TestVoltCompiler extends TestCase {
                 "primary key (id), UNIQUE (id, abs(age)) );\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n";
         checkValidUniqueAndAssumeUnique(schema, null, msgPR);
-
 
         // (3) ****** Partition Table: UNIQUE not valid
         // A unique index on the partitioning key ( non-primary key) gets one error.
@@ -1483,6 +1552,13 @@ public class TestVoltCompiler extends TestCase {
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         String schemaPath = schemaFile.getPath();
 
+        return compiler.compileFromDDL(testout_jar, schemaPath);
+    }
+
+    private boolean compileInitDDL(boolean isInit, String ddl, VoltCompiler compiler) {
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
+        String schemaPath = schemaFile.getPath();
+        compiler.setInitializeDDLWithFiltering(isInit);
         return compiler.compileFromDDL(testout_jar, schemaPath);
     }
 
@@ -2271,8 +2347,8 @@ public class TestVoltCompiler extends TestCase {
 
     public void testInvalidCreateFunctionDDL() throws Exception {
         ArrayList<Feedback> fbs;
+        // Test CREATE FUNCTION syntax
         String[] ddls = new String[] {
-                // Test CREATE FUNCTION syntax
                 "CREATE FUNCTION .func FROM METHOD class.method",
                 "CREATE FUNCTION func FROM METHOD class",
                 "CREATE FUNCTION func FROM METHOD .method",
@@ -2287,8 +2363,8 @@ public class TestVoltCompiler extends TestCase {
             assertTrue(isFeedbackPresent(String.format(expectedError, ddl), fbs));
         }
 
+        // Test identifiers
         String[][] ddlsAndInvalidIdentifiers = new String[][] {
-                // Test identifiers
                 {"CREATE FUNCTION 1nvalid FROM METHOD package.class.method", "1nvalid"},
                 {"CREATE FUNCTION func FROM METHOD 1nvalid.class.method", "1nvalid.class"},
                 {"CREATE FUNCTION func FROM METHOD package.1nvalid.method", "package.1nvalid"},
@@ -2300,6 +2376,67 @@ public class TestVoltCompiler extends TestCase {
             assertTrue(isFeedbackPresent(
                     String.format(expectedError, ddlAndInvalidIdentifier[0], ddlAndInvalidIdentifier[1]), fbs));
         }
+
+        // Test method validation
+        VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
+        VoltCompiler.setVoltLogger(mockedLogger);
+        String temporaryWarningMessage = "User-defined functions are not implemented yet.";
+
+        // Class not found
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.NonExistentClass.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Cannot load class for user-defined function: org.voltdb.compiler.functions.NonExistentClass", fbs));
+
+        // Abstract class
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.AbstractUDFClass.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Cannot define a function using an abstract class org.voltdb.compiler.functions.AbstractUDFClass", fbs));
+
+        // Method not found
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.nonexistent;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Cannot find the implementation method nonexistent for user-defined function afunc in class InvalidUDFLibrary", fbs));
+
+        // Invalid return type
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.runWithUnsupportedReturnType;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedReturnType has an unsupported return type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType", fbs));
+
+        // Invalid parameter type
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.runWithUnsupportedParamType;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedParamType has an unsupported parameter type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType at position 2", fbs));
+
+        // Multiple functions with the same name
+        fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.dup;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Class InvalidUDFLibrary has multiple methods named dup. Only a single function method is supported.", fbs));
+
+        // Function name exists
+        // One from FunctionSQL
+        fbs = checkInvalidDDL("CREATE FUNCTION abs FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Function \"abs\" is already defined.", fbs));
+        // One from FunctionCustom
+        fbs = checkInvalidDDL("CREATE FUNCTION log FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Function \"log\" is already defined.", fbs));
+        // One from FunctionForVoltDB
+        fbs = checkInvalidDDL("CREATE FUNCTION longitude FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;");
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        assertTrue(isFeedbackPresent("Function \"longitude\" is already defined.", fbs));
+
+        // The class contains some other invalid functions with the same name
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;", compiler);
+        assertTrue("A CREATE FUNCTION statement should be able to succeed, but it did not.", success);
+        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
+        verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a non-public run() method."));
+        verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a void run() method."));
+        verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a static run() method."));
+        verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a non-public static void run() method."));
+
+        VoltCompiler.setVoltLogger(new VoltLogger("COMPILER"));
     }
 
     public void testInvalidCreateProcedureDDL() throws Exception {

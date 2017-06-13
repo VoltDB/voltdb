@@ -60,7 +60,10 @@ public abstract class NonVoltDBBackend {
     protected static NonVoltDBBackend m_backend = null;
     protected String m_database_type = null;
     protected Connection dbconn;
+    protected String dbconn_url = "UNKNOWN";
     protected static FileWriter transformedSqlFileWriter;
+    protected static long countCaughtExceptions = 0;
+    protected static final long MAX_CAUGHT_EXCEPTION_MESSAGES = 100;
     protected static final boolean DEBUG = false;
 
     /** Pattern used to recognize "variables", such as {table} or {column:pk},
@@ -110,8 +113,10 @@ public abstract class NonVoltDBBackend {
             dbconn = DriverManager.getConnection(connectionURL, username, password);
             dbconn.setAutoCommit(true);
             dbconn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+            dbconn_url = connectionURL;
             DatabaseMetaData meta = dbconn.getMetaData();
-            System.out.println("Using database: " + meta.getDatabaseProductName()+" "+meta.getDatabaseProductVersion());
+            System.out.println("Using database: " + meta.getDatabaseProductName()+" "
+                    + meta.getDatabaseProductVersion() + " ("+connectionURL+")");
             System.out.println(" & JDBC driver: " + meta.getDriverName()+", "+meta.getDriverVersion());
         } catch (SQLException e) {
             throw new RuntimeException("Failed to open connection to: " + connectionURL, e);
@@ -366,6 +371,18 @@ public abstract class NonVoltDBBackend {
 
     }
 
+    /** Print a message about an Exception that was caught; but limit the number
+     *  of such print messages, so that the console is not swamped by them. */
+    protected static void printCaughtException(String exceptionMessage) {
+        if (++countCaughtExceptions <= MAX_CAUGHT_EXCEPTION_MESSAGES) {
+            System.out.println(exceptionMessage);
+        }
+        if (countCaughtExceptions == MAX_CAUGHT_EXCEPTION_MESSAGES) {
+            System.out.println("In NonVoltDBBackend, reached limit of " + MAX_CAUGHT_EXCEPTION_MESSAGES
+                    + " exception messages to be printed.");
+        }
+    }
+
     /** Returns all column names for the specified table, in the order defined
      *  in the DDL. */
     protected List<String> getAllColumns(String tableName) {
@@ -378,7 +395,7 @@ public abstract class NonVoltDBBackend {
                 columns.add(rs.getString(4));
             }
         } catch (SQLException e) {
-            System.out.println("In NonVoltDBBackend.getAllColumns, caught SQLException: " + e);
+            printCaughtException("In NonVoltDBBackend.getAllColumns, caught SQLException: " + e);
         }
         return columns;
     }
@@ -395,7 +412,7 @@ public abstract class NonVoltDBBackend {
                 pkCols.add(rs.getString(4));
             }
         } catch (SQLException e) {
-            System.out.println("In NonVoltDBBackend.getPrimaryKeys, caught SQLException: " + e);
+            printCaughtException("In NonVoltDBBackend.getPrimaryKeys, caught SQLException: " + e);
         }
         return pkCols;
     }
@@ -461,7 +478,7 @@ public abstract class NonVoltDBBackend {
                     }
                 }
             } catch (SQLException e) {
-                System.out.println("In NonVoltDBBackend.isColumnType, with tableName "+tableName+", columnName "
+                printCaughtException("In NonVoltDBBackend.isColumnType, with tableName "+tableName+", columnName "
                         + columnName+", columnTypes "+columnTypes+", caught SQLException:\n  " + e);
             }
         }
@@ -716,9 +733,9 @@ public abstract class NonVoltDBBackend {
                 transformedSqlFileWriter.write("original SQL: " + originalSql + "\n");
                 transformedSqlFileWriter.write("modified SQL: " + modifiedSql + "\n");
             } catch (IOException e) {
-                System.out.println("Caught IOException:\n    " + e);
-                System.out.println("original SQL: " + originalSql);
-                System.out.println("modified SQL: " + modifiedSql);
+                printCaughtException("Caught IOException:\n    " + e
+                        + "\noriginal SQL: " + originalSql
+                        + "\nmodified SQL: " + modifiedSql);
             }
         }
     }

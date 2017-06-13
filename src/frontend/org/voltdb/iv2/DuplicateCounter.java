@@ -42,13 +42,18 @@ public class DuplicateCounter
     static final int MISMATCH = 0;
     static final int DONE = 1;
     static final int WAITING = 2;
+    static final int ABORT = 3;
 
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
+    static final int[] ZERO_HASHES = new int[] { 0, 0, 0 };
+
     final long m_destinationId;
-    Long m_responseHash = null;
+    int[] m_responseHashes = null;
     protected VoltMessage m_lastResponse = null;
     protected VoltTable m_lastResultTables[] = null;
+    // if any response shows the transaction aborted
+    boolean m_txnSucceed = false;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
     final VoltMessage m_openMessage;
@@ -80,13 +85,13 @@ public class DuplicateCounter
         }
     }
 
-    void logRelevantMismatchInformation(long hash, VoltMessage recentMessage) {
-        String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
+    void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage) {
+        String msg = String.format(reason + " COMPARING: %d to %d\n"
                 + "REQUEST MESSAGE: %s\n"
                 + "PREV RESPONSE MESSAGE: %s\n"
                 + "CURR RESPONSE MESSAGE: %s\n",
-                hash,
-                m_responseHash,
+                hashes[0],
+                m_responseHashes[0],
                 m_openMessage.toString(),
                 m_lastResponse.toString(),
                 recentMessage.toString());
@@ -130,18 +135,26 @@ public class DuplicateCounter
         return "UNKNOWN_PROCEDURE_NAME";
     }
 
-    protected int checkCommon(long hash, boolean rejoining, VoltTable resultTables[], VoltMessage message)
+    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnSucceed)
     {
         if (!rejoining) {
-            if (m_responseHash == null) {
-                m_responseHash = Long.valueOf(hash);
+            if (m_responseHashes == null) {
+                m_responseHashes = hashes;
+                m_txnSucceed = txnSucceed;
             }
-            else if (!m_responseHash.equals(hash)) {
+            else if (!DeterminismHash.compareHashes(m_responseHashes, hashes)) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation(hash, message);
+                logRelevantMismatchInformation("HASH MISMATCH", hashes, message);
                 return MISMATCH;
+            }
+            else if (m_txnSucceed != txnSucceed) {
+                tmLog.fatal("Stored procedure " + getStoredProcedureName()
+                        + " succeeded on one partition but failed on another partition."
+                        + " Shutting down to preserve data integrity.");
+                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message);
+                return ABORT;
             }
             m_lastResponse = message;
             m_lastResultTables = resultTables;
@@ -171,27 +184,30 @@ public class DuplicateCounter
     {
         ClientResponseImpl r = message.getClientResponseData();
         // get the hash of sql run
-        long hash = 0;
-        Integer sqlHash = r.getHash();
-        if (sqlHash != null) {
-            hash = sqlHash.intValue();
+        int[] hashes = r.getHashes();
+
+        boolean txnAbort = true;
+        if (ClientResponseImpl.isTransactionallySuccessful(message.getClientResponseData().getStatus())) {
+            txnAbort = false;
         }
-        return checkCommon(hash, message.isRecovering(), r.getResults(), message);
+
+        return checkCommon(hashes, message.isRecovering(), r.getResults(), message, txnAbort);
     }
 
     int offer(FragmentResponseMessage message)
     {
-        return checkCommon(0, message.isRecovering(), null, message);
+        // No check on fragment message
+        return checkCommon(ZERO_HASHES, message.isRecovering(), null, message, false);
     }
 
     int offer(CompleteTransactionResponseMessage message)
     {
-        return checkCommon(0, message.isRecovering(), null, message);
+        return checkCommon(ZERO_HASHES, message.isRecovering(), null, message, false);
     }
 
     int offer(DummyTransactionResponseMessage message)
     {
-        return checkCommon(0, false, null, message);
+        return checkCommon(ZERO_HASHES, false, null, message, false);
     }
 
     VoltMessage getLastResponse()

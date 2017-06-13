@@ -59,6 +59,7 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -77,8 +78,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Catalog.CatalogCmd;
-import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
@@ -122,8 +121,8 @@ import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
@@ -1235,11 +1234,15 @@ public abstract class CatalogUtil {
                 for( PropertyType configProp: configProperties) {
                     String key = configProp.getName();
                     String value = configProp.getValue();
-                    if (!key.toLowerCase().contains("passw")) {
-                        processorProperties.setProperty(key, value.trim());
-                    } else {
-                        //Dont trim passwords
+                    if (key.toLowerCase().contains("passw")) {
+                        // Don't trim password
                         processorProperties.setProperty(key, value);
+                    } else if (key.toLowerCase().contains("delim")){
+                        // Don't trim \n in delimiters
+                        String trimmedDelimiters = value.replaceAll("^(\r|\f|\t| )+", "").replaceAll("(\r|\f|\t| )+$", "");
+                        processorProperties.setProperty(key, StringEscapeUtils.escapeJava(trimmedDelimiters));
+                    } else {
+                        processorProperties.setProperty(key, value.trim());
                     }
                 }
             }
@@ -1413,7 +1416,7 @@ public abstract class CatalogUtil {
                 if (!key.toLowerCase().contains("passw")) {
                     moduleProps.setProperty(key, value.trim());
                 } else {
-                    //Dont trim passwords
+                    //Don't trim passwords
                     moduleProps.setProperty(key, value);
                 }
             }
@@ -2652,48 +2655,4 @@ public abstract class CatalogUtil {
         }
         return deployment;
     }
-
-    /**
-     * {@link CatalogDiffEngine} generates statement commands that will apply on catalog.
-     * Most of these diffCmds are useful for java in memory catalog, but only very few are used in EE.
-     * This function will generate EE applicable diffCmds.
-     * @param diffCmds
-     * @return
-     */
-    public static String getDiffCommandsForEE(String diffCmds) {
-        if (diffCmds == null || diffCmds.length() == 0) return "";
-        // We know EE does not care procedure changes, so we can skip them for EE diffs.
-        // There are more like deployment changes, the better way is to filter all the other
-        // catalog type changes other than the ones used in EE.
-        // Refer the EE catalog usage.
-
-        // e.g.
-        // add /clusters#cluster/databases#database procedures Vote
-        // set /clusters#cluster/databases#database/procedures#Vote classname "voter.Vote"
-        // set $PREV readonly false
-        // set $PREV singlepartition true
-        // add /clusters#cluster/databases#database/procedures#Vote statements checkContestantStmt
-        // set /clusters#cluster/databases#database/procedures#Vote/statements#checkContestantStmt sqltext "SELECT contes...
-        // set $PREV querytype 2
-        // set $PREV readonly true
-        // set $PREV singlepartition true
-
-        StringBuilder sb = new StringBuilder();
-        String[] cmds = diffCmds.split("\n");
-        boolean skip = false;
-        for (int i = 0; i < cmds.length; i++) {
-            String stmt = cmds[i];
-
-            char cmd = Catalog.parseStmtCmd(stmt);
-            if (cmd == 'a' || cmd == 'd') { // add, del
-                CatalogCmd catCmd = Catalog.parseStmt(stmt);
-                skip = catCmd.isProcedureRelatedCmd();
-            }
-            if (!skip) {
-                sb.append(stmt).append("\n");
-            }
-        }
-        return sb.toString();
-    }
-
 }

@@ -49,10 +49,11 @@ public interface ImportDataProcessor  {
 
     /**
      * Pass processor specific processor configuration properties
-     * @param context current catalog context
      * @param config an instance of {@linkplain Properties}
+     * @param list of abstract importer factory
      */
-    public void setProcessorConfig(CatalogContext context, Map<String, ImportConfiguration> config);
+
+    public void setProcessorConfig(Map<String, ImportConfiguration> config, final Map<String, AbstractImporterFactory> importers);
 
     public int getPartitionsCount();
 

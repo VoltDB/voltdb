@@ -30,7 +30,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
-import org.voltdb.HybridCrc32;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
@@ -40,14 +39,15 @@ import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.iv2.TxnEgo;
-import org.voltdb.utils.VoltTrace;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * Wrapper for native Execution Engine library. There are two implementations,
@@ -85,7 +85,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         POISON_PILL(1),
         CATALOG_UPDATE(2),
         DR_STREAM_START(3),
-        SWAP_TABLE(4);
+        SWAP_TABLE(4),
+        DR_STREAM_END(5);
 
         private EventType(int typeId) {
             this.typeId = typeId;
@@ -632,9 +633,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
             String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long lastCommittedSpHandle,
@@ -661,7 +663,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             }
 
             FastDeserializer results = coreExecutePlanFragments(m_currentBatchIndex, numFragmentIds, planFragmentIds,
-                    inputDepIds, parameterSets, isWriteFrag, writeCRC, txnId, spHandle, lastCommittedSpHandle,
+                    inputDepIds, parameterSets, determinismHash, isWriteFrags, sqlCRCs, txnId, spHandle, lastCommittedSpHandle,
                     uniqueId, undoQuantumToken, traceOn);
 
             if (traceOn) {
@@ -693,8 +695,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long lastCommittedSpHandle,

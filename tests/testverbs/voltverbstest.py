@@ -99,7 +99,7 @@ verbose = Opt('verbose', 'verbose', None, 2)
 output = Opt('output', 'file', str, 2)
 # Ddir = Opt('
 schema = Opt('schema', 'schema', str, 2)
-classes = Opt('classes', 'classpath', str, 2)
+classes = Opt('classes', 'classes', str, 2)
 
 # negative opt
 unknown = Opt('unknown', None, None, 0)
@@ -318,13 +318,10 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
         return True, description
 
     # match the opts
-    # ignore 'classpath' - it gets filtered out
     output_tokens = output_str.lstrip(verb).split()
     expected_tokens = []
     for k, v in opts.items():
-        if k == "classpath":
-            pass
-        elif v:
+        if v:
             expected_tokens.extend([k, v])
         else:
             expected_tokens.append(k)

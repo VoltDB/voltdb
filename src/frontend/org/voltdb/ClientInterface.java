@@ -154,7 +154,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long DR_REPLICATION_SNAPSHOT_BASE_CID  = Long.MIN_VALUE + setBaseValue(2);
     public static final long DR_REPLICATION_NORMAL_BASE_CID    = Long.MIN_VALUE + setBaseValue(3);
     public static final long DR_REPLICATION_MP_BASE_CID        = Long.MIN_VALUE + setBaseValue(4);
-    public static final long INTERNAL_CID                      = Long.MIN_VALUE + setBaseValue(5);
+    public static final long NT_ADAPTER_CID                    = Long.MIN_VALUE + setBaseValue(5);
+    public static final long INTERNAL_CID                      = Long.MIN_VALUE + setBaseValue(6);
 
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
@@ -575,7 +576,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             if (remnant.hasRemaining() && remnant.remaining() <= 4 && remnant.getInt() < remnant.remaining()) {
-                throw new IOException("SSL Handshake remnant is not a valit VoltDB message: " + remnant);
+                throw new IOException("SSL Handshake remnant is not a valid VoltDB message: " + remnant);
             }
 
             /*
@@ -608,23 +609,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 message.position(0);
                 message.get(todigest).position(4);
             }
-            long beforeRead = 0;
             try {
                 while (message == null) {
-                    beforeRead = EstTime.currentTimeMillis();
                     message = messagingChannel.readMessage();
                 }
             } catch (IOException e) {
-                long opduration = EstTime.currentTimeMillis() - beforeRead;
-                if (opduration > (AUTH_TIMEOUT_MS - (AUTH_TIMEOUT_MS/20))) {
-                    e = null;
-                }
+                // Don't log a stack trace - assume a security probe sent a bad packet or the connection timed out.
                 try {
                     socket.close();
                 } catch (IOException e1) {
-                }
-                if (e != null) {
-                    throw e;
                 }
                 return null;
             }
@@ -992,7 +985,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             clientResponse.setClientHandle(clientData.m_clientHandle);
             clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
-            clientResponse.setHash(null); // not part of wire protocol
+            clientResponse.setHashes(null); // not part of wire protocol
 
             return clientResponse.getSerializedSize() + 4;
         }
@@ -1262,6 +1255,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         bindAdapter(m_executeTaskAdpater, null);
 
         m_dispatcher = InvocationDispatcher.builder()
+                .clientInterface(this)
                 .snapshotDaemon(m_snapshotDaemon)
                 .replicationRole(replicationRole)
                 .cartographer(m_cartographer)
@@ -1270,7 +1264,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .clientInterfaceHandleManagerMap(m_cihm)
                 .plannerSiteId(m_plannerSiteId)
                 .siteId(m_siteId)
-                .internalConnectionHandler(m_internalConnectionHandler)
                 .build();
     }
 

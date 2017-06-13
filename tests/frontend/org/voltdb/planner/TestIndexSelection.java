@@ -216,7 +216,7 @@ public class TestIndexSelection extends PlannerTestCase {
                 ((NestLoopIndexPlanNode) pn).getInlineIndexScan();
         assertEquals(IndexLookupType.LT, indexScan.getLookupType());
         assertEquals(
-                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "ID",
+                HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "ID",
                 indexScan.getTargetIndexName());
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
@@ -306,7 +306,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
         pn = compile("select * from l x, l where l.b = ? and DECODE(x.a, null, 0, x.a) = 0 and x.id = ? and l.lname = x.lname;");
         //*enable to debug*/System.out.println("DEBUG: " + pn.toExplainPlanString());
-        leftIndexName = HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG";
+        leftIndexName = HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "PK_LOG";
         checkDualIndexedJoin(pn, leftIndexName, "DECODE_IDX3", 1);
 
         pn = compile("select * from l x, l where l.b = ? and DECODE(x.a, null, 0, x.a) = 0 and l.id = ? and l.lname = x.lname;");
@@ -335,7 +335,7 @@ public class TestIndexSelection extends PlannerTestCase {
 
         pn = compile("select * from l x, l where l.b = ? and DECODE(x.a, null, 0, l.a) = 0 and x.id = ? and l.lname = x.lname;");
         //*enable to debug*/System.out.println("DEBUG: " + pn.toExplainPlanString());
-        leftIndexName = HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG";
+        leftIndexName = HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "PK_LOG";
         checkDualIndexedJoin(pn, leftIndexName, "DECODE_IDX3", 1);
     }
 
@@ -355,7 +355,7 @@ public class TestIndexSelection extends PlannerTestCase {
         // Negative case
         pn = compile("select * from l WHERE CASE WHEN a < 10 THEN a*2 ELSE a + 5 END > 2");
         pn = pn.getChild(0);
-        //*enable to debug*/System.out.println(pn.toExplainPlanString());
+        /*enable to debug*/System.out.println(pn.toExplainPlanString());
         assertTrue(pn.toExplainPlanString().contains("using its primary key index (for deterministic order only)"));
     }
 

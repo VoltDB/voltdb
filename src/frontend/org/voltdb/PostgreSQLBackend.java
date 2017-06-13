@@ -192,7 +192,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
 
     // Captures the use of NOW, without parentheses
     private static final Pattern nowQuery = Pattern.compile(
-            "(?<now>NOW)(?!\\s*\\()", Pattern.CASE_INSENSITIVE);
+            "\\b(?<now>NOW)\\b(?!\\s*\\()", Pattern.CASE_INSENSITIVE);
     // Modifies a query containing NOW, without parentheses, which PostgreSQL
     // does not support, and simply replaces it with NOW(), with parentheses,
     // which it does support.
@@ -471,11 +471,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
     {
         synchronized(backendLock) {
-            if (m_backend == null) {
-                try {
-                    if (m_permanent_db_backend == null) {
-                        m_permanent_db_backend = new PostgreSQLBackend();
-                    }
+            try {
+                if (m_permanent_db_backend == null) {
+                    m_permanent_db_backend = new PostgreSQLBackend();
+                }
+                if (m_backend == null) {
                     Statement stmt = m_permanent_db_backend.getConnection().createStatement();
                     stmt.execute("drop database if exists " + m_database_name + ";");
                     stmt.execute("create database " + m_database_name + ";");
@@ -492,10 +492,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                         m_backend.runDDL(decoded_cmd);
                     }
                 }
-                catch (final Exception e) {
-                    hostLog.fatal("Unable to construct PostgreSQL backend");
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
+            }
+            catch (final Exception e) {
+                hostLog.fatal("Unable to construct PostgreSQL backend");
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
             return (PostgreSQLBackend) m_backend;
         }
@@ -986,20 +986,50 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     @Override
     protected void shutdown() {
         try {
+            System.out.println("Closing and dropping database: " + dbconn_url
+                    + "; and closing: "+m_permanent_db_backend.dbconn_url);
             dbconn.close();
+            // Make sure the connection is closed, before proceeding
+            for (int i=1; dbconn.isValid(i) && i<=10; i++) {
+                Thread.sleep(1000*i);
+            }
             dbconn = null;
-            System.gc();
+            for (int i=1; i<=3; i++) {
+                if (i > 1) {
+                    System.err.println("In PostgreSQLBackend.shutdown(): attempt #"+i+" ...");
+                }
+                try {
+                    Statement stmt = m_permanent_db_backend.getConnection().createStatement();
+                    stmt.execute("drop database if exists " + m_database_name + ";");
+                    break;
+                } catch (SQLException ex) {
+                    System.err.println("In PostgreSQLBackend.shutdown(), for "+dbconn_url
+                            +" on attempt #"+i+", caught exception:\n" + ex);
+                    ex.printStackTrace();
+                }
+            }
+
+            // Also close the connection to the "permanent" database
             try {
-                Statement stmt = m_permanent_db_backend.getConnection().createStatement();
-                stmt.execute("drop database if exists " + m_database_name + ";");
+                m_permanent_db_backend.getConnection().close();
             } catch (SQLException ex) {
-                System.err.println("In PostgreSQLBackend.shutdown(), caught exception: " + ex);
+                System.err.println("In PostgreSQLBackend.shutdown(), for "+m_permanent_db_backend.dbconn_url
+                        + ", caught exception:\n" + ex);
                 ex.printStackTrace();
             }
+            // Make sure the "permanent" connection is closed, before proceeding
+            for (int i=1; m_permanent_db_backend.getConnection().isValid(i) && i<=10; i++) {
+                Thread.sleep(1000*i);
+            }
+            m_permanent_db_backend.dbconn = null;
+            m_permanent_db_backend = null;
+
+            // And close the FileWriter (for printing modified SQL)
             if (transformedSqlFileWriter != null) {
                 transformedSqlFileWriter.close();
                 transformedSqlFileWriter = null;
             }
+            System.gc();
         } catch (Exception e) {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);
         }

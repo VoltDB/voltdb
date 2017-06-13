@@ -26,6 +26,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.messaging.FastDeserializer;
 
@@ -113,9 +114,10 @@ public interface SiteProcedureConnection {
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
             String[] sqlTexts,
+            boolean[] isWriteFrags,
+            int[] sqlCRCs,
             long txnId,
             long spHandle,
             long uniqueId,
@@ -231,4 +233,6 @@ public interface SiteProcedureConnection {
      * binary log stream when we set protocol version.
      */
     public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId);
+
+    public void setDRStreamEnd(long spHandle, long uniqueId);
 }

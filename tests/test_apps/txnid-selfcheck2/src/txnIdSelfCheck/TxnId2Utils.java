@@ -28,6 +28,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import java.security.SecureRandom;
 
 import java.io.IOException;
 
@@ -40,12 +41,12 @@ public enum TxnId2Utils {;
     }
 
     static boolean isConnectionTransactionOrCatalogIssue(String statusString) {
-        return /*cr.getStatus() == ClientResponse.USER_ABORT && */
-                statusString.matches("(?s).*AdHoc transaction -?[0-9]+ wasn.t planned against the current catalog version.*") ||
+        return statusString.matches("(?s).*AdHoc transaction -?[0-9]+ wasn.t planned against the current catalog version.*") ||
                 statusString.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
                 statusString.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
                 statusString.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
-                statusString.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*");
+                statusString.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*") ||
+                statusString.matches("(?s).*Ad Hoc Planner task queue is full.*");
     }
 
     static boolean isServerUnavailableIssue(String statusString) {
@@ -122,5 +123,15 @@ public enum TxnId2Utils {;
     static long getRowCount(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = doAdHoc(client, "select count(*) from " + tableName + ";");
         return cr.getResults()[0].asScalarLong();
+    }
+
+    static final String AB = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static SecureRandom rnd = new SecureRandom();
+
+    static String randomString( int len ){
+        StringBuilder sb = new StringBuilder( len );
+        for( int i = 0; i < len; i++ )
+            sb.append( AB.charAt( rnd.nextInt(AB.length()) ) );
+        return sb.toString();
     }
 }

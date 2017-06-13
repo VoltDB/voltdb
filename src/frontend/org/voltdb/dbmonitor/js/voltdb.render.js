@@ -78,7 +78,8 @@ function alertNodeClicked(obj) {
         var alertCount = 0;
         var serverSettings = false;
         this.memoryDetails = [];
-
+        this.drTablesArray = [];
+        this.exportTablesArray = [];
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
         };
@@ -482,16 +483,6 @@ function alertNodeClicked(obj) {
             VoltDBService.GetDrReplicationInformation(function (connection) {
                 getDrInformations(connection, replicationData);
                 onInformationLoaded(replicationData);
-            });
-        };
-        //
-        //Render Cluster Transaction Graph
-        this.GetTransactionInformation = function (onInformationLoaded) {
-            var transactionDetails = {};
-
-            VoltDBService.GetTransactionInformation(function (connection) {
-                getTransactionDetails(connection, transactionDetails);
-                onInformationLoaded(transactionDetails);
             });
         };
         //
@@ -1162,6 +1153,18 @@ function alertNodeClicked(obj) {
             if (tableData == null || tableData == undefined) {
                 alert("Error: Unable to extract Table Data");
                 return;
+            } else {
+                voltDbRenderer.drTablesArray = [];
+                voltDbRenderer.exportTablesArray = [];
+                for (var key in tableData) {
+                    if (tableData[key]['drEnabled'] == "true") {
+                        voltDbRenderer.drTablesArray.push(tableData[key]['TABLE_NAME']);
+                    }
+
+                    if (tableData[key]['TABLE_TYPE1'] == "EXPORT") {
+                        voltDbRenderer.exportTablesArray.push(tableData[key]['TABLE_NAME']);
+                    }
+                }
             }
             callback(tableData);
         };
@@ -1210,20 +1213,22 @@ function alertNodeClicked(obj) {
             var colIndex = {};
             var counter = 0;
 
-            connection.Metadata['@Statistics_LATENCY_HISTOGRAM'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "UNCOMPRESSED_HISTOGRAM" || columnInfo["name"] == "TIMESTAMP")
+            connection.Metadata['@Statistics_LATENCY'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "P99"
+                || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TPS")
                     colIndex[columnInfo["name"]] = counter;
 
                 counter++;
             });
 
-            connection.Metadata['@Statistics_LATENCY_HISTOGRAM'].data.forEach(function (info) {
+            connection.Metadata['@Statistics_LATENCY'].data.forEach(function (info) {
                 var hostName = info[colIndex["HOSTNAME"]];
                 if (!latency.hasOwnProperty(hostName)) {
                     latency[hostName] = {};
                 }
                 latency[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
-                latency[hostName]["UNCOMPRESSED_HISTOGRAM"] = info[colIndex["UNCOMPRESSED_HISTOGRAM"]];
+                latency[hostName]["P99"] = info[colIndex["P99"]]/1000;
+                latency[hostName]["TPS"] = info[colIndex["TPS"]];
             });
         };
 

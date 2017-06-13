@@ -447,6 +447,7 @@ SET (VOLTDB_SRC
   ${VOLTDB_EE_SRC_DIR}/common/TupleSchema.cpp
   ${VOLTDB_EE_SRC_DIR}/common/types.cpp
   ${VOLTDB_EE_SRC_DIR}/common/UndoLog.cpp
+  ${VOLTDB_EE_SRC_DIR}/common/LargeTempTableBlockCache.cpp
   ${VOLTDB_EE_SRC_DIR}/common/NValue.cpp
   ${VOLTDB_EE_SRC_DIR}/common/RecoveryProtoMessage.cpp
   ${VOLTDB_EE_SRC_DIR}/common/RecoveryProtoMessageBuilder.cpp
@@ -546,6 +547,8 @@ SET (VOLTDB_SRC
   ${VOLTDB_EE_SRC_DIR}/storage/ElasticIndexReadContext.cpp
   ${VOLTDB_EE_SRC_DIR}/storage/ElasticScanner.cpp
   ${VOLTDB_EE_SRC_DIR}/storage/ExportTupleStream.cpp
+  ${VOLTDB_EE_SRC_DIR}/storage/LargeTempTable.cpp
+  ${VOLTDB_EE_SRC_DIR}/storage/LargeTempTableBlock.cpp
   ${VOLTDB_EE_SRC_DIR}/storage/MaterializedViewHandler.cpp
   ${VOLTDB_EE_SRC_DIR}/storage/MaterializedViewTriggerForInsert.cpp
   ${VOLTDB_EE_SRC_DIR}/storage/MaterializedViewTriggerForWrite.cpp

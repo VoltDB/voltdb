@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Objects;
 
 import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -245,13 +246,22 @@ public class FunctionCustom extends FunctionSQL {
 
     private int extractSpec;
 
-    public static FunctionSQL newCustomFunction(String token, int tokenType) {
+    public static int getFunctionId(String functionName) {
+        int tokenType = Tokens.get(functionName.toUpperCase());
+        return getFunctionId(tokenType);
+    }
 
+    public static int getFunctionId(int tokenType) {
         int id = customRegularFuncMap.get(tokenType, -1);
-
         if (id == -1) {
             id = customValueFuncMap.get(tokenType, -1);
         }
+        return id;
+    }
+
+    public static FunctionSQL newCustomFunction(String token, int tokenType) {
+
+        int id = getFunctionId(tokenType);
 
         if (id == -1) {
             return null;
@@ -1830,5 +1840,28 @@ public class FunctionCustom extends FunctionSQL {
 
     private static String DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR = "Custom Function";
     private static String DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD = "Custom Function Special Case";
+
+    public int getExtraSpace() {
+        return extractSpec;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (!super.equals(other)) return false;
+        if (other instanceof FunctionCustom == false) return false;
+
+        FunctionCustom function = (FunctionCustom) other;
+        if (function.getExtraSpace() != extractSpec) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int val = super.hashCode();
+        val += Objects.hashCode(extractSpec);
+        return val;
+    }
+
     /**********************************************************************/
 }

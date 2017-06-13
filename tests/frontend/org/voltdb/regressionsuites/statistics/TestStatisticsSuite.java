@@ -41,7 +41,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
@@ -164,8 +163,8 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
     }
 
-    /** Make sure @Statistics LATENCY returns sane data in the expected formats.
-     */
+    // Make sure @Statistics LATENCY returns sane data in the expected formats.
+    //
     public void testLatencyValidity() throws Exception {
         System.out.println("\n\nTESTING LATENCY STATS VALIDITY\n\n\n");
         Client client  = getFullyConnectedClient();
@@ -398,7 +397,10 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         // Check the schema
         validateSchema(results[0], expectedTable);
         // One WAREHOUSE.select row per host
-        assertEquals(HOSTS, results[0].getRowCount());
+
+        System.out.println(results[0].toFormattedString());
+
+        assertTrue(results[0].getRowCount() >= HOSTS);
 
         // Verify the invocation counts
         int counts = 0;

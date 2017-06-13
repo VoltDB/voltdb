@@ -27,8 +27,6 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-import junit.framework.TestCase;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.compiler.VoltCompiler;
@@ -36,6 +34,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.InMemoryJarfile;
+
+import junit.framework.TestCase;
 
 public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 {
@@ -378,7 +378,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
         assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME",
-                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column1"));
+                HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "PK_TREE", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
@@ -386,7 +386,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
         assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME",
-                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column3"));
+                HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "PK_TREE", "COLUMN_NAME", "Column3"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
@@ -394,7 +394,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
         assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME",
-                HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX+"TABLE1_COLUMN1", "COLUMN_NAME", "Column1"));
+                HSQLInterface.AUTO_GEN_UNIQUE_IDX_PREFIX + "TABLE1_COLUMN1", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,

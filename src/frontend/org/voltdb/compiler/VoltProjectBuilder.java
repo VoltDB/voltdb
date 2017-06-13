@@ -73,8 +73,8 @@ import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -319,6 +319,7 @@ public class VoltProjectBuilder {
 
     private String m_drMasterHost;
     private Integer m_preferredSource;
+    private Boolean m_drConsumerConnectionEnabled = null;
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
 
@@ -749,6 +750,14 @@ public class VoltProjectBuilder {
         m_preferredSource = preferredSource;
     }
 
+    public void setDrConsumerConnectionEnabled() {
+        m_drConsumerConnectionEnabled = true;
+    }
+
+    public void setDrConsumerConnectionDisabled() {
+        m_drConsumerConnectionEnabled = false;
+    }
+
     public void setDrProducerEnabled()
     {
         m_drProducerEnabled = true;
@@ -803,12 +812,12 @@ public class VoltProjectBuilder {
                 replication, null, 0) != null;
     }
 
-    public boolean compile(final String jarPath,
+    public Catalog compile(final String jarPath,
             final int sitesPerHost,
             final int hostCount,
             final int replication, final int clusterId) {
         return compile(jarPath, sitesPerHost, hostCount,
-                replication, null, clusterId) != null;
+                replication, null, clusterId);
     }
 
     public Catalog compile(final String jarPath,
@@ -825,7 +834,7 @@ public class VoltProjectBuilder {
             final int replication,
             final String voltRoot,
             final int clusterId) {
-        VoltCompiler compiler = new VoltCompiler(false);
+        VoltCompiler compiler = new VoltCompiler(m_drRole == DrRoleType.XDCR);
         if (compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
@@ -842,7 +851,7 @@ public class VoltProjectBuilder {
             final boolean ppdEnabled, final String snapshotPath,
             final String ppdPrefix)
     {
-        VoltCompiler compiler = new VoltCompiler(false);
+        VoltCompiler compiler = new VoltCompiler(m_drRole == DrRoleType.XDCR);
         return compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        ppdEnabled, snapshotPath, ppdPrefix);
@@ -1291,6 +1300,7 @@ public class VoltProjectBuilder {
             dr.setConnection(conn);
             conn.setSource(m_drMasterHost);
             conn.setPreferredSource(m_preferredSource);
+            conn.setEnabled(m_drConsumerConnectionEnabled);
         }
 
         // Have some yummy boilerplate!

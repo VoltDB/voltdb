@@ -24,26 +24,26 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class DeleteLoadPartitionedBase extends VoltProcedure {
+public class DeleteLoadPartitionedBase extends DeleteOnlyLoadBase {
 
-    public long doWork(SQLStmt delete, SQLStmt deletecp, long cid) {
+    public long doWork(SQLStmt select, SQLStmt delete, SQLStmt selectcp, SQLStmt deletecp, long cid, VoltTable vtable) {
 
-        voltQueueSQL(delete, cid);
-        VoltTable[] results = voltExecuteSQL();
-        long r = results[0].asScalarLong();
-        if (r != 1) {
-            throw new VoltAbortException("Failed to delete cid that should exist: deleted=" + r + " cid=" + cid);
-        }
-        voltQueueSQL(deletecp, cid);
-        results = voltExecuteSQL();
-        r = results[0].asScalarLong();
-        if (r != 1) {
-            throw new VoltAbortException("Failed to delete cpcid that should exist: deleted=" + r + " cpcid=" + cid);
-        }
-        return 2;
+        // "base" table
+        VoltTable[] results = doWork(select, delete, cid, vtable);
+        long del = results[0].asScalarLong();
+        if (del != 1)
+            throw new VoltAbortException("base table incorrect number of deleted rows=" + del + " for cid=" + cid);
+
+        // "copied" table
+        results = doWork(selectcp, deletecp, cid, vtable);
+        long delcp = results[0].asScalarLong();
+        if (delcp != 1)
+            throw new VoltAbortException("cpy table incorrect number of deleted rows=" + delcp + " for cid=" + cid);
+
+        // assemble the return code as a 2 bit bitmap
+        return (del>0?2:0) + (delcp>0?1:0);
     }
 
     public long run() {

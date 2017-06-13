@@ -6,9 +6,13 @@
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
     <meta name="description" content="">
     <meta name="author" content="">
+    <link href="css/aero.css" rel="stylesheet" />
+    <link href="css/dataTables_page.css" rel="stylesheet" />
+    <link href="css/dataTables_table.css" rel="stylesheet" />
+    <link href="css/theme.default.min.css" rel="stylesheet" />
+    <link href="css/jquery.dataTables.css" rel="stylesheet" />
     <link href="css/jquery-ui.css" rel="stylesheet" />
     <link href="css/layout.css" rel="stylesheet" />
-    <link href="css/aero.css" rel="stylesheet" />
     <link href="css/nv.d3.css" rel="stylesheet" />
     <link href="css/tablesorter.css" rel="stylesheet" />
     <link href="css/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
@@ -39,13 +43,9 @@
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
     <script type="text/javascript" src="js/FileSaver.min.js"></script>
     <script type="text/javascript" src="js/jquery.validate.min.js"></script>
-    <link href="css/dataTables_page.css" rel="stylesheet" />
-    <link href="css/dataTables_table.css" rel="stylesheet" />
-    <link href="css/jquery.dataTables.css" rel="stylesheet" />
     <script src="js/bignumber.js"></script>
     <script src="js/jsonParse.js"></script>
     <!--<link href="css/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
-    <link href="css/theme.default.min.css" rel="stylesheet" />
     <script src="js/jquery.dataTables.min.js"></script>
     <script src="js/jqueryDatatablePlugins.js"></script>
     <script src="js/sha256.js"></script>
@@ -300,7 +300,7 @@
                                             <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
                                             <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
                                         </div>
-                                        <div class="sPContainer tblScroll">
+                                        <div class="sPContainer">
                                             <table width="100%" border="0" cellspacing="0" id="tblSP" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblSP_info" role="grid">
                                                 <thead>
                                                     <tr role="row">
@@ -331,7 +331,7 @@
                                             <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
                                             <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
                                         </div>
-                                        <div class="dTContainer tblScroll">
+                                        <div class="dTContainer">
                                             <table width="100%" border="0" cellspacing="0" id="tblDT" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblCmdLog_info" role="grid">
                                                 <thead>
                                                     <tr role="row">
@@ -652,13 +652,13 @@
                                     </td>
                                 </tr>
                                 <tr class="child-row-4 subLabelRow">
-                                    <td class="configLabel">Export Tables</td>
+                                    <td class="configLabel">Export Streams</td>
                                     <td align="right">&nbsp;
                                         
                                     </td>
                                     <td></td>
                                     <td>
-                                        <a href="javascript:void(0);" id="lstExportTbl" class="drTblBtn" style="display: block;" title="List of Export Tables">Export Tables</a>
+                                        <a href="javascript:void(0);" id="lstExportTbl" class="drTblBtn" style="display: block;" title="List of Export Streams">Export Streams</a>
                                         <a href="#exportTablePopup" id="lstExportTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
                                 </tr>
@@ -2029,7 +2029,7 @@
         <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
     </div>
     <div id="exportTablePopup" style="display:none">
-        <div class="overlay-title icon-alert">Export Tables</div>
+        <div class="overlay-title icon-alert">Export Streams</div>
         <div class="overlay-content resizeCon">
             <div id="exportPopup" class="repliWrapper">
             </div>

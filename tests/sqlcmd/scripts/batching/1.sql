@@ -1,0 +1,7 @@
+
+CREATE TABLE t (p INTEGER NOT NULL, i INTEGER ASSUMEUNIQUE, a INTEGER, s FLOAT, PRIMARY KEY(i, p));
+
+CREATE VIEW mt (a, p, n, s) AS
+    SELECT a, p, COUNT(*), SUM(s)
+    FROM t WHERE a > 5
+    GROUP BY a, p;
