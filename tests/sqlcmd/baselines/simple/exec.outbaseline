@@ -1,4 +1,13 @@
 
+drop procedure p if exists;
+Command succeeded.
+
+drop procedure max_predicates if exists;
+Command succeeded.
+
+drop procedure max_plus_predicates if exists;
+Command succeeded.
+
 drop table t if exists;
 Command succeeded.
 
