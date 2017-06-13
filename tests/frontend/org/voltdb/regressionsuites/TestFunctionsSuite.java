@@ -156,63 +156,37 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(r.get("NUM", VoltType.INTEGER), r.get("C2", VoltType.INTEGER));
 
         // unary minus returns NULL for NULL numeric values like other arithmetic operators
-        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'nulltest', NULL,"+ Float.MAX_VALUE +", NULL)");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'nulltest', NULL, 1.38145922788945552107e-01, NULL)");
         cr = client.callProcedure("@AdHoc", "select -num from P1 where desc='nulltest'");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
         assertEquals( VoltType.NULL_INTEGER, r.get("C1", VoltType.INTEGER));
-//        try {
-//            cr = client.callProcedure("@AdHoc", "select -desc from P1");
-//            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
-//        } catch (ProcCallException e) {
-//            String msg = e.getMessage();
-//            assertTrue(msg.indexOf("incompatible data type") != -1);
-//            caught = true;
-//        }
-//        // Filters intended to be close enough to bring two different indexes to the same result as no index at all.
-//        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7 order by NUM, ID");
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        resultA = r.asScalarLong();
-//
-//        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        resultB = r.asScalarLong();
-//        assertEquals(resultA, resultB);
-//        Client client = getClient();
-//
-//        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (2, '', -10, 2.3, NULL)");
-//
-//        // integral types
-//        validateTableOfScalarLongs(client, "select MOD(25,7) from R1", new long[]{4});
-//        validateTableOfScalarLongs(client, "select MOD(25,-7) from R1", new long[]{4});
-//        validateTableOfScalarLongs(client, "select MOD(-25,7) from R1", new long[]{-4});
-//        validateTableOfScalarLongs(client, "select MOD(-25,-7) from R1", new long[]{-4});
-//
-//        validateTableOfScalarLongs(client, "select MOD(id,7) from R1", new long[]{2});
-//        validateTableOfScalarLongs(client, "select MOD(id * 4,id+2) from R1", new long[]{0});
-//
-//        // Edge case: MOD 0
-//        verifyStmtFails(client, "select MOD(-25,0) from R1", "division by zero");
-//
-//        validateTableOfScalarDecimals(client, "select MOD(CAST(3.0 as decimal), CAST(2.0 as decimal)) from R1",  new BigDecimal[]{new BigDecimal("1.000000000000")});
-//        validateTableOfScalarDecimals(client, "select MOD(CAST(-25.32 as decimal), CAST(ratio as decimal)) from R1",  new BigDecimal[]{new BigDecimal("-0.020000000000")});
-//
-//        // Test MOD with NULL values
-//        validateTableOfScalarDecimals(client, "select MOD(NULL, CAST(ratio as decimal)) from R1",  new BigDecimal[]{null});
-//        validateTableOfScalarDecimals(client, "select MOD(CAST(3.12 as decimal), NULL) from R1",  new BigDecimal[]{null});
-//        validateTableOfScalarDecimals(client, "select MOD(CAST(NULL AS decimal), CAST(ratio as decimal)) from R1",  new BigDecimal[]{null});
-//        verifyStmtFails(client, "select MOD(NULL, NULL) from R1", "data type cast needed for parameter or null literal");
-//
-//        // Mix of decimal and ints
-//        verifyStmtFails(client, "select MOD(25.32, 2) from R1", "incompatible data type in operation");
-//        verifyStmtFails(client, "select MOD(2, 25.32) from R1", "incompatible data type in operation");
-//
-//        // Test guards on other types
-//        verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1", "incompatible data type in operation");
-//        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "incompatible data type in operation");
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (3, 'maxvalues', " + Integer.MAX_VALUE + ","+ Double.MAX_VALUE +", NULL)");
+        cr = client.callProcedure("@AdHoc", "select -ratio from P1 where desc='maxvalues'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        // actually returns NULL but when we do r.get("C1", VoltType.FLOAT) it returns more precision
+        assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= VoltType.NULL_FLOAT );
+
+        cr = client.callProcedure("@AdHoc", "select -num from P1 where desc='maxvalues'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        // https://docs.voltdb.com/UsingVoltDB/ddlref_createtable.php
+        // For integer and floating-point datatypes, VoltDB reserves the largest possible negative value to denote a null value.
+        assertEquals( -Integer.MIN_VALUE+1 , r.get("C1", VoltType.INTEGER));
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'minvalues', 0 , " + Double.MIN_VALUE + " , NULL)");
+
+        cr = client.callProcedure("@AdHoc", "select -ratio from P1 where desc='minvalues'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals( -Double.MIN_VALUE, r.get("C1", VoltType.FLOAT));
+
     }
 
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
