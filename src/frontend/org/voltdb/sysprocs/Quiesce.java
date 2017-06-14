@@ -47,9 +47,8 @@ public class Quiesce extends VoltSystemProcedure {
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_quiesce_sites);
-        registerPlanFragment(SysProcFragmentId.PF_quiesce_processed_sites);
+    public long[] getPlanFragmentIds() {
+        return new long[]{SysProcFragmentId.PF_quiesce_sites, SysProcFragmentId.PF_quiesce_processed_sites};
     }
 
     @Override

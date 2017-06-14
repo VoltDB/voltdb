@@ -39,7 +39,8 @@ import org.voltdb.VoltType;
 public class ProfCtl extends VoltSystemProcedure {
 
     @Override
-    public void init() {
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
     }
 
     @Override

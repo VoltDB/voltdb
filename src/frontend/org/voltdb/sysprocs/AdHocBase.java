@@ -50,7 +50,9 @@ public abstract class AdHocBase extends VoltSystemProcedure {
      * @see org.voltdb.VoltSystemProcedure#init()
      */
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     /* (non-Javadoc)
      * @see org.voltdb.VoltSystemProcedure#executePlanFragment(java.util.Map, long, org.voltdb.ParameterSet, org.voltdb.SystemProcedureExecutionContext)

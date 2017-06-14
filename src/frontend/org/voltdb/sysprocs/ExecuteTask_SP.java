@@ -17,8 +17,6 @@
 
 package org.voltdb.sysprocs;
 
-import java.nio.ByteBuffer;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,7 +25,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
@@ -36,9 +33,10 @@ import org.voltdb.jni.ExecutionEngine.TaskType;
 
 public class ExecuteTask_SP extends VoltSystemProcedure {
 
-    @Override
-    public void init() {
-    }
+	@Override
+	public long[] getPlanFragmentIds() {
+        return new long[]{};
+	}
 
     @Override
     public DependencyPair executePlanFragment(
