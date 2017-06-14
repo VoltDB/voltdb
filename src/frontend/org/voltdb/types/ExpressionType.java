@@ -68,6 +68,7 @@ public enum ExpressionType {
     // unary null evaluation
     OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS", true),
     // unary exists evaluation
+    // 19 is assigned to COMPARE_NOTDISTINCT, 20, 21 to CONJUNCTION_AND and CONJUNCTION_OR
     OPERATOR_UNARY_MINUS           (OperatorExpression.class, 22, "UNARY MINUS", true),
     // unary exists evaluation
 
@@ -99,6 +100,7 @@ public enum ExpressionType {
     // ----------------------------
     CONJUNCTION_AND             (ConjunctionExpression.class, 20, "AND", true),
     CONJUNCTION_OR              (ConjunctionExpression.class, 21, "OR", true),
+    // value 22 is assigned to OPERATOR_UNARY_MINUS
 
     // ----------------------------
     // Values
