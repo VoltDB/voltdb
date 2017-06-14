@@ -85,8 +85,15 @@ public abstract class AdHocQueryTester extends JUnit4LocalClusterTest {
                 "create view V_REPPED1 (REPPEDVAL, num_rows, sum_bigint) as " +
                 "select REPPEDVAL, count(*), sum(NONPART) from REPPED1 group by REPPEDVAL;" +
 
-                "create table long_query_table (id INTEGER NOT NULL, NAME VARCHAR(16));" +
                 "";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("create table long_query_table (id INTEGER NOT NULL, ");
+        for (int i = 1; i < 1022; i++) {
+            sb.append("id" + i + " INTEGER NOT NULL, ");
+        }
+        sb.append("NAME VARCHAR(16));");
+        schema += sb.toString();
 
         builder.addLiteralSchema(schema);
         builder.addPartitionInfo("PARTED1", "PARTVAL");
@@ -272,8 +279,14 @@ public abstract class AdHocQueryTester extends JUnit4LocalClusterTest {
         StringBuilder string = new StringBuilder("SELECT count(*) FROM long_query_table ");
         if (numberOfPredicates > 0) {
             string.append("WHERE ID = 123 ");
-            for (int i = 1; i < numberOfPredicates; i++) {
-                string.append("AND ID > 100 ");
+            int columnNum = Math.min(1022, numberOfPredicates);
+            for (int i = 1; i < columnNum; i++) {
+                string.append("AND ID" + i + " > 100 ");
+            }
+            if (columnNum < numberOfPredicates) {
+                for (int i = numberOfPredicates - columnNum; i < numberOfPredicates; i++) {
+                    string.append("AND ID > 100 ");
+                }
             }
         }
         string.append(";");
