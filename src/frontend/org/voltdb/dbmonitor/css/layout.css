@@ -3568,6 +3568,10 @@ svg.nvd3-svg {height:98% !important}
 	margin:0 2px 0 0;
 }
 
+.proDetailsBarDiagram { margin:0; padding:0;height:400px; width:850px;}
+.titleproDetails { text-align:center;}
+.generateproDetails { float:right;padding-right: 85px;}
+
 
 /********************analysis End *****************/
 /********************jquery us css override*****************/

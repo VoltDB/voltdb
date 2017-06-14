@@ -2411,7 +2411,7 @@ var configureUserPreferences = function () {
     userPreference["partitionIdleTime"] = {};
     userPreference["storedProcedures "] = {};
     userPreference["databaseTables "] = {};
-
+    $("#showAnalysisDetails").popup();
     $('#showMyPreference').popup({
         open: function (event, ui, ele) {
             userPreference = getUserPreferences();
