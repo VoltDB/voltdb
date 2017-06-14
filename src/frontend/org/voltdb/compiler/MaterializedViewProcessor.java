@@ -358,20 +358,17 @@ public class MaterializedViewProcessor {
                 }
 
                 // parse out the aggregation columns into the dest table
-                for (int i = stmt.groupByColumns().size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                for (int i = stmt.groupByColumns().size(); i < stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
 
                     AbstractExpression colExpr = col.expression.getLeft();
                     TupleValueExpression tve = null;
-                    if (colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+
+                    if ( col.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR && colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
                         tve = (TupleValueExpression)colExpr;
                     }
 
-                    // This is to fix the data type mismatch of the COUNT(*) column - other group by columns are fixed above
-                    // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column.
-                    if (col.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR )
-                        setTypeAttributesForColumn(destColumn, col.expression);
                     processMaterializedViewColumn(srcTable, destColumn,
                             col.expression.getExpressionType(), tve);
                     setTypeAttributesForColumn(destColumn, col.expression);
