@@ -17,7 +17,6 @@
 package org.voltdb.planner.microoptimizations;
 
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.types.PlanNodeType;
 
@@ -65,17 +64,21 @@ public class RemoveUnnecessaryProjectNodes extends MicroOptimization {
             ProjectionPlanNode pNode = (ProjectionPlanNode)plan;
             assert(pNode.getChildCount() == 1);
             AbstractPlanNode child = pNode.getChild(0);
-            NodeSchema childSchema = child.getOutputSchema();
-            assert(childSchema != null);
             AbstractPlanNode parent = (pNode.getParentCount() > 0) ? pNode.getParent(0) : null;
             // Either we have no parent or else we have come
             // down some non-negative child index.
             assert((parentIndex < 0) || (parent != null));
-            if (pNode.isIdentity(childSchema)) {
+            if (pNode.isIdentity(child)) {
+                // Replace the output schema in child with the output
+                // schema of pNode.  It will be exactly the same
+                // except for the names.
                 child.clearParents();
                 if (parent != null) {
                     parent.setAndLinkChild(parentIndex, child);
                 }
+                // Let the pNode replace the child's
+                // output schema.  This fixes up the columns.
+                pNode.replaceChildOutputSchema(child);
                 plan = child;
             } else {
                 break;

@@ -176,14 +176,25 @@ public class ProjectionPlanNode extends AbstractPlanNode {
      * Return true if this node unneeded if its
      * input schema is the given one.
      *
-     * @param inputSchema The Input Schema.
+     * @param child The Input Schema.
      * @return true iff the node is unnecessary.
      */
-    public boolean isIdentity(NodeSchema inputSchema) {
-        assert(inputSchema != null);
+    public boolean isIdentity(AbstractPlanNode childNode) {
+        assert(childNode != null);
+        // Find the output schema.
+        // If the child node has an inline projection node,
+        // then the output schema is the inline projection
+        // node's output schema.  Otherwise it's the output
+        // schema of the childNode itself.
+        AbstractPlanNode schemaNode = childNode.getInlinePlanNode(PlanNodeType.PROJECTION);
+        NodeSchema childSchema = childNode.getOutputSchema();
+        if (schemaNode != null) {
+            childSchema = schemaNode.getOutputSchema();
+        }
         NodeSchema outputSchema = getOutputSchema();
+        assert(childSchema != null);
         List<SchemaColumn> cols = outputSchema.getColumns();
-        List<SchemaColumn> childCols = inputSchema.getColumns();
+        List<SchemaColumn> childCols = childSchema.getColumns();
         assert(childCols != null);
         if (cols.size() != childCols.size()) {
             return false;
@@ -197,11 +208,62 @@ public class ProjectionPlanNode extends AbstractPlanNode {
             if ( ! (col.getExpression() instanceof TupleValueExpression)) {
                 return false;
             }
+            if ( ! (childCol.getExpression() instanceof TupleValueExpression)) {
+                return false;
+            }
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
             if (tve.getColumnIndex() != idx) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Replace the output schema of the child node with the
+     * output schema of this node.  We use this when we
+     * delete an unnecessary projection node.
+     *
+     * We find the output schema of the child and replace
+     * all the column names with the column names of the
+     * output schema of this node.  The column types should
+     * be equal, and we should have checked for that earlier.
+     *
+     * If the child has in inline projection node, and does
+     * <em>not</em> have an inline insert node, then
+     * the output schema of the child is the output schema
+     * of the inline projection node.  Otherwise, the output
+     * schema of the child is the output schema of the inline
+     * projection node.
+     *
+     * Just for the record, if the child node has an inline
+     * insert and a projection node, the projection node's
+     * output schema is the schema of the tuples we will be
+     * inserting into the target table.  The output schema of
+     * the child node will be the output schema of the insert
+     * node, which will be the usual DML schema.  This has one
+     * integer column counting the number of rows inserted.
+     *
+     * @param child
+     */
+    public void replaceChildOutputSchema(AbstractPlanNode child) {
+        AbstractPlanNode childProj = (ProjectionPlanNode)child.getInlinePlanNode(PlanNodeType.PROJECTION);
+        if (childProj != null) {
+            child = childProj;
+        }
+        NodeSchema childSchema = child.getOutputSchema();
+        NodeSchema mySchema = getOutputSchema();
+        assert(childSchema.getColumns().size() == mySchema.getColumns().size());
+        for (int idx = 0; idx < childSchema.size(); idx += 1) {
+            SchemaColumn cCol = childSchema.getColumns().get(idx);
+            SchemaColumn myCol = mySchema.getColumns().get(idx);
+            assert(cCol.getType() == myCol.getType());
+            assert(cCol.getExpression() instanceof TupleValueExpression);
+            assert(myCol.getExpression() instanceof TupleValueExpression);
+            cCol.reset(myCol.getTableName(),
+                       myCol.getTableAlias(),
+                       myCol.getColumnName(),
+                       myCol.getColumnAlias());
+        }
     }
 }

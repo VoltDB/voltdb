@@ -22,10 +22,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.json_voltpatches.JSONException;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.PlanSelector;
 
 public class MicroOptimizationRunner {
+    private static final VoltLogger m_logger = new VoltLogger("MICROOPTIMIZER");
+
     public enum Phases {
         SELECT_CONSTRUCTION_PHASE,
         AFTER_BEST_SELECTION
@@ -65,9 +70,30 @@ public class MicroOptimizationRunner {
     {
         List<MicroOptimization> opts = optimizations.get(phase);
         if (opts != null) {
-            for (MicroOptimization opt : opts) {
-                opt.apply(plan, parsedStmt);
+            if (m_logger.isDebugEnabled()) {
+                String sqlString = plan.sql;
+                if (sqlString == null) {
+                    sqlString = plan.toString();
+                }
+                m_logger.debug("Micro Optimizer phase " + phase.name());
+                m_logger.debug("SQL: " + sqlString + "\n");
             }
+        }
+        for (MicroOptimization opt : opts) {
+            if (m_logger.isDebugEnabled()) {
+                String planString = null;
+                try {
+                    planString = PlanSelector.outputPlanDebugString(plan.rootPlanGraph);
+                } catch (JSONException ex) {
+                    planString = ex.getMessage();
+                }
+                m_logger.debug("Microoptimization: " + opt + "\n"
+                           + "Input:\n" + plan.explainedPlan + "\n"
+                           + ":-----------:\n"
+                           + planString
+                           + "\n");
+            }
+            opt.apply(plan, parsedStmt);
         }
     }
 }
