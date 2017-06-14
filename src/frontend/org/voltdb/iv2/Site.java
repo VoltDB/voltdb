@@ -1592,7 +1592,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-	public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
+    public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
         return m_sysprocContext;
     }
 

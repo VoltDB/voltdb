@@ -41,7 +41,7 @@ import org.voltdb.utils.BuildDirectoryUtils;
  */
 public class PlanSelector implements Cloneable {
     /** pointer to the cluster object in the catalog */
-    final Cluster m_cluster;
+    final Cluster m_cluster; // It's not used, that gets removed in ENG-12133
     /** pointer to the database object in the catalog */
     final Database m_db;
     /** pointer to the database estimates */

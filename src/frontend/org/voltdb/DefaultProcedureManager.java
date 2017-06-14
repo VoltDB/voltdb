@@ -51,10 +51,10 @@ public class DefaultProcedureManager {
 
     Map<String, Procedure> m_defaultProcMap = new HashMap<>();
 
-    final Database m_db;
+    private final Database m_db;
     // fake db makes it easy to create procedures that aren't
     // part of the main catalog
-    final Database m_fakeDb;
+    private final Database m_fakeDb;
 
     public DefaultProcedureManager(Database db) {
         m_db = db;
@@ -159,7 +159,7 @@ public class DefaultProcedureManager {
         }
     }
 
-    public String sqlForDefaultProc(Procedure defaultProc) {
+    public static String sqlForDefaultProc(Procedure defaultProc) {
         String name = defaultProc.getClassname();
         String[] parts = name.split("\\.");
         String action = parts[1];
@@ -245,7 +245,7 @@ public class DefaultProcedureManager {
      * @param sb string buffer accumulating the sql statement
      * @return offset in the index of the partition column
      */
-    private int generateCrudPKeyWhereClause(Column partitioncolumn,
+    private static int generateCrudPKeyWhereClause(Column partitioncolumn,
             Constraint pkey, StringBuilder sb)
     {
         // Sort the catalog index columns by index column order.
@@ -276,7 +276,7 @@ public class DefaultProcedureManager {
      * @param table
      * @param sb
      */
-    private void generateCrudExpressionColumns(Table table, StringBuilder sb) {
+    private static void generateCrudExpressionColumns(Table table, StringBuilder sb) {
         boolean first = true;
 
         // Sort the catalog table columns by column order.
@@ -296,7 +296,7 @@ public class DefaultProcedureManager {
     /**
      * Helper to generate a full col1, col2, col3 list.
      */
-    private void generateCrudColumnList(Table table, StringBuilder sb) {
+    private static void generateCrudColumnList(Table table, StringBuilder sb) {
         boolean first = true;
         sb.append("(");
 
@@ -321,7 +321,7 @@ public class DefaultProcedureManager {
      * Create a statement like:
      *  "delete from <table> where {<pkey-column =?>...}"
      */
-    private String generateCrudDelete(Table table, Column partitioncolumn, Constraint pkey) {
+    private static String generateCrudDelete(Table table, Column partitioncolumn, Constraint pkey) {
         StringBuilder sb = new StringBuilder();
         sb.append("DELETE FROM " + table.getTypeName());
 
@@ -335,7 +335,7 @@ public class DefaultProcedureManager {
      * Create a statement like:
      * "update <table> set {<each-column = ?>...} where {<pkey-column = ?>...}
      */
-    private String generateCrudUpdate(Table table, Column partitioncolumn, Constraint pkey) {
+    private static String generateCrudUpdate(Table table, Column partitioncolumn, Constraint pkey) {
         StringBuilder sb = new StringBuilder();
         sb.append("UPDATE " + table.getTypeName() + " SET ");
 
@@ -350,7 +350,7 @@ public class DefaultProcedureManager {
      * Create a statement like:
      *  "insert into <table> values (?, ?, ...);"
      */
-    private String generateCrudInsert(Table table, Column partitioncolumn) {
+    private static String generateCrudInsert(Table table, Column partitioncolumn) {
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT INTO " + table.getTypeName() + " VALUES ");
 
@@ -365,7 +365,7 @@ public class DefaultProcedureManager {
      * Hack simple case of implementation SQL MERGE
      *  "upsert into <table> values (?, ?, ...);"
      */
-    private String generateCrudUpsert(Table table, Column partitioncolumn) {
+    private static String generateCrudUpsert(Table table, Column partitioncolumn) {
         StringBuilder sb = new StringBuilder();
         sb.append("UPSERT INTO " + table.getTypeName() + " VALUES ");
 
@@ -380,7 +380,7 @@ public class DefaultProcedureManager {
      *  "insert into <table> values (?, ?, ...);"
      *  for a replicated table.
      */
-    private String generateCrudReplicatedInsert(Table table) {
+    private static String generateCrudReplicatedInsert(Table table) {
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT INTO " + table.getTypeName() + " VALUES ");
 
@@ -395,7 +395,7 @@ public class DefaultProcedureManager {
      *  "update <table> set {<each-column = ?>...} where {<pkey-column = ?>...}
      *  for a replicated table.
      */
-    private String generateCrudReplicatedUpdate(Table table, Constraint pkey)
+    private static String generateCrudReplicatedUpdate(Table table, Constraint pkey)
     {
         StringBuilder sb = new StringBuilder();
         sb.append("UPDATE " + table.getTypeName() + " SET ");
@@ -412,7 +412,7 @@ public class DefaultProcedureManager {
      *  "delete from <table> where {<pkey-column =?>...}"
      * for a replicated table.
      */
-    private String generateCrudReplicatedDelete(Table table, Constraint pkey)
+    private static String generateCrudReplicatedDelete(Table table, Constraint pkey)
     {
         StringBuilder sb = new StringBuilder();
         sb.append("DELETE FROM " + table.getTypeName());
@@ -423,7 +423,7 @@ public class DefaultProcedureManager {
         return sb.toString();
     }
 
-    private String generateCrudReplicatedUpsert(Table table, Constraint pkey)
+    private static String generateCrudReplicatedUpsert(Table table, Constraint pkey)
     {
         StringBuilder sb = new StringBuilder();
         sb.append("UPSERT INTO " + table.getTypeName() + " VALUES ");
@@ -438,7 +438,7 @@ public class DefaultProcedureManager {
      * Create a statement like:
      *  "select * from <table> where pkey_col1 = ?, pkey_col2 = ? ... ;"
      */
-    private String generateCrudSelect(Table table, Column partitioncolumn, Constraint pkey)
+    private static String generateCrudSelect(Table table, Column partitioncolumn, Constraint pkey)
     {
         StringBuilder sb = new StringBuilder();
         sb.append("SELECT * FROM " + table.getTypeName());

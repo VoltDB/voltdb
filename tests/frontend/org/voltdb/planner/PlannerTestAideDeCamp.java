@@ -32,7 +32,6 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
@@ -145,8 +144,7 @@ public class PlannerTestAideDeCamp {
             partitioning = StatementPartitioning.forceMP();
         }
         String procName = catalogStmt.getParent().getTypeName();
-        Cluster catalogCluster = catalog.getClusters().get("cluster");
-        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, catalogCluster, db,
+        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
                 partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
 
