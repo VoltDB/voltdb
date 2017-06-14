@@ -155,6 +155,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         // actually returns NULL but when we do r.get("C1", VoltType.FLOAT) it returns more precision
         assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= VoltType.NULL_FLOAT );
 
+        // testing the same behavior for 0-Double.MAX_VALUE
+        cr = client.callProcedure("@AdHoc", "select 0-ratio from P1 where desc='maxvalues'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        // actually returns NULL but when we do r.get("C1", VoltType.FLOAT) it returns more precision
+        assertTrue( (Double) r.get("C1", VoltType.FLOAT) <= VoltType.NULL_FLOAT );
+
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'minvalues', 0 , " + Double.MIN_VALUE + " , NULL)");
 
         cr = client.callProcedure("@AdHoc", "select -ratio from P1 where desc='minvalues'");
@@ -207,8 +215,10 @@ public class TestFunctionsSuite extends RegressionSuite {
             -Short.MAX_VALUE, -Long.MAX_VALUE, 0, 0 }});
 
         client.callProcedure("@AdHoc", "delete from NUMBER_TYPES where INTEGERNUM = " + Integer.MAX_VALUE);
-        client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, Double.MIN_VALUE, -9999999999999999999999.999999999999);
+        //client.callProcedure("NUMBER_TYPES.insert", 1, 2, 3, 4, 5.0, -99999999999999999999999999.999999999999);
+        client.callProcedure("@AdHoc", "Insert into NUMBER_TYPES values(1, 2, 3, 4, 5.0, -99999999999999999999999999.999999999999);");
 
+        /* for debugging */
 //        VoltTable[] rs = client.callProcedure("@AdHoc", "SELECT * FROM NUMBER_TYPES").getResults();
 //        System.out.println(rs[0]);
 
@@ -217,12 +227,9 @@ public class TestFunctionsSuite extends RegressionSuite {
         r = cr.getResults()[0];
         System.out.println(r);
         assertEquals(1, r.getRowCount());
-        // no error thrown
-
-//        r.advanceRow();
-//        assertEquals( BigDecimal.valueOf(9999999999999999999.999999999999), r.get("C1", VoltType.DECIMAL));
-//        assertEquals( -Double.MIN_VALUE , r.get("C5" , VoltType.FLOAT ));
-
+        r.advanceRow();
+        // Java converts big numbers - so comparing strings which have the values preserved
+        assertEquals( "99999999999999999999999999.999999999999", r.get("C1", VoltType.DECIMAL).toString() );
     }
 
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
