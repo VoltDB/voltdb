@@ -401,7 +401,7 @@
                 </div>
             </div>
             <!--Analysis-->
-            <div id="analysis" class="contents">
+            <div id="analysis" class="contents" style="display:none">
                 <div class="analysisContainer">
                    <!--<div class="analysisMenu">
                           <ul class="analysisNav">
@@ -411,23 +411,36 @@
                                                  
                     </div> -->
                     <div class="analysisBody">
-                        <button class="analyzeBtn" style="display: block;" onClick="fetchData()">Analyze Now</button>
+                        <button id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</button>
                         <div class="subTabSection" >
                             <!--tab-->
                             <div class="tabContant analysisSubTab" id="divAnalysis">
                                 <ul id="tabAnalysis" class="tabs">
                                     <li><a href="#tabData">Data</a></li>
-                                    <li><a href="#tabProcedure">Procedures</a></li>
+                                    <li><a href="#tabProcedure" class="active">Procedures</a></li>
                                 </ul>
                                 <div class="tab_container subAnalysisTab_container">
                                     <div id="tabData" class="tab_content dataTab tab_content_data ">
-                                        <div class="mainContentAnalysis">
+                                        <div id="tblAnalyzeNowContent" class="mainContentAnalysis analyzeNowContent">
                                             <p>Click the <span>Analyze Now</span> Button to start</p>
                                             <p> the analysis of your database</p>
                                         </div>
+                                        <!--<div class="mainContentAnalysis noDataContent" style="display:none">-->
+                                            <!--<p>No data is available.</p>-->
+                                        <!--</div>-->
+                                        <div id="tblNoDataContent" class="mainContentAnalysis noDataContentTable" style="display:none">
+                                            <p>Work is in progress for the Data tab. Please go to the Procedures tab for viewing latency, frequency and combined charts of procedures.</p>
+                                        </div>
                                     </div>
                                     <div id="tabProcedure" class="tab_content dataTab tab_content_data">
-                                        <div class="tabContant analysisSubTab">
+                                        <div class="mainContentAnalysis analyzeNowContent">
+                                            <p>Click the <span>Analyze Now</span> Button to start</p>
+                                            <p> the analysis of your database</p>
+                                        </div>
+                                        <div class="mainContentAnalysis noDataContent" style="display:none">
+                                            <p>No data is available.</p>
+                                        </div>
+                                        <div id="divTabProcedure" class="tabContant analysisSubTab dataContent" style="display:none">
                                             <ul id="ulProcedure" class="tabs">
                                                 <li><a href="#tabLatency">Latency</a></li>
                                                 <li><a href="#tabFrequency">Frequency</a></li>
