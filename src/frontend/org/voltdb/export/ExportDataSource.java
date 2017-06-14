@@ -612,6 +612,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
+                    //This happens if site mastership triggers and this generation becomes active and so truncate task is not stashed but executed aftre accept mastership task.
+                    //If this happens the truncate for this generation wont happen means more dupes will be exported.
+                    if (m_mastershipAccepted.get()) {
+                        exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition skipping truncation." + getPartitionId());
+                        return;
+                    }
                     m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
                     if (m_committedBuffers.isEmpty() && m_endOfStream) {
                         if (m_pollFuture != null) {
