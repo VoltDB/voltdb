@@ -329,6 +329,24 @@ TEST_F(ExpressionTest, SimpleAddition) {
 }
 
 /*
+ * Show that unary minus works with the framework
+ */
+TEST_F(ExpressionTest, SimpleUnaryMinus) {
+    queue<AE*> e;
+    TableTuple junk;
+
+    // -5
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)5));
+    e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, VALUE_TYPE_TINYINT, 1));
+    // dummy left expression to prevent segmentation fault
+    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)1));
+    boost::scoped_ptr<AbstractExpression> testexp(convertToExpression(e));
+
+    NValue result = testexp->eval(&junk,NULL);
+    ASSERT_EQ(ValuePeeker::peekAsBigInt(result), -5LL);
+}
+
+/*
  * Show that the associative property is as expected
  */
 TEST_F(ExpressionTest, SimpleMultiplication) {
