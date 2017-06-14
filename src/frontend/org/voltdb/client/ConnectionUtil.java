@@ -186,7 +186,7 @@ public class ConnectionUtil {
         if (addr.isUnresolved()) {
             throw new java.net.UnknownHostException(addr.getHostName());
         }
-        SocketChannel aChannel = SocketChannel.open(addr);
+        final SocketChannel aChannel = SocketChannel.open(addr);
         returnArray[0] = aChannel;
         assert(aChannel.isConnected());
         if (!aChannel.isConnected()) {
