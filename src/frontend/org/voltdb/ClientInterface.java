@@ -2131,8 +2131,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void balanceSPI(int hostId) {
 
+        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
+            hostLog.info("Snapshot or node join in progress, skip spi balance.");
+            return;
+        }
+
         Pair<Integer, Integer> target = m_cartographer.getPartitionForMigration();
         if (target == null) {
+            hostLog.info("The cluster reached SPI balance.");
             return;
         }
 
@@ -2155,10 +2161,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (partitionKey == -1) {
             hostLog.warn("Could not find the partition key for partition " + partitionId);
-            return;
-        }
-
-        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
             return;
         }
 

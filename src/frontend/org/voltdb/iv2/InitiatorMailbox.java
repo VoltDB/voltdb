@@ -424,7 +424,7 @@ public class InitiatorMailbox implements Mailbox
 
         boolean seenTheTxn = (((SpScheduler)m_scheduler).getTransaction(message.getTxnId()) != null);
 
-        // If a fragment is part of a transaction which have been see, do not restart.
+        // If a fragment is part of a transaction which have been seen, do not restart.
         if (message.getCurrentBatchIndex() == 0 && !seenTheTxn) {
             FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
             TransactionRestartException restart = new TransactionRestartException(
@@ -433,7 +433,9 @@ public class InitiatorMailbox implements Mailbox
             response.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
             response.m_sourceHSId = getHSId();
             response.setPartitionId(m_partitionId);
-            Iv2Trace.logMisroutedFragmentTaskMessage(message, getHSId());
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("misRoutedFragMsg: site" + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
+            }
             deliver(response);
             return true;
         }
@@ -445,6 +447,9 @@ public class InitiatorMailbox implements Mailbox
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()));
             }
+        }
+        if (message.getCurrentBatchIndex() > 0 && !seenTheTxn && tmLog.isDebugEnabled()) {
+            tmLog.debug("Batch index > 1 but not seen: site" + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
         }
         return false;
     }
