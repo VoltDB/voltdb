@@ -576,6 +576,10 @@ public class UserDefinedTestFunctions {
     public double pi_UDF() {
         return Math.PI;
     }
+    /** Simple test UDF (user-defined function) that just returns the value of pi. */
+    public Double pi_UDF_Boxed() {
+        return Math.PI;
+    }
 
     // Functions with one argument...
 
@@ -586,12 +590,36 @@ public class UserDefinedTestFunctions {
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
+    public Byte abs_TINYINT_Boxed(Byte i) {
+        if (i == null) {
+            return null;
+        }
+        return (Byte) (byte) Math.abs(i);
+    }
+    /** Simple test UDF (user-defined function) that just returns the absolute
+     *  value of the input value. */
     public short abs_SMALLINT(short i) {
         return (short) Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
+    public Short abs_SMALLINT_Boxed(Short i) {
+        if (i == null) {
+            return null;
+        }
+        return (Short) (short) Math.abs(i);
+    }
+    /** Simple test UDF (user-defined function) that just returns the absolute
+     *  value of the input value. */
     public int abs_INTEGER(int i) {
+        return Math.abs(i);
+    }
+    /** Simple test UDF (user-defined function) that just returns the absolute
+     *  value of the input value. */
+    public Integer abs_INTEGER_Boxed(Integer i) {
+        if (i == null) {
+            return null;
+        }
         return Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
@@ -601,7 +629,23 @@ public class UserDefinedTestFunctions {
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
+    public Long abs_BIGINT_Boxed(Long i) {
+        if (i == null) {
+            return null;
+        }
+        return Math.abs(i);
+    }
+    /** Simple test UDF (user-defined function) that just returns the absolute
+     *  value of the input value. */
     public double abs_FLOAT(double x) {
+        return Math.abs(x);
+    }
+    /** Simple test UDF (user-defined function) that just returns the absolute
+     *  value of the input value. */
+    public Double abs_FLOAT_Boxed(Double x) {
+        if (x == null) {
+            return null;
+        }
         return Math.abs(x);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
@@ -635,7 +679,7 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that returns the number of
      *  points in all rings (including the exterior ring) in the input
      *  GEOGRAPHY. */
-    public int numPoints(GeographyValue g) {
+    public int numPoints_UDF(GeographyValue g) {
         if (g == null) {
             return 0;
         }
@@ -659,12 +703,36 @@ public class UserDefinedTestFunctions {
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
+    public Byte mod_TINYINT_Boxed(Byte i, Byte j) {
+        if (i == null || j == null) {
+            return null;
+        }
+        return (Byte) (byte) (i % j);
+    }
+    /** Simple test UDF (user-defined function) that just returns the mod
+     *  (remainder) of the input values. */
     public short mod_SMALLINT(short i, short j) {
         return (short) (i % j);
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
+    public Short mod_SMALLINT_Boxed(Short i, Short j) {
+        if (i == null || j == null) {
+            return null;
+        }
+        return (Short) (short) (i % j);
+    }
+    /** Simple test UDF (user-defined function) that just returns the mod
+     *  (remainder) of the input values. */
     public int mod_INTEGER(int i, int j) {
+        return i % j;
+    }
+    /** Simple test UDF (user-defined function) that just returns the mod
+     *  (remainder) of the input values. */
+    public Integer mod_INTEGER_Boxed(Integer i, Integer j) {
+        if (i == null || j == null) {
+            return null;
+        }
         return i % j;
     }
     /** Simple test UDF (user-defined function) that just returns the mod
@@ -674,12 +742,31 @@ public class UserDefinedTestFunctions {
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
+    public Long mod_BIGINT_Boxed(Long i, Long j) {
+        if (i == null || j == null) {
+            return null;
+        }
+        return i % j;
+    }
+    /** Simple test UDF (user-defined function) that just returns the mod
+     *  (remainder) of the input values. */
     public double mod_FLOAT(double x, double y) {
         return x % y;
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
+    public Double mod_FLOAT_Boxed(Double x, Double y) {
+        if (x == null || y == null) {
+            return null;
+        }
+        return x % y;
+    }
+    /** Simple test UDF (user-defined function) that just returns the mod
+     *  (remainder) of the input values. */
     public BigDecimal mod_DECIMAL(BigDecimal x, BigDecimal y) {
+        if (x == null || y == null) {
+            return null;
+        }
         return x.remainder(y);
     }
 
@@ -715,6 +802,44 @@ public class UserDefinedTestFunctions {
             }
         }
         byte[] result = new byte[endIndex - startIndex];
+        for (int i=0; i < endIndex - startIndex; i++) {
+            result[i] = byteString[startIndex+i];
+        }
+        return result;
+    }
+
+    /** Simple test UDF (user-defined function) that returns the first VARBINARY
+     *  (byte array) argument, with any of the bytes from the second VARBINARY
+     *  (byte array) argument trimmed from the beginning and end. */
+    public Byte[] btrim_Boxed(Byte[] byteString, Byte[] bytesToTrim) {
+        if (byteString == null || bytesToTrim == null) {
+            return null;
+        }
+        int startIndex = 0;
+        for (int i=0; i < byteString.length; i++) {
+            for (int j=0; j < bytesToTrim.length; j++) {
+                if (byteString[i] == bytesToTrim[j]) {
+                    startIndex = i + 1;
+                    break;
+                }
+            }
+            if (startIndex <= i) {
+                break;
+            }
+        }
+        int endIndex = byteString.length;
+        for (int i = byteString.length - 1; i > startIndex; i--) {
+            for (int j=0; j < bytesToTrim.length; j++) {
+                if (byteString[i] == bytesToTrim[j]) {
+                    endIndex = i;
+                    break;
+                }
+            }
+            if (endIndex > i) {
+                break;
+            }
+        }
+        Byte[] result = new Byte[endIndex - startIndex];
         for (int i=0; i < endIndex - startIndex; i++) {
             result[i] = byteString[startIndex+i];
         }
@@ -996,6 +1121,7 @@ public class UserDefinedTestFunctions {
         System.out.println("Tests of (PostgreSQL-compatible) UDF's with 0 or 1 args:");
         System.out.println();
         System.out.println("pi_UDF(): " + udtf.pi_UDF());
+        System.out.println("pi_UDF_Boxed(): " + udtf.pi_UDF_Boxed());
 
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
@@ -1019,6 +1145,26 @@ public class UserDefinedTestFunctions {
         }
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            System.out.println("abs_BIGINT_Boxed("+intInputs[i]+"): " + udtf.abs_BIGINT_Boxed(intInputs[i].longValue()));
+        }
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            System.out.println("abs_INTEGER_Boxed("+intInputs[i]+"): " + udtf.abs_INTEGER_Boxed(intInputs[i]));
+        }
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            System.out.println("abs_SMALLINT_Boxed("+intInputs[i]+"): " + udtf.abs_SMALLINT_Boxed(intInputs[i].shortValue()));
+        }
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            System.out.println("abs_TINYINT_Boxed("+intInputs[i]+"): " + udtf.abs_TINYINT_Boxed(intInputs[i].byteValue()));
+        }
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            System.out.println("abs_FLOAT_Boxed("+intInputs[i]+"): " + udtf.abs_FLOAT_Boxed(intInputs[i].doubleValue()));
+        }
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
             System.out.println("abs_DECIMAL("+intInputs[i]+"): " + udtf.abs_DECIMAL(new BigDecimal(intInputs[i])));
         }
 
@@ -1034,8 +1180,8 @@ public class UserDefinedTestFunctions {
                 polygon = polygon.replace("))", "),("+j+" "+j+", "+intInputs[i]/2+" "+j+", "+j+" "+intInputs[i]/4+", "+j+" "+j+"))");
             }
             GeographyValue g = new GeographyValue(polygon);
-            System.out.println("numRings ( "+g+" ): " + udtf.numRings(g));
-            System.out.println("numPoints( "+g+" ): " + udtf.numPoints(g));
+            System.out.println("numRings     ( "+g+" ): " + udtf.numRings(g));
+            System.out.println("numPoints_UDF( "+g+" ): " + udtf.numPoints_UDF(g));
         }
 
         System.out.println();
@@ -1088,6 +1234,51 @@ public class UserDefinedTestFunctions {
         System.out.println();
         for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
             try {
+                System.out.println("mod_BIGINT_Boxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_BIGINT_Boxed(intInputs[i].longValue(), intInputs[i+1].longValue()));
+            } catch (Throwable e) {
+                System.out.println("mod_BIGINT_Boxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
+            }
+        }
+
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            try {
+                System.out.println("mod_INTEGER_Boxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_INTEGER_Boxed(intInputs[i], intInputs[i+1]));
+            } catch (Throwable e) {
+                System.out.println("mod_INTEGER_Boxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
+            }
+        }
+
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            try {
+                System.out.println("mod_SMALLINT_Boxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_SMALLINT_Boxed(intInputs[i].shortValue(), intInputs[i+1].shortValue()));
+            } catch (Throwable e) {
+                System.out.println("mod_SMALLINT_Boxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
+            }
+        }
+
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            try {
+                System.out.println("mod_TINYINT_Boxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_TINYINT_Boxed(intInputs[i].byteValue(), intInputs[i+1].byteValue()));
+            } catch (Throwable e) {
+                System.out.println("mod_TINYINT_Boxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
+            }
+        }
+
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            try {
+                System.out.println("mod_FLOAT_Boxed("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_FLOAT_Boxed(intInputs[i].doubleValue(), intInputs[i+1].doubleValue()));
+            } catch (Throwable e) {
+                System.out.println("mod_FLOAT_Boxed("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
+            }
+        }
+
+        System.out.println();
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            try {
                 System.out.println("mod_DECIMAL("+intInputs[i]+","+intInputs[i+1]+"): " + udtf.mod_DECIMAL(new BigDecimal(intInputs[i]), new BigDecimal(intInputs[i+1])));
             } catch (Throwable e) {
                 System.out.println("mod_DECIMAL("+intInputs[i]+","+intInputs[i+1]+") threw Exception:\n"+e);
@@ -1109,6 +1300,23 @@ public class UserDefinedTestFunctions {
                 b[j] = (byte) j;
             }
             System.out.println("btrim("+Arrays.toString(a)+","+Arrays.toString(b)+"): " + Arrays.toString(udtf.btrim(a, b)));
+        }
+
+        System.out.println();
+        Byte[] c = new Byte[19];
+        for (byte i=0; i < 8; i++) {
+            c[i] = (Byte) i;
+            c[18-i] = (Byte) i;
+        }
+        c[9] = 0;
+        for (int i=0; i < NUM_SIMPLE_TESTS; i+=2) {
+            c[8]  = intInputs[i].byteValue();
+            c[10] = (Byte) (byte) (intInputs[i+1] - 1);
+            Byte[] d = new Byte[i];
+            for (byte j=0; j < d.length; j++) {
+                d[j] = (Byte) j;
+            }
+            System.out.println("btrim_Boxed("+Arrays.toString(c)+","+Arrays.toString(d)+"): " + Arrays.toString(udtf.btrim_Boxed(c, d)));
         }
 
         System.out.println();
