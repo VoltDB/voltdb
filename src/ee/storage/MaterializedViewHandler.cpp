@@ -38,7 +38,8 @@ namespace voltdb {
                                                      VoltDBEngine* engine) :
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
-            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()) {
+            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()),
+            m_countStarColumn(0) {
         install(mvHandlerInfo, engine);
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
@@ -102,23 +103,29 @@ namespace voltdb {
     void MaterializedViewHandler::setUpAggregateInfo(catalog::MaterializedViewHandlerInfo *mvHandlerInfo) {
         const catalog::CatalogMap<catalog::Column>& columns = mvHandlerInfo->destTable()->columns();
         m_aggColumnCount = columns.size() - m_groupByColumnCount - 1;
+        int foundCountStar = 0;
         m_aggTypes.resize(m_aggColumnCount);
         for (catalog::CatalogMap<catalog::Column>::field_map_iter colIterator = columns.begin();
                 colIterator != columns.end(); colIterator++) {
             const catalog::Column *destCol = colIterator->second;
-            if (destCol->index() < m_groupByColumnCount + 1) {
+            if (destCol->index() < m_groupByColumnCount) {
                 continue;
             }
             // The index into the per-agg metadata starts as a materialized view column index
             // but needs to be shifted down for each column that has no agg option
-            // -- that is, -1 for each "group by" AND -1 for the COUNT(*).
-            std::size_t aggIndex = destCol->index() - m_groupByColumnCount - 1;
+            // -- that is, -1 for each "group by"
+            // and no -1 for the COUNT(*) since it can be anywhere
+            std::size_t aggIndex = destCol->index() - m_groupByColumnCount;
             m_aggTypes[aggIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
             switch(m_aggTypes[aggIndex]) {
                 case EXPRESSION_TYPE_AGGREGATE_SUM:
                 case EXPRESSION_TYPE_AGGREGATE_COUNT:
                 case EXPRESSION_TYPE_AGGREGATE_MIN:
                 case EXPRESSION_TYPE_AGGREGATE_MAX:
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                    m_countStarColumn = destCol->index();
+                    foundCountStar = 1;
                     break; // legal value
                 default: {
                     char message[128];
@@ -219,12 +226,12 @@ namespace voltdb {
             NValue value = m_existingTuple.getNValue(colindex);
             m_updatedTuple.setNValue(colindex, value);
         }
-        // COUNT(*)
-        NValue existingCount = m_existingTuple.getNValue(m_groupByColumnCount);
-        NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
-        m_updatedTuple.setNValue(m_groupByColumnCount, existingCount.op_add(deltaCount));
+        // // COUNT(*)
+        // NValue existingCount = m_existingTuple.getNValue(m_countStarColumn);
+        // NValue deltaCount = deltaTuple.getNValue(m_countStarColumn);
+        // m_updatedTuple.setNValue(m_countStarColumn, existingCount.op_add(deltaCount));
         // Aggregations
-        int aggOffset = m_groupByColumnCount + 1;
+        int aggOffset = m_groupByColumnCount;
         for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
             NValue existingValue = m_existingTuple.getNValue(columnIndex);
             NValue newValue = deltaTuple.getNValue(columnIndex);
@@ -235,6 +242,7 @@ namespace voltdb {
                 switch(m_aggTypes[aggIndex]) {
                     case EXPRESSION_TYPE_AGGREGATE_SUM:
                     case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                    case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
                         if (!existingValue.isNull()) {
                             newValue = existingValue.op_add(newValue);
                         }
@@ -294,15 +302,18 @@ namespace voltdb {
             m_updatedTuple.setNValue(colindex, value);
         }
         // COUNT(*)
-        NValue existingCount = m_existingTuple.getNValue(m_groupByColumnCount);
-        NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
+        NValue existingCount = m_existingTuple.getNValue(m_countStarColumn);
+        NValue deltaCount = deltaTuple.getNValue(m_countStarColumn);
         NValue newCount = existingCount.op_subtract(deltaCount);
-        m_updatedTuple.setNValue(m_groupByColumnCount, newCount);
-        int aggOffset = m_groupByColumnCount + 1;
+        m_updatedTuple.setNValue(m_countStarColumn, newCount);
+
+        int aggOffset = m_groupByColumnCount;
         NValue newValue;
         if (newCount.isZero()) {
             // no group by key, no rows, aggs will be null except for count().
             for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
+                if( columnIndex == m_countStarColumn )
+                    continue;
                 if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
                     newValue = ValueFactory::getBigIntValue(0);
                 }
@@ -323,6 +334,8 @@ namespace voltdb {
 
                 if (! deltaValue.isNull()) {
                     switch(aggType) {
+                        case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR: // already done above
+                            break;
                         case EXPRESSION_TYPE_AGGREGATE_SUM:
                         case EXPRESSION_TYPE_AGGREGATE_COUNT:
                             newValue = existingValue.op_subtract(deltaValue);

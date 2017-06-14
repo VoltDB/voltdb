@@ -305,6 +305,9 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
         case EXPRESSION_TYPE_AGGREGATE_COUNT:
         case EXPRESSION_TYPE_AGGREGATE_MIN:
         case EXPRESSION_TYPE_AGGREGATE_MAX:
+            break;
+        case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+            m_countStarColumn = aggIndex;
             break; // legal value
         default: {
             char message[128];
