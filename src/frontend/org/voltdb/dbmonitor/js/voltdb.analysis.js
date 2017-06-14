@@ -1,47 +1,53 @@
+function loadAnalysisPage(){
+    function fetchData (){
+     $("#tabAnalysis li a").on("click", function(){
+        setInterval(function(){
+            window.dispatchEvent(new Event('resize'));
+        },200)
 
+    })
 
-function fetchData (){
+    voltDbRenderer.GetProceduresInfo(function (procedureDetails) {
+        if(procedureDetails != undefined){
+            if(!$.isEmptyObject(procedureDetails)){
+                $(".analyzeNowContent").hide();
+                $(".dataContent").show();
+            } else {
+                $(".mainContentAnalysis").hide();
+                $(".noDataContent").hide();
+                $(".noDataContent").show();
 
-  voltDbRenderer.GetProceduresInfo(function (procDetails) {
-        debugger;
-        var data = [];
+            }
+            $("#tblAnalyzeNowContent").hide();
+            $("#tblNoDataContent").show();
 
-        data[0] ={};
-        data[0]["key"] = "Latency",
-        data[0]["color"] = "#d62728",
-        data[0]["values"] = [];
-
-         procDetails.sort(function(a, b) {
-    return parseFloat(b.AVG_LATENCY) - parseFloat(a.AVG_LATENCY);
-});
-        procDetails.forEach (function(item){
+        }
+        var dataLatency = [];
+        procedureDetails.sort(function(a, b) {
+            return parseFloat(b.AVG_LATENCY) - parseFloat(a.AVG_LATENCY);
+        });
+        procedureDetails.forEach (function(item){
             //order items w.r.to latency
+            var latValue;
+            VoltDbAnalysis.procedureValue[item.PROCEDURE] = {AVG_LATENCY: item.AVG_LATENCY, INVOCATIONS: item.INVOCATIONS}
 
-            data[0]["values"].push({"label": item.PROCEDURE , "value": item.AVG_LATENCY})
+            dataLatency.push({"label": item.PROCEDURE , "value": item.AVG_LATENCY})
         });
-
-        nv.addGraph(function() {
-          var chart = nv.models.multiBarHorizontalChart()
-              .x(function(d) { return d.label })
-              .y(function(d) { return d.value })
-              .margin({top: 30, right: 20, bottom: 50, left: 175})
-              .showValues(true)
-              .tooltips(false)
-              .showControls(false);
-
-          chart.yAxis
-              .tickFormat(d3.format(',.2f'));
-
-          d3.select('#chart svg')
-              .datum(data)
-            .transition().duration(500)
-              .call(chart);
-
-          nv.utils.windowResize(chart.update);
-
-          return chart;
-        });
+        MonitorGraphUI.initializeLatencyAnalysis();
+        MonitorGraphUI.RefreshLatencyAnalysis(dataLatency);
 
     });
 
 }
+
+    $("#btnAnalyzeNow").on("click", function(){
+        fetchData();
+    })
+}
+
+(function(window) {
+    iVoltDbAnalysis = (function(){
+        this.procedureValue = {}
+    });
+    window.VoltDbAnalysis = new iVoltDbAnalysis();
+})(window);

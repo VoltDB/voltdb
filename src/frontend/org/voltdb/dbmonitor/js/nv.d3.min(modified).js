@@ -613,11 +613,12 @@
                 if (d === null) {
                     return '';
                 }
-
                 if (d.series[0].value == null) {
                     return '';
                 }
                 var currentTime = d.value
+                if(d.series[0].key == "Latency" && chartContainer == null)
+                    currentTime = d.data.label
                 var isPartitionIdleGraph = false
                 var table = d3.select(document.createElement("table"));
                 if (headerEnabled) {
@@ -657,7 +658,7 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        unit = 'Number'
+                        unit = ''
                     }
                     else {
                         unit = '%';
@@ -691,6 +692,9 @@
                     trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
+                } else if(d.series[0].key == "Latency" && chartContainer == null){
+                    trowEnter.append("td")
+                        .html(function (p, i) { return valueFormatter(p.value, i) + unit });
                 } else {
                     trowEnter.append("td")
                         .classed("value", true)
@@ -711,7 +715,34 @@
                             .style("border-top-color", opacityScale(opacity));
                     }
                 });
+                if(d.series[0].key == "Latency" && chartContainer == null){
+                    var trowEnter1 = tbodyEnter.selectAll("tr")
+                    .append("tr");
 
+                    trowEnter1.append("td")
+                    .html("AvgLatency*Invocation")
+
+                    trowEnter1.append("td")
+                        .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].AVG_LATENCY) * parseFloat(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS));
+
+                    var trowEnter2 = tbodyEnter
+                    .append("tr");
+
+                    trowEnter2.append("td")
+                    .html("Frequency")
+
+                    trowEnter2.append("td")
+                        .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS));
+
+                    var trowEnter3 = tbodyEnter
+                    .append("tr");
+
+                    trowEnter3.append("td")
+                    .html("Combined")
+
+                    trowEnter3.append("td")
+                        .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS));
+                }
                 var html = table.node().outerHTML;
                 if (d.footer !== undefined)
                     html += "<div class='footer'>" + d.footer + "</div>";

@@ -677,20 +677,13 @@ function changePassword(obj) {
 }
 
 var loadPage = function (serverName, portid) {
-    $("#tabAnalysis li a").on("click", function(){
-        setInterval(function(){
-            window.dispatchEvent(new Event('resize'));
-        },10)
-
-    })
-
     $(".drShowHide").show();
     $(".clpShowHide").show();
     $("#showHideDrBlock").removeClass('collapsed');
     $("#showHideDrBlock").addClass('expanded');
     $("#showHideCLPBlock").removeClass('collapsed');
     $("#showHideCLPBlock").addClass('expanded');
-
+    loadAnalysisPage();
     var userName = VoltDbUI.getCookie('username') != undefined ? VoltDbUI.getCookie('username') : "";
     var password = VoltDbUI.getCookie('password') != undefined ? VoltDbUI.getCookie('password') : "";
 
