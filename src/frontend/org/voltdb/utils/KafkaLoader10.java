@@ -478,8 +478,8 @@ public class KafkaLoader10 {
             try {
                 client.createConnection(server.trim());
             } catch (IOException e) {
-             // Only swallow exceptions caused by Java network or connection problem
-             // Unresolved hostname exceptions will be thrown
+                // Only swallow exceptions caused by Java network or connection problem
+                // Unresolved hostname exceptions will be thrown
             }
         }
         if (client.getConnectedHostList().isEmpty()) {
