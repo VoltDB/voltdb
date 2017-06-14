@@ -319,6 +319,20 @@ public class CatalogContext {
         return m_jarfile.writeToFile(catalog_file);
     }
 
+    public void writeCatalogJarToFileAsync(String path, String name) throws IOException
+    {
+        new Thread(() -> {
+            File catalog_file = new VoltFile(path, name);
+            if (catalog_file.exists())
+            {
+                catalog_file.delete();
+            }
+            try {
+                m_jarfile.writeToFile(catalog_file);
+            } catch (IOException e) {}
+        }).start();
+    }
+
     /**
      * Get the raw bytes of a catalog file for shipping around.
      */
