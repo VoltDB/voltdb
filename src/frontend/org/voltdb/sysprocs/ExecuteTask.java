@@ -54,13 +54,13 @@ public class ExecuteTask extends VoltSystemProcedure {
                              new VoltTable.ColumnInfo("DR_VERSION", VoltType.INTEGER));
     }
 
-	@Override
-	public long[] getPlanFragmentIds() {
+    @Override
+    public long[] getPlanFragmentIds() {
         return new long[]{
                 SysProcFragmentId.PF_executeTask,
                 SysProcFragmentId.PF_executeTaskAggregate
                 };
-	}
+    }
 
     @Override
     public DependencyPair executePlanFragment(

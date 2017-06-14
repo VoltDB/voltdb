@@ -470,7 +470,7 @@ public class TestVoltProcedure extends TestCase {
     public void testGetClusterId() {
         GetClusterIdProcedure gcip = new GetClusterIdProcedure();
         ProcedureRunner runner = new ProcedureRunner(
-        		Language.JAVA,
+                Language.JAVA,
                 gcip, site, null,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()), null);
         runner.setupTransaction(null);

@@ -82,7 +82,7 @@ public class CatalogContext {
      * Planner associated with this catalog version.
      * Not thread-safe, should only be accessed by AsyncCompilerAgent
      */
-    public final PlannerTool m_ptool;
+    public PlannerTool m_ptool;
 
     // PRIVATE
     private final InMemoryJarfile m_jarfile;
@@ -93,6 +93,21 @@ public class CatalogContext {
     // cluster settings
     private final Supplier<ClusterSettings> m_clusterSettings;
 
+    /**
+     * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
+     * When @param hasSchemaChange is true, @param defaultProcManager and @param plannerTool will be created as new.
+     * Otherwise, it will try to use the ones passed in to save CPU cycles for performance reason.
+     * @param transactionId
+     * @param uniqueId
+     * @param catalog
+     * @param catalogBytes
+     * @param catalogBytesHash
+     * @param deploymentBytes
+     * @param version
+     * @param hasSchemaChange
+     * @param defaultProcManager
+     * @param plannerTool
+     */
     public CatalogContext(
             long transactionId,
             long uniqueId,
@@ -101,7 +116,10 @@ public class CatalogContext {
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
-            int version)
+            int version,
+            boolean hasSchemaChange,
+            DefaultProcedureManager defaultProcManager,
+            PlannerTool plannerTool)
     {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
@@ -153,10 +171,20 @@ public class CatalogContext {
         this.deploymentHashForConfig = CatalogUtil.makeDeploymentHashForConfig(deploymentBytes);
         m_memoizedDeployment = null;
 
-        m_defaultProcs = new DefaultProcedureManager(database);
+
+        // If there is no schema change, default procedures will not be changed.
+        // Also, the planner tool can be almost reused except updating the catalog hash string.
+        // When there is schema change, we just reload every default procedure and create new planner tool
+        // by applying the existing schema, which are costly in the UAC MP blocking path.
+        if (hasSchemaChange) {
+            m_defaultProcs = new DefaultProcedureManager(database);
+            m_ptool = new PlannerTool(database, catalogHash);
+        } else {
+            m_defaultProcs = defaultProcManager;
+            m_ptool = plannerTool.updateWhenNoSchemaChange(database, catalogHash);;
+        }
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
-        m_ptool = new PlannerTool(cluster, database, catalogHash);
         catalogVersion = version;
 
         if (procedures != null) {
@@ -167,6 +195,31 @@ public class CatalogContext {
                 }
             }
         }
+    }
+
+    /**
+     * Constructor of @CatalogConext used when creating brand-new instances.
+     * @param transactionId
+     * @param uniqueId
+     * @param catalog
+     * @param catalogBytes
+     * @param catalogBytesHash
+     * @param deploymentBytes
+     * @param version
+     * @param messenger
+     */
+    public CatalogContext(
+            long transactionId,
+            long uniqueId,
+            Catalog catalog,
+            Supplier<ClusterSettings> settings,
+            byte[] catalogBytes,
+            byte[] catalogBytesHash,
+            byte[] deploymentBytes,
+            int version)
+    {
+        this(transactionId, uniqueId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
+                version, true, null, null);
     }
 
     public Cluster getCluster() {
@@ -184,7 +237,8 @@ public class CatalogContext {
             byte[] catalogBytesHash,
             String diffCommands,
             boolean incrementVersion,
-            byte[] deploymentBytes)
+            byte[] deploymentBytes,
+            boolean hasSchemaChange)
     {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
@@ -214,7 +268,10 @@ public class CatalogContext {
                     bytes,
                     catalogBytesHash,
                     depbytes,
-                    catalogVersion + incValue);
+                    catalogVersion + incValue,
+                    hasSchemaChange,
+                    m_defaultProcs,
+                    m_ptool);
         return retval;
     }
 

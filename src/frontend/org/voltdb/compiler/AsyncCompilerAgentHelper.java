@@ -57,6 +57,7 @@ public class AsyncCompilerAgentHelper
         retval.originalUniqueId = work.originalUniqueId;
         retval.user = work.user;
         retval.tablesThatMustBeEmpty = new String[0]; // ensure non-null
+        retval.hasSchemaChange = true;
 
         try {
             // catalog change specific boiler plate
@@ -108,6 +109,9 @@ public class AsyncCompilerAgentHelper
                 // Real deploymentString should be the current deployment, just set it to null
                 // here and let it get filled in correctly later.
                 deploymentString = null;
+
+                // mark it as non-schema change
+                retval.hasSchemaChange = false;
             }
             else if (work.invocationName.startsWith("@AdHoc")) {
                 // newCatalogBytes and deploymentString should be null.

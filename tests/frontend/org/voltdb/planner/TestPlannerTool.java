@@ -37,7 +37,6 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Supplier;
-
 import junit.framework.TestCase;
 
 public class TestPlannerTool extends TestCase {
@@ -66,7 +65,7 @@ public class TestPlannerTool extends TestCase {
         Supplier<ClusterSettings> settings = ClusterSettings.create().asSupplier();
         CatalogContext context = new CatalogContext(0, 0, catalog, settings, bytes, null, new byte[] {}, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
+        m_pt = new PlannerTool(context.database, context.getCatalogHash());
 
         AdHocPlannedStatement result = null;
         result = m_pt.planSqlForTest("select * from warehouse;");
@@ -162,7 +161,7 @@ public class TestPlannerTool extends TestCase {
         Supplier<ClusterSettings> settings = ClusterSettings.create().asSupplier();
         CatalogContext context = new CatalogContext(0, 0, c, settings, bytes, null, new byte[] {}, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
+        m_pt = new PlannerTool(context.database, context.getCatalogHash());
 
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
