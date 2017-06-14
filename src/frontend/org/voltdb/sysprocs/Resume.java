@@ -35,7 +35,9 @@ import org.voltdb.VoltZK;
 public class Resume extends VoltSystemProcedure
 {
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(

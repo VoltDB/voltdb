@@ -64,13 +64,15 @@ public class UpdateSettings extends VoltSystemProcedure {
 
     private final static VoltLogger log = new VoltLogger("HOST");
 
-    @Override
-    public void init() {
-        registerPlanFragment(PF_updateSettingsBarrier);
-        registerPlanFragment(PF_updateSettingsBarrierAggregate);
-        registerPlanFragment(PF_updateSettings);
-        registerPlanFragment(PF_updateSettingsAggregate);
-    }
+	@Override
+	public long[] getPlanFragmentIds() {
+        return new long[]{
+                SysProcFragmentId.PF_updateSettingsBarrier,
+                SysProcFragmentId.PF_updateSettingsBarrierAggregate,
+                SysProcFragmentId.PF_updateSettings,
+                SysProcFragmentId.PF_updateSettingsAggregate
+                };
+	}
 
     public UpdateSettings() {
     }

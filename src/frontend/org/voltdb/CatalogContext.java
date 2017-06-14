@@ -279,7 +279,7 @@ public class CatalogContext {
 
     /**
      * Given a class name in the catalog jar, loads it from the jar, even if the
-     * jar is served from a url and isn't in the classpath.
+     * jar is served from an URL and isn't in the classpath.
      *
      * @param procedureClassName The name of the class to load.
      * @return A java Class variable associated with the class.

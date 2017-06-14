@@ -633,6 +633,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+	public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
+        return m_sysprocContext;
+    }
+
+    @Override
     public void setDRProtocolVersion(int drVersion) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

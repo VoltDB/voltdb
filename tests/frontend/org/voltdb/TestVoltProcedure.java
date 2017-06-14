@@ -58,6 +58,7 @@ import java.util.Date;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.Language;
 import org.voltdb.types.TimestampType;
 
 import junit.framework.TestCase;
@@ -440,6 +441,7 @@ public class TestVoltProcedure extends TestCase {
     public void testProcedureStatsCollector() {
         NullProcedureWrapper wrapper = new LongProcedure();
         ProcedureRunner runner = new ProcedureRunner(
+                Language.JAVA,
                 wrapper, site, null,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()), null);
 
@@ -468,6 +470,7 @@ public class TestVoltProcedure extends TestCase {
     public void testGetClusterId() {
         GetClusterIdProcedure gcip = new GetClusterIdProcedure();
         ProcedureRunner runner = new ProcedureRunner(
+        		Language.JAVA,
                 gcip, site, null,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()), null);
         runner.setupTransaction(null);
@@ -490,6 +493,7 @@ public class TestVoltProcedure extends TestCase {
             e.printStackTrace();
         }
         ProcedureRunner runner = new ProcedureRunner(
+                Language.JAVA,
                 wrapper, site, null,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()), null);
 

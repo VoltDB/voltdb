@@ -64,11 +64,13 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             SysProcFragmentId.PF_matchesHashinatorResults;
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_validatePartitioningResults);
-        registerPlanFragment(SysProcFragmentId.PF_validatePartitioning);
-        registerPlanFragment(SysProcFragmentId.PF_matchesHashinatorResults);
-        registerPlanFragment(SysProcFragmentId.PF_matchesHashinator);
+    public long[] getPlanFragmentIds() {
+        return new long[] {
+            SysProcFragmentId.PF_validatePartitioningResults,
+            SysProcFragmentId.PF_validatePartitioning,
+            SysProcFragmentId.PF_matchesHashinatorResults,
+            SysProcFragmentId.PF_matchesHashinator
+        };
     }
 
     @Override

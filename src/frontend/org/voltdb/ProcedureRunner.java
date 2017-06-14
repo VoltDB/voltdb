@@ -121,7 +121,7 @@ public class ProcedureRunner {
     //
     protected final SiteProcedureConnection m_site;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
-    protected final CatalogSpecificPlanner m_csp;
+    protected CatalogSpecificPlanner m_csp;
 
     // per procedure state and catalog info
     //
@@ -166,27 +166,28 @@ public class ProcedureRunner {
                 }
             };
 
-    ProcedureRunner(VoltProcedure procedure,
+    ProcedureRunner(Language lang,
+                    VoltProcedure procedure,
                     SiteProcedureConnection site,
-                    SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
+        this(lang, procedure, site, null, catProc, csp);
+        // assert this constructor for non-system procedures
+        assert(procedure instanceof VoltSystemProcedure == false);
+    }
+
+    ProcedureRunner(Language lang,
+            VoltProcedure procedure,
+            SiteProcedureConnection site,
+            SystemProcedureExecutionContext sysprocContext,
+            Procedure catProc,
+            CatalogSpecificPlanner csp) {
+
         assert(m_inputCRC.getValue() == 0L);
-
-        String language = catProc.getLanguage();
-
-        if (language != null && !language.trim().isEmpty()) {
-            m_language = Language.valueOf(language.trim().toUpperCase());
-        } else if (procedure instanceof StmtProcedure){
-            m_language = null;
-        } else {
-            m_language = Language.JAVA;
-        }
-
-        if (procedure instanceof StmtProcedure) {
+        m_language = lang;
+        if (m_language == null) {
             m_procedureName = catProc.getTypeName().intern();
-        }
-        else {
+        } else {
             m_procedureName = m_language.accept(procedureNameRetriever, procedure);
         }
         m_procedure = procedure;
@@ -219,6 +220,17 @@ public class ProcedureRunner {
                 m_statsCollector);
 
         reflect();
+    }
+
+    public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
+        assert(m_procedure != null);
+        if (! m_isSysProc) {
+            return;
+        }
+        ((VoltSystemProcedure) m_procedure).initSysProc(m_site,
+                catalogContext.cluster, catalogContext.getClusterSettings());
+
+        m_csp = csp;
     }
 
     public Procedure getCatalogProcedure() {
