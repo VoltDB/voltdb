@@ -319,25 +319,6 @@ public class CatalogContext {
         return m_jarfile.writeToFile(catalog_file);
     }
 
-    public void writeCatalogJarToFileAsync(String path, String name) throws IOException
-    {
-        new Thread(() -> {
-            File catalog_file = new VoltFile(path, name);
-            if (catalog_file.exists())
-            {
-                catalog_file = new VoltFile(path, "catalog-tmp.jar");
-            }
-            try {
-                m_jarfile.writeToFile(catalog_file);
-                if (!catalog_file.getName().equals("catalog.java")) {
-                    File old_jar = new VoltFile(path, "catalog.java");
-                    if (old_jar.exists()) { old_jar.delete(); }
-                    catalog_file.renameTo(new File(path, "catalog.jar"));
-                }
-            } catch (IOException e) {}
-        }).start();
-    }
-
     /**
      * Get the raw bytes of a catalog file for shipping around.
      */
