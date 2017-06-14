@@ -28,7 +28,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
@@ -45,6 +47,7 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -57,7 +60,14 @@ public class TestImportSuite extends RegressionSuite {
     private static final Level[] s_levels =
         { Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.TRACE, Level.WARN };
 
+    private static final String SERVER = "localhost";
+    private static final int SOCKET_IMPORTER_PORT = 7001;
+    private static final char DELIMITER = '\t';
+
     private Boolean m_socketHandlerInitialized = false;
+    private Client m_client;
+    private List<DataPusher> m_dataPushers = new ArrayList<>();
+    private CountDownLatch m_dataAwaiter = null;
 
     @Override
     public void setUp() throws Exception
@@ -67,13 +77,19 @@ public class TestImportSuite extends RegressionSuite {
         f.mkdirs();
 
         super.setUp();
+
+        m_client = getClient();
+        while (!((ClientImpl) m_client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
     }
 
     private void setupLog4jSocketHandler() {
         synchronized(m_socketHandlerInitialized) {
             if (m_socketHandlerInitialized) return;
 
-            SocketAppender appender = new SocketAppender("localhost", 6060);
+            SocketAppender appender = new SocketAppender(SERVER, 6060);
             appender.setReconnectionDelay(50);
             s_testSocketLogger.setAdditivity(false);
             s_testSocketLogger.removeAllAppenders();
@@ -85,18 +101,65 @@ public class TestImportSuite extends RegressionSuite {
 
     @Override
     public void tearDown() throws Exception {
+        m_dataPushers.clear();
+        m_client.close();
         super.tearDown();
     }
 
-    abstract class DataPusher extends Thread {
-        private final int m_count;
-        private final CountDownLatch m_latch;
+    /** Allows the test thread to check if the importer is alive by writing data to it. */
+    static class ImporterConnector {
+        private final String m_server;
+        private final int m_port;
         private final char m_separator;
+        private int m_counter = 0;
 
-        public DataPusher(int count, CountDownLatch latch, char separator) {
-            m_count = count;
-            m_latch = latch;
+        public ImporterConnector(String server, int port, char separator) {
             m_separator = separator;
+            m_server = server;
+            m_port = port;
+        }
+
+        /** Tries to write data to the importer, but may fail. */
+        public void tryPush(int maxAttempts) throws IOException {
+            int numConnectAttempts = 0;
+            do {
+                try {
+                    Socket pushSocket = new Socket(m_server, m_port);
+                    OutputStream socketStream = pushSocket.getOutputStream();
+                    System.out.printf("Connected to VoltDB socket importer at: %s.\n", m_server + ":" + m_port);
+                    String s = String.valueOf(m_counter) + m_separator + System.currentTimeMillis() + "\n";
+                    socketStream.write(s.getBytes());
+                    pushSocket.close();
+                    m_counter++;
+                    return;
+                } catch (IOException e) {
+                    numConnectAttempts++;
+                    if (numConnectAttempts >= maxAttempts) {
+                        throw e;
+                    }
+                    try {
+                        Thread.sleep((int) (Math.random() * 1000) + 500);
+                    } catch (InterruptedException ignore) {
+                    }
+                }
+            } while (true);
+        }
+    }
+
+    abstract class DataPusher extends Thread {
+        private final CountDownLatch m_startupLatch;
+        private final CountDownLatch m_shutdownLatch;
+        private final char m_separator;
+        private volatile int m_totalCount;
+        private volatile int m_currentCount = 0;
+        private volatile Exception m_error = null;
+
+        public DataPusher(int count, CountDownLatch startupLatch, CountDownLatch shutdownLatch, char separator) {
+            m_totalCount = count;
+            m_startupLatch = startupLatch;
+            m_shutdownLatch = shutdownLatch;
+            m_separator = separator;
+            m_dataPushers.add(this);
         }
 
         protected abstract void initialize();
@@ -106,21 +169,34 @@ public class TestImportSuite extends RegressionSuite {
         @Override
         public void run() {
             initialize();
-
+            if (m_totalCount == 0) {
+                m_totalCount = Integer.MAX_VALUE; // keep running until explicitly stopped
+            }
+            m_startupLatch.countDown();
             try {
-                for (int icnt = 0; icnt < m_count; icnt++) {
-                    String s = String.valueOf(System.nanoTime() + icnt) + m_separator + System.currentTimeMillis() + "\n";
+                while (m_currentCount < m_totalCount) {
+                    String s = String.valueOf(System.nanoTime() + m_currentCount) + m_separator + System.currentTimeMillis() + "\n";
                     pushData(s);
                     Thread.sleep(0, 1);
+                    m_currentCount++;
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
+                m_error = ex;
             } finally {
                 close();
-                m_latch.countDown();
+                m_shutdownLatch.countDown();
             }
         }
 
+        public void shutDown() throws Exception {
+            if (m_totalCount == Integer.MAX_VALUE) {
+                m_totalCount = 0; // this will stop the pusher's forever loop
+            }
+            if (m_error != null) {
+                throw m_error;
+            }
+        }
     }
 
     class SocketDataPusher extends DataPusher {
@@ -128,8 +204,8 @@ public class TestImportSuite extends RegressionSuite {
         private final int m_port;
         private OutputStream m_sout;
 
-        public SocketDataPusher(String server, int port, int count, CountDownLatch latch, char separator) {
-            super(count, latch, separator);
+        public SocketDataPusher(String server, int port, int count, CountDownLatch startupLatch, CountDownLatch shutdownLatch, char separator) {
+            super(count, startupLatch, shutdownLatch, separator);
             m_server = server;
             m_port = port;
         }
@@ -159,8 +235,8 @@ public class TestImportSuite extends RegressionSuite {
 
         private final Random random = new Random();
 
-        public Log4jDataPusher(int count, CountDownLatch latch, char separator) {
-            super(count, latch, separator);
+        public Log4jDataPusher(int count, CountDownLatch startupLatch, CountDownLatch shutdownLatch, char separator) {
+            super(count, startupLatch, shutdownLatch, separator);
         }
 
         @Override
@@ -178,13 +254,27 @@ public class TestImportSuite extends RegressionSuite {
         }
     }
 
-    private void pushDataToImporters(int count, int loops) throws Exception {
-        CountDownLatch latch = new CountDownLatch(2*loops);
+    private void asyncPushDataToImporters(int count, int loops) throws Exception {
+        CountDownLatch startupAwaiter = new CountDownLatch(2*loops);
+        m_dataAwaiter = new CountDownLatch(2*loops);
         for (int i=0; i<loops; i++) {
-            (new SocketDataPusher("localhost", 7001, count, latch, '\t')).start();
-            (new Log4jDataPusher(count, latch, ',')).start();
+            (new SocketDataPusher(SERVER, SOCKET_IMPORTER_PORT, count, startupAwaiter, m_dataAwaiter, DELIMITER)).start();
+            (new Log4jDataPusher(count, startupAwaiter, m_dataAwaiter, ',')).start();
         }
-        latch.await();
+        // ensure pushers are running before test begins
+        startupAwaiter.await();
+    }
+
+    private void waitForData() throws Exception {
+        for (DataPusher pusher : m_dataPushers) {
+            pusher.shutDown();
+        }
+        m_dataAwaiter.await();
+    }
+
+    private void pushDataToImporters(int count, int loops) throws Exception {
+        asyncPushDataToImporters(count, loops);
+        waitForData();
     }
 
     private static Map<String, String> expectedStatRows = new HashMap<>();
@@ -262,68 +352,112 @@ public class TestImportSuite extends RegressionSuite {
 
     public void testImportSimpleData() throws Exception {
         System.out.println("testImportSimpleData");
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         pushDataToImporters(100, 1);
-        verifyData(client, 100);
-        client.close();
+        verifyData(m_client, 100);
     }
 
     public void testImportMultipleTimes() throws Exception {
         System.out.println("testImportUpdateApplicationCatalog");
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         pushDataToImporters(100, 1);
-        verifyData(client, 100);
+        verifyData(m_client, 100);
 
         Thread.sleep(0, 1);
 
         pushDataToImporters(100, 1);
-        verifyData(client, 200);
-
-        client.close();
+        verifyData(m_client, 200);
     }
 
     public void testImportMultipleClientsInParallel() throws Exception {
         System.out.println("testImportMultipleClientsInParallel");
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         pushDataToImporters(100, 2);
-        verifyData(client, 100*2);
-        client.close();
+        verifyData(m_client, 100*2);
     }
 
     public void testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing() throws Exception {
         System.out.println("testImportMultipleClientsUpdateApplicationCatalogWhenNotPushing");
-        Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
-        }
 
         pushDataToImporters(1000, 3);
-        verifyData(client, 3000);
+        verifyData(m_client, 3000);
 
-        ClientResponse response = client.callProcedure("@AdHoc", "create table nudge(id integer);");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        applySchemaChange("create table nudge(id integer);");
 
         pushDataToImporters(1000, 4);
         // log4j will lose some events because of reconnection delay
-        verifyData(client, 7000, 3001);
+        verifyData(m_client, 7000, 3001);
+    }
 
-        client.close();
+    /** Verify that importer stays running during unrelated schema changes.
+     * The data pushers will get IOExceptions if the importers restart.
+     */
+    public void testImportUnrelatedUACWhilePushing() throws Exception {
+        System.out.println("Schema changes that don't affect importers should not result in importer restarts.");
+
+        // Run data pushers until they are explicitly stopped.
+        asyncPushDataToImporters(0, 3);
+
+        applySchemaChange("CREATE TABLE nudge(id integer);");
+        applySchemaChange("CREATE PROCEDURE NudgeThatDB AS INSERT INTO nudge VALUES (?);");
+        applySchemaChange("DROP PROCEDURE NudgeThatDB;");
+        applySchemaChange("DROP TABLE nudge;");
+
+        waitForData();
+    }
+
+    /** Verify that importer can withstand unrelated UACs without restarting.
+     * The data pushers will get IOExceptions if the importers restart.
+     */
+    public void testImportUnrelatedDeploymentChangesWhilePushing() throws Exception {
+        System.out.println("Deployment changes that don't affect importers should not result in them restarting.");
+
+        // Run data pushers until they are explicitly stopped.
+        asyncPushDataToImporters(0, 3);
+
+        updateDeploymentFile(true, true);
+        updateDeploymentFile(true, false);
+
+        waitForData();
+    }
+
+    /** Verify that importer restarts if it is removed from the configuration and then restored.
+     */
+    public void testImporterDeploymentChanges() throws Exception {
+        System.out.println("Removing and re-adding importers should cause them to restart");
+
+        ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
+        testConnector.tryPush(5);
+
+        updateDeploymentFile(false, false);
+        try {
+            testConnector.tryPush(5);
+            fail("Importer is still running even though it is no longer configured");
+        } catch (IOException expected) {
+        }
+
+        updateDeploymentFile(true, false);
+        testConnector.tryPush(5);
+    }
+
+    /** Verify that importer restarts if the procedure it uses is removed from the configuration and then restored.
+     */
+    public void testAddRemoveImporterProcedure() throws Exception {
+        System.out.println("Removing and adding procedures that the importers rely on should result in a restart");
+
+        ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
+        testConnector.tryPush(5);
+
+        // importer uses CRUD procedure associated with this table.
+        applySchemaChange("DROP TABLE importTable;");
+        try {
+            testConnector.tryPush(5);
+            fail("Importer is still running even though its procedure is disabled");
+        } catch (IOException expected) {
+        }
+
+        applySchemaChange("CREATE TABLE IMPORTTABLE (PKEY bigint NOT NULL, A_INTEGER_VALUE bigint); PARTITION TABLE IMPORTTABLE ON COLUMN PKEY;");
+        testConnector.tryPush(5);
     }
 
     /**
@@ -354,28 +488,38 @@ public class TestImportSuite extends RegressionSuite {
         super(name);
     }
 
-    static public junit.framework.Test suite() throws Exception
-    {
-        LocalCluster config;
-        Map<String, String> additionalEnv = new HashMap<>();
-        //Specify bundle location
-        String bundleLocation = System.getProperty("user.dir") + "/bundles";
-        System.out.println("Bundle location is: " + bundleLocation);
-        additionalEnv.put("voltdbbundlelocation", bundleLocation);
+    private void applySchemaChange(String adhocddl) throws Exception {
+        ClientResponse response = m_client.callProcedure("@AdHoc", adhocddl);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+    }
 
-        final MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestImportSuite.class);
+    /** Builds a CatalogContext for the import manager to use.
+     * @param includeImporters Whether or not to include the importers associated with this test.
+     * @param unrelatedChange Whether or not to make a change that has no impact on the importer.
+     * @return New deployment file
+     * @throws Exception upon error or test failure
+     */
+    private void updateDeploymentFile(boolean includeImporters, boolean unrelatedChange) throws Exception {
+        VoltProjectBuilder projectBuilder = generateVoltProject(includeImporters, unrelatedChange);
+        File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly(null, 1, 1, 0, 0));
+        System.out.println("Deployment file " + (includeImporters ? "with" : "without") + " importers, " +
+                (unrelatedChange ? "with" : "without") + " command logs written to " + deploymentFilePath.getCanonicalPath());
+        deploymentFilePath.deleteOnExit();
+        ClientResponse response = m_client.updateApplicationCatalog(null, deploymentFilePath);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+    }
 
+    private static VoltProjectBuilder generateVoltProject(boolean includeImporters, boolean unrelatedChange) throws Exception {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
 
         // configure socket importer
         Properties props = buildProperties(
-                "port", "7001",
+                "port", Integer.toString(SOCKET_IMPORTER_PORT),
                 "decode", "true",
                 "procedure", "importTable.insert");
-        project.addImport(true, "custom", "tsv", "socketstream.jar", props);
+        project.addImport(includeImporters, "custom", "tsv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
         // configure log4j socket handler importer
@@ -383,7 +527,25 @@ public class TestImportSuite extends RegressionSuite {
                 "port", "6060",
                 "procedure", "log_events.insert",
                 "log-event-table", "log_events");
-        project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
+        project.addImport(includeImporters, "custom", null, "log4jsocketimporter.jar", props);
+
+        project.setHeartbeatTimeoutSeconds(5 + (unrelatedChange ? 1 : 0));
+        return project;
+    }
+
+    static public junit.framework.Test suite() throws Exception
+    {
+        LocalCluster config;
+        Map<String, String> additionalEnv = new HashMap<>();
+        //Specify bundle location
+        String bundleLocation = System.getProperty("user.dir") + "/bundles";
+        System.out.println("Bundle location is: " + bundleLocation);
+        additionalEnv.put(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, bundleLocation);
+
+        final MultiConfigSuiteBuilder builder =
+            new MultiConfigSuiteBuilder(TestImportSuite.class);
+
+        VoltProjectBuilder project = generateVoltProject(true, false);
 
         /*
          * compile the catalog all tests start with
