@@ -82,11 +82,11 @@ public class TestAdHocPlans extends AdHocQueryTester {
         sql = getQueryForLongQueryTable(2000);
         try {
             runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
-            fail("Query was expected to generate stack over flow error");
         }
         catch (StackOverflowError error) {
+            fail("Unexpected stack over flow error");
             // The test-only interface to the PlannerTool tests at a level below
-            // any StackOverflowError handling, so expect the raw StackOverflowError.
+            // any StackOverflowError handling.
         }
     }
 
