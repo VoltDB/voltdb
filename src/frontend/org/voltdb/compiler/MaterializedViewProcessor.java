@@ -561,7 +561,7 @@ public class MaterializedViewProcessor {
         }
 
         if (countStarFound == false) {
-            msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
+            msg.append("must have count(*) after the GROUP BY columns (if any)");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
