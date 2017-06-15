@@ -447,41 +447,41 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         if ( ! oldValue.isNull()) {
             int reversedForMin = 1; // initially assume that agg is not MIN.
             switch(m_aggTypes[aggIndex]) {
-            case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
-                newValue = count;
-                break;
-            case EXPRESSION_TYPE_AGGREGATE_SUM:
-                newValue = existingValue.op_subtract(oldValue);
-                break;
-            case EXPRESSION_TYPE_AGGREGATE_COUNT:
-                newValue = oldValue.isNull() ? existingValue : existingValue.op_decrement();
-                break;
-            case EXPRESSION_TYPE_AGGREGATE_MIN:
-                reversedForMin = -1; // fall through...
-                // no break
-            case EXPRESSION_TYPE_AGGREGATE_MAX:
-                if (oldValue.compare(existingValue) == 0) {
-                    // re-calculate MIN / MAX
-                    newValue = NValue::getNullValue(destTbl->schema()->columnType(aggOffset+aggIndex));
-                    if (m_usePlanForAgg[minMaxAggIdx] && allowUsingPlanForMinMax) {
-                        newValue = findFallbackValueUsingPlan(oldTuple, newValue, aggIndex, minMaxAggIdx);
+                case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                    newValue = count;
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_SUM:
+                    newValue = existingValue.op_subtract(oldValue);
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                    newValue = oldValue.isNull() ? existingValue : existingValue.op_decrement();
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_MIN:
+                    reversedForMin = -1; // fall through...
+                    // no break
+                case EXPRESSION_TYPE_AGGREGATE_MAX:
+                    if (oldValue.compare(existingValue) == 0) {
+                        // re-calculate MIN / MAX
+                        newValue = NValue::getNullValue(destTbl->schema()->columnType(aggOffset+aggIndex));
+                        if (m_usePlanForAgg[minMaxAggIdx] && allowUsingPlanForMinMax) {
+                            newValue = findFallbackValueUsingPlan(oldTuple, newValue, aggIndex, minMaxAggIdx);
+                        }
+                        // indexscan if an index is available, otherwise tablescan
+                        else if (m_indexForMinMax[minMaxAggIdx]) {
+                            newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
+                                                                      reversedForMin, aggIndex, minMaxAggIdx);
+                        }
+                        else {
+                            VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
+                            newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
+                                                                         reversedForMin, aggIndex);
+                            VOLT_TRACE("after findMinMaxFallbackValueSequential\n");
+                        }
                     }
-                    // indexscan if an index is available, otherwise tablescan
-                    else if (m_indexForMinMax[minMaxAggIdx]) {
-                        newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
-                                                                  reversedForMin, aggIndex, minMaxAggIdx);
-                    }
-                    else {
-                        VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
-                        newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
-                                                                     reversedForMin, aggIndex);
-                        VOLT_TRACE("after findMinMaxFallbackValueSequential\n");
-                    }
-                }
-                break;
-            default:
-                assert(false); // Should have been caught when the matview was loaded.
-                // no break
+                    break;
+                default:
+                    assert(false); // Should have been caught when the matview was loaded.
+                    // no break
             }
         }
         if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_MIN ||
