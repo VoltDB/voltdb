@@ -39,6 +39,7 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
+    , m_countStarColumnIndex(mvInfo->countStarColumnIndex())
 {
     VOLT_TRACE("Construct MaterializedViewTriggerForInsert...");
 
@@ -285,29 +286,27 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
     bool usesComplexAgg = expressionsAsText.length() > 0;
     // set up the mapping from input col to output col
     const catalog::CatalogMap<catalog::Column>& columns = mvInfo->dest()->columns();
-    m_aggTypes.resize(columns.size() - m_groupByColumnCount - 1);
+    m_aggTypes.resize(columns.size() - m_groupByColumnCount);
     if ( ! usesComplexAgg) {
         m_aggColIndexes.resize(m_aggTypes.size());
     }
     for (catalog::CatalogMap<catalog::Column>::field_map_iter colIterator = columns.begin();
          colIterator != columns.end(); colIterator++) {
         auto destCol = colIterator->second;
-        if (destCol->index() < m_groupByColumnCount + 1) {
+        if (destCol->index() < m_groupByColumnCount) {
             continue;
         }
         // The index into the per-agg metadata starts as a materialized view column index
         // but needs to be shifted down for each column that has no agg option
         // -- that is, -1 for each "group by" AND -1 for the COUNT(*).
-        std::size_t aggIndex = destCol->index() - m_groupByColumnCount - 1;
+        std::size_t aggIndex = destCol->index() - m_groupByColumnCount;
         m_aggTypes[aggIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
         switch(m_aggTypes[aggIndex]) {
         case EXPRESSION_TYPE_AGGREGATE_SUM:
         case EXPRESSION_TYPE_AGGREGATE_COUNT:
         case EXPRESSION_TYPE_AGGREGATE_MIN:
         case EXPRESSION_TYPE_AGGREGATE_MAX:
-            break;
         case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
-            m_countStarColumn = aggIndex;
             break; // legal value
         default: {
             char message[128];

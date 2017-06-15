@@ -312,7 +312,7 @@ public class MaterializedViewProcessor {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     // skip COUNT(*)
                     if ( col.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ) {
-                        matviewinfo.setCountStarColumnIndex(i);
+                        matviewinfo.setCountstarcolumnindex(i);
                         continue;
                     }
                     AbstractExpression aggExpr = col.expression.getLeft();
