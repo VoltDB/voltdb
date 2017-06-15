@@ -126,13 +126,13 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         m_updatedTuple.setNValue(colindex, value);
     }
 
-    int aggOffset = (int)m_groupByColumnCount + 1;
+    int aggOffset = (int)m_groupByColumnCount;
     // set values for the other columns
     // update or insert the row
     if (exists) {
         // increment the next column, which is a count(*)
-        m_updatedTuple.setNValue((int)m_groupByColumnCount,
-                                 m_existingTuple.getNValue((int)m_groupByColumnCount).op_increment());
+        //m_updatedTuple.setNValue((int)m_groupByColumnCount,
+        //                         m_existingTuple.getNValue((int)m_groupByColumnCount).op_increment());
 
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
             NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
@@ -162,6 +162,9 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
                         newValue = existingValue;
                     }
                     break;
+                case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                    newValue = existingValue.op_increment();
+                    break;
                 default:
                     assert(false); // Should have been caught when the matview was loaded.
                     // no break
@@ -177,7 +180,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
     }
     else {
         // set the next column, which is a count(*), to 1
-        m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(1));
+        //m_updatedTuple.setNValue((int)m_countStarColumnIndex, ValueFactory::getBigIntValue(1));
 
         // A new group row gets its initial agg values copied directly from the first source row
         // except for user-defined COUNTs which get set to 0 or 1 depending on whether the
@@ -191,6 +194,9 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
                 else {
                     newValue = ValueFactory::getBigIntValue(1);
                 }
+            }
+            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+                    newValue = ValueFactory::getBigIntValue(1);
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
         }
@@ -346,11 +352,11 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTuple.address(), 0, m_dest->getTupleLength());
     // COUNT(*) column will be zero.
-    m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
-    int aggOffset = (int)m_groupByColumnCount + 1;
+    //m_updatedTuple.setNValue((int)m_countStarColumnIndex, ValueFactory::getBigIntValue(0));
+    int aggOffset = (int)m_groupByColumnCount;
     NValue newValue;
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT || m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
             newValue = ValueFactory::getBigIntValue(0);
         }
         else {
