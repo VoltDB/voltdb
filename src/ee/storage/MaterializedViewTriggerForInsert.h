@@ -177,7 +177,7 @@ protected:
     // How many optional agg columns in the materialized view table?
     // This MUST be declared/initialized AFTER m_aggExprs/m_aggColIndexes/m_aggTypes.
     std::size_t m_aggColumnCount;
-    std::size_t m_countStarColumn;
+    std::size_t m_countStarColumnIndex;
 
     // vector of target table indexes to update.
     // Ideally, these should be a subset of the target table indexes that
