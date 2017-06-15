@@ -18,6 +18,7 @@ package org.voltdb;
 
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
@@ -705,11 +706,11 @@ public class StatsAgent extends OpsAgent
         assert source != null;
         final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
                 m_registeredStatsSources.get(selector);
-        assert siteIdToStatsSources != null;
-
-        NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
-        if (statsSources != null) {
-            statsSources.remove(source);
+        if (siteIdToStatsSources != null) {
+            NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
+            if (statsSources != null) {
+                statsSources.remove(source);
+            }
         }
     }
 
@@ -776,7 +777,10 @@ public class StatsAgent extends OpsAgent
         }
 
         // Just need a random site's list to do some things
-        NonBlockingHashSet<StatsSource> sSources = siteIdToStatsSources.values().iterator().next();
+        Entry<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSource = siteIdToStatsSources.entrySet().iterator().next();
+
+        long siteId = siteIdToStatsSource.getKey();
+        NonBlockingHashSet<StatsSource> sSources = siteIdToStatsSource.getValue();
 
         //There is a window registering the first source where the empty set is visible, don't panic it's coming
         while (sSources.isEmpty()) {
@@ -789,7 +793,17 @@ public class StatsAgent extends OpsAgent
          * case.
          */
         VoltTable.ColumnInfo columns[] = null;
-        final StatsSource firstSource = sSources.iterator().next();
+        final StatsSource firstSource;
+        try {
+            firstSource = sSources.iterator().next();
+        } catch (NoSuchElementException nse) {
+            // since we introduced deregistering source (for dr consumer stats),
+            // there is a race here the firstSource may no longer available
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("StatsSource for siteId " + siteId + " for selector " + selector + " is empty.");
+            }
+            return null;
+        }
         if (!firstSource.isEEStats())
             columns = firstSource.getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
         else {
