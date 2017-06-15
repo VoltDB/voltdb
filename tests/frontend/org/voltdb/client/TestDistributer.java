@@ -251,6 +251,12 @@ public class TestDistributer extends TestCase {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+
+        public void shutdown() throws InterruptedException {
+            shutdown.set(true);
+            join();
+
             try {
                 network.shutdown();
             } catch (InterruptedException e) {
@@ -269,11 +275,6 @@ public class TestDistributer extends TestCase {
                     e.printStackTrace();
                 }
             }
-        }
-
-        public void shutdown() throws InterruptedException {
-            shutdown.set(true);
-            join();
         }
 
         private AtomicBoolean shutdown = new AtomicBoolean(false);

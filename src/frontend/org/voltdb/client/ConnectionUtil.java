@@ -21,6 +21,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -335,6 +336,10 @@ public class ConnectionUtil {
 
             aChannel.socket().setKeepAlive(true);
             success = true;
+        } catch (AsynchronousCloseException ignore) {
+            // If the authentication times out, the channel will be closed
+            // and this exception will be thrown from reads. Ignore it and
+            // let the finally block throw the proper timeout exception.
         } finally {
             if (timeoutFuture != null && !timeoutFuture.cancel(false)) {
                 // Failed to cancel, which means the timeout task must have run
