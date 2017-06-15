@@ -773,6 +773,9 @@ public class StatsAgent extends OpsAgent
         // There are cases early in rejoin where we can get polled before the server is ready to provide
         // stats.  Just return null for now, which will result in no tables from this node.
         else if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("siteIdToStatsSources for selector " + selector + " is " + (siteIdToStatsSources == null ? "null." : "empty.") );
+            }
             return null;
         }
 
