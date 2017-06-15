@@ -1,10 +1,12 @@
 
 drop table t if exists;
+Command succeeded.
 
 drop table t2 if exists;
 Command succeeded.
 
 create table t ( c integer, d varchar(4) );
+Command succeeded.
 
 create procedure p as
     select * from t where d between ? and ?;
@@ -511,17 +513,8 @@ C   D
  33 abc  
  43 abc; 
  53 abc, 
-  3 abc  
-  4 abcd 
- 13 abc  
- 14 abcd 
- 23 abc  
- 24 abcd 
- 33 abc  
- 43 abc; 
- 53 abc, 
 
-(Returned 18 rows in #.##s)
+(Returned 9 rows in #.##s)
 
 exec p 'abc'    'abd''';
 C   D    
@@ -535,17 +528,8 @@ C   D
  33 abc  
  43 abc; 
  53 abc, 
-  3 abc  
-  4 abcd 
- 13 abc  
- 14 abcd 
- 23 abc  
- 24 abcd 
- 33 abc  
- 43 abc; 
- 53 abc, 
 
-(Returned 18 rows in #.##s)
+(Returned 9 rows in #.##s)
 
 exec p ''' abc' 'abd ''';
 C   D    
@@ -578,59 +562,28 @@ C   D
  91 ( )  
  92 )    
  94 '()  
-  1 a    
-  2 ab   
-  3 abc  
-  4 abcd 
- 11 a    
- 12 ab   
- 13 abc  
- 14 abcd 
- 21 a    
- 22 ab   
- 23 abc  
- 24 abcd 
- 31 a z  
- 33 abc  
- 41 a;z  
- 42 ;ab  
- 43 abc; 
- 51 a,z  
- 52 ,ab  
- 53 abc, 
- 62 ; ,  
- 63 ;,   
- 71 ;,   
- 82 'y   
- 83 'z'  
- 91 ( )  
- 92 )    
- 94 '()  
 
-(Returned 56 rows in #.##s)
+(Returned 28 rows in #.##s)
 
 exec p '((' '))';
 C   D 
 --- --
  92 ) 
- 92 ) 
 
-(Returned 2 rows in #.##s)
+(Returned 1 rows in #.##s)
 
 exec p ( );
 C   D   
 --- ----
  91 ( ) 
  92 )   
- 91 ( ) 
- 92 )   
 
-(Returned 4 rows in #.##s)
+(Returned 2 rows in #.##s)
 
 exec max_predicates 90;
 C1 
 ---
-  8
+  4
 
 (Returned 1 rows in #.##s)
 
@@ -638,79 +591,43 @@ select * from t order by c;
 C   D    
 --- -----
   1 a    
-  1 a    
-  2 ab   
   2 ab   
   3 abc  
-  3 abc  
-  4 abcd 
   4 abcd 
  11 a    
- 11 a    
- 12 ab   
  12 ab   
  13 abc  
- 13 abc  
- 14 abcd 
  14 abcd 
  21 a    
- 21 a    
- 22 ab   
  22 ab   
  23 abc  
- 23 abc  
- 24 abcd 
  24 abcd 
  31 a z  
- 31 a z  
- 32  ab  
  32  ab  
  33 abc  
- 33 abc  
- 41 a;z  
  41 a;z  
  42 ;ab  
- 42 ;ab  
- 43 abc; 
  43 abc; 
  51 a,z  
- 51 a,z  
- 52 ,ab  
  52 ,ab  
  53 abc, 
- 53 abc, 
- 61  ,;  
  61  ,;  
  62 ; ,  
- 62 ; ,  
- 63 ;,   
  63 ;,   
  71 ;,   
- 71 ;,   
- 81 x'   
  81 x'   
  82 'y   
- 82 'y   
- 83 'z'  
  83 'z'  
  84 ' '  
- 84 ' '  
- 85 " "  
  85 " "  
  86 ' "  
- 86 ' "  
- 87 ' "  
  87 ' "  
  91 ( )  
- 91 ( )  
- 92 )    
  92 )    
  93 "(   
- 93 "(   
- 94 '()  
  94 '()  
 
-(Returned 72 rows in #.##s)
+(Returned 36 rows in #.##s)
 
 select * from t2 order by c;
 C   D   E  
@@ -730,3 +647,4 @@ drop procedure p;
 Command succeeded.
 
 drop table t;
+Command succeeded.
