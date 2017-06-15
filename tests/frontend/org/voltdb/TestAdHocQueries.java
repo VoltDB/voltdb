@@ -614,9 +614,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost", config.m_port);
 
-        String sql = getQueryForLongQueryTable(2000);
         try {
-            m_client.callProcedure("@AdHoc", sql);
+            for (int len = 2000; len < 100000; len += 1000) {
+                String sql = getQueryForLongQueryTable(len);
+                m_client.callProcedure("@AdHoc", sql);
+            }
             fail("Query was expected to generate stack overflow error");
         }
         catch (Exception exception) {
