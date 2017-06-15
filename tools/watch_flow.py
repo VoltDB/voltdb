@@ -314,12 +314,12 @@ Output column definitions:
 '''
 
 parser = argparse.ArgumentParser(description="This script outputs a periodic aggregation of statistics to show the changing levels of database activity over time.  It outputs to STDOUT, which you can redirect or tee to a file.", usage=print_usage())
-parser.add_argument('-s', metavar='SERVER', help='Hostname or IP of VoltDB server', default='localhost')
-parser.add_argument('-p', metavar='PORT', help='Port number of VoltDB server', type=int, default=21211)
-parser.add_argument('-u', metavar='USERNAME', help='User name (if security is enabled)', default='')
-parser.add_argument('-pw', metavar='PASSWORD', help='Password (if security is enabled)', default='')
-parser.add_argument('-f', metavar='FREQUENCY', help='Frequency of gathering statistics in seconds (default = 10 seconds)', type=int, default=10)
-parser.add_argument('-d', metavar='DURATION', help='Duration of gathering statistics in minutes (default = 50000)', type=int, default=50000)
+parser.add_argument('-s', '--server', help='Hostname or IP of VoltDB server (default=%(default)s)', default='localhost')
+parser.add_argument('-p', '--port', help='Port number of VoltDB server (default=%(default)s)', type=int, default=21211)
+parser.add_argument('-u', '--username', help='User name (if security is enabled)', default='')
+parser.add_argument('-pw', '--password', help='Password (if security is enabled)', default='')
+parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics in seconds (default=%(default)s)', type=int, default=10)
+parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default=%(default)s)', type=int, default=50000)
 args = parser.parse_args()
 
 caller = ProcedureCaller(args)

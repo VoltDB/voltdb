@@ -1,0 +1,7 @@
+
+FILE './scripts/batching/3.sql' './scripts/batching/4.sql' './scripts/batching/file 5.sql'
+
+DROP PROCEDURE testp;
+DROP TABLE t3;
+DROP TABLE t4 CASCADE;
+DROP TABLE t5 CASCADE;
