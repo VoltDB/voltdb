@@ -615,7 +615,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //This happens if site mastership triggers and this generation becomes active and so truncate task is not stashed but executed aftre accept mastership task.
                     //If this happens the truncate for this generation wont happen means more dupes will be exported.
                     if (m_mastershipAccepted.get()) {
-                        exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition skipping truncation." + getPartitionId());
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition skipping truncation." + getPartitionId());
+                        }
                         return;
                     }
                     m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
@@ -1066,8 +1068,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         synchronized(m_executorLock) {
-            exportLog.info("Activating ExportDataSource gen " + m_generation
-                                + " table " + m_tableName + " partition " + m_partitionId + "FirstAction: " + (m_firstAction != null ? "true" : "false"));
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Activating ExportDataSource gen " + m_generation
+                                    + " table " + m_tableName + " partition " + m_partitionId + "FirstAction: " + (m_firstAction != null ? "true" : "false"));
+            }
             if (m_executor==null) {
                 ListeningExecutorService es = CoreUtils.getListeningExecutorService(
                             "ExportDataSource gen " + m_generation
