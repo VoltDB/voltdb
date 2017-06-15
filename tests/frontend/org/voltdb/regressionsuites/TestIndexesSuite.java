@@ -513,7 +513,7 @@ public class TestIndexesSuite extends RegressionSuite {
         try {
             assertEquals(10, results[0].asScalarLong());
         } catch (IllegalStateException not_one) {
-            fail("IN LIST test query rerurned wrong number of rows: " + not_one);
+            fail("IN LIST test query returned wrong number of rows: " + not_one);
         }
 /* TODO: enable and investigate:
  queries like this were causing column index resolution errors.

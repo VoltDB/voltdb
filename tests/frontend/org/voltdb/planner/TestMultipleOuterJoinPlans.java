@@ -263,7 +263,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = n.getChild(1);
         // HSQL doubles the join expression for the first join. Once it's corrected the join expression type
         // should be ExpressionType.COMPARE_EQUAL
-        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
+        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
 
         // The R4 FULL join is an outer node in the R5 FULL join and can not be simplified by the R1.A = R5.A ON expression
         // R1 RIGHT JOIN R2 ON R1.A = R2.A                  R1 JOIN R3 ON R1.A = R3.A
