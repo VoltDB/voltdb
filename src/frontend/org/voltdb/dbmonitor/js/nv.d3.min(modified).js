@@ -617,7 +617,7 @@
                     return '';
                 }
                 var currentTime = d.value
-                if((d.series[0].key == "Latency" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
+                if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
                     currentTime = d.data.label
                 var isPartitionIdleGraph = false
                 var table = d3.select(document.createElement("table"));
@@ -695,7 +695,7 @@
                     trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
-                } else if((d.series[0].key == "Latency" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
+                } else if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
                     trowEnter.append("td")
                         .html(function (p, i) { return p.value + unit });
                 } else {
@@ -718,12 +718,12 @@
                             .style("border-top-color", opacityScale(opacity));
                     }
                 });
-                if((d.series[0].key == "Latency" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
+                if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
                     var trowEnter1 = tbodyEnter.selectAll("tr")
                     .append("tr");
 
                     trowEnter1.append("td")
-                    .html("AvgLatency*Invocation")
+                    .html("AverageExecTime*Invocation")
 
                     trowEnter1.append("td")
                         .html(VoltDbAnalysis.procedureValue[d.data.label].AVG * VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS);
@@ -750,15 +750,15 @@
                             .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].COMBINED));
                     }
 
-                    if(d.series[0].key != "Latency"){
+                    if(d.series[0].key != "Execution Time"){
                         var trowEnter4 = tbodyEnter
                         .append("tr");
 
                         trowEnter4.append("td")
-                        .html("Latency")
+                        .html("Execution Time")
 
                         trowEnter4.append("td")
-                            .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].AVG/1000000000));
+                            .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].AVG));
                     }
                 }
                 var html = table.node().outerHTML;

@@ -9,6 +9,13 @@ function loadAnalysisPage(){
     })
 
     $("#ulProcedure li a").on("click", function(){
+        if($($(this)[0]).text() == "Frequency"){
+            $("#spanAnalysisLegend").html("Frequency");
+        } else if($($(this)[0]).text() == "Combined"){
+            $("#spanAnalysisLegend").html("Combined");
+        } else {
+            $("#spanAnalysisLegend").html("Execution Time");
+        }
         setInterval(function(){
             window.dispatchEvent(new Event('resize'));
         },200)

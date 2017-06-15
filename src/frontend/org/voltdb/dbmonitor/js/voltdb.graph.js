@@ -352,7 +352,7 @@
         }];
 
         var dataLatencyAnalysis = [{
-            key: "Latency",
+            key: "Execution Time",
             values: [],
             color: "rgb(27, 135, 200)"
         }]
