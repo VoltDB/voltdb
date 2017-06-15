@@ -302,21 +302,21 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
         std::size_t aggIndex = destCol->index() - m_groupByColumnCount;
         m_aggTypes[aggIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
         switch(m_aggTypes[aggIndex]) {
-        case EXPRESSION_TYPE_AGGREGATE_SUM:
-        case EXPRESSION_TYPE_AGGREGATE_COUNT:
-        case EXPRESSION_TYPE_AGGREGATE_MIN:
-        case EXPRESSION_TYPE_AGGREGATE_MAX:
-        case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
-            break; // legal value
-        default: {
-            char message[128];
-            snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
-                     (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
+            case EXPRESSION_TYPE_AGGREGATE_SUM:
+            case EXPRESSION_TYPE_AGGREGATE_COUNT:
+            case EXPRESSION_TYPE_AGGREGATE_MIN:
+            case EXPRESSION_TYPE_AGGREGATE_MAX:
+            case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                break; // legal value
+            default: {
+                char message[128];
+                snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
+                         (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                              message);
+            }
         }
-        }
-        if (usesComplexAgg) {
+        if (usesComplexAgg || (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) ) {
             continue;
         }
         // Not used for Complex Aggregation case
