@@ -100,7 +100,7 @@ public class ConnectionUtil {
 
     // Thread pool for checking authentication timeout
     private static final ScheduledThreadPoolExecutor m_periodicWorkThread =
-        CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 0, CoreUtils.SMALL_STACK_SIZE);
+        CoreUtils.getScheduledThreadPoolExecutor("Authentication Timer", 0, CoreUtils.SMALL_STACK_SIZE);
 
     /**
      * Get a hashed password using SHA-1 in a consistent way.
