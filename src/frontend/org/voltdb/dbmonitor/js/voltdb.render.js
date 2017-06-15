@@ -541,6 +541,15 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.GetProcedureProfileInformation = function (onInformationLoaded) {
+            var procedureProfileObj = {};
+
+            VoltDBService.GetProceduresInformation(function (connection) {
+                getProcedureProfileInfo(connection, procedureProfileObj);
+                onInformationLoaded(procedureProfileObj);
+            });
+        };
+
         this.GetHostNodesHtml = function (callback) {
             try {
                 VoltDBService.GetHostNodes(function (connection, state) {
@@ -1871,28 +1880,36 @@ function alertNodeClicked(obj) {
             exportTableDetails["ExportTables"]["collection_time"] = collection_time
         };
 
-        var getProcedureDetailsInfo = function (connection, procedureProfileDetails){
+        var getProcedureProfileInfo = function (connection, procedureProfile){
             var colIndex = {};
             var counter = 0;
 
-            if (connection.Metadata['@Statistics_PROCEDUREDETAILS'] == null) {
+            if (connection.Metadata['@Statistics_PROCEDUREPROFILE'] == undefined) {
                 return;
             }
 
             connection.Metadata['@Statistics_PROCEDUREPROFILE'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PROCEDURE" || columnInfo["name"] == "INVOCATIONS" || columnInfo["name"] == "AVG" || columnInfo["name"] == "MIN" || columnInfo["name"] == "MAX")
+                if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PROCEDURE"
+                || columnInfo["name"] == "INVOCATIONS" || columnInfo["name"] == "AVG"
+                || columnInfo["name"] == "MIN" || columnInfo["name"] == "MAX")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
-             if (!procedureProfileDetails.hasOwnProperty("procedureProfileDetails")) {
-                procedureProfileDetails["ProcedureProfile"] = {};
+
+            if (!procedureProfile.hasOwnProperty("PROCEDURE_PROFILE")) {
+                procedureProfile["PROCEDURE_PROFILE"] = [];
             }
 
             connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.forEach(function (info) {
-            console.log(colIndex)
-                console.log(info);
-                procedureProfileDetails["ProcedureProfile"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
-                procedureProfileDetails["ProcedureProfile"]["PROCEDURE"] = info[colIndex["PROCEDURE"]];
+                var profileObj = {
+                    TIMESTAMP: info[colIndex["TIMESTAMP"]],
+                    PROCEDURE: info[colIndex["PROCEDURE"]],
+                    INVOCATIONS: info[colIndex["INVOCATIONS"]],
+                    AVG: info[colIndex["AVG"]],
+                    MIN: info[colIndex["MIN"]],
+                    MAX: info[colIndex["MAX"]]
+                }
+                procedureProfile["PROCEDURE_PROFILE"].push(profileObj)
             });
         }
 
