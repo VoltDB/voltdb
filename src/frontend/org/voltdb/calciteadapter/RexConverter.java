@@ -44,7 +44,6 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -90,7 +89,7 @@ public class RexConverter {
             tve.setTableIndex(tableIndex);
             TypeConverter.setType(tve, inputRef.getType());
             return tve;
-          }
+        }
 
         @Override
         public ParameterValueExpression visitDynamicParam(RexDynamicParam inputParam) {

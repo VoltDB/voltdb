@@ -33,7 +33,6 @@ import org.voltdb.calciteadapter.rules.convert.VoltDBSortRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcJoinMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendPullUpRule;
-import org.voltdb.calciteadapter.rules.rel.VoltDBFilterScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBJoinSendPullUpRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSortScanMergeRule;
