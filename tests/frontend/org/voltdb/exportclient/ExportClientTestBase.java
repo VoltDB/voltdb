@@ -57,7 +57,7 @@ public class ExportClientTestBase {
             new VoltTable.ColumnInfo("VOLT_EXPORT_TIMESTAMP", VoltType.BIGINT),
             new VoltTable.ColumnInfo("VOLT_EXPORT_SEQUENCE_NUMBER", VoltType.BIGINT),
             new VoltTable.ColumnInfo("VOLT_PARTITION_ID", VoltType.BIGINT),
-            new VoltTable.ColumnInfo("VOLT_TRANSACTION_ID", VoltType.BIGINT),
+            new VoltTable.ColumnInfo("VOLT_OP", VoltType.BIGINT),
             new VoltTable.ColumnInfo("VOLT_SITE_ID", VoltType.BIGINT),
             new VoltTable.ColumnInfo("tinyint", VoltType.TINYINT),
             new VoltTable.ColumnInfo("smallint", VoltType.SMALLINT),
