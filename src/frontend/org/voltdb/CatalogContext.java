@@ -312,9 +312,17 @@ public class CatalogContext {
     public Runnable writeCatalogJarToFile(String path, String name) throws IOException
     {
         File catalog_file = new VoltFile(path, name);
+        File catalog_tmp_file = new VoltFile(path, name + ".tmp");
         if (catalog_file.exists())
         {
-            catalog_file.delete();
+            if (catalog_tmp_file.exists()) {
+                // Rename
+                catalog_file.delete();
+                catalog_tmp_file.renameTo(new File(name));
+            } else {
+                // Write to a temporary file
+                return m_jarfile.writeToFile(catalog_tmp_file);
+            }
         }
         return m_jarfile.writeToFile(catalog_file);
     }

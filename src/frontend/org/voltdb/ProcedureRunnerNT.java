@@ -365,6 +365,7 @@ public class ProcedureRunnerNT {
 
             try {
                 m_procedure.m_runner = this;
+                // The UpdateClasses.run() method is invoked
                 Object rawResult = m_procMethod.invoke(m_procedure, paramList);
 
                 if (rawResult instanceof CompletableFuture<?>) {
