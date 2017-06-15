@@ -402,7 +402,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
     memset(m_updatedTuple.address(), 0, destTbl->getTupleLength());
 
     // set up the first column, which is a count
-    NValue count = m_existingTuple.getNValue((int) m_groupByColumnCount).op_decrement();
+    NValue count = m_existingTuple.getNValue((int) m_countStarColumnIndex).op_decrement();
 
     // check if we should remove the tuple
     if (count.isZero()) {
@@ -435,9 +435,9 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         m_updatedTuple.setNValue(colindex, val);
     }
 
-    m_updatedTuple.setNValue((int) m_groupByColumnCount, count);
+    //m_updatedTuple.setNValue((int) m_groupByColumnCount, count);
 
-    int aggOffset = (int) m_groupByColumnCount + 1;
+    int aggOffset = (int) m_groupByColumnCount;
     int minMaxAggIdx = 0;
     // set values for the other columns
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
@@ -447,6 +447,9 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         if ( ! oldValue.isNull()) {
             int reversedForMin = 1; // initially assume that agg is not MIN.
             switch(m_aggTypes[aggIndex]) {
+            case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                newValue = count;
+                break;
             case EXPRESSION_TYPE_AGGREGATE_SUM:
                 newValue = existingValue.op_subtract(oldValue);
                 break;
