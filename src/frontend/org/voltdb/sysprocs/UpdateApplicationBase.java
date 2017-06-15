@@ -18,6 +18,8 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 
@@ -346,7 +348,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         if (newJarfile != null) {
             for (Entry<String, byte[]> e : newJarfile.entrySet()) {
                 String filename = e.getKey();
-                if (!filename.endsWith(".class")) {
+                // Ignore root level, non-class file names
+                boolean isRootFile = Paths.get(filename).getNameCount() == 1;
+                if (isRootFile && !filename.endsWith(".class")) {
                     continue;
                 }
                 foundClasses = true;

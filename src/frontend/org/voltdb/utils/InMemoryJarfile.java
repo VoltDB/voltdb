@@ -28,6 +28,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -306,6 +308,38 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         remove(classToFileName(classname));
     }
 
+    /**
+     * Used to map connection in a URL back to the InMemoryJarfile
+     */
+    class InMemoryJarHandler extends URLStreamHandler {
+        @Override
+        protected URLConnection openConnection(URL u) throws IOException {
+            return new InMemoryJarUrlConnection(u);
+        }
+    }
+
+    /**
+     * Used to map a URL for a resource to the byte array representing that file in the InMemoryJarfile
+     */
+    class InMemoryJarUrlConnection extends URLConnection {
+        public InMemoryJarUrlConnection(URL url) {
+            super(url);
+        }
+
+        @Override
+        public void connect() throws IOException {
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            String fileName = this.getURL().getPath().substring(1);
+            byte bytes[] = get(fileName);
+            if (bytes == null)
+                throw new IOException("Resource file not found: " + fileName);
+            return new ByteArrayInputStream(bytes.clone());
+        }
+    }
+
     ///////////////////////////////////////////////////////
     // CLASSLOADING
     ///////////////////////////////////////////////////////
@@ -385,6 +419,16 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
         public void initFrom(JarLoader loader) {
             m_classNames.addAll(loader.getClassNames());
+        }
+
+        @Override
+        protected URL findResource(String name) {
+            // Redirect all resource requests to the InMemoryJarFile through the InMemoryJarHandler
+            try {
+                return new URL(null, "inmemoryjar:///" + name, new InMemoryJarHandler());
+            } catch (MalformedURLException e) {
+                return null;
+            }
         }
     }
 

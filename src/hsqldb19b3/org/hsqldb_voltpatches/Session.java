@@ -2045,13 +2045,18 @@ public class Session implements SessionInterface {
     }
 
     long nextExpressionNodeId = 1;
-    java.util.Map<Long, Long> hsqlExpressionNodeIdsToVoltNodeIds = new java.util.HashMap<Long, Long>();
+    java.util.Map<Expression, Long> hsqlExpressionNodeIdsToVoltNodeIds = new java.util.HashMap<Expression, Long>();
 
-    public long getNodeIdForExpression(long hsqlId) {
-        Long id = hsqlExpressionNodeIdsToVoltNodeIds.get(hsqlId);
+    public long getNodeIdForExpression(Expression expr) {
+        Long id = null;
+        // Add a special rule of not reusing node id for value type, to mimic existing HSQL behavior
+        if (expr.getType() == OpTypes.VALUE) {
+            return nextExpressionNodeId++;
+        }
+        id = hsqlExpressionNodeIdsToVoltNodeIds.get(expr);
         if (id == null) {
             id = nextExpressionNodeId++;
-            hsqlExpressionNodeIdsToVoltNodeIds.put(hsqlId, id);
+            hsqlExpressionNodeIdsToVoltNodeIds.put(expr, id);
         }
         return id;
     }
