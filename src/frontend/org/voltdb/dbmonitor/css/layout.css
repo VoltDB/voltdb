@@ -3568,9 +3568,11 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 	margin:0 2px 0 0;
 }
 
+.proDetailsHeightAdjstment {height:400px; overflow-y:scroll;}
 .proDetailsBarDiagram { margin:0; padding:0;height:400px; width:850px;}
-.titleproDetails { text-align:center;}
+.generateDate { background-color:#f0f0f0; padding: 5px 0;margin-bottom: 5px;}
 .generateproDetails { float:right;padding-right: 85px;}
+.proDetailSvgHeight { height:95%!important;}
 
 
 /********************analysis End *****************/
