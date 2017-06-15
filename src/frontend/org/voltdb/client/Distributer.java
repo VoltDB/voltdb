@@ -899,7 +899,8 @@ class Distributer {
     throws UnknownHostException, IOException
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme,
+                                                      TimeUnit.NANOSECONDS.toMillis(m_connectionResponseTimeoutNanos));
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
