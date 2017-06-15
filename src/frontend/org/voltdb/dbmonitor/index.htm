@@ -403,13 +403,6 @@
             <!--Analysis-->
             <div id="analysis" class="contents" style="display:none">
                 <div class="analysisContainer">
-                   <!--<div class="analysisMenu">
-                          <ul class="analysisNav">
-                              <li class="active"><a>Data</a></li>
-                              <li><a>Procedures</a></li>
-                          </ul>
-                                                 
-                    </div> -->
                     <div class="analysisBody">
                         <button id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</button>
                         <div class="subTabSection" >
@@ -417,7 +410,7 @@
                             <div class="tabContant analysisSubTab" id="divAnalysis">
                                 <ul id="tabAnalysis" class="tabs">
                                     <li><a href="#tabData">Data</a></li>
-                                    <li><a href="#tabProcedure" class="active">Procedures</a></li>
+                                    <li><a id="tabProcedureBtn" href="#tabProcedure" class="active">Procedures</a></li>
                                 </ul>
                                 <div class="tab_container subAnalysisTab_container">
                                     <div id="tabData" class="tab_content dataTab tab_content_data ">
@@ -455,13 +448,20 @@
                                                           <svg id="visualiseLatencyAnalysis"></svg>
                                                         </div>
                                                     </div>
-                                                    <svg id = "forXaxis" width="100%" height="80px" style="padding-left:140px"></svg>
                                                 </div>
                                                 <div id="tabFrequency" class="tab_content tab_content_procedure">
-                                                    <p>This is tab 4</p>
+                                                    <div style="height: 400px; overflow-y:scroll;" class="">
+                                                        <div id="chartFrequencyAnalysis" >
+                                                          <svg id="visualiseFrequencyAnalysis"></svg>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div id="tabCombined" class="tab_content tab_content_procedure">
-                                                    <p>This is tab 5</p>
+                                                    <div style="height: 400px; overflow-y:scroll;" class="">
+                                                        <div id="chartCombinedAnalysis" >
+                                                          <svg id="visualiseCombinedAnalysis"></svg>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
                                             </div>

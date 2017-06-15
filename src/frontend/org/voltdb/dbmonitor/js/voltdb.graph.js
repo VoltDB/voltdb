@@ -55,6 +55,8 @@
         var ChartSuccessRate =  nv.models.lineChart();
         var ChartFailureRate = nv.models.lineChart();
         var ChartLatencyAnalysis = nv.models.multiBarHorizontalChart();
+        var ChartFrequencyAnalysis = nv.models.multiBarHorizontalChart();
+        var ChartCombinedAnalysis = nv.models.multiBarHorizontalChart();
         var drChartList = {}
         var ChartCommandlog = nv.models.lineChart();
         var dataMapperSec = {};
@@ -355,29 +357,39 @@
             color: "rgb(27, 135, 200)"
         }]
 
+        var dataFrequencyAnalysis = [{
+            key: "Frequency",
+            values: [],
+            color: "rgb(27, 135, 200)"
+        }]
+
+        var dataCombinedAnalysis = [{
+            key: "Combined",
+            values: [],
+            color: "rgb(27, 135, 200)"
+        }]
+
         var dataPartitionIdleTime = [];
 
         var dataParitionDetails = [];
 
         var barHeight = 0;
 
-        this.initializeLatencyAnalysis = function(){
+        this.initializeAnalysisGraph = function(){
             nv.addGraph(function() {
-
-                ChartLatencyAnalysis.tooltips(true).x(function(d) {
+                ChartLatencyAnalysis.x(function(d) {
                     if(d.label.length > 20)
-                        return d.label.substring(0,18) + "...."
+                        return d.label.substring(0,20) + ".."
                     return  d.label
                   }).y(function(d) { return d.value }).height(barHeight)
-                  .showValues(true).showControls(false).tooltip.enabled(true);
+                  .showValues(true);
 
                 ChartLatencyAnalysis.showLegend(false);
-
+                ChartFrequencyAnalysis.stacked(false).showControls(false);
                 $("#chartLatencyAnalysis").css("height", barHeight-10)
 
-                ChartLatencyAnalysis.tooltips(true)
                 ChartLatencyAnalysis.yAxis
-                    .tickFormat(d3.format(',.1f'));
+                    .tickFormat(d3.format(',.2f'));
                 ChartLatencyAnalysis.xAxis
                     .axisLabelDistance(10)
                 ChartLatencyAnalysis.yAxis.axisLabelDistance(10)
@@ -390,25 +402,81 @@
                 nv.utils.windowResize(updateLatencyAnalysis);
                 return ChartLatencyAnalysis;
             });
+
+            nv.addGraph(function() {
+                ChartFrequencyAnalysis.x(function(d) {
+                    if(d.label.length > 20)
+                        return d.label.substring(0,20) + ".."
+                    return  d.label
+                  }).y(function(d) { return d.value }).height(barHeight)
+                  .showValues(true);
+
+                ChartFrequencyAnalysis.stacked(false).showControls(false);
+                ChartFrequencyAnalysis.showLegend(false);
+
+                $("#chartFrequencyAnalysis").css("height", barHeight-10)
+
+                ChartFrequencyAnalysis.yAxis
+                    .tickFormat(d3.format(',.2f'));
+                ChartFrequencyAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartFrequencyAnalysis.yAxis.axisLabelDistance(10)
+                ChartFrequencyAnalysis.margin({"left":150, "right":50})
+                d3.select('#visualiseFrequencyAnalysis')
+                    .datum(dataFrequencyAnalysis)
+                    .transition().duration(350)
+                    .call(ChartFrequencyAnalysis);
+
+                nv.utils.windowResize(ChartFrequencyAnalysis.update);
+                return ChartFrequencyAnalysis;
+            });
+
+            nv.addGraph(function() {
+                ChartCombinedAnalysis.x(function(d) {
+                    if(d.label.length > 20)
+                        return d.label.substring(0,20) + ".."
+                    return  d.label
+                  }).y(function(d) { return d.value }).height(barHeight)
+                  .showValues(true);
+
+                ChartCombinedAnalysis.stacked(false).showControls(false);
+                ChartCombinedAnalysis.showLegend(false);
+
+                $("#chartCombinedAnalysis").css("height", barHeight-10)
+
+                ChartCombinedAnalysis.yAxis
+                    .tickFormat(d3.format(',.2f'));
+                ChartCombinedAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartCombinedAnalysis.yAxis.axisLabelDistance(10)
+                ChartCombinedAnalysis.margin({"left":150, "right":50})
+                d3.select('#visualiseCombinedAnalysis')
+                    .datum(dataCombinedAnalysis)
+                    .transition().duration(350)
+                    .call(ChartCombinedAnalysis);
+
+                nv.utils.windowResize(ChartCombinedAnalysis.update);
+                return ChartCombinedAnalysis;
+            });
         }
 
-        function getBarHeightAndSpacing(dataSet){
+        function getBarHeightAndSpacing(dataSet, chart){
             var dataCount = dataSet.length;
             if(dataCount < 3){
                 barHeight = 300;
-                ChartLatencyAnalysis.groupSpacing(.5);
+                chart.groupSpacing(.5);
             }
             else if(dataCount < 5){
                 barHeight = 400;
-                ChartLatencyAnalysis.groupSpacing(0.4);
+                chart.groupSpacing(0.4);
             }
              else if(dataCount < 7){
                 barHeight = 400;
-                ChartLatencyAnalysis.groupSpacing(0.3);
+                chart.groupSpacing(0.3);
             }
             else{
                 barHeight = 60 * dataCount;
-                ChartLatencyAnalysis.groupSpacing(0.2);
+                chart.groupSpacing(0.2);
             }
         }
 
@@ -421,14 +489,37 @@
             );
         }
 
-        this.RefreshLatencyAnalysis = function(dataLatency){
+        this.RefreshAnalysisLatencyGraph = function(dataLatency, dataFrequency){
             ChartLatencyAnalysis.update;
-            getBarHeightAndSpacing(dataLatency);
-            dataLatencyAnalysis[0]["values"] =  dataLatency;
+            getBarHeightAndSpacing(dataLatency, ChartLatencyAnalysis);
+
+            dataLatencyAnalysis[0]["values"] = dataLatency;
             d3.select("#visualiseLatencyAnalysis")
-                .datum(dataLatency)
+                .datum(dataLatencyAnalysis)
                 .transition().duration(500)
                 .call(ChartLatencyAnalysis);
+        }
+
+        this.RefreshAnalysisFrequencyGraph = function(dataFrequency){
+            ChartFrequencyAnalysis.update;
+            getBarHeightAndSpacing(dataFrequency, ChartFrequencyAnalysis);
+
+            dataFrequencyAnalysis[0]["values"] = dataFrequency;
+            d3.select("#visualiseFrequencyAnalysis")
+                .datum(dataFrequencyAnalysis)
+                .transition().duration(500)
+                .call(ChartFrequencyAnalysis);
+        }
+
+        this.RefreshAnalysisCombinedGraph = function(dataCombined){
+            ChartCombinedAnalysis.update;
+            getBarHeightAndSpacing(dataCombined, ChartCombinedAnalysis);
+
+            dataCombinedAnalysis[0]["values"] = dataCombined;
+            d3.select("#visualiseCombinedAnalysis")
+                .datum(dataCombinedAnalysis)
+                .transition().duration(500)
+                .call(chartCombinedAnalysis);
         }
 
         nv.addGraph({

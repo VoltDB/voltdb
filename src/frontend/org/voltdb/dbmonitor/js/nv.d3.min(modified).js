@@ -617,7 +617,7 @@
                     return '';
                 }
                 var currentTime = d.value
-                if(d.series[0].key == "Latency" && chartContainer == null)
+                if((d.series[0].key == "Latency" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
                     currentTime = d.data.label
                 var isPartitionIdleGraph = false
                 var table = d3.select(document.createElement("table"));
@@ -675,11 +675,14 @@
                     .enter()
                     .append("tr")
                     .classed("highlight", function (p) { return p.highlight });
-
-                trowEnter.append("td")
-                    .classed("legend-color-guide", true)
-                    .append("div")
-                    .style("background-color", function (p) { return p.color });
+                if(chartContainer != null)
+                    trowEnter.append("td")
+                        .classed("legend-color-guide", true)
+                        .append("div")
+                        .style("background-color", function (p) { return p.color });
+                else
+                    trowEnter.append("td")
+                        .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ d.series[0].key +"</span>" );
 
                 //trowEnter.append("td")
                 //    .classed("key", true)
@@ -692,9 +695,9 @@
                     trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
-                } else if(d.series[0].key == "Latency" && chartContainer == null){
+                } else if((d.series[0].key == "Latency" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
                     trowEnter.append("td")
-                        .html(function (p, i) { return valueFormatter(p.value, i) + unit });
+                        .html(function (p, i) { return p.value + unit });
                 } else {
                     trowEnter.append("td")
                         .classed("value", true)
@@ -715,7 +718,7 @@
                             .style("border-top-color", opacityScale(opacity));
                     }
                 });
-                if(d.series[0].key == "Latency" && chartContainer == null){
+                if((d.series[0].key == "Latency" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
                     var trowEnter1 = tbodyEnter.selectAll("tr")
                     .append("tr");
 
@@ -723,25 +726,40 @@
                     .html("AvgLatency*Invocation")
 
                     trowEnter1.append("td")
-                        .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].AVG_LATENCY) * parseFloat(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS));
+                        .html(VoltDbAnalysis.procedureValue[d.data.label].AVG * VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS);
 
-                    var trowEnter2 = tbodyEnter
-                    .append("tr");
+                    if(d.series[0].key != "Frequency"){
+                        var trowEnter2 = tbodyEnter
+                        .append("tr");
 
-                    trowEnter2.append("td")
-                    .html("Frequency")
+                        trowEnter2.append("td")
+                        .html("Frequency")
 
-                    trowEnter2.append("td")
-                        .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS));
+                        trowEnter2.append("td")
+                            .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS));
+                    }
 
-                    var trowEnter3 = tbodyEnter
-                    .append("tr");
+                    if(d.series[0].key != "Combined"){
+                        var trowEnter3 = tbodyEnter
+                        .append("tr");
 
-                    trowEnter3.append("td")
-                    .html("Combined")
+                        trowEnter3.append("td")
+                        .html("Combined")
 
-                    trowEnter3.append("td")
-                        .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS));
+                        trowEnter3.append("td")
+                            .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].COMBINED));
+                    }
+
+                    if(d.series[0].key != "Latency"){
+                        var trowEnter4 = tbodyEnter
+                        .append("tr");
+
+                        trowEnter4.append("td")
+                        .html("Latency")
+
+                        trowEnter4.append("td")
+                            .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].AVG/1000000000));
+                    }
                 }
                 var html = table.node().outerHTML;
                 if (d.footer !== undefined)
