@@ -318,7 +318,7 @@ public class CatalogContext {
             if (catalog_tmp_file.exists()) {
                 // Rename
                 catalog_file.delete();
-                catalog_tmp_file.renameTo(new File(name));
+                catalog_tmp_file.renameTo(new File(path, name));
             } else {
                 // Write to a temporary file
                 return m_jarfile.writeToFile(catalog_tmp_file);
