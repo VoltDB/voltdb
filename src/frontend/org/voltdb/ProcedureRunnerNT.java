@@ -365,7 +365,8 @@ public class ProcedureRunnerNT {
 
             try {
                 m_procedure.m_runner = this;
-                // The UpdateClasses.run() method is invoked
+                // Methods like UpdateClasses.run() that trigger catalog update
+                // will be called
                 Object rawResult = m_procMethod.invoke(m_procedure, paramList);
 
                 if (rawResult instanceof CompletableFuture<?>) {
