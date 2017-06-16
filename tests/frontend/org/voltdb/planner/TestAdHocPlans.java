@@ -79,9 +79,11 @@ public class TestAdHocPlans extends AdHocQueryTester {
         runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
 
         // generate query with lots of predicate to simulate stack overflow when parsing the expression
-        sql = getQueryForLongQueryTable(2000);
         try {
-            runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+            for (int numberPredicates = 2000; numberPredicates < 100000; numberPredicates += 1000) {
+                sql = getQueryForLongQueryTable(numberPredicates);
+                runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+            }
             fail("Query was expected to generate stack over flow error");
         }
         catch (StackOverflowError error) {
