@@ -39,7 +39,7 @@ namespace voltdb {
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
             m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()),
-            m_countStarColumn(0) {
+            m_countStarColumnIndex(mvHandlerInfo->countStarColumnIndex()) {
         install(mvHandlerInfo, engine);
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
@@ -102,8 +102,7 @@ namespace voltdb {
 
     void MaterializedViewHandler::setUpAggregateInfo(catalog::MaterializedViewHandlerInfo *mvHandlerInfo) {
         const catalog::CatalogMap<catalog::Column>& columns = mvHandlerInfo->destTable()->columns();
-        m_aggColumnCount = columns.size() - m_groupByColumnCount - 1;
-        int foundCountStar = 0;
+        m_aggColumnCount = columns.size() - m_groupByColumnCount;
         m_aggTypes.resize(m_aggColumnCount);
         for (catalog::CatalogMap<catalog::Column>::field_map_iter colIterator = columns.begin();
                 colIterator != columns.end(); colIterator++) {
@@ -122,10 +121,7 @@ namespace voltdb {
                 case EXPRESSION_TYPE_AGGREGATE_COUNT:
                 case EXPRESSION_TYPE_AGGREGATE_MIN:
                 case EXPRESSION_TYPE_AGGREGATE_MAX:
-                    break;
                 case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
-                    m_countStarColumn = destCol->index();
-                    foundCountStar = 1;
                     break; // legal value
                 default: {
                     char message[128];
@@ -243,9 +239,9 @@ namespace voltdb {
                     case EXPRESSION_TYPE_AGGREGATE_SUM:
                     case EXPRESSION_TYPE_AGGREGATE_COUNT:
                     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
-                        if (!existingValue.isNull()) {
+                        // if (!existingValue.isNull()) {
                             newValue = existingValue.op_add(newValue);
-                        }
+                        // }
                         break;
                     case EXPRESSION_TYPE_AGGREGATE_MIN:
                         // ignore any new value that is not strictly an improvement
@@ -301,18 +297,18 @@ namespace voltdb {
             NValue value = m_existingTuple.getNValue(colindex);
             m_updatedTuple.setNValue(colindex, value);
         }
-        // COUNT(*)
-        NValue existingCount = m_existingTuple.getNValue(m_countStarColumn);
-        NValue deltaCount = deltaTuple.getNValue(m_countStarColumn);
+        // COUNT(*) // need to add it to the loop below - TODO
+        NValue existingCount = m_existingTuple.getNValue(m_countStarColumnIndex);
+        NValue deltaCount = deltaTuple.getNValue(m_countStarColumnIndex);
         NValue newCount = existingCount.op_subtract(deltaCount);
-        m_updatedTuple.setNValue(m_countStarColumn, newCount);
+        m_updatedTuple.setNValue(m_countStarColumnIndex, newCount);
 
         int aggOffset = m_groupByColumnCount;
         NValue newValue;
         if (newCount.isZero()) {
             // no group by key, no rows, aggs will be null except for count().
             for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
-                if( columnIndex == m_countStarColumn )
+                if( columnIndex == m_countStarColumnIndex )
                     continue;
                 if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
                     newValue = ValueFactory::getBigIntValue(0);

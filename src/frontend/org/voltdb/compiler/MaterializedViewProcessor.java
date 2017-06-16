@@ -242,6 +242,10 @@ public class MaterializedViewProcessor {
                     Column destColumn = destColumnArray.get(i);
                     setTypeAttributesForColumn(destColumn, col.expression);
 
+                    // set COUNT(*) column index
+                    if ( col.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ) {
+                        mvHandlerInfo.setCountstarcolumnindex(i);
+                    }
                     // Set the expression type here to determine the behavior of the merge function.
                     destColumn.setAggregatetype(col.expression.getExpressionType().getValue());
                 }

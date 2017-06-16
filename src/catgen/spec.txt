@@ -149,6 +149,7 @@ begin MaterializedViewHandlerInfo       "Information used to build and update a 
   Table? destTable                      "The table which will be updated when the source table is updated"
   int groupByColumnCount                "Number of group by columns"
   bool isSafeWithNonemptySources        "Is this a materialized view which may be created with nonempty source tables"
+  int countStarColumnIndex              "Index of the COUNT(*) column"
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"
