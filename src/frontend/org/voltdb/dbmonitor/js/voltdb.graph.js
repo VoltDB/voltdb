@@ -54,9 +54,9 @@
         var ChartOutTrans = nv.models.lineChart();
         var ChartSuccessRate =  nv.models.lineChart();
         var ChartFailureRate = nv.models.lineChart();
-        var ChartLatencyAnalysis = nv.models.multiBarHorizontalChart();
-        var ChartFrequencyAnalysis = nv.models.multiBarHorizontalChart();
-        var ChartCombinedAnalysis = nv.models.multiBarHorizontalChart();
+        var ChartLatencyAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartFrequencyAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartCombinedAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var drChartList = {}
         var ChartCommandlog = nv.models.lineChart();
         var dataMapperSec = {};
@@ -381,11 +381,10 @@
                     if(d.label.length > 20)
                         return d.label.substring(0,20) + ".."
                     return  d.label
-                  }).y(function(d) { return d.value }).height(barHeight)
+                  })
+                  .y(function(d) { return d.value }).height(barHeight)
                   .showValues(true);
 
-                ChartLatencyAnalysis.showLegend(false);
-                ChartFrequencyAnalysis.stacked(false).showControls(false);
                 $("#chartLatencyAnalysis").css("height", barHeight-10)
 
                 ChartLatencyAnalysis.yAxis
@@ -411,9 +410,6 @@
                   }).y(function(d) { return d.value }).height(barHeight)
                   .showValues(true);
 
-                ChartFrequencyAnalysis.stacked(false).showControls(false);
-                ChartFrequencyAnalysis.showLegend(false);
-
                 $("#chartFrequencyAnalysis").css("height", barHeight-10)
 
                 ChartFrequencyAnalysis.yAxis
@@ -438,9 +434,6 @@
                     return  d.label
                   }).y(function(d) { return d.value }).height(barHeight)
                   .showValues(true);
-
-                ChartCombinedAnalysis.stacked(false).showControls(false);
-                ChartCombinedAnalysis.showLegend(false);
 
                 $("#chartCombinedAnalysis").css("height", barHeight-10)
 
