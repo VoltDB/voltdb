@@ -103,6 +103,7 @@ public class PlannerTool {
     public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash) {
         m_database = database;
         m_catalogHash = catalogHash;
+        m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
 
         return this;
     }
