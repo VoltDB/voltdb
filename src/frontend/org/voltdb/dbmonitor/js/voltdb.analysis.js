@@ -10,6 +10,13 @@ function loadAnalysisPage(){
     })
 
     $("#ulProcedure li a").on("click", function(){
+        if($($(this)[0]).text() == "Frequency"){
+            $("#spanAnalysisLegend").html("Frequency");
+        } else if($($(this)[0]).text() == "Combined"){
+            $("#spanAnalysisLegend").html("Combined");
+        } else {
+            $("#spanAnalysisLegend").html("Execution Time");
+        }
         setInterval(function(){
             window.dispatchEvent(new Event('resize'));
         },200)
@@ -27,12 +34,13 @@ function loadAnalysisPage(){
     function fetchData (){
         voltDbRenderer.GetProcedureProfileInformation(function(profileData){
             if(profileData != undefined){
-                if(!$.isEmptyObject(profileData)){
+                if(!$.isEmptyObject(profileData["PROCEDURE_PROFILE"])){
                     $(".analyzeNowContent").hide();
                     $(".dataContent").show();
+                    $(".noDataContent").hide();
                 } else {
                     $(".mainContentAnalysis").hide();
-                    $(".noDataContent").hide();
+                    $(".dataContent").hide();
                     $(".noDataContent").show();
 
                 }
