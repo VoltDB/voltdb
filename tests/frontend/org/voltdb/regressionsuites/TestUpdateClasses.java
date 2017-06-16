@@ -835,7 +835,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             }
 
             // create procedure
-            resp = m_client.callProcedure("@AdHoc", "CREATE	PROCEDURE FROM CLASS org.voltdb_testprocs.updateclasses.testImportProc;");
+            resp = m_client.callProcedure("@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.updateclasses.testImportProc;");
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
             resp = m_client.callProcedure("testImportProc");

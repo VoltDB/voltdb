@@ -33,8 +33,8 @@ public class TestProcWithSQLStmt extends VoltProcedure {
 
     public long run(long param0)
     {
-    	voltQueueSQL(Q1, param0);
-    	voltExecuteSQL();
+        voltQueueSQL(Q1, param0);
+        voltExecuteSQL();
         return 1;
     }
 }
