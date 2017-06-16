@@ -597,7 +597,7 @@ private:
                                 + "\nlength exceeding column info: " + columnInfo->debug()
                                 + "\ntuple schema info: " + m_schema->debug();
 
-            throw SQLException(ex.getSqlState(), errorMsg);
+            throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
         }
     }
 };

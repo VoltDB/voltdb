@@ -237,9 +237,15 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
             // VarChar(3 bytes) < "abcd" or VarChar(3) > "abbd"
-
+            //
+            // Shouldn't this all be the same as the code in indexcountexecutor?
+            // Here the localLookupType can only be NE, EQ, GT or GTE, and never LT
+            // or LTE.  But that seems like something a template could puzzle out.
+            //
             // re-throw if not an overflow, underflow or variable length mismatch
             // currently, it's expected to always be an overflow or underflow
+            //
+            // Note that only one if these three bits will ever be asserted (cf. below).
             if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW | SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
                 throw e;
             }
@@ -250,6 +256,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
                     (ctr == (activeNumOfSearchKeys - 1))) {
 
+                // We have three cases, one for overflow, one for underflow
+                // and one for TYPE_VAR_LENGTH_MISMATCH.  These are
+                // orthogonal here, though it's not clearly so.  See the
+                // definitions of throwCastSQLValueOutOfRangeException,
+                // whence these all come.
                 if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
                     if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
                             (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {

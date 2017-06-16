@@ -165,7 +165,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         }
     }
 
-    // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
+    // Create an IndexCountPlanNode that replaces the parent aggregate and child indexscan
     // UNLESS the indexscan's end expressions aren't a form that can be modeled with an end key.
     // The supported forms for end expression are:
     //   - null
