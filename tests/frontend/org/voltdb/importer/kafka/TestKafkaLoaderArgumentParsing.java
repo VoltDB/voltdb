@@ -37,7 +37,7 @@ import org.voltdb.importclient.kafka.KafkaImporterCommitPolicy;
 
 import junit.framework.Assert;
 
-public class KafkaLoaderUnitTest {
+public class TestKafkaLoaderArgumentParsing {
 
     @Test
     public void testCommitPolicyParsing() throws Exception {

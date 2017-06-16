@@ -22,7 +22,7 @@ import org.voltdb.client.ClientResponse;
 /**
  * BulkLoaderCallback is an interface describing the callback that
  * VoltBulkLoader will use when an individual insertRow() is processed.  Implementations
- * should perform actions based on the supplied client response. Error casses
+ * should perform actions based on the supplied client response. Error cases
  * typically occur if the object[] is the wrong size for the table, no
  * appropriate conversion for a given object can be found given corresponding
  * column data type, a constraint violation is found.
