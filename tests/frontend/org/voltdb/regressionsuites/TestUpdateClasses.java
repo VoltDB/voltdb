@@ -686,8 +686,9 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
-    public void testCreateProceduresBeforeUpdateClasses() throws Exception {
-        System.out.println("\n\n-----\n testCreateProceduresBeforeUpdateClasses \n-----\n\n");
+    @Test
+    public void testUpdateClassesAdvanced() throws Exception {
+        System.out.println("\n\n-----\n testUpdateClassesAdvanced \n-----\n\n");
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
@@ -707,6 +708,10 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             startSystem(config);
 
             ClientResponse resp;
+            resp = m_client.callProcedure("T1.insert", 1, 10);
+            resp = m_client.callProcedure("T1.insert", 2, 20);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
             InMemoryJarfile boom = new InMemoryJarfile();
             VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.NoMeaningClass.class);
@@ -718,6 +723,32 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             catch (ProcCallException pce) {
                 fail("@UpdateClasses should not fail with message: " + pce.getMessage());
             }
+
+            // create procedure
+            resp = m_client.callProcedure("@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.updateclasses.testImportProc;");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = m_client.callProcedure("testImportProc");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = m_client.callProcedure("@AdHoc", "select a from t1 where b = 10;");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            // add a new class
+            boom = new InMemoryJarfile();
+            comp = new VoltCompiler(false);
+            comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.TestProcWithSQLStmt.class);
+
+            resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = m_client.callProcedure("@AdHoc", "select a from t1 where b = 10;");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            // redundent operation
+            resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
         }
         finally {
             teardownSystem();
