@@ -297,7 +297,7 @@ namespace voltdb {
             NValue value = m_existingTuple.getNValue(colindex);
             m_updatedTuple.setNValue(colindex, value);
         }
-        // COUNT(*) // need to add it to the loop below - TODO
+        // COUNT(*)
         NValue existingCount = m_existingTuple.getNValue(m_countStarColumnIndex);
         NValue deltaCount = deltaTuple.getNValue(m_countStarColumnIndex);
         NValue newCount = existingCount.op_subtract(deltaCount);
@@ -308,8 +308,10 @@ namespace voltdb {
         if (newCount.isZero()) {
             // no group by key, no rows, aggs will be null except for count().
             for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
-                if( columnIndex == m_countStarColumnIndex )
+                if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+                    // already updated COUNT(*) above
                     continue;
+                }
                 if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
                     newValue = ValueFactory::getBigIntValue(0);
                 }
@@ -331,7 +333,7 @@ namespace voltdb {
                 if (! deltaValue.isNull()) {
                     switch(aggType) {
                         case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR: // already done above
-                            break;
+                            continue;
                         case EXPRESSION_TYPE_AGGREGATE_SUM:
                         case EXPRESSION_TYPE_AGGREGATE_COUNT:
                             newValue = existingValue.op_subtract(deltaValue);
@@ -406,8 +408,10 @@ namespace voltdb {
                                     " looking for a tuple in the view and"
                                     " expected to find it but didn't", name.c_str());
             }
-            NValue existingCount = m_existingTuple.getNValue(m_groupByColumnCount);
-            NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
+            NValue existingCount = m_existingTuple.getNValue(m_countStarColumnIndex);
+            NValue deltaCount = deltaTuple.getNValue(m_countStarColumnIndex);
+
+            // not sure why we have m_groupByColumnCount > 0 - should it be m_countStarColumnIndex?
             if (existingCount.compare(deltaCount) == 0 && m_groupByColumnCount > 0) {
                 m_destTable->deleteTuple(m_existingTuple, fallible);
             }
