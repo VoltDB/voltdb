@@ -1614,7 +1614,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
         lines = captured.split("\n");
 
         assertTrue(foundLineMatching(lines,
-                ".*V1.*must have count(.*) after the GROUP BY columns \\(if any\\) but before the aggregate functions \\(if any\\).*"));
+                ".*V1.*must have count(.*) after the GROUP BY columns \\(if any\\)*"));
 
         // Real config for tests
         VoltProjectBuilder project = new VoltProjectBuilder();

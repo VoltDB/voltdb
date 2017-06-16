@@ -1798,7 +1798,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMsg);
 
         // count(*) is needed in ddl
-        errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).";
+        errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any)";
         ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
                 "create view my_view as select id, wage from t group by id, wage;" +
                 "partition table t on column num;";
