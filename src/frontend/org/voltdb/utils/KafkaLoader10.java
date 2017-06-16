@@ -154,6 +154,9 @@ public class KafkaLoader10 {
         @Option(desc = "Formatter configuration file (optional)")
         String formatter = "";
 
+        @Option(desc = "Kafka SSL configuration file (optional)")
+        String kafkassl = "";
+
         /**
          * Batch size for processing batched operations.
          */
@@ -283,6 +286,12 @@ public class KafkaLoader10 {
             if ( deserializer != null && VALUE_DESERIALIZER.equals(deserializer.trim())) {
                 m_log.warn("Value deserializer \'" + deserializer.trim() + "\' not supported. \'"
                         + VALUE_DESERIALIZER + "\' will be used for deserializering values");
+            }
+        }
+
+        if (!m_cliOptions.kafkassl.trim().isEmpty()) {
+            try (FileInputStream fis = new FileInputStream(new File(m_cliOptions.kafkassl))) {
+                props.load(fis);
             }
         }
 
