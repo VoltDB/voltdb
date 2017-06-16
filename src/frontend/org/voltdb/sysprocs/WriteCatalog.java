@@ -3,13 +3,11 @@ package org.voltdb.sysprocs;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.Pair;
-import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -33,6 +31,8 @@ public class WriteCatalog extends UpdateApplicationBase {
     {
         assert(tablesThatMustBeEmpty != null);
 
+        String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
+
         CatalogAndIds catalogStuff = null;
         try {
             catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
@@ -40,12 +40,13 @@ public class WriteCatalog extends UpdateApplicationBase {
             Throwables.propagate(e);
         }
 
-        String replayInfo = "REPLAY ?";
+        log.warn("========== UpdateCore.executePlanFragment ==========");
+        log.warn("zk cat ver: " + catalogStuff.version);
+        log.warn("expected cat version: " +  expectedCatalogVersion);
+        log.warn("====================================================");
 
-        // update the global catalog if we get there first
-        Pair<CatalogContext, CatalogSpecificPlanner> p =
         VoltDB.instance().catalogUpdate(
-                catalogDiffCommands,
+                commands,
                 catalogStuff.catalogBytes,
                 catalogStuff.getCatalogHash(),
                 expectedCatalogVersion,
