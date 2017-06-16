@@ -33,12 +33,13 @@ function loadAnalysisPage(){
     function fetchData (){
         voltDbRenderer.GetProcedureProfileInformation(function(profileData){
             if(profileData != undefined){
-                if(!$.isEmptyObject(profileData)){
+                if(!$.isEmptyObject(profileData["PROCEDURE_PROFILE"])){
                     $(".analyzeNowContent").hide();
                     $(".dataContent").show();
+                    $(".noDataContent").hide();
                 } else {
                     $(".mainContentAnalysis").hide();
-                    $(".noDataContent").hide();
+                    $(".dataContent").hide();
                     $(".noDataContent").show();
 
                 }
