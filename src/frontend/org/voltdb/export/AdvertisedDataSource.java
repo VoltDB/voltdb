@@ -33,9 +33,9 @@ public class AdvertisedDataSource
     private String m_partitionColumnName = "";
     final public long m_generation;
     final public long systemStartTimestamp;
-    final public List<String> columnNames = new ArrayList<String>();
-    final public List<VoltType> columnTypes = new ArrayList<VoltType>();
-    final public List<Integer> columnLengths = new ArrayList<Integer>();
+    final public List<String> columnNames;
+    final public List<VoltType> columnTypes;
+    final public List<Integer> columnLengths;
     final public ExportFormat exportFormat;
 
     /*
@@ -74,6 +74,9 @@ public class AdvertisedDataSource
             List<Integer> lengths,
             ExportFormat exportFormat)
     {
+        columnNames = new ArrayList<String>();
+        columnTypes = new ArrayList<VoltType>();
+        columnLengths = new ArrayList<Integer>();
         partitionId = p_id;
         tableName = t_name;
         m_partitionColumnName = partitionColumnName;
@@ -89,6 +92,28 @@ public class AdvertisedDataSource
             columnLengths.addAll(lengths);
         }
         this.exportFormat = exportFormat;
+    }
+
+    //This imethod is used where stream data is used to build ADS we dont unnecessary copy values and format is forced to be SEVENDOTX
+    //Once format is removed this will be simple and can be merged with above constructor.
+    public AdvertisedDataSource(int p_id, String t_signature, String t_name,
+            String partitionColumnName,
+            long systemStartTimestamp,
+            long generation,
+            List<String> names,
+            List<VoltType> types,
+            List<Integer> lengths)
+    {
+        partitionId = p_id;
+        tableName = t_name;
+        m_partitionColumnName = partitionColumnName;
+        m_generation = generation;
+        this.systemStartTimestamp = systemStartTimestamp;
+
+        columnNames = names;
+        columnTypes = types;
+        columnLengths = lengths;
+        exportFormat = ExportFormat.SEVENDOTX;
     }
 
     public VoltType columnType(int index) {
