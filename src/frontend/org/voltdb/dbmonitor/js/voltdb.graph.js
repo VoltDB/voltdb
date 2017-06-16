@@ -395,7 +395,7 @@
                   .showValues(true);
 
                 $("#chartLatencyAnalysis").css("height", barHeight-10)
-
+                ChartLatencyAnalysis.valueFormat(d3.format(',.6f'));
                 ChartLatencyAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
                 ChartLatencyAnalysis.xAxis
@@ -406,7 +406,6 @@
                     .datum(dataLatencyAnalysis)
                     .transition().duration(350)
                     .call(ChartLatencyAnalysis);
-                debugger;
                 nv.utils.windowResize(updateLatencyAnalysis());
                 return ChartLatencyAnalysis;
             });
@@ -420,7 +419,7 @@
                   .showValues(true);
 
                 $("#chartFrequencyAnalysis").css("height", barHeight-10)
-
+                ChartFrequencyAnalysis.valueFormat(d3.format(',.2f'));
                 ChartFrequencyAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
                 ChartFrequencyAnalysis.xAxis
@@ -445,7 +444,7 @@
                   .showValues(true);
 
                 $("#chartCombinedAnalysis").css("height", barHeight-10)
-
+                ChartCombinedAnalysis.valueFormat(d3.format(',.6f'));
                 ChartCombinedAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
                 ChartCombinedAnalysis.xAxis
