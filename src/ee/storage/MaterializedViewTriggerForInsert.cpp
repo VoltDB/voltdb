@@ -352,11 +352,12 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTuple.address(), 0, m_dest->getTupleLength());
     // COUNT(*) column will be zero.
-    //m_updatedTuple.setNValue((int)m_countStarColumnIndex, ValueFactory::getBigIntValue(0));
+    // m_updatedTuple.setNValue((int)m_countStarColumnIndex, ValueFactory::getBigIntValue(0));
     int aggOffset = (int)m_groupByColumnCount;
     NValue newValue;
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT || m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT ||
+            m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
             newValue = ValueFactory::getBigIntValue(0);
         }
         else {
