@@ -1,3 +1,4 @@
+var latencyDetails = [];
 function loadAnalysisPage(){
     $("#tabProcedureBtn").trigger("click");
 
@@ -62,35 +63,40 @@ function loadAnalysisPage(){
             MonitorGraphUI.RefreshAnalysisCombinedGraph(dataCombined);
         })
 
-        voltDbRenderer.GetProceduresInfo(function (procedureDetails) {
-            if(procedureDetails != undefined){
-                if(!$.isEmptyObject(procedureDetails)){
-                    $(".analyzeNowContent").hide();
-                    $(".dataContent").show();
-                } else {
-                    $(".mainContentAnalysis").hide();
-                    $(".noDataContent").hide();
-                    $(".noDataContent").show();
+        voltDbRenderer.GetProcedureDetailInformation(function (procedureDetails){
+//             if(procedureDetails != undefined){
+//                if(!$.isEmptyObject(procedureDetails)){
+//                    $(".analyzeNowContent").hide();
+//                    $(".dataContent").show();
+//                } else {
+//                    $(".mainContentAnalysis").hide();
+//                    $(".noDataContent").hide();
+//                    $(".noDataContent").show();
+//
+//                }
+//                $("#tblAnalyzeNowContent").hide();
+//                $("#tblNoDataContent").show();
+//
+//            }
+//            procedureDetails.sort(function(a, b) {
+//                return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
+//            });
+            var latencyDetails = [];
 
-                }
-                $("#tblAnalyzeNowContent").hide();
-                $("#tblNoDataContent").show();
-
-            }
-            var dataLatency = [];
-            procedureDetails.sort(function(a, b) {
-                return parseFloat(b.AVG_LATENCY) - parseFloat(a.AVG_LATENCY);
+            procedureDetails["PROCEDURE_DETAIL"].sort(function(a, b) {
+                return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
             });
-            procedureDetails.forEach (function(item){
+            procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
                 //order items w.r.to latency
                 var latValue;
-                dataLatency.push({"label": item.PROCEDURE , "value": item.AVG_LATENCY})
+                if(item.PROCEDURE == "leastpopulated"){
+                    latencyDetails.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME})
+                }
             });
-            //MonitorGraphUI.initializeLatencyAnalysis();
-            //MonitorGraphUI.RefreshLatencyAnalysis(dataLatency);
+            MonitorGraphUI.initializeProcedureDetailGraph();
 
+            MonitorGraphUI.RefreshLatencyDetailGraph(latencyDetails);
         });
-
     }
 
     $("#btnAnalyzeNow").on("click", function(){
