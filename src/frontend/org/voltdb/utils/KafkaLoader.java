@@ -423,9 +423,21 @@ public class KafkaLoader {
      * @throws Exception
      */
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {
+        config.setTopologyChangeAware(true);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
-            client.createConnection(server.trim(), port);
+            try {
+                client.createConnection(server.trim(), port);
+            } catch (IOException e) {
+                // Only swallow exceptions caused by Java network or connection problem
+                // Unresolved hostname exceptions will be thrown
+            }
+        }
+        if (client.getConnectedHostList().isEmpty()) {
+            try {
+                client.close();
+            } catch (Exception ignore) {}
+            throw new Exception("Unable to connect to any servers");
         }
         return client;
     }
