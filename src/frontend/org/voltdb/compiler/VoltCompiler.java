@@ -1963,17 +1963,14 @@ public class VoltCompiler {
             throw e;
         }
 
-        // update table annotation for procedure statement
-
-
         // Build DDL from Catalog Data
 //        String ddlWithBatchSupport = CatalogSchemaTools.toSchema(catalog, m_importLines);
 //        m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
 
         // generate the catalog report and write it to disk
-        generateCatalogReport(catalog, m_canonicalDDL);
+        generateCatalogReport(catalog, canonicalDDL);
 
-        jarOutput.put(AUTOGEN_DDL_FILE_NAME, m_canonicalDDL.getBytes(Constants.UTF8ENCODING));
+        jarOutput.put(AUTOGEN_DDL_FILE_NAME, canonicalDDL.getBytes(Constants.UTF8ENCODING));
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
