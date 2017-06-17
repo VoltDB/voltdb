@@ -270,7 +270,13 @@ public class MpProcedureTask extends ProcedureTask
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
         complete.setToLeader(true);
-        m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
+        final List<Long> initiatorHSIds = new ArrayList<Long>();
+        if (((MpTransactionState)m_txnState).isFragmentRestarted()) {
+            initiatorHSIds.addAll(((MpTransactionState)m_txnState).getMasterHSIDs());
+        } else {
+            initiatorHSIds.addAll(m_initiatorHSIds);
+        }
+        m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());
     }

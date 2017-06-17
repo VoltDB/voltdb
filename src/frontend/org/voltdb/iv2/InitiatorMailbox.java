@@ -424,8 +424,8 @@ public class InitiatorMailbox implements Mailbox
 
         boolean seenTheTxn = (((SpScheduler)m_scheduler).getTransaction(message.getTxnId()) != null);
 
-        // If a fragment is part of a transaction which have been seen, do not restart.
-        if (message.getCurrentBatchIndex() == 0 && !seenTheTxn) {
+        // If a fragment is part of a transaction which have not been seen on this site, restart it.
+        if (!seenTheTxn) {
             FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
             TransactionRestartException restart = new TransactionRestartException(
                     "Transaction being restarted due to SPI migration.", message.getTxnId());
@@ -434,7 +434,7 @@ public class InitiatorMailbox implements Mailbox
             response.m_sourceHSId = getHSId();
             response.setPartitionId(m_partitionId);
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("misRoutedFragMsg: site" + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
+                tmLog.debug("misRoutedFragMsg on site:" + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
             }
             deliver(response);
             return true;
@@ -449,7 +449,8 @@ public class InitiatorMailbox implements Mailbox
             }
         }
         if (message.getCurrentBatchIndex() > 0 && !seenTheTxn && tmLog.isDebugEnabled()) {
-            tmLog.debug("Batch index > 1 but not seen: site" + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
+            tmLog.debug("The batch index of the fragment: " + message.getCurrentBatchIndex() + ". It is the 1st time on:"
+                    + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
         }
         return false;
     }

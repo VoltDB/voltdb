@@ -75,7 +75,7 @@ public class MpTransactionState extends TransactionState
     FragmentTaskMessage m_localWork = null;
     boolean m_haveDistributedInitTask = false;
     boolean m_isRestart = false;
-
+    boolean m_fragmentRestarted = false;
     final Map<Long, Long> m_masterSwapFromSpiBalance = Maps.newHashMap();
 
     MpTransactionState(Mailbox mailbox,
@@ -492,7 +492,16 @@ public class MpTransactionState extends TransactionState
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("Rerouted fragment from " + CoreUtils.hsIdToString(hsid) + " to " + CoreUtils.hsIdToString(restartHsid) + "\n" + m_remoteWork);
         }
+        m_fragmentRestarted = true;
         m_mbox.send(restartHsid, m_remoteWork);
+    }
+
+    public boolean isFragmentRestarted() {
+        return m_fragmentRestarted;
+    }
+
+    public List<Long> getMasterHSIDs() {
+        return m_useHSIds;
     }
 
     /**
