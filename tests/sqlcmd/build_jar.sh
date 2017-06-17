@@ -4,9 +4,24 @@
 # (which is used to test the LOAD CLASSES and REMOVE CLASSES commands).
 # Also adds other files to the jar file that are used to test handling of
 # class loader errors.
-
+BUILD=release
+while [ -z "$DONE" ] ; do
+  case "$1" in
+  --build=*)
+	BUILD="$(echo "$1" | sed 's/--build=//')"
+	shift
+	;;
+  "")
+	DONE=YES
+	;;
+  *)
+	echo "$0: Unknown CLI option: $1"
+	exit 100
+	;;
+  esac
+done
 # compile java source
-javac -classpath ../../obj/release/prod procedures/sqlcmdtest/*.java
+javac -classpath ../../obj/$BUILD/prod procedures/sqlcmdtest/*.java
 
 # build the jar file
 jar cf sqlcmdtest-procs.jar -C procedures sqlcmdtest

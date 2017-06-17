@@ -53,7 +53,7 @@ if CTX.compilerName() == 'gcc':
     CTX.CPPFLAGS += " -pthread"
     CTX.LDFLAGS += " -rdynamic"
     if (CTX.compilerMajorVersion() >= 4):
-        CTX.CPPFLAGS += " -Wno-deprecated-declarations  -Wno-unknown-pragmas -Wno-unused-local-typedefs -Wno-ignored-qualifiers"
+        CTX.CPPFLAGS += " -Wno-deprecated-declarations  -Wno-unknown-pragmas -Wno-unused-local-typedefs -Wno-ignored-qualifiers -Wno-strict-aliasing"
 	if (CTX.compilerMinorVersion() == 6):
 	    CTX.CPPFLAGS += " -Wno-unused-but-set-variable"
 	if (CTX.compilerMinorVersion() == 9):

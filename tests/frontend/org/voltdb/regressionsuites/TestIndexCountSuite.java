@@ -524,6 +524,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
+
         return builder;
     }
 
