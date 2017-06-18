@@ -2211,8 +2211,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
             } else {
-                hostLog.error(String.format("The mastership for partition %d has not been successfully moved to host %d.",
-                        partitionId, targetHostId));
+                //if the target host is down, ignore
+                RealVoltDB db = (RealVoltDB)VoltDB.instance();
+                Set<Integer> liveHosts = db.getHostMessenger().getLiveHostIds();
+                if (!liveHosts.contains(targetHostId)) {
+                    hostLog.error(String.format("The mastership for partition %d has not been successfully moved to host %d.",
+                            partitionId, targetHostId));
+                }
             }
         } catch (IOException | InterruptedException e) {
             hostLog.error(String.format("Fail to process mastership change. %s", e.getMessage()));
