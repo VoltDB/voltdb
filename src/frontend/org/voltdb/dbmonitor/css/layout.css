@@ -3566,14 +3566,25 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 	-webkit-border-radius: 50px;
 	border-radius: 50px;
 	float:left;
-	margin:0 2px 0 0;
+	margin:1px 2px 0 0;
+}
+.circle_green {
+    display:block;
+	width: 12px;
+	height: 12px;
+	background: rgb(118, 189, 29);
+	-moz-border-radius: 50px;
+	-webkit-border-radius: 50px;
+	border-radius: 50px;
+	float:left;
+	margin:2px 2px 0 0;
 }
 
-.proDetailsHeightAdjstment {height:400px; overflow-y:scroll;}
+.proDetailsHeightAdjstment {height:400px; overflow-y:scroll; width:800px;}
 .proDetailsBarDiagram { margin:0; padding:0;height:400px; width:850px;}
-.generateDate { background-color:#f0f0f0; padding: 5px 0;margin-bottom: 5px;}
+.generateDate { background-color:#f0f0f0; padding: 5px 0;}
 .generateproDetails { float:right;padding-right: 85px;}
-.proDetailSvgHeight { height:95%!important;}
+.proDetailSvgHeight { height:95%!important; padding:0 0 0 30px;}
 
 
 /********************analysis End *****************/

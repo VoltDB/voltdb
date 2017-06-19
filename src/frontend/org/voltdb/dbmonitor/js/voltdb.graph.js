@@ -374,7 +374,7 @@
         var dataLatencyDetailAnalysis = [{
             key: "Procedure",
             values: [],
-            color: "rgb(27, 135, 200)"
+            color: "rgb(118, 189, 29)"
         }]
 
         var dataPartitionIdleTime = [];
@@ -406,7 +406,6 @@
                     .datum(dataLatencyAnalysis)
                     .transition().duration(350)
                     .call(ChartLatencyAnalysis);
-                debugger;
                 nv.utils.windowResize(updateLatencyAnalysis());
                 return ChartLatencyAnalysis;
             });
@@ -507,11 +506,10 @@
         }
 
         function updateLatencyAnalysis(){
-            debugger;
             ChartLatencyAnalysis.update;
             d3.selectAll(".nv-bar").on('click',
                 function(data){
-                    debugger;
+                    $("#hidProcedureName").html(data.label);
                     $('#showAnalysisDetails').trigger("click");
                 }
             );
@@ -557,7 +555,7 @@
 
         this.RefreshLatencyDetailGraph = function(dataLatency){
             ChartLatencyDetailAnalysis.update;
-//            getBarHeightAndSpacing(dataLatency, ChartLatencyDetailAnalysis);
+            getBarHeightAndSpacing(dataLatency, ChartLatencyDetailAnalysis);
 
             dataLatencyDetailAnalysis[0]["values"] = dataLatency;
             d3.select("#visualizeLatencyDetail")

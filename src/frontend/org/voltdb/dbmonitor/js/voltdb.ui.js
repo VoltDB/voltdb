@@ -2516,7 +2516,26 @@ var getCurrentTab = function () {
         return NavigationTabs.Importer;
     } else if(activeLinkId == "navAnalysis"){
         $(".nvtooltip").show();
-        $("#showAnalysisDetails").popup();
+
+         $("#showAnalysisDetails").popup({
+                open: function (event, ui, ele)  {
+                    var procedureName = $("#hidProcedureName").html();
+                    $("#procedureName").html(procedureName);
+                     //filter specific procedure calls from list of datas
+                    var procDetails = [];
+                    VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+                        //order items w.r.to latency
+                        var latValue;
+                        if(item.PROCEDURE == procedureName ){
+                            procDetails.push({"label": item.label , "value": item.value})
+                        }
+                    });
+                    MonitorGraphUI.RefreshLatencyDetailGraph(procDetails);
+
+                }
+
+            });
+
         return NavigationTabs.Analysis;
     }
     $(".nvtooltip").show();
