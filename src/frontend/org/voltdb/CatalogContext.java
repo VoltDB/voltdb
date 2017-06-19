@@ -315,17 +315,33 @@ public class CatalogContext {
         File catalog_tmp_file = new VoltFile(path, name + ".tmp");
         if (catalog_file.exists())
         {
+            catalog_file.delete();
+            if (catalog_tmp_file.exists()) {
+                catalog_tmp_file.renameTo(catalog_file);
+                return null;
+            }
+        }
+        return m_jarfile.writeToFile(catalog_file);
+    }
+
+    public void writeCatalogJarToFile2(String path, String name) throws IOException
+    {
+        File catalog_file = new VoltFile(path, name);
+        File catalog_tmp_file = new VoltFile(path, name + ".tmp");
+        if (catalog_file.exists())
+        {
             // if (catalog_file.exists()) { catalog_file.delete(); }
             if (catalog_tmp_file.exists()) {
                 // Rename
                 catalog_tmp_file.renameTo(catalog_file);
-                return null;
+                // return;
             } else {
                 // Write to a temporary file
-                return m_jarfile.writeToFile(catalog_tmp_file);
+                m_jarfile.writeToFile(catalog_tmp_file);
+                // return;
             }
         }
-        return m_jarfile.writeToFile(catalog_file);
+        m_jarfile.writeToFile(catalog_file);
     }
 
     /**

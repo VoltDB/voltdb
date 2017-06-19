@@ -1895,7 +1895,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             configInfoDir.mkdirs();
 
             try {
-                cc.writeCatalogJarToFile(configInfoDir.getPath(), "catalog.jar");
+                cc.writeCatalogJarToFile2(configInfoDir.getPath(), "catalog.jar");
             } catch (IOException e) {
                 hostLog.error("Failed to log catalog: " + e.getMessage(), e);
                 e.printStackTrace();
