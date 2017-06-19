@@ -117,7 +117,7 @@ protected:
     std::size_t parseAggregation(catalog::MaterializedViewInfo *mvInfo);
 
     NValue getGroupByValueFromSrcTuple(int colIndex, const TableTuple& tuple);
-    NValue getAggInputFromSrcTuple(int aggIndex, const TableTuple& tuple);
+    NValue getAggInputFromSrcTuple(int aggIndex, int aggExprOffset, const TableTuple& tuple);
 
     /**
      * build a search key based on the src table value

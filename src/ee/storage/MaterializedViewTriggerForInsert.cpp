@@ -90,9 +90,10 @@ void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTab
 }
 
 NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
+                                                                 int aggExprOffset,
                                                                  const TableTuple& tuple) {
     if (m_aggExprs.size() != 0) {
-        AbstractExpression* aggExpr = m_aggExprs[aggIndex];
+        AbstractExpression* aggExpr = m_aggExprs[aggIndex - aggExprOffset];
         return aggExpr->eval(&tuple, NULL);
     }
 
@@ -143,7 +144,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
                 continue;
             }
             NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
-            NValue newValue = getAggInputFromSrcTuple(aggIndex - aggExprOffset, newTuple);
+            NValue newValue = getAggInputFromSrcTuple(aggIndex, aggExprOffset, newTuple);
             if (newValue.isNull()) {
                 newValue = existingValue;
             }
@@ -198,7 +199,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
                 aggExprOffset = 1;
                 continue;
             }
-            NValue newValue = getAggInputFromSrcTuple(aggIndex - aggExprOffset, newTuple);
+            NValue newValue = getAggInputFromSrcTuple(aggIndex, aggExprOffset, newTuple);
             if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
                 if (newValue.isNull()) {
                     newValue = ValueFactory::getBigIntValue(0);
