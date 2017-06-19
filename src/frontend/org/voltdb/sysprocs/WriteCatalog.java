@@ -51,7 +51,7 @@ public class WriteCatalog extends UpdateApplicationBase {
                 catalogStuff.getCatalogHash(),
                 expectedCatalogVersion,
                 getID(),
-                getID() + 1,
+                Long.MAX_VALUE,
                 catalogStuff.deploymentBytes,
                 catalogStuff.getDeploymentHash(),
                 requireCatalogDiffCmdsApplyToEE != 0,

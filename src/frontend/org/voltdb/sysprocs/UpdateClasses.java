@@ -181,7 +181,7 @@ public class UpdateClasses extends UpdateApplicationBase {
                     zk,
                     ccr.expectedCatalogVersion + 1,
                     getID(),
-                    Long.MAX_VALUE,
+                    Long.MAX_VALUE, // currently this value is not treated
                     ccr.catalogBytes,
                     ccr.catalogHash,
                     deploymentBytes);
@@ -225,20 +225,20 @@ public class UpdateClasses extends UpdateApplicationBase {
             }
 
             // This time to rename
-            callProcedure("@UpdateCore",
-                               ccr.encodedDiffCommands,
-                               ccr.catalogHash,
-                               ccr.catalogBytes,
-                               ccr.expectedCatalogVersion + 1,
-                               ccr.deploymentString,
-                               ccr.tablesThatMustBeEmpty,
-                               ccr.reasonsForEmptyTables,
-                               ccr.requiresSnapshotIsolation ? 1 : 0,
-                               ccr.worksWithElastic ? 1 : 0,
-                               ccr.deploymentHash,
-                               ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                               ccr.hasSchemaChange ?  1 : 0,
-                               ccr.requiresNewExportGeneration ? 1 : 0);
+//            callProcedure("@UpdateCore",
+//                               ccr.encodedDiffCommands,
+//                               ccr.catalogHash,
+//                               ccr.catalogBytes,
+//                               ccr.expectedCatalogVersion + 1,
+//                               ccr.deploymentString,
+//                               ccr.tablesThatMustBeEmpty,
+//                               ccr.reasonsForEmptyTables,
+//                               ccr.requiresSnapshotIsolation ? 1 : 0,
+//                               ccr.worksWithElastic ? 1 : 0,
+//                               ccr.deploymentHash,
+//                               ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+//                               ccr.hasSchemaChange ?  1 : 0,
+//                               ccr.requiresNewExportGeneration ? 1 : 0);
 
         } finally {
             // remove the uac blocker when exits
