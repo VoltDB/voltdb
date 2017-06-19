@@ -239,9 +239,9 @@ namespace voltdb {
                     case EXPRESSION_TYPE_AGGREGATE_SUM:
                     case EXPRESSION_TYPE_AGGREGATE_COUNT:
                     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
-                        // if (!existingValue.isNull()) {
+                        if (!existingValue.isNull()) {
                             newValue = existingValue.op_add(newValue);
-                        // }
+                        }
                         break;
                     case EXPRESSION_TYPE_AGGREGATE_MIN:
                         // ignore any new value that is not strictly an improvement
