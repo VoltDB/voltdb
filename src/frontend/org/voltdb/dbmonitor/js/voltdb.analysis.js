@@ -22,34 +22,6 @@ function loadAnalysisPage(){
         },200)
     }
 
-    function formatDateTime(timestamp) {
-        var dateTime = new Date(timestamp);
-        //get date
-        var days = dateTime.getDate();
-        var months = dateTime.getMonth() + 1;
-        var years = dateTime.getFullYear();
-
-        days = days < 10 ? "0" + days : days;
-        months = months < 10 ? "0" + months : months;
-
-        //get time
-        var timePeriod = "AM"
-        var hours = dateTime.getHours();
-        var minutes = dateTime.getMinutes();
-        var seconds = dateTime.getSeconds();
-
-        timePeriod = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        hours = hours ? hours : 12;
-        hours = hours < 10 ? "0" + hours : hours
-        minutes = minutes < 10 ? "0" + minutes : minutes;
-        seconds = seconds < 10 ? "0" + seconds : seconds;
-
-        //get final date time
-        var date = months + "/" + days + "/" + years;
-        var time = hours + ":" + minutes + ":" + seconds + " " + timePeriod;
-        return date + " " + time;
-    };
 
     function calculateCombinedValue(profileData){
         var totalValue = 0;
@@ -100,7 +72,7 @@ function loadAnalysisPage(){
                 dataFrequency.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE, "value": profileData["PROCEDURE_PROFILE"][i].INVOCATIONS})
                 dataCombined.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE, "value": combinedWeight})
             }
-            var formatDate = formatDateTime(timestamp);
+            var formatDate = VoltDbAnalysis.formatDateTime(timestamp);
             $("#analysisDate").html(formatDate);
             MonitorGraphUI.initializeAnalysisGraph();
             MonitorGraphUI.RefreshAnalysisLatencyGraph(dataLatency);
@@ -115,7 +87,7 @@ function loadAnalysisPage(){
                 return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
             });
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
-                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME, "PROCEDURE": item.PROCEDURE})
+                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP})
             });
             MonitorGraphUI.initializeProcedureDetailGraph();
         });
@@ -130,6 +102,35 @@ function loadAnalysisPage(){
     iVoltDbAnalysis = (function(){
         this.procedureValue = {};
         this.latencyDetailValue = [];
+
+        this.formatDateTime = function(timestamp) {
+        var dateTime = new Date(timestamp);
+        //get date
+        var days = dateTime.getDate();
+        var months = dateTime.getMonth() + 1;
+        var years = dateTime.getFullYear();
+
+        days = days < 10 ? "0" + days : days;
+        months = months < 10 ? "0" + months : months;
+
+        //get time
+        var timePeriod = "AM"
+        var hours = dateTime.getHours();
+        var minutes = dateTime.getMinutes();
+        var seconds = dateTime.getSeconds();
+
+        timePeriod = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        hours = hours < 10 ? "0" + hours : hours
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+
+        //get final date time
+        var date = months + "/" + days + "/" + years;
+        var time = hours + ":" + minutes + ":" + seconds + " " + timePeriod;
+        return date + " " + time;
+    };
     });
     window.VoltDbAnalysis = new iVoltDbAnalysis();
 })(window);

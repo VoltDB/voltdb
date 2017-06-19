@@ -2526,6 +2526,7 @@ var getCurrentTab = function () {
                     VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                         //order items w.r.to latency
                         var latValue;
+                        $("#generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
                         if(item.PROCEDURE == procedureName ){
                             procDetails.push({"label": item.label , "value": item.value})
                         }
