@@ -201,14 +201,14 @@ public class VoltZK {
             callbacks.add(cb);
             zk.create(VoltZK.ZK_HIERARCHY[i], null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, cb, null);
         }
-        try {
-            for (ZKUtil.StringCallback cb : callbacks) {
+        for (ZKUtil.StringCallback cb : callbacks) {
+            try {
                 cb.get();
+            } catch (org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException e) {
+                // this is an expected race.
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
-        } catch (org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException e) {
-            // this is an expected race.
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
     }
 
