@@ -1874,7 +1874,7 @@ function alertNodeClicked(obj) {
             connection.Metadata['@Statistics_PROCEDUREDETAIL'].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PROCEDURE"
                 || columnInfo["name"] == "INVOCATIONS" || columnInfo["name"] == "AVG_EXECUTION_TIME"
-                || columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "STATEMENT")
+                || columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "STATEMENT" || columnInfo["name"] == "MIN_EXECUTION_TIME" || columnInfo["name"] == "MAX_EXECUTION_TIME")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1889,6 +1889,8 @@ function alertNodeClicked(obj) {
                     PROCEDURE: info[colIndex["PROCEDURE"]],
                     INVOCATIONS: info[colIndex["INVOCATIONS"]],
                     AVG_EXECUTION_TIME: info[colIndex["AVG_EXECUTION_TIME"]],
+                    MIN_EXECUTION_TIME: info[colIndex["MIN_EXECUTION_TIME"]],
+                    MAX_EXECUTION_TIME: info[colIndex["MAX_EXECUTION_TIME"]],
                     PARTITION_ID: info[colIndex["PARTITION_ID"]],
                     STATEMENT: info[colIndex["STATEMENT"]],
                 }
