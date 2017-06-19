@@ -214,6 +214,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
         assertTablesAreEqual(prefix + "VENG6511expR: ", tresult, vresult, EPSILON);
 
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expRC ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, MIN(abs(v1)) AS vmin, COUNT(*), MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expRC: ", tresult, vresult, EPSILON);
+
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expLR ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
         assertTablesAreEqual(prefix + "VENG6511expLR: ", tresult, vresult, EPSILON);
@@ -1578,6 +1582,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_GLOBAL ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL").getResults()[0];
         assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL: ", tresult, vresult, EPSILON);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_GLOBAL_ANYWHERE ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL_ANYWHERE").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL_ANYWHERE: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_DETAIL_NOPCOL ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER_DETAIL_NOPCOL").getResults()[0];
