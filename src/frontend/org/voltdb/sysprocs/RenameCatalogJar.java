@@ -70,14 +70,14 @@ public class RenameCatalogJar extends VoltSystemProcedure {
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
 
-                // update the global catalog if we get there first
+                // Rename the catalog jar
                 @SuppressWarnings("deprecation")
                 Pair<CatalogContext, CatalogSpecificPlanner> p =
                 VoltDB.instance().catalogUpdate(
                         commands,
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
-                        expectedCatalogVersion + 1,
+                        expectedCatalogVersion + 1, // the version in the context has been updated (same as in zk)
                         DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                         getUniqueId(),
                         catalogStuff.deploymentBytes,

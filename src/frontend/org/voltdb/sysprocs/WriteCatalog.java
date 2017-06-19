@@ -45,6 +45,8 @@ public class WriteCatalog extends UpdateApplicationBase {
         log.warn("expected cat version: " +  expectedCatalogVersion);
         log.warn("====================================================");
 
+        // This will write a temporary jar file, and the version in
+        // the context will be incremented
         VoltDB.instance().catalogUpdate(
                 commands,
                 catalogStuff.catalogBytes,
