@@ -16,15 +16,22 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
 
 public class RenameCatalogJar extends VoltSystemProcedure {
 
     public static VoltLogger log = new VoltLogger("HOST");
+
+    private static final int DEP_updateCatalog = (int)
+            SysProcFragmentId.PF_updateCatalog | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    private static final int DEP_updateCatalogAggregate = (int)
+            SysProcFragmentId.PF_updateCatalogAggregate;
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -54,7 +61,7 @@ public class RenameCatalogJar extends VoltSystemProcedure {
 
             String replayInfo = "replay ... ";
 
-            log.warn("========================================================");
+            log.warn("==================RenameCatalogJar=====================");
             log.warn("context cat ver: " + context.getCatalogVersion());
             log.warn("zk cat ver: " + catalogStuff.version);
             log.warn("expected cat ver: " + expectedCatalogVersion);
@@ -70,7 +77,7 @@ public class RenameCatalogJar extends VoltSystemProcedure {
                         commands,
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
-                        expectedCatalogVersion,
+                        expectedCatalogVersion + 1,
                         DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                         getUniqueId(),
                         catalogStuff.deploymentBytes,
@@ -101,6 +108,13 @@ public class RenameCatalogJar extends VoltSystemProcedure {
                             replayInfo));
                 }
             }
+
+            VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+            result.addRow(VoltSystemProcedure.STATUS_OK);
+            return new DependencyPair.TableDependencyPair(DEP_updateCatalog, result);
+        } else if ( fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateCatalog));
+            return new DependencyPair.TableDependencyPair(DEP_updateCatalogAggregate, result);
         } else {
             VoltDB.crashLocalVoltDB(
                     "Received unrecognized plan fragment id " + fragmentId + " in RenameCatalogJar",
@@ -110,8 +124,67 @@ public class RenameCatalogJar extends VoltSystemProcedure {
         throw new RuntimeException("Should not reach this code here !!!");
     }
 
-    public VoltTable[] run() {
-        return null;
+    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+                           String catalogDiffCommands,
+                           byte[] catalogHash,
+                           byte[] catalogBytes,
+                           int expectedCatalogVersion,
+                           String deploymentString,
+                           String[] tablesThatMustBeEmpty,
+                           String[] reasonsForEmptyTables,
+                           byte requiresSnapshotIsolation,
+                           byte worksWithElastic,
+                           byte[] deploymentHash,
+                           byte requireCatalogDiffCmdsApplyToEE,
+                           byte hasSchemaChange,
+                           byte requiresNewExportGeneration)
+    {
+        performCatalogUpdateWork(
+                catalogDiffCommands,
+                expectedCatalogVersion,
+                requiresSnapshotIsolation,
+                requireCatalogDiffCmdsApplyToEE,
+                hasSchemaChange,
+                requiresNewExportGeneration);
+
+        VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+        result.addRow(VoltSystemProcedure.STATUS_OK);
+        return (new VoltTable[] {result});
+    }
+
+    private final VoltTable[] performCatalogUpdateWork(
+            String catalogDiffCommands,
+            int expectedCatalogVersion,
+            byte requiresSnapshotIsolation,
+            byte requireCatalogDiffCmdsApplyToEE,
+            byte hasSchemaChange,
+            byte requiresNewExportGeneration)
+    {
+        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
+
+        // Now do the real work
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalog;
+        pfs[0].outputDepId = DEP_updateCatalog;
+        pfs[0].multipartition = true;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
+                catalogDiffCommands,
+                expectedCatalogVersion,
+                requiresSnapshotIsolation,
+                requireCatalogDiffCmdsApplyToEE,
+                hasSchemaChange,
+                requiresNewExportGeneration);
+
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
+        pfs[1].outputDepId = DEP_updateCatalogAggregate;
+        pfs[1].inputDepIds  = new int[] { DEP_updateCatalog };
+        pfs[1].multipartition = false;
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
+
+        VoltTable[] results;
+        results = executeSysProcPlanFragments(pfs, DEP_updateCatalogAggregate);
+        return results;
     }
 
 }
