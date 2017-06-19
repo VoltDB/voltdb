@@ -2857,8 +2857,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clusterSettings.get().store();
         } else if (m_myHostId == 0) {
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("Storing with hostcount: " +
-                               m_clusterSettings.get().getProperty(ClusterSettings.HOST_COUNT));
+                hostLog.debug("Writing initial hostcount " +
+                               m_clusterSettings.get().getProperty(ClusterSettings.HOST_COUNT) +
+                               " to ZK");
             }
             m_clusterSettings.store(m_messenger.getZK());
         }
