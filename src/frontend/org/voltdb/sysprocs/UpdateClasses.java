@@ -97,7 +97,7 @@ public class UpdateClasses extends UpdateApplicationBase {
         }
 
 
-
+        // THE OLD METHOD
 //        return callProcedure("@UpdateCore",
 //                                             ccr.encodedDiffCommands,
 //                                             ccr.catalogHash,
@@ -114,10 +114,10 @@ public class UpdateClasses extends UpdateApplicationBase {
 //                                             ccr.requiresNewExportGeneration ? 1 : 0);
 
 
-
-
-
-
+        // Change the way we write the new catalog jar. A NP proc is first called to
+        // write a temporary jar on each host. Then a MP proc is called to rename the
+        // jar file. This way the CI is not blocked for a long time when writing the
+        // new jar file. Many of the code snippets are taken from @UpdateCore
 
         /*
          * Validate that no elastic join is in progress, blocking this catalog update.
@@ -145,6 +145,7 @@ public class UpdateClasses extends UpdateApplicationBase {
             // ever write valid catalog and deployment state to ZK.
             CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
             // New update?
+            // the expected version is the current version of catalog jar  s
             if (catalogStuff.version == ccr.expectedCatalogVersion) {
                 if (log.isInfoEnabled()) {
                     log.info("New catalog update from: " + catalogStuff.toString());
@@ -162,7 +163,8 @@ public class UpdateClasses extends UpdateApplicationBase {
                     }
                 }
                 else {
-                    String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
+                    String errmsg = "Invalid catalog update. ZooKeeper catalog version: " + catalogStuff.version +
+                            ", expected version: " + ccr.expectedCatalogVersion + ". Catalog or deployment change was planned " +
                             "against one version of the cluster configuration but that version was " +
                             "no longer live when attempting to apply the change.  This is likely " +
                             "the result of multiple concurrent attempts to change the cluster " +
@@ -181,12 +183,13 @@ public class UpdateClasses extends UpdateApplicationBase {
                     zk,
                     ccr.expectedCatalogVersion + 1,
                     getID(),
-                    Long.MAX_VALUE, // currently this value is not treated
+                    Long.MAX_VALUE, // currently this value is not treated well
                     ccr.catalogBytes,
                     ccr.catalogHash,
                     deploymentBytes);
 
-            // No sync catalog verify ?
+            // Do we need synchronized catalog verification here ?
+            // TODO
 
 
             // Write the new catalog to a temporary jar file
@@ -212,19 +215,21 @@ public class UpdateClasses extends UpdateApplicationBase {
                 map = cf.get();
             } catch (InterruptedException | ExecutionException e) {
                 hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
-                map = null;
+                throw new VoltAbortException(e);
             }
 
             if (map != null) {
                 for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
                     if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
                         hostLog.warn("A response from one host for writing the catalog jar has failed.");
-                        break;
+                        throw new VoltAbortException("A response from host " + entry.getKey() +
+                                                     " for writing the catalog jar has failed.");
                     }
                 }
             }
 
-            // This time to rename
+            // Rename the catalog jar to replace the old one, this should be done in a
+            // synchronous way.
             callProcedure("@RenameCatalogJar",
                                ccr.encodedDiffCommands,
                                ccr.catalogHash,
@@ -241,12 +246,12 @@ public class UpdateClasses extends UpdateApplicationBase {
                                ccr.requiresNewExportGeneration ? 1 : 0);
 
         } finally {
-            // remove the uac blocker when exits
+            // remove the uac blocker when exits or there is an exception
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
         }
 
         // This is when the UpdateApplicationCatalog really ends in the blocking path
-        log.warn(String.format("Globally updating the current application catalog and deployment " +
+        log.info(String.format("Globally updating the current application catalog and deployment " +
                                "(new hashes %s, %s).",
                                Encoder.hexEncode(ccr.catalogHash).substring(0, 10),
                                Encoder.hexEncode(ccr.deploymentHash).substring(0, 10)));

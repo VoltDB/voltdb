@@ -100,6 +100,7 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -2674,5 +2675,11 @@ public abstract class CatalogUtil {
             paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
         }
         return deployment;
+    }
+
+    public boolean updateCatalogAsync(CatalogChangeResult ccr) {
+
+
+        return false;
     }
 }

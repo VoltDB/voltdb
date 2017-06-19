@@ -1,3 +1,20 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.voltdb.sysprocs;
 
 import java.util.List;
@@ -40,6 +57,7 @@ public class RenameCatalogJar extends VoltSystemProcedure {
                 SysProcFragmentId.PF_updateCatalogAggregate};
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
@@ -61,23 +79,25 @@ public class RenameCatalogJar extends VoltSystemProcedure {
 
             String replayInfo = "replay ... ";
 
-            log.warn("==================RenameCatalogJar=====================");
-            log.warn("context cat ver: " + context.getCatalogVersion());
-            log.warn("zk cat ver: " + catalogStuff.version);
-            log.warn("expected cat ver: " + expectedCatalogVersion);
-            log.warn("========================================================");
-
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
 
+                log.warn("==================RenameCatalogJar=====================");
+                log.warn("context cat ver: " + context.getCatalogVersion());
+                log.warn("zk cat ver: " + catalogStuff.version);
+                log.warn("expected cat ver: " + expectedCatalogVersion);
+                log.warn("========================================================");
+
                 // Rename the catalog jar
-                @SuppressWarnings("deprecation")
+                // This still works here, and only the first site will complete the
+                // context update + renaming procedure
                 Pair<CatalogContext, CatalogSpecificPlanner> p =
                 VoltDB.instance().catalogUpdate(
                         commands,
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
-                        expectedCatalogVersion + 1, // the version in the context has been updated (same as in zk)
+                        // TODO: change this
+                        expectedCatalogVersion,
                         DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                         getUniqueId(),
                         catalogStuff.deploymentBytes,
@@ -108,11 +128,13 @@ public class RenameCatalogJar extends VoltSystemProcedure {
                             replayInfo));
                 }
             }
+            // TODO: check if this is a restart
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
             return new DependencyPair.TableDependencyPair(DEP_updateCatalog, result);
         } else if ( fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
+            // Is this really doing work ?
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateCatalog));
             return new DependencyPair.TableDependencyPair(DEP_updateCatalogAggregate, result);
         } else {

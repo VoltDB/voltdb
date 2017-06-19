@@ -320,6 +320,7 @@ public class CatalogContext {
                 // Rename
                 catalog_file.delete();
                 catalog_tmp_file.renameTo(new File(path, name));
+                return null;
             } else {
                 // Write to a temporary file
                 return m_jarfile.writeToFile(catalog_tmp_file);

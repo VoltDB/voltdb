@@ -1888,6 +1888,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             logDeployment();
         }
 
+        // This is not really efficient
+        // For now it's just a temporary fix
+        private void logCatalogAndDeployment(CatalogContext cc) {
+            File configInfoDir = getConfigDirectory();
+            configInfoDir.mkdirs();
+
+            try {
+                cc.writeCatalogJarToFile(configInfoDir.getPath(), "catalog.jar");
+            } catch (IOException e) {
+                hostLog.error("Failed to log catalog: " + e.getMessage(), e);
+                e.printStackTrace();
+            }
+            logDeployment();
+        }
+
         private void logDeployment() {
             File configInfoDir = getConfigDirectory();
             configInfoDir.mkdirs();
@@ -3295,6 +3310,51 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private final HashMap<Long, ContextTracker>m_txnIdToContextTracker =
         new HashMap<>();
 
+    /*
+     * Write the catalog jar, this is supposed to be a
+     */
+    @Override
+    public void writeCatalogJar(
+                String diffCommands,
+                byte[] newCatalogBytes,
+                byte[] catalogBytesHash,
+                int expectedCatalogVersion,
+                long currentTxnId,
+                long currentTxnUniqueId,
+                byte[] deploymentBytes,
+                byte[] deploymentHash,
+                boolean requireCatalogDiffCmdsApplyToEE,
+                boolean hasSchemaChange,
+                boolean requiresNewExportGeneration)
+    {
+        if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
+            hostLog.fatal("Failed catalog update." +
+                    " expectedCatalogVersion: " + expectedCatalogVersion +
+                    " currentTxnId: " + currentTxnId +
+                    " currentTxnUniqueId: " + currentTxnUniqueId +
+                    " m_catalogContext.catalogVersion " + m_catalogContext.catalogVersion);
+
+            throw new RuntimeException("Trying to update main catalog context with diff " +
+                    "commands generated for an out-of date catalog. Expected catalog version: " +
+                    expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
+        }
+
+        CatalogContext temp_catalogContext =
+                m_catalogContext.update(
+                        currentTxnId,
+                        currentTxnUniqueId,
+                        newCatalogBytes,
+                        catalogBytesHash,
+                        diffCommands,
+                        false,
+                        deploymentBytes,
+                        m_messenger,
+                        hasSchemaChange);
+
+        new ConfigLogging().logCatalogAndDeployment(temp_catalogContext);
+    }
+
+    // TODO: check any other usages of catalogUpdate and update if necessary
     @Override
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
             String diffCommands,
@@ -3313,6 +3373,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             synchronized(m_catalogUpdateLock) {
                 final ReplicationRole oldRole = getReplicationRole();
 
+                // DEBUG
+                hostLog.warn("<--------------------------------->");
+                hostLog.warn("currentTxnId: " + currentTxnId);
+                hostLog.warn("catalogContext txn Id: " + m_catalogContext.m_transactionId);
+                hostLog.warn(!m_txnIdToContextTracker.isEmpty());
+
                 m_statusTracker.setNodeState(NodeState.UPDATING);
                 // A site is catching up with catalog updates
                 if (currentTxnId <= m_catalogContext.m_transactionId && !m_txnIdToContextTracker.isEmpty()) {
@@ -3325,6 +3391,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (contextTracker.m_dispensedSites == ttlsites) {
                         m_txnIdToContextTracker.remove(currentTxnId);
                     }
+
+                    // DEBUG
+                    hostLog.warn("m_dispensedSites: " + contextTracker.m_dispensedSites);
+                    hostLog.warn("ttlsites: " + ttlsites);
+
                     return Pair.of( contextTracker.m_context, contextTracker.m_csp);
                 }
                 else if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
@@ -3345,6 +3416,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
                 // 0. A new catalog! Update the global context and the context tracker
+                // TODO: The best option is not to call this function twice, use a separate method
+                // for writing the temp jar file
                 m_catalogContext =
                     m_catalogContext.update(
                             currentTxnId,
@@ -3459,6 +3532,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
                 }
 
+                // TODO: write the temporary jar file first,
+                // then update all these contexts above
                 new ConfigLogging().logCatalogAndDeployment();
 
                 // log system setting information if the deployment config has changed
