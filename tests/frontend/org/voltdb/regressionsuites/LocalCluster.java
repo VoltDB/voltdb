@@ -286,12 +286,11 @@ public class LocalCluster extends VoltServerConfig {
             boolean debug,
             boolean isRejoinTest,
             Map<String, String> env) {
-        this(null, jarFileName, false, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
+        this(null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
     }
 
     public LocalCluster(String schemaToStage,
                         String catalogJarFileName,
-                        boolean useStagedSchema,
                         int siteCount,
                         int hostCount,
                         int kfactor,
@@ -302,7 +301,12 @@ public class LocalCluster extends VoltServerConfig {
                         boolean isRejoinTest,
                         Map<String, String> env)
     {
-        if (schemaToStage != null) {
+        if (schemaToStage == null) {
+            assert catalogJarFileName != null : "Catalog jar file name is null";
+            setNewCli(isNewCli);
+        } else {
+            assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
+            setNewCli(true);
             m_usesStagedSchema = true;
             try {
                 templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
@@ -311,14 +315,6 @@ public class LocalCluster extends VoltServerConfig {
                 throw new RuntimeException(e);
             }
         }
-        m_usesStagedSchema = useStagedSchema;
-        if (m_usesStagedSchema) {
-            if (catalogJarFileName != null) {
-                templateCmdLine.m_stagedClassesPath = new VoltFile(catalogJarFileName);
-            }
-            setNewCli(true);
-        }
-
         assert siteCount > 0 : "site count is less than 0";
         assert hostCount > 0 : "host count is less than 0";
 
@@ -619,10 +615,6 @@ public class LocalCluster extends VoltServerConfig {
         // Make the local Configuration object...
         CommandLine cmdln = (templateCmdLine.makeCopy());
         cmdln.startCommand(action);
-        if (m_usesStagedSchema) {
-            cmdln.m_pathToCatalog = null;
-            cmdln.m_stagedClassesPath = null;
-        }
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (this.m_additionalProcessEnv != null) {
             for (String name : this.m_additionalProcessEnv.keySet()) {
@@ -1082,10 +1074,6 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.voltdbRoot(root);
             cmdln.pathToDeployment(null);
             cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
-        }
-        if (m_usesStagedSchema) {
-            cmdln.m_pathToCatalog = null;
-            cmdln.m_stagedClassesPath = null;
         }
 
         if (this.m_additionalProcessEnv != null) {
