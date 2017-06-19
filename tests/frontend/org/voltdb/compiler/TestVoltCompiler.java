@@ -1719,6 +1719,18 @@ public class TestVoltCompiler extends TestCase {
                 "as select num, count(*) from (select num from t) subt group by num; \n";
         assertTrue(compileDDL(ddl, compiler));
 
+        // count(*) can be placed anywhere in materialized views
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, min_num, total) " +
+                "as select num, min(num), count(*) from t group by num; \n";
+        assertTrue(compileDDL(ddl, compiler));
+
+        // count(*) can be placed anywhere in materialized views
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 " +
+                "as select num, max(num), min(wage), count(*), sum(wage) from t group by num; \n";
+        assertTrue(compileDDL(ddl, compiler));
+
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from (select num from t limit 5) subt group by num; \n";
