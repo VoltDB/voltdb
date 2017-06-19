@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.ProducerDRGateway.ClusterIdentity;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 
 // Interface through which the outside world can interact with the consumer side
@@ -45,13 +46,13 @@ public interface ConsumerDRGateway extends Promotable {
     Map<Byte, DRRoleStats.State> getStates();
 
     /**
-     * If this cluster was a joiner (at some point) dataSourceCluster will not be -1. If this is the case
+     * If this cluster was a joiner (at some point) dataSourceCluster will not be null. If this is the case
      * the trackers for this clusterId must exist. If they don't exist, this cluster did not finish loading
      * the snapshot as a joiner.
      * @param dataSourceCluster
      * @param expectedClusterMembers
      */
-    void setInitialConversationMembership(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
+    void setInitialConversationMembership(ClusterIdentity dataSource, List<MeshMemberInfo> expectedClusterMembers);
 
     void initialize(boolean resumeReplication);
 
@@ -69,7 +70,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     void startConsumerDispatcher(final MeshMemberInfo member);
 
-    void deactivateConsumerDispatcher(byte clusterId);
+    void deactivateConsumerDispatcher(ClusterIdentity producerClusterIdentity);
 
     void addLocallyLedPartition(int partitionId);
 

@@ -2050,7 +2050,7 @@ public abstract class CatalogUtil {
             } else if (clusterType.getId() == null && dr.getId() == null) {
                 clusterId = 0;
             } else {
-                if (clusterType.getId() == dr.getId()) {
+                if (clusterType.getId().equals(dr.getId())) {
                     clusterId = clusterType.getId();
                 } else {
                     throw new RuntimeException("Detected two conflicting cluster ids in deployement file, setting cluster id in DR tag is "
