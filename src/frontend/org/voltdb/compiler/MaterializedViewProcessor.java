@@ -539,8 +539,7 @@ public class MaterializedViewProcessor {
                     continue;
                 }
                 else {
-                    msg.append("must have non-group by columns aggregated by sum, count, min or max. "
-                            + "Cannot have count(*) more than once.");
+                    msg.append("cannot have count(*) more than once.");
                     throw m_compiler.new VoltCompilerException(msg.toString());
                 }
             }
