@@ -318,8 +318,7 @@ public class CatalogContext {
             // if (catalog_file.exists()) { catalog_file.delete(); }
             if (catalog_tmp_file.exists()) {
                 // Rename
-                catalog_file.delete();
-                catalog_tmp_file.renameTo(new File(path, name));
+                catalog_tmp_file.renameTo(catalog_file);
                 return null;
             } else {
                 // Write to a temporary file

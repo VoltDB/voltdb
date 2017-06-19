@@ -215,6 +215,15 @@ public class UpdateClasses extends UpdateApplicationBase {
                 map = cf.get();
             } catch (InterruptedException | ExecutionException e) {
                 hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
+                // Revert the changes in ZooKeeper
+                CatalogUtil.updateCatalogToZK(
+                                zk,
+                                catalogStuff.version,
+                                catalogStuff.txnId,
+                                catalogStuff.uniqueId,
+                                catalogStuff.catalogBytes,
+                                catalogStuff.getCatalogHash(),
+                                catalogStuff.deploymentBytes);
                 throw new VoltAbortException(e);
             }
 
@@ -222,6 +231,14 @@ public class UpdateClasses extends UpdateApplicationBase {
                 for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
                     if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
                         hostLog.warn("A response from one host for writing the catalog jar has failed.");
+                        CatalogUtil.updateCatalogToZK(
+                                        zk,
+                                        catalogStuff.version,
+                                        catalogStuff.txnId,
+                                        catalogStuff.uniqueId,
+                                        catalogStuff.catalogBytes,
+                                        catalogStuff.getCatalogHash(),
+                                        catalogStuff.deploymentBytes);
                         throw new VoltAbortException("A response from host " + entry.getKey() +
                                                      " for writing the catalog jar has failed.");
                     }

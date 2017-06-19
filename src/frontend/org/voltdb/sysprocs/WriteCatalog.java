@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.utils.CatalogUtil;
@@ -62,23 +63,7 @@ public class WriteCatalog extends UpdateApplicationBase {
         log.warn("expected cat version: " +  expectedCatalogVersion);
         log.warn("====================================================");
 
-        // This will write a temporary jar file, and the version in
-        // the context will be incremented
         // This should only be called once on each host
-//        VoltDB.instance().catalogUpdate(
-//                commands,
-//                catalogStuff.catalogBytes,
-//                catalogStuff.getCatalogHash(),
-//                expectedCatalogVersion,
-//                getID(),
-//                Long.MAX_VALUE,
-//                catalogStuff.deploymentBytes,
-//                catalogStuff.getDeploymentHash(),
-//                requireCatalogDiffCmdsApplyToEE != 0,
-//                hasSchemaChange != 0,
-//                requiresNewExportGeneration != 0);
-
-
         VoltDB.instance().writeCatalogJar(
                   commands,
                   catalogStuff.catalogBytes,
@@ -92,10 +77,9 @@ public class WriteCatalog extends UpdateApplicationBase {
                   hasSchemaChange != 0,
                   requiresNewExportGeneration != 0);
 
-
         hostLog.warn("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
         hostLog.warn("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 
-        return null;
+        return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update finished locally.");
     }
 }

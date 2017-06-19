@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -96,7 +97,6 @@ public class RenameCatalogJar extends VoltSystemProcedure {
                         commands,
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
-                        // TODO: change this
                         expectedCatalogVersion,
                         DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                         getUniqueId(),
@@ -128,7 +128,19 @@ public class RenameCatalogJar extends VoltSystemProcedure {
                             replayInfo));
                 }
             }
-            // TODO: check if this is a restart
+            // if seen before by this code, then check to see if this is a restart
+            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
+                    Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
+                    Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash())) {
+                log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
+                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
+                            Encoder.hexEncode(catalogStuff.getCatalogHash()),
+                            Encoder.hexEncode(catalogStuff.getDeploymentHash())));
+            }
+            else {
+                VoltDB.crashLocalVoltDB("Invalid catalog update.  Expected version: " + expectedCatalogVersion +
+                        ", current version: " + context.getCatalogVersion(), false, null);
+            }
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
