@@ -33,6 +33,7 @@ import org.apache.calcite.util.Util;
 import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.calciteadapter.VoltDBConvention;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
 
 import com.google.common.base.Supplier;
@@ -85,8 +86,8 @@ public class VoltDBProject extends Project implements VoltDBRel {
         @Override
         public AbstractPlanNode toPlanNode() {
             AbstractPlanNode child = ((VoltDBRel)getInput(0)).toPlanNode();
-            ProjectionPlanNode ppn = new ProjectionPlanNode();
-            ppn.setOutputSchema(RexConverter.convertToVoltDBNodeSchema(getNamedProjects()));
+            NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getNamedProjects());
+            ProjectionPlanNode ppn = new ProjectionPlanNode(schema);
             ppn.addAndLinkChild(child);
             return ppn;
         }
