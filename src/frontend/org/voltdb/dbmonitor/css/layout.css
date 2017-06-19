@@ -3585,6 +3585,8 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .generateDate { background-color:#f0f0f0; padding: 5px 0;}
 .generateproDetails { float:right;padding-right: 85px;}
 .proDetailSvgHeight { height:95%!important; padding:0 0 0 30px;}
+.analysisDate { position:relative; top:24px;}
+.tab_content_data { padding-top:10px; padding-bottom:25px;}
 
 
 /********************analysis End *****************/

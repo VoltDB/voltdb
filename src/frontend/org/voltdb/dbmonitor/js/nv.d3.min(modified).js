@@ -697,7 +697,7 @@
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
                 } else if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
                     trowEnter.append("td")
-                        .html(function (p, i) { return p.value + unit });
+                        .html(function (p, i) { return (d.series[0].key != "Frequency" ? p.value.toFixed(6) : p.value.toFixed(2))+ unit });
                 } else {
                     trowEnter.append("td")
                         .classed("value", true)
@@ -726,7 +726,7 @@
                     .html("AverageExecTime*Invocation")
 
                     trowEnter1.append("td")
-                        .html(VoltDbAnalysis.procedureValue[d.data.label].AVG * VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS);
+                        .html((VoltDbAnalysis.procedureValue[d.data.label].AVG * VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS).toFixed(6));
 
                     if(d.series[0].key != "Frequency"){
                         var trowEnter2 = tbodyEnter
@@ -736,7 +736,7 @@
                         .html("Frequency")
 
                         trowEnter2.append("td")
-                            .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS));
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS.toFixed(2));
                     }
 
                     if(d.series[0].key != "Combined"){
@@ -747,7 +747,7 @@
                         .html("Combined")
 
                         trowEnter3.append("td")
-                            .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].COMBINED));
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].COMBINED.toFixed(6));
                     }
 
                     if(d.series[0].key != "Execution Time"){
@@ -758,7 +758,7 @@
                         .html("Execution Time")
 
                         trowEnter4.append("td")
-                            .html(parseFloat(VoltDbAnalysis.procedureValue[d.data.label].AVG));
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].AVG.toFixed(6));
                     }
                 }
                 var html = table.node().outerHTML;
