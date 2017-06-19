@@ -65,6 +65,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.cassandra_voltpatches.GCInspector;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.FileAppender;
@@ -94,11 +95,16 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
+import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
+import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
@@ -140,6 +146,7 @@ import org.voltdb.settings.SettingsException;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -185,7 +192,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private final Properties m_pathList = new Properties();
 
-    private final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
@@ -3930,5 +3937,59 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_clusterCreateTime = clusterCreateTime;
         hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
                 new Date(m_clusterCreateTime).toString() + ".");
+    }
+
+    public static void printDiagnosticInformation(CatalogContext context, String procName, LoadedProcedureSet procSet) {
+        StringBuilder sb = new StringBuilder();
+        final CatalogMap<Procedure> catalogProcedures = context.database.getProcedures();
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        sb.append("Statements within " + procName + ": ").append("\n");
+        for (final Procedure proc : catalogProcedures) {
+            if (proc.getTypeName().equals(procName)) {
+                for (Statement stmt : proc.getStatements()) {
+                    // compute hash for determinism check
+                    crc.reset();
+                    String sqlText = stmt.getSqltext();
+                    crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+                    int hash = (int) crc.getValue();
+                    sb.append("Statement Hash: ").append(hash);
+                    sb.append(", Statement SQL: ").append(sqlText);
+                    for (PlanFragment frag : stmt.getFragments()) {
+                        byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                        long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                        String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                        byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                        sb.append(", Plan Fragment Id:").append(planId);
+                        sb.append(", Plan Stmt Text:").append(stmtText);
+                        sb.append(", Json Plan:").append(new String(jsonPlan));
+                    }
+                    sb.append("\n");
+                }
+            }
+        }
+        sb.append("Default CRUD Procedures: ").append("\n");
+        for (Entry<String, Procedure> pair : context.m_defaultProcs.m_defaultProcMap.entrySet()) {
+            crc.reset();
+            String sqlText = DefaultProcedureManager.sqlForDefaultProc(pair.getValue());
+            crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+            int hash = (int) crc.getValue();
+            sb.append("Statement Hash: ").append(hash);
+            sb.append(", Statement SQL: ").append(sqlText);
+            ProcedureRunner runner = procSet.getProcByName(pair.getValue().getTypeName());
+            for (Statement stmt : runner.getCatalogProcedure().getStatements()) {
+                for (PlanFragment frag : stmt.getFragments()) {
+                    byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                    long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                    String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                    byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                    sb.append(", Plan Fragment Id:").append(planId);
+                    sb.append(", Plan Stmt Text:").append(stmtText);
+                    sb.append(", Json Plan:").append(new String(jsonPlan));
+                }
+            }
+            sb.append("\n");
+        }
+
+        hostLog.error(sb.toString());
     }
 }

@@ -163,6 +163,7 @@ public abstract class BaseInitiator implements Initiator
             LoadedProcedureSet procSet = new LoadedProcedureSet(m_executionSite);
             procSet.loadProcedures(catalogContext, csp);
             m_executionSite.setLoadedProcedures(procSet);
+            m_scheduler.setProcedureSet(procSet);
             m_scheduler.setCommandLog(cl);
 
             m_siteThread = new Thread(m_executionSite);

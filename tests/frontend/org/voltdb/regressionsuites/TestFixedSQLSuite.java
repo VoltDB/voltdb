@@ -1577,7 +1577,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertTrue(ex.getMessage().contains(
                     String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
                             var.length(), var, 2)));
-            assertTrue(ex.getMessage().contains("tuple schema info"));
         }
 
         var = "贾鑫";
@@ -1649,7 +1648,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                         String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
                                 var.length(), var, 2)));
                 // var.length is 26;
-                assertTrue(ex.getMessage().contains("tuple schema info"));
             }
         }
 

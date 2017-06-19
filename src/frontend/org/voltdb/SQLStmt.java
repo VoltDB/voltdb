@@ -85,7 +85,7 @@ public class SQLStmt {
      * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
-        this(sqlText.getBytes(Constants.UTF8ENCODING), joinOrder);
+        this(canonicalizeStmt(sqlText).getBytes(Constants.UTF8ENCODING), joinOrder);
     }
 
     /**
@@ -204,5 +204,19 @@ public class SQLStmt {
      */
     public String getJoinOrder() {
         return joinOrder;
+    }
+
+    // In SQL statement the input without ending with a semicolon is legitimate,
+    // however in order to do a reverse look up (crc -> sql str), we'd like to
+    // use the same statement to compute crc.
+    private static String canonicalizeStmt(String stmtStr) {
+        // Cleanup whitespace newlines and adding semicolon for catalog compatibility
+        stmtStr = stmtStr.replaceAll("\n", " ");
+        stmtStr = stmtStr.trim();
+
+        if (!stmtStr.endsWith(";")) {
+            stmtStr += ";";
+        }
+        return stmtStr;
     }
 }

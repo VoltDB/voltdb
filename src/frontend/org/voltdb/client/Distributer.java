@@ -648,7 +648,7 @@ class Distributer {
                 m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip, stuff.ignoreBackpressure);
                 updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error, false);
                 response.setClientRoundtrip(deltaNanos);
-                assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
+                assert(response.getHashes() == null) : "A determinism hash snuck into the client wire protocol";
                 try {
                     cb.clientCallback(response);
                 } catch (Exception e) {
@@ -899,7 +899,8 @@ class Distributer {
     throws UnknownHostException, IOException
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme,
+                                                      TimeUnit.NANOSECONDS.toMillis(m_connectionResponseTimeoutNanos));
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
