@@ -1,4 +1,13 @@
 
+drop procedure p if exists;
+Command succeeded.
+
+drop procedure max_predicates if exists;
+Command succeeded.
+
+drop procedure max_plus_predicates if exists;
+Command succeeded.
+
 drop table t if exists;
 Command succeeded.
 
@@ -47,6 +56,191 @@ Command succeeded.
 
 create procedure max_plus_predicates as 
 select count(*) FROM t WHERE c > ? and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
@@ -347,14 +541,17 @@ C   D   E
 
 (Returned 2 rows in #.##s)
 
-drop table t2;
+drop procedure max_predicates if exists;
 Command succeeded.
 
-drop procedure max_predicates;
+drop procedure max_plus_predicates if exists;
 Command succeeded.
 
-drop procedure p;
+drop procedure p if exists;
 Command succeeded.
 
-drop table t;
+drop table t2 if exists;
+Command succeeded.
+
+drop table t if exists;
 Command succeeded.

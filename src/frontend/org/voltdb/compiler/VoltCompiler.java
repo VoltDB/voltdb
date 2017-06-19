@@ -112,7 +112,7 @@ public class VoltCompiler {
 
     // Causes the "debugoutput" folder to be generated and populated.
     // Also causes explain plans on disk to include cost.
-    public final static boolean DEBUG_MODE = System.getProperties().contains("compilerdebug");
+    public final static boolean DEBUG_MODE = Boolean.getBoolean("org.voltdb.compilerdebug");
 
     // was this voltcompiler instantiated in a main(), or as part of VoltDB
     public final boolean standaloneCompiler;
