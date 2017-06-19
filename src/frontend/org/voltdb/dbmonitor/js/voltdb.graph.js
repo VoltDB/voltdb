@@ -383,9 +383,42 @@
 
         var barHeight = 0;
 
+        function getBarHeightAndSpacing(dataSet, chart){
+            var dataCount = dataSet.length;
+            if(dataCount < 3){
+                barHeight = 300;
+                chart.groupSpacing(.5);
+            }
+            else if(dataCount < 5){
+                barHeight = 400;
+                chart.groupSpacing(0.4);
+            }
+             else if(dataCount < 7){
+                barHeight = 400;
+                chart.groupSpacing(0.3);
+            }
+            else{
+                barHeight = 60 * dataCount;
+                chart.groupSpacing(0.2);
+            }
+        }
+
+        function updateLatencyAnalysis(){
+            ChartLatencyAnalysis.update();
+            d3.selectAll(".nv-bar").on('click',
+                function(data){
+                    $("#hidProcedureName").html(data.label);
+                    $('#showAnalysisDetails').trigger("click");
+                }
+            );
+        }
+
+        function updateLatencyDetailAnalysis(){
+            ChartLatencyDetailAnalysis.update;
+        }
+
         this.initializeAnalysisGraph = function(){
             nv.addGraph(function() {
-
                 ChartLatencyAnalysis.x(function(d) {
                     if(d.label.length > 20)
                         return d.label.substring(0,20) + ".."
@@ -485,45 +518,8 @@
             });
         }
 
-        function getBarHeightAndSpacing(dataSet, chart){
-            var dataCount = dataSet.length;
-            if(dataCount < 3){
-                barHeight = 300;
-                chart.groupSpacing(.5);
-            }
-            else if(dataCount < 5){
-                barHeight = 400;
-                chart.groupSpacing(0.4);
-            }
-             else if(dataCount < 7){
-                barHeight = 400;
-                chart.groupSpacing(0.3);
-            }
-            else{
-                barHeight = 60 * dataCount;
-                chart.groupSpacing(0.2);
-            }
-        }
-
-        function updateLatencyAnalysis(){
-            ChartLatencyAnalysis.update();
-            d3.selectAll("#chartLatencyAnalysis .nv-bar").on('click',
-                function(data){
-                    $("#hidProcedureName").html(data.label);
-                    $('#showAnalysisDetails').trigger("click");
-                }
-            );
-        }
-
-        function updateLatencyDetailAnalysis(){
-            ChartLatencyDetailAnalysis.update;
-        }
-
-
         this.RefreshAnalysisLatencyGraph = function(dataLatency, dataFrequency){
-            ChartLatencyAnalysis.update;
             getBarHeightAndSpacing(dataLatency, ChartLatencyAnalysis);
-
             dataLatencyAnalysis[0]["values"] = dataLatency;
             d3.select("#visualiseLatencyAnalysis")
                 .datum(dataLatencyAnalysis)

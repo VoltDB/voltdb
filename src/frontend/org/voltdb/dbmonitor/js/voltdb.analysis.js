@@ -1,12 +1,8 @@
 var latencyDetails = [];
 function loadAnalysisPage(){
     $("#tabProcedureBtn").trigger("click");
-
     $("#tabAnalysis li a").on("click", function(){
-        setInterval(function(){
-            window.dispatchEvent(new Event('resize'));
-        },200)
-
+        refreshChart();
     })
 
     $("#ulProcedure li a").on("click", function(){
@@ -17,11 +13,14 @@ function loadAnalysisPage(){
         } else {
             $("#spanAnalysisLegend").html("Execution Time");
         }
+        refreshChart()
+    })
+
+    function refreshChart(){
         setInterval(function(){
             window.dispatchEvent(new Event('resize'));
         },200)
-
-    })
+    }
 
 
     function calculateCombinedValue(profileData){
@@ -33,6 +32,7 @@ function loadAnalysisPage(){
     }
 
     function fetchData (){
+        refreshChart();
         voltDbRenderer.GetProcedureProfileInformation(function(profileData){
             if(profileData != undefined){
                 if(!$.isEmptyObject(profileData["PROCEDURE_PROFILE"])){
