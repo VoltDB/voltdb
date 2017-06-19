@@ -71,17 +71,14 @@ public class ExportClientTestBase {
             new VoltTable.ColumnInfo("geog", VoltType.GEOGRAPHY)
     );
 
-    static AdvertisedDataSource constructTestSource(boolean replicated, int partition)
-    {
+    static AdvertisedDataSource constructTestSource(boolean replicated, int partition) {
         return constructTestSource(replicated, partition, "yankeelover");
     }
 
-    static AdvertisedDataSource constructTestSource(boolean replicated, int partition, String tableName)
-    {
+    static AdvertisedDataSource constructTestSource(boolean replicated, int partition, String tableName) {
         ArrayList<String> col_names = new ArrayList<String>();
         ArrayList<VoltType> col_types = new ArrayList<VoltType>();
-        for (int i = 0; i < COLUMN_TYPES.length; i++)
-        {
+        for (int i = 0; i < COLUMN_TYPES.length; i++) {
             col_names.add(COLUMN_NAMES[i]);
             col_types.add(COLUMN_TYPES[i]);
         }
@@ -94,8 +91,7 @@ public class ExportClientTestBase {
         return source;
     }
 
-    protected void setup()
-    {
+    protected void setup() {
         vtable.clearRowData();
     }
 }
