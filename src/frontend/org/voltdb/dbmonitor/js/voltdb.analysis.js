@@ -23,6 +23,35 @@ function loadAnalysisPage(){
 
     })
 
+    function formatDateTime(timestamp) {
+        var dateTime = new Date(timestamp);
+        //get date
+        var days = dateTime.getDate();
+        var months = dateTime.getMonth() + 1;
+        var years = dateTime.getFullYear();
+
+        days = days < 10 ? "0" + days : days;
+        months = months < 10 ? "0" + months : months;
+
+        //get time
+        var timePeriod = "AM"
+        var hours = dateTime.getHours();
+        var minutes = dateTime.getMinutes();
+        var seconds = dateTime.getSeconds();
+
+        timePeriod = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        hours = hours < 10 ? "0" + hours : hours
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+
+        //get final date time
+        var date = months + "/" + days + "/" + years;
+        var time = hours + ":" + minutes + ":" + seconds + " " + timePeriod;
+        return date + " " + time;
+    };
+
     function calculateCombinedValue(profileData){
         var totalValue = 0;
         for(var j = 0; j < profileData.length; j++){
@@ -48,23 +77,30 @@ function loadAnalysisPage(){
                 $("#tblNoDataContent").show();
 
             }
-
             //order the procedure by  their (avg_exec_time * #of invocation) value
             profileData["PROCEDURE_PROFILE"].sort(function(a,b) {return ((b.AVG * b.INVOCATIONS) > (a.AVG * a.INVOCATIONS)) ? 1 : (((a.AVG * a.INVOCATIONS) > (b.AVG * b.INVOCATIONS)) ? -1 : 0);} );
 
             var dataLatency = [];
             var dataFrequency = [];
             var dataCombined = [];
+            var timestamp;
             var sumOfAllProcedure = calculateCombinedValue(profileData["PROCEDURE_PROFILE"])
             for(var i = 0; i < profileData["PROCEDURE_PROFILE"].length; i++){
-                var combinedWeight = (profileData["PROCEDURE_PROFILE"][i].AVG/100000000 * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS)/sumOfAllProcedure;
-                VoltDbAnalysis.procedureValue[profileData["PROCEDURE_PROFILE"][i].PROCEDURE] = {AVG: profileData["PROCEDURE_PROFILE"][i].AVG/100000000,
-                INVOCATIONS: profileData["PROCEDURE_PROFILE"][i].INVOCATIONS, COMBINED: combinedWeight}
+                if(i == 0)
+                    timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
+                var combinedWeight = ((profileData["PROCEDURE_PROFILE"][i].AVG/100000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS)/sumOfAllProcedure;
+                VoltDbAnalysis.procedureValue[profileData["PROCEDURE_PROFILE"][i].PROCEDURE] =
+                    {
+                        AVG: profileData["PROCEDURE_PROFILE"][i].AVG/100000000,
+                        INVOCATIONS: profileData["PROCEDURE_PROFILE"][i].INVOCATIONS,
+                        COMBINED: combinedWeight
+                    }
                 dataLatency.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE , "value": profileData["PROCEDURE_PROFILE"][i].AVG/100000000})
                 dataFrequency.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE, "value": profileData["PROCEDURE_PROFILE"][i].INVOCATIONS})
                 dataCombined.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE, "value": combinedWeight})
             }
-
+            var formatDate = formatDateTime(timestamp);
+            $("#analysisDate").html(formatDate);
             MonitorGraphUI.initializeAnalysisGraph();
             MonitorGraphUI.RefreshAnalysisLatencyGraph(dataLatency);
             MonitorGraphUI.RefreshAnalysisFrequencyGraph(dataFrequency);
