@@ -180,6 +180,15 @@ public class ExecuteTask extends VoltSystemProcedure {
                 }
                 break;
             }
+            case ELASTIC_CHANGE:
+                result = new VoltTable(STATUS_SCHEMA);
+                int oldPartitionCnt = buffer.getInt();
+                int newPartitionCnt = buffer.getInt();
+                long uniqueId = m_runner.getUniqueId();
+                long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                context.getSiteProcedureConnection().generateElasticChangeEvents(oldPartitionCnt,
+                        newPartitionCnt, spHandle, uniqueId);
+
             default:
                 throw new VoltAbortException("Unable to find the task associated with the given task id");
             }

@@ -600,6 +600,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
 
     switch (type) {
     case CATALOG_UPDATE:
+    case DR_ELASTIC_CHANGE:
     case DR_STREAM_END:
     case DR_STREAM_START: {
         writeEventData(type, payloads);

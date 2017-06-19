@@ -1709,6 +1709,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
     }
 
+    @Override
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long spHandle, long uniqueId) {
+        if (m_partitionId >= oldPartitionCnt) {
+            hostLog.info("Generating Stream Start event");
+            generateDREvent(
+                    EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
+        }
+        else {
+            hostLog.info("Generating Elastic Change event");
+            ByteBuffer paramBuffer = ByteBuffer.allocate(8);
+            paramBuffer.putInt(oldPartitionCnt);
+            paramBuffer.putInt(newPartitionCnt);
+            generateDREvent(
+                    EventType.DR_ELASTIC_CHANGE, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
+        }
+    }
+
     public void setDRStreamEnd(long spHandle, long uniqueId) {
         generateDREvent(
                 EventType.DR_STREAM_END, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
