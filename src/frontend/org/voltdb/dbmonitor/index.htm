@@ -1347,19 +1347,23 @@
         </div>
         <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
     </div>
+    <div style="display:none" id="hidProcedureName"></div>
     <div><a href="#analysisDetails" class="btn" id="showAnalysisDetails" style="display:none;"></a> </div>
     <div id="analysisDetails" style="display:none">
         <div class="overlay-title ">
-           Detail View of Latency for Procedure1
+           Detail View of Latency for <span id="procedureName"></span>
         </div>
         <div class="clear"></div>
         <div class="overlay-content">
             <div class="generateDate">
                 <div class="generateproDetails">
-                     <p>Generated on: 01/02/2017 12:30</p>
+                     <p>Generated on: <span id="generatedDate">01/02/2017 12:30</span></p>
                 </div>
                 <div class="clear"></div>
             </div>
+            <div class="legendAnalysis"><span class="circle_green"></span>
+            <span id="spanAnalysisLegend">Execution Time</span></div>
+             <div class="clear"></div>
 
             <div class="proDetailsHeightAdjstment">
             <div id="divVisualizeLatencyDetail">

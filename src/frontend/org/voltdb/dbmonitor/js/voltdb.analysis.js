@@ -96,6 +96,7 @@ function loadAnalysisPage(){
                         COMBINED: combinedWeight
                     }
                 dataLatency.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE , "value": profileData["PROCEDURE_PROFILE"][i].AVG/100000000})
+
                 dataFrequency.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE, "value": profileData["PROCEDURE_PROFILE"][i].INVOCATIONS})
                 dataCombined.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE, "value": combinedWeight})
             }
@@ -108,38 +109,15 @@ function loadAnalysisPage(){
         })
 
         voltDbRenderer.GetProcedureDetailInformation(function (procedureDetails){
-//             if(procedureDetails != undefined){
-//                if(!$.isEmptyObject(procedureDetails)){
-//                    $(".analyzeNowContent").hide();
-//                    $(".dataContent").show();
-//                } else {
-//                    $(".mainContentAnalysis").hide();
-//                    $(".noDataContent").hide();
-//                    $(".noDataContent").show();
-//
-//                }
-//                $("#tblAnalyzeNowContent").hide();
-//                $("#tblNoDataContent").show();
-//
-//            }
-//            procedureDetails.sort(function(a, b) {
-//                return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
-//            });
             var latencyDetails = [];
 
             procedureDetails["PROCEDURE_DETAIL"].sort(function(a, b) {
                 return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
             });
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
-                //order items w.r.to latency
-                var latValue;
-                if(item.PROCEDURE == "leastpopulated"){
-                    latencyDetails.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME})
-                }
+                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME, "PROCEDURE": item.PROCEDURE})
             });
             MonitorGraphUI.initializeProcedureDetailGraph();
-
-            MonitorGraphUI.RefreshLatencyDetailGraph(latencyDetails);
         });
     }
 
@@ -150,7 +128,8 @@ function loadAnalysisPage(){
 
 (function(window) {
     iVoltDbAnalysis = (function(){
-        this.procedureValue = {}
+        this.procedureValue = {};
+        this.latencyDetailValue = [];
     });
     window.VoltDbAnalysis = new iVoltDbAnalysis();
 })(window);
