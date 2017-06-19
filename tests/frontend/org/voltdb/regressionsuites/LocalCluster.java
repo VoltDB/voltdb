@@ -113,17 +113,10 @@ public class LocalCluster extends VoltServerConfig {
     private boolean m_expectedToInitialize = true;
     int m_replicationPort = -1;
 
-    /**
-     * Utility for regex search in logs: all the regex will be pre-compiled and the
-     * patterns will be searched on the fly for each line of the logs. If any of the
-     * patterns is found on a host, the corresponding  set will be updated (all found
-     * regexes will be inserted into the set)
-     */
-    // The 2d map to store the results of matches (2-dimensional since for each host we may have
-    // multiple patterns to search for)
-    private Map<Integer, Set<String>> m_regexResults = null;
-    // Store the pre-compiled regex strings
-    private Map<String, Pattern> m_regexes = null;
+    // log message pattern match results by host
+    private Map<Integer, Set<String>> m_logMessageMatchResults = null;
+    // log message patterns
+    private Map<String, Pattern> m_logMessageMatchPatterns = null;
 
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
@@ -228,12 +221,12 @@ public class LocalCluster extends VoltServerConfig {
     {
         this(jarFileName, siteCount, hostCount, kfactor, target, null);
         m_hasLocalServer = false;
-        m_regexResults = new ConcurrentHashMap<>();
-        m_regexes = new ConcurrentHashMap<>();
+        m_logMessageMatchResults = new ConcurrentHashMap<>();
+        m_logMessageMatchPatterns = new ConcurrentHashMap<>();
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
-            m_regexes.put(s, p);
+            m_logMessageMatchPatterns.put(s, p);
         }
     }
 
@@ -877,8 +870,8 @@ public class LocalCluster extends VoltServerConfig {
         m_pipes.clear();
         m_cluster.clear();
         m_cmdLines.clear();
-        if (m_regexes != null) {
-            resetAllPreCompRegexResults();
+        if (m_logMessageMatchPatterns != null) {
+            resetLogMessageMatchResults();
         }
         int oopStartIndex = 0;
 
@@ -1079,7 +1072,7 @@ public class LocalCluster extends VoltServerConfig {
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
 
-            if (m_regexes == null) {
+            if (m_logMessageMatchPatterns == null) {
                 ptf = new PipeToFile(
                         fileName,
                         proc.getInputStream(),
@@ -1087,8 +1080,8 @@ public class LocalCluster extends VoltServerConfig {
                         false,
                         proc);
             } else {
-                if (m_regexResults.get(hostId) == null) {
-                    m_regexResults.put(hostId, new ConcurrentHashSet<>());
+                if (m_logMessageMatchResults.get(hostId) == null) {
+                    m_logMessageMatchResults.put(hostId, new ConcurrentHashSet<>());
                 }
                 ptf = new PipeToFile(
                         fileName,
@@ -1096,8 +1089,8 @@ public class LocalCluster extends VoltServerConfig {
                         String.valueOf(hostId),
                         false,
                         proc,
-                        m_regexes,
-                        m_regexResults.get(hostId));
+                        m_logMessageMatchPatterns,
+                        m_logMessageMatchResults.get(hostId));
                 ptf.setHostId(hostId);
             }
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
@@ -1126,7 +1119,7 @@ public class LocalCluster extends VoltServerConfig {
 
     void startOne(int hostId, boolean clearLocalDataDirectories,
             StartAction startAction, boolean waitForReady, String placementGroup,
-            boolean resetHostRegexResults) throws IOException
+            boolean resetLogMessageMatchResults) throws IOException
     {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
@@ -1281,7 +1274,7 @@ public class LocalCluster extends VoltServerConfig {
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
 
-            if (m_regexes == null) {
+            if (m_logMessageMatchPatterns == null) {
                 ptf = new PipeToFile(
                         fileName,
                         proc.getInputStream(),
@@ -1289,12 +1282,12 @@ public class LocalCluster extends VoltServerConfig {
                         false,
                         proc);
             } else {
-                if (m_regexResults.containsKey(hostId)) {
-                    if (resetHostRegexResults) {
-                        resetHostRegexResults(hostId);
+                if (m_logMessageMatchResults.containsKey(hostId)) {
+                    if (resetLogMessageMatchResults) {
+                        resetLogMessageMatchResults(hostId);
                     }
                 } else {
-                    m_regexResults.put(hostId, new ConcurrentHashSet<>());
+                    m_logMessageMatchResults.put(hostId, new ConcurrentHashSet<>());
                 }
                 ptf = new PipeToFile(
                         fileName,
@@ -1302,8 +1295,8 @@ public class LocalCluster extends VoltServerConfig {
                         PipeToFile.m_initToken,
                         false,
                         proc,
-                        m_regexes,
-                        m_regexResults.get(hostId));
+                        m_logMessageMatchPatterns,
+                        m_logMessageMatchResults.get(hostId));
                 ptf.setHostId(hostId);
             }
 
@@ -1580,7 +1573,7 @@ public class LocalCluster extends VoltServerConfig {
                               "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
                               ".rejoined.txt";
 
-            if (m_regexes == null) {
+            if (m_logMessageMatchPatterns == null) {
                 ptf = new PipeToFile(
                         filePath,
                         proc.getInputStream(),
@@ -1588,10 +1581,10 @@ public class LocalCluster extends VoltServerConfig {
                         false,
                         proc);
             } else {
-                if (m_regexResults.containsKey(hostId)) {
-                    resetHostRegexResults(hostId);
+                if (m_logMessageMatchResults.containsKey(hostId)) {
+                    resetLogMessageMatchResults(hostId);
                 } else {
-                    m_regexResults.put(hostId, new ConcurrentHashSet<>());
+                    m_logMessageMatchResults.put(hostId, new ConcurrentHashSet<>());
                 }
                 ptf = new PipeToFile(
                         filePath,
@@ -1599,8 +1592,8 @@ public class LocalCluster extends VoltServerConfig {
                         PipeToFile.m_initToken,
                         false,
                         proc,
-                        m_regexes,
-                        m_regexResults.get(hostId));
+                        m_logMessageMatchPatterns,
+                        m_logMessageMatchResults.get(hostId));
                 ptf.setHostId(hostId);
             }
 
@@ -1685,8 +1678,8 @@ public class LocalCluster extends VoltServerConfig {
         }
         shutDownExternal();
 
-        if (m_regexes != null) {
-            resetAllPreCompRegexResults();
+        if (m_logMessageMatchPatterns != null) {
+            resetLogMessageMatchResults();
         }
 
         VoltServerConfig.removeInstance(this);
@@ -2298,57 +2291,56 @@ public class LocalCluster extends VoltServerConfig {
         m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
     }
 
-    // Reset the host's regex search result (removing from the set)
-    public void resetPreCompRegexResult(int hostNum, String regex) {
-        assert(m_regexes != null);
-        assert(m_regexResults.containsKey(hostNum));
-        assert(m_regexes.containsKey(regex));
-        m_regexResults.get(hostNum).remove(regex);
+    // Reset the message match result
+    public void resetLogMessageMatchResult(int hostNum, String regex) {
+        assert(m_logMessageMatchPatterns != null);
+        assert(m_logMessageMatchResults.containsKey(hostNum));
+        assert(m_logMessageMatchPatterns.containsKey(regex));
+        m_logMessageMatchResults.get(hostNum).remove(regex);
     }
 
-    // Reset all the regex results to false
-    public void resetAllPreCompRegexResults() {
-        m_regexResults.values().stream().forEach(m -> m.clear());
+    // Reset all the message match results
+    public void resetLogMessageMatchResults() {
+        m_logMessageMatchResults.values().stream().forEach(m -> m.clear());
     }
 
-    // check that the string exists in the specified host
+    // verify the presence of message in the log from specified host
     public boolean verifyLogMessage(int hostNum, String regex) {
-        assertTrue(m_regexes != null);
-        assertTrue(m_regexResults.containsKey(hostNum));
-        assertTrue(m_regexes.containsKey(regex));
-        return m_regexResults.get(hostNum).contains(regex);
+        assertTrue(m_logMessageMatchPatterns != null);
+        assertTrue(m_logMessageMatchResults.containsKey(hostNum));
+        assertTrue(m_logMessageMatchPatterns.containsKey(regex));
+        return m_logMessageMatchResults.get(hostNum).contains(regex);
     }
 
-    // Check that all the patterns exist in the specified host
-    private boolean preCompLogContains(int hostId, List<String> patterns) {
+    // verify the presence of messages in the log from specified host
+    private boolean logMessageContains(int hostId, List<String> patterns) {
         return patterns.stream().allMatch(s -> verifyLogMessage(hostId, s));
     }
 
-    // Helper function to check non of the patterns appear in the specified host
-    private boolean preCompLogNotContains(int hostId, List<String> patterns) {
+    private boolean logMessageNotContains(int hostId, List<String> patterns) {
         return patterns.stream().allMatch(s -> !verifyLogMessage(hostId, s));
     }
 
     // Verify that the patterns provided exist in all the specified hosts
     // These patterns should have been added when constructing the class
     public boolean verifyLogMessages(List<Integer> hostIds, List<String> patterns) {
-        return hostIds.stream().allMatch(id -> preCompLogContains(id, patterns));
+        return hostIds.stream().allMatch(id -> logMessageContains(id, patterns));
     }
 
     // Verify that none of the patterns provided exist in any of the specified hosts
     // These patterns should have been added when constructing the class
     public boolean verifyLogMessagesNotExist(List<Integer> hostIds, List<String> patterns) {
-        return hostIds.stream().allMatch(id -> preCompLogNotContains(id, patterns));
+        return hostIds.stream().allMatch(id -> logMessageNotContains(id, patterns));
     }
 
     // verify that all the patterns exist in every host
     public boolean verifyLogMessages(List<String> patterns) {
-        return m_regexResults.keySet().stream().allMatch(id -> preCompLogContains(id, patterns));
+        return m_logMessageMatchResults.keySet().stream().allMatch(id -> logMessageContains(id, patterns));
     }
 
     // verify that none of the patterns exist in any of the host
     public boolean verifyLogMessagesNotExist(List<String> patterns) {
-        return m_regexResults.keySet().stream().allMatch(id -> preCompLogNotContains(id, patterns));
+        return m_logMessageMatchResults.keySet().stream().allMatch(id -> logMessageNotContains(id, patterns));
     }
 
     // verify a single pattern exists in every host
@@ -2356,14 +2348,13 @@ public class LocalCluster extends VoltServerConfig {
         return verifyLogMessages(Arrays.asList(new String[] {regex}));
     }
 
-    // verify the regex does not exist in any host
+    // verify the message does not exist in all the logs
     public boolean verifyLogMessageNotExist(String regex) {
         return verifyLogMessagesNotExist(Arrays.asList(new String[] {regex}));
     }
 
-    // clear the result sets of a given host
-    private void resetHostRegexResults(int hostId) {
-        assertTrue(m_regexResults.containsKey(hostId));
-        m_regexResults.get(hostId).clear();
+    private void resetLogMessageMatchResults(int hostId) {
+        assertTrue(m_logMessageMatchResults.containsKey(hostId));
+        m_logMessageMatchResults.get(hostId).clear();
     }
 }
