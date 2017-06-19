@@ -144,11 +144,36 @@ public class Collector {
         // Validate voltdbroot path is valid or not - check if deployment and config info json exists
         File deploymentFile = new File(m_deploymentPath);
         File configInfoFile = new File(m_configInfoPath);
+
+        //  ENG-12684: The deployment and config files are created in another process, so we have to wait for them to be created.
+        try {
+            for (int i = 0; i < 6; i++) {
+                if (!(deploymentFile.exists() && configInfoFile.exists())) {
+                    System.err.println("Still looking for files, i=" + i + " m_voltdbRoot=" + m_voltdbRoot.getParentFile().getAbsolutePath() +
+                                       " deploymentFile=" + deploymentFile.getAbsolutePath() + " configInfoFile=" + configInfoFile.getAbsolutePath());
+                    Thread.sleep(5000);
+                }
+                else {
+                    break;
+                }
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+
         if (!deploymentFile.exists() || !configInfoFile.exists()) {
-            System.err.println("ERROR: Invalid database directory " + m_voltdbRoot.getParentFile().getAbsolutePath()
-                    + ". Specify valid database directory using --dir option.");
+            if (!deploymentFile.exists()) {
+                System.err.println("ERROR: deploymentFile does not exist: " + deploymentFile.getAbsolutePath() + " voltdbRoot=" + m_voltdbRoot
+                        + " Specify valid database directory using --dir option.");
+            }
+            if (!configInfoFile.exists()) {
+                System.err.println("ERROR: configInfo does not exist: " + configInfoFile.getAbsolutePath() + " voltdbRoot=" + m_voltdbRoot
+                        + " Specify valid database directory using --dir option.");
+            }
             VoltDB.exit(-1);
         }
+
 
         if (!m_config.prefix.isEmpty()) {
             m_config.outputFile = m_config.prefix + "_" +  PREFIX_DEFAULT_COLLECT_FILE + "_"
