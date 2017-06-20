@@ -2533,6 +2533,7 @@ var getCurrentTab = function () {
         $(".nvtooltip").show();
         return NavigationTabs.Importer;
     } else if(activeLinkId == "navAnalysis"){
+        VoltDbAnalysis.refreshChart();
         $(".nvtooltip").show();
         return NavigationTabs.Analysis;
     }
