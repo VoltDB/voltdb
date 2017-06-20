@@ -58,7 +58,7 @@ public class WriteCatalog extends UpdateApplicationBase {
             Throwables.propagate(e);
         }
 
-        log.warn("========== UpdateCore.executePlanFragment ==========");
+        log.warn("=================== WriteCatalog ===================");
         log.warn("zk cat ver: " + catalogStuff.version);
         log.warn("expected cat version: " +  expectedCatalogVersion);
         log.warn("====================================================");

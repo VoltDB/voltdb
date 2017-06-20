@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -525,7 +526,24 @@ public class UpdateCore extends VoltSystemProcedure {
     {
         assert(tablesThatMustBeEmpty != null);
 
-
+        // This is not really a good way
+        // A temporary fix
+//        if (updateZK) {
+            ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
+            // update the global version. only one site per node will accomplish this.
+            // others will see there is no work to do and gracefully continue.
+            // then update data at the local site.
+            log.warn("XXXXXXXX Start updateCatalogToZK...");
+            CatalogUtil.updateCatalogToZK(
+                    zk,
+                    expectedCatalogVersion + 1,
+                    DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
+                    getUniqueId(),
+                    catalogBytes,
+                    catalogHash,
+                    deploymentBytes);
+//        }
 
         performCatalogUpdateWork(
                 catalogDiffCommands,
