@@ -247,20 +247,20 @@ public class UpdateClasses extends UpdateApplicationBase {
 
             // Rename the catalog jar to replace the old one, this should be done in a
             // synchronous way.
-            callProcedure("@RenameCatalogJar",
-                               ccr.encodedDiffCommands,
-                               ccr.catalogHash,
-                               ccr.catalogBytes,
-                               ccr.expectedCatalogVersion,
-                               ccr.deploymentString,
-                               ccr.tablesThatMustBeEmpty,
-                               ccr.reasonsForEmptyTables,
-                               ccr.requiresSnapshotIsolation ? 1 : 0,
-                               ccr.worksWithElastic ? 1 : 0,
-                               ccr.deploymentHash,
-                               ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                               ccr.hasSchemaChange ?  1 : 0,
-                               ccr.requiresNewExportGeneration ? 1 : 0);
+            callProcedure("@UpdateCore",
+                           ccr.encodedDiffCommands,
+                           ccr.catalogHash,
+                           ccr.catalogBytes,
+                           ccr.expectedCatalogVersion,
+                           ccr.deploymentString,
+                           ccr.tablesThatMustBeEmpty,
+                           ccr.reasonsForEmptyTables,
+                           ccr.requiresSnapshotIsolation ? 1 : 0,
+                           ccr.worksWithElastic ? 1 : 0,
+                           ccr.deploymentHash,
+                           ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                           ccr.hasSchemaChange ?  1 : 0,
+                           ccr.requiresNewExportGeneration ? 1 : 0);
 
         } finally {
             // remove the uac blocker when exits or there is an exception

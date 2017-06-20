@@ -313,35 +313,35 @@ public class CatalogContext {
     {
         File catalog_file = new VoltFile(path, name);
         File catalog_tmp_file = new VoltFile(path, name + ".tmp");
-        if (catalog_file.exists())
+        if (catalog_file.exists() && catalog_tmp_file.exists())
         {
-            catalog_file.delete();
-            if (catalog_tmp_file.exists()) {
-                catalog_tmp_file.renameTo(catalog_file);
-                return null;
-            }
+            catalog_tmp_file.renameTo(catalog_file);
+            return null;
+        } else if (!catalog_file.exists() && !catalog_tmp_file.exists()) {
+            return m_jarfile.writeToFile(catalog_file);
+        } else if (catalog_file.exists() && !catalog_tmp_file.exists()) {
+            // restart ?
+//            catalog_file.delete();
+//            return m_jarfile.writeToFile(catalog_file);
+            return null;
+        } else {
+            throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
+                    + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists());
         }
-        return m_jarfile.writeToFile(catalog_file);
+        // return m_jarfile.writeToFile(catalog_file);
     }
 
-    public void writeCatalogJarToFile2(String path, String name) throws IOException
+    public void writeCatalogJarToTempFile(String path, String name) throws IOException
     {
         File catalog_file = new VoltFile(path, name);
         File catalog_tmp_file = new VoltFile(path, name + ".tmp");
-        if (catalog_file.exists())
+        if (catalog_file.exists() && !catalog_tmp_file.exists())
         {
-            // if (catalog_file.exists()) { catalog_file.delete(); }
-            if (catalog_tmp_file.exists()) {
-                // Rename
-                catalog_tmp_file.renameTo(catalog_file);
-                // return;
-            } else {
-                // Write to a temporary file
-                m_jarfile.writeToFile(catalog_tmp_file);
-                // return;
-            }
+            m_jarfile.writeToFile(catalog_tmp_file);
+        } else {
+            throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
+                    + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists());
         }
-        m_jarfile.writeToFile(catalog_file);
     }
 
     /**

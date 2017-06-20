@@ -17,10 +17,7 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
@@ -101,51 +98,11 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
             noteRestoreCompleted();
         }
 
-        CompletableFuture<Map<Integer,ClientResponse>> cf =
-                callNTProcedureOnAllHosts(
-                "@UpdateCore",
-                ccr.encodedDiffCommands,
-                ccr.catalogHash,
-                ccr.catalogBytes,
-                ccr.expectedCatalogVersion,
-                ccr.deploymentString,
-                ccr.tablesThatMustBeEmpty,
-                ccr.reasonsForEmptyTables,
-                ccr.requiresSnapshotIsolation ? 1 : 0,
-                ccr.worksWithElastic ? 1 : 0,
-                ccr.deploymentHash,
-                ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                ccr.hasSchemaChange ?  1 : 0,
-                ccr.requiresNewExportGeneration ? 1 : 0);
-
-        Map<Integer, ClientResponse>  map = null;
-        try {
-            map = cf.get();
-        } catch (InterruptedException | ExecutionException e) {
-            hostLog.info("A request to update the loaded classes has failed. More info returned to client.");
-            // What should the status code be?
-            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, e.getMessage());
-        }
-
-        for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
-            if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
-                hostLog.info("A response from one host for writing the catalog jar has failed.");
-                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
-                              "Catalog asynchronous write failed on one host.");
-            }
-        }
-
-        // Call the transaction to complete the renaming process
-        // return callProcedure("@CatalogRename", true);
-
-        // return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog asynchronous write completed.");
-
-        // This time to rename
         return callProcedure("@UpdateCore",
-                              "",   // hack
+                              ccr.encodedDiffCommands,
                               ccr.catalogHash,
                               ccr.catalogBytes,
-                              ccr.expectedCatalogVersion + 1,    // hack hack hack
+                              ccr.expectedCatalogVersion,
                               ccr.deploymentString,
                               ccr.tablesThatMustBeEmpty,
                               ccr.reasonsForEmptyTables,
