@@ -55,6 +55,10 @@ public class ClusterSettingsRef extends AtomicStampedReference<ClusterSettings>
         } catch (KeeperException|InterruptedException e) {
             throw new SettingsException("Failed to initialize from ZooKeeper", e);
         }
+
+        if (bytes==null) {
+            throw new SettingsException("Failed to initialize cluster settings from ZooKeeper");
+        }
         set(ClusterSettings.create(bytes), stat.getVersion());
         return stat.getVersion();
     }

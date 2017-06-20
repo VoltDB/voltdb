@@ -23,17 +23,22 @@
 package org.voltdb.regressionsuites;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
+import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.EELibraryLoader;
@@ -108,6 +113,11 @@ public class LocalCluster extends VoltServerConfig {
     private boolean m_expectedToInitialize = true;
     int m_replicationPort = -1;
 
+    // log message pattern match results by host
+    private Map<Integer, Set<String>> m_logMessageMatchResults = null;
+    // log message patterns
+    private Map<String, Pattern> m_logMessageMatchPatterns = null;
+
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
      * Used with NewCLI.
@@ -122,6 +132,9 @@ public class LocalCluster extends VoltServerConfig {
         return m_subRoots;
     }
 
+    // This should be set to true by default, otherwise the client interface
+    // may throw different types of exception in other tests, which results
+    // to failure
     boolean m_hasLocalServer = true;
     public void setHasLocalServer(boolean hasLocalServer) {
         m_hasLocalServer = hasLocalServer;
@@ -195,6 +208,27 @@ public class LocalCluster extends VoltServerConfig {
         m_httpOverridePort = port;
     }
     public int getHttpOverridePort() { return m_httpOverridePort; };
+
+    /*
+     * Enable pre-compiled regex search in logs
+     */
+    public LocalCluster(String jarFileName,
+                        List<String> regexes,
+                        int siteCount,
+                        int hostCount,
+                        int kfactor,
+                        BackendTarget target)
+    {
+        this(jarFileName, siteCount, hostCount, kfactor, target, null);
+        m_hasLocalServer = false;
+        m_logMessageMatchResults = new ConcurrentHashMap<>();
+        m_logMessageMatchPatterns = new ConcurrentHashMap<>();
+        for (int i = 0; i < regexes.size(); i++) {
+            String s = regexes.get(i);
+            Pattern p = Pattern.compile(s);
+            m_logMessageMatchPatterns.put(s, p);
+        }
+    }
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -836,6 +870,9 @@ public class LocalCluster extends VoltServerConfig {
         m_pipes.clear();
         m_cluster.clear();
         m_cmdLines.clear();
+        if (m_logMessageMatchPatterns != null) {
+            resetLogMessageMatchResults();
+        }
         int oopStartIndex = 0;
 
         // create the in-process server instance.
@@ -1034,15 +1071,31 @@ public class LocalCluster extends VoltServerConfig {
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
-            ptf = new PipeToFile(
-                    fileName,
-                    proc.getInputStream(),
-                    String.valueOf(hostId),
-                    false,
-                    proc);
+
+            if (m_logMessageMatchPatterns == null) {
+                ptf = new PipeToFile(
+                        fileName,
+                        proc.getInputStream(),
+                        String.valueOf(hostId),
+                        false,
+                        proc);
+            } else {
+                if (m_logMessageMatchResults.get(hostId) == null) {
+                    m_logMessageMatchResults.put(hostId, new ConcurrentHashSet<>());
+                }
+                ptf = new PipeToFile(
+                        fileName,
+                        proc.getInputStream(),
+                        String.valueOf(hostId),
+                        false,
+                        proc,
+                        m_logMessageMatchPatterns,
+                        m_logMessageMatchResults.get(hostId));
+                ptf.setHostId(hostId);
+            }
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
-            proc.waitFor();
+            proc.waitFor(); // Wait for the server initialization to finish ?
         }
         catch (IOException ex) {
             log.error("Failed to start cluster process:" + ex.getMessage(), ex);
@@ -1060,6 +1113,13 @@ public class LocalCluster extends VoltServerConfig {
 
     void startOne(int hostId, boolean clearLocalDataDirectories,
             StartAction startAction, boolean waitForReady, String placementGroup) throws IOException
+    {
+        startOne(hostId, clearLocalDataDirectories, startAction, waitForReady, placementGroup, false);
+    }
+
+    void startOne(int hostId, boolean clearLocalDataDirectories,
+            StartAction startAction, boolean waitForReady, String placementGroup,
+            boolean resetLogMessageMatchResults) throws IOException
     {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
@@ -1213,12 +1273,33 @@ public class LocalCluster extends VoltServerConfig {
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
             System.out.println("Process output can be found in: " + fileName);
-            ptf = new PipeToFile(
-                    fileName,
-                    proc.getInputStream(),
-                    PipeToFile.m_initToken,
-                    false,
-                    proc);
+
+            if (m_logMessageMatchPatterns == null) {
+                ptf = new PipeToFile(
+                        fileName,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        false,
+                        proc);
+            } else {
+                if (m_logMessageMatchResults.containsKey(hostId)) {
+                    if (resetLogMessageMatchResults) {
+                        resetLogMessageMatchResults(hostId);
+                    }
+                } else {
+                    m_logMessageMatchResults.put(hostId, new ConcurrentHashSet<>());
+                }
+                ptf = new PipeToFile(
+                        fileName,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        false,
+                        proc,
+                        m_logMessageMatchPatterns,
+                        m_logMessageMatchResults.get(hostId));
+                ptf.setHostId(hostId);
+            }
+
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
@@ -1385,6 +1466,9 @@ public class LocalCluster extends VoltServerConfig {
             return true;
         }
 
+        // For some mythical reason rejoinHostId is not actually used for the newly created host,
+        // hostNum is used by default (in fact hostNum should equal to hostId, otherwise some tests
+        // may fail)
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
@@ -1481,17 +1565,38 @@ public class LocalCluster extends VoltServerConfig {
                 assert(status);
             }
 
-            ptf = new PipeToFile(
-                    testoutputdir +
-                    File.separator +
-                    "LC-" +
-                    getFileName() + "-" +
-                    hostId + "-" +
-                    "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
-                    ".rejoined.txt",
-                    proc.getInputStream(),
-                    PipeToFile.m_initToken,
-                    true, proc);
+            String filePath = testoutputdir +
+                              File.separator +
+                              "LC-" +
+                              getFileName() + "-" +
+                              hostId + "-" +
+                              "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
+                              ".rejoined.txt";
+
+            if (m_logMessageMatchPatterns == null) {
+                ptf = new PipeToFile(
+                        filePath,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        false,
+                        proc);
+            } else {
+                if (m_logMessageMatchResults.containsKey(hostId)) {
+                    resetLogMessageMatchResults(hostId);
+                } else {
+                    m_logMessageMatchResults.put(hostId, new ConcurrentHashSet<>());
+                }
+                ptf = new PipeToFile(
+                        filePath,
+                        proc.getInputStream(),
+                        PipeToFile.m_initToken,
+                        false,
+                        proc,
+                        m_logMessageMatchPatterns,
+                        m_logMessageMatchResults.get(hostId));
+                ptf.setHostId(hostId);
+            }
+
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
                 // replace the existing dead proc
@@ -1572,6 +1677,10 @@ public class LocalCluster extends VoltServerConfig {
             m_running = false;
         }
         shutDownExternal();
+
+        if (m_logMessageMatchPatterns != null) {
+            resetLogMessageMatchResults();
+        }
 
         VoltServerConfig.removeInstance(this);
     }
@@ -2180,5 +2289,72 @@ public class LocalCluster extends VoltServerConfig {
 
     public void setDeplayBetweenNodeStartup(long deplayBetweenNodeStartup) {
         m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
+    }
+
+    // Reset the message match result
+    public void resetLogMessageMatchResult(int hostNum, String regex) {
+        assert(m_logMessageMatchPatterns != null);
+        assert(m_logMessageMatchResults.containsKey(hostNum));
+        assert(m_logMessageMatchPatterns.containsKey(regex));
+        m_logMessageMatchResults.get(hostNum).remove(regex);
+    }
+
+    // Reset all the message match results
+    public void resetLogMessageMatchResults() {
+        m_logMessageMatchResults.values().stream().forEach(m -> m.clear());
+    }
+
+    // verify the presence of message in the log from specified host
+    public boolean verifyLogMessage(int hostNum, String regex) {
+        assertTrue(m_logMessageMatchPatterns != null);
+        assertTrue(m_logMessageMatchResults.containsKey(hostNum));
+        assertTrue(m_logMessageMatchPatterns.containsKey(regex));
+        return m_logMessageMatchResults.get(hostNum).contains(regex);
+    }
+
+    // verify the presence of messages in the log from specified host
+    private boolean logMessageContains(int hostId, List<String> patterns) {
+        return patterns.stream().allMatch(s -> verifyLogMessage(hostId, s));
+    }
+
+    private boolean logMessageNotContains(int hostId, List<String> patterns) {
+        return patterns.stream().allMatch(s -> !verifyLogMessage(hostId, s));
+    }
+
+    // Verify that the patterns provided exist in all the specified hosts
+    // These patterns should have been added when constructing the class
+    public boolean verifyLogMessages(List<Integer> hostIds, List<String> patterns) {
+        return hostIds.stream().allMatch(id -> logMessageContains(id, patterns));
+    }
+
+    // Verify that none of the patterns provided exist in any of the specified hosts
+    // These patterns should have been added when constructing the class
+    public boolean verifyLogMessagesNotExist(List<Integer> hostIds, List<String> patterns) {
+        return hostIds.stream().allMatch(id -> logMessageNotContains(id, patterns));
+    }
+
+    // verify that all the patterns exist in every host
+    public boolean verifyLogMessages(List<String> patterns) {
+        return m_logMessageMatchResults.keySet().stream().allMatch(id -> logMessageContains(id, patterns));
+    }
+
+    // verify that none of the patterns exist in any of the host
+    public boolean verifyLogMessagesNotExist(List<String> patterns) {
+        return m_logMessageMatchResults.keySet().stream().allMatch(id -> logMessageNotContains(id, patterns));
+    }
+
+    // verify a single pattern exists in every host
+    public boolean verifyLogMessage(String regex) {
+        return verifyLogMessages(Arrays.asList(new String[] {regex}));
+    }
+
+    // verify the message does not exist in all the logs
+    public boolean verifyLogMessageNotExist(String regex) {
+        return verifyLogMessagesNotExist(Arrays.asList(new String[] {regex}));
+    }
+
+    private void resetLogMessageMatchResults(int hostId) {
+        assertTrue(m_logMessageMatchResults.containsKey(hostId));
+        m_logMessageMatchResults.get(hostId).clear();
     }
 }
