@@ -207,7 +207,7 @@ if config.runalltests:
         testCmd += " -R %s" % config.eetestsuite
     if not runCommand(testCmd, config):
         print("Test command \"%s\" failed." % testCmd)
-        system.exit(100)
+        sys.exit(100)
 
 print("Build success.")
 sys.exit(0)

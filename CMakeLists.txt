@@ -20,6 +20,9 @@
 # If this succeeds, then the build artifacts will be placed in
 # obj/${BUILD}/prod.
 #
+# Note that there's the potential for making Eclipse projects here.
+# Also, there's the potential for substituting ninja for make, which
+# would improve EE build times.
 #
 # The two artifacts are:
 #   1.) The jni library, which will be in
@@ -43,9 +46,10 @@
 #       a.) The hand written tests are checked in to github,
 #           and are listed in the variable VOLTDB_TEST_PROGRAMS
 #           below.  Their names have the form TEST_DIR/TEST_NAME.
-#           Both of these should be a simple name, and not a path.
+#           Both TEST_DIR and TEST_NAME should be simple names,
+#           and not a paths.
 #       b.) Generated tests are generated from java sources.  These
-#           don't currently work now.
+#           don't currently work.
 #   1.) To build the tests run "make build-tests".  You
 #       can use the usual -jN and -k options, of course.
 #       The tests will all go into cpptests/TEST_DIR/TEST_NAME.
@@ -88,7 +92,13 @@
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.12 FATAL_ERROR)
 PROJECT(VoltDB_EE)
 INCLUDE(ExternalProject)
-CMAKE_POLICY(SET CMP0042 OLD)
+IF ( (CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND ( (CMAKE_VERSION VERSION_GREATER 3.0.0) OR (CMAKE_VERSION VERSION_EQUAL 3.0.0) ) )
+    # Newer versions of CMake than we use set this
+    # policy on te mac.  There there is a way to set the
+    # rpath which is different from Linux.  We just ignore
+    # it, but we need to use the old behavior on the mac.
+    CMAKE_POLICY(SET CMP0042 OLD)
+ENDIF()
 ########################################################################
 #
 # This CMakeLists.txt file describes the VoltDB build system.
@@ -855,8 +865,7 @@ FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD OUTPUT_VAR)
       "/usr/bin/env"
       "valgrind"
       "--leak-check=full"
-      "--show-leak-kinds=all"
-      "--errors-for-leak-kinds=all"
+      "--show-reachable=yes"
       "--error-exitcode=1"
       "--suppressions=${SUPPRESSIONS}"
       "--xml=yes"
