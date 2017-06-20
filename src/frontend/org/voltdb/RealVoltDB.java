@@ -353,7 +353,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     String m_terminusNonce = null;
 
-//  m_durable means commandlogging is enabled.
+    // m_durable means commandlogging is enabled.
     boolean m_durable = false;
 
     private int m_maxThreadsCount;
