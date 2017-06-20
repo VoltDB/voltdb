@@ -96,7 +96,7 @@ function loadAnalysisPage(){
 
         voltDbRenderer.GetProcedureDetailInformation(function (procedureDetails){
             var latencyDetails = [];
-
+            var i = 0;
             procedureDetails["PROCEDURE_DETAIL"].sort(function(a, b) {
                 return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
             });
@@ -108,7 +108,9 @@ function loadAnalysisPage(){
                         MAX: item.MAX_EXECUTION_TIME
                     }
 
-                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP});
+                var procedureName = "(" + (i + 1) + ") " + item.PROCEDURE;
+                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME, "PROCEDURE": procedureName, "TIMESTAMP": item.TIMESTAMP});
+                i++;
             });
 
             MonitorGraphUI.initializeProcedureDetailGraph();
