@@ -2389,7 +2389,7 @@ var loadPage = function (serverName, portid) {
 
     $("#showAnalysisDetails").popup({
         open: function (event, ui, ele)  {
-            var procedureName = $("#hidProcedureName").html();
+            var procedureName = $("#hidProcedureName").html().split(' ')[1];
             $("#procedureName").html(procedureName);
              //filter specific procedure calls from list of datas
             var procDetails = [];
@@ -2533,6 +2533,7 @@ var getCurrentTab = function () {
         $(".nvtooltip").show();
         return NavigationTabs.Importer;
     } else if(activeLinkId == "navAnalysis"){
+        VoltDbAnalysis.refreshChart();
         $(".nvtooltip").show();
         return NavigationTabs.Analysis;
     }
