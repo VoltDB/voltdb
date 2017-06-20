@@ -353,6 +353,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     String m_terminusNonce = null;
 
+//  m_durable means commandlogging is enabled.
     boolean m_durable = false;
 
     private int m_maxThreadsCount;
@@ -1040,7 +1041,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            // durable means commandlogging is enabled.
             m_durable = readDeploymentAndCreateStarterCatalogContext(config);
 
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
@@ -1362,7 +1362,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             (ProducerDRGateway) ndrgwConstructor.newInstance(
                                     new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
-                                    willResumeReplication(),
+                                    willDoActualRecover(),
                                     m_config.m_startAction.doesRejoin(),
                                     m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,
@@ -1574,16 +1574,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
-     * Check if replication needs to be resumed
-     * Return true replication needs to be resumed,
-     * false if we need to starting new or command log was disabled or
-     * there was no complete snapshot
+     * Check if actual recover is needed
+     * Return false if we need to start new,
+     * or command log is disabled,
+     * or there is no complete snapshot
      */
-   private boolean willResumeReplication()
+   private boolean willDoActualRecover()
    {
        return (m_config.m_startAction.doesRecover() &&
               (m_durable || getTerminusNonce() != null));
-
    }
     /**
      * recover the partition assignment from one of lost hosts in the same placement group for rejoin
@@ -4087,7 +4086,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             expectedClusterMembers.getSecond());
                 }
 
-                m_consumerDRGateway.initialize(m_config.m_startAction.doesRejoin() || willResumeReplication());
+                m_consumerDRGateway.initialize(m_config.m_startAction.doesRejoin() || willDoActualRecover());
             }
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),
