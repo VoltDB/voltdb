@@ -1040,6 +1040,10 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof MaterializedViewInfo) {
+            // ENG-10945 Allow materialized views to change the count star position they use dynamically.
+            if( field.equals("countStarColumnIndex") )
+                return null;
+
             if ( ! m_inStrictMatViewDiffMode) {
                 // Ignore differences to json fields that only reflect other underlying
                 // changes that are presumably checked and accepted/rejected separately.
