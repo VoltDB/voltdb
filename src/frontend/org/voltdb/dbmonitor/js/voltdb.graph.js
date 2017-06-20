@@ -405,7 +405,7 @@
 
         function updateLatencyAnalysis(){
             ChartLatencyAnalysis.update();
-            d3.selectAll(".nv-bar").on('click',
+            d3.selectAll("#chartLatencyAnalysis .nv-bar").on('click',
                 function(data){
                     $("#hidProcedureName").html(data.label);
                     $('#showAnalysisDetails').trigger("click");
@@ -439,7 +439,7 @@
                     .datum(dataLatencyAnalysis)
                     .transition().duration(350)
                     .call(ChartLatencyAnalysis);
-                nv.utils.windowResize(updateLatencyAnalysis);
+                nv.utils.windowResize(updateLatencyAnalysis());
                 return ChartLatencyAnalysis;
             });
 
