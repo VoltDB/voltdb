@@ -276,15 +276,20 @@ def generateInitNewClusterCommand(opts, killSet, files, new_cluster_deploy, newN
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s --schema={Schema File} --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                      '%s init --dir=%s --config=%s --schema=%s --classes%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                 opts.newRoot,
-                                                                os.path.join(opts.newRoot, new_cluster_deploy)))
+                                                                os.path.join(opts.newRoot, new_cluster_deploy),
+                                                                os.path.join(opts.newRoot, 'ddl.sql'),
+                                                                os.path.join(opts.newRoot, 'pro.jar')))
+                                                                
     if opts.newNode is not None:
         writeCommands(newNodeF,
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s --schema={Schema File} --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                      '%s init --dir=%s --config=%s --schema=%s --classes%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                 opts.newRoot,
-                                                                os.path.join(opts.newRoot, new_cluster_deploy)))
+                                                                os.path.join(opts.newRoot, new_cluster_deploy),
+                                                                os.path.join(opts.newRoot, 'ddl.sql'),
+                                                                os.path.join(opts.newRoot, 'pro.jar')))
 
 def generateInitOldClusterCommmand(opts, surviveSet, files, new_cluster_deploy, halfNodes, step):
     initNodes = 0
@@ -292,9 +297,11 @@ def generateInitOldClusterCommmand(opts, surviveSet, files, new_cluster_deploy, 
         initNodes += 1
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s --schema={Schema File} --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                      '%s init --dir=%s --config=%s --schema=%s --classes%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                 opts.newRoot,
-                                                                os.path.join(opts.newRoot, new_cluster_deploy)))
+                                                                os.path.join(opts.newRoot, new_cluster_deploy),
+                                                                os.path.join(opts.newRoot, 'ddl.sql'),
+                                                                os.path.join(opts.newRoot, 'pro.jar')))
         if initNodes == halfNodes:
             break
 
@@ -308,13 +315,12 @@ def generateStartNewClusterCommand(opts, killSet, hostcount, files, newNodeF, st
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: start new cluster' % step,
-                      "%s start --dir=%s -H %s -c %d --missing=%d --replication=%s\nPlease use proper port to avoid error" 
+                      "%s start --dir=%s -H %s -c %d --missing=%d\nPlease use proper port to avoid error" 
                                                                    % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                       opts.newRoot,
                                                                       ','.join(leadersString),
                                                                       hostcount,
-                                                                      hostcount / 2,
-                                                                      getHostnameOrIp(hostInfo).join(':').join(hostInfo.replication)
+                                                                      hostcount / 2
                                                                       ))
 
     if opts.newNode is not None:
