@@ -321,9 +321,9 @@ public class CatalogContext {
             return m_jarfile.writeToFile(catalog_file);
         } else if (catalog_file.exists() && !catalog_tmp_file.exists()) {
             // restart ?
-//            catalog_file.delete();
-//            return m_jarfile.writeToFile(catalog_file);
-            return null;
+            catalog_file.delete();
+            return m_jarfile.writeToFile(catalog_file);
+//            return null;
         } else {
             throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
                     + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists());

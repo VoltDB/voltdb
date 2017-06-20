@@ -3394,10 +3394,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 final ReplicationRole oldRole = getReplicationRole();
 
                 // DEBUG
-                hostLog.warn("<--------------------------------->");
-                hostLog.warn("currentTxnId: " + currentTxnId);
-                hostLog.warn("catalogContext txn Id: " + m_catalogContext.m_transactionId);
-                hostLog.warn(!m_txnIdToContextTracker.isEmpty());
+//                hostLog.warn("<--------------------------------->");
+//                hostLog.warn("currentTxnId: " + currentTxnId);
+//                hostLog.warn("catalogContext txn Id: " + m_catalogContext.m_transactionId);
+//                hostLog.warn(!m_txnIdToContextTracker.isEmpty());
 
                 m_statusTracker.setNodeState(NodeState.UPDATING);
                 // A site is catching up with catalog updates
@@ -3413,8 +3413,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
 
                     // DEBUG
-                    hostLog.warn("m_dispensedSites: " + contextTracker.m_dispensedSites);
-                    hostLog.warn("ttlsites: " + ttlsites);
+//                    hostLog.warn("m_dispensedSites: " + contextTracker.m_dispensedSites);
+//                    hostLog.warn("ttlsites: " + ttlsites);
 
                     return Pair.of( contextTracker.m_context, contextTracker.m_csp);
                 }
