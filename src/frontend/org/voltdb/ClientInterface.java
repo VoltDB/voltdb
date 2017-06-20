@@ -157,6 +157,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long NT_ADAPTER_CID                    = Long.MIN_VALUE + setBaseValue(5);
     public static final long INTERNAL_CID                      = Long.MIN_VALUE + setBaseValue(6);
 
+    private static final VoltLogger clog = new VoltLogger("CIHM");
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -947,9 +948,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     clientResponse.getStatusString() != null &&
                     clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
                 clientData = cihm.removeHandle(response.getClientInterfaceHandle());
+                if (clog.isDebugEnabled() && clientData == null) {
+                    clog.debug("Failed to removeHandle(), InitiateResponseMessage: " + response);
+                }
             }
             else {
                 clientData = cihm.findHandle(response.getClientInterfaceHandle());
+                if (clog.isDebugEnabled() && clientData == null) {
+                    clog.debug("Failed to findHandle(), InitiateResponseMessage: " + response);
+                }
             }
             if (clientData == null) {
                 return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
