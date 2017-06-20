@@ -33,6 +33,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -123,6 +124,7 @@ import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
@@ -1571,16 +1573,53 @@ public abstract class CatalogUtil {
             return;
         }
         List<String> streamList = new ArrayList<>();
+        List<ImportConfigurationType> kafkaConfigs = new ArrayList<>();
 
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
+
+            if (importConfiguration.getType().equals(ServerImportEnum.KAFKA)) {
+                kafkaConfigs.add(importConfiguration);
+            }
+
             if (!streamList.contains(importConfiguration.getModule())) {
                 streamList.add(importConfiguration.getModule());
             }
 
             checkImportProcessorConfiguration(importConfiguration);
+        }
+        validateKafkaConfig(kafkaConfigs);
+    }
+
+    private static void validateKafkaConfig(List<ImportConfigurationType> configs) {
+        if (configs.isEmpty()) {
+            return;
+        }
+
+        HashMap<String, HashSet<String>> groupidToTopics = new HashMap<>();
+        for (ImportConfigurationType config : configs) {
+            String groupid = "";
+            HashSet<String> topics = new HashSet<>();
+            for (PropertyType pt : config.getProperty()) {
+                if (pt.getName().equals("topics")) {
+                    topics.addAll(Arrays.asList(pt.getValue().split("\\s*,\\s*")));
+                } else if (pt.getName().equals("groupid")) {
+                    groupid = pt.getValue();
+                }
+            }
+            if (groupidToTopics.containsKey(groupid)) {
+                HashSet<String> union = new HashSet<>(groupidToTopics.get(groupid));
+                union.addAll(topics);
+                if (union.size() == topics.size() + groupidToTopics.get(groupid).size()) {
+                    groupidToTopics.put(groupid, union);
+                } else {
+                    VoltDB.crashLocalVoltDB("Two kafka configurations cannot have the same topic and groupid");
+                }
+            } else {
+                groupidToTopics.put(groupid, topics);
+            }
         }
     }
 
