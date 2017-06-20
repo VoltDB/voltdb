@@ -528,13 +528,14 @@ public class UpdateCore extends VoltSystemProcedure {
 
         // This is not really a good way
         // A temporary fix
-//        if (updateZK) {
-            ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
-            // update the global version. only one site per node will accomplish this.
-            // others will see there is no work to do and gracefully continue.
-            // then update data at the local site.
-            log.warn("XXXXXXXX Start updateCatalogToZK...");
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
+
+        CatalogAndIds currCatalog = CatalogUtil.getCatalogFromZK(zk);
+
+        // This means @UpdateCore is called from command log replay
+        // update the ZK first
+        if (currCatalog.version == expectedCatalogVersion ) {
             CatalogUtil.updateCatalogToZK(
                     zk,
                     expectedCatalogVersion + 1,
@@ -543,7 +544,7 @@ public class UpdateCore extends VoltSystemProcedure {
                     catalogBytes,
                     catalogHash,
                     deploymentBytes);
-//        }
+        }
 
         performCatalogUpdateWork(
                 catalogDiffCommands,
