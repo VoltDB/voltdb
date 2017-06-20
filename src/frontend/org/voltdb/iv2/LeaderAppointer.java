@@ -628,7 +628,7 @@ public class LeaderAppointer implements Promotable
                         final String split[] = replica.split("/");
                         final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                         final int hostId = CoreUtils.getHostIdFromHSId(hsId);
-                        if (failedHosts.contains(hostId)) {
+                        if (!failedHosts.contains(hostId)) {
                             Host host = hostLeaderMap.get(hostId);
                             if (host == null) {
                                 host = new Host(hostId);
