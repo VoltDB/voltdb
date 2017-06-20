@@ -1509,9 +1509,13 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
         // With view size limits in place, it's actually not possible
         // to delete all the rows from the source table
-        verifyStmtFails(client, "truncate table r6", "exceeds the size");
-        validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
-                new long[] {numSourceRows});
+        if (! isValgrind()) {
+            // This does not actually fail under valgrind, where we
+            // allocate memory differently.
+            verifyStmtFails(client, "truncate table r6", "exceeds the size");
+            validateTableOfScalarLongs(client, "select count(*) from (select id from r6 where id > -1000) as sel",
+                    new long[] {numSourceRows});
+        }
     }
 
     //
