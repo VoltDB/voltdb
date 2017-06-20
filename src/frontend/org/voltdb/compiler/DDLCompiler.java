@@ -1092,8 +1092,6 @@ public class DDLCompiler {
         char[] nchar = new char[1];
         @SuppressWarnings("synthetic-access")
         DDLStatement retval = new DDLStatement();
-        retval.lineNo = currLineNo;
-        retval.endLineNo = currLineNo;
 
         try {
 
@@ -1143,13 +1141,11 @@ public class DDLCompiler {
                 else {
                     retval.statement += nchar[0];
                     state = kStateReading;
-                    // Set the line number to the start of the real statement.
-                    retval.lineNo = currLineNo;
                     break;
                 }
             } while (true);
 
-            // start line number of statement
+            // Set the line number to the start of the real statement.
             retval.lineNo = currLineNo;
             retval.endLineNo = currLineNo;
 

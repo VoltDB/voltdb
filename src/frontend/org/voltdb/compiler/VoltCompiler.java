@@ -18,7 +18,6 @@
 package org.voltdb.compiler;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
@@ -123,7 +122,8 @@ public class VoltCompiler {
     private Map<String, ProcInfoData> m_procInfoOverrides = null;
 
     // Name of DDL file built by the DDL VoltCompiler from the catalog and added to the jar.
-    public static String AUTOGEN_DDL_FILE_NAME = "autogen-ddl.sql";
+    public static final String AUTOGEN_DDL_FILE_NAME = "autogen-ddl.sql";
+    public static final String CATLOG_REPORT = "catalog-report.html";
     // Environment variable used to verify that a catalog created from autogen-dll.sql is effectively
     // identical to the original catalog that was used to create the autogen-ddl.sql file.
     public static final boolean DEBUG_VERIFY_CATALOG = Boolean.valueOf(System.getenv().get("VERIFY_CATALOG_DEBUG"));
@@ -140,7 +140,6 @@ public class VoltCompiler {
     Set<String> m_importLines = null;
 
     // generated html text for catalog report
-    String m_report = null;
     String m_reportPath = null;
     static String m_canonicalDDL = null;
     Catalog m_catalog = null;
@@ -643,7 +642,8 @@ public class VoltCompiler {
         return true;
     }
 
-    private void generateCatalogReport(Catalog catalog, String ddlWithBatchSupport) throws IOException {
+    private static void generateCatalogReport(Catalog catalog, String ddl, boolean standaloneCompiler,
+            ArrayList<Feedback> warnings, InMemoryJarfile jarOutput) throws IOException {
         VoltDBInterface voltdb = VoltDB.instance();
         // try to get a catalog context
         CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
@@ -657,32 +657,12 @@ public class VoltCompiler {
             sitesPerHost =  voltdb.getCatalogContext().getNodeSettings().getLocalSitesCount();
         }
         boolean isPro = MiscUtils.isPro();
-
         long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
-        m_report = ReportMaker.report(catalog, minHeapRqt, isPro, hostcount,
-                sitesPerHost, kfactor, m_warnings, ddlWithBatchSupport);
-        m_reportPath = null;
-        File file = null;
 
-        // write to working dir when using VoltCompiler directly
-        if (standaloneCompiler) {
-            file = new File("catalog-report.html");
-        }
-        else {
-            // it's possible that standaloneCompiler will be false and catalogContext will be null in test code.
-            // if we have a context, write report to voltroot
-            if (catalogContext != null) {
-                file = new File(VoltDB.instance().getVoltDBRootPath(), "catalog-report.html");
-            }
-        }
-
-        // if there's a good place to write the report, do so
-        if (file != null) {
-            FileWriter fw = new FileWriter(file);
-            fw.write(m_report);
-            fw.close();
-            m_reportPath = file.getAbsolutePath();
-        }
+        String report = ReportMaker.report(catalog, minHeapRqt, isPro, hostcount, sitesPerHost, kfactor,
+                warnings, ddl);
+        // put the compiler report into the jarfile
+        jarOutput.put(CATLOG_REPORT, report.getBytes(Constants.UTF8ENCODING));
     }
 
     /**
@@ -734,7 +714,7 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            generateCatalogReport(m_catalog, ddlWithBatchSupport);
+            generateCatalogReport(m_catalog, ddlWithBatchSupport, standaloneCompiler, m_warnings, jarOutput);
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -758,8 +738,6 @@ public class VoltCompiler {
                 addBuildInfo(jarOutput);
             }
             jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
-            // put the compiler report into the jarfile
-            jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
         }
         catch (final Exception e) {
             e.printStackTrace();
@@ -1842,12 +1820,28 @@ public class VoltCompiler {
         }
     }
 
+    public static ProcInfoData constructProcInfoData(Procedure proc) {
+        ProcInfoData info = new ProcInfoData();
+        if (! proc.getSinglepartition()) {
+            return info;
+        }
+
+        String partitionTableName = proc.getPartitiontable().getTypeName();
+        String columnName = proc.getPartitioncolumn().getTypeName();
+        int partitionIndex = proc.getPartitionparameter();
+
+        info.singlePartition = proc.getSinglepartition();
+        info.partitionInfo = String.format("%s.%s:%d", partitionTableName, columnName, partitionIndex);
+        return info;
+    }
+
     /**
      * Compile the provided jarfile.  Basically, treat the jarfile as a staging area
      * for the artifacts to be included in the compile, and then compile it in place.
      *
      * @throws ClassNotFoundException
      * @throws VoltCompilerException
+     * @throws IOException
      *
      */
     public void compileInMemoryJarfileForUpdateClasses(InMemoryJarfile jarOutput,
@@ -1867,9 +1861,6 @@ public class VoltCompiler {
         // Get DDL from InMemoryJar
         byte[] ddlBytes = jarOutput.get(AUTOGEN_DDL_FILE_NAME);
         String canonicalDDL = new String(ddlBytes, Constants.UTF8ENCODING);
-
-        Map<String, String> ddlProcedurePartitionString =
-                ProcedureCompiler.getProcedurePartitioningInformation(canonicalDDL, this);
 
         try {
             CatalogMap<Procedure> procedures = db.getProcedures();
@@ -1916,9 +1907,8 @@ public class VoltCompiler {
                     procedure.setAnnotation(pa);
                 }
 
-                String ddlPartitionString = ddlProcedurePartitionString.get(className);
-                ProcInfoData info = ProcedureCompiler.checkPartitioningInfo(this, ddlPartitionString,
-                        className, pa, procClass);
+                // UpdateClasses can not change procedure partitioning information
+                ProcInfoData info = constructProcInfoData(procedure);
 
                 // if the procedure is non-transactional, then take this special path here
                 if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
@@ -1963,14 +1953,8 @@ public class VoltCompiler {
             throw e;
         }
 
-        // Build DDL from Catalog Data
-//        String ddlWithBatchSupport = CatalogSchemaTools.toSchema(catalog, m_importLines);
-//        m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
-
         // generate the catalog report and write it to disk
-        generateCatalogReport(catalog, canonicalDDL);
-
-        jarOutput.put(AUTOGEN_DDL_FILE_NAME, canonicalDDL.getBytes(Constants.UTF8ENCODING));
+        generateCatalogReport(catalog, canonicalDDL, standaloneCompiler, m_warnings, jarOutput);
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
@@ -1983,8 +1967,6 @@ public class VoltCompiler {
             addBuildInfo(jarOutput);
         }
         jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
-        // put the compiler report into the jarfile
-        jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
 
         assert(!hasErrors());
         if (hasErrors()) {

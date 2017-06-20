@@ -17,8 +17,6 @@
 
 package org.voltdb.compiler;
 
-import java.io.IOException;
-import java.io.Reader;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -26,8 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.regex.Matcher;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfo;
@@ -49,13 +45,11 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
-import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
@@ -158,7 +152,7 @@ public abstract class ProcedureCompiler {
         try {
             procInstance = (VoltProcedure) procClass.newInstance();
         } catch (InstantiationException | IllegalAccessException e) {
-            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
+            throw new RuntimeException("Error instantiating procedure " + procClass.getName(), e);
         }
         Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, procInstance, true);
         return stmtMap;
@@ -177,63 +171,6 @@ public abstract class ProcedureCompiler {
         String shortName = parts[parts.length - 1];
 
         return shortName;
-    }
-
-    public static Map<String, String> getProcedurePartitioningInformation(
-            String cannoicalDDL, VoltCompiler compiler) throws VoltCompilerException {
-        Map<String, String> procedureStringMap = new HashMap<String, String>();
-
-        Reader reader = new VoltCompilerStringReader(null, cannoicalDDL);
-        int currLineNo = 1;
-
-        DDLStatement stmt = DDLCompiler.getNextStatement(reader, compiler, currLineNo);
-        while(stmt != null) {
-            // Find create procedure statements
-            Matcher statementMatcher = SQLParser.matchCreateProcedureFromClass(stmt.statement);
-            if (! statementMatcher.matches()) {
-                stmt = DDLCompiler.getNextStatement(reader, compiler, stmt.endLineNo);
-                continue;
-            }
-
-            String className = statementMatcher.group(2);
-
-            // Parse the ALLOW and PARTITION clauses.
-            // Populate descriptor roles and returned partition data as needed.
-            Matcher matcher = SQLParser.matchAnyCreateProcedureStatementClause(statementMatcher.group(1));
-
-            StringBuffer sb = new StringBuffer();
-            int start = 0;
-            while (matcher.find(start)) {
-                start = matcher.end();
-
-                if (matcher.group(1) != null) {
-                    // it's an ALLOW clause, skip it
-                    continue;
-                }
-
-                String tableName = matcher.group(2);
-                String columnName = matcher.group(3);
-                String parameterNo = matcher.group(4);
-                if (parameterNo == null) {
-                    parameterNo = "0";
-                }
-
-                // construct the internal partition string
-                sb.append(tableName).append(".").append(columnName).append(":").append(parameterNo);
-                break;
-            }
-            procedureStringMap.put(className, sb.toString());
-
-            stmt = DDLCompiler.getNextStatement(reader, compiler, stmt.endLineNo);
-        };
-
-        try {
-            reader.close();
-        } catch (IOException e) {
-            throw compiler.new VoltCompilerException("Error closing schema file");
-        }
-
-        return procedureStringMap;
     }
 
     public static ProcInfoData checkPartitioningInfo(VoltCompiler compiler, String ddlPartitionString,

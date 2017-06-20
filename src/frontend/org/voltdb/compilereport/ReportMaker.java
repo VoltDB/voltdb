@@ -45,6 +45,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
@@ -1048,7 +1049,8 @@ public class ReportMaker {
     /**
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
-    public static String report(Catalog catalog, long minHeap, boolean isPro, int hostCount, int sitesPerHost, int kfactor, ArrayList<Feedback> warnings, String autoGenDDL) throws IOException {
+    public static String report(Catalog catalog, long minHeap, boolean isPro, int hostCount, int sitesPerHost,
+            int kfactor, ArrayList<Feedback> warnings, String autoGenDDL) throws IOException {
         // asynchronously get platform properties
         new Thread() {
             @Override
@@ -1146,7 +1148,7 @@ public class ReportMaker {
      * the built-in web portal.
      */
     public static String liveReport() {
-        byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("catalog-report.html");
+        byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar(VoltCompiler.CATLOG_REPORT);
         String report = new String(reportbytes, Charsets.UTF_8);
 
         // remove commented out code

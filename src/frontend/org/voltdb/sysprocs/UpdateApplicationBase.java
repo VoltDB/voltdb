@@ -18,7 +18,6 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
@@ -315,11 +314,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
     /**
      * @return NUll if no classes changed, otherwise return the update jar file.
+     *
      * @throws ClassNotFoundException
+     * @throws VoltCompilerException
      * @throws IOException
      */
     private static InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
-            InMemoryJarfile newJarfile, boolean isXDCR, HSQLInterface hsql) throws Exception
+            InMemoryJarfile newJarfile, boolean isXDCR, HSQLInterface hsql)
+                    throws IOException, ClassNotFoundException, VoltCompilerException
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
@@ -365,7 +367,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         VoltCompiler compiler = new VoltCompiler(isXDCR);
         try {
             compiler.compileInMemoryJarfileForUpdateClasses(jarfile, catalog, hsql);
-        } catch (Exception ex) {
+        } catch (ClassNotFoundException | VoltCompilerException | IOException ex) {
             throw ex;
         }
 
