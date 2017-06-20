@@ -101,8 +101,16 @@ function loadAnalysisPage(){
                 return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
             });
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
-                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP})
+                VoltDbAnalysis.latencyDetail[item.STATEMENT + '(' + item.PARTITION_ID + ')'] =
+                    {
+                        AVG: item.AVG_EXECUTION_TIME,
+                        MIN: item.MIN_EXECUTION_TIME,
+                        MAX: item.MAX_EXECUTION_TIME
+                    }
+
+                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP});
             });
+
             MonitorGraphUI.initializeProcedureDetailGraph();
         });
     }
@@ -116,7 +124,7 @@ function loadAnalysisPage(){
     iVoltDbAnalysis = (function(){
         this.procedureValue = {};
         this.latencyDetailValue = [];
-
+        this.latencyDetail = {};
         this.formatDateTime = function(timestamp) {
         var dateTime = new Date(timestamp);
         //get date

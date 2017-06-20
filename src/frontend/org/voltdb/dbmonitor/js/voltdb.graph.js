@@ -372,7 +372,7 @@
         }]
 
         var dataLatencyDetailAnalysis = [{
-            key: "Execution Time",
+            key: "Avg Execution Time",
             values: [],
             color: "rgb(118, 189, 29)"
         }]
@@ -405,7 +405,7 @@
 
         function updateLatencyAnalysis(){
             ChartLatencyAnalysis.update();
-            d3.selectAll(".nv-bar").on('click',
+            d3.selectAll("#chartLatencyAnalysis .nv-bar").on('click',
                 function(data){
                     $("#hidProcedureName").html(data.label);
                     $('#showAnalysisDetails').trigger("click");
@@ -440,7 +440,6 @@
                     .transition().duration(350)
                     .call(ChartLatencyAnalysis);
                 nv.utils.windowResize(updateLatencyAnalysis);
-
                 return ChartLatencyAnalysis;
             });
 

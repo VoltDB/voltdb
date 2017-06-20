@@ -617,7 +617,8 @@
                     return '';
                 }
                 var currentTime = d.value
-                if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
+
+                if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
                     currentTime = d.data.label.split(" ")[1]
                 var isPartitionIdleGraph = false
                 var table = d3.select(document.createElement("table"));
@@ -724,12 +725,12 @@
                     }
                 });
                 if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
+
                     var trowEnter1 = tbodyEnter.selectAll("tr")
                     .append("tr");
 
                     trowEnter1.append("td")
                     .html("AverageExecTime*Invocation")
-
                     trowEnter1.append("td")
                         .html((VoltDbAnalysis.procedureValue[d.data.label].AVG * VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS).toFixed(6) + " ms");
 
@@ -766,6 +767,30 @@
                             .html(VoltDbAnalysis.procedureValue[d.data.label].AVG.toFixed(6) + " ms");
                     }
                 }
+
+                if((d.series[0].key == "Avg Execution Time") && chartContainer == null){
+                    var trowEnter1 = tbodyEnter.selectAll("tr")
+                    .append("tr");
+
+                    trowEnter1.append("td")
+                    .html("Min Execution Time")
+
+                    trowEnter1.append("td")
+                        .html(VoltDbAnalysis.latencyDetail[d.data.label].MIN);
+
+                    var trowEnter2 = tbodyEnter
+                        .append("tr");
+
+                        trowEnter2.append("td")
+                        .html("Max Execution Time")
+
+                        trowEnter2.append("td")
+                            .html(VoltDbAnalysis.latencyDetail[d.data.label].MAX);
+
+                }
+
+
+
                 var html = table.node().outerHTML;
                 if (d.footer !== undefined)
                     html += "<div class='footer'>" + d.footer + "</div>";
