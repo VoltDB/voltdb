@@ -39,6 +39,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.SortedMap;
@@ -198,6 +199,7 @@ public abstract class CatalogUtil {
     private static boolean m_exportEnabled = false;
     public static final String CATALOG_FILE_NAME = "catalog.jar";
     public static final String STAGED_CATALOG_PATH = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
+    public static final String VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME = "voltdbbundlelocation";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -1311,6 +1313,24 @@ public abstract class CatalogUtil {
         public FormatterBuilder getFormatterBuilder() {
             return m_formatterBuilder;
         }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(m_moduleProps, m_formatterBuilder);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == this) {
+                return true;
+            }
+            if (!(o instanceof ImportConfiguration)) {
+                return false;
+            }
+            ImportConfiguration other = (ImportConfiguration) o;
+            return m_moduleProps.equals(other.m_moduleProps)
+                && m_formatterBuilder.equals(other.m_formatterBuilder);
+        }
     }
 
     private static String buildBundleURL(String bundle, boolean alwaysBundle) {
@@ -1325,7 +1345,7 @@ public abstract class CatalogUtil {
         String bundleUrl = bundle;
         if (is == null) {
             try {
-                String bundlelocation = System.getProperty("voltdbbundlelocation");
+                String bundlelocation = System.getProperty(VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
                 if (bundlelocation == null || bundlelocation.trim().length() == 0) {
                     String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
                     hostLog.info("Module base is: " + rpath + "/../bundles/");

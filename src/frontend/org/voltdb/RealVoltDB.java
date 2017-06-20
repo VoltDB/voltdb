@@ -350,6 +350,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     String m_terminusNonce = null;
 
+    // m_durable means commandlogging is enabled.
+    boolean m_durable = false;
+
     private int m_maxThreadsCount;
 
     @Override
@@ -1035,15 +1038,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            // durable means commandlogging is enabled.
-            boolean durable = readDeploymentAndCreateStarterCatalogContext(config);
+            m_durable = readDeploymentAndCreateStarterCatalogContext(config);
+
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
-                    && !config.m_forceVoltdbCreate && durable) {
+                    && !config.m_forceVoltdbCreate && m_durable) {
                 managedPathsEmptyCheck(config);
             }
             //If we are not durable and we are not rejoining we backup auto snapshots if present.
             //If terminus is present we will recover from shutdown save so dont move.
-            if (!durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
+            if (!m_durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
                 if (m_nodeSettings.clean()) {
                     String msg = "Archiving old snapshots to " + m_nodeSettings.getSnapshoth() +
                                  ".1 and starting an empty database." +
@@ -1225,7 +1228,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // do the many init tasks in the Inits class
-            Inits inits = new Inits(m_statusTracker, this, 1, durable);
+            Inits inits = new Inits(m_statusTracker, this, 1, m_durable);
             inits.doInitializationWork();
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
@@ -1356,7 +1359,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             (ProducerDRGateway) ndrgwConstructor.newInstance(
                                     new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
-                                    (m_config.m_startAction.doesRecover() && (durable || determination.terminusNonce != null)),
+                                    willDoActualRecover(),
                                     m_config.m_startAction.doesRejoin(),
                                     m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,
@@ -1568,6 +1571,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
+     * Check if actual recover is needed
+     * Return false if we need to start new,
+     * or command log is disabled,
+     * or there is no complete snapshot
+     */
+   private boolean willDoActualRecover()
+   {
+       return (m_config.m_startAction.doesRecover() &&
+              (m_durable || getTerminusNonce() != null));
+   }
+    /**
      * recover the partition assignment from one of lost hosts in the same placement group for rejoin
      * Use the placement group of the recovering host to find a matched host from the lost nodes in the topology
      * If the partition count from the lost node is the same as the site count of the recovering host,
@@ -1606,8 +1620,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // First check to make sure that the cluster still is viable before
                     // before allowing the fault log to be updated by the notifications
                     // generated below.
-                    Set<Integer> hostsOnRing = new HashSet<>();
-                    if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
+                    if (!m_leaderAppointer.isClusterKSafe(failedHosts)) {
                         VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
                                 false, null);
                         return;
@@ -2206,6 +2219,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void stageSchemaFiles(Configuration config) {
+        if (config.m_userSchema == null) {
+            return; // nothing to do
+        }
+        assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
 
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
@@ -2850,6 +2867,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clusterSettings.load(m_messenger.getZK());
             m_clusterSettings.get().store();
         } else if (m_myHostId == 0) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("Writing initial hostcount " +
+                               m_clusterSettings.get().getProperty(ClusterSettings.HOST_COUNT) +
+                               " to ZK");
+            }
             m_clusterSettings.store(m_messenger.getZK());
         }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
@@ -4064,7 +4086,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_consumerDRGateway.setInitialConversationMembership(expectedClusterMembers.getFirst(),
                             expectedClusterMembers.getSecond());
                 }
-                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
+
+                m_consumerDRGateway.initialize(m_config.m_startAction.doesRejoin() || willDoActualRecover());
             }
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),
