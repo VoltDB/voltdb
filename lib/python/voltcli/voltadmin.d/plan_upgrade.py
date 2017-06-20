@@ -174,26 +174,26 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
     leadersString = generateStartNewClusterCommand(runner.opts, killSet, hostcount, files, newNodeF, step)
 
     # 5 load schema into the new cluster
-    step += 1
-    writeCommands(files[getKey(killSet[0])], 'Step %d: load schema' % step, '#instruction# load schema into the new-version cluster')
+    #step += 1
+    #writeCommands(files[getKey(killSet[0])], 'Step %d: load schema' % step, '#instruction# load schema into the new-version cluster')
 
-    # 6 call 'voltadmin shutdown --wait' on the original cluster
+    # 5 call 'voltadmin shutdown --wait' on the original cluster
     step += 1
     generatePauseCommand(surviveSet[0], files, step)
 
-    # 7 kill the original cluster
+    # 6 kill the original cluster
     step += 1
     generateShutdownOriginClusterCommand(surviveSet[0], files, step)
 
-    # 8 run DR RESET on one node of the new cluster.
+    # 7 run DR RESET on one node of the new cluster.
     step += 1
     generateDRResetCommand(runner, surviveSet[0], killSet[0], clusterIds, files, step)
 
-    # 9 rejoin the nodes being shutdown recently to the new cluster
+    # 8 rejoin the nodes being shutdown recently to the new cluster
     step += 1
     generateNodeRejoinCommand(runner.opts, surviveSet, leadersString, files, hostcount / 2, step)
 
-    # 10 only for upgrading stand-alone cluster, disable the DR connection source for new cluster
+    # 9 only for upgrading stand-alone cluster, disable the DR connection source for new cluster
     if len(clusterIds) == 1:
         step += 1
         generateDisableDRConnectionCommand(runner.opts, surviveSet[0], files, post_upgrade_deploy, step)
@@ -245,6 +245,13 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
                 writeCommands(file,
                               'Step %d: copy deployment file' % step,
                               '%s#instruction# copy %s to %s' % (warningForDeploy, new_cluster_deploy, runner.opts.newRoot))
+    
+    # originally it is the 5th step - get all the ddl and scp to all machines
+    file.write('#instruction# get ddl file by using: voltdb get --output={path to dir} schema')
+    file.write('\n')
+    file.write('#instruction# scp the ddl to other machines')
+    file.write('\n')
+    
     newNodeF = None
     if runner.opts.newNode is not None:
         newNodeF = cStringIO.StringIO()
@@ -252,6 +259,7 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
         writeCommands(newNodeF,
                       'Step %d: copy deployment file' % step,
                       '#instruction# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
+
     return files, newNodeF
 
 def generateStopNodeCommand(hosts, survivor, killSet, files, step):
@@ -268,13 +276,13 @@ def generateInitNewClusterCommand(opts, killSet, files, new_cluster_deploy, newN
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                      '%s init --dir=%s --config=%s --schema={Schema File} --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                 opts.newRoot,
                                                                 os.path.join(opts.newRoot, new_cluster_deploy)))
     if opts.newNode is not None:
         writeCommands(newNodeF,
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                      '%s init --dir=%s --config=%s --schema={Schema File} --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                 opts.newRoot,
                                                                 os.path.join(opts.newRoot, new_cluster_deploy)))
 
@@ -284,7 +292,7 @@ def generateInitOldClusterCommmand(opts, surviveSet, files, new_cluster_deploy, 
         initNodes += 1
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                      '%s init --dir=%s --config=%s --schema={Schema File} --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                 opts.newRoot,
                                                                 os.path.join(opts.newRoot, new_cluster_deploy)))
         if initNodes == halfNodes:
@@ -300,12 +308,14 @@ def generateStartNewClusterCommand(opts, killSet, hostcount, files, newNodeF, st
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: start new cluster' % step,
-                      "%s start --dir=%s -H %s -c %d --missing=%d" % (os.path.join(opts.newKit, 'bin/voltdb'),
+                      "%s start --dir=%s -H %s -c %d --missing=%d --replication=%s\nPlease use proper port to avoid error" 
+                                                                   % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                       opts.newRoot,
                                                                       ','.join(leadersString),
                                                                       hostcount,
-                                                                      hostcount / 2))
-
+                                                                      hostcount / 2,
+                                                                      getHostnameOrIp(hostInfo).join(':').join(hostInfo.replication)
+                                                                      ))
 
     if opts.newNode is not None:
         writeCommands(newNodeF,
