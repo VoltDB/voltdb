@@ -591,38 +591,44 @@ public class LeaderAppointer implements Promotable
         final long statTs = System.currentTimeMillis();
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
-            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
+            if (pid == MpInitiator.MP_INIT_PID) continue;
+
             try {
+                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
+
                 // The data of the partition dir indicates whether the partition has finished
                 // initializing or not. If not, the replicas may still be in the process of
                 // adding themselves to the dir. So don't check for k-safety if that's the case.
                 byte[] partitionState = dataCallbacks.poll().getData();
-                boolean isInitializing = false;
+                boolean isInitialized = true;
+                assert(partitionState != null && partitionState.length == 1);
                 if (partitionState != null && partitionState.length == 1) {
-                    isInitializing = partitionState[0] == LeaderElector.INITIALIZING;
+                    isInitialized = partitionState[0] == LeaderElector.INITIALIZED;
                 }
 
                 List<String> replicas = childrenCallbacks.poll().getChildren();
-                if (pid == MpInitiator.MP_INIT_PID) continue;
-                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
-                if (!isInitializing && replicas.isEmpty()) {
-                    //These partitions can fail, just cleanup and remove the partition from the system
+                if (isInitialized && replicas.isEmpty()) {
+                    // The replicas may still be in the process of adding themselves to the dir.
+                    // So don't check for k-safety if that's the case.
                     if (partitionNotOnHashRing) {
                         removeAndCleanupPartition(pid);
                         continue;
                     }
                     tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
                     retval = false;
-                } else if (!partitionNotOnHashRing) {
-                    //Record host ids for all partitions that are on the ring
-                    //so they are considered for partition detection
+                }
+
+                //if a partition is not on hash ring or not initialized, go to next
+                if (partitionNotOnHashRing || !isInitialized) continue;
+
+                //if a partition is on hash ring, go through its partition leader assignment.
+                //masters cache is not empty only on the appointer with master LeaderCache started.
+                if (failedHosts != null && !masters.isEmpty()) {
                     for (String replica : replicas) {
                         final String split[] = replica.split("/");
                         final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                         final int hostId = CoreUtils.getHostIdFromHSId(hsId);
-
-                        //The appointer with master LeaderCache started.
-                        if (failedHosts != null && !masters.isEmpty() && !(failedHosts.contains(hostId))) {
+                        if (failedHosts.contains(hostId)) {
                             Host host = hostLeaderMap.get(hostId);
                             if (host == null) {
                                 host = new Host(hostId);
@@ -632,24 +638,25 @@ public class LeaderAppointer implements Promotable
                         }
                     }
                 }
-                if (!isInitializing && !partitionNotOnHashRing) {
-                    lackingReplication.add(
-                            new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size())
-                            );
-                }
-            }
-            catch (Exception e) {
+                // update k-safety statistics for initialized partitions
+                // the missing partition count may be incorrect if the failed hosts contain any of the replicas?
+                lackingReplication.add(new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size()));
+            } catch (Exception e) {
+                String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
+        // update the statistics
+        m_stats.setSafetySet(lackingReplication.build());
 
         //calculate partition leaders when RealVoltDB.hostsFailed in invoked.
         if (!hostLeaderMap.isEmpty() && failedHosts != null) {
             for (Map.Entry<Integer, Long> entry: masters.entrySet()) {
-
+                Integer pid = entry.getKey();
+                Long hsId = entry.getValue();
                 //ignore MPI
-                if (entry.getKey() == MpInitiator.MP_INIT_PID) continue;
-                int hostId = CoreUtils.getHostIdFromHSId(entry.getValue());
+                if (pid == MpInitiator.MP_INIT_PID) continue;
+                int hostId = CoreUtils.getHostIdFromHSId(hsId);
 
                 //ignore the failed hosts
                 if (failedHosts.contains(hostId)) continue;
@@ -660,11 +667,11 @@ public class LeaderAppointer implements Promotable
                 }
 
                 host.increasePartitionLeader();
-                host.addPartition(entry.getKey());
+                host.addPartition(pid);
             }
             determinePartitionLeaders(hostLeaderMap);
         }
-        m_stats.setSafetySet(lackingReplication.build());
+
         return retval;
     }
 
