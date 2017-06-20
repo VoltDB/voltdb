@@ -138,7 +138,10 @@ def getNumberProcessors(config):
     return np
 
 def makeCommandString(config):
-    target='build'
+    target=''
+    cmdstr = None
+    if config.build:
+        target += ' build'
     if config.install:
         target += ' install'
     if config.buildtests:
@@ -147,7 +150,8 @@ def makeCommandString(config):
         target += ' voltdbipc'
     if config.runalltests:
         target += ' build-tests'
-    cmdstr = "%s %s" % (makeGeneratorCommand(config), target)
+    if len(target) > 0:
+        cmdstr = "%s %s" % (makeGeneratorCommand(config), target)
     return cmdstr
 
 def runCommand(commandStr, config):
@@ -189,9 +193,10 @@ if not os.path.exists('CMakeCache.txt'):
 # Do the actual build.
 #
 buildCmd = makeCommandString(config)
-if not runCommand(buildCmd, config):
-    print("Build command \"%s\" failed." % buildCmd)
-    sys.exit(100)
+if buildCmd:
+    if not runCommand(buildCmd, config):
+        print("Build command \"%s\" failed." % buildCmd)
+        sys.exit(100)
 
 #
 # Do testing if requested.
