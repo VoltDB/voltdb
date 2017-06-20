@@ -26,9 +26,18 @@ function loadAnalysisPage(){
     function calculateCombinedValue(profileData){
         var totalValue = 0;
         for(var j = 0; j < profileData.length; j++){
-            totalValue += (profileData[j].AVG/100000000) * profileData[j].INVOCATIONS;
+            totalValue += (profileData[j].AVG/1000000) * profileData[j].INVOCATIONS;
         }
         return totalValue;
+    }
+
+    function checkObjForLongProcedureName(profileData){
+        for(var j = 0; j < profileData.length; j++){
+            if(profileData[j].PROCEDURE.length > 28){
+                return true;
+            }
+        }
+        return false;
     }
 
     function fetchData (){
@@ -51,7 +60,7 @@ function loadAnalysisPage(){
             }
             //order the procedure by  their (avg_exec_time * #of invocation) value
             profileData["PROCEDURE_PROFILE"].sort(function(a,b) {return ((b.AVG * b.INVOCATIONS) > (a.AVG * a.INVOCATIONS)) ? 1 : (((a.AVG * a.INVOCATIONS) > (b.AVG * b.INVOCATIONS)) ? -1 : 0);} );
-
+            var containLongName = checkObjForLongProcedureName(profileData["PROCEDURE_PROFILE"])
             var dataLatency = [];
             var dataFrequency = [];
             var dataCombined = [];
@@ -60,17 +69,22 @@ function loadAnalysisPage(){
             for(var i = 0; i < profileData["PROCEDURE_PROFILE"].length; i++){
                 if(i == 0)
                     timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
-                var combinedWeight = ((profileData["PROCEDURE_PROFILE"][i].AVG/100000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS)/sumOfAllProcedure;
-                VoltDbAnalysis.procedureValue[profileData["PROCEDURE_PROFILE"][i].PROCEDURE] =
+
+                var combinedWeight = (((profileData["PROCEDURE_PROFILE"][i].AVG/1000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS)/sumOfAllProcedure) * 100;
+                var procedureName = profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
+                if(containLongName)
+                    procedureName = "(" + (i + 1) + ") " + profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
+
+                VoltDbAnalysis.procedureValue[procedureName] =
                     {
-                        AVG: profileData["PROCEDURE_PROFILE"][i].AVG/100000000,
+                        AVG: profileData["PROCEDURE_PROFILE"][i].AVG/1000000,
                         INVOCATIONS: profileData["PROCEDURE_PROFILE"][i].INVOCATIONS,
                         COMBINED: combinedWeight
                     }
-                dataLatency.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE , "value": profileData["PROCEDURE_PROFILE"][i].AVG/100000000})
 
-                dataFrequency.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE, "value": profileData["PROCEDURE_PROFILE"][i].INVOCATIONS})
-                dataCombined.push({"label": profileData["PROCEDURE_PROFILE"][i].PROCEDURE, "value": combinedWeight})
+                dataLatency.push({"label": procedureName , "value": profileData["PROCEDURE_PROFILE"][i].AVG/1000000})
+                dataFrequency.push({"label": procedureName, "value": profileData["PROCEDURE_PROFILE"][i].INVOCATIONS})
+                dataCombined.push({"label": procedureName, "value": combinedWeight})
             }
             var formatDate = VoltDbAnalysis.formatDateTime(timestamp);
             $("#analysisDate").html(formatDate);

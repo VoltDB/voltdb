@@ -420,8 +420,8 @@
         this.initializeAnalysisGraph = function(){
             nv.addGraph(function() {
                 ChartLatencyAnalysis.x(function(d) {
-                    if(d.label.length > 20)
-                        return d.label.substring(0,20) + ".."
+                    if(d.label.length > 28)
+                        return d.label.substring(0,28) + ".."
                     return  d.label
                   })
                   .y(function(d) { return d.value }).height(barHeight)
@@ -434,31 +434,32 @@
                 ChartLatencyAnalysis.xAxis
                     .axisLabelDistance(10)
                 ChartLatencyAnalysis.yAxis.axisLabelDistance(10)
-                ChartLatencyAnalysis.margin({"left":150, "right":50})
+                ChartLatencyAnalysis.margin({"left":174, "right":50})
                 d3.select('#visualiseLatencyAnalysis')
                     .datum(dataLatencyAnalysis)
                     .transition().duration(350)
                     .call(ChartLatencyAnalysis);
                 nv.utils.windowResize(updateLatencyAnalysis);
+
                 return ChartLatencyAnalysis;
             });
 
             nv.addGraph(function() {
                 ChartFrequencyAnalysis.x(function(d) {
-                    if(d.label.length > 20)
-                        return d.label.substring(0,20) + ".."
+                    if(d.label.length > 28)
+                        return d.label.substring(0,28) + ".."
                     return  d.label
                   }).y(function(d) { return d.value }).height(barHeight)
                   .showValues(true);
 
                 $("#chartFrequencyAnalysis").css("height", barHeight-10)
-                ChartFrequencyAnalysis.valueFormat(d3.format(',.2f'));
+                ChartFrequencyAnalysis.valueFormat(d3.format(',.0d'));
                 ChartFrequencyAnalysis.yAxis
-                    .tickFormat(d3.format(',.2f'));
+                    .tickFormat(d3.format(',.0d'));
                 ChartFrequencyAnalysis.xAxis
                     .axisLabelDistance(10)
                 ChartFrequencyAnalysis.yAxis.axisLabelDistance(10)
-                ChartFrequencyAnalysis.margin({"left":150, "right":50})
+                ChartFrequencyAnalysis.margin({"left":174, "right":50})
                 d3.select('#visualiseFrequencyAnalysis')
                     .datum(dataFrequencyAnalysis)
                     .transition().duration(350)
@@ -470,8 +471,8 @@
 
             nv.addGraph(function() {
                 ChartCombinedAnalysis.x(function(d) {
-                    if(d.label.length > 20)
-                        return d.label.substring(0,20) + ".."
+                    if(d.label.length > 28)
+                        return d.label.substring(0,28) + ".."
                     return  d.label
                   }).y(function(d) { return d.value }).height(barHeight)
                   .showValues(true);
@@ -483,7 +484,7 @@
                 ChartCombinedAnalysis.xAxis
                     .axisLabelDistance(10)
                 ChartCombinedAnalysis.yAxis.axisLabelDistance(10)
-                ChartCombinedAnalysis.margin({"left":150, "right":50})
+                ChartCombinedAnalysis.margin({"left":174, "right":50})
                 d3.select('#visualiseCombinedAnalysis')
                     .datum(dataCombinedAnalysis)
                     .transition().duration(350)

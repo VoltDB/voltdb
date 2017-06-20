@@ -618,7 +618,7 @@
                 }
                 var currentTime = d.value
                 if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
-                    currentTime = d.data.label
+                    currentTime = d.data.label.split(" ")[1]
                 var isPartitionIdleGraph = false
                 var table = d3.select(document.createElement("table"));
                 if (headerEnabled) {
@@ -658,7 +658,12 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        unit = ''
+                        if(d.series[0].key == "Execution Time")
+                            unit = " ms"
+                        else if(d.series[0].key == "Frequency")
+                            unit = ""
+                        else
+                            unit = " %"
                     }
                     else {
                         unit = '%';
@@ -697,7 +702,7 @@
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
                 } else if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
                     trowEnter.append("td")
-                        .html(function (p, i) { return (d.series[0].key != "Frequency" ? p.value.toFixed(6) : p.value.toFixed(2))+ unit });
+                        .html(function (p, i) { return (d.series[0].key != "Frequency" ? p.value.toFixed(6) : p.value)+ unit });
                 } else {
                     trowEnter.append("td")
                         .classed("value", true)
@@ -726,7 +731,7 @@
                     .html("AverageExecTime*Invocation")
 
                     trowEnter1.append("td")
-                        .html((VoltDbAnalysis.procedureValue[d.data.label].AVG * VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS).toFixed(6));
+                        .html((VoltDbAnalysis.procedureValue[d.data.label].AVG * VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS).toFixed(6) + " ms");
 
                     if(d.series[0].key != "Frequency"){
                         var trowEnter2 = tbodyEnter
@@ -736,7 +741,7 @@
                         .html("Frequency")
 
                         trowEnter2.append("td")
-                            .html(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS.toFixed(2));
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS);
                     }
 
                     if(d.series[0].key != "Combined"){
@@ -747,7 +752,7 @@
                         .html("Combined")
 
                         trowEnter3.append("td")
-                            .html(VoltDbAnalysis.procedureValue[d.data.label].COMBINED.toFixed(6));
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].COMBINED.toFixed(6) + " %");
                     }
 
                     if(d.series[0].key != "Execution Time"){
@@ -758,7 +763,7 @@
                         .html("Execution Time")
 
                         trowEnter4.append("td")
-                            .html(VoltDbAnalysis.procedureValue[d.data.label].AVG.toFixed(6));
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].AVG.toFixed(6) + " ms");
                     }
                 }
                 var html = table.node().outerHTML;
