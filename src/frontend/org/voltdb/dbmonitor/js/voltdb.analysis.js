@@ -41,6 +41,7 @@ function loadAnalysisPage(){
     }
 
     function fetchData (){
+        $("#analysisLoader").show();
         refreshChart();
         voltDbRenderer.GetProcedureProfileInformation(function(profileData){
             if(profileData != undefined){
@@ -56,8 +57,8 @@ function loadAnalysisPage(){
                 }
                 $("#tblAnalyzeNowContent").hide();
                 $("#tblNoDataContent").show();
-
             }
+            $("#analysisLoader").hide();
             //order the procedure by  their (avg_exec_time * #of invocation) value
             profileData["PROCEDURE_PROFILE"].sort(function(a,b) {return ((b.AVG * b.INVOCATIONS) > (a.AVG * a.INVOCATIONS)) ? 1 : (((a.AVG * a.INVOCATIONS) > (b.AVG * b.INVOCATIONS)) ? -1 : 0);} );
             var containLongName = checkObjForLongProcedureName(profileData["PROCEDURE_PROFILE"])
