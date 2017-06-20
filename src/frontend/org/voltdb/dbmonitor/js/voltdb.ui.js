@@ -2389,12 +2389,8 @@ var loadPage = function (serverName, portid) {
 
     $("#showAnalysisDetails").popup({
         open: function (event, ui, ele)  {
-            var procedureName = $("#hidProcedureName").html();
-            var procedure = '';
-            if(procedureName != undefined){
-                procedure = procedureName.split(' ')[1];
-            }
-            $("#procedureName").html(procedure);
+            var procedureName = $("#hidProcedureName").html().split(' ')[1];
+            $("#procedureName").html(procedureName);
              //filter specific procedure calls from list of datas
             var procDetails = [];
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
