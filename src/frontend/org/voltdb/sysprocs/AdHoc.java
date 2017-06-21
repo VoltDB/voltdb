@@ -21,15 +21,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
@@ -172,6 +176,43 @@ public class AdHoc extends AdHocNTBase {
         // case for @CatalogChangeResult
         if (ccr.encodedDiffCommands.trim().length() == 0) {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
+        }
+
+        // Write the new catalog to a temporary jar file
+        CompletableFuture<Map<Integer,ClientResponse>> cf =
+                                                      callNTProcedureOnAllHosts(
+                                                      "@WriteCatalog",
+                                                      ccr.encodedDiffCommands,
+                                                      ccr.catalogHash,
+                                                      ccr.catalogBytes,
+                                                      ccr.expectedCatalogVersion,
+                                                      ccr.deploymentString,
+                                                      ccr.tablesThatMustBeEmpty,
+                                                      ccr.reasonsForEmptyTables,
+                                                      ccr.requiresSnapshotIsolation ? 1 : 0,
+                                                      ccr.worksWithElastic ? 1 : 0,
+                                                      ccr.deploymentHash,
+                                                      ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                                                      ccr.hasSchemaChange ?  1 : 0,
+                                                      ccr.requiresNewExportGeneration ? 1 : 0);
+
+        Map<Integer, ClientResponse>  map = null;
+        try {
+            map = cf.get();
+        } catch (InterruptedException | ExecutionException e) {
+            hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
+            // Revert the changes in ZooKeeper
+            throw new VoltAbortException(e);
+        }
+
+        if (map != null) {
+            for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
+                if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
+                    hostLog.warn("A response from one host for writing the catalog jar has failed.");
+                    throw new VoltAbortException("A response from host " + entry.getKey() +
+                                                 " for writing the catalog jar has failed.");
+                }
+            }
         }
 
         return callProcedure("@UpdateCore",

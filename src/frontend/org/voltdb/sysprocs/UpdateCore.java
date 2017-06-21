@@ -358,10 +358,10 @@ public class UpdateCore extends VoltSystemProcedure {
 
             String replayInfo = m_runner.getTxnState().isForReplay() ? " (FOR REPLAY)" : "";
 
-            log.warn("============== UpdateCore PlanFragment ==============");
-            log.warn("context cat ver: " + context.getCatalogVersion());
-            log.warn("expected cat ver: " + expectedCatalogVersion);
-            log.warn("=====================================================");
+//            log.warn("============== UpdateCore PlanFragment ==============");
+//            log.warn("context cat ver: " + context.getCatalogVersion());
+//            log.warn("expected cat ver: " + expectedCatalogVersion);
+//            log.warn("=====================================================");
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
@@ -526,6 +526,9 @@ public class UpdateCore extends VoltSystemProcedure {
                                    throws Exception
     {
         assert(tablesThatMustBeEmpty != null);
+
+//        log.warn("=================== UpdateCore ===================");
+
 
         // This is not really a good way
         // A temporary fix

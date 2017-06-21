@@ -313,6 +313,8 @@ public class CatalogContext {
     {
         File catalog_file = new VoltFile(path, name);
         File catalog_tmp_file = new VoltFile(path, name + ".tmp");
+//        hostLog.warn("path: " + path + ", name: " + name);
+//        hostLog.warn(m_jarfile.firstKey());
         if (catalog_file.exists() && catalog_tmp_file.exists())
         {
             // This means a @UpdateCore case, the asynchronous writing of
@@ -326,11 +328,10 @@ public class CatalogContext {
             // by @UAC, @UpdateClasses, etc.
             return m_jarfile.writeToFile(catalog_file);
         } else if (catalog_file.exists() && !catalog_tmp_file.exists()) {
-            // This may happen during cluster recover step, when the latest catalog
-            // jar file stays still, and @UpdateCore is called during initialization
-            // or command log recover. I assume the catalog jar is the latest before
-            // shutdown, so it does not need to be updated.
-            return null;
+            // This may happen during cluster recover step, in this case
+            // we must overwrite the file (the file may have been changed)
+            catalog_file.delete();
+            return m_jarfile.writeToFile(catalog_file);
         } else {
             throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
                     + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists());

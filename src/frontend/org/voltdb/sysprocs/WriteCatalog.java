@@ -57,8 +57,9 @@ public class WriteCatalog extends UpdateApplicationBase {
 //        }
 
 //        log.warn("=================== WriteCatalog ===================");
-//        log.warn("zk cat ver: " + catalogStuff.version);
 //        log.warn("expected cat version: " +  expectedCatalogVersion);
+//        log.warn(catalogDiffCommands);
+//        log.warn(deploymentString);
 //        log.warn("====================================================");
 
         // This should only be called once on each host
@@ -74,9 +75,6 @@ public class WriteCatalog extends UpdateApplicationBase {
                   requireCatalogDiffCmdsApplyToEE != 0,
                   hasSchemaChange != 0,
                   requiresNewExportGeneration != 0);
-
-        hostLog.warn("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
-        hostLog.warn("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 
         return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update finished locally.");
     }
