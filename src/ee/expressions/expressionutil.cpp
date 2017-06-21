@@ -352,6 +352,10 @@ operatorFactory(ExpressionType et,
          ret = new OperatorExistsExpression(lc);
          break;
 
+     case (EXPRESSION_TYPE_OPERATOR_UNARY_MINUS):
+         ret = new OperatorUnaryMinusExpression(lc);
+         break;
+
      case (EXPRESSION_TYPE_OPERATOR_MOD):
        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "Mod operator is not yet supported.");
@@ -556,6 +560,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_OPERATOR_NOT):
     case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
     case (EXPRESSION_TYPE_OPERATOR_EXISTS):
+    case (EXPRESSION_TYPE_OPERATOR_UNARY_MINUS):
         ret = operatorFactory(et, lc, rc);
     break;
 
