@@ -23,11 +23,14 @@
 
 package org.voltdb.catalog;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.net.URL;
 
-import junit.framework.TestCase;
-
+import org.junit.Test;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
@@ -39,6 +42,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb_testprocs.catalog.resourceuse.UseResourceProc;
@@ -46,7 +50,7 @@ import org.voltdb_testprocs.catalog.resourceuse.UseResourceProc;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 
-public class TestResourcesInUpdateClasses extends TestCase {
+public class TestResourcesInUpdateClasses extends JUnit4LocalClusterTest {
 
     private Pair<File, String> buildJarFile(byte[] rawCatalog, String resourceFileVersion) throws Exception {
         // turn it into an in memory JarFile
@@ -64,6 +68,7 @@ public class TestResourcesInUpdateClasses extends TestCase {
         return Pair.of(jarPath, resourceContentsString);
     }
 
+    @Test
     public void testBasic() throws Exception {
         // create a catalog jarfile with one class, the UseResourceProc
         CatalogBuilder builder = new CatalogBuilder();
