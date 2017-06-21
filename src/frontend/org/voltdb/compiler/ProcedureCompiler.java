@@ -270,10 +270,8 @@ public abstract class ProcedureCompiler {
         VoltProcedure procInstance;
         try {
             procInstance = (VoltProcedure) procClass.newInstance();
-        } catch (InstantiationException e) {
-            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
+        } catch (InstantiationException | IllegalAccessException e) {
+            throw new RuntimeException(String.format("Error instantiating procedure \"%s\"", procClass.getName()), e);
         }
         Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, procInstance, true);
 
@@ -566,10 +564,8 @@ public abstract class ProcedureCompiler {
 
         try {
             procClass.newInstance();
-        } catch (InstantiationException e) {
-            throw new RuntimeException("Error instantiating procedure \"" + procClass.getName() + "\"", e);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Error instantiating procedure \"" + procClass.getName() + "\"", e);
+        } catch (InstantiationException | IllegalAccessException e) {
+            throw new RuntimeException(String.format("Error instantiating procedure \"%s\"", procClass.getName()), e);
         }
 
         // find the run() method and get the params

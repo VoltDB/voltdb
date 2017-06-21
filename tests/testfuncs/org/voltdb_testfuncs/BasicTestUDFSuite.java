@@ -23,7 +23,7 @@
 
 package org.voltdb_testfuncs;
 
-public class IntFunction {
+public class BasicTestUDFSuite {
 
     public int constantIntFunction() {
         return 0;

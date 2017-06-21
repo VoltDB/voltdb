@@ -150,7 +150,8 @@ public:
 
         m_engine->setBuffers(m_parameter_buffer.get(), m_smallBufferSize,
                              m_per_fragment_stats_buffer.get(), m_smallBufferSize,
-                             NULL, 0,
+                             NULL, 0, // the UDF buffer
+                             NULL, 0, // the first result buffer
                              m_result_buffer.get(), m_resultBufferSize,
                              m_exception_buffer.get(), m_smallBufferSize);
         m_engine->resetReusedResultOutputBuffer();

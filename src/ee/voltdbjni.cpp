@@ -502,11 +502,13 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
  * @return error code
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBuffers
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jobject parameter_buffer, jint parameter_buffer_size,
-   jobject per_fragment_stats_buffer, jint per_fragment_stats_buffer_size,
-   jobject first_result_buffer, jint first_result_buffer_size,
-   jobject next_result_buffer, jint next_result_buffer_size,
-   jobject exception_buffer, jint exception_buffer_size)
+  (JNIEnv *env, jobject obj, jlong engine_ptr,
+    jobject parameter_buffer,          jint parameter_buffer_size,
+    jobject per_fragment_stats_buffer, jint per_fragment_stats_buffer_size,
+    jobject udf_buffer,                jint udf_buffer_size,
+    jobject first_result_buffer,       jint first_result_buffer_size,
+    jobject next_result_buffer,        jint next_result_buffer_size,
+    jobject exception_buffer,          jint exception_buffer_size)
 {
     VOLT_DEBUG("nativeSetBuffers() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -525,6 +527,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
                 env->GetDirectBufferAddress(per_fragment_stats_buffer));
         int perFragmentStatsBufferCapacity = per_fragment_stats_buffer_size;
 
+        char *udfBuffer = reinterpret_cast<char*>(
+                 env->GetDirectBufferAddress(udf_buffer));
+        int udfBufferCapacity = udf_buffer_size;
+
         char *firstReusedResultBuffer = reinterpret_cast<char*>(
                 env->GetDirectBufferAddress(first_result_buffer));
         int firstReusedResultBufferCapacity = first_result_buffer_size;
@@ -537,11 +543,12 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
                  env->GetDirectBufferAddress(exception_buffer));
         int exceptionBufferCapacity = exception_buffer_size;
 
-        engine->setBuffers(parameterBuffer, parameterBufferCapacity,
-                perFragmentStatsBuffer, perFragmentStatsBufferCapacity,
-                firstReusedResultBuffer, firstReusedResultBufferCapacity,
-                nextReusedResultBuffer, nextReusedResultBufferCapacity,
-                exceptionBuffer, exceptionBufferCapacity);
+        engine->setBuffers(parameterBuffer,         parameterBufferCapacity,
+                           perFragmentStatsBuffer,  perFragmentStatsBufferCapacity,
+                           udfBuffer,               udfBufferCapacity,
+                           firstReusedResultBuffer, firstReusedResultBufferCapacity,
+                           nextReusedResultBuffer,  nextReusedResultBufferCapacity,
+                           exceptionBuffer,         exceptionBufferCapacity);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }

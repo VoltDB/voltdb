@@ -86,6 +86,9 @@ public:
      */
     field_map_iter end() const;
 
+    // Get the path of this catalog map.
+    std::string path() const;
+
     /**
      * Clear the map. Does no destruction.
      */
@@ -163,6 +166,11 @@ typename std::map<std::string, T*>::const_iterator CatalogMap<T>::end() const {
 template <class T>
 void CatalogMap<T>::clear() {
     m_items.clear();
+}
+
+template <class T>
+std::string CatalogMap<T>::path() const {
+    return m_path;
 }
 
 } // namespace catalog
