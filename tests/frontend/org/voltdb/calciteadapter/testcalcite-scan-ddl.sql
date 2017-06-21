@@ -6,6 +6,12 @@ create table R1 (
     f float not null,
     v varchar(32));
 
+create table RI1 (
+    i integer PRIMARY KEY,
+    si smallint
+);
+
+
 create table R2 (
     i integer,
     si smallint,

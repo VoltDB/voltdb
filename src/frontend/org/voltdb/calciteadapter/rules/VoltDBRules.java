@@ -35,7 +35,7 @@ import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendPullUpRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBJoinSendPullUpRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
-import org.voltdb.calciteadapter.rules.rel.VoltDBSortScanMergeRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBSortSeqScanMergeRule;
 
 public class VoltDBRules {
     //public static final ConverterRule PROJECT_RULE = new VoltDBProjectRule();
@@ -62,8 +62,7 @@ public class VoltDBRules {
                 , VoltDBCalcScanMergeRule.INSTANCE
                 , VoltDBCalcJoinMergeRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
-                , VoltDBSortScanMergeRule.INSTANCE  // Inline LIMIT/OFFSET
-//                , VoltDBFilterScanMergeRule.INSTANCE
+                , VoltDBSortSeqScanMergeRule.INSTANCE
 
                 // Convert rules
                 , VoltDBProjectRule.INSTANCE

@@ -38,7 +38,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
 import org.voltdb.calciteadapter.rel.VoltDBSend;
-import org.voltdb.calciteadapter.rel.VoltDBTableScan;
+import org.voltdb.calciteadapter.rel.VoltDBTableSeqScan;
 import org.voltdb.catalog.Column;
 import org.voltdb.utils.CatalogUtil;
 
@@ -117,7 +117,8 @@ public class VoltDBTable implements TranslatableTable {
     @Override
     public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
         RelOptCluster cluster = context.getCluster();
-        RelNode node = new VoltDBTableScan(cluster, relOptTable, this);
+        // Start with conservatively with a Sequential Scan
+        RelNode node = new VoltDBTableSeqScan(cluster, relOptTable, this);
         RelDataType rowType = node.getRowType();
 
         if (! getCatTable().getIsreplicated()) {

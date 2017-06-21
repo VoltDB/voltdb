@@ -27,7 +27,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.util.Pair;
 import org.voltdb.calciteadapter.RelConverter;
 import org.voltdb.calciteadapter.RexConverter;
@@ -97,10 +96,8 @@ public class VoltDBSort extends Sort implements VoltDBRel {
                 opn = new OrderByPlanNode();
 
                 // Convert ORDER BY Calcite expressions to VoltDB
-                RexShuttle rexShuttle = new RexShuttle();
-                List<RexNode> exprList = rexShuttle.apply(fieldExps);
                 List<AbstractExpression> voltExprList = new ArrayList<>();
-                for (RexNode expr : exprList) {
+                for (RexNode expr : fieldExps) {
                     AbstractExpression voltExpr = RexConverter.convert(expr);
                     voltExprList.add(voltExpr);
                 }
