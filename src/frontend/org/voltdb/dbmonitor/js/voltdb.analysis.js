@@ -69,7 +69,7 @@ function loadAnalysisPage(){
                 var combinedWeight = (((profileData["PROCEDURE_PROFILE"][i].AVG/1000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS)/sumOfAllProcedure) * 100;
                 var procedureName = profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
                 if(containLongName)
-                    procedureName = "(" + (i + 1) + ") " + profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
+                    procedureName =(i + 1) + ") " + profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
 
                 VoltDbAnalysis.procedureValue[procedureName] =
                     {
