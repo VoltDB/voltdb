@@ -591,7 +591,6 @@ public class LeaderAppointer implements Promotable
         final long statTs = System.currentTimeMillis();
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
-            if (pid == MpInitiator.MP_INIT_PID) continue;
 
             try {
                 // The data of the partition dir indicates whether the partition has finished
@@ -612,6 +611,7 @@ public class LeaderAppointer implements Promotable
                 final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
 
                 List<String> replicas = childrenCallbacks.poll().getChildren();
+                if (pid == MpInitiator.MP_INIT_PID) continue;
                 if (replicas.isEmpty()) {
                     if (partitionNotOnHashRing) {
                         // no replica for the new partition, clean it up
