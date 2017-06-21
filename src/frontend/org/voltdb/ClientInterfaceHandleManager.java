@@ -296,7 +296,8 @@ public class ClientInterfaceHandleManager
         PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
             // whoa, bad
-            tmLog.error("Unable to find handle list for partition: " + partitionId);
+            tmLog.error("Unable to find handle list for partition: " + partitionId +
+                ", client interface handle: " + ciHandle);
             return null;
         }
 
@@ -365,7 +366,8 @@ public class ClientInterfaceHandleManager
         PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
             // whoa, bad
-            tmLog.error("Unable to find handle list for partition: " + partitionId);
+            tmLog.error("Unable to find handle list for removal for partition: " + partitionId +
+                    ", client interface handle: " + ciHandle);
             return null;
         }
 

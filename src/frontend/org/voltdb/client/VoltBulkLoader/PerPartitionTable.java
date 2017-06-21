@@ -224,13 +224,13 @@ public class PerPartitionTable {
             ProcedureCallback callback = new ProcedureCallback() {
                 @Override
                 public void clientCallback(ClientResponse response) throws Exception {
-                    row.m_loader.m_loaderCompletedCnt.incrementAndGet();
-                    row.m_loader.m_outstandingRowCount.decrementAndGet();
-
                     //one insert at a time callback
                     if (response.getStatus() != ClientResponse.SUCCESS) {
                         row.m_loader.m_notificationCallBack.callback(row.m_rowHandle, row.m_rowData, response);
                     }
+
+                    row.m_loader.m_loaderCompletedCnt.incrementAndGet();
+                    row.m_loader.m_outstandingRowCount.decrementAndGet();
                 }
             };
 
