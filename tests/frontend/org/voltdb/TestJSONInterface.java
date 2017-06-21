@@ -124,7 +124,7 @@ import junit.framework.TestCase;
 public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
             ContentType.create("application/x-www-form-urlencoded","UTF-8");
-    
+
     private static final Set<Integer> HANDLED_CLIENT_ERRORS = new HashSet<>();
 
     static {
