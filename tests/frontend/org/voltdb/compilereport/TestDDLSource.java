@@ -31,6 +31,7 @@ import java.nio.file.Paths;
 import java.util.UUID;
 
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -51,7 +52,9 @@ public class TestDDLSource extends TestCase{
             VoltCompiler vc = new VoltCompiler(true, false); // trick it into behaving like standalone
             boolean success = vc.compileFromDDL(jarName, ddlName);
             assertTrue("Catalog compilation failed!", success);
-            report = new String(Files.readAllBytes(Paths.get("catalog-report.html")), Charsets.UTF_8);
+
+            InMemoryJarfile jarfile = new InMemoryJarfile(Files.readAllBytes(Paths.get(jarName)));
+            report = new String(jarfile.get(VoltCompiler.CATLOG_REPORT), Charsets.UTF_8);
         }
         catch (Exception e) {
         }
