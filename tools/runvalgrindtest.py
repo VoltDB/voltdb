@@ -5,8 +5,9 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 class XMLFile(object):
-    def __init__(self, xmlfile):
+    def __init__(self, xmlfile, expecterrors):
         self.xmlfile = xmlfile
+        self.expecterrors = expecterrors
 
     def printStack(self, stack):
         idx = 0
@@ -40,6 +41,8 @@ class XMLFile(object):
         print(':---------------------------------------------------:')
         print(':----------- Valgrind Failure Report ---------------:')
         print(':---------------------------------------------------:')
+        if self.expecterrors:
+            print(':------------- Unexpected Success ------------------:');
         tree = ET.parse(self.xmlfile)
         root = tree.getroot()
         exe=root.findall('.//argv/exe')
@@ -53,15 +56,26 @@ class XMLFile(object):
         
 if __name__ == '__main__':
     xmlfile = None
+    arg = sys.argv[1]
+    expectfail=False
+    expected_status = 0
+    if arg == '--expect-fail=true':
+        expectfail=True
+        sys.argv.pop(1)
+        expected_status = 1
+    elif arg == '--expect-fail=false':
+        expectfail=False
+        sys.argv.pop(1)
+        expected_status = 0
     for arg in sys.argv:
         if arg.startswith('--xml-file='):
             xmlfile=arg[11:]
             break
     testReturnStatus = subprocess.call(sys.argv[1:], shell=False)
-    if xmlfile and testReturnStatus == 0:
+    if xmlfile and testReturnStatus == expected_status:
         os.remove(xmlfile)
         sys.exit(0)
     else:
         if xmlfile:
-            XMLFile(xmlfile).printErrors()
+            XMLFile(xmlfile, expectfail).printErrors()
     sys.exit(testReturnStatus)

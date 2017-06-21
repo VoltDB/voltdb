@@ -856,12 +856,18 @@ function(JOIN VALUES GLUE OUTPUT)
   set (${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
 endfunction()
 
-FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD OUTPUT_VAR)
+FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD WILL_FAIL OUTPUT_VAR)
   SET(SUPPRESSIONS ${CMAKE_SOURCE_DIR}/${VOLTDB_EE_TEST_DIR}/test_utils/vdbsuppressions.supp)
+  IF ( WILL_FAIL )
+    SET(FAIL_ARG --expect-fail=true)
+  ELSE()
+    SET(FAIL_ARG --expect-fail=false)
+  FI
   IF (${IS_VALGRIND_BUILD})
     VALGRIND_FILE_NAME(${TARGET_DIR} ${TARGET_NAME} VGFN)
     SET(CMD_LIST
       ${CMAKE_SOURCE_DIR}/tools/runvalgrindtest.py
+      ${FAIL_ARG}
       "/usr/bin/env"
       "valgrind"
       "--leak-check=full"
@@ -937,13 +943,6 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     # Calculate the actual test command.
     #
     SET(TARGET_EXE_CMD ${CMAKE_BINARY_DIR}/${TEST_OUTPUT_NAME})
-    # If we are running a valgrind test, then calculate the
-    # valgrind command.
-    VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} VALGRIND_EXE_CMD)
-    PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD)
-    ADD_TEST(NAME ${CTEST_TEST_NAME}
-      WORKING_DIRECTORY ${VOLTDB_TEST_WORKING_DIR}
-      COMMAND ${CTEST_EXE_CMD})
     #
     # We expect all the memleak tests to fail, except for
     # the test no_losses.  It's possible, but not obvious,
@@ -960,6 +959,13 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
       ENDIF()
     ELSE()
     ENDIF()
+    # If we are running a valgrind test, then calculate the
+    # valgrind command.
+    VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} ${WILL_FAIL} VALGRIND_EXE_CMD)
+    PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD)
+    ADD_TEST(NAME ${CTEST_TEST_NAME}
+      WORKING_DIRECTORY ${VOLTDB_TEST_WORKING_DIR}
+      COMMAND ${CTEST_EXE_CMD})
     SET_TESTS_PROPERTIES(${CTEST_TEST_NAME}
       PROPERTIES
       DEPENDS Configure-${CTEST_TEST_NAME}
@@ -970,5 +976,5 @@ ENDFOREACH()
 
 ADD_CUSTOM_TARGET(run-all-tests
   DEPENDS build-tests
-  COMMAND ctest --output-on-fail -j 4
+  COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ctest -j 4
   )
