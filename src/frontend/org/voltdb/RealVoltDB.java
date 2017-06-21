@@ -328,6 +328,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // should be able to always get a valid context without needing this lock.
     private final Object m_catalogUpdateLock = new Object();
 
+    private final Object m_writeCatalogJarLock = new Object();
+
     // add a random number to the sampler output to make it likely to be unique for this process.
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
     private final AtomicBoolean m_hasStartedSampler = new AtomicBoolean(false);
@@ -3346,31 +3348,33 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 boolean hasSchemaChange,
                 boolean requiresNewExportGeneration)
     {
-        if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
-            hostLog.fatal("Failed catalog update." +
-                    " expectedCatalogVersion: " + expectedCatalogVersion +
-                    " currentTxnId: " + currentTxnId +
-                    " currentTxnUniqueId: " + currentTxnUniqueId +
-                    " m_catalogContext.catalogVersion " + m_catalogContext.catalogVersion);
+        synchronized (m_writeCatalogJarLock) {
+            if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
+                hostLog.fatal("Failed catalog update." +
+                        " expectedCatalogVersion: " + expectedCatalogVersion +
+                        " currentTxnId: " + currentTxnId +
+                        " currentTxnUniqueId: " + currentTxnUniqueId +
+                        " m_catalogContext.catalogVersion " + m_catalogContext.catalogVersion);
 
-            throw new RuntimeException("Trying to update main catalog context with diff " +
-                    "commands generated for an out-of date catalog. Expected catalog version: " +
-                    expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
+                throw new RuntimeException("Trying to update main catalog context with diff " +
+                        "commands generated for an out-of date catalog. Expected catalog version: " +
+                        expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
+            }
+
+            CatalogContext temp_catalogContext =
+                    m_catalogContext.update(
+                            currentTxnId,
+                            currentTxnUniqueId,
+                            newCatalogBytes,
+                            catalogBytesHash,
+                            diffCommands,
+                            false,
+                            deploymentBytes,
+                            m_messenger,
+                            hasSchemaChange);
+
+            new ConfigLogging().logCatalogAndDeployment(temp_catalogContext);
         }
-
-        CatalogContext temp_catalogContext =
-                m_catalogContext.update(
-                        currentTxnId,
-                        currentTxnUniqueId,
-                        newCatalogBytes,
-                        catalogBytesHash,
-                        diffCommands,
-                        false,
-                        deploymentBytes,
-                        m_messenger,
-                        hasSchemaChange);
-
-        new ConfigLogging().logCatalogAndDeployment(temp_catalogContext);
     }
 
     // TODO: check any other usages of catalogUpdate and update if necessary

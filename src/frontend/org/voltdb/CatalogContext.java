@@ -334,7 +334,8 @@ public class CatalogContext {
             return m_jarfile.writeToFile(catalog_file);
         } else {
             throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
-                    + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists());
+                    + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists() +
+                    "\nPlease make such changes synchronously from a single " + "connection to the cluster.");
         }
     }
 
@@ -350,7 +351,12 @@ public class CatalogContext {
             m_jarfile.writeToFile(catalog_tmp_file);
         } else {
             throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
-                    + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists());
+                    + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists() +
+                    "\n" + "Invalid catalog update.  Catalog or deployment change was planned " +
+                    "against one version of the cluster while the previous one is ongoing.  This is likely " +
+                    "the result of multiple concurrent attempts to change the cluster " +
+                    "configuration.  Please make such changes synchronously from a single " +
+                    "connection to the cluster.");
         }
     }
 
