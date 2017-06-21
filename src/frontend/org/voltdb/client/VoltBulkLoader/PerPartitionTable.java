@@ -19,8 +19,10 @@ package org.voltdb.client.VoltBulkLoader;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -79,9 +81,11 @@ public class PerPartitionTable {
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
     class PartitionProcedureCallback implements ProcedureCallback {
         final List<VoltBulkLoaderRow> m_batchRowList;
+        final Map<VoltBulkLoader, Long> m_batchSizes;
 
-        PartitionProcedureCallback(List<VoltBulkLoaderRow> batchRowList) {
+        PartitionProcedureCallback(List<VoltBulkLoaderRow> batchRowList, Map<VoltBulkLoader, Long> batchSizes) {
             m_batchRowList = batchRowList;
+            m_batchSizes = batchSizes;
         }
 
         // Called by Client to inform us of the status of the bulk insert.
@@ -101,8 +105,10 @@ public class PerPartitionTable {
                 });
             }
             else {
-                m_batchRowList.get(0).m_loader.m_loaderCompletedCnt.addAndGet(m_batchRowList.size());
-                m_batchRowList.get(0).m_loader.m_outstandingRowCount.addAndGet(-1 * m_batchRowList.size());
+                for (Map.Entry<VoltBulkLoader, Long> e : m_batchSizes.entrySet()) {
+                    e.getKey().m_loaderCompletedCnt.addAndGet(e.getValue());
+                    e.getKey().m_outstandingRowCount.addAndGet(-1 * e.getValue());
+                }
             }
         }
     }
@@ -224,6 +230,8 @@ public class PerPartitionTable {
     private PartitionProcedureCallback buildTable() {
         ArrayList<VoltBulkLoaderRow> buf = new ArrayList<VoltBulkLoaderRow>(m_minBatchTriggerSize);
         m_partitionRowQueue.drainTo(buf, m_minBatchTriggerSize);
+
+        Map<VoltBulkLoader, Long> batchSizes = new HashMap<>();
         ListIterator<VoltBulkLoaderRow> it = buf.listIterator();
         while (it.hasNext()) {
             VoltBulkLoaderRow currRow = it.next();
@@ -243,9 +251,14 @@ public class PerPartitionTable {
                 continue;
             }
             table.addRow(row_args);
+
+            Long prevValue;
+            if ((prevValue = batchSizes.put(loader, 1L)) != null) {
+                batchSizes.put(loader, prevValue + 1);
+            }
         }
 
-        return new PartitionProcedureCallback(buf);
+        return new PartitionProcedureCallback(buf, batchSizes);
     }
 
     private void loadTable(ProcedureCallback callback, VoltTable toSend) throws Exception {
