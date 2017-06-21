@@ -63,6 +63,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -94,6 +95,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
@@ -132,6 +134,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.FormatterBuilder;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -2674,5 +2677,35 @@ public abstract class CatalogUtil {
             paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
         }
         return deployment;
+    }
+
+    /*
+     * Print procedure detail, such as statement text, frag id and json plan.
+     *
+     * @Param proc  Catalog procedure
+     */
+    public static String printProcedureDetail(Procedure proc, String sqlText) {
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        StringBuilder sb = new StringBuilder();
+        sb.append("Procedure:" + proc.getTypeName()).append("\n");
+        for (Statement stmt : proc.getStatements()) {
+            // compute hash for determinism check
+            crc.reset();
+            crc.update(sqlText.getBytes(Constants.UTF8ENCODING));
+            int hash = (int) crc.getValue();
+            sb.append("Statement Hash: ").append(hash);
+            sb.append(", Statement SQL: ").append(sqlText);
+            for (PlanFragment frag : stmt.getFragments()) {
+                byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
+                long planId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                String stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
+                byte[] jsonPlan = ActivePlanRepository.planForFragmentId(planId);
+                sb.append("Plan Stmt Text:").append(stmtText);
+                sb.append(", Plan Fragment Id:").append(planId);
+                sb.append(", Json Plan:").append(new String(jsonPlan));
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 }
