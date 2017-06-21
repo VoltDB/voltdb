@@ -594,8 +594,6 @@ public class LeaderAppointer implements Promotable
             if (pid == MpInitiator.MP_INIT_PID) continue;
 
             try {
-                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
-
                 // The data of the partition dir indicates whether the partition has finished
                 // initializing or not. If not, the replicas may still be in the process of
                 // adding themselves to the dir. So don't check for k-safety if that's the case.
@@ -606,20 +604,29 @@ public class LeaderAppointer implements Promotable
                     isInitialized = partitionState[0] == LeaderElector.INITIALIZED;
                 }
 
-                List<String> replicas = childrenCallbacks.poll().getChildren();
-                if (isInitialized && replicas.isEmpty()) {
+                if (!isInitialized) {
                     // The replicas may still be in the process of adding themselves to the dir.
                     // So don't check for k-safety if that's the case.
+                    continue;
+                }
+                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
+
+                List<String> replicas = childrenCallbacks.poll().getChildren();
+                if (replicas.isEmpty()) {
                     if (partitionNotOnHashRing) {
+                        // no replica for the new partition, clean it up
                         removeAndCleanupPartition(pid);
                         continue;
                     }
                     tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
                     retval = false;
+                } else if (partitionNotOnHashRing) {
+                    //if a partition is not on hash ring
+                    // The replicas may still be in the process of adding themselves to the dir.
+                    continue;
                 }
 
-                //if a partition is not on hash ring or not initialized, go to next
-                if (partitionNotOnHashRing || !isInitialized) continue;
+                assert(!partitionNotOnHashRing);
 
                 //if a partition is on hash ring, go through its partition leader assignment.
                 //masters cache is not empty only on the appointer with master LeaderCache started.
