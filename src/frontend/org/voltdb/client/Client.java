@@ -24,7 +24,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 
-import org.voltdb.client.VoltBulkLoader.BulkLoaderCallback;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /**
@@ -430,8 +430,8 @@ public interface Client {
      * @return instance of VoltBulkLoader
      * @throws Exception if tableName can't be found in the catalog.
      */
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderCallback callback) throws Exception;
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderCallback callback) throws Exception;
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack callback) throws Exception;
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack callback) throws Exception;
 
     /**
      * <p>

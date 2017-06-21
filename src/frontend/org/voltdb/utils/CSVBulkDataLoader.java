@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.VoltBulkLoader.BulkLoaderCallback;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.ImportSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
@@ -59,7 +59,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
         m_loader.flush();
     }
 
-    public class CsvFailureCallback implements BulkLoaderCallback {
+    public class CsvFailureCallback implements BulkLoaderFailureCallBack {
         @Override
         public void callback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             if (response.getStatus() == ClientResponse.SUCCESS) {

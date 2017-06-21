@@ -44,7 +44,7 @@ import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
-import org.voltdb.client.VoltBulkLoader.BulkLoaderCallback;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
@@ -1006,7 +1006,7 @@ public final class ClientImpl implements Client {
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderCallback blfcb) throws Exception
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack blfcb) throws Exception
     {
         synchronized(m_vblGlobals) {
             return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, blfcb);
@@ -1014,7 +1014,7 @@ public final class ClientImpl implements Client {
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderCallback callback) throws Exception
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack callback) throws Exception
     {
         synchronized(m_vblGlobals) {
             return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, callback);

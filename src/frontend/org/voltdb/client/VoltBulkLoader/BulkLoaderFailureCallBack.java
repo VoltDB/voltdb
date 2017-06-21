@@ -27,7 +27,7 @@ import org.voltdb.client.ClientResponse;
  * appropriate conversion for a given object can be found given corresponding
  * column data type, a constraint violation is found.
  */
-public interface BulkLoaderCallback {
+public interface BulkLoaderFailureCallBack {
 
     /**
      * <p>Invoked by the VoltBulkLoader when a insertRow() is processed.</p>

@@ -67,7 +67,7 @@ public class VoltBulkLoader {
     // Flag to indicate to use upsert instead of insert
     final boolean m_upsert;
     // Callback used to notify users of failed row inserts
-    final BulkLoaderCallback m_notificationCallBack;
+    final BulkLoaderFailureCallBack m_notificationCallBack;
     //Array of PerPartitionTables from which this VoltBulkLoader chooses to put a row in
     PerPartitionTable[] m_partitionTable = null;
     //Index in m_partitionTable of first partition
@@ -110,11 +110,11 @@ public class VoltBulkLoader {
 
     // Constructor allocated through the Client to ensure consistency of VoltBulkLoaderGlobals
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize,
-            BulkLoaderCallback blfcb) throws Exception {
+            BulkLoaderFailureCallBack blfcb) throws Exception {
         this(vblGlobals,tableName,maxBatchSize,false,blfcb);
     }
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
-                BulkLoaderCallback callback) throws Exception {
+                BulkLoaderFailureCallBack callback) throws Exception {
         this.m_clientImpl = vblGlobals.m_clientImpl;
         this.m_maxBatchSize = maxBatchSize;
         this.m_notificationCallBack = callback;
