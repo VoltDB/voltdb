@@ -1015,11 +1015,11 @@ public class CatalogDiffEngine {
             return true;
         }
 
-        if (suspect instanceof Table ||
+        if (suspect instanceof Table || suspect instanceof TableRef ||
                 suspect instanceof Column || suspect instanceof ColumnRef ||
                 suspect instanceof Index || suspect instanceof IndexRef ||
                 suspect instanceof Constraint || suspect instanceof ConstraintRef ||
-                suspect instanceof MaterializedViewInfo) {
+                suspect instanceof MaterializedViewInfo || suspect instanceof MaterializedViewHandlerInfo) {
             return true;
         }
 

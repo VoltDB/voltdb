@@ -310,7 +310,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 long uniqueId = m_runner.getUniqueId();
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
                 context.updateCatalog(commands, p.getFirst(), p.getSecond(),
-                        requiresSnapshotIsolation, uniqueId, spHandle, hasSchemaChange);
+                        requiresSnapshotIsolation, uniqueId, spHandle, requireCatalogDiffCmdsApplyToEE);
 
                 if (log.isDebugEnabled()) {
                     log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
