@@ -702,7 +702,9 @@ public abstract class CatalogUtil {
             validateDeployment(catalog, deployment);
 
             // add our hacky Deployment to the catalog
-            catalog.getClusters().get("cluster").getDeployment().add("deployment");
+            if (catalog.getClusters().get("cluster").getDeployment().get("deployment") == null) {
+                catalog.getClusters().get("cluster").getDeployment().add("deployment");
+            }
 
             // set the cluster info
             setClusterInfo(catalog, deployment);
@@ -763,7 +765,10 @@ public abstract class CatalogUtil {
     private static void setCommandLogInfo(Catalog catalog, CommandLogType commandlog) {
         int fsyncInterval = 200;
         int maxTxnsBeforeFsync = Integer.MAX_VALUE;
-        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().add("log");
+        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
+        if (config == null) {
+            config = catalog.getClusters().get("cluster").getLogconfig().add("log");
+        }
 
         Frequency freq = commandlog.getFrequency();
         if (freq != null) {
@@ -1155,8 +1160,10 @@ public abstract class CatalogUtil {
                                           Deployment catDeployment)
     {
         // Create catalog Systemsettings
-        Systemsettings syssettings =
-            catDeployment.getSystemsettings().add("systemsettings");
+        Systemsettings syssettings = catDeployment.getSystemsettings().get("systemsettings");
+        if (syssettings == null) {
+            syssettings = catDeployment.getSystemsettings().add("systemsettings");
+        }
 
         syssettings.setTemptablemaxsize(deployment.getSystemsettings().getTemptables().getMaxsize());
         syssettings.setSnapshotpriority(deployment.getSystemsettings().getSnapshot().getPriority());
@@ -1524,7 +1531,10 @@ public abstract class CatalogUtil {
 
 
             for (String name: processorProperties.stringPropertyNames()) {
-                ConnectorProperty prop = catconn.getConfig().add(name);
+                ConnectorProperty prop = catconn.getConfig().get(name);
+                if (prop == null) {
+                    prop = catconn.getConfig().add(name);
+                }
                 prop.setName(name);
                 prop.setValue(processorProperties.getProperty(name));
             }
@@ -1631,7 +1641,10 @@ public abstract class CatalogUtil {
      */
     private static void setSnapshotInfo(Catalog catalog, SnapshotType snapshotSettings) {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        SnapshotSchedule schedule = db.getSnapshotschedule().add("default");
+        SnapshotSchedule schedule = db.getSnapshotschedule().get("default");
+        if (schedule == null) {
+            schedule = db.getSnapshotschedule().add("default");
+        }
         schedule.setEnabled(snapshotSettings.isEnabled());
         String frequency = snapshotSettings.getFrequency();
         if (!frequency.endsWith("s") &&
@@ -1879,7 +1892,10 @@ public abstract class CatalogUtil {
                 // throw exception disable user with invalid masked password
                 throw new RuntimeException("User \"" + user.getName() + "\" has invalid masked password in deployment file");
             }
-            org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
+            org.voltdb.catalog.User catUser = db.getUsers().get(user.getName());
+            if (catUser == null) {
+                catUser = db.getUsers().add(user.getName());
+            }
 
             // generate salt only once for sha1 and sha256
             String saltGen = BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr);
@@ -1899,7 +1915,10 @@ public abstract class CatalogUtil {
                 final Group catalogGroup = db.getGroups().get(role);
                 // if the role doesn't exist, ignore it.
                 if (catalogGroup != null) {
-                    final GroupRef groupRef = catUser.getGroups().add(role);
+                    GroupRef groupRef = catUser.getGroups().get(role);
+                    if (groupRef == null) {
+                        groupRef = catUser.getGroups().add(role);
+                    }
                     groupRef.setGroup(catalogGroup);
                 }
                 else {
