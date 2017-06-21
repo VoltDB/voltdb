@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -48,7 +47,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     private final String m_insertProcedure;
     private final VoltType[] m_columnTypes;
     private final BulkLoaderErrorHandler m_errHandler;
-    private final ExecutorService m_es;
+    private final ExecutorService m_callbackExecutor;
 
     final AtomicLong m_processedCount = new AtomicLong(0);
     final AtomicLong m_failedCount = new AtomicLong(0);
@@ -85,9 +84,9 @@ public class CSVTupleDataLoader implements CSVDataLoader {
         public void clientCallback(final ClientResponse response) throws Exception {
             byte status = response.getStatus();
             if (status == ClientResponse.SUCCESS) {
-                if (m_csvLine instanceof ImportSuccessCallback) {
+                if (m_callbackExecutor != null && m_csvLine instanceof ImportSuccessCallback) {
                     // If the client is keeping track of offsets, notify it (but run on a service thread)
-                    m_es.execute(new Runnable() {
+                    m_callbackExecutor.execute(new Runnable() {
                         @Override
                         public void run() {
                             m_csvLine.success(response);
@@ -110,10 +109,16 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler)
             throws IOException, ProcCallException
     {
+        this(client, procName, errHandler, null);
+    }
+
+    public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler, ExecutorService callbackExecutor)
+            throws IOException, ProcCallException
+    {
         m_client = client;
         m_insertProcedure = procName;
         m_errHandler = errHandler;
-        m_es = CoreUtils.getSingleThreadExecutor(procName + "-" + Thread.currentThread().getName());
+        m_callbackExecutor = callbackExecutor;
 
         List<VoltType> typeList = Lists.newArrayList();
         VoltTable procInfo = client.callProcedure("@SystemCatalog", "PROCEDURECOLUMNS").getResults()[0];

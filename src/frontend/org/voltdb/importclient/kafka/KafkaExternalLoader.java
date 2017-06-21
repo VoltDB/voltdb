@@ -39,6 +39,7 @@ import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -77,6 +78,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private ExecutorService m_executorService = null;
+    private ExecutorService m_callbackExecutor = null;
 
     public KafkaExternalLoader(KafkaExternalLoaderCLIArguments config) {
         m_config = config;
@@ -110,8 +112,12 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         List<String> hostPorts = m_config.getVoltHosts();
         m_client = getVoltClient(c_config, hostPorts);
 
+        // Create an executor on which to run the success callback:
+        String procName = (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table) + "-callbackproc";
+        m_callbackExecutor = CoreUtils.getSingleThreadExecutor(procName + "-" + Thread.currentThread().getName());
+
         if (m_config.useSuppliedProcedure) {
-            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback());
+            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback(), m_callbackExecutor);
         } else {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batchsize, m_config.update, new KafkaBulkLoaderCallback());
         }
@@ -434,6 +440,11 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
             m_executorService.shutdownNow();
             m_executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
             m_executorService = null;
+        }
+        if (m_callbackExecutor != null) {
+            m_callbackExecutor.shutdownNow();
+            m_callbackExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            m_callbackExecutor = null;
         }
     }
 
