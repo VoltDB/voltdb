@@ -1902,9 +1902,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             logDeployment();
         }
 
-        // This is not really efficient
-        // For now it's just a temporary fix
-        // Only write to a temporary jar
+        // Write the catalog to to a temporary jar file (e.g. "catalog.jar.tmp")
         private void logCatalogAndDeployment(CatalogContext cc) {
             File configInfoDir = getConfigDirectory();
             configInfoDir.mkdirs();
@@ -3331,7 +3329,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         new HashMap<>();
 
     /*
-     * Write the catalog jar, this is supposed to be a
+     * Write the catalog jar to a temporary jar file, this function
+     * is supposed to be called in an NT proc
      */
     @Override
     public void writeCatalogJar(

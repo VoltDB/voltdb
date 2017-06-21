@@ -315,22 +315,31 @@ public class CatalogContext {
         File catalog_tmp_file = new VoltFile(path, name + ".tmp");
         if (catalog_file.exists() && catalog_tmp_file.exists())
         {
+            // This means a @UpdateCore case, the asynchronous writing of
+            // jar file has finished, rename the jar file
             catalog_tmp_file.renameTo(catalog_file);
             return null;
         } else if (!catalog_file.exists() && !catalog_tmp_file.exists()) {
+            // This happens in the beginning of cluster startup / restart,
+            // when the catalog jar does not yet exist. Though the contents
+            // written might be a default one and could be overwritten later
+            // by @UAC, @UpdateClasses, etc.
             return m_jarfile.writeToFile(catalog_file);
         } else if (catalog_file.exists() && !catalog_tmp_file.exists()) {
-            // restart ?
-            catalog_file.delete();
-            return m_jarfile.writeToFile(catalog_file);
-//            return null;
+            // This may happen during cluster recover step, when the latest catalog
+            // jar file stays still, and @UpdateCore is called during initialization
+            // or command log recover. I assume the catalog jar is the latest before
+            // shutdown, so it does not need to be updated.
+            return null;
         } else {
             throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
                     + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists());
         }
-        // return m_jarfile.writeToFile(catalog_file);
     }
 
+    // This function is supposed to be in the @WriteCatalog system call.
+    // Therefore we expect to see an existing catalog jar, and no other
+    // temporary jar file exists
     public void writeCatalogJarToTempFile(String path, String name) throws IOException
     {
         File catalog_file = new VoltFile(path, name);

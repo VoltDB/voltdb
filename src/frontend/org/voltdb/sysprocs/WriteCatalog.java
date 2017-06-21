@@ -67,7 +67,7 @@ public class WriteCatalog extends UpdateApplicationBase {
                   catalogBytes,
                   catalogHash,
                   expectedCatalogVersion,   // not used, though
-                  getID(),
+                  getID(),  // The transaction ID and the unique does not really matter for writing the catalog jar
                   Long.MAX_VALUE,
                   deploymentBytes,
                   deploymentHash,
