@@ -145,7 +145,7 @@ public class TestCollector extends JUnit4LocalClusterTest {
             if (!(deploymentFile.exists() && configInfoFile.exists())) {
                 System.err.println("Still looking for files, i=" + i + " m_voltdbRoot=" + voltDbRoot.getParentFile().getAbsolutePath() +
                         " deploymentFile=" + deploymentFile.getAbsolutePath() + " configInfoFile=" + configInfoFile.getAbsolutePath());
-                Thread.sleep(5000);
+                Thread.sleep(2000);
             }
             else {
                 break;
