@@ -245,13 +245,13 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
                 writeCommands(file,
                               'Step %d: copy deployment file' % step,
                               '%s#instruction# copy %s to %s' % (warningForDeploy, new_cluster_deploy, runner.opts.newRoot))
-    
+
     # originally it is the 5th step - get all the ddl and scp to all machines
     file.write('#instruction# get ddl file by using: voltdb get --output={path to dir} schema')
     file.write('\n')
     file.write('#instruction# scp the ddl to other machines')
     file.write('\n')
-    
+
     newNodeF = None
     if runner.opts.newNode is not None:
         newNodeF = cStringIO.StringIO()
@@ -281,7 +281,7 @@ def generateInitNewClusterCommand(opts, killSet, files, new_cluster_deploy, newN
                                                                 os.path.join(opts.newRoot, new_cluster_deploy),
                                                                 os.path.join(opts.newRoot, 'ddl.sql'),
                                                                 os.path.join(opts.newRoot, 'pro.jar')))
-                                                                
+
     if opts.newNode is not None:
         writeCommands(newNodeF,
                       'Step %d: initialize new cluster' % step,
@@ -315,13 +315,12 @@ def generateStartNewClusterCommand(opts, killSet, hostcount, files, newNodeF, st
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: start new cluster' % step,
-                      "%s start --dir=%s -H %s -c %d --missing=%d\nPlease use proper port to avoid error" 
+                      "%s start --dir=%s -H %s -c %d --missing=%d\nPlease use proper port to avoid error"
                                                                    % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                       opts.newRoot,
                                                                       ','.join(leadersString),
                                                                       hostcount,
-                                                                      hostcount / 2
-                                                                      ))
+                                                                      hostcount / 2))
 
     if opts.newNode is not None:
         writeCommands(newNodeF,
