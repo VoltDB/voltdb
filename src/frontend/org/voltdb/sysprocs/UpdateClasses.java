@@ -17,25 +17,19 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndIds;
-import org.voltdb.utils.Encoder;
 
 /**
  * Non-transactional procedure to implement public @UpdateClasses system procedure.
@@ -113,6 +107,64 @@ public class UpdateClasses extends UpdateApplicationBase {
 //                                             ccr.hasSchemaChange ?  1 : 0,
 //                                             ccr.requiresNewExportGeneration ? 1 : 0);
 
+        // Write the new catalog to a temporary jar file
+        CompletableFuture<Map<Integer,ClientResponse>> cf =
+                                                      callNTProcedureOnAllHosts(
+                                                      "@WriteCatalog",
+                                                      ccr.encodedDiffCommands,
+                                                      ccr.catalogHash,
+                                                      ccr.catalogBytes,
+                                                      ccr.expectedCatalogVersion,
+                                                      ccr.deploymentString,
+                                                      ccr.tablesThatMustBeEmpty,
+                                                      ccr.reasonsForEmptyTables,
+                                                      ccr.requiresSnapshotIsolation ? 1 : 0,
+                                                      ccr.worksWithElastic ? 1 : 0,
+                                                      ccr.deploymentHash,
+                                                      ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                                                      ccr.hasSchemaChange ?  1 : 0,
+                                                      ccr.requiresNewExportGeneration ? 1 : 0);
+
+        Map<Integer, ClientResponse>  map = null;
+        try {
+            map = cf.get();
+        } catch (InterruptedException | ExecutionException e) {
+            hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
+            // Revert the changes in ZooKeeper
+            throw new VoltAbortException(e);
+        }
+
+        if (map != null) {
+            for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
+                if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
+                    hostLog.warn("A response from one host for writing the catalog jar has failed.");
+                    throw new VoltAbortException("A response from host " + entry.getKey() +
+                                                 " for writing the catalog jar has failed.");
+                }
+            }
+        }
+
+//        return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update finished.");
+
+      return callProcedure("@UpdateCore",
+                          ccr.encodedDiffCommands,
+                          ccr.catalogHash,
+                          ccr.catalogBytes,
+                          ccr.expectedCatalogVersion,
+                          ccr.deploymentString,
+                          ccr.tablesThatMustBeEmpty,
+                          ccr.reasonsForEmptyTables,
+                          ccr.requiresSnapshotIsolation ? 1 : 0,
+                          ccr.worksWithElastic ? 1 : 0,
+                          ccr.deploymentHash,
+                          ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                          ccr.hasSchemaChange ?  1 : 0,
+                          ccr.requiresNewExportGeneration ? 1 : 0);
+
+
+
+
+
 
         // Change the way we write the new catalog jar. A NP proc is first called to
         // write a temporary jar on each host. Then a MP proc is called to rename the
@@ -123,156 +175,156 @@ public class UpdateClasses extends UpdateApplicationBase {
          * Validate that no elastic join is in progress, blocking this catalog update.
          * If this update works with elastic then do the update anyways
          */
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        if ((ccr.worksWithElastic ? 1 : 0) == 0 &&
-            !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
-            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
-        }
+//        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+//        if ((ccr.worksWithElastic ? 1 : 0) == 0 &&
+//            !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
+//            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
+//        }
+//
+//        // write uac blocker zk node
+//        VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker);
+//        // check rejoin blocker node
+//        if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
+//            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
+//            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
+//        }
+//
+//        try {
+//            // Pull the current catalog and deployment version and hash info.  Validate that we're either:
+//            // (a) starting a new, valid catalog or deployment update
+//            // (b) restarting a valid catalog or deployment update
+//            // otherwise, we can bomb out early.  This should guarantee that we only
+//            // ever write valid catalog and deployment state to ZK.
+//            CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+//            // New update?
+//            // the expected version is the current version of catalog jar  s
+//            if (catalogStuff.version == ccr.expectedCatalogVersion) {
+//                if (log.isInfoEnabled()) {
+//                    log.info("New catalog update from: " + catalogStuff.toString());
+//                    log.info("To: catalog hash: " + Encoder.hexEncode(ccr.catalogHash).substring(0, 10) +
+//                            ", deployment hash: " + Encoder.hexEncode(ccr.deploymentHash).substring(0, 10));
+//                }
+//            }
+//            // restart?
+//            else {
+//                if (catalogStuff.version == (ccr.expectedCatalogVersion + 1) &&
+//                        Arrays.equals(catalogStuff.getCatalogHash(), ccr.catalogHash) &&
+//                        Arrays.equals(catalogStuff.getDeploymentHash(), ccr.deploymentHash)) {
+//                    if (log.isInfoEnabled()) {
+//                        log.info("Restarting catalog update: " + catalogStuff.toString());
+//                    }
+//                }
+//                else {
+//                    String errmsg = "Invalid catalog update. ZooKeeper catalog version: " + catalogStuff.version +
+//                            ", expected version: " + ccr.expectedCatalogVersion + ". Catalog or deployment change was planned " +
+//                            "against one version of the cluster configuration but that version was " +
+//                            "no longer live when attempting to apply the change.  This is likely " +
+//                            "the result of multiple concurrent attempts to change the cluster " +
+//                            "configuration.  Please make such changes synchronously from a single " +
+//                            "connection to the cluster.";
+//                    log.warn(errmsg);
+//                    throw new VoltAbortException(errmsg);
+//                }
+//            }
+//
+//            byte[] deploymentBytes = ccr.deploymentString.getBytes("UTF-8");
+//            // update the global version. only one site per node will accomplish this.
+//            // others will see there is no work to do and gracefully continue.
+//            // then update data at the local site.
+//            CatalogUtil.updateCatalogToZK(
+//                    zk,
+//                    ccr.expectedCatalogVersion + 1,
+//                    getID(),
+//                    Long.MAX_VALUE, // currently this value is not treated well
+//                    ccr.catalogBytes,
+//                    ccr.catalogHash,
+//                    deploymentBytes);
+//
+//            // Do we need synchronized catalog verification here ?
+//            // TODO
+//
+//
+//            // Write the new catalog to a temporary jar file
+//            CompletableFuture<Map<Integer,ClientResponse>> cf =
+//                                                          callNTProcedureOnAllHosts(
+//                                                          "@WriteCatalog",
+//                                                          ccr.encodedDiffCommands,
+//                                                          ccr.catalogHash,
+//                                                          ccr.catalogBytes,
+//                                                          ccr.expectedCatalogVersion,
+//                                                          ccr.deploymentString,
+//                                                          ccr.tablesThatMustBeEmpty,
+//                                                          ccr.reasonsForEmptyTables,
+//                                                          ccr.requiresSnapshotIsolation ? 1 : 0,
+//                                                          ccr.worksWithElastic ? 1 : 0,
+//                                                          ccr.deploymentHash,
+//                                                          ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+//                                                          ccr.hasSchemaChange ?  1 : 0,
+//                                                          ccr.requiresNewExportGeneration ? 1 : 0);
+//
+//            Map<Integer, ClientResponse>  map = null;
+//            try {
+//                map = cf.get();
+//            } catch (InterruptedException | ExecutionException e) {
+//                hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
+//                // Revert the changes in ZooKeeper
+//                CatalogUtil.updateCatalogToZK(
+//                                zk,
+//                                catalogStuff.version,
+//                                catalogStuff.txnId,
+//                                catalogStuff.uniqueId,
+//                                catalogStuff.catalogBytes,
+//                                catalogStuff.getCatalogHash(),
+//                                catalogStuff.deploymentBytes);
+//                throw new VoltAbortException(e);
+//            }
+//
+//            if (map != null) {
+//                for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
+//                    if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
+//                        hostLog.warn("A response from one host for writing the catalog jar has failed.");
+//                        CatalogUtil.updateCatalogToZK(
+//                                        zk,
+//                                        catalogStuff.version,
+//                                        catalogStuff.txnId,
+//                                        catalogStuff.uniqueId,
+//                                        catalogStuff.catalogBytes,
+//                                        catalogStuff.getCatalogHash(),
+//                                        catalogStuff.deploymentBytes);
+//                        throw new VoltAbortException("A response from host " + entry.getKey() +
+//                                                     " for writing the catalog jar has failed.");
+//                    }
+//                }
+//            }
+//
+//            // Rename the catalog jar to replace the old one, this should be done in a
+//            // synchronous way.
+//            callProcedure("@UpdateCore",
+//                           ccr.encodedDiffCommands,
+//                           ccr.catalogHash,
+//                           ccr.catalogBytes,
+//                           ccr.expectedCatalogVersion,
+//                           ccr.deploymentString,
+//                           ccr.tablesThatMustBeEmpty,
+//                           ccr.reasonsForEmptyTables,
+//                           ccr.requiresSnapshotIsolation ? 1 : 0,
+//                           ccr.worksWithElastic ? 1 : 0,
+//                           ccr.deploymentHash,
+//                           ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+//                           ccr.hasSchemaChange ?  1 : 0,
+//                           ccr.requiresNewExportGeneration ? 1 : 0);
+//
+//        } finally {
+//            // remove the uac blocker when exits or there is an exception
+//            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
+//        }
+//
+//        // This is when the UpdateApplicationCatalog really ends in the blocking path
+//        log.info(String.format("Globally updating the current application catalog and deployment " +
+//                               "(new hashes %s, %s).",
+//                               Encoder.hexEncode(ccr.catalogHash).substring(0, 10),
+//                               Encoder.hexEncode(ccr.deploymentHash).substring(0, 10)));
 
-        // write uac blocker zk node
-        VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker);
-        // check rejoin blocker node
-        if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
-            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
-        }
-
-        try {
-            // Pull the current catalog and deployment version and hash info.  Validate that we're either:
-            // (a) starting a new, valid catalog or deployment update
-            // (b) restarting a valid catalog or deployment update
-            // otherwise, we can bomb out early.  This should guarantee that we only
-            // ever write valid catalog and deployment state to ZK.
-            CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
-            // New update?
-            // the expected version is the current version of catalog jar  s
-            if (catalogStuff.version == ccr.expectedCatalogVersion) {
-                if (log.isInfoEnabled()) {
-                    log.info("New catalog update from: " + catalogStuff.toString());
-                    log.info("To: catalog hash: " + Encoder.hexEncode(ccr.catalogHash).substring(0, 10) +
-                            ", deployment hash: " + Encoder.hexEncode(ccr.deploymentHash).substring(0, 10));
-                }
-            }
-            // restart?
-            else {
-                if (catalogStuff.version == (ccr.expectedCatalogVersion + 1) &&
-                        Arrays.equals(catalogStuff.getCatalogHash(), ccr.catalogHash) &&
-                        Arrays.equals(catalogStuff.getDeploymentHash(), ccr.deploymentHash)) {
-                    if (log.isInfoEnabled()) {
-                        log.info("Restarting catalog update: " + catalogStuff.toString());
-                    }
-                }
-                else {
-                    String errmsg = "Invalid catalog update. ZooKeeper catalog version: " + catalogStuff.version +
-                            ", expected version: " + ccr.expectedCatalogVersion + ". Catalog or deployment change was planned " +
-                            "against one version of the cluster configuration but that version was " +
-                            "no longer live when attempting to apply the change.  This is likely " +
-                            "the result of multiple concurrent attempts to change the cluster " +
-                            "configuration.  Please make such changes synchronously from a single " +
-                            "connection to the cluster.";
-                    log.warn(errmsg);
-                    throw new VoltAbortException(errmsg);
-                }
-            }
-
-            byte[] deploymentBytes = ccr.deploymentString.getBytes("UTF-8");
-            // update the global version. only one site per node will accomplish this.
-            // others will see there is no work to do and gracefully continue.
-            // then update data at the local site.
-            CatalogUtil.updateCatalogToZK(
-                    zk,
-                    ccr.expectedCatalogVersion + 1,
-                    getID(),
-                    Long.MAX_VALUE, // currently this value is not treated well
-                    ccr.catalogBytes,
-                    ccr.catalogHash,
-                    deploymentBytes);
-
-            // Do we need synchronized catalog verification here ?
-            // TODO
-
-
-            // Write the new catalog to a temporary jar file
-            CompletableFuture<Map<Integer,ClientResponse>> cf =
-                                                          callNTProcedureOnAllHosts(
-                                                          "@WriteCatalog",
-                                                          ccr.encodedDiffCommands,
-                                                          ccr.catalogHash,
-                                                          ccr.catalogBytes,
-                                                          ccr.expectedCatalogVersion,
-                                                          ccr.deploymentString,
-                                                          ccr.tablesThatMustBeEmpty,
-                                                          ccr.reasonsForEmptyTables,
-                                                          ccr.requiresSnapshotIsolation ? 1 : 0,
-                                                          ccr.worksWithElastic ? 1 : 0,
-                                                          ccr.deploymentHash,
-                                                          ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                                                          ccr.hasSchemaChange ?  1 : 0,
-                                                          ccr.requiresNewExportGeneration ? 1 : 0);
-
-            Map<Integer, ClientResponse>  map = null;
-            try {
-                map = cf.get();
-            } catch (InterruptedException | ExecutionException e) {
-                hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
-                // Revert the changes in ZooKeeper
-                CatalogUtil.updateCatalogToZK(
-                                zk,
-                                catalogStuff.version,
-                                catalogStuff.txnId,
-                                catalogStuff.uniqueId,
-                                catalogStuff.catalogBytes,
-                                catalogStuff.getCatalogHash(),
-                                catalogStuff.deploymentBytes);
-                throw new VoltAbortException(e);
-            }
-
-            if (map != null) {
-                for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
-                    if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
-                        hostLog.warn("A response from one host for writing the catalog jar has failed.");
-                        CatalogUtil.updateCatalogToZK(
-                                        zk,
-                                        catalogStuff.version,
-                                        catalogStuff.txnId,
-                                        catalogStuff.uniqueId,
-                                        catalogStuff.catalogBytes,
-                                        catalogStuff.getCatalogHash(),
-                                        catalogStuff.deploymentBytes);
-                        throw new VoltAbortException("A response from host " + entry.getKey() +
-                                                     " for writing the catalog jar has failed.");
-                    }
-                }
-            }
-
-            // Rename the catalog jar to replace the old one, this should be done in a
-            // synchronous way.
-            callProcedure("@UpdateCore",
-                           ccr.encodedDiffCommands,
-                           ccr.catalogHash,
-                           ccr.catalogBytes,
-                           ccr.expectedCatalogVersion,
-                           ccr.deploymentString,
-                           ccr.tablesThatMustBeEmpty,
-                           ccr.reasonsForEmptyTables,
-                           ccr.requiresSnapshotIsolation ? 1 : 0,
-                           ccr.worksWithElastic ? 1 : 0,
-                           ccr.deploymentHash,
-                           ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                           ccr.hasSchemaChange ?  1 : 0,
-                           ccr.requiresNewExportGeneration ? 1 : 0);
-
-        } finally {
-            // remove the uac blocker when exits or there is an exception
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
-        }
-
-        // This is when the UpdateApplicationCatalog really ends in the blocking path
-        log.info(String.format("Globally updating the current application catalog and deployment " +
-                               "(new hashes %s, %s).",
-                               Encoder.hexEncode(ccr.catalogHash).substring(0, 10),
-                               Encoder.hexEncode(ccr.deploymentHash).substring(0, 10)));
-
-        return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update finished.");
+//        return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update finished.");
     }
 }

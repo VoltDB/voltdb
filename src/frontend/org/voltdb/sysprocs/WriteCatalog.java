@@ -23,11 +23,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
-
-import com.google_voltpatches.common.base.Throwables;
 
 public class WriteCatalog extends UpdateApplicationBase {
     VoltLogger log = new VoltLogger("HOST");
@@ -46,33 +42,35 @@ public class WriteCatalog extends UpdateApplicationBase {
                                                  byte requireCatalogDiffCmdsApplyToEE,
                                                  byte hasSchemaChange,
                                                  byte requiresNewExportGeneration)
+                                                    throws Exception
     {
         assert(tablesThatMustBeEmpty != null);
 
         String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
+        byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
 
-        CatalogAndIds catalogStuff = null;
-        try {
-            catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-        } catch (Exception e) {
-            Throwables.propagate(e);
-        }
+//        CatalogAndIds catalogStuff = null;
+//        try {
+//            catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+//        } catch (Exception e) {
+//            Throwables.propagate(e);
+//        }
 
-        log.warn("=================== WriteCatalog ===================");
-        log.warn("zk cat ver: " + catalogStuff.version);
-        log.warn("expected cat version: " +  expectedCatalogVersion);
-        log.warn("====================================================");
+//        log.warn("=================== WriteCatalog ===================");
+//        log.warn("zk cat ver: " + catalogStuff.version);
+//        log.warn("expected cat version: " +  expectedCatalogVersion);
+//        log.warn("====================================================");
 
         // This should only be called once on each host
         VoltDB.instance().writeCatalogJar(
                   commands,
-                  catalogStuff.catalogBytes,
-                  catalogStuff.getCatalogHash(),
-                  expectedCatalogVersion,
+                  catalogBytes,
+                  catalogHash,
+                  expectedCatalogVersion,   // not used, though
                   getID(),
                   Long.MAX_VALUE,
-                  catalogStuff.deploymentBytes,
-                  catalogStuff.getDeploymentHash(),
+                  deploymentBytes,
+                  deploymentHash,
                   requireCatalogDiffCmdsApplyToEE != 0,
                   hasSchemaChange != 0,
                   requiresNewExportGeneration != 0);
