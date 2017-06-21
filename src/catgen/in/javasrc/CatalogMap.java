@@ -206,7 +206,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     }
 
     @SuppressWarnings("unchecked")
-    public void copyFrom(CatalogMap<? extends CatalogType> catalogMap) {
+    void copyFrom(CatalogMap<? extends CatalogType> catalogMap) {
         CatalogMap<T> castedMap = (CatalogMap<T>) catalogMap;
         m_hasComputedOrder = castedMap.m_hasComputedOrder;
         if (castedMap.m_items == null) {

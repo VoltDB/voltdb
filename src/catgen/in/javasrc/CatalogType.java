@@ -1,3 +1,4 @@
+
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2017 VoltDB Inc.
  *
@@ -128,7 +129,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         m_attachment = attachment;
     }
 
-    public int getDepth() {
+    int getDepth() {
         return m_parentMap.m_depth;
     }
 
