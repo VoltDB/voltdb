@@ -80,7 +80,7 @@ public class HTTPClientInterface {
         @Override
         public InternalConnectionHandler get() {
             ClientInterface ci = VoltDB.instance().getClientInterface();
-            if (ci == null || !ci.isAcceptingConnections()) {
+            if (ci == null || (!VoltDB.instance().rejoining() && !ci.isAcceptingConnections())) {
                 throw new IllegalStateException("Client interface is not ready to be used or has been closed.");
             }
             return ci.getInternalConnectionHandler();
