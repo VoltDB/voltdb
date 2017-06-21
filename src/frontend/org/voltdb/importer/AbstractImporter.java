@@ -46,7 +46,7 @@ import org.voltdb.client.ProcedureCallback;
  * because of addition/deletion of nodes to the cluster.
  */
 public abstract class AbstractImporter
-    implements InternalConnectionContext, ImporterSupport {
+    implements InternalConnectionContext, ImporterLifecycle, ImporterLogger {
 
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
 

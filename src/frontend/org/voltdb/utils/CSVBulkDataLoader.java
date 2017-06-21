@@ -64,12 +64,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
         public void callback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 if (rowHandle instanceof ImportSuccessCallback) {
-                    try {
-                        ((ImportSuccessCallback) rowHandle).success(response);
-                    }
-                    catch (Exception e) {
-                        log.error("Exception in client callback", e);
-                    }
+                    ((ImportSuccessCallback) rowHandle).success(response);
                 }
             }
             else {

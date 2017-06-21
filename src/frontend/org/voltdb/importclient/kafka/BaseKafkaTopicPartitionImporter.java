@@ -35,7 +35,8 @@ import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
 import org.voltdb.importer.CommitTracker;
-import org.voltdb.importer.ImporterSupport;
+import org.voltdb.importer.ImporterLifecycle;
+import org.voltdb.importer.ImporterLogger;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
@@ -61,6 +62,11 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
 
+/*
+ * This base class provides the implementation for manual offset management of a single Kafka partition of a given topic. An instance of this
+ * class must provide an implementation of the executeVolt() method, which executes a procedure or database function in the
+ * appropriate manner.
+ */
 public abstract class BaseKafkaTopicPartitionImporter {
 
     private final static PartitionOffsetRequestInfo LATEST_OFFSET =
@@ -89,16 +95,18 @@ public abstract class BaseKafkaTopicPartitionImporter {
     //Counters for commit policies.
     private long m_lastCommitTime = 0;
 
-    protected ImporterSupport m_wrapper;
+    protected ImporterLifecycle m_lifecycle;
+    protected ImporterLogger m_logger;
 
     /*
      * Submit the supplied data to the database. Subclasses override this method with the appropriate operations.
      */
     public abstract boolean executeVolt(Object[] params, TopicPartitionInvocationCallback cb);
 
-    public BaseKafkaTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterSupport wrapper)
+    public BaseKafkaTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterLifecycle lifecycle, ImporterLogger logger)
     {
-        m_wrapper = wrapper;
+        m_lifecycle = lifecycle;
+        m_logger = logger;
         m_config = config;
         m_coordinator = m_config.getPartitionLeader();
         m_topicAndPartition = new TopicAndPartition(config.getTopic(), config.getPartition());
@@ -139,13 +147,13 @@ public abstract class BaseKafkaTopicPartitionImporter {
                         }
                     }
                 } catch (Exception e) {
-                    m_wrapper.rateLimitedLog(Level.WARN, e, "Error in finding leader for " + m_topicAndPartition);
+                    m_logger.rateLimitedLog(Level.WARN, e, "Error in finding leader for " + m_topicAndPartition);
                 } finally {
                     KafkaStreamImporterConfig.closeConsumer(consumer);
                 }
             }
         if (returnMetaData == null) {
-            m_wrapper.rateLimitedLog(Level.WARN, null, "Failed to find Leader for " + m_topicAndPartition);
+            m_logger.rateLimitedLog(Level.WARN, null, "Failed to find Leader for " + m_topicAndPartition);
         }
         return returnMetaData;
     }
@@ -178,7 +186,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             }
         }
         //Unable to find return null for recheck.
-        m_wrapper.rateLimitedLog(Level.WARN, null, "Failed to find new leader for " + m_topicAndPartition);
+        m_logger.rateLimitedLog(Level.WARN, null, "Failed to find new leader for " + m_topicAndPartition);
         return null;
     }
 
@@ -215,7 +223,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                                         )
                                 );
                         m_offsetManager.get().connect();
-                        m_wrapper.info(null, "Offset Coordinator for " + m_topicAndPartition + " is " + offsetManager);
+                        m_logger.info(null, "Offset Coordinator for " + m_topicAndPartition + " is " + offsetManager);
                         if (consumer != null) try {
                             consumer.disconnect();
                         } catch (Exception ignoreIt) {
@@ -238,7 +246,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 }
             }
             if (probeException != null) {
-                m_wrapper.warn(probeException, "Failed to query all brokers for the offset coordinator for " + m_topicAndPartition);
+                m_logger.warn(probeException, "Failed to query all brokers for the offset coordinator for " + m_topicAndPartition);
             }
             backoffSleep(attempts+1);
         }
@@ -271,7 +279,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             fault = e;
         }
         if (fault != null) {
-            m_wrapper.rateLimitedLog(Level.ERROR, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
+            m_logger.rateLimitedLog(Level.ERROR, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
             response = null;
         }
         return response;
@@ -316,7 +324,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             fault = e;
         }
         if (fault != null) {
-            m_wrapper.rateLimitedLog(Level.WARN, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
+            m_logger.rateLimitedLog(Level.WARN, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
             rsp = null;
         }
         return rsp;
@@ -365,11 +373,11 @@ public abstract class BaseKafkaTopicPartitionImporter {
         HostAndPort leaderBroker = findNewLeader();
         if (leaderBroker == null) {
             //point to original leader which will fail and we fall back again here.
-            m_wrapper.rateLimitedLog(Level.WARN, null, "Fetch Failed to find leader continue with old leader: " + m_config.getPartitionLeader());
+            m_logger.rateLimitedLog(Level.WARN, null, "Fetch Failed to find leader continue with old leader: " + m_config.getPartitionLeader());
             leaderBroker = m_config.getPartitionLeader();
         } else {
             if (!leaderBroker.equals(m_config.getPartitionLeader())) {
-                m_wrapper.info(null, "Fetch Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
+                m_logger.info(null, "Fetch Found new leader for " + m_topicAndPartition + " New Leader: " + leaderBroker);
                 m_config.setPartitionLeader(leaderBroker);
             }
         }
@@ -380,7 +388,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
     }
 
     protected void accept() {
-        m_wrapper.info(null, "Starting partition fetcher for " + m_topicAndPartition);
+        m_logger.info(null, "Starting partition fetcher for " + m_topicAndPartition);
         long submitCount = 0;
         PendingWorkTracker callbackTracker = new PendingWorkTracker();
         Formatter formatter = m_config.getFormatterBuilder().create();
@@ -390,7 +398,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             resetLeader();
 
             int sleepCounter = 1;
-            while (m_wrapper.shouldRun()) {
+            while (m_lifecycle.shouldRun()) {
                 if (m_currentOffset.get() < 0) {
                     getOffsetCoordinator();
                     if (m_offsetManager.get() == null) {
@@ -411,10 +419,10 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     if (m_currentOffset.get() < 0) {
                         //If we dont know the offset get it backoff if we fail.
                         sleepCounter = backoffSleep(sleepCounter);
-                        m_wrapper.info(null, "No valid offset found for " + m_topicAndPartition);
+                        m_logger.info(null, "No valid offset found for " + m_topicAndPartition);
                         continue;
                     }
-                    m_wrapper.info(null, "Starting offset for " + m_topicAndPartition + " is " + m_currentOffset.get());
+                    m_logger.info(null, "Starting offset for " + m_topicAndPartition + " is " + m_currentOffset.get());
                 }
                 long currentFetchCount = 0;
                 //Build fetch request of we have a valid offset and not too many are pending.
@@ -429,7 +437,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                         continue;
                     }
                 } catch (Exception ex) {
-                    m_wrapper.rateLimitedLog(Level.WARN, ex, "Failed to fetch from " +  m_topicAndPartition);
+                    m_logger.rateLimitedLog(Level.WARN, ex, "Failed to fetch from " +  m_topicAndPartition);
                     //See if its network error and find new leader for this partition.
                     if (ex instanceof IOException) {
                         resetLeader();
@@ -443,11 +451,11 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 if (fetchResponse.hasError()) {
                     // Something went wrong!
                     short code = fetchResponse.errorCode(m_topicAndPartition.topic(), m_topicAndPartition.partition());
-                    m_wrapper.warn(ErrorMapping.exceptionFor(code), "Failed to fetch messages for %s", m_topicAndPartition);
+                    m_logger.warn(ErrorMapping.exceptionFor(code), "Failed to fetch messages for %s", m_topicAndPartition);
                     sleepCounter = backoffSleep(sleepCounter);
                     if (code == ErrorMapping.OffsetOutOfRangeCode()) {
                         // We asked for an invalid offset. For simple case ask for the last element to reset
-                        m_wrapper.info(null, "Invalid offset requested for " + m_topicAndPartition);
+                        m_logger.info(null, "Invalid offset requested for " + m_topicAndPartition);
                         getOffsetCoordinator();
                         m_currentOffset.set(-1L);
                         continue;
@@ -474,29 +482,29 @@ public abstract class BaseKafkaTopicPartitionImporter {
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(messageAndOffset.offset(),
                                 messageAndOffset.nextOffset(), callbackTracker, m_gapTracker, m_dead, m_pauseOffset);
 
-                        if (m_wrapper.hasTransaction()) {
+                        if (m_lifecycle.hasTransaction()) {
                             if (executeVolt(params, cb)) {
                                 callbackTracker.produceWork();
                             }
                             else {
-                                if (m_wrapper.isDebugEnabled()) {
-                                    m_wrapper.debug(null, "Failed to process Invocation possibly bad data: " + Arrays.toString(params));
+                                if (m_logger.isDebugEnabled()) {
+                                    m_logger.debug(null, "Failed to process Invocation possibly bad data: " + Arrays.toString(params));
                                 }
                                 m_gapTracker.commit(messageAndOffset.nextOffset());
                             }
                         }
 
                     } catch (FormatException e) {
-                        m_wrapper.rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" , Arrays.toString(params));
+                        m_logger.rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" , Arrays.toString(params));
                         m_gapTracker.commit(messageAndOffset.nextOffset());
                     }
                     submitCount++;
                     m_currentOffset.set(messageAndOffset.nextOffset());
-                    if (!m_wrapper.shouldRun()) {
+                    if (!m_lifecycle.shouldRun()) {
                         break;
                     }
                 }
-                if (!m_wrapper.shouldRun()) {
+                if (!m_lifecycle.shouldRun()) {
                     break;
                 }
 
@@ -512,7 +520,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 }
             }
         } catch (Exception ex) {
-            m_wrapper.error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
+            m_logger.error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
         } finally {
             final boolean usePausedOffset = m_pauseOffset.get() != -1;
             boolean skipCommit = false;
@@ -520,9 +528,9 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 // Paused offset is not guaranteed reliable until all callbacks have been called.
                 if (callbackTracker.waitForWorkToFinish() == false) {
                     if (m_pauseOffset.get() < m_lastCommittedOffset) {
-                        m_wrapper.warn(null, "Committing paused offset even though a timeout occurred waiting for pending stored procedures to finish.");
+                        m_logger.warn(null, "Committing paused offset even though a timeout occurred waiting for pending stored procedures to finish.");
                     } else {
-                        m_wrapper.warn(null, "Refusing to commit paused offset because a timeout occurred waiting for pending stored procedures to finish.");
+                        m_logger.warn(null, "Refusing to commit paused offset because a timeout occurred waiting for pending stored procedures to finish.");
                         skipCommit = true;
                     }
                 }
@@ -539,7 +547,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             }
         }
         m_dead.compareAndSet(false, true);
-        m_wrapper.info(null, "Partition fetcher stopped for " + m_topicAndPartition
+        m_logger.info(null, "Partition fetcher stopped for " + m_topicAndPartition
                 + " Last commit point is: " + m_lastCommittedOffset
                 + " Callback Rcvd: " + callbackTracker.getCallbackCount()
                 + " Submitted: " + submitCount);
@@ -574,12 +582,12 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 BlockingChannel channel = null;
                 int retries = 3;
                 if (pausedOffset != -1) {
-                    m_wrapper.rateLimitedLog(Level.INFO, null, m_topicAndPartition + " is using paused offset to commit: " + pausedOffset);
+                    m_logger.rateLimitedLog(Level.INFO, null, m_topicAndPartition + " is using paused offset to commit: " + pausedOffset);
                 }
                 while (channel == null && --retries >= 0) {
                     if ((channel = m_offsetManager.get()) == null) {
                         getOffsetCoordinator();
-                        m_wrapper.rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
+                        m_logger.rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
                         continue;
                     }
                     safe = (pausedOffset != -1 ? pausedOffset : safe);
@@ -594,7 +602,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     offsetCommitResponse = OffsetCommitResponse.readFrom(channel.receive().buffer());
                     final short code = ((Short)offsetCommitResponse.errors().get(m_topicAndPartition)).shortValue();
                     if (code == ErrorMapping.NotCoordinatorForConsumerCode() || code == ErrorMapping.ConsumerCoordinatorNotAvailableCode()) {
-                        m_wrapper.info(null, "Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
+                        m_logger.info(null, "Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
                         getOffsetCoordinator();
                         channel = null;
                         continue;
@@ -604,7 +612,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     return false;
                 }
             } catch (Exception e) {
-                m_wrapper.rateLimitedLog(Level.ERROR, e, "Failed to commit Offset for " + m_topicAndPartition);
+                m_logger.rateLimitedLog(Level.ERROR, e, "Failed to commit Offset for " + m_topicAndPartition);
                 if (e instanceof IOException) {
                     getOffsetCoordinator();
                 }
@@ -613,7 +621,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition)).shortValue();
             if (code != ErrorMapping.NoError()) {
                 final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition;
-                m_wrapper.rateLimitedLog(Level.ERROR, ErrorMapping.exceptionFor(code), msg);
+                m_logger.rateLimitedLog(Level.ERROR, ErrorMapping.exceptionFor(code), msg);
                 return false;
             }
             m_lastCommittedOffset = safe;
@@ -671,7 +679,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                 try {
                     wait(m_gapFullWait);
                 } catch (InterruptedException e) {
-                    m_wrapper.rateLimitedLog(Level.WARN, e, "Gap tracker wait was interrupted for" + m_topicAndPartition);
+                    m_logger.rateLimitedLog(Level.WARN, e, "Gap tracker wait was interrupted for" + m_topicAndPartition);
                 }
             }
             if (offset > s) {
@@ -697,7 +705,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             if (offset <= s && offset > c) {
                 int ggap = (int)Math.min(lag.length, offset-c);
                 if (ggap == lag.length) {
-                    m_wrapper.rateLimitedLog(Level.WARN,
+                    m_logger.rateLimitedLog(Level.WARN,
                               null, "Gap tracker moving topic commit point from %d to %d for "
                               + m_topicAndPartition, c, (offset - lag.length + 1)
                             );

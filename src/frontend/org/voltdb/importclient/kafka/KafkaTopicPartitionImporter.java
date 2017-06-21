@@ -19,7 +19,8 @@ package org.voltdb.importclient.kafka;
 import java.net.URI;
 
 import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.ImporterSupport;
+import org.voltdb.importer.ImporterLifecycle;
+import org.voltdb.importer.ImporterLogger;
 import org.voltdb.importer.Invocation;
 
 /**
@@ -34,7 +35,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private static String KAFKA_IMPORTER_NAME = "KafkaImporter";
 
     public KafkaTopicPartitionImporter(KafkaStreamImporterConfig config) {
-        delegate = new VoltInternalTopicPartitionImporter(config, this);
+        delegate = new VoltInternalTopicPartitionImporter(config, this, this);
     }
 
     @Override
@@ -73,8 +74,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     class VoltInternalTopicPartitionImporter extends BaseKafkaTopicPartitionImporter {
 
-        public VoltInternalTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterSupport wrapper) {
-            super(config, wrapper);
+        public VoltInternalTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterLifecycle lifecycle, ImporterLogger logger) {
+            super(config, lifecycle, logger);
         }
 
         @Override

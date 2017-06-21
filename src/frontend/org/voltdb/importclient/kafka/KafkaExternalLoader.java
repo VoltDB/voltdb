@@ -46,7 +46,8 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
-import org.voltdb.importer.ImporterSupport;
+import org.voltdb.importer.ImporterLifecycle;
+import org.voltdb.importer.ImporterLogger;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.importer.formatter.FormatterBuilder;
@@ -65,7 +66,7 @@ import kafka.cluster.Broker;
  * @author jcrump
  * @since 7.4
  */
-public class KafkaExternalLoader implements ImporterSupport {
+public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
     private static final VoltLogger m_log = new VoltLogger("KAFKA-EXTERNAL-LOADER");
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
@@ -124,7 +125,7 @@ public class KafkaExternalLoader implements ImporterSupport {
     private void processKafkaMessages() throws Exception {
 
         try {
-            m_executorService = createImporterExecutor(m_loader, this);
+            m_executorService = createImporterExecutor(m_loader, this, this);
 
             if (m_config.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started using procedure: " + m_config.procedure);
@@ -254,7 +255,7 @@ public class KafkaExternalLoader implements ImporterSupport {
     /*
      * Create an executor with one importer per thread (per partition).
      */
-    private ExecutorService createImporterExecutor(CSVDataLoader loader, final ImporterSupport wrapper) throws Exception {
+    private ExecutorService createImporterExecutor(CSVDataLoader loader, final ImporterLifecycle lifecycle, final ImporterLogger logger) throws Exception {
 
         Map<URI, KafkaStreamImporterConfig> configs = createKafkaImporterConfigFromProperties(m_config);
         ExecutorService executor = Executors.newFixedThreadPool(configs.size());
@@ -263,7 +264,7 @@ public class KafkaExternalLoader implements ImporterSupport {
         for (URI uri : configs.keySet()) {
             m_log.warn(" " + uri);
             KafkaStreamImporterConfig cfg = configs.get(uri);
-            LoaderTopicPartitionImporter importer = new LoaderTopicPartitionImporter(cfg , wrapper);
+            LoaderTopicPartitionImporter importer = new LoaderTopicPartitionImporter(cfg, lifecycle, logger);
             executor.submit(importer);
         }
 
@@ -455,8 +456,8 @@ public class KafkaExternalLoader implements ImporterSupport {
      */
     private class LoaderTopicPartitionImporter extends BaseKafkaTopicPartitionImporter implements Runnable {
 
-        public LoaderTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterSupport wrapper) {
-            super(config, wrapper);
+        public LoaderTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterLifecycle lifecycle, ImporterLogger logger) {
+            super(config, lifecycle, logger);
         }
 
         @Override

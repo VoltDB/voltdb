@@ -90,11 +90,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                     m_es.execute(new Runnable() {
                         @Override
                         public void run() {
-                            try {
-                                m_csvLine.success(response);
-                            } catch (Exception e) {
-                                m_log.error("Exception in success client callback", e);
-                            }
+                            m_csvLine.success(response);
                         }
                     });
                 }

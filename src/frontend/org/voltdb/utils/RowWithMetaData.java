@@ -16,6 +16,7 @@
  */
 package org.voltdb.utils;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.VoltBulkLoader.ImportSuccessCallback;
@@ -26,6 +27,7 @@ public class RowWithMetaData implements ImportSuccessCallback {
     final public Object rawLine;
     final public long lineNumber;
     final public ProcedureCallback procedureCallback;
+    private static final VoltLogger log = new VoltLogger(RowWithMetaData.class.getName());
 
     public RowWithMetaData(Object rawLine, long ln) {
         this.rawLine = rawLine;
@@ -40,9 +42,14 @@ public class RowWithMetaData implements ImportSuccessCallback {
     }
 
     @Override
-    public void success(ClientResponse response) throws Exception {
+    public void success(ClientResponse response) {
         if (procedureCallback != null) {
-            procedureCallback.clientCallback(response);
+            try {
+                procedureCallback.clientCallback(response);
+            }
+            catch (Exception e) {
+                log.error("Exception in client callback", e);
+            }
         }
     }
 

@@ -14,20 +14,16 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.client.VoltBulkLoader;
 
-import org.voltdb.client.ClientResponse;
+package org.voltdb.importer;
 
 /**
- * Interface for operations that need to be informed of a successful import operation, such as Kafka offset management.
+ * Interface for importer lifecycle support.
  * @author jcrump
- *
  */
-public interface ImportSuccessCallback {
+public interface ImporterLifecycle {
 
-    /**
-     * Callback for successful row import.  Callers are reponsible for managing their own exception reporting.
-     */
-    public void success(ClientResponse response);
-
+    public boolean shouldRun();
+    public void stop();
+    public boolean hasTransaction();
 }

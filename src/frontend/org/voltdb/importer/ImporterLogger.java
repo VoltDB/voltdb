@@ -20,13 +20,10 @@ package org.voltdb.importer;
 import org.voltcore.logging.Level;
 
 /**
- * Interface for in-database and external-to-database importers to interact with the base implementation.
+ * Interface for providing logging support to Importer implementations.
  * @author jcrump
  */
-public interface ImporterSupport {
-
-    public boolean shouldRun();
-    public void stop();
+public interface ImporterLogger {
 
     public void rateLimitedLog(Level level, Throwable cause, String format, Object... args);
     public void info(Throwable t, String msgFormat, Object... args);
@@ -34,5 +31,4 @@ public interface ImporterSupport {
     public void error(Throwable t, String msgFormat, Object... args);
     public void debug(Throwable t, String msgFormat, Object... args);
     public boolean isDebugEnabled();
-    public boolean hasTransaction();
 }
