@@ -382,6 +382,7 @@ class NValue {
     NValue op_add(const NValue& rhs) const;
     NValue op_multiply(const NValue& rhs) const;
     NValue op_divide(const NValue& rhs) const;
+    NValue op_unary_minus() const;
     /*
      * This NValue must be VARCHAR and the rhs must be VARCHAR.
      * This NValue is the value and the rhs is the pattern
@@ -3505,6 +3506,36 @@ inline void* NValue::castAsAddress() const {
     }
     throwDynamicSQLException("Type %s not a recognized type for casting as an address",
                              getValueTypeString().c_str());
+}
+
+inline NValue NValue::op_unary_minus() const {
+    const ValueType type = getValueType();
+    NValue retval(type);
+    switch(type) {
+    case VALUE_TYPE_TINYINT:
+        retval.getTinyInt() = static_cast<int8_t>(-getTinyInt());
+        break;
+    case VALUE_TYPE_SMALLINT:
+        retval.getSmallInt() = static_cast<int16_t>(-getSmallInt());
+        break;
+    case VALUE_TYPE_INTEGER:
+        retval.getInteger() = -getInteger();
+        break;
+    case VALUE_TYPE_BIGINT:
+    case VALUE_TYPE_TIMESTAMP:
+        retval.getBigInt() = -getBigInt();
+        break;
+    case VALUE_TYPE_DECIMAL:
+        retval.getDecimal() = -getDecimal();
+        break;
+    case VALUE_TYPE_DOUBLE:
+        retval.getDouble() = -getDouble();
+        break;
+    default:
+        throwDynamicSQLException( "unary minus cannot be applied to type %s", getValueTypeString().c_str());
+        break;
+    }
+    return retval;
 }
 
 inline NValue NValue::op_increment() const {
