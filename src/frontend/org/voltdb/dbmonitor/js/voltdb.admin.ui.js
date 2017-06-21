@@ -335,7 +335,7 @@ function loadAdminPage() {
     //Admin Page download link
     $('#downloadAdminConfigurations').on('click', function (e) {
         var port = VoltDBConfig.GetPortId() != null ? VoltDBConfig.GetPortId() : '8080';
-        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/deployment.xml?' + VoltDBCore.shortApiCredentials;
+        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/?' + VoltDBCore.shortApiCredentials;
         $(this).attr("href", url);
         setTimeout(function () {
             $('#downloadAdminConfigurations').attr("href", "#");
