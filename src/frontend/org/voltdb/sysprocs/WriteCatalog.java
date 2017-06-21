@@ -63,18 +63,22 @@ public class WriteCatalog extends UpdateApplicationBase {
 //        log.warn("====================================================");
 
         // This should only be called once on each host
-        VoltDB.instance().writeCatalogJar(
-                  commands,
-                  catalogBytes,
-                  catalogHash,
-                  expectedCatalogVersion,   // not used, though
-                  getID(),  // The transaction ID and the unique does not really matter for writing the catalog jar
-                  Long.MAX_VALUE,
-                  deploymentBytes,
-                  deploymentHash,
-                  requireCatalogDiffCmdsApplyToEE != 0,
-                  hasSchemaChange != 0,
-                  requiresNewExportGeneration != 0);
+        try {
+            VoltDB.instance().writeCatalogJar(
+                      commands,
+                      catalogBytes,
+                      catalogHash,
+                      expectedCatalogVersion,   // not used, though
+                      getID(),  // The transaction ID and the unique id does not really matter for writing the catalog jar
+                      Long.MAX_VALUE,
+                      deploymentBytes,
+                      deploymentHash,
+                      requireCatalogDiffCmdsApplyToEE != 0,
+                      hasSchemaChange != 0,
+                      requiresNewExportGeneration != 0);
+        } catch (RuntimeException e) {
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, e.getMessage());
+        }
 
         return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update finished locally.");
     }

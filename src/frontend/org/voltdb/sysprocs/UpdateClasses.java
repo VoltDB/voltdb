@@ -138,6 +138,7 @@ public class UpdateClasses extends UpdateApplicationBase {
             for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
                 if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
                     hostLog.warn("A response from one host for writing the catalog jar has failed.");
+                    hostLog.warn("Warning message: " + entry.getValue().getStatusString());
                     throw new VoltAbortException("A response from host " + entry.getKey() +
                                                  " for writing the catalog jar has failed.");
                 }
