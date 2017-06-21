@@ -1615,7 +1615,7 @@ public abstract class CatalogUtil {
                 if (union.size() == topics.size() + groupidToTopics.get(groupid).size()) {
                     groupidToTopics.put(groupid, union);
                 } else {
-                    VoltDB.crashLocalVoltDB("Two kafka configurations cannot have the same topic and groupid");
+                    throw new RuntimeException("Import failed to configure, two Kafka configurations have the same groupid and topic.");
                 }
             } else {
                 groupidToTopics.put(groupid, topics);
