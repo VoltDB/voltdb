@@ -359,7 +359,9 @@ public class TestJSONInterface extends TestCase {
         varString = getHTTPVarString(params);
 
         String ret = callProcOverJSONRaw(varString, expectedCode);
-        if (preHash) {
+        // Update application catalog sometimes changes the password.
+        // The second procedure call will fail in that case, so don't call it a second time.
+        if (preHash && !procName.equals("@UpdateApplicationCatalog")) {
             //If prehash make same call with SHA1 to check expected code.
             params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthScheme.HASH_SHA1));
             varString = getHTTPVarString(params);
