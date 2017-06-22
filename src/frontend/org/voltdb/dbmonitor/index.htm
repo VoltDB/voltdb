@@ -404,7 +404,14 @@
             <div id="analysis" class="contents" style="display:none">
                 <div class="analysisContainer">
                     <div class="analysisBody">
-                        <button id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</button>
+                        <div class="analysisWrap">
+                            <div class="setThreshold">
+                                <a href="#thresholdPopup" id="btnThreshold" style="display:none">Set Threshold</a>
+                            </div>
+                            <button id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</button>
+                            <div class="clear"></div>
+                        </div>
+
                         <div class="subTabSection" >
                             <!--tab-->
                             <div class="tabContant analysisSubTab" id="divAnalysis">
@@ -412,6 +419,7 @@
                                     <li><a href="#tabData">Data</a></li>
                                     <li><a id="tabProcedureBtn" href="#tabProcedure" class="active">Procedures</a></li>
                                 </ul>
+                                <div class="clear"></div>
                                 <div class="tab_container subAnalysisTab_container">
                                     <div id="tabData" class="tab_content dataTab tab_content_data ">
                                         <div id="tblAnalyzeNowContent" class="mainContentAnalysis analyzeNowContent">
@@ -477,11 +485,23 @@
                                     </div>
                                    
                                 </div>
-                            </div>                 
-                       </div> 
-                    </div>   
+
+                            </div>
+
+                       </div>
+                        <div class="clear"></div>
+                        <div class="analysisRemarks" style="display:none">
+                            <h1>Analysis</h1>
+                            <h2>Procedures</h2>
+                            <p>Find_user Multi-partitional procedure executed morre than 100/sec.</p>
+                            <p>Delete_user: Procedure latency greater than 300ms.</p>
+                              <h2>Table</h2>
+                            <p>Stock_transcation:Table with distribution cariance greater than 20%</p>
+                        </div>
+                    </div>
+
                 </div>
-                
+
             </div>
             <!--Admin-->
             <div id="admin" class="container contents">
@@ -1371,6 +1391,30 @@
             </div>
                 </div>
         </div>
+    </div>
+
+    <div id="thresholdPopup" style="display:none">
+          <div class="overlay-title ">
+           Threshold</span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content setThresholdPopContent">
+            <div class="partitioned">
+                <div class="leftPart">Usage Percent for Multi-Partitioned Procedure</div>
+                <div class="rightPart"><input type="text" value="20" id="partitionThreshold"></div>
+                <div class="clear"></div>
+            </div>
+
+            <div class="replicated">
+                <div class="leftRep">Variance in Distribution for Partitioned Table </div>
+                <div class="rightRep"><input type="text" value="20" id="replicatedThreshold"></div>
+                <div class="clear"></div>
+            </div>
+        </div>
+       <div class="overlay-btns">
+           <a id="" class="btn">Save</a>
+           <a id="" class="btn btn-gray">Cancel</a>
+       </div>
     </div>
 
     <!-- POPUP Saved Preferences -->

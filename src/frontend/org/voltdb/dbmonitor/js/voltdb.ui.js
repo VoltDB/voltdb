@@ -2405,6 +2405,9 @@ var loadPage = function (serverName, portid) {
         }
     });
 
+    $("#btnThreshold").popup();
+
+
     VoltDbUI.refreshConnectionTime('20000');
 };
 

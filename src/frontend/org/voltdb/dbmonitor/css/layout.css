@@ -700,13 +700,14 @@ html ul.tabs li.active a:hover {
     border-top: none;
     clear: both;
     float: left;
-    width: 100%;
+    width: 99.9%;
     background: #fff;
     overflow: auto;
 }
 .subAnalysisTab_container {
     overflow:initial;
     padding-bottom:10px;
+    margin-bottom:15px;
 }
 .tab_content {
     padding: 20px;
@@ -3506,6 +3507,36 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     display: block;
     color: #FFFFFF !important;
 }
+
+.analysisBody {
+    overflow:hidden;
+    padding: 0;
+    background: #fff;
+    padding:0 20px 20px 20px;
+   /* height:calc(100vh - 200px);*/
+    
+}
+.analysisWrap { float:right}
+.setThreshold {
+            float:left;
+            position:relative;
+            top:27px;
+            margin:0 5px 0 0;
+        }
+.setThreshold a {
+        background: #AA1F2F;
+        padding: 5px 10px 6px;
+        border: 1px solid #AA1F2F;
+        color: #FFFFFF;
+        cursor: pointer;
+
+    }
+
+ .setThreshold a:hover {
+    background: #C12026;
+
+
+}
 .analyzeBtn {
     float: right;
     background: #AA1F2F;
@@ -3526,14 +3557,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     cursor: pointer;
 
 }
-.analysisBody {
-    overflow:hidden;
-    padding: 0;
-    background: #fff;
-    padding:0 20px 20px 20px;
-   /* height:calc(100vh - 200px);*/
-    
-}
+
 .mainContent, .mainContentAnalysis {
     margin:0 auto;
     margin-top:11%;
@@ -3586,7 +3610,16 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .generateproDetails { float:right;padding-right: 85px;}
 .proDetailSvgHeight { height:95%!important; padding:0 0 0 30px;}
 .analysisDate { position:relative; top:24px;}
-.tab_content_data { padding-top:10px; padding-bottom:25px;}
+.tab_content_data { padding-top:10px;}
+.analysisRemarks { padding:15px; background:#F1F1F1; border:1px solid #cccccc;}
+.analysisRemarks h1{ font-weight:bold; text-decoration:underline;}
+.analysisRemarks h2 {font-weight:bold; padding:15px 0 0 10px;}
+.analysisRemarks p { padding:0 0 0 20px; font-size:13px;line-height:20px;}
+.setThresholdPopContent { min-width:350px;}
+.partitioned{ padding:0 0 10px 0;}
+.partitioned .leftPart, .replicated .leftRep { float:left;}
+.partitioned .rightPart, .replicated .rightRep {float:right;}
+.partitioned .rightPart input[type="text"], .replicated .rightRep input[type="text"] { width: 50px; padding: 0 0 0 3px;}
 
 
 /********************analysis End *****************/
