@@ -36,6 +36,7 @@ function loadAnalysisPage(){
     }
 
     function fetchData (){
+        $("#analysisLoader").show();
         VoltDbAnalysis.refreshChart();
         voltDbRenderer.GetProcedureProfileInformation(function(profileData){
             if(profileData != undefined){
@@ -51,8 +52,8 @@ function loadAnalysisPage(){
                 }
                 $("#tblAnalyzeNowContent").hide();
                 $("#tblNoDataContent").show();
-
             }
+            $("#analysisLoader").hide();
             //order the procedure by  their (avg_exec_time * #of invocation) value
             profileData["PROCEDURE_PROFILE"].sort(function(a,b) {return ((b.AVG * b.INVOCATIONS) > (a.AVG * a.INVOCATIONS)) ? 1 : (((a.AVG * a.INVOCATIONS) > (b.AVG * b.INVOCATIONS)) ? -1 : 0);} );
             var containLongName = checkObjForLongProcedureName(profileData["PROCEDURE_PROFILE"])
@@ -68,7 +69,7 @@ function loadAnalysisPage(){
                 var combinedWeight = (((profileData["PROCEDURE_PROFILE"][i].AVG/1000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS)/sumOfAllProcedure) * 100;
                 var procedureName = profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
                 if(containLongName)
-                    procedureName = "(" + (i + 1) + ") " + profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
+                    procedureName =(i + 1) + ") " + profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
 
                 VoltDbAnalysis.procedureValue[procedureName] =
                     {

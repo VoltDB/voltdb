@@ -1960,7 +1960,7 @@ ul.drHeadList li.drArrow {
     height: 100%;
     width: 100%;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 9999;
 }
 #schemaOverlay {
@@ -1968,7 +1968,7 @@ ul.drHeadList li.drArrow {
     height: 100%;
     width: 100%;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 999;
     top: 10.5%;
 }
@@ -1977,14 +1977,15 @@ ul.drHeadList li.drArrow {
     height: 100%;
     width: 100%;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 999;
     left: 0px;
 }
 .loading {
-    background: #fff url(../images/loader.GIF) no-repeat center center;
-    height: 75px;
-    width: 75px;
+    background: url(../images/loader.gif) no-repeat center center;
+    background-size: 80px 80px;
+    height: 80px;
+    width: 80px;
     margin: 20% auto;
     z-index: 99999;
 }
@@ -3477,16 +3478,30 @@ label.errorTimeOut {
     line-height: 22px!important;
 }
 /********************analysis*****************/
-.analysisContainer {    
+.analysisContainer {
+    position:relative;
     margin: 0 auto;
     padding: 0;
     width: 98%;
     }
+.analysisLoader {
+     position:absolute;
+     background-color:rgba(0,0,0, 0.5);
+     height:100%;
+     width:100%;
+     z-index:1;
+}
+.analysisLoading {
+    background:  url(../images/loader.gif) no-repeat center center;
+    background-size: 80px 80px;
+    height: 80px;
+    width: 80px;
+    margin: 17% auto;
+    z-index: 99999;
+}
 .analysisMenu {overflow: hidden;
     background: #FFFFFF;
     margin: 0 0 20px 0;
-    
-
 } 
 ul.analysisNav { overflow: hidden; float:left;
     margin:0; padding:0; background:#ffffff;
