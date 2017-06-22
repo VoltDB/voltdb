@@ -174,14 +174,12 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         prop = props.getProperty("socket.timeout.ms", null);
         if (prop != null) {
             timeout = Integer.parseInt(prop);
-            warningWriter.println("Warning: Kafka 'socket.timeout.ms' property extracted from properties file, which is deprecated.  Use --timeout argument instead.");
         }
 
         // socket.receive.buffer.bytes
         prop = props.getProperty("socket.receive.buffer.bytes", null);
         if (prop != null) {
             buffersize = Integer.parseInt(prop);
-            warningWriter.println("Warning: Kafka 'socket.receive.buffer.bytes' property extracted from properties file, which is deprecated.  Use --buffersize argument instead.");
         }
 
     }
@@ -222,9 +220,6 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         }
         if (!servers.trim().isEmpty()) {
             warningWriter.println("Warning: --servers argument is deprecated; please use --host instead.");
-        }
-        if (!config.trim().isEmpty()) {
-            warningWriter.println("Warning: --config argument is deprecated, please consult the documentation.");
         }
         if (!port.trim().isEmpty()) {
             warningWriter.println("Warning: --port argument is deprecated, please use --host with <host:port> URIs instead.");
