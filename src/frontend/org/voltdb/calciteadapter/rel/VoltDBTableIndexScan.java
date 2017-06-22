@@ -29,7 +29,7 @@ import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.catalog.Index;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 
 public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements VoltDBRel {
 
@@ -45,7 +45,6 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
     protected VoltDBTableIndexScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable, RexProgram program, Index index) {
           super(cluster, table, voltDBTable, program);
-
           assert(index != null);
           m_index = index;
     }
@@ -71,16 +70,15 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
     @Override
     public AbstractPlanNode toPlanNode() {
 
-        SeqScanPlanNode sspn = new SeqScanPlanNode();
         List<String> qualName = table.getQualifiedName();
-        sspn.setTargetTableAlias(qualName.get(0));
-        sspn.setTargetTableName(m_voltDBTable.getCatTable().getTypeName());
+        IndexScanPlanNode ispn =
+                new IndexScanPlanNode(m_voltDBTable.getCatTable().getTypeName(), qualName.get(0), m_index);
 
-        addPredicate(sspn);
-        addLimitOffset(sspn);
-        addProjection(sspn);
+        addPredicate(ispn);
+        addLimitOffset(ispn);
+        addProjection(ispn);
 
-        return sspn;
+        return ispn;
     }
 
     public RelNode copy(RexProgram program, RexBuilder programRexBuilder) {

@@ -233,6 +233,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
                     indexProgramTuple.right,
                     indexProgramTuple.left);
         }
+
         newScan.m_limit = relScan.m_limit;
         newScan.m_offset = relScan.m_offset;
 
@@ -241,22 +242,26 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
 
     private static Pair<Index, RexProgram> selectScanIndex(AbstractVoltDBTableScan relScan, RexProgram program) {
         Pair<Index, RexProgram> indexProgramTuple = null;
-        RexLocalRef condition = program.getCondition();
-        if (condition == null) {
-            // The filter is null - no index
-            return indexProgramTuple;
+
+        // @TODO for now
+        if ("RI1".equals(relScan.getVoltDBTable().getCatTable().getTypeName())) {
+
+            RexLocalRef condition = program.getCondition();
+            if (condition == null) {
+                // The filter is null - no index
+                return indexProgramTuple;
+            }
+
+            AbstractExpression filter = RexConverter.convert(program.expandLocalRef(condition));
+            // Iterate over table indexes and pick the best one
+            VoltDBTable voltTable = relScan.getVoltDBTable();
+            assert(voltTable != null);
+            Table catTable = voltTable.getCatTable();
+            assert(catTable != null);
+            for (Index index : catTable.getIndexes()) {
+                return new Pair<Index, RexProgram>(index, program);
+            }
         }
-
-        AbstractExpression filter = RexConverter.convert(program.expandLocalRef(condition));
-        // Iterate over table indexes and pick the best one
-        VoltDBTable voltTable = relScan.getVoltDBTable();
-        assert(voltTable != null);
-        Table catTable = voltTable.getCatTable();
-        assert(catTable != null);
-        for (Index index : catTable.getIndexes()) {
-
-        }
-
 
         return indexProgramTuple;
     }
