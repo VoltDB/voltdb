@@ -686,10 +686,14 @@
                         .classed("legend-color-guide", true)
                         .append("div")
                         .style("background-color", function (p) { return p.color });
-                else
-                    trowEnter.append("td")
-                        .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ d.series[0].key +"</span>" );
-
+                else{
+                    if((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Combined") && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "MP")
+                        trowEnter.append("td")
+                            .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
+                    else
+                        trowEnter.append("td")
+                            .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ d.series[0].key +"</span>" );
+                }
                 //trowEnter.append("td")
                 //    .classed("key", true)
                 //    .html(function (p, i) { return keyFormatter(p.key, i) });
@@ -725,8 +729,15 @@
                     }
                 });
                 if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
+                    var trowEnter0 = tbodyEnter.selectAll("tr")
+                    .append("tr");
 
-                    var trowEnter1 = tbodyEnter.selectAll("tr")
+                    trowEnter0.append("td")
+                    .html("Type")
+                    trowEnter0.append("td")
+                        .html(VoltDbAnalysis.procedureValue[d.data.label].TYPE == undefined ? "Unknown" : VoltDbAnalysis.procedureValue[d.data.label].TYPE);
+
+                    var trowEnter1 = tbodyEnter
                     .append("tr");
 
                     trowEnter1.append("td")
@@ -788,8 +799,6 @@
                             .html(VoltDbAnalysis.latencyDetail[d.data.label].MAX);
 
                 }
-
-
 
                 var html = table.node().outerHTML;
                 if (d.footer !== undefined)
@@ -9073,6 +9082,7 @@
                 }
 
                 barsEnter.append('text');
+                barsEnter.append("foreignObject");
 
                 if (showValues && !stacked) {
                     bars.select('text')
@@ -9088,9 +9098,30 @@
                                 return t + '±' + valueFormat(Math.abs(yerr));
                             return t + '+' + valueFormat(Math.abs(yerr[1])) + '-' + valueFormat(Math.abs(yerr[0]));
                         });
+                    bars.select('foreignObject')
+                        .attr("style", 'height:10px; width:10px;color:#C12026;font-size:25px;font-weight:600;cursor:default')
+                        .html(function (d, i){
+                            if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Combined")
+                            && VoltDbAnalysis.procedureValue[d.label].COMBINED > 20
+                            && VoltDbAnalysis.procedureValue[d.label].TYPE == "MP")
+                                return "&#9888;";
+                            else
+                                return "";
+                        })
                     bars.watchTransition(renderWatch, 'multibarhorizontal: bars')
                         .select('text')
                         .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) + 4 })
+
+                    bars.watchTransition(renderWatch, 'multibarhorizontal: bars')
+                        .select('foreignObject')
+                        .attr('x', (function (d, i) {
+                            var charLength = d.value.toString().length - 1
+                            var xLength = getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) + 16 + (6.5 * charLength);
+                            if(d.key == "Combined")
+                                xLength = xLength - 52;
+                            return xLength;
+                        }))
+                        .attr('y', 8)
                 } else {
                     bars.selectAll('text').text('');
                 }

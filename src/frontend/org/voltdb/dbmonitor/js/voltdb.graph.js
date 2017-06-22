@@ -434,11 +434,16 @@
                 ChartLatencyAnalysis.xAxis
                     .axisLabelDistance(10)
                 ChartLatencyAnalysis.yAxis.axisLabelDistance(10)
-                ChartLatencyAnalysis.margin({"left":174, "right":50})
+                ChartLatencyAnalysis.margin({"left":174, "right":60})
                 d3.select('#visualiseLatencyAnalysis')
                     .datum(dataLatencyAnalysis)
                     .transition().duration(350)
                     .call(ChartLatencyAnalysis);
+                d3.selectAll("#visualiseLatencyAnalysis .nv-barsWrap .nv-bar rect")
+                .style("fill", function(d, i){
+                    var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
+                    return procedureType == "MP" ? "#14416d":"#1B87C8";
+                });
                 nv.utils.windowResize(updateLatencyAnalysis);
                 return ChartLatencyAnalysis;
             });
@@ -458,12 +463,17 @@
                 ChartFrequencyAnalysis.xAxis
                     .axisLabelDistance(10)
                 ChartFrequencyAnalysis.yAxis.axisLabelDistance(10)
-                ChartFrequencyAnalysis.margin({"left":174, "right":50})
+                ChartFrequencyAnalysis.margin({"left":174, "right":60})
                 d3.select('#visualiseFrequencyAnalysis')
                     .datum(dataFrequencyAnalysis)
                     .transition().duration(350)
                     .call(ChartFrequencyAnalysis);
-
+                d3.selectAll("#visualiseFrequencyAnalysis .nv-barsWrap .nv-bar rect")
+                .style("fill", function(d, i){
+                    debugger;
+                    var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
+                    return procedureType == "MP" ? "#14416d":"#1B87C8";
+                });
                 nv.utils.windowResize(ChartFrequencyAnalysis.update);
                 return ChartFrequencyAnalysis;
             });
@@ -483,12 +493,17 @@
                 ChartCombinedAnalysis.xAxis
                     .axisLabelDistance(10)
                 ChartCombinedAnalysis.yAxis.axisLabelDistance(10)
-                ChartCombinedAnalysis.margin({"left":174, "right":50})
+                ChartCombinedAnalysis.margin({"left":174, "right":60})
                 d3.select('#visualiseCombinedAnalysis')
                     .datum(dataCombinedAnalysis)
                     .transition().duration(350)
                     .call(ChartCombinedAnalysis);
-
+                d3.selectAll("#visualiseCombinedAnalysis .nv-barsWrap .nv-bar rect")
+                .style("fill", function(d, i){
+                    debugger;
+                    var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
+                    return procedureType == "MP" ? "#14416d":"#1B87C8";
+                });
                 nv.utils.windowResize(ChartCombinedAnalysis.update);
                 return ChartCombinedAnalysis;
             });

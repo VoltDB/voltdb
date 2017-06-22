@@ -75,9 +75,10 @@ function loadAnalysisPage(){
                     {
                         AVG: profileData["PROCEDURE_PROFILE"][i].AVG/1000000,
                         INVOCATIONS: profileData["PROCEDURE_PROFILE"][i].INVOCATIONS,
-                        COMBINED: combinedWeight
+                        COMBINED: combinedWeight,
+                        //TYPE:(i == 0 ? "MP" : "SP"),
+                        WEIGHTED_PERC: profileData["PROCEDURE_PROFILE"][i].WEIGHTED_PERC
                     }
-
                 dataLatency.push({"label": procedureName , "value": profileData["PROCEDURE_PROFILE"][i].AVG/1000000})
                 dataFrequency.push({"label": procedureName, "value": profileData["PROCEDURE_PROFILE"][i].INVOCATIONS})
                 dataCombined.push({"label": procedureName, "value": combinedWeight})
