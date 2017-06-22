@@ -125,7 +125,6 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
             map = cf.get();
         } catch (InterruptedException | ExecutionException e) {
             hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
-            // Revert the changes in ZooKeeper
             throw new VoltAbortException(e);
         }
 

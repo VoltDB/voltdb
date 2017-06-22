@@ -3358,6 +3358,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
             }
 
+            // A temporary context to be created for writing the updated jar
+            // The context will be updated later in @UpdateCore call
+            // Note that the txn id and unique id should not matter for writing
+            // the catalog jar to disk
             CatalogContext temp_catalogContext =
                     m_catalogContext.update(
                             currentTxnId,
@@ -3374,7 +3378,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    // TODO: check any other usages of catalogUpdate and update if necessary
     @Override
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
             String diffCommands,
@@ -3423,9 +3426,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 byte[] oldDeployHash = m_catalogContext.deploymentHash;
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
-                // 0. A new catalog! Update the global context and the context tracker
-                // TODO: The best option is not to call this function twice, use a separate method
-                // for writing the temp jar file
                 m_catalogContext =
                     m_catalogContext.update(
                             currentTxnId,
@@ -3540,8 +3540,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
                 }
 
-                // TODO: write the temporary jar file first,
-                // then update all these contexts above
                 new ConfigLogging().logCatalogAndDeployment();
 
                 // log system setting information if the deployment config has changed
