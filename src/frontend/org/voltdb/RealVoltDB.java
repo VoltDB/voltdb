@@ -3969,7 +3969,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         try {
-            if (m_adminListener != null) {
+            if (m_adminListener != null && !m_rejoining) {
                 m_adminListener.start();
             }
         } catch (Exception e) {

@@ -960,7 +960,7 @@ public class HTTPAdminListener {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
                 response.setContentType(JSON_CONTENT_TYPE);
                 if (m_jsonEnabled) {
-                    if (target.equals("/") && !VoltDB.instance().rejoining()) {
+                    if (target.equals("/")) {
                         httpClientInterface.process(baseRequest, response);
                     } else {
                         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
