@@ -112,11 +112,10 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         List<String> hostPorts = m_config.getVoltHosts();
         m_client = getVoltClient(c_config, hostPorts);
 
-        // Create an executor on which to run the success callback:
-        String procName = (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table) + "-callbackproc";
-        m_callbackExecutor = CoreUtils.getSingleThreadExecutor(procName + "-" + Thread.currentThread().getName());
-
         if (m_config.useSuppliedProcedure) {
+            // Create an executor on which to run the success callback. For the direct-to-table bulk case, that loader already has an executor.
+            String procName = (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table) + "-callbackproc";
+            m_callbackExecutor = CoreUtils.getSingleThreadExecutor(procName + "-" + Thread.currentThread().getName());
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback(), m_callbackExecutor);
         } else {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batchsize, m_config.update, new KafkaBulkLoaderCallback());
