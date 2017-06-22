@@ -603,6 +603,9 @@ public class LeaderAppointer implements Promotable
                     isInitialized = partitionState[0] == LeaderElector.INITIALIZED;
                 }
 
+                List<String> replicas = childrenCallbacks.poll().getChildren();
+                if (pid == MpInitiator.MP_INIT_PID) continue;
+
                 if (!isInitialized) {
                     // The replicas may still be in the process of adding themselves to the dir.
                     // So don't check for k-safety if that's the case.
@@ -610,8 +613,6 @@ public class LeaderAppointer implements Promotable
                 }
                 final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
 
-                List<String> replicas = childrenCallbacks.poll().getChildren();
-                if (pid == MpInitiator.MP_INIT_PID) continue;
                 if (replicas.isEmpty()) {
                     if (partitionNotOnHashRing) {
                         // no replica for the new partition, clean it up
