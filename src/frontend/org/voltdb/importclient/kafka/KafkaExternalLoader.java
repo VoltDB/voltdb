@@ -46,6 +46,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.ImporterLogger;
@@ -112,13 +113,17 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         List<String> hostPorts = m_config.getVoltHosts();
         m_client = getVoltClient(c_config, hostPorts);
 
+        KafkaBulkLoaderCallback kafkaBulkLoaderCallback = new KafkaBulkLoaderCallback();
+
         if (m_config.useSuppliedProcedure) {
             // Create an executor on which to run the success callback. For the direct-to-table bulk case, that loader already has an executor.
             String procName = (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table) + "-callbackproc";
             m_callbackExecutor = CoreUtils.getSingleThreadExecutor(procName + "-" + Thread.currentThread().getName());
-            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback(), m_callbackExecutor);
+
+
+            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, kafkaBulkLoaderCallback, m_callbackExecutor, kafkaBulkLoaderCallback);
         } else {
-            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batchsize, m_config.update, new KafkaBulkLoaderCallback());
+            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batchsize, m_config.update, kafkaBulkLoaderCallback, kafkaBulkLoaderCallback);
         }
 
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
@@ -154,7 +159,18 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
     /*
      * Error callback from the CSV loader in case of trouble writing to Volt.
      */
-    private class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler {
+    private class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler, BulkLoaderSuccessCallback {
+
+        @Override
+        public void success(Object rowHandle, ClientResponse response) {
+            RowWithMetaData metaData = (RowWithMetaData) rowHandle;
+            try {
+                metaData.procedureCallback.clientCallback(response);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
 
         @Override
         public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {

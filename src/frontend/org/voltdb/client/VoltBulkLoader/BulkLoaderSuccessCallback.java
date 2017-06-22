@@ -23,11 +23,11 @@ import org.voltdb.client.ClientResponse;
  * @author jcrump
  *
  */
-public interface ImportSuccessCallback {
+public interface BulkLoaderSuccessCallback {
 
     /**
      * Callback for successful row import.  Callers are reponsible for managing their own exception reporting.
      */
-    public void success(ClientResponse response);
+    public void success(Object rowHandle, ClientResponse response);
 
 }

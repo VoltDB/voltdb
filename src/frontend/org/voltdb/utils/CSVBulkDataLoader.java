@@ -25,7 +25,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
-import org.voltdb.client.VoltBulkLoader.ImportSuccessCallback;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /**
@@ -41,6 +41,12 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
             BulkLoaderErrorHandler errHandler) throws Exception    {
         m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback());
+        m_errHandler = errHandler;
+    }
+
+    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
+            BulkLoaderErrorHandler errHandler, BulkLoaderSuccessCallback successCallback) throws Exception {
+        m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback(), successCallback);
         m_errHandler = errHandler;
     }
 
@@ -63,8 +69,8 @@ public class CSVBulkDataLoader implements CSVDataLoader {
         @Override
         public void callback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             if (response.getStatus() == ClientResponse.SUCCESS) {
-                if (rowHandle instanceof ImportSuccessCallback) {
-                    ((ImportSuccessCallback) rowHandle).success(response);
+                if (rowHandle instanceof BulkLoaderSuccessCallback) {
+                    ((BulkLoaderSuccessCallback) rowHandle).success(rowHandle, response);
                 }
             }
             else {

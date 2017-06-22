@@ -25,6 +25,7 @@ import java.net.UnknownHostException;
 import java.util.List;
 
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /**
@@ -432,6 +433,7 @@ public interface Client {
      */
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack callback) throws Exception;
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack callback) throws Exception;
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception;
 
     /**
      * <p>

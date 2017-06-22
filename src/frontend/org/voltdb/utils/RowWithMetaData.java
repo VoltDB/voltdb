@@ -19,10 +19,10 @@ package org.voltdb.utils;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.VoltBulkLoader.ImportSuccessCallback;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 
 //Processor queue to keep track of line data and number and such.
-public class RowWithMetaData implements ImportSuccessCallback {
+public class RowWithMetaData implements BulkLoaderSuccessCallback {
 
     final public Object rawLine;
     final public long lineNumber;
@@ -42,7 +42,7 @@ public class RowWithMetaData implements ImportSuccessCallback {
     }
 
     @Override
-    public void success(ClientResponse response) {
+    public void success(Object rowHandle, ClientResponse response) {
         if (procedureCallback != null) {
             try {
                 procedureCallback.clientCallback(response);

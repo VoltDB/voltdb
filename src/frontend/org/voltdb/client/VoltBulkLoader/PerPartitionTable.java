@@ -74,6 +74,8 @@ public class PerPartitionTable {
     final String m_tableName;
     // Upsert Mode Flag
     final byte m_upsert;
+    // Callback for per-row success notification
+    final BulkLoaderSuccessCallback m_successCallback;
 
     // Callback for batch submissions to the Client. A failed request submits the entire
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
@@ -104,19 +106,16 @@ public class PerPartitionTable {
                 // For each row in the batch, notify the caller of success, so it can do any
                 // necessary bookkeeping (like managing offsets, for example). Do this in the executor
                 // so as not to hold up the callback.
-                m_es.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        for (VoltBulkLoaderRow r : m_batchRowList) {
-                            // If the row has a per-row success callback, invoke it. This lets us track things like
-                            // Kafka offsets.  We might  be able to optimize this by bringing the metadata outside of the
-                            // row and calling back on a batch  basis, but for now this will work.
-                            if (r.m_rowHandle != null && r.m_rowHandle instanceof ImportSuccessCallback) {
-                                ((ImportSuccessCallback) r.m_rowHandle).success(response);
+                if (m_successCallback != null) {
+                    m_es.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            for (VoltBulkLoaderRow r : m_batchRowList) {
+                                m_successCallback.success(r.m_rowHandle, response);
                             }
                         }
-                    }
-                });
+                    });
+                }
 
                 m_batchRowList.get(0).m_loader.m_loaderCompletedCnt.addAndGet(m_batchRowList.size());
                 m_batchRowList.get(0).m_loader.m_outstandingRowCount.addAndGet(-1 * m_batchRowList.size());
@@ -125,7 +124,7 @@ public class PerPartitionTable {
     }
 
     PerPartitionTable(ClientImpl clientImpl, String tableName, int partitionId, boolean isMP,
-            VoltBulkLoader firstLoader, int minBatchTriggerSize) {
+            VoltBulkLoader firstLoader, int minBatchTriggerSize, BulkLoaderSuccessCallback successCallback) {
         m_clientImpl = clientImpl;
         m_partitionId = partitionId;
         m_isMP = isMP;
@@ -138,7 +137,7 @@ public class PerPartitionTable {
         m_columnTypes = firstLoader.m_columnTypes;
         m_partitionColumnType = firstLoader.m_partitionColumnType;
         m_tableName = tableName;
-
+        m_successCallback = successCallback;
         m_table = new VoltTable(m_columnInfo);
 
         m_es = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);

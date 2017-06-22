@@ -65,6 +65,7 @@ import org.mockito.Mockito;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
@@ -306,6 +307,12 @@ public class MockVoltClient implements Client {
     @Override
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize,
             boolean upsert, BulkLoaderFailureCallBack callback) throws Exception {
+        return null;
+    }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode,
+            BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
         return null;
     }
 

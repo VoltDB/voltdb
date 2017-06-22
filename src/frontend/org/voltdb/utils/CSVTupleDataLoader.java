@@ -33,7 +33,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.VoltBulkLoader.ImportSuccessCallback;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 
 import com.google_voltpatches.common.collect.Lists;
 
@@ -52,6 +52,8 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     final AtomicLong m_processedCount = new AtomicLong(0);
     final AtomicLong m_failedCount = new AtomicLong(0);
     final int m_reportEveryNRows = 10000;
+
+    final BulkLoaderSuccessCallback m_successCallback;
 
     @Override
     public void setFlushInterval(int delay, int seconds) {
@@ -84,12 +86,12 @@ public class CSVTupleDataLoader implements CSVDataLoader {
         public void clientCallback(final ClientResponse response) throws Exception {
             byte status = response.getStatus();
             if (status == ClientResponse.SUCCESS) {
-                if (m_callbackExecutor != null && m_csvLine instanceof ImportSuccessCallback) {
+                if (m_callbackExecutor != null && m_successCallback != null) {
                     // If the client is keeping track of offsets, notify it (but run on a service thread)
                     m_callbackExecutor.execute(new Runnable() {
                         @Override
                         public void run() {
-                            m_csvLine.success(response);
+                            m_successCallback.success(m_csvLine, response);
                         }
                     });
                 }
@@ -113,12 +115,18 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     }
 
     public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler, ExecutorService callbackExecutor)
+            throws IOException, ProcCallException {
+        this(client, procName, errHandler, callbackExecutor, null);
+    }
+
+    public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler, ExecutorService callbackExecutor, BulkLoaderSuccessCallback successCallback)
             throws IOException, ProcCallException
     {
         m_client = client;
         m_insertProcedure = procName;
         m_errHandler = errHandler;
         m_callbackExecutor = callbackExecutor;
+        m_successCallback = successCallback;
 
         List<VoltType> typeList = Lists.newArrayList();
         VoltTable procInfo = client.callProcedure("@SystemCatalog", "PROCEDURECOLUMNS").getResults()[0];

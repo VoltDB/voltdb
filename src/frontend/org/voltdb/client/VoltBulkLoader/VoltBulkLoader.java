@@ -113,8 +113,13 @@ public class VoltBulkLoader {
             BulkLoaderFailureCallBack blfcb) throws Exception {
         this(vblGlobals,tableName,maxBatchSize,false,blfcb);
     }
+
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
-                BulkLoaderFailureCallBack callback) throws Exception {
+            BulkLoaderFailureCallBack callback) throws Exception {
+        this(vblGlobals, tableName, maxBatchSize, upsertMode, callback, null);
+    }
+    public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
+                BulkLoaderFailureCallBack callback, BulkLoaderSuccessCallback successCallback) throws Exception {
         this.m_clientImpl = vblGlobals.m_clientImpl;
         this.m_maxBatchSize = maxBatchSize;
         this.m_notificationCallBack = callback;
@@ -242,7 +247,7 @@ public class VoltBulkLoader {
             // Set up the BulkLoaderPerPartitionTables
             for(int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++) {
                 m_partitionTable[i] = new PerPartitionTable(m_clientImpl, m_tableName,
-                        i, i == m_maxPartitionProcessors-1, this, maxBatchSize);
+                        i, i == m_maxPartitionProcessors-1, this, maxBatchSize, successCallback);
             }
             loaderList = new ArrayList<VoltBulkLoader>();
             loaderList.add(this);

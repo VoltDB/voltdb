@@ -46,6 +46,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
@@ -1009,7 +1010,7 @@ public final class ClientImpl implements Client {
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack blfcb) throws Exception
     {
         synchronized(m_vblGlobals) {
-            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, blfcb);
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, blfcb, null);
         }
     }
 
@@ -1018,6 +1019,13 @@ public final class ClientImpl implements Client {
     {
         synchronized(m_vblGlobals) {
             return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, callback);
+        }
+    }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
+        synchronized(m_vblGlobals) {
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, successCallback);
         }
     }
 
