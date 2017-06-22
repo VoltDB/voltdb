@@ -346,8 +346,13 @@ public class CatalogContext {
     {
         File catalog_file = new VoltFile(path, name);
         File catalog_tmp_file = new VoltFile(path, name + ".tmp");
-        if (catalog_file.exists() && !catalog_tmp_file.exists())
+        if (catalog_file.exists())
         {
+            if (catalog_tmp_file.exists()) {
+                // There might be some leftover files from previous aborted
+                // catalog updates
+                catalog_tmp_file.delete();
+            }
             m_jarfile.writeToFile(catalog_tmp_file);
         } else {
             throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
