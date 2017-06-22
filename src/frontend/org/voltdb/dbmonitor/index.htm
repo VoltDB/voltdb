@@ -458,8 +458,22 @@
                                             </ul>
 
                                             <div class="tab_container subAnalysisTab_container">
-                                                <div class="legendAnalysis"><span class="circle"></span>
-                                                    <span id="spanAnalysisLegend">Execution Time</span></div>
+                                                <div id="legendAnalysisP" class="legendAnalysis">
+                                                    <span class="circle"></span>
+                                                    <span class="spnAnalysisLegend">Execution Time</span>
+                                                </div>
+                                                <div id="legendAnalysisMP" class="legendAnalysis" style="display:none">
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span class="spnAnalysisLegend">Execution Time</span>
+                                                </div>
+                                                <div id="legendAnalysisBoth" class="legendAnalysis" style="display:none">
+                                                    <span class="spnAnalysisLegend">Execution Time (</span>
+                                                    <span class="circle"></span>
+                                                    <span>Partitioned</span>
+                                                    <span class="circle_dark_blue"></span>
+                                                    <span>Multi Partitioned</span>
+                                                    <span>)</span>
+                                                </div>
                                                 <div class="clear"></div>
                                                 <div id="tabLatency" class="tab_content tab_content_procedure">
                                                     <div style="height: 400px; overflow-y:scroll;" class="">
