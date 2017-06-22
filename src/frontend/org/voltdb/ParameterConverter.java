@@ -276,32 +276,36 @@ public class ParameterConverter {
         if (inputClz == Long.class) {
             if (expectedClz == long.class) return param;
             if ((Long) param == VoltType.NULL_BIGINT) return nullValueForType(expectedClz);
+            if (expectedClz == Long.class) return param;
             numberParam = (Number) param;
         }
         else if (inputClz == Integer.class) {
             if (expectedClz == int.class) return param;
             if ((Integer) param == VoltType.NULL_INTEGER) return nullValueForType(expectedClz);
-            if (expectedClz == long.class) return ((Integer) param).longValue();
+            if (expectedClz == Integer.class) return param;
+            if (expectedClz == long.class || expectedClz == Long.class) return ((Integer) param).longValue();
             numberParam = (Number) param;
         }
         else if (inputClz == Short.class) {
             if (expectedClz == short.class) return param;
             if ((Short) param == VoltType.NULL_SMALLINT) return nullValueForType(expectedClz);
-            if (expectedClz == long.class) return ((Short) param).longValue();
-            if (expectedClz == int.class) return ((Short) param).intValue();
+            if (expectedClz == Short.class) return param;
+            if (expectedClz == long.class || expectedClz == Long.class) return ((Short) param).longValue();
+            if (expectedClz == int.class || expectedClz == Integer.class) return ((Short) param).intValue();
             numberParam = (Number) param;
         }
         else if (inputClz == Byte.class) {
             if (expectedClz == byte.class) return param;
             if ((Byte) param == VoltType.NULL_TINYINT) return nullValueForType(expectedClz);
-            if (expectedClz == long.class) return ((Byte) param).longValue();
-            if (expectedClz == int.class) return ((Byte) param).intValue();
-            if (expectedClz == short.class) return ((Byte) param).shortValue();
+            if (expectedClz == long.class || expectedClz == Long.class) return ((Byte) param).longValue();
+            if (expectedClz == int.class || expectedClz == Integer.class) return ((Byte) param).intValue();
+            if (expectedClz == short.class || expectedClz == Short.class) return ((Byte) param).shortValue();
             numberParam = (Number) param;
         }
         else if (inputClz == Double.class) {
             if (expectedClz == double.class) return param;
             if ((Double) param == VoltType.NULL_FLOAT) return nullValueForType(expectedClz);
+            if (expectedClz == Double.class) return param;
         }
         else if (inputClz == String.class) {
             String stringParam = (String)param;
