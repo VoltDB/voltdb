@@ -470,7 +470,6 @@
                     .call(ChartFrequencyAnalysis);
                 d3.selectAll("#visualiseFrequencyAnalysis .nv-barsWrap .nv-bar rect")
                 .style("fill", function(d, i){
-                    debugger;
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
                     return procedureType == "MP" ? "#14416d":"#1B87C8";
                 });
@@ -500,7 +499,6 @@
                     .call(ChartCombinedAnalysis);
                 d3.selectAll("#visualiseCombinedAnalysis .nv-barsWrap .nv-bar rect")
                 .style("fill", function(d, i){
-                    debugger;
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
                     return procedureType == "MP" ? "#14416d":"#1B87C8";
                 });

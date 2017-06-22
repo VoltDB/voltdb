@@ -9099,7 +9099,9 @@
                             return t + '+' + valueFormat(Math.abs(yerr[1])) + '-' + valueFormat(Math.abs(yerr[0]));
                         });
                     bars.select('foreignObject')
-                        .attr("style", 'height:10px; width:10px;color:#C12026;font-size:25px;font-weight:600;cursor:default')
+                        .attr("style", 'color:#C12026;font-size:25px;font-weight:600;cursor:default')
+                        .attr("height", "22px")
+                        .attr("width", "22px")
                         .html(function (d, i){
                             if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Combined")
                             && VoltDbAnalysis.procedureValue[d.label].COMBINED > 20
@@ -9118,10 +9120,10 @@
                             var charLength = d.value.toString().length - 1
                             var xLength = getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) + 16 + (6.5 * charLength);
                             if(d.key == "Combined")
-                                xLength = xLength - 52;
+                                xLength = xLength + 52;
                             return xLength;
                         }))
-                        .attr('y', 8)
+                        .attr('y', 22)
                 } else {
                     bars.selectAll('text').text('');
                 }
