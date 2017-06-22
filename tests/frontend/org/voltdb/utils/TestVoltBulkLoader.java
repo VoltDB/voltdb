@@ -1335,7 +1335,7 @@ public class TestVoltBulkLoader extends TestCase {
                 bulkLoaders[i] = client.getNewBulkLoader("test1", 50, new BulkLoaderFailureCallBack() {
 
                     @Override
-                    public void failureCallback(Object arg0, Object[] arg1, ClientResponse arg2)
+                    public void callback(Object arg0, Object[] arg1, ClientResponse arg2)
                     {
                         System.out.println("Insert failed: " + arg0);
                     }
