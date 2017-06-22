@@ -3426,6 +3426,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 byte[] oldDeployHash = m_catalogContext.deploymentHash;
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
+                // 0. A new catalog! Update the global context and the context tracker                
                 m_catalogContext =
                     m_catalogContext.update(
                             currentTxnId,
