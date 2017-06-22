@@ -49,19 +49,6 @@ public class WriteCatalog extends UpdateApplicationBase {
         String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
         byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
 
-//        CatalogAndIds catalogStuff = null;
-//        try {
-//            catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-//        } catch (Exception e) {
-//            Throwables.propagate(e);
-//        }
-
-//        log.warn("=================== WriteCatalog ===================");
-//        log.warn("expected cat version: " +  expectedCatalogVersion);
-//        log.warn(catalogDiffCommands);
-//        log.warn(deploymentString);
-//        log.warn("====================================================");
-
         // This should only be called once on each host
         try {
             VoltDB.instance().writeCatalogJar(
