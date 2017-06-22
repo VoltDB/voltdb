@@ -272,8 +272,9 @@ public class ExportManager
             //We close and delete regardless
             drainedGeneration.closeAndDelete(m_messenger);
         } catch (IOException e) {
-            e.printStackTrace();
-            exportLog.error(e);
+            //Warn users if close or delete of PBDs has issues the generation is closed and thus on startup will be attempted
+            //to load and delete if empty.
+            exportLog.warn("Failed to close and delete generation files.", e);
         }
     }
 

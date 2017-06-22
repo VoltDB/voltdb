@@ -399,25 +399,25 @@ public class VoltBulkLoader {
 
         // Remove this VoltBulkLoader from the active set.
         synchronized (m_vblGlobals) {
+            drain();
+
             List<VoltBulkLoader> loaderList = m_vblGlobals.m_TableNameToLoader.get(m_tableName);
             if (loaderList.size() == 1) {
                 m_vblGlobals.m_TableNameToLoader.remove(m_tableName);
-            }
-            else
-                loaderList.remove(this);
 
-            // First flush the tables
-            // keep one PerPartitionTable around so we can use it as the poisoned
-            // table for the PartitionProcessors
-            drain();
-            for (PerPartitionTable ppt : m_partitionTable) {
-                if (ppt != null) {
-                    try {
-                        ppt.shutdown();
-                    } catch (Exception e) {
-                        loaderLog.error("Failed to close processor for partition " + ppt.m_partitionId, e);
+                // We are the last loader for this table,
+                // shutdown the PerPartitionTable instances
+                for (PerPartitionTable ppt : m_partitionTable) {
+                    if (ppt != null) {
+                        try {
+                            ppt.shutdown();
+                        } catch (Exception e) {
+                            loaderLog.error("Failed to close processor for partition " + ppt.m_partitionId, e);
+                        }
                     }
                 }
+            } else {
+                loaderList.remove(this);
             }
         }
 
