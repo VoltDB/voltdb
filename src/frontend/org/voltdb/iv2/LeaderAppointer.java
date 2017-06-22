@@ -561,19 +561,20 @@ public class LeaderAppointer implements Promotable
     {
         boolean retval = true;
         List<String> partitionDirs = null;
-
-        ImmutableSortedSet.Builder<KSafetyStats.StatsPoint> lackingReplication =
-                ImmutableSortedSet.naturalOrder();
-
         try {
             partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to read partitions from ZK", true, e);
         }
+
         //Don't fetch the values serially do it asynchronously
         Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
         Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<ZKUtil.ChildrenCallback>();
         for (String partitionDir : partitionDirs) {
+            //skip checking MP, not relevant to KSafety
+            int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+            if (pid == MpInitiator.MP_INIT_PID) continue;
+
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
                 ZKUtil.ByteArrayCallback callback = new ZKUtil.ByteArrayCallback();
@@ -586,11 +587,16 @@ public class LeaderAppointer implements Promotable
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
+
+        ImmutableSortedSet.Builder<KSafetyStats.StatsPoint> lackingReplication =
+                ImmutableSortedSet.naturalOrder();
+
         Map<Integer, Host> hostLeaderMap = Maps.newHashMap();
         ImmutableMap<Integer, Long> masters = m_iv2masters.pointInTimeCache();
         final long statTs = System.currentTimeMillis();
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+            if (pid == MpInitiator.MP_INIT_PID) continue;
 
             try {
                 // The data of the partition dir indicates whether the partition has finished
@@ -604,8 +610,6 @@ public class LeaderAppointer implements Promotable
                 }
 
                 List<String> replicas = childrenCallbacks.poll().getChildren();
-                if (pid == MpInitiator.MP_INIT_PID) continue;
-
                 if (!isInitialized) {
                     // The replicas may still be in the process of adding themselves to the dir.
                     // So don't check for k-safety if that's the case.
