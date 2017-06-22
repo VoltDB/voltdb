@@ -54,6 +54,7 @@ Command succeeded.
 
 --- Potential Procedure Classes ------------------------------
  sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -140,6 +141,7 @@ Trivial
 
 --- Potential Procedure Classes ------------------------------
  sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -160,6 +162,7 @@ remove classes sqlcmdtest.*;
 
 --- Potential Procedure Classes ------------------------------
  sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -225,6 +228,7 @@ Command succeeded.
 
 --- Potential Procedure Classes ------------------------------
  sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -277,6 +281,7 @@ Breakable0
 
 --- Potential Procedure Classes ------------------------------
  sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
@@ -354,6 +359,7 @@ Command succeeded.
 
 --- Potential Procedure Classes ------------------------------
  sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable0                 
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
@@ -406,6 +412,7 @@ Breakable0
 
 --- Potential Procedure Classes ------------------------------
  sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
  sqlcmdtest.Breakable1                 
  sqlcmdtest.Breakable2                 
  sqlcmdtest.InsertEmployee             
