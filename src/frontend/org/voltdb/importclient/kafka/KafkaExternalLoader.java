@@ -119,8 +119,6 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
             // Create an executor on which to run the success callback. For the direct-to-table bulk case, that loader already has an executor.
             String procName = (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table) + "-callbackproc";
             m_callbackExecutor = CoreUtils.getSingleThreadExecutor(procName + "-" + Thread.currentThread().getName());
-
-
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, kafkaBulkLoaderCallback, m_callbackExecutor, kafkaBulkLoaderCallback);
         } else {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batchsize, m_config.update, kafkaBulkLoaderCallback, kafkaBulkLoaderCallback);

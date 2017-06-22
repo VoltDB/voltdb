@@ -33,6 +33,7 @@ import org.apache.log4j.Logger;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.FormatterBuilder;
+import org.voltdb.utils.JsonUtils;
 
 import kafka.cluster.Broker;
 import kafka.javaapi.PartitionMetadata;
@@ -300,6 +301,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 throw new KafkaConfigurationException("Failed to get topic metadata for %s", topic);
             }
         }
+
+        configs.entrySet().stream().forEach(c -> m_logger.info(JsonUtils.toJson(c)));
         return configs;
     }
 
