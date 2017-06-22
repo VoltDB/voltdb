@@ -128,9 +128,10 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A RIGHT JOIN R3 ON R3.C = R1.C");
         assertEquals(PlanNodeType.SEND, pn.getPlanNodeType());
         pn = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == pn.getPlanNodeType()) {
-            pn = pn.getChild(0);
-        }
+
+        assertEquals(PlanNodeType.PROJECTION, pn.getPlanNodeType());
+        pn = pn.getChild(0);
+
         verifyJoinNode(pn, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.NESTLOOP, "R3", null);
         pn = pn.getChild(1);
         verifyJoinNode(pn, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R1", "R2");
@@ -138,9 +139,9 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         pn = compile("select * FROM R1 RIGHT JOIN R2 ON R1.A = R2.A RIGHT JOIN R3 ON R3.C = R2.C");
         assertEquals(PlanNodeType.SEND, pn.getPlanNodeType());
         pn = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == pn.getPlanNodeType()) {
-            pn = pn.getChild(0);
-        }
+        assertEquals(PlanNodeType.PROJECTION, pn.getPlanNodeType());
+        pn = pn.getChild(0);
+
         verifyJoinNode(pn, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.NESTLOOP, "R3", null);
         pn = pn.getChild(1);
         verifyJoinNode(pn, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R2", "R1");
@@ -148,9 +149,9 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         pn = compile("select * FROM R1 RIGHT JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R3.C = R1.C");
         assertEquals(PlanNodeType.SEND, pn.getPlanNodeType());
         pn = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == pn.getPlanNodeType()) {
-            pn = pn.getChild(0);
-        }
+        assertEquals(PlanNodeType.PROJECTION, pn.getPlanNodeType());
+        pn = pn.getChild(0);
+
         verifyJoinNode(pn, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOP, PlanNodeType.SEQSCAN, null, "R3");
         pn = pn.getChild(0);
         verifyJoinNode(pn, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R2", "R1");
@@ -170,6 +171,11 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         NestLoopPlanNode nlj = (NestLoopPlanNode) n;
         AbstractExpression p = nlj.getJoinPredicate();
         assertEquals(ExpressionType.CONJUNCTION_OR, p.getExpressionType());
+    }
+
+    private AbstractPlanNode requireProjection(AbstractPlanNode pn) {
+        assertEquals(PlanNodeType.PROJECTION, pn.getPlanNodeType());
+        return pn.getChild(0);
     }
 
     public void testPushDownExprJoin() {
@@ -192,9 +198,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
 
         pn = compile("select * FROM R3 JOIN R2 ON R3.C = R2.C RIGHT JOIN R1 ON R1.C = R2.C  AND R3.A > 0");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.NESTLOOP, "R1", null);
         n = n.getChild(1);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R3", "R2");
@@ -202,9 +206,6 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         // R3.A > 0 gets pushed down all the way to the R3 scan node and used as an index
         pn = compile("select * FROM R2, R3 LEFT JOIN R1 ON R1.C = R2.C WHERE R3.C = R2.C AND R3.A > 0");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOP, PlanNodeType.SEQSCAN, null, "R1");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "R2", "R3");
@@ -212,9 +213,6 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         // R3.A = R2.C gets pushed down to the R2, R3 join node scan node and used as an index
         pn = compile("select * FROM R2, R3 LEFT JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.C");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.SEQSCAN, null, "R1");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.INNER, null, null, null, PlanNodeType.SEQSCAN, null, "R2", "R3");
@@ -228,9 +226,6 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
 
         pn = compile("select * FROM R1, R3 RIGHT JOIN R2 ON R1.A = R2.A WHERE R3.C = R1.C");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOP, PlanNodeType.SEQSCAN);
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
@@ -246,9 +241,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         // The second R3.C = R2.C join condition is NULL-rejecting for the first LEFT join
         pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A RIGHT JOIN R3 ON R3.C = R2.C");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.NESTLOOP, "R3", null);
         n = n.getChild(1);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
@@ -259,9 +252,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "R1 FULL JOIN R2 ON R1.A = R2.A " +
                 "RIGHT JOIN R3 ON R3.A = R1.A");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.NESTLOOP, "R3", null);
         n = n.getChild(1);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R1", "R2");
@@ -272,9 +263,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "R1 FULL JOIN R2 ON R1.A = R2.A " +
                     "RIGHT JOIN R3 ON R3.A = R2.A");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.NESTLOOP, "R3", null);
         n = n.getChild(1);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R2", "R1");
@@ -284,9 +273,6 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "R1 FULL JOIN R2 ON R1.A = R2.A " +
                     "LEFT JOIN R3 ON R3.A = R2.A");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.LEFT, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R3");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R1", "R2");
@@ -297,9 +283,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "R1 FULL JOIN R2 ON R1.A = R2.A " +
                     "RIGHT JOIN R3 ON R3.A = R2.A AND R3.A = R1.A");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.NESTLOOP, "R3", null);
         n = n.getChild(1);
         // HSQL doubles the join expression for the first join. Once it's corrected the join expression type
@@ -317,9 +301,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                     "FULL JOIN R4 ON R1.A = R4.A " +
                         "FULL JOIN R5 ON R1.A = R5.A");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.INDEXSCAN, null, "R5");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R4");
@@ -335,9 +317,6 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                     "JOIN R3 ON R1.A = R3.A " +
                     "FULL JOIN R4 ON R2.A = R4.A");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.INDEXSCAN, null, "R4");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.INNER, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.SEQSCAN, null, "R3");
@@ -350,9 +329,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                     "JOIN R3 ON R1.A = R3.A " +
                     "FULL JOIN R4 ON R1.A = R4.A WHERE R2.A > 0");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.LEFT, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R4");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.SEQSCAN, null, "R2");
@@ -361,13 +338,8 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
 
         // The R1-R2 RIGHT join is an outer node in the top FULL join - not simplified
         pn = compile("SELECT * FROM R1 RIGHT JOIN R2 ON R1.A = R2.A FULL JOIN R3 ON R3.A = R1.A");
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R3");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R2", "R1");
@@ -375,9 +347,6 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         // The R1-R2 LEFT join is an outer node in the top FULL join - not simplified
         pn = compile("SELECT * FROM R1 LEFT JOIN R2 ON R1.A = R2.A FULL JOIN R3 ON R3.A = R2.A");
         n = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R3");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R1", "R2");
@@ -393,9 +362,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = lpn.get(0);
         assertEquals(PlanNodeType.SEND, n.getPlanNodeType());
         n = n.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.RECEIVE);
 
         // R3.A and P2.A have an index. P2,R1 is NLIJ/inlined IndexScan because it's an inner join even P2 is distributed
@@ -404,16 +371,11 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = lpn.get(0);
         assertEquals(PlanNodeType.SEND, n.getPlanNodeType());
         n = n.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         assertTrue(n instanceof ReceivePlanNode);
         n = lpn.get(1);
         assertEquals(PlanNodeType.SEND, n.getPlanNodeType());
         n = n.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.LEFT, null, null, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.INDEXSCAN);
 
         // R3.A has an index. R3,P2 is NLJ because it's an outer join and P2 is distributed
@@ -424,9 +386,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = lpn.get(0);
         assertEquals(PlanNodeType.SEND, n.getPlanNodeType());
         n = n.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.RECEIVE);
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.INNER, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN);
@@ -444,18 +404,12 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = lpn.get(0);
         assertEquals(PlanNodeType.SEND, n.getPlanNodeType());
         n = n.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.INNER, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.SEQSCAN);
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE);
         n = lpn.get(1);
         assertEquals(PlanNodeType.SEND, n.getPlanNodeType());
         n = n.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         // For determinism reason
         assertTrue(n instanceof IndexScanPlanNode);
 
@@ -465,9 +419,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = lpn.get(0);
         assertEquals(PlanNodeType.SEND, n.getPlanNodeType());
         n = n.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         assertTrue(n instanceof ReceivePlanNode);
         n = lpn.get(1);
         assertEquals(PlanNodeType.SEND, n.getPlanNodeType());
@@ -553,9 +505,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "R3 FULL JOIN R1 ON R3.A = R1.A WHERE R3.C IS NULL");
         assert(PlanNodeType.SEND == n.getPlanNodeType());
         n = n.getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, ExpressionType.OPERATOR_IS_NULL, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN);
         String json = (new PlanNodeTree(pn)).toJSONString();
 
@@ -569,44 +519,29 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         pn = compile("select * FROM  " +
                 "R1 FULL JOIN R3 ON R3.C = R1.A AND R3.A > 0");
         pn = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == pn.getPlanNodeType()) {
-            pn = pn.getChild(0);
-        }
         verifyJoinNode(pn, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R1", "R3");
 
         // FULL NLIJ, inner join R3.A > 0 is added as a post-predicate to the inline Index scan
         pn = compile("select * FROM R1 FULL JOIN R3 ON R3.A = R1.A AND R3.A > 55");
         pn = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == pn.getPlanNodeType()) {
-            pn = pn.getChild(0);
-        }
         verifyJoinNode(pn, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "R1", "R3");
         verifyIndexScanNode(pn.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, ExpressionType.COMPARE_GREATERTHAN);
 
         // FULL NLIJ, inner join L.A > 0 is added as a pre-predicate to the NLIJ
         pn = compile("select * FROM R3 L FULL JOIN R3 R ON L.A = R.A AND L.A > 55");
         pn = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == pn.getPlanNodeType()) {
-            pn = pn.getChild(0);
-        }
         verifyJoinNode(pn, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, ExpressionType.COMPARE_GREATERTHAN, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "L", "R");
         verifyIndexScanNode(pn.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, null);
 
         // FULL NLIJ, inner-outer join R3.c = R1.c is a post-predicate for the inline Index scan
         pn = compile("select * FROM R1 FULL JOIN R3 ON R3.A = R1.A AND R3.C = R1.C");
         pn = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == pn.getPlanNodeType()) {
-            pn = pn.getChild(0);
-        }
         verifyJoinNode(pn, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "R1", "R3");
         verifyIndexScanNode(pn.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, ExpressionType.COMPARE_EQUAL);
 
         // FULL NLIJ, outer join (R1, R2) expression R1.A > 0 is a pre-predicate
         pn = compile("select * FROM R1 JOIN R2 ON R1.A = R2.C FULL JOIN R3 ON R3.A = R2.C  AND R1.A > 0");
         pn = pn.getChild(0);
-        if (PlanNodeType.PROJECTION == pn.getPlanNodeType()) {
-            pn = pn.getChild(0);
-        }
         verifyJoinNode(pn, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, ExpressionType.COMPARE_GREATERTHAN, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R3");
         verifyIndexScanNode(pn.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, null);
         n = pn.getChild(0);
@@ -623,9 +558,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "P1 FULL JOIN R2 ON P1.A = R2.A ");
         assertEquals(2, lpn.size());
         n = lpn.get(0).getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE, "R2", null);
 
         // FULL join on partition column
@@ -633,9 +566,6 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "R2 FULL JOIN P1 ON P1.A = R2.A ");
         assertEquals(2, lpn.size());
         n = lpn.get(0).getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE, "R2", null);
 
         // FULL join on non-partition column
@@ -643,9 +573,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "P1 FULL JOIN R2 ON P1.C = R2.A ");
         assertEquals(2, lpn.size());
         n = lpn.get(0).getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE, "R2", null);
 
         // NLJ FULL join (R2, P2) on partition column  R2.A > 0 is a pre-predicate, P2.A = R2.A AND P2.E < 0 are join predicate
@@ -654,9 +582,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "P2 FULL JOIN R2 ON P2.A = R2.A AND R2.A > 0 AND P2.E < 0");
         assertEquals(2, lpn.size());
         n = lpn.get(0).getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, ExpressionType.COMPARE_GREATERTHAN, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE, "R2", null);
 
         // NLJ FULL join (R2, P2) on partition column  P2.E = R2.A AND P2.A > 0 are join predicate
@@ -665,9 +591,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "P2 FULL JOIN R2 ON P2.E = R2.A AND P2.A > 0");
         assertEquals(2, lpn.size());
         n = lpn.get(0).getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE, "R2", null);
 
         // NLJ (R3, P2) on partition column P2.A. R3.A > 0 is a PRE_PREDICTAE
@@ -676,27 +600,19 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "P2 FULL JOIN R3 ON P2.A = R3.A AND R3.A > 0 AND P2.E < 0");
         assertEquals(2, lpn.size());
         n = lpn.get(0).getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
+        n = requireProjection(n);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, ExpressionType.COMPARE_GREATERTHAN, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE, "R3", null);
 
         // FULL NLJ join of two partition tables on partition column
         lpn = compileToFragments("select * FROM  P1 FULL JOIN P4 ON P1.A = P4.A ");
         assertEquals(2, lpn.size());
         n = lpn.get(1).getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "P1", "P4");
 
         // FULL NLIJ (P1,P2) on partition column P2.A
         lpn = compileToFragments("select * FROM P2 FULL JOIN P1 ON P1.A = P2.A AND P2.A > 0");
         assertEquals(2, lpn.size());
         n = lpn.get(1).getChild(0);
-        if (PlanNodeType.PROJECTION == n.getPlanNodeType()) {
-            n = n.getChild(0);
-        }
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "P1", "P2");
         verifyIndexScanNode(n.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, ExpressionType.COMPARE_GREATERTHAN);
 
