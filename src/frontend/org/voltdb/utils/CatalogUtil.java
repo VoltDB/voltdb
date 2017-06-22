@@ -2639,7 +2639,7 @@ public abstract class CatalogUtil {
         try {
             if (paths.getVoltdbroot() == null) {
                 PathsType.Voltdbroot root = new PathsType.Voltdbroot();
-                root.setPath(new File(VoltDB.instance().getVoltDBRootPath()).getCanonicalPath());
+                root.setPath(VoltDB.instance().getVoltDBRootPath());
                 paths.setVoltdbroot(root);
             } else {
                 paths.getVoltdbroot().setPath(new File(VoltDB.instance().getVoltDBRootPath()).getCanonicalPath());
