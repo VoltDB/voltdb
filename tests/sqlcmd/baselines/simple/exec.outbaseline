@@ -1,4 +1,13 @@
 
+drop procedure max_predicates if exists;
+Command succeeded.
+
+drop procedure max_plus_predicates if exists;
+Command succeeded.
+
+drop procedure p if exists;
+Command succeeded.
+
 drop table t if exists;
 Command succeeded.
 
@@ -92,6 +101,7 @@ c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
+Command succeeded.
 
 create table t2 ( c integer, d varchar(4), e varchar(4) );
 Command succeeded.
@@ -347,14 +357,17 @@ C   D   E
 
 (Returned 2 rows in #.##s)
 
-drop table t2;
+drop table t2 if exists;
 Command succeeded.
 
-drop procedure max_predicates;
+drop procedure max_predicates if exists;
 Command succeeded.
 
-drop procedure p;
+drop procedure max_plus_predicates if exists;
 Command succeeded.
 
-drop table t;
+drop procedure p if exists;
+Command succeeded.
+
+drop table t if exists;
 Command succeeded.
