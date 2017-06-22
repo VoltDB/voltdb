@@ -163,19 +163,21 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         assertEquals(expectedCalcitePlan, calcitePlan);
     }
 
+    public void testIndexScanWithRedundantOrderBy() throws Exception {
+        String sql;
+        sql = "select si, i from RI1 where I > 3 order by i limit 3";
+        // ORDER BY is redundant because of the index on I column
+        // LIMIT is inlined with IndexScan
+        String expectedCalcitePlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"ORDERBY\",\"CHILDREN_IDS\":[3],\"SORT_COLUMNS\":[{\"SORT_EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1},\"SORT_DIRECTION\":\"ASC\"},{\"SORT_EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":2},\"SORT_DIRECTION\":\"DESC\"}]},{\"ID\":3,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":4,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"BI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":3}},{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}]}";
+        String calcitePlan = testPlan(sql, PlannerType.CALCITE);
+        assertEquals(expectedCalcitePlan, calcitePlan);
+    }
+
     public void testIndexScanWithOrderBy() throws Exception {
         String sql;
-//        sql = "select bi, i, si from R1 order by i, si desc";
-        sql = "select si from R1 where i > 0 order by i, ti desc";
-//        sql = "select i + 1, si from Ri1 where i > 3 order by i desc";
-
-//        sql = "select ri1.i from R1 join RI1 on r1.i = ri1.i";
-//
-//        sql = "select t1.i from Ri1 t1 join RI1 t2 on t1.i = t2.i order by t1.i, t2.si";
-
-        // Calcite and VoltDB plans differ significantly
-        // Calcite plan is SeqScan -> OrderBy -> Send
-        // VoltDB plan is SeqScan -> OrderBy -> Projection -> Send
+        // ORDER BY is required - Index is on column I
+        // LIMIT is inlined with OrderBy node
+        sql = "select si, i from RI1 where I > 3 order by si limit 3";
         String expectedCalcitePlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"ORDERBY\",\"CHILDREN_IDS\":[3],\"SORT_COLUMNS\":[{\"SORT_EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1},\"SORT_DIRECTION\":\"ASC\"},{\"SORT_EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":2},\"SORT_DIRECTION\":\"DESC\"}]},{\"ID\":3,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":4,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"BI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":6,\"COLUMN_IDX\":3}},{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}},{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}]}";
         String calcitePlan = testPlan(sql, PlannerType.CALCITE);
         assertEquals(expectedCalcitePlan, calcitePlan);
