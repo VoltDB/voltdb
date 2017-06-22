@@ -1371,6 +1371,7 @@ public abstract class CatalogUtil {
                 is = null;
             }
         }
+
         if (is != null) {
             try {
                 is.close();
