@@ -3597,15 +3597,14 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 
 .legendAnalysis { float:right;margin:15px 120px 0 0;}
 .circle {
-    display:block;
+    display:inline-block;
 	width: 12px;
 	height: 12px;
 	background: rgb(27, 135, 200);
 	-moz-border-radius: 50px;
 	-webkit-border-radius: 50px;
 	border-radius: 50px;
-	float:left;
-	margin:1px 2px 0 0;
+	margin:1px 2px -1px 0;
 }
 .circle_green {
     display:block;
@@ -3617,6 +3616,17 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 	border-radius: 50px;
 	float:left;
 	margin:2px 2px 0 0;
+}
+
+.circle_dark_blue {
+    display:inline-block;
+	width: 12px;
+	height: 12px;
+	background: rgb(20, 65, 109);
+	-moz-border-radius: 50px;
+	-webkit-border-radius: 50px;
+	border-radius: 50px;
+	margin:1px 2px -1px 0;
 }
 
 .proDetailsHeightAdjstment {height:400px; overflow-y:scroll; width:800px;}

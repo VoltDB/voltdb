@@ -1841,7 +1841,7 @@ function alertNodeClicked(obj) {
             connection.Metadata['@Statistics_PROCEDUREPROFILE'].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "PROCEDURE"
                 || columnInfo["name"] == "INVOCATIONS" || columnInfo["name"] == "AVG"
-                || columnInfo["name"] == "MIN" || columnInfo["name"] == "MAX")
+                || columnInfo["name"] == "MIN" || columnInfo["name"] == "MAX" || columnInfo["name"] == "WEIGHTED_PERC")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -1857,7 +1857,8 @@ function alertNodeClicked(obj) {
                     INVOCATIONS: info[colIndex["INVOCATIONS"]],
                     AVG: info[colIndex["AVG"]],
                     MIN: info[colIndex["MIN"]],
-                    MAX: info[colIndex["MAX"]]
+                    MAX: info[colIndex["MAX"]],
+                    WEIGHTED_PERC: info[colIndex["WEIGHTED_PERC"]]
                 }
                 procedureProfile["PROCEDURE_PROFILE"].push(profileObj)
             });

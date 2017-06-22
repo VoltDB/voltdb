@@ -7,11 +7,11 @@ function loadAnalysisPage(){
 
     $("#ulProcedure li a").on("click", function(){
         if($($(this)[0]).text() == "Frequency"){
-            $("#spanAnalysisLegend").html("Frequency");
+            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Frequency(" : "Frequency");
         } else if($($(this)[0]).text() == "Combined"){
-            $("#spanAnalysisLegend").html("Combined");
+            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Combined(" : "Combined");
         } else {
-            $("#spanAnalysisLegend").html("Execution Time");
+            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Execution Time(" : "Execution Time");
         }
         VoltDbAnalysis.refreshChart()
     })
@@ -33,6 +33,25 @@ function loadAnalysisPage(){
             }
         }
         return false;
+    }
+
+    function formatAnalysisLegend(isMP, isP){
+        if(isMP && isP){
+            $("#legendAnalysisMP").hide();
+            $("#legendAnalysisP").hide();
+            $("#legendAnalysisBoth").show();
+            VoltDbAnalysis.partitionStatus = "both"
+        } else if(isMP){
+            $("#legendAnalysisMP").show();
+            $("#legendAnalysisP").hide();
+            $("#legendAnalysisBoth").hide();
+            VoltDbAnalysis.partitionStatus = "MP"
+        } else {
+            $("#legendAnalysisMP").hide();
+            $("#legendAnalysisP").show();
+            $("#legendAnalysisBoth").hide();
+            VoltDbAnalysis.partitionStatus = "SP"
+        }
     }
 
     function fetchData (){
@@ -62,6 +81,8 @@ function loadAnalysisPage(){
             var dataCombined = [];
             var timestamp;
             var sumOfAllProcedure = calculateCombinedValue(profileData["PROCEDURE_PROFILE"])
+            var isMPPresent = false;
+            var isPPresent = false;
             for(var i = 0; i < profileData["PROCEDURE_PROFILE"].length; i++){
                 if(i == 0)
                     timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
@@ -70,20 +91,25 @@ function loadAnalysisPage(){
                 var procedureName = profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
                 if(containLongName)
                     procedureName =(i + 1) + ") " + profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
-
+                if(profileData["PROCEDURE_PROFILE"][i].TYPE == "MP")
+                    isMPPresent = true;
+                else
+                    isPPresent = true;
                 VoltDbAnalysis.procedureValue[procedureName] =
                     {
                         AVG: profileData["PROCEDURE_PROFILE"][i].AVG/1000000,
                         INVOCATIONS: profileData["PROCEDURE_PROFILE"][i].INVOCATIONS,
-                        COMBINED: combinedWeight
+                        COMBINED: combinedWeight,
+                        //TYPE:(i == 0 ? "MP" : "SP"),
+                        WEIGHTED_PERC: profileData["PROCEDURE_PROFILE"][i].WEIGHTED_PERC
                     }
-
                 dataLatency.push({"label": procedureName , "value": profileData["PROCEDURE_PROFILE"][i].AVG/1000000})
                 dataFrequency.push({"label": procedureName, "value": profileData["PROCEDURE_PROFILE"][i].INVOCATIONS})
                 dataCombined.push({"label": procedureName, "value": combinedWeight})
             }
             var formatDate = VoltDbAnalysis.formatDateTime(timestamp);
             $("#analysisDate").html(formatDate);
+            formatAnalysisLegend(isMPPresent, isPPresent);
             MonitorGraphUI.initializeAnalysisGraph();
             MonitorGraphUI.RefreshAnalysisLatencyGraph(dataLatency);
             MonitorGraphUI.RefreshAnalysisFrequencyGraph(dataFrequency);
@@ -122,6 +148,7 @@ function loadAnalysisPage(){
         this.procedureValue = {};
         this.latencyDetailValue = [];
         this.latencyDetail = {};
+        this.partitionStatus = "SP"
         this.formatDateTime = function(timestamp) {
         var dateTime = new Date(timestamp);
         //get date
