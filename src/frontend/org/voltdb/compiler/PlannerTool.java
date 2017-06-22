@@ -108,6 +108,10 @@ public class PlannerTool {
         return this;
     }
 
+    public HSQLInterface getHSQLInterface() {
+        return m_hsql;
+    }
+
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();

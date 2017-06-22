@@ -269,6 +269,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_NOT                    = 8, // logical not operator
     EXPRESSION_TYPE_OPERATOR_IS_NULL                = 9, // is null test.
     EXPRESSION_TYPE_OPERATOR_EXISTS                 = 18, // exists test.
+    EXPRESSION_TYPE_OPERATOR_UNARY_MINUS            = 22, // exists test.
 
     // -----------------------------
     // Comparison Operators

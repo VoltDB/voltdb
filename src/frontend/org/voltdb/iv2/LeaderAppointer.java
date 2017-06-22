@@ -591,42 +591,32 @@ public class LeaderAppointer implements Promotable
         final long statTs = System.currentTimeMillis();
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
-            if (pid == MpInitiator.MP_INIT_PID) continue;
-
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
-                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
-                //These partitions can fail, just cleanup and remove the partition from the system
-                if (partitionNotOnHashRing) {
-                    removeAndCleanupPartition(pid);
-                    continue;
-                }
-
                 // The data of the partition dir indicates whether the partition has finished
                 // initializing or not. If not, the replicas may still be in the process of
                 // adding themselves to the dir. So don't check for k-safety if that's the case.
                 byte[] partitionState = dataCallbacks.poll().getData();
-                boolean isInitialized = true;
-                assert(partitionState != null && partitionState.length == 1);
+                boolean isInitializing = false;
                 if (partitionState != null && partitionState.length == 1) {
-                    isInitialized = partitionState[0] == LeaderElector.INITIALIZED;
-                }
-
-                if (!isInitialized) {
-                    // The replicas may still be in the process of adding themselves to the dir.
-                    // So don't check for k-safety if that's the case.
-                    continue;
+                    isInitializing = partitionState[0] == LeaderElector.INITIALIZING;
                 }
 
                 List<String> replicas = childrenCallbacks.poll().getChildren();
-                if (replicas.isEmpty()) {
+                if (pid == MpInitiator.MP_INIT_PID) continue;
+                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
+                if (!isInitializing && replicas.isEmpty()) {
+                    //These partitions can fail, just cleanup and remove the partition from the system
+                    if (partitionNotOnHashRing) {
+                        removeAndCleanupPartition(pid);
+                        continue;
+                    }
                     tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
                     retval = false;
-                } else {
+                } else if (!partitionNotOnHashRing) {
                     //Record host ids for all partitions that are on the ring
                     //so they are considered for partition detection
                     for (String replica : replicas) {
-                        // TODO: better to have an example path here or wrap them into a ZKUtil
                         final String split[] = replica.split("/");
                         final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                         final int hostId = CoreUtils.getHostIdFromHSId(hsId);
@@ -642,25 +632,24 @@ public class LeaderAppointer implements Promotable
                         }
                     }
                 }
-                // update k-safety statistics for initialized partitions
-                // TODO: the missing partition count may be incorrect if the failed hosts contain any of the replicas?
-                lackingReplication.add(new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size()));
-                            }
+                if (!isInitializing && !partitionNotOnHashRing) {
+                    lackingReplication.add(
+                            new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size())
+                            );
+                }
+            }
             catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
-        // update the statistics
-        m_stats.setSafetySet(lackingReplication.build());
 
         //calculate partition leaders when RealVoltDB.hostsFailed in invoked.
         if (!hostLeaderMap.isEmpty() && failedHosts != null) {
             for (Map.Entry<Integer, Long> entry: masters.entrySet()) {
-                Integer pid = entry.getKey();
-                Long hsId = entry.getValue();
+
                 //ignore MPI
-                if (pid == MpInitiator.MP_INIT_PID) continue;
-                int hostId = CoreUtils.getHostIdFromHSId(hsId);
+                if (entry.getKey() == MpInitiator.MP_INIT_PID) continue;
+                int hostId = CoreUtils.getHostIdFromHSId(entry.getValue());
 
                 //ignore the failed hosts
                 if (failedHosts.contains(hostId)) continue;
@@ -671,11 +660,11 @@ public class LeaderAppointer implements Promotable
                 }
 
                 host.increasePartitionLeader();
-                host.addPartition(pid);
+                host.addPartition(entry.getKey());
             }
             determinePartitionLeaders(hostLeaderMap);
         }
-
+        m_stats.setSafetySet(lackingReplication.build());
         return retval;
     }
 
