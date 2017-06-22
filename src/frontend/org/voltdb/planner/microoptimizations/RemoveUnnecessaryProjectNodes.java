@@ -72,13 +72,14 @@ public class RemoveUnnecessaryProjectNodes extends MicroOptimization {
                 // Replace the output schema in child with the output
                 // schema of pNode.  It will be exactly the same
                 // except for the names.
-                child.clearParents();
+                child.disconnectParents();
                 if (parent != null) {
-                    parent.setAndLinkChild(parentIndex, child);
+                    parent.replaceChild(parentIndex, child);
                 }
-                // Let the pNode replace the child's
-                // output schema.  This fixes up the columns.
-                pNode.replaceChildOutputSchema(child);
+                pNode.disconnectChildren();
+                // Let the pNode replace the column names of the child's
+                // output schema.
+                pNode.replaceChildOutputSchemaNames(child);
                 plan = child;
             } else {
                 break;

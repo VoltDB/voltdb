@@ -28,6 +28,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 
 public class ProjectionPlanNode extends AbstractPlanNode {
@@ -171,7 +172,6 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         return false;
     }
 
-
     /**
      * Return true if this node unneeded if its
      * input schema is the given one.
@@ -179,20 +179,16 @@ public class ProjectionPlanNode extends AbstractPlanNode {
      * @param child The Input Schema.
      * @return true iff the node is unnecessary.
      */
-    public boolean isIdentity(AbstractPlanNode childNode) {
+    public boolean isIdentity(AbstractPlanNode childNode) throws PlanningErrorException {
         assert(childNode != null);
         // Find the output schema.
         // If the child node has an inline projection node,
         // then the output schema is the inline projection
         // node's output schema.  Otherwise it's the output
         // schema of the childNode itself.
-        AbstractPlanNode schemaNode = childNode.getInlinePlanNode(PlanNodeType.PROJECTION);
-        NodeSchema childSchema = childNode.getOutputSchema();
-        if (schemaNode != null) {
-            childSchema = schemaNode.getOutputSchema();
-        }
-        NodeSchema outputSchema = getOutputSchema();
+        NodeSchema childSchema = childNode.getTrueOutputSchema();
         assert(childSchema != null);
+        NodeSchema outputSchema = getOutputSchema();
         List<SchemaColumn> cols = outputSchema.getColumns();
         List<SchemaColumn> childCols = childSchema.getColumns();
         assert(childCols != null);
@@ -220,38 +216,17 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * Replace the output schema of the child node with the
-     * output schema of this node.  We use this when we
-     * delete an unnecessary projection node.
-     *
-     * We find the output schema of the child and replace
-     * all the column names with the column names of the
-     * output schema of this node.  The column types should
-     * be equal, and we should have checked for that earlier.
-     *
-     * If the child has in inline projection node, and does
-     * <em>not</em> have an inline insert node, then
-     * the output schema of the child is the output schema
-     * of the inline projection node.  Otherwise, the output
-     * schema of the child is the output schema of the inline
-     * projection node.
-     *
-     * Just for the record, if the child node has an inline
-     * insert and a projection node, the projection node's
-     * output schema is the schema of the tuples we will be
-     * inserting into the target table.  The output schema of
-     * the child node will be the output schema of the insert
-     * node, which will be the usual DML schema.  This has one
-     * integer column counting the number of rows inserted.
+     * Replace the column names output schema of the child node with the
+     * output schema column names of this node.  We use this when we
+     * delete an unnecessary projection node.  We only need
+     * to make sure the column names are changed, since we
+     * will have checked carefully that everything else is the
+     * same.
      *
      * @param child
      */
-    public void replaceChildOutputSchema(AbstractPlanNode child) {
-        AbstractPlanNode childProj = (ProjectionPlanNode)child.getInlinePlanNode(PlanNodeType.PROJECTION);
-        if (childProj != null) {
-            child = childProj;
-        }
-        NodeSchema childSchema = child.getOutputSchema();
+    public void replaceChildOutputSchemaNames(AbstractPlanNode child) {
+        NodeSchema childSchema = child.getTrueOutputSchema();
         NodeSchema mySchema = getOutputSchema();
         assert(childSchema.getColumns().size() == mySchema.getColumns().size());
         for (int idx = 0; idx < childSchema.size(); idx += 1) {

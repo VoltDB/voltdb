@@ -94,6 +94,15 @@ public class MicroOptimizationRunner {
                            + "\n");
             }
             opt.apply(plan, parsedStmt);
+            if (m_logger.isDebugEnabled()) {
+                String planString = null;
+                try {
+                    planString = PlanSelector.outputPlanDebugString(plan.rootPlanGraph);
+                } catch (JSONException ex) {
+                    planString = ex.getMessage();
+                }
+                m_logger.debug("Output:\n" + planString + "\n");
+            }
         }
     }
 }
