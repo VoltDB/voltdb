@@ -148,10 +148,10 @@ public class MatchChecks {
         return result[0].asScalarLong();
     }
 
-    public static long getImportTableRowCount(boolean alltypes, Client client) {
+    public static long getImportTableRowCount(int tablenum, Client client) {
         // check row count in import table
-        String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
-        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+        // String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
+        ClientResponse response = doAdHoc(client, "select count(*) from KafkaImportTable" + tablenum);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
         if (data.asScalarLong() == VoltType.NULL_BIGINT)
