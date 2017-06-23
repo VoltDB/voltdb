@@ -39,6 +39,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 import org.voltcore.zk.ZKTestBase;
 
 import com.google_voltpatches.common.collect.FluentIterable;
@@ -59,9 +60,21 @@ public class TestChannelDistributer extends ZKTestBase {
     BlockingDeque<ImporterChannelAssignment> queue;
 
     public class Collector implements ChannelChangeCallback {
+
+        Map<URI, AbstractImporter> importerAssignments = new ImmutableMap.Builder<URI, AbstractImporter>().build();
+
         @Override
         public void onChange(ImporterChannelAssignment assignment) {
-            queue.offer(assignment);
+            queue.add(assignment);
+            // Mimic ImporterLifeCycleManager.onChange().
+            // This process will throw an exception if the channel assignments don't make sense.
+            ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
+            builder.putAll(Maps.filterKeys(importerAssignments, ImporterLifeCycleManager.notUriIn(assignment.getRemoved())));
+            for (final URI added : assignment.getAdded()) {
+                AbstractImporter importer = Mockito.mock(AbstractImporter.class);
+                builder.put(added, importer);
+            }
+            builder.build();
         }
         @Override
         public void onClusterStateChange(VersionedOperationMode mode) {

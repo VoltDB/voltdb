@@ -214,7 +214,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         }
     }
 
-    private final static Predicate<URI> notUriIn(final Set<URI> uris) {
+    final static Predicate<URI> notUriIn(final Set<URI> uris) {
         return new Predicate<URI>() {
             @Override
             final public boolean apply(URI uri) {
