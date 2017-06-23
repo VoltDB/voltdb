@@ -9102,6 +9102,7 @@
                         .attr("style", 'color:#C12026;font-size:25px;font-weight:600;cursor:default')
                         .attr("height", "22px")
                         .attr("width", "22px")
+                        .attr('y', (x.rangeBand() / (data.length * 2)) -12)
                         .html(function (d, i){
                             if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Combined")
                             && VoltDbAnalysis.procedureValue[d.label].COMBINED > 20
@@ -9123,7 +9124,6 @@
                                 xLength = xLength + 52;
                             return xLength;
                         }))
-                        .attr('y', 22)
                 } else {
                     bars.selectAll('text').text('');
                 }

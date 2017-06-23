@@ -3593,7 +3593,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     height:390px;
     padding:10px 10px 0;
 }
-#visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseCombinedAnalysis.nvd3-svg {height:98% !important}
+#visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseCombinedAnalysis.nvd3-svg {height:100% !important}
 
 .legendAnalysis { float:right;margin:15px 120px 0 0;}
 .circle {
