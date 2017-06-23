@@ -112,18 +112,18 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         }
 
         return callProcedure("@UpdateCore",
-                              ccr.encodedDiffCommands,
-                              ccr.catalogHash,
-                              ccr.catalogBytes,
-                              ccr.expectedCatalogVersion,
-                              ccr.deploymentString,
-                              ccr.tablesThatMustBeEmpty,
-                              ccr.reasonsForEmptyTables,
-                              ccr.requiresSnapshotIsolation ? 1 : 0,
-                              ccr.worksWithElastic ? 1 : 0,
-                              ccr.deploymentHash,
-                              ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                              ccr.hasSchemaChange ?  1 : 0,
-                              ccr.requiresNewExportGeneration ? 1 : 0);
+                             ccr.encodedDiffCommands,
+                             ccr.catalogHash,
+                             ccr.catalogBytes,
+                             ccr.expectedCatalogVersion,
+                             ccr.deploymentString,
+                             ccr.tablesThatMustBeEmpty,
+                             ccr.reasonsForEmptyTables,
+                             ccr.requiresSnapshotIsolation ? 1 : 0,
+                             ccr.worksWithElastic ? 1 : 0,
+                             ccr.deploymentHash,
+                             ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                             ccr.hasSchemaChange ?  1 : 0,
+                             ccr.requiresNewExportGeneration ? 1 : 0);
     }
 }
