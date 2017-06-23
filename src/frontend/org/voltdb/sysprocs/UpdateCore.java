@@ -358,11 +358,6 @@ public class UpdateCore extends VoltSystemProcedure {
 
             String replayInfo = m_runner.getTxnState().isForReplay() ? " (FOR REPLAY)" : "";
 
-//            log.warn("============== UpdateCore PlanFragment ==============");
-//            log.warn("context cat ver: " + context.getCatalogVersion());
-//            log.warn("expected cat ver: " + expectedCatalogVersion);
-//            log.warn("=====================================================");
-
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
 
@@ -526,7 +521,6 @@ public class UpdateCore extends VoltSystemProcedure {
                                    throws Exception
     {
         assert(tablesThatMustBeEmpty != null);
-
         /*
          * Validate that no elastic join is in progress, blocking this catalog update.
          * If this update works with elastic then do the update anyways

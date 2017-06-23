@@ -3360,6 +3360,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         try {
             synchronized(m_catalogUpdateLock) {
                 final ReplicationRole oldRole = getReplicationRole();
+
                 m_statusTracker.setNodeState(NodeState.UPDATING);
                 // A site is catching up with catalog updates
                 if (currentTxnId <= m_catalogContext.m_transactionId && !m_txnIdToContextTracker.isEmpty()) {
@@ -3391,6 +3392,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 byte[] oldDeployHash = m_catalogContext.deploymentHash;
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
+                // 0. A new catalog! Update the global context and the context tracker
                 m_catalogContext =
                     m_catalogContext.update(
                             currentTxnId,
