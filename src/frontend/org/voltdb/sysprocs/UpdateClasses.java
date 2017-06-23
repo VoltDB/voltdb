@@ -18,9 +18,7 @@
 package org.voltdb.sysprocs;
 
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
@@ -94,37 +92,11 @@ public class UpdateClasses extends UpdateApplicationBase {
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                                                       callNTProcedureOnAllHosts(
                                                       "@WriteCatalog",
-                                                      ccr.encodedDiffCommands,
-                                                      ccr.catalogHash,
-                                                      ccr.catalogBytes,
-                                                      ccr.expectedCatalogVersion,
-                                                      ccr.deploymentString,
-                                                      ccr.tablesThatMustBeEmpty,
-                                                      ccr.reasonsForEmptyTables,
-                                                      ccr.requiresSnapshotIsolation ? 1 : 0,
-                                                      ccr.worksWithElastic ? 1 : 0,
-                                                      ccr.deploymentHash,
-                                                      ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                                                      ccr.hasSchemaChange ?  1 : 0,
-                                                      ccr.requiresNewExportGeneration ? 1 : 0);
+                                                      ccr.catalogBytes);
 
-        Map<Integer, ClientResponse>  map = null;
-        try {
-            map = cf.get();
-        } catch (InterruptedException | ExecutionException e) {
-            hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
-            throw new VoltAbortException(e);
-        }
-
-        if (map != null) {
-            for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
-                if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
-                    hostLog.warn("A response from one host for writing the catalog jar has failed.");
-                    hostLog.warn("Warning message: " + entry.getValue().getStatusString());
-                    throw new VoltAbortException("A response from host " + entry.getKey() +
-                                                 " for writing the catalog jar has failed.");
-                }
-            }
+        String errMsg;
+        if((errMsg = checkCatalogJarAsyncWriteResults(cf)) != null ) {
+            throw new VoltAbortException(errMsg);
         }
 
         return callProcedure("@UpdateCore",

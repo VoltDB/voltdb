@@ -19,36 +19,14 @@ package org.voltdb.sysprocs;
 
 import java.util.concurrent.CompletableFuture;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.utils.Encoder;
 
 public class WriteCatalog extends UpdateApplicationBase {
-    VoltLogger log = new VoltLogger("HOST");
-
     // Write the new catalog to a temporary jar file
-    public CompletableFuture<ClientResponse> run(String catalogDiffCommands,
-                                                 byte[] catalogHash,
-                                                 byte[] catalogBytes,
-                                                 int expectedCatalogVersion,
-                                                 String deploymentString,
-                                                 String[] tablesThatMustBeEmpty,
-                                                 String[] reasonsForEmptyTables,
-                                                 byte requiresSnapshotIsolation,
-                                                 byte worksWithElastic,
-                                                 byte[] deploymentHash,
-                                                 byte requireCatalogDiffCmdsApplyToEE,
-                                                 byte hasSchemaChange,
-                                                 byte requiresNewExportGeneration)
-                                                    throws Exception
+    public CompletableFuture<ClientResponse> run(byte[] catalogBytes) throws Exception
     {
-        assert(tablesThatMustBeEmpty != null);
-
-        String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
-        byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
-
         // This should only be called once on each host
         try {
             VoltDB.instance().writeCatalogJar(catalogBytes);

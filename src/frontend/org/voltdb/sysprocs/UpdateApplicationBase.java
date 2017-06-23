@@ -19,8 +19,10 @@ package org.voltdb.sysprocs;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
@@ -387,5 +389,31 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         CompletableFuture<ClientResponse> f = new CompletableFuture<>();
         f.complete(cri);
         return f;
+    }
+
+    /** Check the calls to write the new catalog on every host asynchronously. If the write failed,
+     * return the error message, otherwise return NULL
+     */
+    static protected String checkCatalogJarAsyncWriteResults(CompletableFuture<Map<Integer,ClientResponse>> cf) {
+        Map<Integer, ClientResponse>  map = null;
+        try {
+            map = cf.get();
+        } catch (InterruptedException | ExecutionException e) {
+            hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
+            return e.getMessage();
+        }
+
+        if (map != null) {
+            for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
+                if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
+                    hostLog.warn("A response from one host for writing the catalog jar has failed.");
+                    hostLog.warn("Warning message: " + entry.getValue().getStatusString());
+                    return "A response from host " + entry.getKey() +
+                            " for writing the catalog jar has failed.";
+                }
+            }
+        }
+
+        return null;
     }
 }

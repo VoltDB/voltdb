@@ -1887,27 +1887,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
 
+        // For now this function is still needed during recover
         private void logCatalogAndDeployment() {
-
             File configInfoDir = getConfigDirectory();
             configInfoDir.mkdirs();
 
             try {
                 m_catalogContext.writeCatalogJarToFile(configInfoDir.getPath(), "catalog.jar");
-            } catch (IOException e) {
-                hostLog.error("Failed to log catalog: " + e.getMessage(), e);
-                e.printStackTrace();
-            }
-            logDeployment();
-        }
-
-        // Write the catalog to to a temporary jar file (e.g. "catalog.jar.tmp")
-        private void logCatalogAndDeployment(CatalogContext cc) {
-            File configInfoDir = getConfigDirectory();
-            configInfoDir.mkdirs();
-
-            try {
-                cc.writeCatalogJarToTempFile(configInfoDir.getPath(), "catalog.jar");
             } catch (IOException e) {
                 hostLog.error("Failed to log catalog: " + e.getMessage(), e);
                 e.printStackTrace();
