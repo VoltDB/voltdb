@@ -440,6 +440,8 @@
                     .transition().duration(350)
                     .call(ChartLatencyAnalysis);
                 d3.selectAll("#visualiseLatencyAnalysis .nv-barsWrap .nv-bar rect")
+                .attr("style", "cursor: pointer");
+                d3.selectAll("#visualiseLatencyAnalysis .nv-barsWrap .nv-bar rect")
                 .style("fill", function(d, i){
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
                     return procedureType == "MP" ? "#14416d":"#1B87C8";
@@ -469,6 +471,8 @@
                     .transition().duration(350)
                     .call(ChartFrequencyAnalysis);
                 d3.selectAll("#visualiseFrequencyAnalysis .nv-barsWrap .nv-bar rect")
+                .attr("style", "cursor: pointer");
+                d3.selectAll("#visualiseFrequencyAnalysis .nv-barsWrap .nv-bar rect")
                 .style("fill", function(d, i){
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
                     return procedureType == "MP" ? "#14416d":"#1B87C8";
@@ -497,6 +501,8 @@
                     .datum(dataCombinedAnalysis)
                     .transition().duration(350)
                     .call(ChartCombinedAnalysis);
+                d3.selectAll("#visualiseCombinedAnalysis .nv-barsWrap .nv-bar rect")
+                .attr("style", "cursor: pointer");
                 d3.selectAll("#visualiseCombinedAnalysis .nv-barsWrap .nv-bar rect")
                 .style("fill", function(d, i){
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
