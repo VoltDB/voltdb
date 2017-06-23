@@ -58,7 +58,6 @@ import org.voltdb.utils.BulkLoaderErrorHandler;
 import org.voltdb.utils.CSVBulkDataLoader;
 import org.voltdb.utils.CSVDataLoader;
 import org.voltdb.utils.CSVTupleDataLoader;
-import org.voltdb.utils.JsonUtils;
 import org.voltdb.utils.RowWithMetaData;
 
 import kafka.cluster.Broker;
@@ -278,9 +277,6 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
     private ExecutorService createImporterExecutor(CSVDataLoader loader, final ImporterLifecycle lifecycle, final ImporterLogger logger) throws Exception {
 
         Map<URI, KafkaStreamImporterConfig> configs = createKafkaImporterConfigFromProperties(m_config);
-        // Log the configuration in a nice readable format:
-        configs.entrySet().stream().forEach(c -> m_log.info(JsonUtils.toJson(c)));
-
         ExecutorService executor = Executors.newFixedThreadPool(configs.size());
         m_log.warn("Created " + configs.size() + " configurations for partitions:");
 
