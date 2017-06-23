@@ -618,8 +618,18 @@
                 }
                 var currentTime = d.value
 
-                if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
+                if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
                     currentTime = d.data.label.split(" ")[1]
+
+                if (d.series[0].key == "Avg Execution Time")
+                    {
+                        currentTime = d.data.label.split("(")[0]
+                        if(currentTime.indexOf("<") >= 0){
+                        currentTime = currentTime.replace("<", "&lt;");
+                        currentTime = currentTime.replace(">", "&gt;");
+                        }
+                    }
+
                 var isPartitionIdleGraph = false
                 var table = d3.select(document.createElement("table"));
                 if (headerEnabled) {
@@ -659,7 +669,8 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        if(d.series[0].key == "Execution Time")
+                        debugger;
+                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time")
                             unit = " ms"
                         else if(d.series[0].key == "Frequency")
                             unit = ""
@@ -705,7 +716,8 @@
                     trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
-                } else if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
+                } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
+                    debugger;
                     trowEnter.append("td")
                         .html(function (p, i) { return (d.series[0].key != "Frequency" ? p.value.toFixed(6) : p.value)+ unit });
                 } else {
@@ -787,7 +799,7 @@
                     .html("Min Execution Time")
 
                     trowEnter1.append("td")
-                        .html(VoltDbAnalysis.latencyDetail[d.data.label].MIN);
+                        .html(VoltDbAnalysis.latencyDetail[d.data.label].MIN + " ms");
 
                     var trowEnter2 = tbodyEnter
                         .append("tr");
@@ -796,7 +808,25 @@
                         .html("Max Execution Time")
 
                         trowEnter2.append("td")
-                            .html(VoltDbAnalysis.latencyDetail[d.data.label].MAX);
+                            .html(VoltDbAnalysis.latencyDetail[d.data.label].MAX + " ms");
+
+                    var trowEnter3 = tbodyEnter
+                        .append("tr");
+
+                        trowEnter3.append("td")
+                        .html("Invocations")
+
+                        trowEnter3.append("td")
+                            .html(VoltDbAnalysis.latencyDetail[d.data.label].INVOCATIONS);
+
+                    var trowEnter4 = tbodyEnter
+                        .append("tr");
+
+                        trowEnter4.append("td")
+                        .html("Partition ID")
+
+                        trowEnter4.append("td")
+                            .html(VoltDbAnalysis.latencyDetail[d.data.label].PARTITION_ID);
 
                 }
 
