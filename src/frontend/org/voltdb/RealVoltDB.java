@@ -3966,17 +3966,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData(m_catalogContext, m_messenger);
-        }
 
-        try {
-            if (m_adminListener != null && !m_rejoining) {
-                m_adminListener.start();
+            try {
+                if (m_adminListener != null) {
+                    m_adminListener.start();
+                }
+            }catch (Exception e) {
+                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
+                VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
             }
-        } catch (Exception e) {
-            hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
-            VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
-        }
-        if (!m_rejoining && !m_joining) {
+
             Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
