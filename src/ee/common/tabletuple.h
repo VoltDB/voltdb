@@ -591,16 +591,8 @@ private:
         char *dataPtr = getWritableDataPtr(columnInfo);
         int32_t columnLength = columnInfo->length;
 
-        try {
-            value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
-                                          allocateObjects, tempPool);
-        } catch (SQLException &ex) {
-            std::string errorMsg = ex.message()
-                                + "\nlength exceeding column info: " + columnInfo->debug()
-                                + "\ntuple schema info: " + m_schema->debug();
-
-            throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
-        }
+        value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
+                                      allocateObjects, tempPool);
     }
 };
 
