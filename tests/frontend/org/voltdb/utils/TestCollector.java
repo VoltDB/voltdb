@@ -49,11 +49,10 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.client.Client;
@@ -110,6 +109,9 @@ public class TestCollector extends JUnit4LocalClusterTest {
             String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
             voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         }
+
+        verifyConfigFilesPresent(voltDbRoot);
+
         m_voltDbRootPath = voltDbRoot.getPath();
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
@@ -126,6 +128,32 @@ public class TestCollector extends JUnit4LocalClusterTest {
         client.close();
         cluster.shutDown();
         deleteOutputFileIfExists();
+    }
+
+    private void verifyConfigFilesPresent(File voltDbRoot) throws Exception {
+
+        //  ENG-12684: The deployment and config files are created in another process, so we have to wait for them to be created.
+
+        String configLogDirPath = voltDbRoot.getAbsolutePath() + File.separator + Constants.CONFIG_DIR + File.separator;
+        String deploymentPath = configLogDirPath + "deployment.xml";
+        String configInfoPath = configLogDirPath + "config.json";
+
+        File deploymentFile = new File(deploymentPath);
+        File configInfoFile = new File(configInfoPath);
+
+        for (int i = 0; i < 6; i++) {
+            if (!(deploymentFile.exists() && configInfoFile.exists())) {
+                System.err.println("Still looking for files, i=" + i + " m_voltdbRoot=" + voltDbRoot.getParentFile().getAbsolutePath() +
+                        " deploymentFile=" + deploymentFile.getAbsolutePath() + " configInfoFile=" + configInfoFile.getAbsolutePath());
+                Thread.sleep(2000);
+            }
+            else {
+                break;
+            }
+        }
+
+        Assert.assertTrue("ERROR: deploymentFile does not exist: " + deploymentFile.getAbsolutePath(), deploymentFile.exists());
+        Assert.assertTrue("ERROR: configInfo does not exist: " + configInfoFile.getAbsolutePath(), configInfoFile.exists());
     }
 
     private ZipFile collect(boolean skipHeapDump, int days, boolean force) throws Exception {
