@@ -79,6 +79,8 @@ import jsr166y.LinkedTransferQueue;
 public class CoreUtils {
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
+    private static final RateLimitedLogger rateHostLogger =
+            new RateLimitedLogger(5 * 1000, new VoltLogger("HOST"), Level.WARN);
 
     public static volatile Runnable m_threadLocalDeallocator = new Runnable() {
         @Override
@@ -1257,6 +1259,11 @@ public class CoreUtils {
             default:
                 break;
         }
+    }
+
+    // Print the message using the limited logger
+    public static void printMsgLimited(String msg) {
+        rateHostLogger.log(msg, EstTime.currentTimeMillis());
     }
 
     // Utility method to figure out if this is a test case.  Various junit targets in
