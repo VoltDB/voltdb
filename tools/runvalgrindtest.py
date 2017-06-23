@@ -25,6 +25,7 @@ class XMLFile(object):
                 print('        obj: ' + obj[0].text)
             if len(fn) > 0:
                 print('        fn:  ' + fn[0].text)
+
     def printError(self, error):
         kind=error.findall('.//what')
         if len(kind) > 0:
@@ -37,21 +38,30 @@ class XMLFile(object):
         for stack in stacks:
             print('    Stack %d/%d' % (idx + 1, nstacks))
             self.printStack(stack)
-    def printErrors(self):
-        print(':---------------------------------------------------:')
-        print(':----------- Valgrind Failure Report ---------------:')
-        print(':---------------------------------------------------:')
-        if self.expecterrors:
-            print(':------------- Unexpected Success ------------------:');
+    
+    def readErrors(self):
         tree = ET.parse(self.xmlfile)
         root = tree.getroot()
         exe=root.findall('.//argv/exe')
         print('Exe: %s' % exe[0].text)
-        errors = root.findall('.//error')
+        self.errors = root.findall('.//error')
+        self.numErrors = len(self.errors)
+        
+    def printErrors(self):
+        print(':---------------------------------------------------:')
+        print(':----------- Valgrind Failure Report ---------------:')
+        print(':---------------------------------------------------:')
+        if self.expecterrors != (self.numErrors > 0):
+            if self.expecterrors:
+                message = "Success"
+            else:
+                message = "Failure"
+            print(':------------- Unexpected %s ------------------:' % message)
+        
         idx = 0
-        nerrs = len(errors)
-        for error in errors:
-            print("Error %d/%d" % (idx + 1, nerrs))
+        for error in self.errors:
+            idx += 1
+            print("Error %d/%d" % (idx + 1, self.numErrors))
             self.printError(error)
         
 if __name__ == '__main__':
@@ -72,10 +82,11 @@ if __name__ == '__main__':
             xmlfile=arg[11:]
             break
     testReturnStatus = subprocess.call(sys.argv[1:], shell=False)
-    if xmlfile and testReturnStatus == expected_status:
-        os.remove(xmlfile)
-        sys.exit(0)
-    else:
-        if xmlfile:
-            XMLFile(xmlfile, expectfail).printErrors()
+    if xmlfile:
+        if (testReturnStatus == expected_status):
+            os.remove(xmlfile)
+        else:
+            result = XMLFile(xmlfile, expectfail)
+            result.readErrors()
+            result.printErrors()
     sys.exit(testReturnStatus)
