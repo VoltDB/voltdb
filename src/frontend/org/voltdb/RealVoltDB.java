@@ -2550,14 +2550,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             case GET:
                 // once a voltdbroot is inited, the path properties contain the true path values
                 Settings.initialize(config.m_voltdbRoot);
-                // only override the local sites count
-                nodeSettings = NodeSettings.create(config.asNodeSettingsMap());
+                // override the local sites count and paths
+                nodeSettings = NodeSettings.create(config.asNodeSettingsMap(),
+                        config.asRelativePathSettingsMap());
                 break;
             case PROBE:
                 // once a voltdbroot is inited, the path properties contain the true path values
                 Settings.initialize(config.m_voltdbRoot);
-                // only override the local sites count
-                nodeSettings = NodeSettings.create(config.asNodeSettingsMap());
+                // override the local sites count and paths
+                nodeSettings = NodeSettings.create(config.asNodeSettingsMap(),
+                        config.asRelativePathSettingsMap());
                 File nodeSettingsFH = new File(getConfigDirectory(config), "path.properties");
                 consoleLog.info("Loaded node-specific settings from " + nodeSettingsFH.getPath());
                 hostLog.info("Loaded node-specific settings from " + nodeSettingsFH.getPath());

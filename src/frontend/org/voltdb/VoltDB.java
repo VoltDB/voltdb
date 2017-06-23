@@ -54,6 +54,7 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
+import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
@@ -826,6 +827,20 @@ public class VoltDB {
             return ImmutableMap.<String, String>builder()
                     .put(NodeSettings.VOLTDBROOT_PATH_KEY, m_voltdbRoot.getPath())
                     .build();
+        }
+
+        public Map<String,String> asRelativePathSettingsMap() {
+            try {
+            Settings.initialize(m_voltdbRoot);
+            File currDir = new File("").getCanonicalFile();
+            File voltdbroot = m_voltdbRoot.getCanonicalFile();
+            String relativePath = currDir.toPath().relativize(voltdbroot.toPath()).toString();
+            return ImmutableMap.<String, String>builder()
+                    .put(NodeSettings.VOLTDBROOT_PATH_KEY, relativePath)
+                    .build();
+            } catch (IOException e) {
+                throw new SettingsException("Failed to relativize voltdbroot");
+            }
         }
 
         public Map<String, String> asNodeSettingsMap() {
