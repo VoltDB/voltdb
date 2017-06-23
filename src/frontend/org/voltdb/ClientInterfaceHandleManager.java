@@ -101,6 +101,10 @@ public class ClientInterfaceHandleManager
         return "(pid " + getPartIdFromHandle(handle) + " seq " + getSeqNumFromHandle(handle) + ")";
     }
 
+    private boolean isShortCircuitReadHandle(long handle) {
+        return (handle >> PART_ID_SHIFT) == SHORT_CIRCUIT_PART_ID;
+    }
+
     static class Iv2InFlight
     {
         final long m_ciHandle;
@@ -287,6 +291,22 @@ public class ClientInterfaceHandleManager
             m_outstandingTxns--;
             return inflight;
         }
+        else if (isShortCircuitReadHandle(ciHandle)) {
+            // This can happen for NT transactions which are accepted at a non-MPI node
+            // and have finished with a response while the MPI-node dies and MPI fails
+            // over to this particular node. In this scenario, there is a race between
+            // the delivery of the actual transaction response to CI site and the
+            // delivery of MPI fail over callback, the first event will try to remove
+            // this particular short circuit read handle and send the response back to
+            // the client, the second event will try to remove all short circuit read
+            // handles and send a "transaction dropped due to change of mastership and
+            // may be committed" response for all of them. If the first event happens
+            // first, the second event can still handle it correctly so it's fine.
+            // If the second event happens first, we need to tolerate it here. In either
+            // case, the client will receive a response for this handle so there's no
+            // problem.
+            return null;
+        }
 
         /*
          * Not a short circuit read, check the partition specific
@@ -356,6 +376,10 @@ public class ClientInterfaceHandleManager
             m_acg.reduceBackpressure(inflight.m_messageSize);
             m_outstandingTxns--;
             return inflight;
+        }
+        else if (isShortCircuitReadHandle(ciHandle)) {
+            // Refer to the corresponding part in findHandle() above for explanation
+            return null;
         }
 
         /*
