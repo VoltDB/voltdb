@@ -430,14 +430,19 @@ public class VoltCompiler {
             final File classesJarPath,
             final File catalogOutputPath)
     {
-        if (schemaPath == null || !schemaPath.exists()) {
+        if (schemaPath != null && !schemaPath.exists()) {
             compilerLog.error("Cannot compile nonexistent or missing schema.");
             return false;
         }
 
         List<VoltCompilerReader> ddlReaderList;
         try {
-            ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+            if (schemaPath == null) {
+                ddlReaderList = new ArrayList<>(1);
+                ddlReaderList.add(new VoltCompilerStringReader(AUTOGEN_DDL_FILE_NAME, m_emptyDDLComment));
+            } else {
+                ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+            }
         }
         catch (VoltCompilerException e) {
             compilerLog.error("Unable to open schema file \"" + schemaPath + "\"", e);

@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -209,6 +210,14 @@ public class LocalCluster extends VoltServerConfig {
     }
     public int getHttpOverridePort() { return m_httpOverridePort; };
 
+    private static String getBuildDir() {
+        String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
+        if (buildDir == null) {
+            buildDir = System.getProperty("user.dir") + "/obj/release";
+        }
+        return buildDir;
+    }
+
     /*
      * Enable pre-compiled regex search in logs
      */
@@ -320,10 +329,12 @@ public class LocalCluster extends VoltServerConfig {
             boolean debug,
             boolean isRejoinTest,
             Map<String, String> env) {
-        this(null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
+        // NOTE: isRejoinTest is unused
+        this(null, null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, env);
     }
 
     public LocalCluster(String schemaToStage,
+                        String classesJarToStage,
                         String catalogJarFileName,
                         int siteCount,
                         int hostCount,
@@ -332,23 +343,11 @@ public class LocalCluster extends VoltServerConfig {
                         BackendTarget target,
                         FailureState failureState,
                         boolean debug,
-                        boolean isRejoinTest,
                         Map<String, String> env)
     {
-        if (schemaToStage == null) {
-            assert catalogJarFileName != null : "Catalog jar file name is null";
-            setNewCli(isNewCli);
-        } else {
-            assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
-            setNewCli(true);
-            m_usesStagedSchema = true;
-            try {
-                templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
-                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
+        m_usesStagedSchema = schemaToStage != null || classesJarToStage != null;
+        setNewCli(isNewCli() || m_usesStagedSchema);
+
         assert siteCount > 0 : "site count is less than 0";
         assert hostCount > 0 : "host count is less than 0";
 
@@ -376,7 +375,7 @@ public class LocalCluster extends VoltServerConfig {
         m_callingMethodName = traces[i].getMethodName();
 
         if (catalogJarFileName == null) {
-            if (schemaToStage == null) {
+            if (m_usesStagedSchema == false) {
                 log.info("Instantiating empty LocalCluster with class.method: " +
                         m_callingClassName + "." + m_callingMethodName);
             } else {
@@ -384,6 +383,7 @@ public class LocalCluster extends VoltServerConfig {
                         m_callingClassName + "." + m_callingMethodName);
             }
         } else {
+            Preconditions.checkArgument(m_usesStagedSchema == false, "Cannot use OldCLI catalog with staged schema and/or classes");
             log.info("Instantiating LocalCluster for " + catalogJarFileName + " with class.method: " +
                     m_callingClassName + "." + m_callingMethodName);
         }
@@ -412,6 +412,18 @@ public class LocalCluster extends VoltServerConfig {
         m_failureState = m_kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<>();
         m_cmdLines = new ArrayList<>();
+        if (schemaToStage != null) {
+            try {
+                templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
+                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if (classesJarToStage != null) {
+            templateCmdLine.m_stagedClassesPath = new VoltFile(classesJarToStage);
+            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPath + "\"");
+        }
 
         // if the user wants valgrind and it makes sense, give it to 'em
         // For now only one host works.
@@ -422,21 +434,15 @@ public class LocalCluster extends VoltServerConfig {
             m_target = target;
         }
 
-        String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
-        if (buildDir == null) {
-            buildDir = System.getProperty("user.dir") + "/obj/release";
-        }
-
+        String buildDir = getBuildDir();
         String classPath = System.getProperty("java.class.path");
         if (m_jarFileName != null) {
             classPath += ":" + buildDir + File.separator + m_jarFileName;
         }
         classPath += ":" + buildDir + File.separator + "prod";
-        if (m_jarFileName != null) {
-            // Remove the stored procedures from the classpath.  Out-of-process nodes will
-            // only be able to find procedures and dependent classes in the catalog, as intended
-            classPath = classPath.replace(buildDir + File.separator + "testprocs:", "");
-        }
+        // Remove the stored procedures from the classpath.  Out-of-process nodes will
+        // only be able to find procedures and dependent classes in the catalog, as intended
+        classPath = classPath.replace(buildDir + File.separator + "testprocs:", "");
 
         // set the java lib path to the one for this process - Add obj/release/nativelibs
         String javaLibraryPath = System.getProperty("java.library.path");
@@ -478,6 +484,10 @@ public class LocalCluster extends VoltServerConfig {
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
         // "tag" this command line so it's clear which test started it
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
+    }
+
+    public void addTestProcsToClasspath() {
+        templateCmdLine.addToClassPath(":" + getBuildDir() + File.separator + "testprocs");
     }
 
     /** Directs this LocalCluster to initialize one of its nodes with a different schema.
