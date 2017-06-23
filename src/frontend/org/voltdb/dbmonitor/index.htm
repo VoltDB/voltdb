@@ -507,13 +507,21 @@
 
                        </div>
                         <div class="clear"></div>
-                        <div class="analysisRemarks" style="display:none">
+                        <div id="analysisRemarks" class="analysisRemarks" style="display:none">
                             <h1>Analysis</h1>
-                            <h2>Procedures</h2>
-                            <p>Find_user Multi-partitional procedure executed morre than 100/sec.</p>
-                            <p>Delete_user: Procedure latency greater than 300ms.</p>
-                              <h2>Table</h2>
-                            <p>Stock_transcation:Table with distribution cariance greater than 20%</p>
+                            <div id="procedureWarningSection" style="display:none">
+                                <h2>Procedures</h2>
+                                <div id="procedureWarning">
+                                    <!--<p>Find_user Multi-partitional procedure executed more than 100/sec.</p>-->
+                                    <!--<p>Delete_user: Procedure latency greater than 300ms.</p>-->
+                                </div>
+                            </div>
+                            <div id="tableWarningSection" style="display:none">
+                                <h2>Table</h2>
+                                <div id="tableWarning">
+                                    <p>Stock_transcation:Table with distribution cariance greater than 20%</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

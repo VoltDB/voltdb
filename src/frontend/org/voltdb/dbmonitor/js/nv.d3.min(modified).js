@@ -669,7 +669,6 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        debugger;
                         if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time")
                             unit = " ms"
                         else if(d.series[0].key == "Frequency")
@@ -698,7 +697,7 @@
                         .append("div")
                         .style("background-color", function (p) { return p.color });
                 else{
-                    if((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Combined") && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "MP")
+                    if((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Combined") && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "Multi Partitioned")
                         trowEnter.append("td")
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
                     else
@@ -717,7 +716,6 @@
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
                 } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
-                    debugger;
                     trowEnter.append("td")
                         .html(function (p, i) { return (d.series[0].key != "Frequency" ? p.value.toFixed(6) : p.value)+ unit });
                 } else {
@@ -788,6 +786,17 @@
 
                         trowEnter4.append("td")
                             .html(VoltDbAnalysis.procedureValue[d.data.label].AVG.toFixed(6) + " ms");
+                    }
+
+                    if(VoltDbAnalysis.procedureValue[d.data.label].WARNING != ""){
+                        var trowEnter5 = tbodyEnter
+                        .append("tr");
+
+                        trowEnter5.append("td")
+                        .html("Warning")
+
+                        trowEnter5.append("td")
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].WARNING);
                     }
                 }
 
@@ -9136,7 +9145,7 @@
                         .html(function (d, i){
                             if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Combined")
                             && VoltDbAnalysis.procedureValue[d.label].COMBINED > 20
-                            && VoltDbAnalysis.procedureValue[d.label].TYPE == "MP")
+                            && VoltDbAnalysis.procedureValue[d.label].TYPE == "Multi Partitioned")
                                 return "&#9888;";
                             else
                                 return "";

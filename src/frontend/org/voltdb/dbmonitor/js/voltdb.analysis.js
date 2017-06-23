@@ -56,6 +56,9 @@ function loadAnalysisPage(){
 
     function fetchData (){
         $("#analysisLoader").show();
+        $("#analysisRemarks").hide();
+        $("#procedureWarning").html("");
+        $("#tableWarning").html("");
         VoltDbAnalysis.refreshChart();
         voltDbRenderer.GetProcedureProfileInformation(function(profileData){
             voltDbRenderer.GetProcedureDetailInformation(function (procedureDetails){
@@ -85,7 +88,6 @@ function loadAnalysisPage(){
                 var sumOfAllProcedure = calculateCombinedValue(profileData["PROCEDURE_PROFILE"])
                 var isMPPresent = false;
                 var isPPresent = false;
-
                 for(var i = 0; i < profileData["PROCEDURE_PROFILE"].length; i++){
                     if(i == 0)
                         timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
@@ -96,21 +98,27 @@ function loadAnalysisPage(){
                     var invocation = profileData["PROCEDURE_PROFILE"][i].INVOCATIONS;
                     var wtPercentage = profileData["PROCEDURE_PROFILE"][i].WEIGHTED_PERC;
                     //find procedure type
-                    var type = "SP";
+                    var type = "Single Partitioned";
                     procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
                         if(procedureName == item.PROCEDURE && item.PARTITION_ID == 16383){
-                            type = "MP"
-                           // return false;
+                            type = "Multi Partitioned"
+                            return false;
                         }
                     });
 
                     if(containLongName)
                         procedureName =(i + 1) + ") " + procedureName;
 
-                    if(type == "MP")
+                    if(type == "Multi Partitioned")
                         isMPPresent = true;
                     else
                         isPPresent = true;
+
+                    if(combinedWeight > 20) {
+                        $("#analysisRemarks").show();
+                        $("#procedureWarningSection").show();
+                        $("#procedureWarning").append("<p>" + procedureName.split(" ")[1] + " has combined usage greater than 20%." + "</p>");
+                    }
 
                     VoltDbAnalysis.procedureValue[procedureName] =
                         {
@@ -118,7 +126,8 @@ function loadAnalysisPage(){
                             INVOCATIONS: invocation,
                             COMBINED: combinedWeight,
                             TYPE:type,
-                            WEIGHTED_PERC: wtPercentage
+                            WEIGHTED_PERC: wtPercentage,
+                            WARNING: (combinedWeight > 20 ? procedureName.split(" ")[1] + " <br> has combined usage greater <br> than 20%." : "")
                         }
                     dataLatency.push({"label": procedureName , "value": avgExecTime})
                     dataFrequency.push({"label": procedureName, "value": invocation})

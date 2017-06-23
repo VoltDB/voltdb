@@ -444,7 +444,7 @@
                 d3.selectAll("#visualiseLatencyAnalysis .nv-barsWrap .nv-bar rect")
                 .style("fill", function(d, i){
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
-                    return procedureType == "MP" ? "#14416d":"#1B87C8";
+                    return procedureType == "Multi Partitioned" ? "#14416d":"#1B87C8";
                 });
                 nv.utils.windowResize(updateLatencyAnalysis);
                 return ChartLatencyAnalysis;
@@ -475,7 +475,7 @@
                 d3.selectAll("#visualiseFrequencyAnalysis .nv-barsWrap .nv-bar rect")
                 .style("fill", function(d, i){
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
-                    return procedureType == "MP" ? "#14416d":"#1B87C8";
+                    return procedureType == "Multi Partitioned" ? "#14416d":"#1B87C8";
                 });
                 nv.utils.windowResize(ChartFrequencyAnalysis.update);
                 return ChartFrequencyAnalysis;
@@ -506,7 +506,7 @@
                 d3.selectAll("#visualiseCombinedAnalysis .nv-barsWrap .nv-bar rect")
                 .style("fill", function(d, i){
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
-                    return procedureType == "MP" ? "#14416d":"#1B87C8";
+                    return procedureType == "Multi Partitioned" ? "#14416d":"#1B87C8";
                 });
                 nv.utils.windowResize(ChartCombinedAnalysis.update);
                 return ChartCombinedAnalysis;
