@@ -144,9 +144,10 @@ public class Collector {
         // Validate voltdbroot path is valid or not - check if deployment and config info json exists
         File deploymentFile = new File(m_deploymentPath);
         File configInfoFile = new File(m_configInfoPath);
+
         if (!deploymentFile.exists() || !configInfoFile.exists()) {
             System.err.println("ERROR: Invalid database directory " + m_voltdbRoot.getParentFile().getAbsolutePath()
-                    + ". Specify valid database directory using --dir option.");
+                               + ". Specify valid database directory using --dir option.");
             VoltDB.exit(-1);
         }
 
