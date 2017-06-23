@@ -309,6 +309,7 @@ public class CatalogContext {
      * @param name
      * @throws IOException
      */
+    // TODO: Replace this function with the one in InMemoryJarFile
     public Runnable writeCatalogJarToFile(String path, String name) throws IOException
     {
         File catalog_file = new VoltFile(path, name);
