@@ -173,10 +173,6 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
     step += 1
     leadersString = generateStartNewClusterCommand(runner.opts, killSet, hostcount, files, newNodeF, step)
 
-    # 5 load schema into the new cluster
-    #step += 1
-    #writeCommands(files[getKey(killSet[0])], 'Step %d: load schema' % step, '#instruction# load schema into the new-version cluster')
-
     # 5 call 'voltadmin shutdown --wait' on the original cluster
     step += 1
     generatePauseCommand(surviveSet[0], files, step)
@@ -246,9 +242,10 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
                               'Step %d: copy deployment file' % step,
                               '%s#instruction# copy %s to %s' % (warningForDeploy, new_cluster_deploy, runner.opts.newRoot))
         # originally it is the 5th step - get all the ddl and scp to all machines
-        file.write('#instruction# get schema file: voltdb get --dir=%s --output=%s schema' %(runner.opts.voltdbroot,
+        host = hosts.hosts_by_id.itervalues().next();
+        file.write('#instruction# get schema file: voltdb get --dir=%s --output=%s schema' %(host.voltdbroot,
                                                                                              os.path.join(runner.opts.newRoot, 'description.sql')))
-        file.write('#instruction# get procedure classes file: voltdb get --dir=%s --output=%s schema' %(runner.opts.voltdbroot,
+        file.write('#instruction# get procedure classes file: voltdb get --dir=%s --output=%s classes' %(host.voltdbroot,
                                                                                                         os.path.join(runner.opts.newRoot, 'procedure.jar')))
         file.write('\n')
 
@@ -276,20 +273,20 @@ def generateInitNewClusterCommand(opts, killSet, files, new_cluster_deploy, newN
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s --schema=%s --classes%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                      '%s init --dir=%s --config=%s --schema=%s --classes=%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                 opts.newRoot,
                                                                 os.path.join(opts.newRoot, new_cluster_deploy),
-                                                                os.path.join(opts.newRoot, 'ddl.sql'),
-                                                                os.path.join(opts.newRoot, 'pro.jar')))
+                                                                os.path.join(opts.newRoot, 'schema.sql'),
+                                                                os.path.join(opts.newRoot, 'procedure.jar')))
 
     if opts.newNode is not None:
         writeCommands(newNodeF,
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s --schema=%s --classes%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                      '%s init --dir=%s --config=%s --schema=%s --classes=%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                 opts.newRoot,
                                                                 os.path.join(opts.newRoot, new_cluster_deploy),
-                                                                os.path.join(opts.newRoot, 'ddl.sql'),
-                                                                os.path.join(opts.newRoot, 'pro.jar')))
+                                                                os.path.join(opts.newRoot, 'schema.sql'),
+                                                                os.path.join(opts.newRoot, 'procedure.jar')))
 
 def generateInitOldClusterCommmand(opts, surviveSet, files, new_cluster_deploy, halfNodes, step):
     initNodes = 0
@@ -300,8 +297,8 @@ def generateInitOldClusterCommmand(opts, surviveSet, files, new_cluster_deploy, 
                       '%s init --dir=%s --config=%s --schema=%s --classes%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                 opts.newRoot,
                                                                 os.path.join(opts.newRoot, new_cluster_deploy),
-                                                                os.path.join(opts.newRoot, 'ddl.sql'),
-                                                                os.path.join(opts.newRoot, 'pro.jar')))
+                                                                os.path.join(opts.newRoot, 'schema.sql'),
+                                                                os.path.join(opts.newRoot, 'procedure.jar')))
         if initNodes == halfNodes:
             break
 
@@ -310,7 +307,7 @@ def generateStartNewClusterCommand(opts, killSet, hostcount, files, newNodeF, st
     for hostInfo in killSet:
         leadersString.append(getHostnameOrIp(hostInfo) + ':' + str(hostInfo.internalport))
     if opts.newNode is not None:
-        leadersString.append(getHostanmeOrIp(opts.newNode) + ':' + str(hostInfo.internalport))
+        leadersString.append(opts.newNode + ':' + str(hostInfo.internalport))
 
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
