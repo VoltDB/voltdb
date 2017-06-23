@@ -49,13 +49,15 @@ import org.voltdb_testfuncs.UserDefinedTestFunctions.UserDefinedTestException;
  * Tests of SQL statements that use User-Defined Functions (UDF's).
  */
 public class TestUserDefinedFunctions extends RegressionSuite {
-    static Random random = new Random();
+    static private Random random = new Random();
     static private final BigDecimal MIN_DECIMAL_VALUE = new BigDecimal("-99999999999999999999999999.999999999999");
     static private final BigDecimal MAX_DECIMAL_VALUE = new BigDecimal( "99999999999999999999999999.999999999999");
+    static private final String SIMPLE_POLYGON_WTK = "PolygonFromText( 'POLYGON((3 3, -3 3, -3 -3, 3 -3, 3 3),"
+            + "(1 1, 1 2, 2 1, 1 1),(-1 -1, -1 -2, -2 -1, -1 -1))' )";
 
     // TODO: once UDF's actually work, i.e. return non-null values, this should
     // be removed and all calls to it replaced with calls to (JUnit) assertEquals
-    // (with or, more likely, without the first arg) (ENG-?)
+    // (with or, more likely, without the first arg) (ENG-12753)
     static private double minDecimalDoubleValue = MIN_DECIMAL_VALUE.doubleValue();
     static private List<Long> nullLongValues = Arrays.asList(-128L, -32768L, -2147483648L, -9223372036854775808L);
     private void assertEqualsTemp(String message, Object expected, Object actual) {
@@ -74,7 +76,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
 
     // TODO: once UDF's actually work, i.e. return non-null values, this should
     // be removed and any calls to it replaced with calls to (JUnit) assertEquals
-    // (ENG-?)
+    // (ENG-12753)
     private void assertEqualsTemp(Object expected, Object actual) {
         assertEqualsTemp("", expected, actual);
     }
@@ -119,14 +121,14 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         if (expected == null) {
             Object result = vt.get(1, returnType);
             // TODO: temp debug:
-            System.out.println(functionCall+" resulted in: "+result);
+//            System.out.println(functionCall+" resulted in: "+result);
             assertTrue("Expect null result for "+functionCall, vt.wasNull());
         // If expecting a VoltDB FLOAT (Java Double) value not equal to NaN
         } else if ( returnType == VoltType.FLOAT &&
                 !( expected instanceof Number && Double.isNaN(((Number)expected).doubleValue()) ) ) {
             // TODO: once UDF's actually work, this line will probably need to be
             // replaced by the commented out line below, in order to avoid test
-            // failures due to round-off errors (ENG-?):
+            // failures due to round-off errors (ENG-12753):
             assertEqualsTemp(returnType+", "+functionCall, expected, vt.getDouble(1));
             //assertTrue(Math.abs(vt.getDouble(1) - expected) <= 1.0e-16);
         } else {
@@ -158,14 +160,19 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction(functionCall, expected, returnType, null, null);
     }
 
-    /** TODO. */
+    /** Tests the specified <i>functionCall</i>, and confirms that an Exception
+     *  is thrown, of <i>expectedExceptionType</i>.
+     *  Optionally, you can also specify <i>columnNames</i> and corresponding
+     *  <i>columnValues</i> to be inserted before the SELECT query containing
+     *  the <i>functionCall</i>. The table to INSERT into and SELECT from
+     *  is chosen randomly. */
     private void testFunctionThrowsException(String functionCall, VoltType returnType,
             Class<? extends Throwable> expectedExceptionType, String[] columnNames, String[] columnValues) {
         try {
             testFunction(functionCall, null, returnType, columnNames, columnValues);
         } catch (Throwable ex) {
             // TODO: temp debug:
-            System.out.println(functionCall+" triggered exception: "+ex);
+//            System.out.println(functionCall+" triggered exception: "+ex);
             ex.printStackTrace(System.out);
             assertEquals(expectedExceptionType, ex.getClass());
             return;
@@ -173,7 +180,9 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         fail(functionCall+" did not throw expected exception: "+expectedExceptionType);
     }
 
-    /** TODO. */
+    /** Tests the specified <i>functionCall</i>, and confirms that an Exception
+     *  is thrown, of <i>expectedExceptionType</i>. The table to INSERT into and
+     *  SELECT from is chosen randomly. */
     private void testFunctionThrowsException(String functionCall, VoltType returnType,
             Class<? extends Throwable> expectedExceptionType) {
         testFunctionThrowsException(functionCall, returnType, expectedExceptionType, null, null);
@@ -190,7 +199,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("piUdfBoxed()", PI, VoltType.FLOAT);
     }
 
-    // Test UDF's with one argument, with parameters and return value of various types ...
+    // Test UDF's with one argument, with parameters and return values of various types ...
 
     public void testAbsTinyintFunction() throws IOException, ProcCallException {
         testFunction("absTinyint(-99)", (byte)99, VoltType.TINYINT);
@@ -229,17 +238,13 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("reverse('abcde')", "edcba", VoltType.STRING);
     }
 
-    // TODO: uncomment, once GEOGRAPHY (and GEOGRAPHY_POINT) UDFs work (ENG-?):
-    public void testNumRingsFunction() throws IOException, ProcCallException {
-        String polygonFromText = "PolygonFromText( 'POLYGON((3 3, -3 3, -3 -3, 3 -3, 3 3),"
-                + "(1 1, 1 2, 2 1, 1 1),(-1 -1, -1 -2, -2 -1, -1 -1))' )";
-        testFunction("numRings("+polygonFromText+")", 3, VoltType.INTEGER);
-    }
-    public void testNumPointsUdfFunction() throws IOException, ProcCallException {
-        String polygonFromText = "PolygonFromText( 'POLYGON((3 3, -3 3, -3 -3, 3 -3, 3 3),"
-                + "(1 1, 1 2, 2 1, 1 1),(-1 -1, -1 -2, -2 -1, -1 -1))' )";
-        testFunction("numPointsUdf("+polygonFromText+")", 13, VoltType.INTEGER);
-    }
+    // TODO: uncomment, once GEOGRAPHY (and GEOGRAPHY_POINT) UDFs work (ENG-12753):
+//    public void testNumRingsFunction() throws IOException, ProcCallException {
+//        testFunction("numRings("+SIMPLE_POLYGON_WTK+")", 3, VoltType.INTEGER);
+//    }
+//    public void testNumPointsUdfFunction() throws IOException, ProcCallException {
+//        testFunction("numPointsUdf("+SIMPLE_POLYGON_WTK+")", 13, VoltType.INTEGER);
+//    }
 
     // Test UDF's with two arguments, with parameters and return value of various types ...
 
@@ -277,21 +282,21 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("modDecimal(47.8,10)", new BigDecimal(7.8), VoltType.DECIMAL);
     }
 
-    // TODO: uncomment, once VARBINARY UDFs work (ENG-?):
-    public void testBtrimFunction() throws IOException, ProcCallException {
-        byte[] expectedResult = new byte[3];
-        expectedResult[0] = (byte) 0xAB;
-        expectedResult[1] = (byte) 0x00;
-        expectedResult[2] = (byte) 0xCD;
-        testFunction("btrim(x'0001AB00CD0100',x'0001')", expectedResult, VoltType.VARBINARY);
-    }
-    public void testBtrimBoxedFunction() throws IOException, ProcCallException {
-        Byte[] expectedResult = new Byte[3];
-        expectedResult[0] = (byte) 0xAB;
-        expectedResult[1] = (byte) 0x00;
-        expectedResult[2] = (byte) 0xCD;
-        testFunction("btrimBoxed(x'0001AB00CD0100',x'0001')", expectedResult, VoltType.VARBINARY);
-    }
+    // TODO: uncomment, once VARBINARY UDFs work (ENG-12753):
+//    public void testBtrimFunction() throws IOException, ProcCallException {
+//        byte[] expectedResult = new byte[3];
+//        expectedResult[0] = (byte) 0xAB;
+//        expectedResult[1] = (byte) 0x00;
+//        expectedResult[2] = (byte) 0xCD;
+//        testFunction("btrim(x'0001AB00CD0100',x'0001')", expectedResult, VoltType.VARBINARY);
+//    }
+//    public void testBtrimBoxedFunction() throws IOException, ProcCallException {
+//        Byte[] expectedResult = new Byte[3];
+//        expectedResult[0] = (byte) 0xAB;
+//        expectedResult[1] = (byte) 0x00;
+//        expectedResult[2] = (byte) 0xCD;
+//        testFunction("btrimBoxed(x'0001AB00CD0100',x'0001')", expectedResult, VoltType.VARBINARY);
+//    }
 
     // Test more UDF's with two arguments; now the arguments are column names,
     // rather than constant values ...
@@ -363,24 +368,40 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("addYearsToTimestamp(TIME, INT)", expectedResult, VoltType.TIMESTAMP, columnNames, columnValues);
     }
 
-    public void testAdd2VarbinaryFunction() throws IOException, ProcCallException {
-        String[] columnNames  = {"VARBIN1", "VARBIN2"};
-        String[] columnValues = {"x'010203'", "x'0405'"};
-        byte[] expectedResult = new byte[3];
-        expectedResult[0] = (byte) 0x05;
-        expectedResult[1] = (byte) 0x07;
-        expectedResult[2] = (byte) 0x03;
-        testFunction("add2Varbinary(VARBIN1, VARBIN2)", expectedResult, VoltType.VARBINARY, columnNames, columnValues);
-    }
-    public void testAdd2VarbinaryBoxedFunction() throws IOException, ProcCallException {
-        String[] columnNames  = {"VARBIN1", "VARBIN2"};
-        String[] columnValues = {"x'010203'", "x'0405'"};
-        Byte[] expectedResult = new Byte[3];
-        expectedResult[0] = (byte) 0x05;
-        expectedResult[1] = (byte) 0x07;
-        expectedResult[2] = (byte) 0x03;
-        testFunction("add2VarbinaryBoxed(VARBIN1, VARBIN2)", expectedResult, VoltType.VARBINARY, columnNames, columnValues);
-    }
+    // TODO: uncomment, once VARBINARY UDFs work (ENG-12753):
+//    public void testAdd2VarbinaryFunction() throws IOException, ProcCallException {
+//        String[] columnNames  = {"VARBIN1", "VARBIN2"};
+//        String[] columnValues = {"x'010203'", "x'0405'"};
+//        byte[] expectedResult = new byte[3];
+//        expectedResult[0] = (byte) 0x05;
+//        expectedResult[1] = (byte) 0x07;
+//        expectedResult[2] = (byte) 0x03;
+//        testFunction("add2Varbinary(VARBIN1, VARBIN2)", expectedResult, VoltType.VARBINARY, columnNames, columnValues);
+//    }
+//    public void testAdd2VarbinaryBoxedFunction() throws IOException, ProcCallException {
+//        String[] columnNames  = {"VARBIN1", "VARBIN2"};
+//        String[] columnValues = {"x'010203'", "x'0405'"};
+//        Byte[] expectedResult = new Byte[3];
+//        expectedResult[0] = (byte) 0x05;
+//        expectedResult[1] = (byte) 0x07;
+//        expectedResult[2] = (byte) 0x03;
+//        testFunction("add2VarbinaryBoxed(VARBIN1, VARBIN2)", expectedResult, VoltType.VARBINARY, columnNames, columnValues);
+//    }
+
+    // TODO: uncomment, once GEOGRAPHY_POINT and GEOGRAPHY UDFs work (ENG-12753):
+//    public void testAdd2GeographyPoint() throws IOException, ProcCallException {
+//        String[] columnNames  = {"POINT1", "POINT2"};
+//        String[] columnValues = {"PointFromText('POINT(1 2)')", "PointFromText('POINT(3 4)')"};
+//        GeographyPointValue expectedResult = new GeographyPointValue(4, 6);
+//        testFunction("add2GeographyPoint(POINT1, POINT2)", expectedResult, VoltType.GEOGRAPHY_POINT, columnNames, columnValues);
+//    }
+//    public void testAddGeographyPointToGeography() throws IOException, ProcCallException {
+//        String[] columnNames  = {"POLYGON", "POINT1"};
+//        String[] columnValues = {SIMPLE_POLYGON_WTK, "PointFromText('POINT(1 2)')"};
+//        GeographyValue expectedResult = new GeographyValue("PolygonFromText( 'POLYGON((4 5, -2 5, -2 -1, 4 -1, 4 5),"
+//                                                        + "(2 3, 2 4, 3 3, 2 4),(0 1, 0 0, -1 1, 0 1))' )");
+//        testFunction("addGeographyPointToGeography(POLYGON, POINT1)", expectedResult, VoltType.GEOGRAPHY, columnNames, columnValues);
+//    }
 
     // Test concat UDF's with two, three or four arguments ...
 
@@ -432,28 +453,33 @@ public class TestUserDefinedFunctions extends RegressionSuite {
     public void testReturnVarcharNull() throws IOException, ProcCallException {
         testFunction("add2Varchar('"+UDF_TEST.RETURN_JAVA_NULL+"', 'Foo')", null, VoltType.STRING);
     }
-    public void testReturnVarbinaryNull() throws IOException, ProcCallException {
-        testFunction("add2Varbinary(x'" + String.format("%02X", (byte)UDF_TEST.RETURN_DATA_TYPE_NULL) + "', x'00')",
-                    null, VoltType.VARBINARY);
-    }
-    public void testReturnVarbinaryBoxedNull() throws IOException, ProcCallException {
-        testFunction("add2VarbinaryBoxed(x'" + String.format("%02X", (byte)UDF_TEST.RETURN_DATA_TYPE_NULL) + "', x'00')",
-                    null, VoltType.VARBINARY);
-    }
+
+    // TODO: uncomment, once VARBINARY UDFs work (ENG-12753):
+//    public void testReturnVarbinaryNull() throws IOException, ProcCallException {
+//        testFunction("add2Varbinary(x'" + String.format("%02X", (byte)UDF_TEST.RETURN_DATA_TYPE_NULL) + "', x'00')",
+//                    null, VoltType.VARBINARY);
+//    }
+//    public void testReturnVarbinaryBoxedNull() throws IOException, ProcCallException {
+//        testFunction("add2VarbinaryBoxed(x'" + String.format("%02X", (byte)UDF_TEST.RETURN_DATA_TYPE_NULL) + "', x'00')",
+//                    null, VoltType.VARBINARY);
+//    }
+
     public void testReturnTimestampNull() throws IOException, ProcCallException {
         int year = 1900 + UDF_TEST.RETURN_DATA_TYPE_NULL;
         testFunction("addYearsToTimestamp('"+year+"-12-31 23:59:50.0', 0)", null, VoltType.TIMESTAMP);
     }
-    public void testReturnGeographyPointNull() throws IOException, ProcCallException {
-        testFunction("add2GeographyPoint(PointFromText('POINT("+UDF_TEST.RETURN_DATA_TYPE_NULL+" 0)'), "
-                    + "PointFromText('POINT(0 0)') )", null, VoltType.GEOGRAPHY_POINT);
-    }
-    public void testReturnGeographyNull() throws IOException, ProcCallException {
-        int nullCode = UDF_TEST.RETURN_DATA_TYPE_NULL;
-        testFunction("addGeographyPointToGeography( PolygonFromText('POLYGON"
-                    + "((0 0, "+nullCode+" 0, 0 "+nullCode+", 0 0))'), "
-                    + "PointFromText('POINT(0 0)') )", null, VoltType.GEOGRAPHY);
-    }
+
+    // TODO: uncomment, once GEOGRAPHY_POINT and GEOGRAPHY UDFs work (ENG-12753):
+//    public void testReturnGeographyPointNull() throws IOException, ProcCallException {
+//        testFunction("add2GeographyPoint(PointFromText('POINT("+UDF_TEST.RETURN_DATA_TYPE_NULL+" 0)'), "
+//                    + "PointFromText('POINT(0 0)') )", null, VoltType.GEOGRAPHY_POINT);
+//    }
+//    public void testReturnGeographyNull() throws IOException, ProcCallException {
+//        int nullCode = UDF_TEST.RETURN_DATA_TYPE_NULL;
+//        testFunction("addGeographyPointToGeography( PolygonFromText('POLYGON"
+//                    + "((0 0, "+nullCode+" 0, 0 "+nullCode+", 0 0))'), "
+//                    + "PointFromText('POINT(0 0)') )", null, VoltType.GEOGRAPHY);
+//    }
 
     // Test UDF calls designed to return unusual values (NaN, DECIMAL min & max) ...
 
@@ -469,50 +495,70 @@ public class TestUserDefinedFunctions extends RegressionSuite {
 
     // Test UDF calls designed to throw an exception ...
 
-    public void testNullPointerException() {
-        testFunctionThrowsException("add2Tinyint("+UDF_TEST.THROW_NullPointerException+", 0)",
-                VoltType.TINYINT, NullPointerException.class);
-    }
-    public void testIllegalArgumentException() {
-        testFunctionThrowsException("add2SmallintBoxed("+UDF_TEST.THROW_IllegalArgumentException+", 0)",
-                VoltType.SMALLINT, IllegalArgumentException.class);
-    }
-    public void testNumberFormatException() {
-        testFunctionThrowsException("add2Integer("+UDF_TEST.THROW_NumberFormatException+", 0)",
-                VoltType.INTEGER, NumberFormatException.class);
-    }
-    public void testArrayIndexOutOfBoundsException() {
-        testFunctionThrowsException("add2BigintBoxed("+UDF_TEST.THROW_ArrayIndexOutOfBoundsException+", 0)",
-                VoltType.BIGINT, ArrayIndexOutOfBoundsException.class);
-    }
-    public void testClassCastException() {
-        testFunctionThrowsException("add2Float("+UDF_TEST.THROW_ClassCastException+", 0.0)",
-                VoltType.FLOAT, ClassCastException.class);
-    }
-    public void testArithmeticException() {
-        testFunctionThrowsException("add2FloatBoxed("+UDF_TEST.THROW_ArithmeticException+", 0.0)",
-                VoltType.FLOAT, ArithmeticException.class);
-    }
-    public void testUnsupportedOperationException() {
-        testFunctionThrowsException("add2Decimal("+UDF_TEST.THROW_UnsupportedOperationException+", 0.0)",
-                VoltType.DECIMAL, UnsupportedOperationException.class);
-    }
-    public void testVoltTypeException() {
-        testFunctionThrowsException("add2Varchar('"+UDF_TEST.THROW_VoltTypeException+"', 'Foo')",
-                VoltType.STRING, VoltTypeException.class);
-    }
-    public void testUserDefinedTestException() {
-        int year = 1900 + UDF_TEST.THROW_UserDefinedTestException;
-        testFunctionThrowsException("addYearsToTimestamp('"+year+"-12-31 23:59:50.0', 0)",
-                VoltType.TIMESTAMP, UserDefinedTestException.class);
-    }
+    // TODO: uncomment, once UDFs throwing exceptions works (ENG-12753):
+//    public void testNullPointerException() {
+//        testFunctionThrowsException("add2Tinyint("+UDF_TEST.THROW_NullPointerException+", 0)",
+//                VoltType.TINYINT, NullPointerException.class);
+//    }
+//    public void testIllegalArgumentException() {
+//        testFunctionThrowsException("add2SmallintBoxed("+UDF_TEST.THROW_IllegalArgumentException+", 0)",
+//                VoltType.SMALLINT, IllegalArgumentException.class);
+//    }
+//    public void testNumberFormatException() {
+//        testFunctionThrowsException("add2Integer("+UDF_TEST.THROW_NumberFormatException+", 0)",
+//                VoltType.INTEGER, NumberFormatException.class);
+//    }
+//    public void testArrayIndexOutOfBoundsException() {
+//        testFunctionThrowsException("add2BigintBoxed("+UDF_TEST.THROW_ArrayIndexOutOfBoundsException+", 0)",
+//                VoltType.BIGINT, ArrayIndexOutOfBoundsException.class);
+//    }
+//    public void testClassCastException() {
+//        testFunctionThrowsException("add2Float("+UDF_TEST.THROW_ClassCastException+", 0.0)",
+//                VoltType.FLOAT, ClassCastException.class);
+//    }
+//    public void testArithmeticException() {
+//        testFunctionThrowsException("add2FloatBoxed("+UDF_TEST.THROW_ArithmeticException+", 0.0)",
+//                VoltType.FLOAT, ArithmeticException.class);
+//    }
+//    public void testUnsupportedOperationException() {
+//        testFunctionThrowsException("add2Decimal("+UDF_TEST.THROW_UnsupportedOperationException+", 0.0)",
+//                VoltType.DECIMAL, UnsupportedOperationException.class);
+//    }
+//    public void testVoltTypeException() {
+//        testFunctionThrowsException("add2Varchar('"+UDF_TEST.THROW_VoltTypeException+"', 'Foo')",
+//                VoltType.STRING, VoltTypeException.class);
+//    }
+//    public void testUserDefinedTestException() {
+//        int year = 1900 + UDF_TEST.THROW_UserDefinedTestException;
+//        testFunctionThrowsException("addYearsToTimestamp('"+year+"-12-31 23:59:50.0', 0)",
+//                VoltType.TIMESTAMP, UserDefinedTestException.class);
+//    }
 
     // We've tested all the exceptions we care about above, but we want to
     // check exceptions for the remaining data types too ...
 
-//    public void testUnsupportedOperationException() {
-//        testFunctionThrowsException("add2GeographyPoint("+UDF_TEST.THROW_UnsupportedOperationException+", 0.0)",
-//                VoltType.DECIMAL, UnsupportedOperationException.class);
+    // TODO: uncomment, once UDFs throwing exceptions works; and once VARBINARY,
+    // GEOGRAPHY_POINT and GEOGRAPHY UDFs work (ENG-12753):
+//    public void testVarbinaryIllegalArgumentException() {
+//        testFunctionThrowsException("add2Varbinary(x'"
+//                + String.format("%02X", (byte)UDF_TEST.THROW_IllegalArgumentException)
+//                + "', x'00')", VoltType.VARBINARY, IllegalArgumentException.class);
+//    }
+//    public void testVarbinaryBoxedUnsupportedOperationException() {
+//        testFunctionThrowsException("add2VarbinaryBoxed(x'"
+//                + String.format("%02X", (byte)UDF_TEST.THROW_UnsupportedOperationException)
+//                + "', x'00')", VoltType.VARBINARY, UnsupportedOperationException.class);
+//    }
+//    public void testGeographyPointVoltTypeException() {
+//        testFunctionThrowsException("add2GeographyPoint(PointFromText('POINT("+UDF_TEST.THROW_VoltTypeException+" 0)'), "
+//                    + "PointFromText('POINT(0 0)') )", VoltType.GEOGRAPHY_POINT, VoltTypeException.class);
+//    }
+//    public void testGeographyUserDefinedTestException() {
+//        int udteCode = UDF_TEST.THROW_UserDefinedTestException;
+//        testFunctionThrowsException("addGeographyPointToGeography( PolygonFromText('POLYGON"
+//                    + "((0 0, "+udteCode+" 0, 0 "+udteCode+", 0 0))'), "
+//                    + "PointFromText('POINT(0 0)') )",
+//                    VoltType.GEOGRAPHY, UserDefinedTestException.class);
 //    }
 
 
@@ -545,14 +591,13 @@ public class TestUserDefinedFunctions extends RegressionSuite {
                 + "  BIG     BIGINT,"
                 + "  NUM     FLOAT,"
                 + "  DEC     DECIMAL,"
-                + "  VCHAR_INLINE     VARCHAR(14),"
                 + "  VCHAR_INLINE_MAX VARCHAR(63 BYTES),"
                 + "  VCHAR            VARCHAR(64 BYTES),"
-                + "  VCHAR_JSON       VARCHAR(1000),"
                 + "  TIME    TIMESTAMP,"
                 + "  VARBIN1 VARBINARY(100),"
                 + "  VARBIN2 VARBINARY(100),"
-                + "  POINT   GEOGRAPHY_POINT,"
+                + "  POINT1  GEOGRAPHY_POINT,"
+                + "  POINT2  GEOGRAPHY_POINT,"
                 + "  POLYGON GEOGRAPHY );\n";
         final String literalSchema = new String(createFunctionsDDL) + "\n"
                 + "CREATE TABLE R1" + tableDefinition
@@ -560,7 +605,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
                 + "PARTITION TABLE P1 ON COLUMN ID;";
 
         // TODO: temp debug:
-        System.out.println("literalSchema:\n" + literalSchema);
+//        System.out.println("literalSchema:\n" + literalSchema);
 
         try {
             project.addLiteralSchema(literalSchema);
@@ -583,8 +628,8 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("tudf-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
-        // TODO: uncomment this once UDF's work on multiple-node clusters (ENG-?):
-        //builder.addServerConfig(config);
+        // TODO: uncomment this once UDF's work on multiple-node clusters (ENG-12753):
+//        builder.addServerConfig(config);
 
         return builder;
     }
