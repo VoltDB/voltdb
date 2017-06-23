@@ -168,30 +168,8 @@ public interface VoltDBInterface
 
     /**
      * Given the information, write the new catalog jar file only
-     * @param diffCommands
-     * @param newCatalogBytes
-     * @param catalogBytesHash
-     * @param expectedCatalogVersion
-     * @param currentTxnId
-     * @param currentTxnTimestamp
-     * @param deploymentBytes
-     * @param deploymentHash
-     * @param requireCatalogDiffCmdsApplyToEE
-     * @param hasSchemaChange
-     * @param requiresNewExportGeneration
      */
-    default public void writeCatalogJar(
-            String diffCommands,
-            byte[] newCatalogBytes,
-            byte[] catalogBytesHash,
-            int expectedCatalogVersion,
-            long currentTxnId,
-            long currentTxnUniqueId,
-            byte[] deploymentBytes,
-            byte[] deploymentHash,
-            boolean requireCatalogDiffCmdsApplyToEE,
-            boolean hasSchemaChange,
-            boolean requiresNewExportGeneration)
+    default public void writeCatalogJar(byte[] newCatalogBytes) throws IOException
     {
         return;
     }

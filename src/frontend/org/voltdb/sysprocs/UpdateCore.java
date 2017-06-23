@@ -527,45 +527,6 @@ public class UpdateCore extends VoltSystemProcedure {
     {
         assert(tablesThatMustBeEmpty != null);
 
-//        log.warn("=================== UpdateCore ===================");
-
-
-        // This is not really a good way
-        // A temporary fix
-//        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-//        byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
-//
-//        CatalogAndIds currCatalog = CatalogUtil.getCatalogFromZK(zk);
-//
-//        // This means @UpdateCore is called from command log replay
-//        // update the ZK first
-//        if (currCatalog.version == expectedCatalogVersion ) {
-//            CatalogUtil.updateCatalogToZK(
-//                    zk,
-//                    expectedCatalogVersion + 1,
-//                    DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
-//                    getUniqueId(),
-//                    catalogBytes,
-//                    catalogHash,
-//                    deploymentBytes);
-//        }
-//
-//        performCatalogUpdateWork(
-//                catalogDiffCommands,
-//                expectedCatalogVersion,
-//                requiresSnapshotIsolation,
-//                requireCatalogDiffCmdsApplyToEE,
-//                hasSchemaChange,
-//                requiresNewExportGeneration);
-//
-//        VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
-//        result.addRow(VoltSystemProcedure.STATUS_OK);
-//        return (new VoltTable[] {result});
-
-
-
-
-
         /*
          * Validate that no elastic join is in progress, blocking this catalog update.
          * If this update works with elastic then do the update anyways

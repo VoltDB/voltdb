@@ -313,8 +313,6 @@ public class CatalogContext {
     {
         File catalog_file = new VoltFile(path, name);
         File catalog_tmp_file = new VoltFile(path, name + ".tmp");
-//        hostLog.warn("path: " + path + ", name: " + name);
-//        hostLog.warn(m_jarfile.firstKey());
         if (catalog_file.exists() && catalog_tmp_file.exists())
         {
             // This means a @UpdateCore case, the asynchronous writing of
@@ -336,32 +334,6 @@ public class CatalogContext {
             throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
                     + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists() +
                     "\nPlease make such changes synchronously from a single " + "connection to the cluster.");
-        }
-    }
-
-    // This function is supposed to be in the @WriteCatalog system call.
-    // Therefore we expect to see an existing catalog jar, and no other
-    // temporary jar file exists
-    public void writeCatalogJarToTempFile(String path, String name) throws IOException
-    {
-        File catalog_file = new VoltFile(path, name);
-        File catalog_tmp_file = new VoltFile(path, name + ".tmp");
-        if (catalog_file.exists())
-        {
-            if (catalog_tmp_file.exists()) {
-                // There might be some leftover files from previous aborted
-                // catalog updates
-                catalog_tmp_file.delete();
-            }
-            m_jarfile.writeToFile(catalog_tmp_file);
-        } else {
-            throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
-                    + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists() +
-                    "\n" + "Invalid catalog update.  Catalog or deployment change was planned " +
-                    "against one version of the cluster while the previous one is ongoing.  This is likely " +
-                    "the result of multiple concurrent attempts to change the cluster " +
-                    "configuration.  Please make such changes synchronously from a single " +
-                    "connection to the cluster.");
         }
     }
 

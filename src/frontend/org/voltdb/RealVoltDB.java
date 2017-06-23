@@ -3332,49 +3332,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * is supposed to be called in an NT proc
      */
     @Override
-    public void writeCatalogJar(
-                String diffCommands,
-                byte[] newCatalogBytes,
-                byte[] catalogBytesHash,
-                int expectedCatalogVersion,
-                long currentTxnId,
-                long currentTxnUniqueId,
-                byte[] deploymentBytes,
-                byte[] deploymentHash,
-                boolean requireCatalogDiffCmdsApplyToEE,
-                boolean hasSchemaChange,
-                boolean requiresNewExportGeneration)
+    public void writeCatalogJar(byte[] catalogBytes) throws IOException
     {
         synchronized (m_writeCatalogJarLock) {
-            if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
-                hostLog.fatal("Failed catalog update." +
-                        " expectedCatalogVersion: " + expectedCatalogVersion +
-                        " currentTxnId: " + currentTxnId +
-                        " currentTxnUniqueId: " + currentTxnUniqueId +
-                        " m_catalogContext.catalogVersion " + m_catalogContext.catalogVersion);
+            File configInfoDir = getConfigDirectory();
+            configInfoDir.mkdirs();
 
-                throw new RuntimeException("Trying to update main catalog context with diff " +
-                        "commands generated for an out-of date catalog. Expected catalog version: " +
-                        expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
-            }
-
-            // A temporary context to be created for writing the updated jar
-            // The context will be updated later in @UpdateCore call
-            // Note that the txn id and unique id should not matter for writing
-            // the catalog jar to disk
-            CatalogContext temp_catalogContext =
-                    m_catalogContext.update(
-                            currentTxnId,
-                            currentTxnUniqueId,
-                            newCatalogBytes,
-                            catalogBytesHash,
-                            diffCommands,
-                            false,
-                            deploymentBytes,
-                            m_messenger,
-                            hasSchemaChange);
-
-            new ConfigLogging().logCatalogAndDeployment(temp_catalogContext);
+            InMemoryJarfile.writeToFile(catalogBytes, new VoltFile(configInfoDir.getPath(),
+                                        InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
         }
     }
 
