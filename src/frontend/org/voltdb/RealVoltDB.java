@@ -470,7 +470,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.getVoltDBRoot().getPath();
+        try {
+            return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
+        } catch (IOException e) {
+            throw new SettingsException("failed to canonicalize voltdbroot");
+        }
     }
 
     @Override
@@ -478,7 +482,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize commandlog path");
+        }
     }
 
     @Override
@@ -486,7 +494,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize commandlog snapshot path");
+        }
     }
 
     @Override
@@ -494,7 +506,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize snapshot path");
+        }
     }
 
     @Override
@@ -502,7 +518,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize export overflow path");
+        }
     }
 
     @Override
@@ -510,37 +530,65 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize DR overflow path");
+        }
     }
 
     @Override
     public String getVoltDBRootPath() {
-        return m_nodeSettings.getVoltDBRoot().getPath();
+        try {
+            return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
+        } catch (IOException e) {
+            throw new SettingsException("failed to canonicalize voltdbroot");
+        }
     }
 
     @Override
     public String getCommandLogPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize commandlog path");
+        }
     }
 
     @Override
     public String getCommandLogSnapshotPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize commandlog snapshot path");
+        }
     }
 
     @Override
     public String getSnapshotPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize snapshot path");
+        }
     }
 
     @Override
     public String getExportOverflowPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize export overflow path");
+        }
     }
 
     @Override
     public String getDROverflowPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getPath();
+        try {
+            return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getCanonicalPath();
+        } catch(IOException e) {
+            throw new SettingsException("failed to canonicalize DR overflow path");
+        }
     }
 
     public static String getStagedCatalogPath(String voltDbRoot) {
