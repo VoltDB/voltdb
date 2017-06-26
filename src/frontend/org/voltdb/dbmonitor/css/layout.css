@@ -3975,6 +3975,17 @@ ul#shutdownMsg li {
         width: 86%;
         margin-right: 2px;
     }
+       .mainContent, .mainContentAnalysis{ width:auto;}
+       ul#ulProcedure li { float:none;}
+
+
+}
+@media (max-width: 719px) {
+.generateproDetails { position:relative; top:-28px; float:none;}
+}
+@media (min-width: 720px) and (max-width: 800px) {
+ .generateproDetails { padding-right:0;}
+
 }
 @media (max-width: 480px) {
     .split {
@@ -4459,6 +4470,7 @@ ul#shutdownMsg li {
         float: none;
         width: 100%;
     }
+    .analysisBody{height: calc(100vh - 200px);}
 /*    .tblScroll {
         overflow: auto;
         width: 100%;
