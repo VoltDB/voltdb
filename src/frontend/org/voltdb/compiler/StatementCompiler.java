@@ -96,13 +96,6 @@ public abstract class StatementCompiler {
         // and to make statement parsing easier.
         stmt = stmt.replaceAll("\n", " ");
         stmt = stmt.trim();
-
-        // if there are multiple statements, the string of statements will begin and end with quotes
-        if( stmt.charAt(0) == '"' && stmt.charAt(stmt.length()-2) == '"' )  {
-            // we will add semicolon below
-            stmt = stmt.substring(1, stmt.length()-2);
-        }
-
         compiler.addInfo("Compiling Statement: " + stmt);
 
         // put the data in the catalog that we have
