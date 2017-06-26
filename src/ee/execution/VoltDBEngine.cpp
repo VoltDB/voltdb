@@ -744,10 +744,10 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     // This must be done after loading all the tables.
     initMaterializedViewsAndLimitDeletePlans(false);
 
-    typedef std::pair<CatalogId, Table*> CatToTable;
-    BOOST_FOREACH (CatToTable tablePair, m_tables) {
-        VOLT_TRACE("Partition %d loaded table %d at address %p", m_partitionId, tablePair.first, tablePair.second);
-    }
+//    typedef std::pair<CatalogId, Table*> CatToTable;
+//    BOOST_FOREACH (CatToTable tablePair, m_tables) {
+//        VOLT_TRACE("Partition %d loaded table %d at address %p", m_partitionId, tablePair.first, tablePair.second);
+//    }
 
     VOLT_DEBUG("Loaded catalog from partition %d ...", m_partitionId);
     return true;

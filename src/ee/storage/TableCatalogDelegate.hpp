@@ -59,7 +59,7 @@ class TableCatalogDelegate {
         , m_exportEnabled(false)
         , m_signature(signature)
         , m_compactionThreshold(compactionThreshold)
-        , m_engine(engine)
+//        , m_engine(engine)
     {}
 
     ~TableCatalogDelegate();
@@ -145,7 +145,7 @@ class TableCatalogDelegate {
     const std::string m_signature;
     const int32_t m_compactionThreshold;
     char m_signatureHash[20];
-    voltdb::VoltDBEngine *m_engine;
+//    voltdb::VoltDBEngine *m_engine;
 };
 
 }
