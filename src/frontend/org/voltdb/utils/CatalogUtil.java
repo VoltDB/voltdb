@@ -1696,7 +1696,6 @@ public abstract class CatalogUtil {
         File voltDbRoot;
         // Handles default voltdbroot (and completely missing "paths" element).
         voltDbRoot = getVoltDbRoot(paths);
-
         //Snapshot
         setupSnapshotPaths(paths.getSnapshots(), voltDbRoot);
         //export overflow
@@ -2682,7 +2681,6 @@ public abstract class CatalogUtil {
         }
         return deployment;
     }
-
 
     /*
      * Print procedure detail, such as statement text, frag id and json plan.
