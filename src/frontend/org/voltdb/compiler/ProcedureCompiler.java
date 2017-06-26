@@ -758,6 +758,13 @@ public abstract class ProcedureCompiler {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
         }
 
+        // if there are multiple statements, the string of statements will begin and end with quotes
+        // TODO - fix parsing done in m_singleStmt - it parses till first ";"
+        String proc_stmts = procedureDescriptor.m_singleStmt;
+        if( proc_stmts.charAt(0) == '"' && proc_stmts.charAt(proc_stmts.length()-2) == '"' )  {
+            proc_stmts = proc_stmts.substring(1, proc_stmts.length()-2);
+        }
+
         // get the short name of the class (no package if a user procedure)
         // use the Table.<builtin> name (allowing the period) if builtin.
         String shortName = className;
@@ -797,6 +804,8 @@ public abstract class ProcedureCompiler {
         }
         assert(info != null);
 
+        // TODO: parse the statements in the proc and have a loop for the code below for each stmt
+
         // ADD THE STATEMENT
 
         // add the statement to the catalog
@@ -808,7 +817,7 @@ public abstract class ProcedureCompiler {
                                    StatementPartitioning.forceMP();
         // default to FASTER detmode because stmt procs can't feed read output into writes
         StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
-                estimates, catalogStmt, procedureDescriptor.m_singleStmt,
+                estimates, catalogStmt, proc_stmts,//procedureDescriptor.m_singleStmt,
                 procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 
         // if the single stmt is not read only, then the proc is not read only
