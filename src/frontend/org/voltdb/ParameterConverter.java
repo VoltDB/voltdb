@@ -297,6 +297,7 @@ public class ParameterConverter {
         else if (inputClz == Byte.class) {
             if (expectedClz == byte.class) return param;
             if ((Byte) param == VoltType.NULL_TINYINT) return nullValueForType(expectedClz);
+            if (expectedClz == Byte.class) return param;
             if (expectedClz == long.class || expectedClz == Long.class) return ((Byte) param).longValue();
             if (expectedClz == int.class || expectedClz == Integer.class) return ((Byte) param).intValue();
             if (expectedClz == short.class || expectedClz == Short.class) return ((Byte) param).shortValue();
@@ -357,12 +358,12 @@ public class ParameterConverter {
                 return VoltDecimalHelper.setDefaultScale(pBigDecimal);
             }
 
-            if (expectedClz == long.class) {
+            if (expectedClz == long.class || expectedClz == Long.class) {
                 try {
                     long result = pBigDecimal.longValueExact();
                     return result;
                 } catch (ArithmeticException e) {}  // The error will be re-thrown below
-            } else if (expectedClz == double.class) {
+            } else if (expectedClz == double.class || expectedClz == Double.class) {
                 // This conversion could potentially lose information, should a warning be
                 // given at a higher level ?
                 double result = pBigDecimal.doubleValue();
@@ -370,18 +371,18 @@ public class ParameterConverter {
                 if (result != Double.POSITIVE_INFINITY && result != Double.NEGATIVE_INFINITY) {
                     return result;
                 }
-            } else if (expectedClz == int.class) {
+            } else if (expectedClz == int.class || expectedClz == Integer.class) {
                 try {
                     int result = pBigDecimal.intValueExact();
                     return result;
                 } catch (ArithmeticException e) {}  // The error will be re-thrown below
-            } else if (expectedClz == short.class) {
+            } else if (expectedClz == short.class || expectedClz == Short.class) {
                 try {
                     short result = pBigDecimal.shortValueExact();
                     return result;
                 } catch (ArithmeticException e) {} // The error will be re-thrown below
             }
-            else if (expectedClz == byte.class) {
+            else if (expectedClz == byte.class || expectedClz == Byte.class) {
                 try {
                     byte result = pBigDecimal.byteValueExact();
                     return result;

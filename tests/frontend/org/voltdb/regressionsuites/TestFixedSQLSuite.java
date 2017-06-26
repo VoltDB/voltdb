@@ -38,6 +38,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
+import org.voltdb_testprocs.regressionsuites.fixedsql.InsertBoxed;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
@@ -51,7 +52,7 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
 public class TestFixedSQLSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class,
+    static final Class<?>[] PROCEDURES = { Insert.class, InsertBoxed.class, TestENG1232.class, TestENG1232_2.class,
         TestENG2423.InnerProc.class };
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
@@ -272,6 +273,49 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 6, "desc", 300, 14.5);
             client.callProcedure("Insert", table, 7, "desc", 300, 14.5);
             client.callProcedure("Insert", table, 8, "desc", 500, 14.5);
+
+            String query =
+                String.format("select count(*), %s.NUM from %s group by %s.NUM",
+                              table, table, table);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(3, results[0].getRowCount());
+            while (results[0].advanceRow())
+            {
+                if (results[0].getLong(1) == 100)
+                {
+                    assertEquals(3, results[0].getLong(0));
+                }
+                else if (results[0].getLong(1) == 300)
+                {
+                    assertEquals(2, results[0].getLong(0));
+                }
+                else if (results[0].getLong(1) == 500)
+                {
+                    assertEquals(1, results[0].getLong(0));
+                }
+                else
+                {
+                    fail();
+                }
+            }
+        }
+
+        truncateTables(client, tables);
+    }
+
+    // test for insert with boxed types
+    private void subTestBoxedTypes() throws IOException, ProcCallException
+    {
+        String[] tables = {"P1", "R1", "P2", "R2"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("InsertBoxed", table, new Long(1), "desc", new Long(100), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(2), "desc", new Long(100), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(3), "desc", new Long(100), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(6), "desc", new Long(300), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(7), "desc", new Long(300), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(8), "desc", new Long(500), new Double(14.5));
 
             String query =
                 String.format("select count(*), %s.NUM from %s group by %s.NUM",
