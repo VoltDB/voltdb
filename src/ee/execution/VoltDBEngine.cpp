@@ -704,9 +704,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
         VOLT_DEBUG("loading replicated parts of catalog from partition %d", m_partitionId);
-        EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
-        VoltDBEngine* mpEngine = mpEngineLocals.context->getContextEngine();
-        ExecutorContext::assignThreadLocals(mpEngineLocals);
+        ExecutorContext::switchToMpContext();
+        VoltDBEngine* mpEngine = ExecutorContext::getEngine();
 
         // load up all the tables, adding all tables
         if (mpEngine->processCatalogAdditions(timestamp, true) == false) {
@@ -722,7 +721,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
         // Assign the correct pool back to this thread
-        ExecutorContext::assignThreadLocals(*ourEngineLocals);
+        ExecutorContext::restoreContext();
         SynchronizedThreadLock::signalLastSiteFinished();
     }
     else {
@@ -1280,9 +1279,8 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
 
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
-        EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
-        VoltDBEngine* mpEngine = mpEngineLocals.context->getContextEngine();
-        ExecutorContext::assignThreadLocals(mpEngineLocals);
+        ExecutorContext::switchToMpContext();
+        VoltDBEngine* mpEngine = ExecutorContext::getEngine();
 
         mpEngine->processCatalogDeletes(timestamp, true);
 
@@ -1295,7 +1293,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
 
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
-        ExecutorContext::assignThreadLocals(*ourEngineLocals);
+        ExecutorContext::restoreContext();
         SynchronizedThreadLock::signalLastSiteFinished();
     }
     else {
@@ -1328,8 +1326,6 @@ VoltDBEngine::loadTable(int32_t tableId,
                         int64_t uniqueId,
                         bool returnUniqueViolations,
                         bool shouldDRStream) {
-    EngineLocals* ourEngineLocals = NULL;
-    bool needsReleaseLock = false;
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
     //since their only purpose as of writing this (1/2013) they are only used
@@ -1357,12 +1353,9 @@ VoltDBEngine::loadTable(int32_t tableId,
     try {
         if (table->isReplicatedTable()) {
             if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
-                ourEngineLocals = &enginesByPartitionId[m_partitionId];
-                ExecutorContext::assignThreadLocals(mpEngineLocals);
-                needsReleaseLock = true;
+                ExecutorContext::switchToMpContext();
                 table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
-                needsReleaseLock = false;
-                ExecutorContext::assignThreadLocals(*ourEngineLocals);
+                ExecutorContext::restoreContext();
                 SynchronizedThreadLock::signalLastSiteFinished();
             }
             else {
@@ -1374,9 +1367,9 @@ VoltDBEngine::loadTable(int32_t tableId,
         }
     }
     catch (const SerializableEEException &e) {
-        if (needsReleaseLock) {
+        if (ExecutorContext::needContextRestore()) {
             // Assign the correct pool back to this thread
-            ExecutorContext::assignThreadLocals(*ourEngineLocals);
+            ExecutorContext::restoreContext();
             SynchronizedThreadLock::signalLastSiteFinished();
         }
         throwFatalException("%s", e.message().c_str());

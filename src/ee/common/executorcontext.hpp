@@ -102,9 +102,11 @@ class ExecutorContext {
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
 
-    static void switchThreadLocals(EngineLocals& mapping);
-    static void restoreThreadLocals();
-    static void assignThreadLocals(EngineLocals& locals);
+    // Must be used in pair.
+    static void switchToMpContext();
+    static void restoreContext();
+
+    static bool needContextRestore();
 
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
@@ -418,8 +420,6 @@ class ExecutorContext {
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;
     int64_t m_currentDRTimestamp;
-    /* Is current context running for updating replicated table? */
-    bool m_runningRTContext;
     static EngineLocals *savedEngineLocals;
   public:
     int64_t m_lastCommittedSpHandle;

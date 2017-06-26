@@ -17,6 +17,8 @@
 
 #include "SynchronizedThreadLock.h"
 
+#include "common/debuglog.h"
+
 namespace voltdb {
 
 // Initialized when executor context is created.
@@ -36,6 +38,9 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost)
 
 bool SynchronizedThreadLock::countDownGlobalTxnStartCount()
 {
+    if (globalTxnStartCountdownLatch <= 0) {
+        StackTrace::printStackTrace();
+    }
     assert(globalTxnStartCountdownLatch > 0);
     return --globalTxnStartCountdownLatch == 0;
 }
