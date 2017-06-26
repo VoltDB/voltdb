@@ -4470,7 +4470,7 @@ ul#shutdownMsg li {
         float: none;
         width: 100%;
     }
-    .analysisBody{height: calc(100vh - 200px);}
+
 /*    .tblScroll {
         overflow: auto;
         width: 100%;
