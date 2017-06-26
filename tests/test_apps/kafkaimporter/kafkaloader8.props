@@ -1,0 +1,11 @@
+group.id=ABC4
+zookeeper.session.timeout.ms=400
+zookeeper.sync.time.ms=200
+auto.commit.interval.ms=1000
+auto.commit.enable=true
+auto.offset.reset=smallest
+rebalance.backoff.ms=10000
+offsets.storage=kafka
+request.timeout.ms=20000
+session.timeout.ms=10000
+fetch.max.wait.ms=10000
