@@ -3971,7 +3971,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (m_adminListener != null) {
                     m_adminListener.start();
                 }
-            }catch (Exception e) {
+            } catch (Exception e) {
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
                 VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
             }
