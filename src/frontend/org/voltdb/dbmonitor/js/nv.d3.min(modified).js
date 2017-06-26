@@ -9128,6 +9128,12 @@
                         .attr('text-anchor', function (d, i) { return getY(d, i) < 0 ? 'end' : 'start' })
                         .attr('y', x.rangeBand() / (data.length * 2))
                         .attr('dy', '.32em')
+                        .attr('style', function(d, i){
+                            if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Combined")
+                            && VoltDbAnalysis.procedureValue[d.label].COMBINED > 20
+                            && VoltDbAnalysis.procedureValue[d.label].TYPE == "Multi Partitioned")
+                                return "fill:#C12026"
+                        })
                         .text(function (d, i) {
                             var t = valueFormat(getY(d, i))
                                 , yerr = getYerr(d, i);
