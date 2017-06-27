@@ -41,6 +41,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -176,7 +177,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
             if (response != null) {
                 byte status = response.getStatus();
                 if (status != ClientResponse.SUCCESS) {
-                    m_log.error("Failed to Insert Row: " + metaData.rawLine);
+                    m_log.error("Failed to Insert Row: error=" + error + " response=" + ((ClientResponseImpl)response).toJSONString() + " data=" + metaData.rawLine);
                     long fc = m_failedCount.incrementAndGet();
                     // If we've reached our max-error threshold, quit. Use a different error message for the various cases for
                     // troubleshooting purposes.
