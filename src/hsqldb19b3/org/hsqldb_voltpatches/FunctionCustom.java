@@ -541,7 +541,13 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_ATAN :
             case FUNC_ATAN2 :
             case FUNC_DEGREES :
+                name = Tokens.T_DEGREES;
+                parseList = singleParamList;
+                break;
             case FUNC_RADIANS :
+                name = Tokens.T_RADIANS;
+                parseList = singleParamList;
+                break;
             case FUNC_ROUNDMAGIC :
             case FUNC_SIGN :
             case FUNC_SOUNDEX :

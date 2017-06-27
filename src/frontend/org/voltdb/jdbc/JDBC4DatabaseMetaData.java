@@ -603,6 +603,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves the maximum number of characters this database allows in a user name.
     @Override
+
     public int getMaxUserNameLength() throws SQLException
     {
         checkClosed();
@@ -614,7 +615,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getNumericFunctions() throws SQLException
     {
         checkClosed();
-        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,COS,COT,CSC,EXP,FLOOR,LN,LOG,LOG10,PI,POWER,ROUND,SEC,SIN,SQRT,TAN";
+        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,COS,COT,CSC,DEGREES,EXP,FLOOR,LN,LOG,LOG10,PI,POWER,RADIANS,ROUND,SEC,SIN,SQRT,TAN";
     }
 
     // Retrieves a description of the given table's primary key columns.

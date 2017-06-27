@@ -1745,6 +1745,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestNaturalLog();
         subtestNaturalLog10();
         subtestTrig();
+        //subtestDegrees();
+        //subtestRadians();
     }
 
     public void subtestCeiling() throws Exception
@@ -1911,6 +1913,40 @@ public class TestFunctionsSuite extends RegressionSuite {
                 verifyStmtFails(getClient(), stmt, "Invalid result value");
             }
         }
+    }
+
+    public void subtestDegrees() throws Exception
+    {
+        String fname = "DEGREES";
+        final double[] resultValues = new double[values.length];
+        final Set<Double> filters = new HashSet<>();
+        //final Set<Double> filters = null;
+        for (int kk = 0; kk < resultValues.length; ++kk) {
+            resultValues[kk] = values[kk]*(180.0/Math.PI);
+            filters.add(resultValues[kk]);
+        }
+        final boolean monotonic = true;
+        final boolean ascending = true;
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
+
+    }
+
+    public void subtestRadians() throws Exception
+    {
+        String fname = "RADIANS";
+        final double[] resultValues = new double[values.length];
+        final Set<Double> filters = new HashSet<>();
+        //final Set<Double> filters = null;
+        for (int kk = 0; kk < resultValues.length; ++kk) {
+            resultValues[kk] = values[kk]*(Math.PI / 180.0);
+            filters.add(resultValues[kk]);
+        }
+        final boolean monotonic = true;
+        final boolean ascending = true;
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
+
     }
 
     public void subtestNaturalLog() throws Exception
@@ -3843,6 +3879,22 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("WHERE_CEILING_FLOAT",    "select count(*) from NUMBER_TYPES where CEILING(FLOATNUM) = ?");
         project.addStmtProcedure("WHERE_CEILING_DECIMAL",  "select count(*) from NUMBER_TYPES where CEILING(DECIMALNUM) = ?");
 
+        project.addStmtProcedure("DISPLAY_DEGREES", "select DEGREES(INTEGERNUM), DEGREES(TINYNUM), DEGREES(SMALLNUM), DEGREES(BIGNUM), DEGREES(FLOATNUM), DEGREES(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_DEGREES_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by DEGREES(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by DEGREES(TINYNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by DEGREES(SMALLNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by DEGREES(BIGNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by DEGREES(FLOATNUM)");
+        project.addStmtProcedure("ORDER_DEGREES_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by DEGREES(DECIMALNUM)");
+
+        project.addStmtProcedure("WHERE_DEGREES_INTEGER",  "select count(*) from NUMBER_TYPES where DEGREES(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_TINYINT",  "select count(*) from NUMBER_TYPES where DEGREES(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_SMALLINT", "select count(*) from NUMBER_TYPES where DEGREES(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_BIGINT",   "select count(*) from NUMBER_TYPES where DEGREES(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_FLOAT",    "select count(*) from NUMBER_TYPES where DEGREES(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_DEGREES_DECIMAL",  "select count(*) from NUMBER_TYPES where DEGREES(DECIMALNUM) = ?");
+
         project.addStmtProcedure("DISPLAY_EXP", "select EXP(INTEGERNUM), EXP(TINYNUM), EXP(SMALLNUM), EXP(BIGNUM), EXP(FLOATNUM), EXP(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
         project.addStmtProcedure("ORDER_EXP_INTEGER",  "select INTEGERNUM, EXP(INTEGERNUM) from NUMBER_TYPES order by EXP(INTEGERNUM)");
@@ -3940,6 +3992,22 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("WHERE_POWERX07_BIGINT",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(BIGNUM,     0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
         project.addStmtProcedure("WHERE_POWERX07_FLOAT",    "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(FLOATNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
         project.addStmtProcedure("WHERE_POWERX07_DECIMAL",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(DECIMALNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+
+        project.addStmtProcedure("DISPLAY_RADIANS", "select RADIANS(INTEGERNUM), RADIANS(TINYNUM), RADIANS(SMALLNUM), RADIANS(BIGNUM), RADIANS(FLOATNUM), RADIANS(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_RADIANS_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(TINYNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by RADIANS(SMALLNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by RADIANS(BIGNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by RADIANS(FLOATNUM)");
+        project.addStmtProcedure("ORDER_RADIANS_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(DECIMALNUM)");
+
+        project.addStmtProcedure("WHERE_RADIANS_INTEGER",  "select count(*) from NUMBER_TYPES where RADIANS(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_RADIANS_TINYINT",  "select count(*) from NUMBER_TYPES where RADIANS(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_RADIANS_SMALLINT", "select count(*) from NUMBER_TYPES where RADIANS(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_RADIANS_BIGINT",   "select count(*) from NUMBER_TYPES where RADIANS(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_RADIANS_FLOAT",    "select count(*) from NUMBER_TYPES where RADIANS(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_RADIANS_DECIMAL",  "select count(*) from NUMBER_TYPES where RADIANS(DECIMALNUM) = ?");
 
         // These are intended for application to non-negative values.
         // Failure tests on negative values can be done separately, possibly via ad hoc.

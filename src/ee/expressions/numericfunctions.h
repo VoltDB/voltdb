@@ -18,6 +18,10 @@
 #include "common/NValue.hpp"
 #include "boost/math/constants/constants.hpp"
 
+#ifndef M_PI
+#define M_PI 3.1415926535
+#endif
+
 namespace voltdb {
 
 static const TTInt CONST_ONE("1");
@@ -292,6 +296,33 @@ template<> inline NValue NValue::callUnary<FUNC_SEC>() const {
     return retval;
 }
 
+/** implement the SQL SEC function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_DEGREES>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double resultDouble = inputValue*(180.0 / M_PI);
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function DEGREES");
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
+/** implement the SQL SEC function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_RADIANS>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double resultDouble = inputValue*(M_PI / 180.0);
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function Radians");
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
+
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
@@ -313,6 +344,7 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     retval.getDouble() = resultDouble;
     return retval;
 }
+
 
 /**
  * FYI, http://stackoverflow.com/questions/7594508/modulo-operator-with-negative-values
