@@ -568,6 +568,39 @@ public class TestCatalogUtil extends TestCase {
         }
     }
 
+    public void testFileExportPath() {
+        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+            return;
+        }
+
+        final String voltdbroot = "/tmp/" + System.getProperty("user.name");
+        File voltroot = new File(voltdbroot);
+        for (File f : voltroot.listFiles())
+        {
+            f.delete();
+        }
+
+        final String deploy =
+            "<deployment>" +
+            "    <cluster kfactor=\"0\" schema=\"ddl\" siteperhost=\"6\" />" +
+            "    <export>" +
+            "        <configuration enabled=\"true\" target=\"log\" type=\"file\">" +
+            "            <property name=\"type\">csv</property>" +
+            "            <property name=\"nonce\">exportFiles</property>" +
+            "        </configuration>" +
+            "    </export>" +
+            "</deployment>";
+
+        final File tmpDeploy = VoltProjectBuilder.writeStringToTempFile(deploy);
+        CatalogUtil.compileDeployment(catalog, tmpDeploy.getPath(), false);
+
+        File fileExportDir = new File(voltdbroot, "file_export");
+        assertTrue("snapshot directory: " + fileExportDir.getAbsolutePath() + " does not exist",
+                   fileExportDir.exists());
+        assertTrue("snapshot directory: " + fileExportDir.getAbsolutePath() + " is not a directory",
+                   fileExportDir.isDirectory());
+    }
+
     public void testCompileDeploymentAgainstEmptyCatalog() {
         Catalog catalog = new Catalog();
         Cluster cluster = catalog.getClusters().add("cluster");
