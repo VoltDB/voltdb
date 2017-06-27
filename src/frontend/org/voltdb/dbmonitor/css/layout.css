@@ -3593,7 +3593,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     height:390px;
     padding:10px 10px 0;
 }
-#visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseCombinedAnalysis.nvd3-svg {height:100% !important}
+#visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseCombinedAnalysis.nvd3-svg {height:100% !important; width:100%!important;}
 
 .legendAnalysis { float:right;margin:15px 120px 0 0;}
 .circle {
@@ -3981,7 +3981,7 @@ ul#shutdownMsg li {
 
 }
 @media (max-width: 719px) {
-.generateproDetails { position:relative; top:-28px; float:none;}
+.generateproDetails { position:relative; top:-28px; float:none; padding:5px 0;}
 }
 @media (min-width: 720px) and (max-width: 800px) {
  .generateproDetails { padding-right:0;}
