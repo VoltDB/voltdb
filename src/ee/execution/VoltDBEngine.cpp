@@ -1424,9 +1424,9 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                     currEngine->m_tablesByName[tableName] = localTable;
                 }
             }
-            else {
+            /*else {
                 continue;
-            }
+            }*/
         }
         else {
             if (updateReplicated) {
@@ -1442,10 +1442,11 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
             if (!tcd->materialized()) {
                 int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
                 if (catTable->isreplicated()) {
-                    assert(updateReplicated);
-                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
-                        VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
-                        currEngine->m_tablesBySignatureHash[hash] = persistentTable;
+                    if (updateReplicated) {
+                        BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                            VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
+                            currEngine->m_tablesBySignatureHash[hash] = persistentTable;
+                        }
                     }
                 }
                 else {
@@ -1464,6 +1465,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
         else {
             stats = tcd->getStreamedTable()->getTableStats();
         }
+        VOLT_ERROR("VoltDBEngine %p register stats source %p\n", this, stats);
         getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                               relativeIndexOfTable,
                                               stats);
