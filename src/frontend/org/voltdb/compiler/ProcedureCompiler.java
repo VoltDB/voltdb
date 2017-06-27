@@ -761,7 +761,7 @@ public abstract class ProcedureCompiler {
         // if there are multiple statements, the string of statements will begin and end with quotes
         // TODO - fix parsing done in m_singleStmt - it parses till first ";"
         String proc_stmts = procedureDescriptor.m_singleStmt;
-        if( proc_stmts.charAt(0) == '"' && proc_stmts.charAt(proc_stmts.length()-2) == '"' )  {
+        if( proc_stmts.charAt(0) == '\'' && proc_stmts.charAt(proc_stmts.length()-2) == '\'' )  {
             proc_stmts = proc_stmts.substring(1, proc_stmts.length()-2);
         }
 
