@@ -314,6 +314,49 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     return retval;
 }
 
+template<> inline NValue NValue::callUnary<FUNC_T_ADD>() const {
+    if (getValueType() != VALUE_TYPE_VARBINARY) {
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
+    }
+    if (isNull()) {
+        return getNullValue(VALUE_TYPE_VARBINARY);
+    }
+
+    int32_t addr_len;
+    const int32_t *addr = (const int32_t *)getObject_withoutNull(&addr_len);
+
+    // get rows, and column
+    int32_t *row = nullptr;
+    int32_t *col = nullptr;
+
+    // copy row value
+    memcpy(row,addr+sizeof(int),sizeof(int));
+    // copy col value
+    memcpy(col,addr+sizeof(int)*2,sizeof(int));
+
+    int r = *row;
+    int c = *col;
+
+    // starting add for the col value
+    addr = addr+sizeof(int)*3;
+
+    // double ** mat = new double[r*c];
+    double **mat = (double **)malloc(r * sizeof(double *));
+    for (int i=0; i<r; i++)
+         mat[i] = (double *)malloc(c * sizeof(double));
+
+    for(int ii =0; ii <r; ii++)
+    for(int jj =0; jj <c; jj++)
+    {
+          // manipulate the matrix
+                  mat[ii][jj] = *(addr + ii*c + jj);
+    }
+
+    return getNullValue(VALUE_TYPE_VARBINARY);
+
+}
+
+
 /**
  * FYI, http://stackoverflow.com/questions/7594508/modulo-operator-with-negative-values
  *

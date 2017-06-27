@@ -139,6 +139,7 @@ static const int FUNC_DATEDIFF         = 140;
 static const int FUNC_SECONDS_MIDNIGHT = 141;
 static const int FUNC_CSC              = 142;
 static const int FUNC_SEC              = 143;
+static const int FUNC_T_ADD            = 144;
 
 // Function ID offsets for specializations of EXTRACT and TRIM.
 // Individual ID values are based on various Tokens.java constants
