@@ -569,9 +569,9 @@ public class TestCatalogUtil extends TestCase {
     }
 
     public void testFileExportPath() {
-//        if (!VoltDB.instance().getConfig().m_isEnterprise) {
-//            return;
-//        }
+        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+            return;
+        }
 
         final String voltdbroot = "/tmp/" + System.getProperty("user.name");
         File voltroot = new File(voltdbroot);
