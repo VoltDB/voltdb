@@ -569,9 +569,9 @@ public class TestCatalogUtil extends TestCase {
     }
 
     public void testFileExportPath() {
-        if (!VoltDB.instance().getConfig().m_isEnterprise) {
-            return;
-        }
+//        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+//            return;
+//        }
 
         final String voltdbroot = "/tmp/" + System.getProperty("user.name");
         File voltroot = new File(voltdbroot);
@@ -582,7 +582,7 @@ public class TestCatalogUtil extends TestCase {
 
         final String deploy =
             "<deployment>" +
-            "    <cluster kfactor=\"0\" schema=\"ddl\" siteperhost=\"6\" />" +
+            "    <cluster kfactor=\"0\" schema=\"ddl\" sitesperhost=\"6\" />" +
             "    <export>" +
             "        <configuration enabled=\"true\" target=\"log\" type=\"file\">" +
             "            <property name=\"type\">csv</property>" +
@@ -595,9 +595,9 @@ public class TestCatalogUtil extends TestCase {
         CatalogUtil.compileDeployment(catalog, tmpDeploy.getPath(), false);
 
         File fileExportDir = new File(voltdbroot, "file_export");
-        assertTrue("snapshot directory: " + fileExportDir.getAbsolutePath() + " does not exist",
+        assertTrue("file export directory: " + fileExportDir.getAbsolutePath() + " does not exist",
                    fileExportDir.exists());
-        assertTrue("snapshot directory: " + fileExportDir.getAbsolutePath() + " is not a directory",
+        assertTrue("file export directory: " + fileExportDir.getAbsolutePath() + " is not a directory",
                    fileExportDir.isDirectory());
     }
 
