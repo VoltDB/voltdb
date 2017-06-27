@@ -3629,10 +3629,11 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 	margin:1px 2px -1px 0;
 }
 
-.proDetailsHeightAdjstment {height:400px; overflow-y:scroll; width:800px;}
+.proDetailsHeightAdjstment {height:400px; overflow-x:hidden; overflow-y:scroll;/* width:800px;*/}
 .proDetailsBarDiagram { margin:0; padding:0;height:400px; width:850px;}
 .generateDate { background-color:#f0f0f0; padding: 5px 0;}
-.generateproDetails { float:right;padding-right: 85px;}
+.generateproDetails { float:right;padding-right: 85px; }
+.generateproDetails p {padding-left:10px;}
 .proDetailSvgHeight { overflow:initial; height:95%!important; padding:0 0 0 30px;}
 .analysisDate { position:relative; top:24px;}
 .tab_content_data { padding-top:10px;}
@@ -3645,8 +3646,16 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .partitioned .leftPart, .replicated .leftRep { float:left;}
 .partitioned .rightPart, .replicated .rightRep {float:right;}
 .partitioned .rightPart input[type="text"], .replicated .rightRep input[type="text"] { width: 50px; padding: 0 0 0 3px;}
-
-
+.overlay-content-proc-detail {
+    padding: 20px;
+    min-width: 450px;
+    height: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    line-height: 18px;
+}
+generateProcedureDate { float:right;padding-right: 85px;}
+.procDetailTitle { padding-top:10px;}
 /********************analysis End *****************/
 /********************jquery us css override*****************/
 
@@ -3981,8 +3990,10 @@ ul#shutdownMsg li {
 
 }
 @media (max-width: 719px) {
-.generateproDetails { position:relative; top:-28px; float:none; padding:5px 0;}
+.generateproDetails { position:relative; /*top:-28px;*/ float:none; padding:5px 0;}
+.generateProcedureDate { position:relative; top:-28px; float:none; padding:5px 0;}
 }
+@media (max-width: 550px) {.procDetailTitle {height:100%;line-height:20px;}}
 @media (min-width: 720px) and (max-width: 800px) {
  .generateproDetails { padding-right:0;}
 
@@ -4018,6 +4029,7 @@ ul#shutdownMsg li {
     .exportType select {
         margin-top: 5px;
     }
+    .legendAnalysis{margin-top:75px;}
 }
 @media (min-width: 639px) and (max-width: 640px) {
     #serverConfigAdmin {
