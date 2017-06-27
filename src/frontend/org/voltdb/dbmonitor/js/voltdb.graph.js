@@ -420,19 +420,21 @@
         }
 
         function updateCombinedAnalysis(){
-            chartCombinedAnalysis.update();
+            ChartCombinedAnalysis.update();
             updateAnalysisChartProperties($("#visualiseCombinedAnalysis"), ChartCombinedAnalysis);
         }
 
         function updateAnalysisChartProperties(chartId, chartObj){
-            if(chartId.width() < 315){
-                chartObj.margin({"left": 26,"right": 50})
-                chartObj.x(function(d) {
-                    var label = d.label.split(" ")[1]
-                    if(label.length > 3)
-                        return label.substring(0,3) + "."
-                    return  d.label
-                  })
+            if(chartId.width() < 315 && chartId.width() > 100){
+                if(chartId.is(":visible")){
+                    chartObj.margin({"left": 26,"right": 50})
+                    chartObj.x(function(d) {
+                        var label = d.label.split(" ")[1]
+                        if(label.length > 3)
+                            return label.substring(0,3) + "."
+                        return  d.label
+                      })
+                }
             } else {
                 chartObj.margin({"left":174, "right":60});
                 chartObj.x(function(d) {
@@ -500,7 +502,7 @@
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
                     return procedureType == "Multi Partitioned" ? "#14416d":"#1B87C8";
                 });
-                nv.utils.windowResize(ChartFrequencyAnalysis.update);
+                nv.utils.windowResize(updateFrequencyAnalysis);
                 return ChartFrequencyAnalysis;
             });
 
@@ -528,7 +530,7 @@
                     var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
                     return procedureType == "Multi Partitioned" ? "#14416d":"#1B87C8";
                 });
-                nv.utils.windowResize(ChartCombinedAnalysis.update);
+                nv.utils.windowResize(updateCombinedAnalysis);
                 return ChartCombinedAnalysis;
             });
         }
