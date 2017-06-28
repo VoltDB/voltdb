@@ -424,12 +424,13 @@ public class FunctionForVoltDB extends FunctionSQL {
                         		   Tokens.COMMA,
                         		   Tokens.QUESTION,
                         		   Tokens.COMMA,
-                        		   Tokens.X_REPEAT,
-                        		   // Count == -1 means an arbitrary number of
-                        		   // the following, which is Tokens.QUESTION.
-                        		   -1,
-                        		   Tokens.QUESTION,
-                        		   Tokens.CLOSEBRACKET
+                        		   // X_ARBITRARY here means an arbitrary
+                        		   // sequence of Tokens.QUESTION, Tokens.COMMA
+                        		   // pairs, followed by Tokens.CLOSEBRACKET.
+                        		   // The readExpression function knows how to
+                        		   // do this, so nothing else is required here.
+                        		   Tokens.X_ARBITRARY,
+                        		   Tokens.CLOSEBRACKET,
                            }),
             new FunctionId("t_size", Type.SQL_VARBINARY, FUNC_VOLT_T_SIZE, -1,
                            new Type[] {
@@ -804,7 +805,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 !nodes[1].dataType.isIntegralType()) {
                 throw Error.error(ErrorCode.X_42561);
             }
-            dataType = Type.SQL_VARBINARY;
+            dataType = Type.SQL_INTEGER;
             break;
         case FunctionId.FUNC_VOLT_T_GET:
             if (nodes[0].dataType != null &&
@@ -826,6 +827,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 !nodes[1].dataType.isBinaryType()) {
                 throw Error.error(ErrorCode.X_42561);
             }
+            // %%%
             dataType = Type.SQL_VARBINARY;
             break;
         case FunctionId.FUNC_VOLT_T_TR:
@@ -859,11 +861,11 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
         case FunctionId.FUNC_VOLT_T_TENSOR:
             if (nodes[0].dataType != null &&
-                !nodes[0].dataType.isBinaryType()) {
+                !nodes[0].dataType.isIntegralType()) {
                 throw Error.error(ErrorCode.X_42561);
             }
             if (nodes[1].dataType != null &&
-                !nodes[1].dataType.isNumberType()) {
+                !nodes[1].dataType.isIntegralType()) {
                 throw Error.error(ErrorCode.X_42561);
             }
             for (int idx = 2; idx < nodes.length; idx += 1) {
@@ -873,7 +875,8 @@ public class FunctionForVoltDB extends FunctionSQL {
             	}
             }
             dataType = Type.SQL_VARBINARY;
-            break;
+            // We are done here.  So just return.
+            return;
         default:
             break;
         }
