@@ -766,6 +766,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (m_defaultConsistencyReadLevel == ReadLevel.FAST || !m_isLeader) {
                 // the initiatorHSId is the ClientInterface mailbox.
                 m_mailbox.send(message.getInitiatorHSId(), message);
+                notifyNewPartitionLeaderFromBalanceSPI();
                 return;
             }
 
@@ -774,6 +775,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 assert(m_isLeader);
                 assert(m_bufferedReadLog != null);
                 m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
+                notifyNewPartitionLeaderFromBalanceSPI();
                 return;
             }
         }
@@ -815,6 +817,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             setRepairLogTruncationHandle(spHandle);
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
+        notifyNewPartitionLeaderFromBalanceSPI();
     }
 
     // BorrowTaskMessages encapsulate a FragmentTaskMessage along with
@@ -1302,6 +1305,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!m_isLeader && msg.isAckRequestedFromSender()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
+        notifyNewPartitionLeaderFromBalanceSPI();
     }
 
     /**
@@ -1427,6 +1431,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_duplicateCounters.remove(dcKey);
             setRepairLogTruncationHandle(spHandle);
         }
+        notifyNewPartitionLeaderFromBalanceSPI();
     }
 
 
@@ -1657,5 +1662,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_repairLog != null) {
             m_repairLog.deliver(message);
         }
+    }
+
+    public boolean isDuplicateCounterEmpty() {
+        return m_duplicateCounters.isEmpty();
+    }
+
+    private void notifyNewPartitionLeaderFromBalanceSPI() {
+        ((InitiatorMailbox)m_mailbox).notifyNewPartitionLeaderOfTxnDone();
     }
 }

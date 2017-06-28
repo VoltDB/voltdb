@@ -63,6 +63,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         @Override
         public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
+            boolean isAlreadyLeader = m_initiatorMailbox.m_scheduler.m_isLeader;
             String hsidStr = CoreUtils.hsIdToString(m_initiatorMailbox.getHSId());
             if (cache != null && tmLog.isDebugEnabled()) {
                 tmLog.debug(hsidStr + " [SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
@@ -80,6 +81,10 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     }
                     break;
                 }
+            }
+            //reset BalanceSPi status if it is already a leader
+            if (isAlreadyLeader) {
+                ((InitiatorMailbox)m_initiatorMailbox).startBufferTransactionsOnBalanceSPI(false);
             }
 
             if (!leaders.contains(getInitiatorHSId())) {
@@ -222,6 +227,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
+                    m_initiatorMailbox.startBufferTransactionsOnBalanceSPI(balanceSPI);
                 }
                 else {
                     // The only known reason to fail is a failed replica during
