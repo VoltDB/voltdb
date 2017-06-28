@@ -717,7 +717,7 @@
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
                 } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
                     trowEnter.append("td")
-                        .html(function (p, i) { return (d.series[0].key != "Frequency" ? p.value.toFixed(6) : p.value)+ unit });
+                        .html(function (p, i) { return (d.series[0].key != "Frequency" ? (d.series[0].key == "Combined" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
                 } else {
                     trowEnter.append("td")
                         .classed("value", true)
@@ -774,7 +774,7 @@
                         .html("Combined")
 
                         trowEnter3.append("td")
-                            .html(VoltDbAnalysis.procedureValue[d.data.label].COMBINED.toFixed(6) + " %");
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].COMBINED.toFixed(3) + " %");
                     }
 
                     if(d.series[0].key != "Execution Time"){

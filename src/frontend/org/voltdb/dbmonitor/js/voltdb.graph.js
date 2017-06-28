@@ -509,7 +509,7 @@
                     .showValues(true);
 
                 $("#chartCombinedAnalysis").css("height", barHeight-10)
-                ChartCombinedAnalysis.valueFormat(d3.format(',.6f'));
+                ChartCombinedAnalysis.valueFormat(d3.format(',.3f'));
                 ChartCombinedAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
                 ChartCombinedAnalysis.xAxis
