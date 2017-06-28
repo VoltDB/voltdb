@@ -426,15 +426,12 @@
 
         function updateAnalysisChartProperties(chartId, chartObj){
             if(chartId.width() < 315 && chartId.width() > 100){
-                if(chartId.is(":visible")){
-                    chartObj.margin({"left": 26,"right": 50})
-                    chartObj.x(function(d) {
-                        var label = d.label.split(" ")[1]
-                        if(label.length > 3)
-                            return label.substring(0,3) + "."
-                        return  d.label
-                      })
-                }
+                chartObj.margin({"left": 36,"right": 40})
+                chartObj.x(function(d) {
+                    if(d.label.length > 5)
+                        return d.label.substring(0,5) + "."
+                    return  d.label
+                  })
             } else {
                 chartObj.margin({"left":174, "right":60});
                 chartObj.x(function(d) {

@@ -13,7 +13,9 @@ function loadAnalysisPage(){
         } else {
             $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Execution Time(" : "Execution Time");
         }
-        VoltDbAnalysis.refreshChart()
+        //this method is called twice to ensure graph reloads properly
+        VoltDbAnalysis.refreshChart();
+        VoltDbAnalysis.refreshChart();
     })
 
 
