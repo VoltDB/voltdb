@@ -139,7 +139,18 @@ static const int FUNC_DATEDIFF         = 140;
 static const int FUNC_SECONDS_MIDNIGHT = 141;
 static const int FUNC_CSC              = 142;
 static const int FUNC_SEC              = 143;
-static const int FUNC_T_ADD            = 144;
+/*
+static const int FUNC_T_TENSOR         = 144; // (nrow, ncol, S1, S2, ..., Snd)
+static const int FUNC_T_SIZE           = 145; // (T, d)
+static const int FUNC_T_GET            = 146; // (T, i [, j])
+static const int FUNC_T_TENSOR_MUL     = 147; // (T1, T2)
+static const int FUNC_T_TR             = 148; // (T)
+*/
+static const int FUNC_T_ADD            = 149; // (T1, T2)
+/*
+static const int FUNC_T_SCALAR_MUL     = 150; // (S, T)
+*/
+
 
 // Function ID offsets for specializations of EXTRACT and TRIM.
 // Individual ID values are based on various Tokens.java constants

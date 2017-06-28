@@ -434,9 +434,11 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_INET6_ATON:
             ret = new UnaryFunctionExpression<FUNC_INET6_ATON>((*arguments)[0]);
             break;
-        case FUNC_T_ADD:
-            ret = new UnaryFunctionExpression<FUNC_T_ADD>((*arguments)[0]);
+            /*
+        case FUNC_T_TR:
+            ret = new UnaryFunctionExpression<FUNC_T_TR>((*arguments)[0]);
             break;
+            */
         default:
             return NULL;
         }
@@ -570,6 +572,28 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_DWITHIN_POLYGON_POINT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_DWITHIN_POLYGON_POINT>(*arguments);
             break;
+            /*
+        case FUNC_T_TENSOR:
+            ret = new GeneralFunctionExpression<FUNC_T_TENSOR>(*arguments);
+            break;
+        case FUNC_T_SIZE:
+            ret = new GeneralFunctionExpression<FUNC_T_SIZE>(*arguments);
+            break;
+        case FUNC_T_GET:
+            ret = new GeneralFunctionExpression<FUNC_T_GET>(*arguments);
+            break;
+        case FUNC_T_TENSOR_MUL:
+            ret = new GeneralFunctionExpression<FUNC_T_TENSOR_MUL>(*arguments);
+            break;
+        case FUNC_T_ADD:
+        */
+            ret = new GeneralFunctionExpression<FUNC_T_ADD>(*arguments);
+            break;
+            /*
+        case FUNC_T_SCALAR_MUL:
+            ret = new GeneralFunctionExpression<FUNC_T_SCALAR_MUL>(*arguments);
+            break;
+            */
         default:
             return NULL;
         }

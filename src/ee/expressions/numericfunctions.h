@@ -17,6 +17,7 @@
 
 #include "common/NValue.hpp"
 #include "boost/math/constants/constants.hpp"
+#include "common/TensorWrapper.hpp"
 
 namespace voltdb {
 
@@ -313,50 +314,67 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     retval.getDouble() = resultDouble;
     return retval;
 }
+/** implement the sql FUNC_T_ADD function for all numeric values */
+template<> inline NValue NValue::call<FUNC_T_ADD>(const std::vector<NValue>& arguments) {
 
-template<> inline NValue NValue::callUnary<FUNC_T_ADD>() const {
-    if (getValueType() != VALUE_TYPE_VARBINARY) {
+      assert(arguments.size() == 2);
+    const NValue& tensor1 = arguments[0];
+    const NValue& tensor2 = arguments[1];
+
+    const ValueType tesnsor1Type = tensor1.getValueType();
+    const ValueType tesnsor2Type = tensor2.getValueType();
+
+    if (tesnsor1Type != VALUE_TYPE_VARBINARY && tesnsor2Type != VALUE_TYPE_VARBINARY) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
     }
-    if (isNull()) {
+
+    if (tensor1.isNull() || tensor2.isNull()) {
         return getNullValue(VALUE_TYPE_VARBINARY);
     }
 
-    int32_t addr_len;
-    const int32_t *addr = (const int32_t *)getObject_withoutNull(&addr_len);
+    int32_t addr_lenp;
+    double *addrp = (double *)tensor1.getObject_withoutNull(&addr_lenp);
 
-    // get rows, and column
-    int32_t *row = nullptr;
-    int32_t *col = nullptr;
+    int32_t addr_lenq;
+    double *addrq = (double *)tensor2.getObject_withoutNull(&addr_lenq);
 
-    // copy row value
-    memcpy(row,addr+sizeof(int),sizeof(int));
-    // copy col value
-    memcpy(col,addr+sizeof(int)*2,sizeof(int));
+    TensorWrapper P((char*)addrp,addr_lenp);
+    TensorWrapper Q((char*)addrq,addr_lenq);
 
-    int r = *row;
-    int c = *col;
+    int32_t rlen = P.numRows()*Q.numCols();
+    //double *r = new double[rlen];
+    double *r = nullptr;
 
-    // starting add for the col value
-    addr = addr+sizeof(int)*3;
+    NValue retval(VALUE_TYPE_VARBINARY);
 
-    // double ** mat = new double[r*c];
-    double **mat = (double **)malloc(r * sizeof(double *));
-    for (int i=0; i<r; i++)
-         mat[i] = (double *)malloc(c * sizeof(double));
+    // need to fix this part and test values: getTempBinaryValue
+    retval.getTempStringValue((const char*)r,rlen);
 
-    for(int ii =0; ii <r; ii++)
-    for(int jj =0; jj <c; jj++)
-    {
-          // manipulate the matrix
-                  mat[ii][jj] = *(addr + ii*c + jj);
+    TensorWrapper R((char *)r,rlen);
+
+    // both dimension should match
+    if(P.numRows() == Q.numRows() && P.numCols() == Q.numCols()) {
+
+        // both dimension should match
+      for (int i = 0; i < P.numRows(); i += 1) {
+      for (int j = 0; j < Q.numCols(); j += 1) {
+          double sum = 0.0;
+          for (int k = 0; k < P.numCols(); k += 1) {
+              sum += P.get(i,k) + Q.get(k,j);
+          }
+          R.set(i, j, sum);
+       }
     }
-
-    return getNullValue(VALUE_TYPE_VARBINARY);
+    }
+    else
+    {
+    // not sure what should be the behaviour here
+    throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
+    }
+     // need to return TensorWrapper
+    return retval;
 
 }
-
-
 /**
  * FYI, http://stackoverflow.com/questions/7594508/modulo-operator-with-negative-values
  *
