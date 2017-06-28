@@ -2029,6 +2029,10 @@ public class LocalCluster extends VoltServerConfig {
     public int port(int hostId) {
         return m_cmdLines.get(hostId).port();
     }
+    
+    public int httpPort(int hostId) {
+        return m_cmdLines.get(hostId).httpPort();
+    }
 
     public int adminPort(int hostId) {
         return m_cmdLines.get(hostId).adminPort();

@@ -86,6 +86,7 @@ import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
@@ -123,10 +124,13 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
+import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+
+import com.sun.corba.se.spi.activation.Server;
 
 import junit.framework.TestCase;
 
@@ -975,6 +979,54 @@ public class TestJSONInterface extends TestCase {
                 server.join();
             }
             server = null;
+        }
+    }
+    
+    public void testHTTPListenerAfterRejoin() throws Exception {
+        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+            // Community version does not support rejoin.
+            return;
+        }
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.setSecurityEnabled(false, false);
+        builder.setHTTPDPort(0);
+        builder.setJSONAPIEnabled(true);
+        
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, true);
+        try {
+            boolean success = cluster.compile(builder);
+            assertTrue(success);
+            cluster.startUp();
+            
+            String url = "http://127.0.0.1:" + cluster.httpPort(0) + "/deployment";
+            try {
+                getUrlOverJSON(url, null, null, null, 200,  "application/json");
+            } catch (HttpHostConnectException e) {
+                fail("HTTP Listener is not open when the node is on");
+            }
+            
+            cluster.killSingleHost(0);
+            Thread.sleep(1000);
+            url = "http://127.0.0.1:" + cluster.httpPort(0) + "/deployment";
+            try {
+                getUrlOverJSON(url, null, null, null, 200,  "application/json");
+                fail("HTTP Listener is not closed when the node is down.");
+            } catch (HttpHostConnectException e) {
+                assertTrue(e.toString().contains("Connection refused"));
+            }
+            
+            cluster.recoverOne(0, 0, "", true);
+            Thread.sleep(1000);
+            url = "http://127.0.0.1:" + cluster.httpPort(2) + "/deployment";
+            try {
+                getUrlOverJSON(url, null, null, null, 200,  "application/json");
+            } catch (HttpHostConnectException e) {
+                fail("HTTP Listener is not open after the node has rejoined.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            cluster.shutDown();
         }
     }
 
