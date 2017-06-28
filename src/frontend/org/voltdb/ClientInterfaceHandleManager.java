@@ -291,7 +291,10 @@ public class ClientInterfaceHandleManager
             m_outstandingTxns--;
             return inflight;
         }
-        else if (isShortCircuitReadHandle(ciHandle)) {
+        // Normal short circuit read has been handled above.
+        // If this handle is for short circuit read, it must be a NT transaction.
+        // NT transactions are handled as short circuit read for simplicity.
+        if (isShortCircuitReadHandle(ciHandle)) {
             // This can happen for NT transactions which are accepted at a non-MPI node
             // and have finished with a response while the MPI-node dies and MPI fails
             // over to this particular node. In this scenario, there is a race between
@@ -377,7 +380,7 @@ public class ClientInterfaceHandleManager
             m_outstandingTxns--;
             return inflight;
         }
-        else if (isShortCircuitReadHandle(ciHandle)) {
+        if (isShortCircuitReadHandle(ciHandle)) {
             // Refer to the corresponding part in findHandle() above for explanation
             return null;
         }
