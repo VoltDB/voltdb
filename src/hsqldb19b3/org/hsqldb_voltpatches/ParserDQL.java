@@ -4275,7 +4275,9 @@ public class ParserDQL extends ParserBase {
     ... disabled 2 lines */
     // End of VoltDB extension
 
-        for (int i = start; i < start + count; i++) {
+        for (int i = start; 
+        		(count < 0) || (i < start + count); 
+        		i += (count < 0) ? 0 : 1) {
             int exprType = parseList[i];
 
             switch (exprType) {
@@ -4287,7 +4289,13 @@ public class ParserDQL extends ParserBase {
 
                     exprList.add(e);
 
-                    continue;
+                    // If this is X_ARBITRARY then we want to read
+                    // the comma or ')' next.  This will happen at the
+                    // end of this loop.
+                    if (0 <= count) {
+                    	continue;
+                    }
+                    break;
                 }
                 case Tokens.X_POS_INTEGER : {
                     Expression e       = null;
@@ -4358,24 +4366,27 @@ public class ParserDQL extends ParserBase {
 
                     continue;
                 }
-                case Tokens.X_REPEAT : {
+
+                case Tokens.X_REPEAT : { 
                     i++;
 
+                    // Assume exprType == Tokens.X_REPEAT.
                     int elementCount = parseList[i++];
-                    int parseIndex   = i;
+                    int parseIndex = i;
 
                     while (true) {
                         int initialExprIndex = exprList.size();
+                        int trueCount = (elementCount < 0) ? 2 : elementCount;
 
                         // A VoltDB extension to avoid using exceptions for flow control.
                         if (preferToThrow) {
                             readExpression(exprList, parseList, parseIndex,
-                                           elementCount, true, true);
+                                           trueCount, true, true);
                         } else {
                             HsqlException ex = null;
                             try {
                                 ex = readExpression(exprList, parseList, parseIndex,
-                                                           elementCount, true, false);
+                                                    trueCount, true, false);
                             } catch (HsqlException caught) {
                                 ex = caught;
                             }
@@ -4400,8 +4411,11 @@ public class ParserDQL extends ParserBase {
                             break;
                         }
                     }
-
-                    i += elementCount - 1;
+                    if (0 < elementCount) {
+                    	i += elementCount - 1;
+                    } else {
+                    	i -= 1;
+                    }
 
                     continue;
                 }

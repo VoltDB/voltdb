@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.hsqldb_voltpatches.types.Type;
+import org.voltdb.VoltType;
 
 
 
@@ -187,6 +188,15 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_MIN_VALID_TIMESTAMP          = 21021;    // Minimum valid timestamp.
         static final int FUNC_VOLT_MAX_VALID_TIMESTAMP          = 21022;    // Maximum valid timestamp.
         static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?
+        
+        // Functions for linear algebra.
+        static final int FUNC_VOLT_T_TENSOR                     = 21024;    // (nrow, ncol, S1, S2, ..., Snd)
+        static final int FUNC_VOLT_T_SIZE                       = 21025;    // (T, d)
+        static final int FUNC_VOLT_T_GET                        = 21026;    // (T, i [, j])
+        static final int FUNC_VOLT_T_TENSOR_MUL                 = 21027;    // (T1, T2)
+        static final int FUNC_VOLT_T_TR                         = 21028;    // (T)
+        static final int FUNC_VOLT_T_ADD                        = 21029;    // (T1, T2)
+        static final int FUNC_VOLT_T_SCALAR_MUL                 = 21030;    // (S, T)
 
         /*
          * All VoltDB user-defined functions must have IDs in this range.
@@ -406,6 +416,57 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_VARBINARY },
                     singleParamList),
 
+            new FunctionId("t_tensor", Type.SQL_VARBINARY, FUNC_VOLT_T_TENSOR, -1,
+                           new Type[] { Type.SQL_INTEGER, Type.SQL_INTEGER, Type.SQL_VARBINARY },
+                           new short[] { 
+                        		   Tokens.OPENBRACKET,
+                        		   Tokens.QUESTION,
+                        		   Tokens.COMMA,
+                        		   Tokens.QUESTION,
+                        		   Tokens.COMMA,
+                        		   Tokens.X_REPEAT,
+                        		   // Count == -1 means an arbitrary number of
+                        		   // the following, which is Tokens.QUESTION.
+                        		   -1,
+                        		   Tokens.QUESTION,
+                        		   Tokens.CLOSEBRACKET
+                           }),
+            new FunctionId("t_size", Type.SQL_VARBINARY, FUNC_VOLT_T_SIZE, -1,
+                           new Type[] {
+                        		   Type.SQL_VARBINARY,
+                        		   Type.SQL_INTEGER,
+                           },
+                           doubleParamList),
+            new FunctionId("t_get", Type.SQL_VARBINARY, FUNC_VOLT_T_GET, -1,
+                           new Type[] {
+                        		   Type.SQL_VARBINARY,
+                        		   Type.SQL_INTEGER,
+                        		   Type.SQL_INTEGER,
+                           },
+                           tripleParamList),
+            new FunctionId("t_tensor_mul", Type.SQL_VARBINARY, FUNC_VOLT_T_TENSOR_MUL, -1,
+                           new Type[] {
+                        		   Type.SQL_VARBINARY,
+                        		   Type.SQL_VARBINARY
+                           },
+                           doubleParamList),
+            new FunctionId("t_tr", Type.SQL_VARBINARY, FUNC_VOLT_T_TR, -1,
+                           new Type[] {
+                        		   Type.SQL_VARBINARY,
+                           },
+                           singleParamList),
+            new FunctionId("t_add", Type.SQL_VARBINARY, FUNC_VOLT_T_ADD, -1,
+                           new Type[] {
+                        		   Type.SQL_VARBINARY,
+                        		   Type.SQL_VARBINARY,
+                           },
+                           doubleParamList),
+            new FunctionId("t_scalar_mul", Type.SQL_VARBINARY, FUNC_VOLT_T_SCALAR_MUL, -1,
+                           new Type[] {
+                        		   Type.SQL_DOUBLE,
+                        		   Type.SQL_VARBINARY,
+                           },
+                           doubleParamList),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<>();
@@ -734,6 +795,85 @@ public class FunctionForVoltDB extends FunctionSQL {
             dataType = Type.SQL_VARCHAR;
             break;
 
+        case FunctionId.FUNC_VOLT_T_SIZE:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            if (nodes[1].dataType != null &&
+                !nodes[1].dataType.isIntegralType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARBINARY;
+            break;
+        case FunctionId.FUNC_VOLT_T_GET:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            if (nodes[1].dataType != null &&
+                !nodes[1].dataType.isIntegralType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_DOUBLE;
+            break;
+        case FunctionId.FUNC_VOLT_T_TENSOR_MUL:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            if (nodes[1].dataType != null &&
+                !nodes[1].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARBINARY;
+            break;
+        case FunctionId.FUNC_VOLT_T_TR:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARBINARY;
+            break;
+        case FunctionId.FUNC_VOLT_T_ADD:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            if (nodes[1].dataType != null &&
+                !nodes[1].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARBINARY;
+            break;
+        case FunctionId.FUNC_VOLT_T_SCALAR_MUL:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            if (nodes[1].dataType != null &&
+                ! nodes[1].dataType.isNumberType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARBINARY;
+            break;
+        case FunctionId.FUNC_VOLT_T_TENSOR:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            if (nodes[1].dataType != null &&
+                !nodes[1].dataType.isNumberType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            for (int idx = 2; idx < nodes.length; idx += 1) {
+            	if (nodes[idx].dataType != null &&
+            			( ! nodes[idx].dataType.isNumberType())) {
+            		throw Error.error(ErrorCode.X_42561);
+            	}
+            }
+            dataType = Type.SQL_VARBINARY;
+            break;
         default:
             break;
         }
