@@ -878,13 +878,13 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
                     if (uq == currUQ) {
                         // do the actual work
                         char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
-                       //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
-                       //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-                       //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-                       uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
+                        //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
+                        //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+                        //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+                        currUQ->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
                     } else {
-                        // put a placeholder
-                        uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
+                        // put a placeholder for non-lowest sites
+                        currUQ->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
                     }
                 } else {
                     // If undoQuantum is null it should be null on every site.
@@ -1273,10 +1273,10 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
                     target.setPendingDeleteOnUndoReleaseTrue();
                     ++m_tuplesPinnedByUndo;
                     ++m_invisibleTuplesPendingDeleteCount;
-                   uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+                    currUQ->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
                 } else {
-                    // put a placeholder
-                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
+                    // put a placeholder for non-lowest sites
+                    currUQ->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
                 }
             }
         } else {
