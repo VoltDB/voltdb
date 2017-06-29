@@ -17,6 +17,7 @@
 
 #include "common/NValue.hpp"
 #include "boost/math/constants/constants.hpp"
+#include "common/TensorWrapper.hpp"
 
 namespace voltdb {
 
@@ -292,6 +293,37 @@ template<> inline NValue NValue::callUnary<FUNC_SEC>() const {
     return retval;
 }
 
+/** implement the sql FUNC_T_TR function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_T_TR>() const {
+
+      if (isNull()) {
+        return *this;
+    }
+
+    const ValueType type = getValueType();
+
+    if (type != VALUE_TYPE_VARBINARY) {
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
+    }
+
+    int32_t addr_lenp;
+    const char *addrp = getObject_withoutNull(&addr_lenp);
+
+    TensorWrapper P(addrp,addr_lenp);
+    // create a transpose of Tensor
+
+    NValue result = ValueFactory::getTempBinaryValue(NULL, addr_lenp);
+
+    int32_t resLen;
+    const char *resAddr = result.getObject_withoutNull(&resLen);
+    assert(resLen == addr_lenp);
+
+    TensorWrapper R(resAddr, resLen);
+    R.transpose(P);
+
+    return result;
+}
+
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
@@ -312,6 +344,154 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     throwDataExceptionIfInfiniteOrNaN(resultDouble, "function POWER");
     retval.getDouble() = resultDouble;
     return retval;
+}
+
+/**
+ * implement the sql FUNC_T_ADD function for all numeric values
+ */
+template<> inline NValue NValue::call<FUNC_T_ADD>(const std::vector<NValue>& arguments) {
+
+      assert(arguments.size() == 2);
+    const NValue& tensor1 = arguments[0];
+    const NValue& tensor2 = arguments[1];
+
+    const ValueType tensor1Type = tensor1.getValueType();
+    const ValueType tensor2Type = tensor2.getValueType();
+
+    if (tensor1Type != VALUE_TYPE_VARBINARY && tensor2Type != VALUE_TYPE_VARBINARY) {
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
+    }
+
+    if (tensor1.isNull() || tensor2.isNull()) {
+        return getNullValue(VALUE_TYPE_VARBINARY);
+    }
+
+    int32_t addr_lenp;
+    const char * addrp = tensor1.getObject_withoutNull(&addr_lenp);
+
+    int32_t addr_lenq;
+    const char * addrq = tensor2.getObject_withoutNull(&addr_lenq);
+
+    TensorWrapper P(addrp,addr_lenp);
+    TensorWrapper Q(addrq,addr_lenq);
+
+    // both dimension should match
+    if(P.numRows() != Q.numRows() && P.numCols() != Q.numCols()) {
+      return getNullValue(VALUE_TYPE_VARBINARY);
+    }
+
+    int32_t resLenReq = TensorWrapper::tensorByteSize(P.numRows(), P.numCols());
+    int32_t resLen;
+    NValue result = ValueFactory::getTempBinaryValue(NULL, resLenReq);
+    const char *resAddr = result.getObject_withoutNull(&resLen);
+    assert(resLen == resLenReq);
+    TensorWrapper R(resAddr, resLen);
+
+    for (int i = 0; i < P.numRows(); i += 1) {
+      for (int j = 0; j < Q.numCols(); j += 1) {
+          R.set(i, j, P.get(i,j) + Q.get(i,j));
+       }
+    }
+
+    return result;
+}
+
+/** implement the sql FUNC_T_TENSOR_MUL function for all numeric values */
+template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValue>& arguments) {
+
+      assert(arguments.size() == 2);
+    const NValue& tensor1 = arguments[0];
+    const NValue& tensor2 = arguments[1];
+
+    const ValueType tensor1Type = tensor1.getValueType();
+    const ValueType tensor2Type = tensor2.getValueType();
+
+    if (tensor1Type != VALUE_TYPE_VARBINARY && tensor2Type != VALUE_TYPE_VARBINARY) {
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
+    }
+
+    if (tensor1.isNull() || tensor2.isNull()) {
+        return getNullValue(VALUE_TYPE_VARBINARY);
+    }
+
+    int32_t addr_lenp;
+    const char *addrp = tensor1.getObject_withoutNull(&addr_lenp);
+
+    int32_t addr_lenq;
+    const char *addrq = tensor2.getObject_withoutNull(&addr_lenq);
+
+    TensorWrapper P(addrp,addr_lenp);
+    TensorWrapper Q(addrq,addr_lenq);
+
+    // both dimension should match
+    if(P.numRows() != Q.numCols()) {
+      return getNullValue(VALUE_TYPE_VARBINARY);
+    }
+
+    int32_t resLenReq = TensorWrapper::tensorByteSize(P.numRows(), Q.numCols());
+    int32_t resLen;
+    NValue result = ValueFactory::getTempBinaryValue(NULL, resLenReq);
+    const char *resAddr = result.getObject_withoutNull(&resLen);
+    assert(resLen == resLenReq);
+
+    TensorWrapper R(resAddr, resLen);
+
+
+    for (int i = 0; i < P.numRows(); i += 1) {
+      for (int j = 0; j < Q.numCols(); j += 1) {
+          double sum = 0.0;
+          for (int k = 0; k < P.numCols(); k += 1) {
+              sum += P.get(i,k)*Q.get(k,j);
+          }
+          R.set(i, j, sum);
+       }
+    }
+
+    return result;
+}
+
+/** implement the sql FUNC_T_TENSOR_MUL function for all numeric values */
+template<> inline NValue NValue::call<FUNC_T_SCALAR_MUL>(const std::vector<NValue>& arguments) {
+
+      assert(arguments.size() == 2);
+    const NValue& tensor = arguments[0];
+    const NValue& scalar = arguments[1];
+
+    const ValueType tensorType = tensor.getValueType();
+    const ValueType scalarType = scalar.getValueType();
+
+    if (tensorType != VALUE_TYPE_VARBINARY) {
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function to T_SCALAR_MUL");
+    }
+
+    if ( ! isNumeric(scalarType)) {
+        throw SQLException(SQLException::dynamic_sql_error, "Second argument to T_SCALAR_MUL should be numeric");
+    }
+
+    if (tensor.isNull() || scalar.isNull()) {
+        return getNullValue(VALUE_TYPE_VARBINARY);
+    }
+
+    double base = scalar.castAsDoubleAndGetValue();
+
+    int32_t addr_lenp;
+    const char *addrp = tensor.getObject_withoutNull(&addr_lenp);
+
+    TensorWrapper P(addrp,addr_lenp);
+
+    NValue result = ValueFactory::getTempBinaryValue(NULL, addr_lenp);
+    int32_t resLen;
+    const char *resAddr = result.getObject_withoutNull(&resLen);
+    assert(resLen == addr_lenp);
+    TensorWrapper R(resAddr, resLen);
+
+    for (int i = 0; i < P.numRows(); i += 1) {
+        for (int j = 0; j < P.numCols(); j += 1) {
+            R.set(i, j, P.get(i,j)*base);
+        }
+    }
+
+    return result;
 }
 
 /**
