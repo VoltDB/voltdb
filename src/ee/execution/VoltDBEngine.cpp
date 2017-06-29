@@ -1415,9 +1415,6 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                     currEngine->m_tablesByName[tableName] = localTable;
                 }
             }
-            /*else {
-                continue;
-            }*/
         }
         else {
             if (!updateReplicated) {
@@ -1443,26 +1440,45 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                     m_tablesBySignatureHash[hash] = persistentTable;
                 }
             }
-            // don't register stats twice for the updateReplicated path
-            if (updateReplicated) continue;
 
             // add all of the indexes to the stats source
             std::vector<TableIndex*> const& tindexes = persistentTable->allIndexes();
-            BOOST_FOREACH (auto index, tindexes) {
-                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+            if (catTable->isreplicated()) {
+                if (updateReplicated) {
+                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                        VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
+                        BOOST_FOREACH (auto index, tindexes) {
+                            currEngine->getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+                                                                              relativeIndexOfTable,
+                                                                              index->getIndexStats());
+                        }
+                        VOLT_DEBUG("VoltDBEngine %p register stats source %p for table %s", this, stats, localTable->name().c_str());
+                        currEngine->getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+                                                                          relativeIndexOfTable,
+                                                                          stats);
+                    }
+                }
+            }
+            else if (!updateReplicated) {
+                BOOST_FOREACH (auto index, tindexes) {
+                    getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+                                                          relativeIndexOfTable,
+                                                          index->getIndexStats());
+                }
+                VOLT_DEBUG("VoltDBEngine %p register stats source %p for table %s", this, stats, localTable->name().c_str());
+                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                       relativeIndexOfTable,
-                                                      index->getIndexStats());
+                                                      stats);
             }
         }
         else {
             if (updateReplicated) continue;
             stats = tcd->getStreamedTable()->getTableStats();
+            VOLT_DEBUG("VoltDBEngine %p register stats source %p for table %s", this, stats, localTable->name().c_str());
+            getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+                                                  relativeIndexOfTable,
+                                                  stats);
         }
-        VOLT_DEBUG("VoltDBEngine %p register stats source %p for table %s", this, stats, localTable->name().c_str());
-        getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
-                                              relativeIndexOfTable,
-                                              stats);
-
     }
     resetDRConflictStreamedTables();
 }
