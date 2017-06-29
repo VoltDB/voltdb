@@ -811,6 +811,14 @@ public abstract class ProcedureCompiler {
 
         // ADD THE STATEMENT
         int stmtNum = 0;
+        // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
+        boolean procHasWriteStmts = false;
+        boolean procHasSeqScans = false;
+
+        StatementPartitioning partitioning =
+                info.singlePartition ? StatementPartitioning.forceSP() :
+                                       StatementPartitioning.forceMP();
+
         for (String curStmt: stmts) {
 
             // add the statement to the catalog
@@ -818,23 +826,27 @@ public abstract class ProcedureCompiler {
 //            Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
 
             // compile the statement
-            StatementPartitioning partitioning =
-                info.singlePartition ? StatementPartitioning.forceSP() :
-                                       StatementPartitioning.forceMP();
-
             // default to FASTER detmode because stmt procs can't feed read output into writes
             StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
                     estimates, catalogStmt, curStmt,//procedureDescriptor.m_singleStmt,
                     procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 
-            // if the single stmt is not read only, then the proc is not read only
-            boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);
+//            // if the single stmt is not read only, then the proc is not read only
+//            boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);
+//
+//            // set the read onlyness of a proc
+//            procedure.setReadonly(procHasWriteStmts == false);
+//
+//            int seqs = catalogStmt.getSeqscancount();
+//            procedure.setHasseqscans(seqs > 0);
+            // if a single stmt is not read only, then the proc is not read only
+            if (catalogStmt.getReadonly() == false) {
+                procHasWriteStmts = true;
+            }
 
-            // set the read onlyness of a proc
-            procedure.setReadonly(procHasWriteStmts == false);
-
-            int seqs = catalogStmt.getSeqscancount();
-            procedure.setHasseqscans(seqs > 0);
+            if (catalogStmt.getSeqscancount() > 0) {
+                procHasSeqScans = true;
+            }
 
             // set procedure parameter types
             CatalogMap<ProcParameter> params = procedure.getParameters();
@@ -902,6 +914,11 @@ public abstract class ProcedureCompiler {
                 }
             }
         }
+
+        // set the read onlyness of a proc
+        procedure.setReadonly(procHasWriteStmts == false);
+
+        procedure.setHasseqscans(procHasSeqScans);
     }
 
     /**
