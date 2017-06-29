@@ -979,7 +979,7 @@ public class TestJSONInterface extends TestCase {
             server = null;
         }
     }
-    
+
     public void testHTTPListenerAfterRejoin() throws Exception {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             // Community version does not support rejoin.
@@ -989,20 +989,20 @@ public class TestJSONInterface extends TestCase {
         builder.setSecurityEnabled(false, false);
         builder.setHTTPDPort(0);
         builder.setJSONAPIEnabled(true);
-        
+
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, true);
         try {
             boolean success = cluster.compile(builder);
             assertTrue(success);
             cluster.startUp();
-            
+
             String url = "http://127.0.0.1:" + cluster.httpPort(0) + "/deployment";
             try {
                 getUrlOverJSON(url, null, null, null, 200,  "application/json");
             } catch (HttpHostConnectException e) {
                 fail("HTTP Listener is not open when the node is on");
             }
-            
+
             cluster.killSingleHost(0);
             Thread.sleep(1000);
             url = "http://127.0.0.1:" + cluster.httpPort(0) + "/deployment";
@@ -1012,7 +1012,7 @@ public class TestJSONInterface extends TestCase {
             } catch (HttpHostConnectException e) {
                 assertTrue(e.toString().contains("Connection refused"));
             }
-            
+
             cluster.recoverOne(0, 0, "", true);
             Thread.sleep(1000);
             url = "http://127.0.0.1:" + cluster.httpPort(2) + "/deployment";

@@ -169,7 +169,7 @@ public class CommandLine extends VoltDB.Configuration
     public int adminPort() {
         return m_adminPort;
     }
-    
+
     public int httpPort() {
         return m_httpPort;
     }
