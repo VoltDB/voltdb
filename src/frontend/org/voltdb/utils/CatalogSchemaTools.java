@@ -480,7 +480,7 @@ public abstract class CatalogSchemaTools {
             // SQL Statement procedure
 
             sb.append(String.format(
-                    "CREATE PROCEDURE %s%s%s\n%sAS\n'%s%s",
+                    "CREATE PROCEDURE %s%s%s\n%sAS\n%s'%s",
                     proc.getClassname(),
                     allowClause,
                     partitionClause.toString(),
@@ -495,7 +495,7 @@ public abstract class CatalogSchemaTools {
 //                        proc.getStatements().get("SQL").getSqltext().trim()));
                         proc.getStatements().get("SQL" + String.valueOf(i)).getSqltext().trim()));
             }
-            sb.append("';");
+            sb.append("'");
         }
         else {
             // Java Class
