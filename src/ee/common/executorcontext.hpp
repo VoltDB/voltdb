@@ -420,7 +420,7 @@ class ExecutorContext {
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;
     int64_t m_currentDRTimestamp;
-    static EngineLocals *savedEngineLocals;
+    static bool inMpContext;
   public:
     int64_t m_lastCommittedSpHandle;
     int64_t m_siteId;
@@ -449,7 +449,7 @@ struct EngineLocals : public PoolLocals {
 typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 
 extern SharedEngineLocalsType enginesByPartitionId;
-extern EngineLocals mpEngineLocals;
+extern bool inMpContext;
 extern AbstractExecutor * mpExecutor;
 }
 

@@ -252,8 +252,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
         SynchronizedThreadLock::init(sitesPerHost);
         if (isLowestSiteId) {
             // The site thread that has the lowest siteId gets to create DR replicated stream
-            mpEngineLocals = EngineLocals(16383);
-            VOLT_DEBUG("Initializing mp partition with context %p", mpEngineLocals.context);
+            VOLT_DEBUG("Initializing mp partition with context %p", EngineLocals(16383).context);
         }
     }
     pthread_mutex_unlock(&sharedEngineMutex);
@@ -920,8 +919,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
         // get the delegate for the table... add the table if it's null
         auto tcd = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
         if (!tcd) {
-            VOLT_TRACE("add a completely new table or rebuild an empty table...");
-
             //////////////////////////////////////////
             // add a completely new table
             //////////////////////////////////////////
@@ -933,11 +930,13 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
                     // use the delegate to init the table and create indexes n' stuff
                     tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
                     const std::string& tableName = tcd->getTable()->name();
+                    VOLT_TRACE("add a REPLICATED completely new table or rebuild an empty table %s", tableName.c_str());
                     BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
                         VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                         currEngine->m_catalogDelegates[catalogTable->path()] = tcd;
                         currEngine->m_delegatesByName[tableName] = tcd;
                     }
+                    assert(tcd->getStreamedTable() == NULL);
                 }
                 continue;
             }
@@ -951,6 +950,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
                 tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
                 m_catalogDelegates[catalogTable->path()] = tcd;
                 Table* table = tcd->getTable();
+                VOLT_TRACE("add a PARTITIONED completely new table or rebuild an empty table %s", table->name().c_str());
                 m_delegatesByName[table->name()] = tcd;
             }
             // set export info on the new table
@@ -1379,17 +1379,14 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
     // 1. See header comments explaining m_snapshottingTables.
     // 2. Don't clear m_exportTables. They are still exporting, even if deleted.
     // 3. Clear everything else.
-    if (updateReplicated) {
-        BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
-            VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
-            currEngine->m_tables.clear();
-            currEngine->m_tablesByName.clear();
-            currEngine->m_tablesBySignatureHash.clear();
+    if (!updateReplicated) {
+        m_tables.clear();
+        m_tablesByName.clear();
+        m_tablesBySignatureHash.clear();
 
-            // need to re-map all the table ids / indexes
-            currEngine->getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
-            currEngine->getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
-        }
+        // need to re-map all the table ids / indexes
+        getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
+        getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
     }
 
     // walk the table delegates and update local table collections
@@ -1423,11 +1420,10 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
             }*/
         }
         else {
-            if (updateReplicated) {
-                continue;
+            if (!updateReplicated) {
+                m_tables[relativeIndexOfTable] = localTable;
+                m_tablesByName[tableName] = localTable;
             }
-            m_tables[relativeIndexOfTable] = localTable;
-            m_tablesByName[tableName] = localTable;
         }
         TableStats* stats;
         PersistentTable* persistentTable = tcd->getPersistentTable();
@@ -1447,6 +1443,8 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                     m_tablesBySignatureHash[hash] = persistentTable;
                 }
             }
+            // don't register stats twice for the updateReplicated path
+            if (updateReplicated) continue;
 
             // add all of the indexes to the stats source
             std::vector<TableIndex*> const& tindexes = persistentTable->allIndexes();
@@ -1457,6 +1455,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
             }
         }
         else {
+            if (updateReplicated) continue;
             stats = tcd->getStreamedTable()->getTableStats();
         }
         VOLT_DEBUG("VoltDBEngine %p register stats source %p for table %s", this, stats, localTable->name().c_str());

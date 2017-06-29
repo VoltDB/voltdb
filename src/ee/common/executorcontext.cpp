@@ -41,7 +41,7 @@ namespace voltdb {
 SharedEngineLocalsType enginesByPartitionId;
 EngineLocals mpEngineLocals;
 AbstractExecutor * mpExecutor = NULL;
-EngineLocals* ExecutorContext::savedEngineLocals;
+bool ExecutorContext::inMpContext;
 
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
@@ -141,10 +141,8 @@ ExecutorContext::~ExecutorContext() {
  */
 void ExecutorContext::switchToMpContext()
 {
-    VOLT_DEBUG("Switching context to partition %d on thread %lu", mpEngineLocals.partitionId, pthread_self());
-    savedEngineLocals = &enginesByPartitionId[getExecutorContext()->m_partitionId];
-    pthread_setspecific(static_key, mpEngineLocals.context);
-    ThreadLocalPool::assignThreadLocals(mpEngineLocals);
+    VOLT_DEBUG("Switching context to MP partition on thread %lu", pthread_self());
+    inMpContext = true;
 }
 
 /*
@@ -154,15 +152,13 @@ void ExecutorContext::switchToMpContext()
  */
 void ExecutorContext::restoreContext()
 {
-    VOLT_DEBUG("Restore context to partition %d on thread %lu", savedEngineLocals->partitionId, pthread_self());
-    pthread_setspecific(static_key, savedEngineLocals->context);
-    ThreadLocalPool::assignThreadLocals(*savedEngineLocals);
-    savedEngineLocals = NULL;
+    VOLT_DEBUG("Restore context to lowest SP partition on thread %lu", pthread_self());
+    inMpContext = false;
 }
 
 bool ExecutorContext::needContextRestore()
 {
-    return savedEngineLocals != NULL;
+    return inMpContext;
 }
 
 void ExecutorContext::bindToThread()
