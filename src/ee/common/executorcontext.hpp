@@ -19,7 +19,6 @@
 #define _EXECUTORCONTEXT_HPP_
 
 #include "Topend.h"
-#include "common/UndoQuantum.h"
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
 #include "common/ValuePeeker.hpp"
@@ -44,6 +43,7 @@ const int64_t LONG_OP_THRESHOLD = 10000;
 class AbstractExecutor;
 class AbstractDRTupleStream;
 class VoltDBEngine;
+class UndoQuantum;
 struct EngineLocals;
 
 class TempTable;
@@ -101,12 +101,6 @@ class ExecutorContext {
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
-
-    // Must be used in pair.
-    static void switchToMpContext();
-    static void restoreContext();
-
-    static bool needContextRestore();
 
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
@@ -449,7 +443,6 @@ struct EngineLocals : public PoolLocals {
 typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 
 extern SharedEngineLocalsType enginesByPartitionId;
-extern bool inMpContext;
 }
 
 #endif

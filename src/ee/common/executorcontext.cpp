@@ -15,6 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
+#include "common/UndoQuantum.h"
 #include "common/SynchronizedThreadLock.h"
 
 #include "common/debuglog.h"
@@ -39,7 +40,6 @@ using namespace std;
 namespace voltdb {
 
 SharedEngineLocalsType enginesByPartitionId;
-bool ExecutorContext::inMpContext;
 
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
@@ -127,38 +127,6 @@ ExecutorContext::~ExecutorContext() {
     pthread_setspecific(static_key, NULL);
 }
 
-/**
- * Switch executor context when updating MP related data structures.
- *
- * Calling this function will switch the executor context from current EngineLocals to the MP EngineLocals,
- * it also changes the associated thread-specific memory pools. The original thread locals are kept in a static
- * variable, it's safe since updating replicated table is always running on a single thread (the lowest site within a node).
- *
- * Must be paired with restoreContext() to restore the original thread-specific variables.
- *
- */
-void ExecutorContext::switchToMpContext()
-{
-    VOLT_DEBUG("Switching context to MP partition on thread %lu", pthread_self());
-    inMpContext = true;
-}
-
-/*
- * Restore saved executor context.
- *
- * Must be paired with switchToMpContext().
- */
-void ExecutorContext::restoreContext()
-{
-    VOLT_DEBUG("Restore context to lowest SP partition on thread %lu", pthread_self());
-    inMpContext = false;
-}
-
-bool ExecutorContext::needContextRestore()
-{
-    return inMpContext;
-}
-
 void ExecutorContext::bindToThread()
 {
     pthread_setspecific(static_key, this);
@@ -198,7 +166,6 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                 if (persistentTarget != NULL && persistentTarget->isReplicatedTable()) {
                     VOLT_ERROR("PlanNodeType:%d", nextPlanNodeType);
                     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
-                        switchToMpContext();
                         // Call the execute method to actually perform whatever action
                         // it is that the node is supposed to do...
                         if (!executor->execute(m_staticParams)) {
@@ -207,7 +174,6 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                         }
                         ++ctr;
                         // Assign the correct pool back to this thread
-                        restoreContext();
                         VOLT_ERROR("release all waited thread");
                         SynchronizedThreadLock::signalLowestSiteFinished();
                     }
@@ -231,9 +197,8 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
             }
         }
     } catch (const SerializableEEException &e) {
-        if (needContextRestore()) {
+        if (SynchronizedThreadLock::isInRepTableContext()) {
             // Assign the correct pool back to this thread
-            restoreContext();
             SynchronizedThreadLock::signalLowestSiteFinished();
         }
 

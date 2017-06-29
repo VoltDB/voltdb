@@ -35,6 +35,7 @@ class TableAndIndexTest;
 namespace voltdb {
 class UndoLog;
 
+
 class UndoQuantum {
     // UndoQuantum has a very limited public API that allows UndoAction registration
     // and copying buffers into pooled storage. Anything else is reserved for friends.
@@ -92,7 +93,7 @@ protected:
         for (std::vector<UndoAction*>::reverse_iterator i = m_undoActions.rbegin();
              i != m_undoActions.rend(); ++i) {
             UndoAction* goner = *i;
-            if (goner->isReplicatedTable()) {
+            if (goner->isReplicatedTable() && !SynchronizedThreadLock::isInRepTableContext()) {
                 if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_forLowestSite)) {
                     // only lowest site can reach here, and it has the real undo action for rep tables,
                     goner->undo();

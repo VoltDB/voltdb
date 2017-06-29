@@ -46,6 +46,10 @@ public:
      */
     static bool countDownGlobalTxnStartCount(bool lowestSite);
     static void signalLowestSiteFinished();
+
+    static bool isInRepTableContext();
+private:
+    static bool s_inMpContext;
 };
 
 }

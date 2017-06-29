@@ -716,7 +716,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
         VOLT_DEBUG("loading replicated parts of catalog from partition %d", m_partitionId);
-        ExecutorContext::switchToMpContext();
         VoltDBEngine* mpEngine = ExecutorContext::getEngine();
 
         // load up all the tables, adding all tables
@@ -734,7 +733,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
         // Assign the correct pool back to this thread
-        ExecutorContext::restoreContext();
         SynchronizedThreadLock::signalLowestSiteFinished();
     }
 
@@ -1290,7 +1288,6 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
 
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
-        ExecutorContext::switchToMpContext();
         VoltDBEngine* mpEngine = ExecutorContext::getEngine();
 
         mpEngine->processCatalogDeletes(timestamp, true);
@@ -1304,7 +1301,6 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
 
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
-        ExecutorContext::restoreContext();
         SynchronizedThreadLock::signalLowestSiteFinished();
     }
 
@@ -1350,9 +1346,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     try {
         if (table->isReplicatedTable()) {
             if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
-                ExecutorContext::switchToMpContext();
                 table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
-                ExecutorContext::restoreContext();
                 SynchronizedThreadLock::signalLowestSiteFinished();
             }
         }
@@ -1361,9 +1355,8 @@ VoltDBEngine::loadTable(int32_t tableId,
         }
     }
     catch (const SerializableEEException &e) {
-        if (ExecutorContext::needContextRestore()) {
+        if (SynchronizedThreadLock::isInRepTableContext()) {
             // Assign the correct pool back to this thread
-            ExecutorContext::restoreContext();
             SynchronizedThreadLock::signalLowestSiteFinished();
         }
         throwFatalException("%s", e.message().c_str());

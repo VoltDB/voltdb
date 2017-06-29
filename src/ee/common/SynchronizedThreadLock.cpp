@@ -27,6 +27,7 @@ pthread_cond_t sharedEngineCondition;
 pthread_cond_t wakeLowestEngineCondition;
 int32_t globalTxnStartCountdownLatch = 0;
 int32_t SITES_PER_HOST = -1;
+bool SynchronizedThreadLock::s_inMpContext = false;
 
 void SynchronizedThreadLock::init(int32_t sitesPerHost)
 {
@@ -45,6 +46,8 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite)
             pthread_cond_wait(&wakeLowestEngineCondition, &sharedEngineMutex);
         }
         pthread_mutex_unlock(&sharedEngineMutex);
+        VOLT_DEBUG("Switching context to MP partition on thread %lu", pthread_self());
+        s_inMpContext = true;
         return true;
     }
     else {
@@ -62,7 +65,15 @@ void SynchronizedThreadLock::signalLowestSiteFinished()
 {
     pthread_mutex_lock(&sharedEngineMutex);
     globalTxnStartCountdownLatch = SITES_PER_HOST;
+    VOLT_DEBUG("Restore context to lowest SP partition on thread %lu", pthread_self());
+    s_inMpContext = false;
     pthread_cond_broadcast(&sharedEngineCondition);
     pthread_mutex_unlock(&sharedEngineMutex);
 }
+
+bool SynchronizedThreadLock::isInRepTableContext()
+{
+    return s_inMpContext;
+}
+
 }
