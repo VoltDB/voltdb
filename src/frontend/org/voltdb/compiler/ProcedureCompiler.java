@@ -856,7 +856,8 @@ public abstract class ProcedureCompiler {
             for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmtParams, "index")) {
                 // name each parameter "param1", "param2", etc...
                 ProcParameter procParam = params.add("param" + String.valueOf(paramCount));
-                procParam.setIndex(stmtParam.getIndex());
+//                procParam.setIndex(stmtParam.getIndex() + paramCount);
+                procParam.setIndex(paramCount);
                 procParam.setIsarray(stmtParam.getIsarray());
                 procParam.setType(stmtParam.getJavatype());
                 paramCount++;
