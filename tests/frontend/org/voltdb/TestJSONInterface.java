@@ -130,8 +130,6 @@ import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
-import com.sun.corba.se.spi.activation.Server;
-
 import junit.framework.TestCase;
 
 public class TestJSONInterface extends TestCase {
