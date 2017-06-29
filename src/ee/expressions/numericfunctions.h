@@ -307,21 +307,20 @@ template<> inline NValue NValue::callUnary<FUNC_T_TR>() const {
     }
 
     int32_t addr_lenp;
-    double *addrp = (double *)getObject_withoutNull(&addr_lenp);
+    char *addrp = (char *)getObject_withoutNull(&addr_lenp);
 
-    TensorWrapper P((char*)addrp,addr_lenp);
+    TensorWrapper P(addrp,addr_lenp);
     // create a transpose of Tensor
 
     int32_t addrr_lenr = addr_lenp;
-    double *addrr = nullptr;
+    char *addrr = nullptr;
 
     ValueFactory::getTempBinaryValue((const char *)addrr, addrr_lenr);
 
-    TensorWrapper R((char*)addrr,addrr_lenr);
+    TensorWrapper R(addrr,addrr_lenr);
     R.transpose(P);
 
-    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
-                                     (const char*) &addrr, sizeof(addrr), getTempStringPool());
+    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,(const char *)addrr, sizeof(addrr), getTempStringPool());
 
 }
 
@@ -353,10 +352,10 @@ template<> inline NValue NValue::call<FUNC_T_ADD>(const std::vector<NValue>& arg
     const NValue& tensor1 = arguments[0];
     const NValue& tensor2 = arguments[1];
 
-    const ValueType tesnsor1Type = tensor1.getValueType();
-    const ValueType tesnsor2Type = tensor2.getValueType();
+    const ValueType tensor1Type = tensor1.getValueType();
+    const ValueType tensor2Type = tensor2.getValueType();
 
-    if (tesnsor1Type != VALUE_TYPE_VARBINARY && tesnsor2Type != VALUE_TYPE_VARBINARY) {
+    if (tensor1Type != VALUE_TYPE_VARBINARY && tensor2Type != VALUE_TYPE_VARBINARY) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
     }
 
@@ -365,13 +364,13 @@ template<> inline NValue NValue::call<FUNC_T_ADD>(const std::vector<NValue>& arg
     }
 
     int32_t addr_lenp;
-    double *addrp = (double *)tensor1.getObject_withoutNull(&addr_lenp);
+    char * addrp = (char *)tensor1.getObject_withoutNull(&addr_lenp);
 
     int32_t addr_lenq;
-    double *addrq = (double *)tensor2.getObject_withoutNull(&addr_lenq);
+    char * addrq = (char *)tensor2.getObject_withoutNull(&addr_lenq);
 
-    TensorWrapper P((char*)addrp,addr_lenp);
-    TensorWrapper Q((char*)addrq,addr_lenq);
+    TensorWrapper P(addrp,addr_lenp);
+    TensorWrapper Q(addrq,addr_lenq);
 
     // both dimension should match
     if(P.numRows() != Q.numRows() && P.numCols() != Q.numCols()) {
@@ -379,24 +378,19 @@ template<> inline NValue NValue::call<FUNC_T_ADD>(const std::vector<NValue>& arg
     }
 
     int32_t addr_lenr = addr_lenp;
-    double *addrr = nullptr;
+    char *addrr = nullptr;
 
     ValueFactory::getTempBinaryValue((const char *)addrr, addr_lenr);
 
-    TensorWrapper R((char*)addrr,addr_lenr);
+    TensorWrapper R(addrr,addr_lenr);
 
     for (int i = 0; i < P.numRows(); i += 1) {
       for (int j = 0; j < Q.numCols(); j += 1) {
-          double sum = 0.0;
-          for (int k = 0; k < P.numCols(); k += 1) {
-              sum += P.get(i,k) + Q.get(k,j);
-          }
-          R.set(i, j, sum);
+          R.set(i, j, P.get(i,j) + Q.get(i,j));
        }
     }
 
-    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
-                                     (const char*) &addrr, sizeof(addrr), getTempStringPool());
+    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,(const char *)addrr, sizeof(addrr), getTempStringPool());
 
 
 }
@@ -408,10 +402,10 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValu
     const NValue& tensor1 = arguments[0];
     const NValue& tensor2 = arguments[1];
 
-    const ValueType tesnsor1Type = tensor1.getValueType();
-    const ValueType tesnsor2Type = tensor2.getValueType();
+    const ValueType tensor1Type = tensor1.getValueType();
+    const ValueType tensor2Type = tensor2.getValueType();
 
-    if (tesnsor1Type != VALUE_TYPE_VARBINARY && tesnsor2Type != VALUE_TYPE_VARBINARY) {
+    if (tensor1Type != VALUE_TYPE_VARBINARY && tensor2Type != VALUE_TYPE_VARBINARY) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
     }
 
@@ -420,13 +414,13 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValu
     }
 
     int32_t addr_lenp;
-    double *addrp = (double *)tensor1.getObject_withoutNull(&addr_lenp);
+    char *addrp = (char *)tensor1.getObject_withoutNull(&addr_lenp);
 
     int32_t addr_lenq;
-    double *addrq = (double *)tensor2.getObject_withoutNull(&addr_lenq);
+    char *addrq = (char *)tensor2.getObject_withoutNull(&addr_lenq);
 
-    TensorWrapper P((char*)addrp,addr_lenp);
-    TensorWrapper Q((char*)addrq,addr_lenq);
+    TensorWrapper P(addrp,addr_lenp);
+    TensorWrapper Q(addrq,addr_lenq);
 
     // both dimension should match
     if(P.numRows() != Q.numCols()) {
@@ -434,11 +428,11 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValu
     }
 
     int32_t addr_lenr = addr_lenp;
-    double *addrr = nullptr;
+    char *addrr = nullptr;
 
     ValueFactory::getTempBinaryValue((const char *)addrr, addr_lenr);
 
-    TensorWrapper R((char*)addrr,addr_lenr);
+    TensorWrapper R((char *)addrr,addr_lenr);
 
 
     for (int i = 0; i < P.numRows(); i += 1) {
@@ -452,9 +446,7 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValu
     }
 
     return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
-                                     (const char*) &addrr, sizeof(addrr), getTempStringPool());
-
-
+                                     (const char *)addrr, sizeof(addrr), getTempStringPool());
 }
 
 /** implement the sql FUNC_T_TENSOR_MUL function for all numeric values */
@@ -464,10 +456,10 @@ template<> inline NValue NValue::call<FUNC_T_SCALAR_MUL>(const std::vector<NValu
     const NValue& tensor = arguments[0];
     const NValue& scalar = arguments[1];
 
-    const ValueType tesnsorType = tensor.getValueType();
+    const ValueType tensorType = tensor.getValueType();
     const ValueType scalarType = scalar.getValueType();
 
-    if (tesnsorType != VALUE_TYPE_VARBINARY && isNumeric(scalarType)) {
+    if (tensorType != VALUE_TYPE_VARBINARY && isNumeric(scalarType)) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
     }
 
@@ -475,20 +467,20 @@ template<> inline NValue NValue::call<FUNC_T_SCALAR_MUL>(const std::vector<NValu
         return getNullValue(VALUE_TYPE_VARBINARY);
     }
 
-    int32_t base = scalar.castAsIntegerAndGetValue();
+    double base = scalar.castAsDoubleAndGetValue();
 
     int32_t addr_lenp;
-    double *addrp = (double *)tensor.getObject_withoutNull(&addr_lenp);
+    char *addrp = (char *)tensor.getObject_withoutNull(&addr_lenp);
 
-    TensorWrapper P((char*)addrp,addr_lenp);
+    TensorWrapper P(addrp,addr_lenp);
 
     // dimension same as P
     int32_t addr_lenr = addr_lenp;
-    double *addrr = nullptr;
+    char *addrr = nullptr;
 
     ValueFactory::getTempBinaryValue((const char *)addrr, addr_lenr);
 
-    TensorWrapper R((char*)addrr,addr_lenr);
+    TensorWrapper R(addrr,addr_lenr);
 
 
     for (int i = 0; i < P.numRows(); i += 1) {
@@ -499,8 +491,7 @@ template<> inline NValue NValue::call<FUNC_T_SCALAR_MUL>(const std::vector<NValu
           }
        }
 
-    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
-                                     (const char*) &addrr, sizeof(addrr), getTempStringPool());
+    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,(const char *)addrr, sizeof(addrr), getTempStringPool());
 
 }
 

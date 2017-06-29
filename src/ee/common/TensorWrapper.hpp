@@ -3,8 +3,9 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
+
+//Some file to provide a declaration for SQLException.
 #include "common/SQLException.h"
-//#include ... Some file to provide a declaration for SQLException.
 
 /**
  *  Wrap a 1D array of doubles to make a 2D
