@@ -92,18 +92,15 @@ protected:
         for (std::vector<UndoAction*>::reverse_iterator i = m_undoActions.rbegin();
              i != m_undoActions.rend(); ++i) {
             UndoAction* goner = *i;
-//<<<<<<< HEAD
-//            if (goner->isReplicatedTable()) {
-//                if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_forLowestSite)) {
-//                    SynchronizedThreadLock::signalLowestSiteFinished();
-//                    goner->undo();
-//                }
-//            } else {
-//                goner->undo();
-//            }
-//=======
-            goner->undo();
-//>>>>>>> Fix an undo bug that not all site threads execute the undo action.
+            if (goner->isReplicatedTable()) {
+                if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_forLowestSite)) {
+                    // only lowest site can reach here, and it has the real undo action for rep tables,
+                    goner->undo();
+                    SynchronizedThreadLock::signalLowestSiteFinished();
+                }
+            } else {
+                goner->undo();
+            }
             delete goner;
         }
         Pool * result = m_dataPool;
