@@ -805,11 +805,9 @@ public abstract class ProcedureCompiler {
         }
         assert(info != null);
 
-        // TODO: parse the statements in the proc and have a loop for the code below for each stmt
         String[] stmts = stmtsStr.split(";");
-        //String curStmt = stmts[0];
 
-        // ADD THE STATEMENT
+        // ADD THE STATEMENTS in a loop
         int stmtNum = 0;
         // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
         boolean procHasWriteStmts = false;
@@ -823,7 +821,6 @@ public abstract class ProcedureCompiler {
 
             // add the statement to the catalog
             Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME + String.valueOf(stmtNum++));
-//            Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
 
             // compile the statement
             // default to FASTER detmode because stmt procs can't feed read output into writes
@@ -831,14 +828,6 @@ public abstract class ProcedureCompiler {
                     estimates, catalogStmt, curStmt,//procedureDescriptor.m_singleStmt,
                     procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 
-//            // if the single stmt is not read only, then the proc is not read only
-//            boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);
-//
-//            // set the read onlyness of a proc
-//            procedure.setReadonly(procHasWriteStmts == false);
-//
-//            int seqs = catalogStmt.getSeqscancount();
-//            procedure.setHasseqscans(seqs > 0);
             // if a single stmt is not read only, then the proc is not read only
             if (catalogStmt.getReadonly() == false) {
                 procHasWriteStmts = true;
@@ -853,12 +842,10 @@ public abstract class ProcedureCompiler {
             CatalogMap<StmtParameter> stmtParams = catalogStmt.getParameters();
 
             // set the procedure parameter types from the statement parameter types
-//            int paramCount = 0;
             int paramCount = params.size();
             for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmtParams, "index")) {
                 // name each parameter "param1", "param2", etc...
                 ProcParameter procParam = params.add("param" + String.valueOf(paramCount));
-//                procParam.setIndex(stmtParam.getIndex() + paramCount);
                 procParam.setIndex(paramCount);
                 procParam.setIsarray(stmtParam.getIsarray());
                 procParam.setType(stmtParam.getJavatype());
