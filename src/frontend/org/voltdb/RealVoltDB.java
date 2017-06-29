@@ -484,7 +484,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize commandlog path");
         }
     }
@@ -496,7 +496,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize commandlog snapshot path");
         }
     }
@@ -508,7 +508,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize snapshot path");
         }
     }
@@ -520,7 +520,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize export overflow path");
         }
     }
@@ -532,7 +532,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize DR overflow path");
         }
     }
@@ -550,7 +550,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public String getCommandLogPath() {
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize commandlog path");
         }
     }
@@ -559,7 +559,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public String getCommandLogSnapshotPath() {
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize commandlog snapshot path");
         }
     }
@@ -568,7 +568,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public String getSnapshotPath() {
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize snapshot path");
         }
     }
@@ -577,7 +577,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public String getExportOverflowPath() {
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize export overflow path");
         }
     }
@@ -586,7 +586,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public String getDROverflowPath() {
         try {
             return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getCanonicalPath();
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new SettingsException("failed to canonicalize DR overflow path");
         }
     }
