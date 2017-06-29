@@ -30,6 +30,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.StarvationTracker;
 
 /**
@@ -59,6 +60,7 @@ class MpRoSitePool {
             m_queue = new SiteTaskerQueue();
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
+            m_queue.setQueueDepthTracker(new QueueDepthTracker(siteId));
             m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
             m_loadedProcedures = new LoadedProcedureSet(m_site);
             m_loadedProcedures.loadProcedures(m_catalogContext, csp);
