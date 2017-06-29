@@ -409,7 +409,7 @@
                     <div class="analysisBody">
                         <div class="analysisWrap">
                             <div class="setThreshold">
-                                <a href="#thresholdPopup" id="btnThreshold" style="display:none">Set Threshold</a>
+                                <a href="#thresholdPopup" id="btnThreshold">Set Threshold</a>
                             </div>
                             <button id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</button>
                             <div class="clear"></div>
@@ -1426,7 +1426,7 @@
         <div class="overlay-content setThresholdPopContent">
             <div class="partitioned">
                 <div class="leftPart">Usage Percent for Multi-Partitioned Procedure</div>
-                <div class="rightPart"><input type="text" value="20" id="partitionThreshold"></div>
+                <div class="rightPart"><input type="text" id="partitionThreshold"></div>
                 <div class="clear"></div>
             </div>
 
@@ -1437,8 +1437,8 @@
             </div>
         </div>
        <div class="overlay-btns">
-           <a id="" class="btn">Save</a>
-           <a id="" class="btn btn-gray">Cancel</a>
+           <a id="btnSaveThreshold" class="btn">Save</a>
+           <a id="btnCancelThreshold" class="btn btn-gray">Cancel</a>
        </div>
     </div>
 

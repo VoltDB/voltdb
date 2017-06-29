@@ -90,6 +90,11 @@ function loadAnalysisPage(){
                 var sumOfAllProcedure = calculateCombinedValue(profileData["PROCEDURE_PROFILE"])
                 var isMPPresent = false;
                 var isPPresent = false;
+                var partitionThreshold = VoltDbUI.getFromLocalStorage("usagePercentage");
+
+                if(partitionThreshold == undefined){
+                    partitionThreshold = 20;
+                }
                 for(var i = 0; i < profileData["PROCEDURE_PROFILE"].length; i++){
                     if(i == 0)
                         timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
@@ -115,11 +120,10 @@ function loadAnalysisPage(){
                         isMPPresent = true;
                     else
                         isPPresent = true;
-
-                    if(combinedWeight > 20) {
+                    if(combinedWeight > partitionThreshold) {
                         $("#analysisRemarks").show();
                         $("#procedureWarningSection").show();
-                        $("#procedureWarning").append("<p>" + procedureName.split(" ")[1] + " has combined usage greater than 20%." + "</p>");
+                        $("#procedureWarning").append("<p>" + procedureName.split(" ")[1] + " has combined usage greater than "+ partitionThreshold +".</p>");
                     }
 
                     VoltDbAnalysis.procedureValue[procedureName] =
@@ -129,7 +133,7 @@ function loadAnalysisPage(){
                             COMBINED: combinedWeight,
                             TYPE:type,
                             WEIGHTED_PERC: wtPercentage,
-                            WARNING: (combinedWeight > 20 ? procedureName.split(" ")[1] + " <br> has combined usage greater <br> than 20%." : "")
+                            WARNING: (combinedWeight > partitionThreshold ? procedureName.split(" ")[1] + " <br> has combined usage greater <br> than "+ partitionThreshold +"." : "")
                         }
                     dataLatency.push({"label": procedureName , "value": avgExecTime})
                     dataFrequency.push({"label": procedureName, "value": invocation})

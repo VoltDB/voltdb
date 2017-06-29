@@ -2405,7 +2405,30 @@ var loadPage = function (serverName, portid) {
         }
     });
 
-    $("#btnThreshold").popup();
+    $("#btnThreshold").popup({
+        open: function (event, ui, ele) {
+            debugger;
+              if(VoltDbUI.getFromLocalStorage("usagePercentage") == undefined){
+                    saveInLocalStorage("usagePercentage", 20)
+                }
+            $("#partitionThreshold").val(VoltDbUI.getFromLocalStorage("usagePercentage"))
+        },
+       afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnSaveThreshold").unbind("click");
+            $("#btnSaveThreshold").on("click", function () {
+                saveInLocalStorage("usagePercentage", $("#partitionThreshold").val())
+                //Close the popup
+                popup.close();
+            });
+
+            $("#btnCancelThreshold").unbind("click");
+            $("#btnCancelThreshold").on("click", function () {
+                popup.close();
+            });
+        }
+
+    });
 
 
     VoltDbUI.refreshConnectionTime('20000');
@@ -2433,6 +2456,7 @@ var configureUserPreferences = function () {
             });
         },
         save: function () {
+            debugger;
             $('ul.user-preferences > li Input:checkbox').each(function (value) {
                 userPreference[$(this)[0].id] = $(this)[0].checked;
 
