@@ -1279,6 +1279,15 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
         return false;
     }
 
+    processCatalogDeletes(timestamp, false);
+
+    if (processCatalogAdditions(timestamp, false) == false) {
+        VOLT_ERROR("Error processing catalog additions.");
+        return false;
+    }
+
+    rebuildTableCollections(false);
+
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
         ExecutorContext::switchToMpContext();
@@ -1298,15 +1307,6 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
         ExecutorContext::restoreContext();
         SynchronizedThreadLock::signalLowestSiteFinished();
     }
-
-    processCatalogDeletes(timestamp, false);
-
-    if (processCatalogAdditions(timestamp, false) == false) {
-        VOLT_ERROR("Error processing catalog additions.");
-        return false;
-    }
-
-    rebuildTableCollections(false);
 
     initMaterializedViewsAndLimitDeletePlans(false);
 

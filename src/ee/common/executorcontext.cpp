@@ -39,7 +39,6 @@ using namespace std;
 namespace voltdb {
 
 SharedEngineLocalsType enginesByPartitionId;
-AbstractExecutor * mpExecutor = NULL;
 bool ExecutorContext::inMpContext;
 
 static pthread_key_t static_key;

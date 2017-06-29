@@ -665,6 +665,7 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     assert(hasNameIntegrity(name(), otherIndexNames));
     assert(hasNameIntegrity(otherTable->name(), theIndexNames));
 
+    // TODO: Fix this to coordinate the swap for replicated tables by the lowest site
     ExecutorContext::getEngine()->rebuildTableCollections(true);
 }
 

@@ -450,7 +450,6 @@ typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 
 extern SharedEngineLocalsType enginesByPartitionId;
 extern bool inMpContext;
-extern AbstractExecutor * mpExecutor;
 }
 
 #endif
