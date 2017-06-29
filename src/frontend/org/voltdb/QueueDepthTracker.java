@@ -111,7 +111,7 @@ public class QueueDepthTracker extends SiteStatsSource {
         super.populateColumnSchema(columns);
         columns.add(new ColumnInfo("CURRENT_DEPTH", VoltType.INTEGER));
         columns.add(new ColumnInfo("POLL_COUNT", VoltType.BIGINT));
-        columns.add(new ColumnInfo("MEAN_WAIT", VoltType.BIGINT));
+        columns.add(new ColumnInfo("AVG_WAIT", VoltType.BIGINT));
         columns.add(new ColumnInfo("MAX_WAIT", VoltType.BIGINT));
     }
 
@@ -143,8 +143,8 @@ public class QueueDepthTracker extends SiteStatsSource {
         }
         rowValues[columnNameToIndex.get("CURRENT_DEPTH")] = m_depth;
         rowValues[columnNameToIndex.get("POLL_COUNT")] = totalPollCountInWindow;
-        rowValues[columnNameToIndex.get("MEAN_WAIT")] = totalWaitTimeInWindow / Math.max(1, totalPollCountInWindow) / 1000;
-        rowValues[columnNameToIndex.get("MAX_WAIT")] = maxWaitTimeInWindow / 1000;
+        rowValues[columnNameToIndex.get("AVG_WAIT")] = totalWaitTimeInWindow / Math.max(1, totalPollCountInWindow);
+        rowValues[columnNameToIndex.get("MAX_WAIT")] = maxWaitTimeInWindow;
 
         super.updateStatsRow(rowKey, rowValues);
     }
@@ -175,4 +175,5 @@ public class QueueDepthTracker extends SiteStatsSource {
 
         };
     }
+
 }

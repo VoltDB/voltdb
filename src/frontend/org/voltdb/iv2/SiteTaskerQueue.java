@@ -34,7 +34,6 @@ public class SiteTaskerQueue
     {
         task.setTimestamp();
         m_queueDepthTracker.offerUpdate();
-//        System.err.println("Offerred at " + task.getTimestamp());
         return m_tasks.offer(task);
     }
 
