@@ -17,15 +17,15 @@
 
 package org.voltdb.calciteadapter.rules.rel;
 
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelTrait;
+import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.rel.VoltDBTableIndexScan;
 
 public class VoltDBSortIndexScanMergeRule extends RelOptRule {
@@ -40,8 +40,17 @@ public class VoltDBSortIndexScanMergeRule extends RelOptRule {
     public boolean matches(RelOptRuleCall call) {
         Sort sort = call.rel(0);
         VoltDBTableIndexScan scan = call.rel(1);
-        List<RelFieldCollation> collations = sort.collation.getFieldCollations();
-        return collations.isEmpty() || isCollationCompartible(scan, sort.collation);
+
+        // @TODO if we can get collations from the RelMetadataQuery then we don't need to
+        // make Sort and Scan to be next to each other (I think)
+        // final RelMetadataQuery mq = call.getMetadataQuery();
+        //mq.collations(scan);
+        RelTraitDef collTraitDef = sort.getCollation().getTraitDef();
+        RelTrait scanCollationTrait = scan.getTraitSet().getTrait(collTraitDef);
+        assert (scanCollationTrait instanceof RelCollation);
+        RelCollation scanCollation = (RelCollation) scanCollationTrait;
+        boolean matches = areCollationsCompartible(scanCollation, sort.collation);
+        return matches;
     }
 
     @Override
@@ -56,7 +65,7 @@ public class VoltDBSortIndexScanMergeRule extends RelOptRule {
         call.transformTo(newScan);
     }
 
-    private boolean isCollationCompartible(VoltDBTableIndexScan scan, RelCollation collation) {
-        return true;
+    private boolean areCollationsCompartible(RelCollation scanCollation, RelCollation sortCollation) {
+        return sortCollation.satisfies(scanCollation);
     }
 }

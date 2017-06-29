@@ -17,19 +17,26 @@
 
 package org.voltdb.calciteadapter.rel;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.VoltDBTable;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.types.IndexType;
+import org.voltdb.utils.CatalogUtil;
 
 public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements VoltDBRel {
 
@@ -47,6 +54,27 @@ public class VoltDBTableIndexScan extends AbstractVoltDBTableScan implements Vol
           super(cluster, table, voltDBTable, program);
           assert(index != null);
           m_index = index;
+          //Set collation trait from the index if it's a sortable one
+          if (IndexType.isScannable(m_index.getType())) {
+              // @TODO Ignore the expressions for a sec
+              List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+              List<RelFieldCollation> collationsList = new ArrayList<>();
+              for (ColumnRef indexColumn : indexedColRefs) {
+                  int columnIndex = indexColumn.getIndex();
+                  collationsList.add(new RelFieldCollation(columnIndex));
+              }
+              RelCollation indexCollation =  RelCollations.of(collationsList);
+              if (program != null) {
+                  // Convert collations to take the program into an account
+                  List<RelCollation> inputCollations = new ArrayList<>();
+                  inputCollations.add(indexCollation);
+                  List<RelCollation> outputCollations = program.getCollations(inputCollations);
+                  assert(outputCollations.size() == 1);
+                  traitSet = getTraitSet().replace(outputCollations.get(0));
+              } else {
+                  traitSet = getTraitSet().replace(indexCollation);
+              }
+          }
     }
 
     /**
