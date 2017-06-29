@@ -434,11 +434,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_INET6_ATON:
             ret = new UnaryFunctionExpression<FUNC_INET6_ATON>((*arguments)[0]);
             break;
-            /*
         case FUNC_T_TR:
             ret = new UnaryFunctionExpression<FUNC_T_TR>((*arguments)[0]);
             break;
-            */
         default:
             return NULL;
         }

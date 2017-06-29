@@ -293,6 +293,38 @@ template<> inline NValue NValue::callUnary<FUNC_SEC>() const {
     return retval;
 }
 
+/** implement the sql FUNC_T_TR function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_T_TR>() const {
+
+      if (isNull()) {
+        return *this;
+    }
+
+    const ValueType type = getValueType();
+
+    if (type != VALUE_TYPE_VARBINARY) {
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
+    }
+
+    int32_t addr_lenp;
+    double *addrp = (double *)getObject_withoutNull(&addr_lenp);
+
+    TensorWrapper P((char*)addrp,addr_lenp);
+    // create a transpose of Tensor
+
+    int32_t addrr_lenr = addr_lenp;
+    double *addrr = nullptr;
+
+    ValueFactory::getTempBinaryValue((const char *)addrr, addrr_lenr);
+
+    TensorWrapper R((char*)addrr,addrr_lenr);
+    R.transpose(P);
+
+    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
+                                     (const char*) &addrr, sizeof(addrr), getTempStringPool());
+
+}
+
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
@@ -346,16 +378,12 @@ template<> inline NValue NValue::call<FUNC_T_ADD>(const std::vector<NValue>& arg
       return getNullValue(VALUE_TYPE_VARBINARY);
     }
 
-    int32_t rlen = P.numRows()*Q.numCols();
-    //double *r = new double[rlen];
-    double *r = nullptr;
+    int32_t addr_lenr = addr_lenp;
+    double *addrr = nullptr;
 
-    NValue tensor3 = ValueFactory::getTempBinaryValue((const char *)r, rlen);
+    ValueFactory::getTempBinaryValue((const char *)addrr, addr_lenr);
 
-    int32_t addr_lenr;
-    double *addrr = (double *)tensor3.getObject_withoutNull(&addr_lenr);
     TensorWrapper R((char*)addrr,addr_lenr);
-
 
     for (int i = 0; i < P.numRows(); i += 1) {
       for (int j = 0; j < Q.numCols(); j += 1) {
@@ -405,14 +433,11 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValu
       return getNullValue(VALUE_TYPE_VARBINARY);
     }
 
-    int32_t rlen = P.numRows()*Q.numCols();
-    //double *r = new double[rlen];
-    double *r = nullptr;
+    int32_t addr_lenr = addr_lenp;
+    double *addrr = nullptr;
 
-    NValue tensor3 = ValueFactory::getTempBinaryValue((const char *)r, rlen);
+    ValueFactory::getTempBinaryValue((const char *)addrr, addr_lenr);
 
-    int32_t addr_lenr;
-    double *addrr = (double *)tensor3.getObject_withoutNull(&addr_lenr);
     TensorWrapper R((char*)addrr,addr_lenr);
 
 
@@ -458,14 +483,11 @@ template<> inline NValue NValue::call<FUNC_T_SCALAR_MUL>(const std::vector<NValu
     TensorWrapper P((char*)addrp,addr_lenp);
 
     // dimension same as P
-    int32_t rlen = P.numRows()*P.numCols();
+    int32_t addr_lenr = addr_lenp;
+    double *addrr = nullptr;
 
-    double *r = nullptr;
+    ValueFactory::getTempBinaryValue((const char *)addrr, addr_lenr);
 
-    NValue tensor2 = ValueFactory::getTempBinaryValue((const char *)r, rlen);
-
-    int32_t addr_lenr;
-    double *addrr = (double *)tensor2.getObject_withoutNull(&addr_lenr);
     TensorWrapper R((char*)addrr,addr_lenr);
 
 
