@@ -393,6 +393,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         Topend* getTopend() { return m_topend; }
 
+        bool isLowestSite() { return m_isLowestSite; }
+
         /**
          * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
@@ -493,7 +495,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void initMaterializedViewsAndLimitDeletePlans(bool updateReplicated);
 
         template<class TABLE> void initMaterializedViews(catalog::Table* catalogTable,
-                                                                  TABLE* table);
+                                                         TABLE* table);
 
         bool updateCatalogDatabaseReference();
 
@@ -532,6 +534,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         voltdb::UndoQuantum* m_currentUndoQuantum;
 
         int64_t m_siteId;
+
+        bool m_isLowestSite;
 
         int32_t m_partitionId;
 

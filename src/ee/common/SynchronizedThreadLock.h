@@ -34,8 +34,8 @@ namespace voltdb {
 
 extern pthread_mutex_t sharedEngineMutex;
 extern pthread_cond_t sharedEngineCondition;
-extern std::atomic<int32_t> globalTxnStartCountdownLatch;
-extern int32_t globalTxnEndCountdownLatch;
+extern pthread_cond_t wakeLowestEngineCondition;
+extern int32_t globalTxnStartCountdownLatch;
 extern int32_t SITES_PER_HOST;
 
 class SynchronizedThreadLock {
@@ -44,9 +44,8 @@ public:
     /**
      * Cross-site synchronization functions
      */
-    static bool countDownGlobalTxnStartCount();
-    static void signalLastSiteFinished();
-    static void waitForLastSiteFinished();
+    static bool countDownGlobalTxnStartCount(bool lowestSite);
+    static void signalLowestSiteFinished();
 };
 
 }

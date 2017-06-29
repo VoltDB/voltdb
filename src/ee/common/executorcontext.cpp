@@ -83,6 +83,7 @@ static void globalInitOrCreateOncePerProcess() {
     SITES_PER_HOST = 0;
     pthread_mutex_init(&sharedEngineMutex, NULL);
     pthread_cond_init(&sharedEngineCondition, 0);
+    pthread_cond_init(&wakeLowestEngineCondition, 0);
 }
 
 ExecutorContext::ExecutorContext(int64_t siteId,
@@ -140,7 +141,7 @@ ExecutorContext::~ExecutorContext() {
  */
 void ExecutorContext::switchToMpContext()
 {
-    VOLT_DEBUG("Switching context to partition %d on thread %p", mpEngineLocals.partitionId, pthread_self());
+    VOLT_DEBUG("Switching context to partition %d on thread %lu", mpEngineLocals.partitionId, pthread_self());
     savedEngineLocals = &enginesByPartitionId[getExecutorContext()->m_partitionId];
     pthread_setspecific(static_key, mpEngineLocals.context);
     ThreadLocalPool::assignThreadLocals(mpEngineLocals);
@@ -153,7 +154,7 @@ void ExecutorContext::switchToMpContext()
  */
 void ExecutorContext::restoreContext()
 {
-    VOLT_DEBUG("Restore context to partition %d on thread %p", savedEngineLocals.partitionId, pthread_self());
+    VOLT_DEBUG("Restore context to partition %d on thread %lu", savedEngineLocals->partitionId, pthread_self());
     pthread_setspecific(static_key, savedEngineLocals->context);
     ThreadLocalPool::assignThreadLocals(*savedEngineLocals);
     savedEngineLocals = NULL;
@@ -167,7 +168,7 @@ bool ExecutorContext::needContextRestore()
 void ExecutorContext::bindToThread()
 {
     pthread_setspecific(static_key, this);
-    VOLT_DEBUG("Installing EC(%ld) for partition %d", (long)this, m_partitionId);
+    VOLT_DEBUG("Installing EC(%p) for partition %d", this, m_partitionId);
 }
 
 ExecutorContext* ExecutorContext::getExecutorContext()
@@ -205,7 +206,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                         mpExecutor = executor;
                     }
                     VOLT_ERROR("PlanNodeType:%d", nextPlanNodeType);
-                    if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
+                    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
                         switchToMpContext();
                         // Call the execute method to actually perform whatever action
                         // it is that the node is supposed to do...
@@ -218,10 +219,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                         // Assign the correct pool back to this thread
                         restoreContext();
                         VOLT_ERROR("release all waited thread");
-                        SynchronizedThreadLock::signalLastSiteFinished();
-                    } else {
-                        VOLT_ERROR("wait for last site finished, then run next executor");
-                        SynchronizedThreadLock::waitForLastSiteFinished();
+                        SynchronizedThreadLock::signalLowestSiteFinished();
                     }
                 } else {
                     // Call the execute method to actually perform whatever action
@@ -246,7 +244,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
         if (needContextRestore()) {
             // Assign the correct pool back to this thread
             restoreContext();
-            SynchronizedThreadLock::signalLastSiteFinished();
+            SynchronizedThreadLock::signalLowestSiteFinished();
         }
 
         // Clean up any tempTables when the plan finishes abnormally.

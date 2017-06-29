@@ -48,7 +48,7 @@ public interface Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          boolean hasMPDRGateway)
+                          boolean isLowestSiteId)
         throws KeeperException, InterruptedException, ExecutionException;
 
     /** Create DR gateway */

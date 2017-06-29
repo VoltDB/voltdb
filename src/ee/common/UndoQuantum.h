@@ -47,8 +47,9 @@ protected:
     void operator delete(void*, Pool&) { /* emergency deallocator does nothing */ }
     void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
 
-    inline UndoQuantum(int64_t undoToken, Pool *dataPool)
-        : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0), m_interests(NULL), m_dataPool(dataPool) {}
+    inline UndoQuantum(int64_t undoToken, Pool *dataPool, bool forLowestSite)
+        : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0), m_interests(NULL),
+          m_forLowestSite(forLowestSite), m_dataPool(dataPool) {}
     inline virtual ~UndoQuantum() {}
 
 public:
@@ -92,11 +93,9 @@ protected:
              i != m_undoActions.rend(); ++i) {
             UndoAction* goner = *i;
             if (goner->isReplicatedTable()) {
-                if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
-                    SynchronizedThreadLock::signalLastSiteFinished();
+                if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_forLowestSite)) {
+                    SynchronizedThreadLock::signalLowestSiteFinished();
                     goner->undo();
-                } else {
-                    SynchronizedThreadLock::waitForLastSiteFinished();
                 }
             } else {
                 goner->undo();
@@ -164,6 +163,7 @@ private:
     uint32_t m_numInterests;
     uint32_t m_interestsCapacity;
     UndoQuantumReleaseInterest **m_interests;
+    const bool m_forLowestSite;
 protected:
     Pool *m_dataPool;
 };

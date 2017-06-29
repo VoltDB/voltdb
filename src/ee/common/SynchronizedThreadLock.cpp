@@ -24,8 +24,8 @@ namespace voltdb {
 // Initialized when executor context is created.
 pthread_mutex_t sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sharedEngineCondition;
-std::atomic<int32_t> globalTxnStartCountdownLatch(0);
-int32_t globalTxnEndCountdownLatch = 0;
+pthread_cond_t wakeLowestEngineCondition;
+int32_t globalTxnStartCountdownLatch = 0;
 int32_t SITES_PER_HOST = -1;
 
 void SynchronizedThreadLock::init(int32_t sitesPerHost)
@@ -36,40 +36,33 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost)
     }
 }
 
-bool SynchronizedThreadLock::countDownGlobalTxnStartCount()
+bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite)
 {
-    if (globalTxnStartCountdownLatch <= 0) {
-        StackTrace::printStackTrace();
-    }
     assert(globalTxnStartCountdownLatch > 0);
-    return --globalTxnStartCountdownLatch == 0;
+    if (lowestSite) {
+        pthread_mutex_lock(&sharedEngineMutex);
+        if (--globalTxnStartCountdownLatch != 0) {
+            pthread_cond_wait(&wakeLowestEngineCondition, &sharedEngineMutex);
+        }
+        pthread_mutex_unlock(&sharedEngineMutex);
+        return true;
+    }
+    else {
+        pthread_mutex_lock(&sharedEngineMutex);
+        if (--globalTxnStartCountdownLatch == 0) {
+            pthread_cond_broadcast(&wakeLowestEngineCondition);
+        }
+        pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
+        pthread_mutex_unlock(&sharedEngineMutex);
+        return false;
+    }
 }
 
-void SynchronizedThreadLock::signalLastSiteFinished()
+void SynchronizedThreadLock::signalLowestSiteFinished()
 {
     pthread_mutex_lock(&sharedEngineMutex);
-    globalTxnEndCountdownLatch++;
-    while (globalTxnEndCountdownLatch != SITES_PER_HOST) {
-        pthread_mutex_unlock(&sharedEngineMutex);
-#ifdef __linux__
-        pthread_yield();
-#else
-        sched_yield();
-#endif
-        pthread_mutex_lock(&sharedEngineMutex);
-    }
-    // We now know all other threads are waiting to be signaled
-    globalTxnEndCountdownLatch = 0;
     globalTxnStartCountdownLatch = SITES_PER_HOST;
     pthread_cond_broadcast(&sharedEngineCondition);
-    pthread_mutex_unlock(&sharedEngineMutex);
-}
-
-void SynchronizedThreadLock::waitForLastSiteFinished()
-{
-    pthread_mutex_lock(&sharedEngineMutex);
-    globalTxnEndCountdownLatch++;
-    pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
     pthread_mutex_unlock(&sharedEngineMutex);
 }
 }

@@ -150,6 +150,8 @@ class EnginePlanSet : public PlanSet { };
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
     : m_currentIndexInBatch(-1),
       m_currentUndoQuantum(NULL),
+      m_siteId(-1),
+      m_isLowestSite(false),
       m_partitionId(-1),
       m_hashinator(NULL),
       m_isActiveActiveDREnabled(false),
@@ -178,11 +180,12 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t drClusterId,
                          int32_t defaultDrBufferSize,
                          int64_t tempTableMemoryLimit,
-                         bool createDrReplicatedStream,
+                         bool isLowestSiteId,
                          int32_t compactionThreshold)
 {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
+    m_isLowestSite = isLowestSiteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
@@ -220,8 +223,9 @@ VoltDBEngine::initialize(int32_t clusterIndex,
 
     // configure DR stream
     m_drStream = new DRTupleStream(partitionId, defaultDrBufferSize);
-    if (createDrReplicatedStream) {
+    if (isLowestSiteId) {
         m_drReplicatedStream = new DRTupleStream(16383, defaultDrBufferSize);
+        m_undoLog.setUndoLogForLowestSite();
     }
 
     // set the DR version
@@ -246,7 +250,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
         enginesByPartitionId[partitionId] = EngineLocals(m_partitionId);
         VOLT_DEBUG("Initializing partition %d with context %p", m_partitionId, m_executorContext);
         SynchronizedThreadLock::init(sitesPerHost);
-        if (createDrReplicatedStream) {
+        if (isLowestSiteId) {
             // The site thread that has the lowest siteId gets to create DR replicated stream
             mpEngineLocals = EngineLocals(16383);
             VOLT_DEBUG("Initializing mp partition with context %p", mpEngineLocals.context);
@@ -702,7 +706,16 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
-    if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
+    VOLT_DEBUG("loading partitioned parts of catalog from partition %d", m_partitionId);
+
+    // load up all the tables, adding all tables
+    if (processCatalogAdditions(timestamp, false) == false) {
+        return false;
+    }
+
+    rebuildTableCollections(false);
+
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
         VOLT_DEBUG("loading replicated parts of catalog from partition %d", m_partitionId);
         ExecutorContext::switchToMpContext();
         VoltDBEngine* mpEngine = ExecutorContext::getEngine();
@@ -718,26 +731,15 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         // and limit delete statements.
         //
         // This must be done after loading all the tables.
+        VOLT_DEBUG("loading replicated views from partition %d", m_partitionId);
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
         // Assign the correct pool back to this thread
         ExecutorContext::restoreContext();
-        SynchronizedThreadLock::signalLastSiteFinished();
-    }
-    else {
-        // Unfortunately the site thread calls getStats() before all the tables are created so we need to
-        // block the site thread until the replicated tables have been applied in all partitions
-        SynchronizedThreadLock::waitForLastSiteFinished();
-    }
-    VOLT_DEBUG("loading partitioned parts of catalog from partition %d", m_partitionId);
-
-    // load up all the tables, adding all tables
-    if (processCatalogAdditions(timestamp, false) == false) {
-        return false;
+        SynchronizedThreadLock::signalLowestSiteFinished();
     }
 
-    rebuildTableCollections(false);
-
+    VOLT_DEBUG("loading partitioned views from partition %d", m_partitionId);
     // load up all the materialized views
     // and limit delete statements.
     //
@@ -1277,7 +1279,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
         return false;
     }
 
-    if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
         ExecutorContext::switchToMpContext();
         VoltDBEngine* mpEngine = ExecutorContext::getEngine();
@@ -1294,12 +1296,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
         ExecutorContext::restoreContext();
-        SynchronizedThreadLock::signalLastSiteFinished();
-    }
-    else {
-        // Unfortunately the site thread calls getStats() before all the tables are created so we need to
-        // block the site thread until the replicated tables have been applied in all partitions
-        SynchronizedThreadLock::waitForLastSiteFinished();
+        SynchronizedThreadLock::signalLowestSiteFinished();
     }
 
     processCatalogDeletes(timestamp, false);
@@ -1352,14 +1349,11 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
     try {
         if (table->isReplicatedTable()) {
-            if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
+            if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
                 ExecutorContext::switchToMpContext();
                 table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
                 ExecutorContext::restoreContext();
-                SynchronizedThreadLock::signalLastSiteFinished();
-            }
-            else {
-                SynchronizedThreadLock::waitForLastSiteFinished();
+                SynchronizedThreadLock::signalLowestSiteFinished();
             }
         }
         else {
@@ -1370,7 +1364,7 @@ VoltDBEngine::loadTable(int32_t tableId,
         if (ExecutorContext::needContextRestore()) {
             // Assign the correct pool back to this thread
             ExecutorContext::restoreContext();
-            SynchronizedThreadLock::signalLastSiteFinished();
+            SynchronizedThreadLock::signalLowestSiteFinished();
         }
         throwFatalException("%s", e.message().c_str());
     }
@@ -1465,7 +1459,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
         else {
             stats = tcd->getStreamedTable()->getTableStats();
         }
-        VOLT_ERROR("VoltDBEngine %p register stats source %p\n", this, stats);
+        VOLT_DEBUG("VoltDBEngine %p register stats source %p for table %s", this, stats, localTable->name().c_str());
         getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                               relativeIndexOfTable,
                                               stats);
@@ -1580,12 +1574,14 @@ static bool updateMaterializedViewDestTable(std::vector<MATVIEW*> & views,
 template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* catalogTable,
                                                                TABLE* table) {
     // walk views
+    VOLT_DEBUG("Processing views for table %s", table->name().c_str());
     BOOST_FOREACH (LabeledView labeledView, catalogTable->views()) {
         auto catalogView = labeledView.second;
         catalog::Table const* destCatalogTable = catalogView->dest();
         int32_t catalogIndex = destCatalogTable->relativeIndex();
         auto destTable = static_cast<PersistentTable*>(m_tables[catalogIndex]);
         assert(destTable);
+        VOLT_DEBUG("Updating view on table %s", destTable->name().c_str());
         assert(destTable == dynamic_cast<PersistentTable*>(m_tables[catalogIndex]));
         // Ensure that the materialized view controlling the existing
         // target table by the same name is using the latest version of
@@ -1598,6 +1594,7 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* c
             // This is a new view, a connection needs to be made using a new MaterializedViewTrigger..
             TABLE::MatViewType::build(table, destTable, catalogView);
         }
+        VOLT_DEBUG("Finished update for view on table %s", destTable->name().c_str());
     }
 
     catalog::MaterializedViewHandlerInfo *mvHandlerInfo = catalogTable->mvHandlerInfo().get("mvHandlerInfo");
@@ -1609,6 +1606,7 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table* c
         if ( ! destTable->materializedViewHandler() || destTable->materializedViewHandler()->isDirty() ) {
             // The newly-added handler will at the same time trigger
             // the uninstallation of the previous (if exists) handler.
+            VOLT_DEBUG("Creating view handler for table %s", destTable->name().c_str());
             auto handler = new MaterializedViewHandler(destTable, mvHandlerInfo, this);
             if (destTable->isPersistentTableEmpty()) {
                 handler->catchUpWithExistingData(false);

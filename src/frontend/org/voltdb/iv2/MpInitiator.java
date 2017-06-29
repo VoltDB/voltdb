@@ -74,7 +74,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          boolean hasMPDRGateway)
+                          boolean isLowestSiteId)
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything

@@ -1359,7 +1359,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             m_memoryStats,
                             m_commandLog,
                             m_config.m_executionCoreBindings.poll(),
-                            shouldInitiatorCreateMPDRGateway(iv2init));
+                            isLowestSiteId(iv2init));
                 }
 
                 // LeaderAppointer startup blocks if the initiators are not initialized.
@@ -3953,7 +3953,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 for (Initiator iv2init : m_iv2Initiators.values()) {
                     iv2init.initDRGateway(m_config.m_startAction,
                                           m_producerDRGateway,
-                                          shouldInitiatorCreateMPDRGateway(iv2init));
+                                          isLowestSiteId(iv2init));
                 }
 
                 m_producerDRGateway.truncateDRLog();
@@ -3986,7 +3986,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private boolean shouldInitiatorCreateMPDRGateway(Initiator initiator) {
+    private boolean isLowestSiteId(Initiator initiator) {
         // The initiator map is sorted, the initiator that has the lowest local
         // partition ID gets to create the MP DR gateway
         return initiator.getPartitionId() == m_iv2Initiators.firstKey();

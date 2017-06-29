@@ -687,7 +687,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream) {
+            final boolean isLowestSiteId) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -717,7 +717,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 defaultDrBufferSize,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
-                createDrReplicatedStream);
+                isLowestSiteId);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
