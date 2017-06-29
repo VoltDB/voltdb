@@ -582,18 +582,16 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_T_GET:
             ret = new GeneralFunctionExpression<FUNC_T_GET>(*arguments);
             break;
+            */
         case FUNC_T_TENSOR_MUL:
             ret = new GeneralFunctionExpression<FUNC_T_TENSOR_MUL>(*arguments);
             break;
         case FUNC_T_ADD:
-        */
             ret = new GeneralFunctionExpression<FUNC_T_ADD>(*arguments);
             break;
-            /*
         case FUNC_T_SCALAR_MUL:
             ret = new GeneralFunctionExpression<FUNC_T_SCALAR_MUL>(*arguments);
             break;
-            */
         default:
             return NULL;
         }

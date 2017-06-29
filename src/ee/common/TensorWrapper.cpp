@@ -61,6 +61,7 @@
     m_numRows = ip[1];
     m_numCols = ip[2];
     m_data = (double *)&(ip[3]);
+    m_transposed = false;
 
   }
 
