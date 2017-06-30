@@ -409,7 +409,7 @@
                     <div class="analysisBody">
                         <div class="analysisWrap">
                             <div class="setThreshold">
-                                <a href="#thresholdPopup" id="btnThreshold">Set Threshold</a>
+                                <a href="#thresholdPopup" id="btnThreshold">Alert Threshold</a>
                             </div>
                             <button id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</button>
                             <div class="clear"></div>
@@ -1422,19 +1422,41 @@
           <div class="overlay-title ">
            Threshold</span>
         </div>
-        <div class="clear"></div>
+
         <div class="overlay-content setThresholdPopContent">
-            <div class="partitioned">
-                <div class="leftPart">Usage Percent for Multi-Partitioned Procedure</div>
-                <div class="rightPart"><input type="text" id="partitionThreshold"></div>
+
+            <table width="100%" cellpadding="0" cellspacing="0" class="alertThresholdTbl">
+                <tr>
+                    <td>Combined usage for multi-partitioned procedure</td>
+                    <td><input type="text" id="partitionThreshold">%</td>
+                </tr>
+                <tr>
+                    <td>Frequency for procedure</td>
+                    <td><input type="text" value="" id="replicatedThreshold"></td>
+                </tr>
+                <tr>
+                    <td>Execution Time for procedure</td>
+                    <td><input type="text" value="" id="execTime">ms</td>
+                </tr>
+            </table>
+
+           <!-- <div class="partitioned">
+                <div class="leftPart">Combined usage for multi-partitioned procedure</div>
+                <div class="rightPart"><input type="text" id="partitionThreshold">%</div>
                 <div class="clear"></div>
             </div>
 
             <div class="replicated">
-                <div class="leftRep">Variance in Distribution for Partitioned Table </div>
-                <div class="rightRep"><input type="text" value="20" id="replicatedThreshold"></div>
+                <div class="leftRep">Frequency for procedure</div>
+                <div class="rightRep"><input type="text" value="" id="replicatedThreshold"></div>
                 <div class="clear"></div>
             </div>
+
+             <div class="replicated">
+                <div class="leftRep">Execution Time for procedure</div>
+                <div class="rightRep"><input type="text" value="" id="execTime">ms</div>
+                <div class="clear"></div>
+            </div>-->
         </div>
        <div class="overlay-btns">
            <a id="btnSaveThreshold" class="btn">Save</a>

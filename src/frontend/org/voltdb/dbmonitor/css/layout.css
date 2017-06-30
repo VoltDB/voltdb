@@ -3656,6 +3656,19 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 }
 generateProcedureDate { float:right;padding-right: 85px;}
 .procDetailTitle { padding-top:10px;}
+.alertThresholdTbl {
+    border: 1px solid #CCCCCC;
+}
+.alertThresholdTbl tr td {
+    border-bottom: 1px solid #CCCCCC;
+    padding: 8px 5px 10px 5px;
+    text-align: left;
+    border-right:none;
+}
+.alertThresholdTbl tr td {
+    padding-left: 10px;
+}
+.alertThresholdTbl tr td input[type="text"]{ width:40px; padding:0 0 0 2px; margin:0 3px 0 0}
 /********************analysis End *****************/
 /********************jquery us css override*****************/
 

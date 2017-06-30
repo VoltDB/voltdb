@@ -2418,6 +2418,7 @@ var loadPage = function (serverName, portid) {
             $("#btnSaveThreshold").unbind("click");
             $("#btnSaveThreshold").on("click", function () {
                 saveInLocalStorage("usagePercentage", $("#partitionThreshold").val())
+                $("#btnAnalyzeNow").trigger("click");
                 //Close the popup
                 popup.close();
             });
