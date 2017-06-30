@@ -3637,7 +3637,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 	margin:1px 2px -1px 0;
 }
 
-.proDetailsHeightAdjstment {height:400px; overflow-x:hidden; overflow-y:scroll;/* width:800px;*/}
+.proDetailsHeightAdjstment {height:400px; /*overflow-x:hidden; overflow-y:scroll;*/ width:750px;}
 .proDetailsBarDiagram { margin:0; padding:0;height:400px; width:850px;}
 .generateDate { background-color:#f0f0f0; padding: 5px 0;}
 .generateproDetails { float:right;padding-right: 85px; }
