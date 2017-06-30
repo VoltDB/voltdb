@@ -197,6 +197,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_T_TR                         = 21028;    // (T)
         static final int FUNC_VOLT_T_ADD                        = 21029;    // (T1, T2)
         static final int FUNC_VOLT_T_SCALAR_MUL                 = 21030;    // (S, T)
+        static final int FUNC_VOLT_T_SIGMOID                    = 21031;    // (S, Min, Max, Beta) all numeric.
 
         /*
          * All VoltDB user-defined functions must have IDs in this range.
@@ -417,7 +418,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     singleParamList),
 
             new FunctionId("t_tensor", Type.SQL_VARBINARY, FUNC_VOLT_T_TENSOR, -1,
-                           new Type[] { Type.SQL_INTEGER, Type.SQL_INTEGER, Type.SQL_VARBINARY },
+                           new Type[] { Type.SQL_INTEGER, Type.SQL_INTEGER },
                            new short[] { 
                         		   Tokens.OPENBRACKET,
                         		   Tokens.QUESTION,
@@ -464,10 +465,18 @@ public class FunctionForVoltDB extends FunctionSQL {
                            doubleParamList),
             new FunctionId("t_scalar_mul", Type.SQL_VARBINARY, FUNC_VOLT_T_SCALAR_MUL, -1,
                            new Type[] {
-                        		   Type.SQL_DOUBLE,
+                        		   Type.SQL_NUMERIC,
                         		   Type.SQL_VARBINARY,
                            },
                            doubleParamList),
+            new FunctionId("t_sigmoid", Type.SQL_DOUBLE, FUNC_VOLT_T_SIGMOID, -1,
+                           new Type[] {
+                        		   Type.SQL_NUMERIC, // t
+                        		   Type.SQL_NUMERIC, // min
+                        		   Type.SQL_NUMERIC, // max
+                        		   Type.SQL_NUMERIC  // beta
+                           },
+                           quadParamList),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<>();
@@ -859,19 +868,42 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             dataType = Type.SQL_VARBINARY;
             break;
+        case FunctionId.FUNC_VOLT_T_SIGMOID:
+        	for (int idx = 0; idx < 3; idx += 1) {
+        		if (nodes[idx] != null &&
+        				! nodes[idx].dataType.isNumberType()) {
+        			throw Error.error(ErrorCode.X_42561);
+        		}
+        	}
+        	dataType = Type.SQL_DOUBLE;
+        	break;
         case FunctionId.FUNC_VOLT_T_TENSOR:
-            if (nodes[0].dataType != null &&
-                !nodes[0].dataType.isIntegralType()) {
-                throw Error.error(ErrorCode.X_42561);
+        	// Be careful here.  If nodes[-].dataType is
+        	// null this is a ? parameter, and we don't
+        	// know the type from the SQL.  We have to
+        	// fill in the type here.  For the other
+        	// functions we handle this below.
+            if (nodes[0].dataType != null) {
+                if (!nodes[0].dataType.isIntegralType()) {
+                	throw Error.error(ErrorCode.X_42561);
+                }
+            } else {
+            	nodes[0].dataType = Type.SQL_INTEGER;
             }
-            if (nodes[1].dataType != null &&
-                !nodes[1].dataType.isIntegralType()) {
-                throw Error.error(ErrorCode.X_42561);
+            if (nodes[1].dataType != null) {
+                if ( ! nodes[1].dataType.isIntegralType()) {
+                	throw Error.error(ErrorCode.X_42561);
+                }
+            } else {
+            	nodes[1].dataType = Type.SQL_INTEGER;
             }
             for (int idx = 2; idx < nodes.length; idx += 1) {
-            	if (nodes[idx].dataType != null &&
-            			( ! nodes[idx].dataType.isNumberType())) {
-            		throw Error.error(ErrorCode.X_42561);
+            	if (nodes[idx].dataType != null) {
+            		if ( ! nodes[idx].dataType.isNumberType()) {
+            			throw Error.error(ErrorCode.X_42561);
+            		}
+            	} else {
+            		nodes[idx].dataType = Type.SQL_DOUBLE;
             	}
             }
             dataType = Type.SQL_VARBINARY;
@@ -884,7 +916,8 @@ public class FunctionForVoltDB extends FunctionSQL {
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
                 if (i >= paramTypes.length) {
-                 // TODO support type checking for variadic functions
+                	// TODO Support type checking for variadic functions
+                	//      See FUNC_T_TENSOR above.
                     break;
                 }
                 if (paramTypes[i] == null) {

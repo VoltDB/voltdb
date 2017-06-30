@@ -350,6 +350,15 @@ template<> inline NValue NValue::call<FUNC_T_GET>(const std::vector<NValue>& arg
     const NValue &tensor = arguments[0];
     const NValue &nrow = arguments[1];
     const NValue &ncol = arguments[2];
+    if (tensor.isNull() || nrow.isNull() || ncol.isNull()) {
+        return getNullValue(VALUE_TYPE_DOUBLE);
+    }
+    if (tensor.getValueType() != VALUE_TYPE_VARBINARY) {
+        throw SQLException(SQLException::dynamic_sql_error, "Expected a tensor as first parameter to T_GET");
+    }
+    if ( ! isNumeric(nrow.getValueType()) || ! isNumeric(ncol.getValueType())) {
+        throw SQLException(SQLException::dynamic_sql_error, "Bad type for row or column argument to T_GET");
+    }
     int32_t numRows = nrow.castAsIntegerAndGetValue();
     int32_t numCols = ncol.castAsIntegerAndGetValue();
 
@@ -507,17 +516,38 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValu
     return result;
 }
 
+template<> inline NValue NValue::call<FUNC_T_SIGMOID>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 4);
+    double args[4];
+    for (int idx = 0; idx < 4; idx += 1) {
+        const NValue &nv = arguments[idx];
+        if ( nv.isNull() ) {
+            return getNullValue(VALUE_TYPE_DOUBLE);
+        }
+        if ( ! isNumeric(nv.getValueType())) {
+            throw SQLException(SQLException::dynamic_sql_error, "Non-numeric type to argument of T_SIGMOID");
+        }
+        args[idx] = nv.castAsDoubleAndGetValue();
+    }
+    double answer = (args[2] - args[1])/(1.0 + exp(-args[3] * args[0])) + args[1];
+    return ValueFactory::getDoubleValue(answer);
+}
+
 /**
  * implement the sql FUNC_T_TENSOR_MUL function for all numeric values
  */
 template<> inline NValue NValue::call<FUNC_T_SCALAR_MUL>(const std::vector<NValue>& arguments) {
 
-      assert(arguments.size() == 2);
+    assert(arguments.size() == 2);
     const NValue& tensor = arguments[0];
     const NValue& scalar = arguments[1];
 
     const ValueType tensorType = tensor.getValueType();
     const ValueType scalarType = scalar.getValueType();
+
+    if (tensor.isNull() || scalar.isNull()) {
+        return getNullValue(VALUE_TYPE_VARBINARY);
+    }
 
     if (tensorType != VALUE_TYPE_VARBINARY) {
         throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function to T_SCALAR_MUL");
@@ -525,10 +555,6 @@ template<> inline NValue NValue::call<FUNC_T_SCALAR_MUL>(const std::vector<NValu
 
     if ( ! isNumeric(scalarType)) {
         throw SQLException(SQLException::dynamic_sql_error, "Second argument to T_SCALAR_MUL should be numeric");
-    }
-
-    if (tensor.isNull() || scalar.isNull()) {
-        return getNullValue(VALUE_TYPE_VARBINARY);
     }
 
     double base = scalar.castAsDoubleAndGetValue();

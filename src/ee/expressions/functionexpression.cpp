@@ -587,6 +587,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_T_SCALAR_MUL:
             ret = new GeneralFunctionExpression<FUNC_T_SCALAR_MUL>(*arguments);
             break;
+        case FUNC_T_SIGMOID:
+            ret = new GeneralFunctionExpression<FUNC_T_SIGMOID>(*arguments);
+            break;
         case FUNC_T_TENSOR:
             ret = new GeneralFunctionExpression<FUNC_T_TENSOR>(*arguments);
             break;
