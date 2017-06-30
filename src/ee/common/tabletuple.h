@@ -418,7 +418,7 @@ public:
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput& output, bool includeHiddenColumns = false) const;
     void serializeToExport(voltdb::ExportSerializeOutput &io,
-                          int colOffset, uint8_t *nullArray, const bool encodeType = false) const;
+                          int colOffset, uint8_t *nullArray) const;
     void serializeToDR(voltdb::ExportSerializeOutput &io,
                        int colOffset, uint8_t *nullArray);
 
@@ -485,7 +485,7 @@ private:
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
     }
 
-    inline void serializeColumnToExport(ExportSerializeOutput &io, int offset, const NValue &value, uint8_t *nullArray, const bool encodeType) const {
+    inline void serializeColumnToExport(ExportSerializeOutput &io, int offset, const NValue &value, uint8_t *nullArray) const {
         // NULL doesn't produce any bytes for the NValue
         // Handle it here to consolidate manipulation of
         // the null array.
@@ -496,7 +496,7 @@ private:
             int mask = 0x80 >> bit;
             nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
         } else {
-            value.serializeToExport_withoutNull(io, encodeType);
+            value.serializeToExport_withoutNull(io);
         }
     }
 
@@ -974,11 +974,11 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includ
 }
 
 inline void TableTuple::serializeToExport(ExportSerializeOutput &io,
-                              int colOffset, uint8_t *nullArray, bool encodeType) const
+                              int colOffset, uint8_t *nullArray) const
 {
     int columnCount = sizeInValues();
     for (int i = 0; i < columnCount; i++) {
-        serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray, encodeType);
+        serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
     }
 }
 
