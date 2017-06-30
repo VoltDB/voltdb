@@ -193,9 +193,12 @@ public interface NodeSettings extends Settings {
                 throw new SettingsException("Missing VoltDB root " +
                                             "information in path.properties file.");
             }
+            // Voltdbroot path is always absolute
             File voltdbroot = getVoltDBRoot().getCanonicalFile();
             mb.put(VOLTDBROOT_PATH_KEY, voltdbroot.getCanonicalPath());
             for (Map.Entry<String, File> e: getManagedArtifactPaths().entrySet()) {
+                // For other paths (command log, command log snap shot etc.), we will translate their values
+                // to be relative to the voltdbroot if they are not absolute.
                 File path = e.getValue();
                 if (path.isAbsolute()) {
                     mb.put(e.getKey(), path.getCanonicalPath());
