@@ -474,7 +474,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.getVoltDBRoot() +
                     " Reason: " +
                     e.getMessage());
@@ -490,7 +490,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getCommandLog()) +
                     " Reason: " +
                     e.getMessage());
@@ -506,7 +506,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()) +
                     " Reason: " +
                     e.getMessage());
@@ -522,7 +522,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()) +
                     " Reason: " +
                     e.getMessage());
@@ -538,7 +538,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()) +
                     " Reason: " +
                     e.getMessage());
@@ -554,7 +554,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getDROverflow()) +
                     " Reason: " +
                     e.getMessage());
@@ -567,7 +567,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.getVoltDBRoot() +
                     " Reason: " +
                     e.getMessage());
@@ -580,7 +580,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getCommandLog()) +
                     " Reason: " +
                     e.getMessage());
@@ -593,7 +593,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()) +
                     " Reason: " +
                     e.getMessage());
@@ -606,7 +606,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()) +
                     " Reason: " +
                     e.getMessage());
@@ -619,7 +619,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()) +
                     " Reason: " +
                     e.getMessage());
@@ -632,7 +632,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " + 
+                    "failed to canonicalize voltdbroot: " +
                     m_nodeSettings.resolve(m_nodeSettings.getDROverflow()) +
                     " Reason: " +
                     e.getMessage());

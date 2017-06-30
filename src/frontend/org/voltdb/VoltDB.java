@@ -840,7 +840,7 @@ public class VoltDB {
                     .build();
             } catch (IOException e) {
                 throw new SettingsException(
-                        "failed to relativize voltdbroot " + 
+                        "failed to relativize voltdbroot " +
                         m_voltdbRoot.getPath() +
                         " Reason: " +
                         e.getMessage());
