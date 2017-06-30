@@ -366,12 +366,18 @@ template<> inline NValue NValue::call<FUNC_T_GET>(const std::vector<NValue>& arg
 template<> inline NValue NValue::call<FUNC_T_TENSOR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() > 1);
     const NValue &rowvalue = arguments[0];
+    if (rowvalue.isNull()) {
+        return getNullValue(VALUE_TYPE_VARBINARY);
+    }
     if (!(isNumeric(rowvalue.getValueType()))) {
         throw SQLException(SQLException::dynamic_sql_error, "Bad row count in T_TENSOR");
     }
     int32_t row = rowvalue.castAsIntegerAndGetValue();
 
     const NValue &colvalue = arguments[1];
+    if (colvalue.isNull()) {
+        return getNullValue(VALUE_TYPE_VARBINARY);
+    }
     if (!(isNumeric(colvalue.getValueType()))) {
         throw SQLException(SQLException::dynamic_sql_error, "Bad column count in T_TENSOR");
     }
@@ -388,14 +394,13 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR>(const std::vector<NValue>& 
     for (int i = 0; i < row; i += 1) {
         for (int j = 0; j < col; j += 1) {
             const NValue &value = arguments[k++];
-            NValue ele = value.getValueType();
-            if(ele.isNull()) {
-                throw SQLException(SQLException::dynamic_sql_error, "Null value in Matrix");
+            if(value.isNull()) {
+                return(getNullValue(VALUE_TYPE_VARBINARY));
             }
-            R.set(i, j, ele.castAsDoubleAndGetValue());
+            double val = value.castAsDoubleAndGetValue();
+            R.set(i, j, val);
         }
     }
-    std::cerr << "Tensor R: " << R.debug() << "\n";
     return result;
 }
 

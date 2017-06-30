@@ -53,14 +53,18 @@
   }
 
   std::string TensorWrapper::debug() {
-      std::ostringstream ostr();
+      std::ostringstream ostr;
       ostr << "[";
+      std::string rsep = "";
       for (int ridx = 0; ridx < m_numRows; ridx += 1) {
-          ostr << "[";
+          ostr << rsep << "[";
+          std::string csep = "";
           for (int cidx = 0; cidx < m_numCols; cidx += 1) {
-              ostr << m_data[ridx*m_numRows + cidx] << ",";
+              ostr << csep << "(" << ridx << ", " << cidx << ") = " << m_data[ridx*m_numRows + cidx];
+              csep = ", ";
           }
-          ostr << "],";
+          ostr << "]";
+          rsep = ", ";
       }
       ostr << "]";
       return ostr.str();
