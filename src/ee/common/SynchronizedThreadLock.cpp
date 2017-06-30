@@ -16,63 +16,114 @@
  */
 
 #include "SynchronizedThreadLock.h"
-
+#include "common/executorcontext.hpp"
+#include "storage/DummyPersistentTableUndoAction.h"
+#include "common/UndoQuantum.h"
 #include "common/debuglog.h"
 
 namespace voltdb {
 
 // Initialized when executor context is created.
-pthread_mutex_t sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t sharedEngineCondition;
-pthread_cond_t wakeLowestEngineCondition;
-int32_t globalTxnStartCountdownLatch = 0;
-int32_t SITES_PER_HOST = -1;
+pthread_mutex_t SynchronizedThreadLock::s_sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t SynchronizedThreadLock::s_sharedEngineCondition;
+pthread_cond_t SynchronizedThreadLock::s_wakeLowestEngineCondition;
+int32_t SynchronizedThreadLock::s_globalTxnStartCountdownLatch = 0;
+int32_t SynchronizedThreadLock::s_SITES_PER_HOST = -1;
 bool SynchronizedThreadLock::s_inMpContext = false;
+SharedEngineLocalsType SynchronizedThreadLock::s_enginesByPartitionId;
 
-void SynchronizedThreadLock::init(int32_t sitesPerHost)
-{
-    if (SITES_PER_HOST == 0) {
-        SITES_PER_HOST = sitesPerHost;
-        globalTxnStartCountdownLatch = SITES_PER_HOST;
-    }
+void SynchronizedThreadLock::create() {
+    assert(s_SITES_PER_HOST == -1);
+    s_SITES_PER_HOST = 0;
+    pthread_mutex_init(&s_sharedEngineMutex, NULL);
+    pthread_cond_init(&s_sharedEngineCondition, 0);
+    pthread_cond_init(&s_wakeLowestEngineCondition, 0);
 }
 
-bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite)
-{
-    assert(globalTxnStartCountdownLatch > 0);
+void SynchronizedThreadLock::destroy() {
+    pthread_cond_destroy(&s_sharedEngineCondition);
+    pthread_cond_destroy(&s_wakeLowestEngineCondition);
+    pthread_mutex_destroy(&s_sharedEngineMutex);
+}
+
+void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineLocals) {
+    if (s_SITES_PER_HOST == 0) {
+        s_SITES_PER_HOST = sitesPerHost;
+        s_globalTxnStartCountdownLatch = s_SITES_PER_HOST;
+    }
+    s_enginesByPartitionId[newEngineLocals.partitionId] = newEngineLocals;
+}
+
+bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
+    assert(s_globalTxnStartCountdownLatch > 0);
     if (lowestSite) {
-        pthread_mutex_lock(&sharedEngineMutex);
-        if (--globalTxnStartCountdownLatch != 0) {
-            pthread_cond_wait(&wakeLowestEngineCondition, &sharedEngineMutex);
+        pthread_mutex_lock(&s_sharedEngineMutex);
+        if (--s_globalTxnStartCountdownLatch != 0) {
+            pthread_cond_wait(&s_wakeLowestEngineCondition, &s_sharedEngineMutex);
         }
-        pthread_mutex_unlock(&sharedEngineMutex);
+        pthread_mutex_unlock(&s_sharedEngineMutex);
         VOLT_DEBUG("Switching context to MP partition on thread %lu", pthread_self());
         s_inMpContext = true;
         return true;
     }
     else {
-        pthread_mutex_lock(&sharedEngineMutex);
-        if (--globalTxnStartCountdownLatch == 0) {
-            pthread_cond_broadcast(&wakeLowestEngineCondition);
+        VOLT_DEBUG("Waiting for MP partition work to complete on thread %lu", pthread_self());
+        pthread_mutex_lock(&s_sharedEngineMutex);
+        if (--s_globalTxnStartCountdownLatch == 0) {
+            pthread_cond_broadcast(&s_wakeLowestEngineCondition);
         }
-        pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
-        pthread_mutex_unlock(&sharedEngineMutex);
+        pthread_cond_wait(&s_sharedEngineCondition, &s_sharedEngineMutex);
+        pthread_mutex_unlock(&s_sharedEngineMutex);
+        assert(!s_inMpContext);
+        VOLT_DEBUG("Other SP partition thread released on thread %lu", pthread_self());
         return false;
     }
 }
 
-void SynchronizedThreadLock::signalLowestSiteFinished()
-{
-    pthread_mutex_lock(&sharedEngineMutex);
-    globalTxnStartCountdownLatch = SITES_PER_HOST;
+void SynchronizedThreadLock::signalLowestSiteFinished() {
+    pthread_mutex_lock(&s_sharedEngineMutex);
+    s_globalTxnStartCountdownLatch = s_SITES_PER_HOST;
     VOLT_DEBUG("Restore context to lowest SP partition on thread %lu", pthread_self());
     s_inMpContext = false;
-    pthread_cond_broadcast(&sharedEngineCondition);
-    pthread_mutex_unlock(&sharedEngineMutex);
+    pthread_cond_broadcast(&s_sharedEngineCondition);
+    pthread_mutex_unlock(&s_sharedEngineMutex);
 }
 
-bool SynchronizedThreadLock::isInRepTableContext()
-{
+void SynchronizedThreadLock::lockReplicatedResource() {
+    pthread_mutex_lock(&s_sharedEngineMutex);
+    VOLT_DEBUG("Grabbing replicated resource lock on thread %lu", pthread_self());
+    assert(!s_inMpContext);
+}
+
+
+void SynchronizedThreadLock::addUndoAction(bool replicated, UndoQuantum *uq, UndoAction* action,
+        UndoQuantumReleaseInterest *interest) {
+    if (replicated) {
+        // For shared replicated table, in the same host site with lowest id
+        // will create the actual undo action, other sites register a dummy
+        // undo action as placeholder
+        BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, s_enginesByPartitionId) {
+            UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+            VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
+            if (uq == currUQ) {
+                // do the actual work
+                uq->registerUndoAction(action, interest);
+            } else {
+                // put a placeholder
+                currUQ->registerUndoAction(new (*currUQ) DummyPersistentTableUndoAction());
+            }
+        }
+    } else {
+        uq->registerUndoAction(action);
+    }
+}
+
+void SynchronizedThreadLock::unlockReplicatedResource() {
+    VOLT_DEBUG("Releasing replicated resource lock on thread %lu", pthread_self());
+    pthread_mutex_unlock(&s_sharedEngineMutex);
+}
+
+bool SynchronizedThreadLock::isInRepTableContext() {
     return s_inMpContext;
 }
 

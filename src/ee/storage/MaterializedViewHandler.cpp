@@ -90,12 +90,20 @@ namespace voltdb {
         delete m_destTable->m_mvHandler;
         // The handler will not only be installed on the view table, but also the source tables.
         m_destTable->m_mvHandler = this;
+        bool viewHandlerPartitioned = !m_destTable->isCatalogTableReplicated();
         BOOST_FOREACH (LabeledTableRef labeledTableRef, mvHandlerInfo->sourceTables()) {
             catalog::TableRef *sourceTableRef = labeledTableRef.second;
             TableCatalogDelegate *sourceTcd =  engine->getTableDelegate(sourceTableRef->table()->name());
             PersistentTable *sourceTable = sourceTcd->getPersistentTable();
             assert(sourceTable);
-            addSourceTable(sourceTable);
+            if (viewHandlerPartitioned && sourceTable->isCatalogTableReplicated()) {
+                SynchronizedThreadLock::lockReplicatedResource();
+                addSourceTable(sourceTable);
+                SynchronizedThreadLock::unlockReplicatedResource();
+            }
+            else {
+                addSourceTable(sourceTable);
+            }
         }
     }
 

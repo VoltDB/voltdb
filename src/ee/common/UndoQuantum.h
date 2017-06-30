@@ -126,7 +126,16 @@ protected:
         for (std::vector<UndoAction*>::iterator i = m_undoActions.begin();
              i != m_undoActions.end(); ++i) {
             UndoAction* goner = *i;
-            goner->release();
+            if (goner->isReplicatedTable() && !SynchronizedThreadLock::isInRepTableContext()) {
+                if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_forLowestSite)) {
+                    // only lowest site can reach here, and it has the real undo action for rep tables,
+                    goner->release();
+                    SynchronizedThreadLock::signalLowestSiteFinished();
+                }
+            }
+            else {
+                goner->release();
+            }
             delete goner;
         }
         if (m_interests != NULL) {

@@ -245,17 +245,17 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             drClusterId);
 
     // Add the engine to the global list tracking replicated tables
-    pthread_mutex_lock(&sharedEngineMutex);
+    SynchronizedThreadLock::lockReplicatedResource();
     if (partitionId != 16383) {
-        enginesByPartitionId[partitionId] = EngineLocals(m_partitionId);
         VOLT_DEBUG("Initializing partition %d with context %p", m_partitionId, m_executorContext);
-        SynchronizedThreadLock::init(sitesPerHost);
+        EngineLocals newLocals = EngineLocals(m_partitionId);
+        SynchronizedThreadLock::init(sitesPerHost, newLocals);
         if (isLowestSiteId) {
             // The site thread that has the lowest siteId gets to create DR replicated stream
             VOLT_DEBUG("Initializing mp partition with context %p", EngineLocals(16383).context);
         }
     }
-    pthread_mutex_unlock(&sharedEngineMutex);
+    SynchronizedThreadLock::unlockReplicatedResource();
 }
 
 VoltDBEngine::~VoltDBEngine() {
@@ -285,7 +285,7 @@ VoltDBEngine::~VoltDBEngine() {
 
     if (m_partitionId != 16383) {
         // This lock is strictly defensive because sites are normally shutdown serially with a Join in between
-        pthread_mutex_lock(&sharedEngineMutex);
+        SynchronizedThreadLock::lockReplicatedResource();
         for (auto tcdIter = m_catalogDelegates.cbegin(); tcdIter != m_catalogDelegates.cend(); ) {
             auto table = tcdIter->second->getPersistentTable();
             if (!table || !table->isReplicatedTable()) {
@@ -296,7 +296,7 @@ VoltDBEngine::~VoltDBEngine() {
             }
             else {
                 assert(m_drReplicatedStream);
-                BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                     if (enginePair.first == m_partitionId) {
                         continue;
                     }
@@ -323,12 +323,12 @@ VoltDBEngine::~VoltDBEngine() {
         delete m_drReplicatedStream;
         delete m_drStream;
 
-        enginesByPartitionId.erase(m_partitionId);
-        bool allEnginesDestroyed = enginesByPartitionId.empty();
-        pthread_mutex_unlock(&sharedEngineMutex);
+        SynchronizedThreadLock::s_enginesByPartitionId.erase(m_partitionId);
+        bool allEnginesDestroyed = SynchronizedThreadLock::s_enginesByPartitionId.empty();
+        SynchronizedThreadLock::unlockReplicatedResource();
 
         if (allEnginesDestroyed) {
-            pthread_mutex_destroy(&sharedEngineMutex);
+            SynchronizedThreadLock::destroy();
         }
     }
     else {
@@ -822,7 +822,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
             PersistentTable * persistenttable = dynamic_cast<PersistentTable*>(table);
             if (persistenttable && persistenttable->isCatalogTableReplicated()) {
                 isReplicatedTable = true;
-                BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                    VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                    currEngine->m_delegatesByName.erase(table->name());
                }
@@ -838,7 +838,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
             delete tcd;
         }
         if (isReplicatedTable) {
-            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                currEngine->m_catalogDelegates.erase(path);
            }
@@ -929,7 +929,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
                     tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
                     const std::string& tableName = tcd->getTable()->name();
                     VOLT_TRACE("add a REPLICATED completely new table or rebuild an empty table %s", tableName.c_str());
-                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                         VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                         currEngine->m_catalogDelegates[catalogTable->path()] = tcd;
                         currEngine->m_delegatesByName[tableName] = tcd;
@@ -1401,7 +1401,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
         const std::string& tableName = tcd->getTable()->name();
         if (catTable->isreplicated()) {
             if (updateReplicated) {
-                BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                     VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                     currEngine->m_tables[relativeIndexOfTable] = localTable;
                     currEngine->m_tablesByName[tableName] = localTable;
@@ -1422,7 +1422,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
                 int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
                 if (catTable->isreplicated()) {
                     if (updateReplicated) {
-                        BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                        BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                             VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                             currEngine->m_tablesBySignatureHash[hash] = persistentTable;
                         }
@@ -1437,7 +1437,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated) {
             std::vector<TableIndex*> const& tindexes = persistentTable->allIndexes();
             if (catTable->isreplicated()) {
                 if (updateReplicated) {
-                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                         VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                         BOOST_FOREACH (auto index, tindexes) {
                             currEngine->getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
@@ -1642,7 +1642,8 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
         if (updateReplicated == catalogTable->isreplicated()) {
             typedef std::pair<CatalogId, Table*> CatToTable;
             BOOST_FOREACH (CatToTable tablePair, m_tables) {
-                VOLT_ERROR("updateReplicated=%d Partition %d loaded table %d at address %p thread %p\n", updateReplicated, m_partitionId, tablePair.first, tablePair.second, pthread_self());
+                VOLT_ERROR("updateReplicated=%d Partition %d loaded table %d at address %p thread  %lu",
+                        updateReplicated, m_partitionId, tablePair.first, tablePair.second, pthread_self());
             }
         }
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);

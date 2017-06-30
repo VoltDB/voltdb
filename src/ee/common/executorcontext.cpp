@@ -39,8 +39,6 @@ using namespace std;
 
 namespace voltdb {
 
-SharedEngineLocalsType enginesByPartitionId;
-
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 
@@ -76,12 +74,7 @@ static void globalInitOrCreateOncePerProcess() {
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 
     (void)pthread_key_create(&static_key, NULL);
-
-    assert(SITES_PER_HOST == -1);
-    SITES_PER_HOST = 0;
-    pthread_mutex_init(&sharedEngineMutex, NULL);
-    pthread_cond_init(&sharedEngineCondition, 0);
-    pthread_cond_init(&wakeLowestEngineCondition, 0);
+    SynchronizedThreadLock::create();
 }
 
 ExecutorContext::ExecutorContext(int64_t siteId,
@@ -174,7 +167,6 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                         }
                         ++ctr;
                         // Assign the correct pool back to this thread
-                        VOLT_ERROR("release all waited thread");
                         SynchronizedThreadLock::signalLowestSiteFinished();
                     }
                 } else {

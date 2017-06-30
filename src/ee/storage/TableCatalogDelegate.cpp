@@ -388,6 +388,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
         tableAllocationTargetSize = 1024 * 64;
       }
     }
+    VOLT_DEBUG("Creating %s %s as %s", m_materialized?"VIEW":"TABLE", tableName.c_str(), isReplicated?"REPLICATED":"PARTITIONED");
     Table* table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, m_signatureHash,
                                                     m_materialized,

@@ -440,9 +440,6 @@ struct EngineLocals : public PoolLocals {
     int32_t partitionId;
     ExecutorContext* context;
 };
-typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
-
-extern SharedEngineLocalsType enginesByPartitionId;
 }
 
 #endif

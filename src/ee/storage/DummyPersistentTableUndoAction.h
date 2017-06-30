@@ -26,9 +26,7 @@ namespace voltdb {
 
 class DummyPersistentTableUndoAction: public voltdb::UndoAction {
 public:
-    inline DummyPersistentTableUndoAction(voltdb::PersistentTableSurgeon *tableSurgeon)
-        : m_tableSurgeon(tableSurgeon)
-    { }
+    inline DummyPersistentTableUndoAction() { }
 
     virtual ~DummyPersistentTableUndoAction() { }
 
@@ -47,10 +45,7 @@ public:
     /*
      * Indicates this undo action needs to be coordinated across sites in the same host
      */
-    virtual bool isReplicatedTable() { return m_tableSurgeon->getTable().isCatalogTableReplicated(); }
-
-private:
-    PersistentTableSurgeon *m_tableSurgeon;
+    virtual bool isReplicatedTable() { return true; }
 };
 
 }

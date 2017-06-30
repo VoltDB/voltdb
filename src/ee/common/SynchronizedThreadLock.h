@@ -31,25 +31,39 @@
 #include <atomic>
 
 namespace voltdb {
-
-extern pthread_mutex_t sharedEngineMutex;
-extern pthread_cond_t sharedEngineCondition;
-extern pthread_cond_t wakeLowestEngineCondition;
-extern int32_t globalTxnStartCountdownLatch;
-extern int32_t SITES_PER_HOST;
+struct EngineLocals;
+class UndoQuantum;
+class UndoAction;
+class UndoQuantumReleaseInterest;
+typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 
 class SynchronizedThreadLock {
 public:
-    static void init(int32_t sitesPerHost);
+    static void create();
+    static void destroy();
+    static void init(int32_t sitesPerHost, EngineLocals& newEngineLocals);
     /**
      * Cross-site synchronization functions
      */
     static bool countDownGlobalTxnStartCount(bool lowestSite);
     static void signalLowestSiteFinished();
 
+    static void lockReplicatedResource();
+    static void unlockReplicatedResource();
+
+    static void addUndoAction(bool replicated, UndoQuantum *uq, UndoAction* action,
+            UndoQuantumReleaseInterest *interest = NULL);
+
     static bool isInRepTableContext();
 private:
     static bool s_inMpContext;
+    static pthread_mutex_t s_sharedEngineMutex;
+    static pthread_cond_t s_sharedEngineCondition;
+    static pthread_cond_t s_wakeLowestEngineCondition;
+    static int32_t s_globalTxnStartCountdownLatch;
+    static int32_t s_SITES_PER_HOST;
+public:
+    static SharedEngineLocalsType s_enginesByPartitionId;
 };
 
 }
