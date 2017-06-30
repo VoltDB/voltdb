@@ -26,7 +26,6 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
@@ -47,11 +46,7 @@ public class AdHoc extends AdHocNTBase {
                     "Adhoc system procedure requires at least the query parameter.");
         }
 
-        Object[] paramWithIP = params.toArray();
-
-        Object[] paramArray = (Object[]) paramWithIP[0];
-        String userIP = (String) paramWithIP[1];
-
+        Object[] paramArray = params.toArray();
         String sql = (String) paramArray[0];
         Object[] userParams = null;
         if (params.size() > 1) {
@@ -179,10 +174,7 @@ public class AdHoc extends AdHocNTBase {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
         }
 
-        if (userIP.length() > 0) {
-            String warnMsg = "A user from " + userIP + " issued a @AdHoc to update the catalog.";
-            CoreUtils.printMsgLimited(warnMsg);
-        }
+        printCatalogUpdateLog(invocationName);
 
         // initiate the transaction.
         return callProcedure("@UpdateCore",

@@ -83,6 +83,8 @@ public class UpdateClasses extends UpdateApplicationBase {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
         }
 
+        printCatalogUpdateLog("@UpdateClasses");
+
         // initiate the transaction.
         return callProcedure("@UpdateCore",
                              ccr.encodedDiffCommands,

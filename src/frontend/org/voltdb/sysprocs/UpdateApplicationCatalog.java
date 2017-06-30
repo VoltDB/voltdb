@@ -98,6 +98,8 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
             noteRestoreCompleted();
         }
 
+        printCatalogUpdateLog("@UpdateApplicationCatalog");
+
         // initiate the transaction.
         return callProcedure("@UpdateCore",
                              ccr.encodedDiffCommands,

@@ -82,8 +82,9 @@ def getGitInfo():
         gitRemoteVersion = gitRemoteVersion.strip()
         if gitRemoteVersion != gitLocalVersion[:len(gitRemoteVersion)]:
             local = "-local"
-            
-    return "%s%s" % (gitLocalVersion, local)
+    
+    return "fake-string"        
+    # return "%s%s" % (gitLocalVersion, local)
 
 
 if __name__ == "__main__":

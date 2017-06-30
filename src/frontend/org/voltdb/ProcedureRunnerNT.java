@@ -542,4 +542,12 @@ public class ProcedureRunnerNT {
     protected void noteRestoreCompleted() {
         m_ntProcService.isRestoring = false;
     }
+
+    protected String getConnectionIPAndPort() {
+        return m_ccxn.getHostnameAndIPAndPort();
+    }
+
+    protected boolean isUserAuthEnabled() {
+        return m_user.isAuthEnabled();
+    }
 }

@@ -356,15 +356,6 @@ public final class InvocationDispatcher {
         // note that we also need to check for java for now as transactional flag is
         // only 100% when we're talking Java
         if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
-            // @UpdateCore related NT procs are logged (@UAC, @AdHoc, etc.)
-            if (user.isAuthEnabled()) {
-                // @AdHoc must be considered separately, could it may not modify the catalog
-                if ("@UpdateClasses".equals(procName) || "@UpdateApplicationCatalog".equals(procName)
-                    || "@Quiesce".equals(procName)) {
-                    CoreUtils.printMsgLimited("Catalog update warning: User " + user.m_name + " from " +
-                                       clientInfo + " issued a " + procName + task.toString());
-                }
-            }
             return dispatchNTProcedure(handler, task, user, ccxn, nowNanos, ntPriority);
         }
 

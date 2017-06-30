@@ -411,13 +411,7 @@ public class NTProcedureService {
             @Override
             public void run() {
                 try {
-                    // Insert the user ip info
-                    if ("@AdHoc".equals(procName)) {
-                        ParameterSet params = task.getParams();
-                        runner.call(params.toArray(), user.isAuthEnabled() ? user.m_hostIP : "");
-                    } else {
                         runner.call(task.getParams().toArray());
-                    }
                 }
                 catch (Throwable ex) {
                     ex.printStackTrace();
