@@ -2407,17 +2407,20 @@ var loadPage = function (serverName, portid) {
 
     $("#btnThreshold").popup({
         open: function (event, ui, ele) {
-            debugger;
               if(VoltDbUI.getFromLocalStorage("usagePercentage") == undefined){
                     saveInLocalStorage("usagePercentage", 20)
                 }
+
             $("#partitionThreshold").val(VoltDbUI.getFromLocalStorage("usagePercentage"))
+            $("#replicatedThreshold").val(VoltDbUI.getFromLocalStorage("frequencyForProc"))
         },
        afterOpen: function () {
             var popup = $(this)[0];
             $("#btnSaveThreshold").unbind("click");
             $("#btnSaveThreshold").on("click", function () {
                 saveInLocalStorage("usagePercentage", $("#partitionThreshold").val())
+                saveInLocalStorage("frequencyForProc", $("#replicatedThreshold").val())
+                saveInLocalStorage("execTimeForProc", $("#execTime").val())
                 $("#btnAnalyzeNow").trigger("click");
                 //Close the popup
                 popup.close();

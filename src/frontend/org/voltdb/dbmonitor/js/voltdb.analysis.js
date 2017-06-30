@@ -91,6 +91,7 @@ function loadAnalysisPage(){
                 var isMPPresent = false;
                 var isPPresent = false;
                 var partitionThreshold = VoltDbUI.getFromLocalStorage("usagePercentage");
+                var frequencyThreshold = VoltDbUI.getFromLocalStorage("frequencyForProc");
 
                 if(partitionThreshold == undefined){
                     partitionThreshold = 20;
@@ -120,11 +121,29 @@ function loadAnalysisPage(){
                         isMPPresent = true;
                     else
                         isPPresent = true;
+
+                    var warningString = '';
+                    var warningToolTip = '';
+
                     if(combinedWeight > partitionThreshold) {
                         $("#analysisRemarks").show();
                         $("#procedureWarningSection").show();
-                        $("#procedureWarning").append("<p>" + procedureName.split(" ")[1] + " has combined usage greater than "+ partitionThreshold +".</p>");
+                        warningString = "<p>" + procedureName.split(" ")[1] + " has combined usage greater than "+ partitionThreshold +"%.</p>";
+                        warningToolTip = procedureName.split(" ")[1] + " <br> has combined usage greater <br> than "+ partitionThreshold +"%.";
                     }
+
+                    if(frequencyThreshold != undefined){
+                        if(invocation > frequencyThreshold ){
+                            $("#analysisRemarks").show();
+                            $("#procedureWarningSection").show();
+                            warningString = warningString + "<p>" + procedureName.split(" ")[1] + " has frequency greater than "+ frequencyThreshold +".</p>"
+                            warningToolTip = warningToolTip + "<br>"+ procedureName.split(" ")[1] + " <br> has frequency greater than <br> than "+ frequencyThreshold +".";
+    //                        $("#procedureWarning").append("<p>" + procedureName.split(" ")[1] + " has frequency greater than "+ frequencyThreshold +"%.</p>");
+                        }
+                    }
+
+                    $("#procedureWarning").append(warningString);
+
 
                     VoltDbAnalysis.procedureValue[procedureName] =
                         {
@@ -133,7 +152,7 @@ function loadAnalysisPage(){
                             COMBINED: combinedWeight,
                             TYPE:type,
                             WEIGHTED_PERC: wtPercentage,
-                            WARNING: (combinedWeight > partitionThreshold ? procedureName.split(" ")[1] + " <br> has combined usage greater <br> than "+ partitionThreshold +"." : "")
+                            WARNING: warningToolTip
                         }
                     dataLatency.push({"label": procedureName , "value": avgExecTime})
                     dataFrequency.push({"label": procedureName, "value": invocation})
@@ -172,6 +191,9 @@ function loadAnalysisPage(){
     }
 
     $("#btnAnalyzeNow").on("click", function(){
+        if(VoltDbUI.getFromLocalStorage("usagePercentage") == undefined){
+           saveInLocalStorage("usagePercentage", 20)
+        }
         fetchData();
     })
 }

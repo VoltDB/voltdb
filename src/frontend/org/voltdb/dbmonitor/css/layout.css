@@ -3540,10 +3540,11 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
         }
 .setThreshold a {
         background: #AA1F2F;
-        padding: 5px 10px 6px;
+        padding: 5px 10px 5px;
         border: 1px solid #AA1F2F;
         color: #FFFFFF;
         cursor: pointer;
+        font-size:13px;
 
     }
 
@@ -3555,23 +3556,30 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .analyzeBtn {
     float: right;
     background: #AA1F2F;
-    padding: 5px 10px;
+    padding: 6px 10px;
     border: 1px solid #AA1F2F;
     color: #FFFFFF;
     cursor: pointer;
     position:relative;
     top:20px;
+    outline:none;
+    font-size:13px;
+
 
 }
 .analyzeBtn:hover {
     float: right;
     background: #C12026;
-    padding: 5px 10px;
+    padding: 6px 10px;
     border: 1px solid #C12026;
     color: #FFFFFF;
     cursor: pointer;
+    outline:none;
+
 
 }
+
+
 
 .mainContent, .mainContentAnalysis {
     margin:0 auto;
@@ -4000,11 +4008,14 @@ ul#shutdownMsg li {
        .mainContent, .mainContentAnalysis{ width:auto;}
        ul#ulProcedure li { float:none;}
 
+    .analysisSubTab { margin-top:60px;}
+
 
 }
 @media (max-width: 719px) {
 .generateproDetails { position:relative; /*top:-28px;*/ float:none; padding:5px 0;}
 .generateProcedureDate { position:relative; top:-28px; float:none; padding:5px 0;}
+
 }
 @media (max-width: 550px) {.procDetailTitle {height:100%;line-height:20px;}}
 @media (min-width: 720px) and (max-width: 800px) {
