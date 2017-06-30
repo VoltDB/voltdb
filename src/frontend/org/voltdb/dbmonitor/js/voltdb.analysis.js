@@ -79,7 +79,7 @@ function loadAnalysisPage(){
                     $("#tblNoDataContent").show();
                 }
                 $("#analysisLoader").hide();
-
+                VoltDbAnalysis.proceduresCount = profileData["PROCEDURE_PROFILE"].length;
                 //order the procedure by  their (avg_exec_time * #of invocation) value
                 profileData["PROCEDURE_PROFILE"].sort(function(a,b) {return ((b.AVG * b.INVOCATIONS) > (a.AVG * a.INVOCATIONS)) ? 1 : (((a.AVG * a.INVOCATIONS) > (b.AVG * b.INVOCATIONS)) ? -1 : 0);} );
                 var containLongName = checkObjForLongProcedureName(profileData["PROCEDURE_PROFILE"])
@@ -204,6 +204,7 @@ function loadAnalysisPage(){
         this.latencyDetailValue = [];
         this.latencyDetail = {};
         this.partitionStatus = "SP"
+        this.proceduresCount = 0;
         this.formatDateTime = function(timestamp) {
         var dateTime = new Date(timestamp);
         //get date

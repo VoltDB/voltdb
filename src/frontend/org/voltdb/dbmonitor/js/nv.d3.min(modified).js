@@ -8948,7 +8948,6 @@
 
         var x0, y0; //used to store previous scales
         var renderWatch = nv.utils.renderWatch(dispatch, duration);
-
         function chart(selection) {
             renderWatch.reset();
             selection.each(function (data) {
@@ -9147,7 +9146,7 @@
                         .attr("style", 'color:#C12026;font-size:25px;font-weight:600;cursor:default')
                         .attr("height", "22px")
                         .attr("width", "22px")
-                        .attr('y', (x.rangeBand() / (data.length * 2)) -12)
+                        .attr('y', (x.rangeBand() / (data.length * 2)) -15)
                         .html(function (d, i){
                             if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Combined")
                             && VoltDbAnalysis.procedureValue[d.label].COMBINED > VoltDbUI.getFromLocalStorage("usagePercentage")
@@ -9162,13 +9161,15 @@
 
                     bars.watchTransition(renderWatch, 'multibarhorizontal: bars')
                         .select('foreignObject')
-                        .attr('x', (function (d, i) {
+                        .attr('x', function (d, i) {
                             var charLength = d.value.toString().length - 1
-                            var xLength = getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) + 16 + (6.5 * charLength);
+                            var xLength = getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) + 16;
                             if(d.key == "Combined")
-                                xLength = xLength + 52;
+                                xLength += VoltDbAnalysis.proceduresCount > 1 ? (2 * charLength) : 35 + (2.5 * charLength);//xLength - 70;
+                            else
+                                xLength += (6.5 * charLength);
                             return xLength;
-                        }))
+                        })
                 } else {
                     bars.selectAll('text').text('');
                 }
