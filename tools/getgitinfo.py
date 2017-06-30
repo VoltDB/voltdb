@@ -82,7 +82,7 @@ def getGitInfo():
         gitRemoteVersion = gitRemoteVersion.strip()
         if gitRemoteVersion != gitLocalVersion[:len(gitRemoteVersion)]:
             local = "-local"
-
+            
     return "%s%s" % (gitLocalVersion, local)
 
 
