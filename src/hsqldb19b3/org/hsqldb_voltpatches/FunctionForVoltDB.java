@@ -438,7 +438,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                         		   Type.SQL_INTEGER,
                            },
                            doubleParamList),
-            new FunctionId("t_get", Type.SQL_VARBINARY, FUNC_VOLT_T_GET, -1,
+            new FunctionId("t_get", Type.SQL_DOUBLE, FUNC_VOLT_T_GET, -1,
                            new Type[] {
                         		   Type.SQL_VARBINARY,
                         		   Type.SQL_INTEGER,

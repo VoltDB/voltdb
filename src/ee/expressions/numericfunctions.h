@@ -318,7 +318,7 @@ template<> inline NValue NValue::callUnary<FUNC_T_TR>() const {
     const char *resAddr = result.getObject_withoutNull(&resLen);
     assert(resLen == addr_lenp);
 
-    TensorWrapper R(resAddr, resLen);
+    TensorWrapper R = TensorWrapper::makeTensorWrapper(resAddr, resLen, P.numRows(), P.numCols());
     R.transpose(P);
 
     return result;
@@ -346,12 +346,64 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     return retval;
 }
 
+template<> inline NValue NValue::call<FUNC_T_GET>(const std::vector<NValue>& arguments) {
+    const NValue &tensor = arguments[0];
+    const NValue &nrow = arguments[1];
+    const NValue &ncol = arguments[2];
+    int32_t numRows = nrow.castAsIntegerAndGetValue();
+    int32_t numCols = ncol.castAsIntegerAndGetValue();
+
+    int32_t addr_lenp;
+    const char * addrp = tensor.getObject_withoutNull(&addr_lenp);
+
+    TensorWrapper T(addrp, addr_lenp);
+    return ValueFactory::getDoubleValue(T.get(numRows, numCols));
+}
+
+/**
+ * implement the sql FUNC_T_TENSOR function for all numeric values
+ */
+template<> inline NValue NValue::call<FUNC_T_TENSOR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() > 1);
+    const NValue &rowvalue = arguments[0];
+    if (!(isNumeric(rowvalue.getValueType()))) {
+        throw SQLException(SQLException::dynamic_sql_error, "Bad row count in T_TENSOR");
+    }
+    int32_t row = rowvalue.castAsIntegerAndGetValue();
+
+    const NValue &colvalue = arguments[1];
+    if (!(isNumeric(colvalue.getValueType()))) {
+        throw SQLException(SQLException::dynamic_sql_error, "Bad column count in T_TENSOR");
+    }
+    int32_t col = colvalue.castAsIntegerAndGetValue();
+
+    int32_t resLenReq = TensorWrapper::tensorByteSize(row,col);
+    int32_t resLen;
+    NValue result = ValueFactory::getTempBinaryValue(NULL, resLenReq);
+    const char *resAddr = result.getObject_withoutNull(&resLen);
+    assert(resLen == resLenReq);
+    TensorWrapper R = TensorWrapper::makeTensorWrapper(resAddr, resLen, row, col);
+
+    int32_t k = 2;
+    for (int i = 0; i < row; i += 1) {
+        for (int j = 0; j < col; j += 1) {
+            const NValue &value = arguments[k++];
+            NValue ele = value.getValueType();
+            if(ele.isNull()) {
+                throw SQLException(SQLException::dynamic_sql_error, "Null value in Matrix");
+            }
+            R.set(i, j, ele.castAsDoubleAndGetValue());
+        }
+    }
+    std::cerr << "Tensor R: " << R.debug() << "\n";
+    return result;
+}
+
 /**
  * implement the sql FUNC_T_ADD function for all numeric values
  */
 template<> inline NValue NValue::call<FUNC_T_ADD>(const std::vector<NValue>& arguments) {
-
-      assert(arguments.size() == 2);
+    assert(arguments.size() == 2);
     const NValue& tensor1 = arguments[0];
     const NValue& tensor2 = arguments[1];
 
@@ -385,7 +437,7 @@ template<> inline NValue NValue::call<FUNC_T_ADD>(const std::vector<NValue>& arg
     NValue result = ValueFactory::getTempBinaryValue(NULL, resLenReq);
     const char *resAddr = result.getObject_withoutNull(&resLen);
     assert(resLen == resLenReq);
-    TensorWrapper R(resAddr, resLen);
+    TensorWrapper R = TensorWrapper::makeTensorWrapper(resAddr, resLen, P.numRows(), P.numCols());
 
     for (int i = 0; i < P.numRows(); i += 1) {
       for (int j = 0; j < Q.numCols(); j += 1) {
@@ -424,7 +476,7 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValu
     TensorWrapper Q(addrq,addr_lenq);
 
     // both dimension should match
-    if(P.numRows() != Q.numCols()) {
+    if(P.numCols() != Q.numRows()) {
       return getNullValue(VALUE_TYPE_VARBINARY);
     }
 
@@ -434,7 +486,7 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValu
     const char *resAddr = result.getObject_withoutNull(&resLen);
     assert(resLen == resLenReq);
 
-    TensorWrapper R(resAddr, resLen);
+    TensorWrapper R = TensorWrapper::makeTensorWrapper(resAddr, resLen, P.numRows(), Q.numCols());
 
 
     for (int i = 0; i < P.numRows(); i += 1) {
@@ -450,7 +502,9 @@ template<> inline NValue NValue::call<FUNC_T_TENSOR_MUL>(const std::vector<NValu
     return result;
 }
 
-/** implement the sql FUNC_T_TENSOR_MUL function for all numeric values */
+/**
+ * implement the sql FUNC_T_TENSOR_MUL function for all numeric values
+ */
 template<> inline NValue NValue::call<FUNC_T_SCALAR_MUL>(const std::vector<NValue>& arguments) {
 
       assert(arguments.size() == 2);
@@ -483,7 +537,7 @@ template<> inline NValue NValue::call<FUNC_T_SCALAR_MUL>(const std::vector<NValu
     int32_t resLen;
     const char *resAddr = result.getObject_withoutNull(&resLen);
     assert(resLen == addr_lenp);
-    TensorWrapper R(resAddr, resLen);
+    TensorWrapper R = TensorWrapper::makeTensorWrapper(resAddr, resLen, P.numRows(), P.numCols());
 
     for (int i = 0; i < P.numRows(); i += 1) {
         for (int j = 0; j < P.numCols(); j += 1) {

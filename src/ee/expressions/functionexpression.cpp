@@ -571,16 +571,13 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new GeneralFunctionExpression<FUNC_VOLT_DWITHIN_POLYGON_POINT>(*arguments);
             break;
             /*
-        case FUNC_T_TENSOR:
-            ret = new GeneralFunctionExpression<FUNC_T_TENSOR>(*arguments);
-            break;
         case FUNC_T_SIZE:
             ret = new GeneralFunctionExpression<FUNC_T_SIZE>(*arguments);
             break;
+            */
         case FUNC_T_GET:
             ret = new GeneralFunctionExpression<FUNC_T_GET>(*arguments);
             break;
-            */
         case FUNC_T_TENSOR_MUL:
             ret = new GeneralFunctionExpression<FUNC_T_TENSOR_MUL>(*arguments);
             break;
@@ -589,6 +586,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_T_SCALAR_MUL:
             ret = new GeneralFunctionExpression<FUNC_T_SCALAR_MUL>(*arguments);
+            break;
+        case FUNC_T_TENSOR:
+            ret = new GeneralFunctionExpression<FUNC_T_TENSOR>(*arguments);
             break;
         default:
             return NULL;

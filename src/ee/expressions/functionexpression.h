@@ -140,10 +140,10 @@ static const int FUNC_SECONDS_MIDNIGHT = 141;
 static const int FUNC_CSC              = 142;
 static const int FUNC_SEC              = 143;
 /*
-static const int FUNC_T_TENSOR         = 144; // (nrow, ncol, S1, S2, ..., Snd)
 static const int FUNC_T_SIZE           = 145; // (T, d)
-static const int FUNC_T_GET            = 146; // (T, i [, j])
 */
+static const int FUNC_T_TENSOR         = 21024; // (nrow, ncol, S1, S2, ..., Snd)
+static const int FUNC_T_GET            = 21026; // (T, i, j)
 static const int FUNC_T_TENSOR_MUL     = 21027; // (T1, T2)
 static const int FUNC_T_TR             = 21028; // (T)
 static const int FUNC_T_ADD            = 21029; // (T1, T2)

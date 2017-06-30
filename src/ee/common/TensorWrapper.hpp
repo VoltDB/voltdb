@@ -79,6 +79,14 @@ public:
   static int32_t tensorByteSize(int32_t numRows, int32_t numCols) {
     return 3 * sizeof(int32_t) + numRows * numCols * sizeof(double);
   }
+
+  /**
+   * Return a tensor wrapper with the given data.  It will not
+   * be filled in yet.
+   */
+  static TensorWrapper makeTensorWrapper(const char *data, int32_t dataLen, int32_t numRows, int32_t numCols);
+  std::string debug();
+
 private:
   /**
    * This is here just for debugging, to verify

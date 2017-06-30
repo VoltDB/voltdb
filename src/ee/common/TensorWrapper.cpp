@@ -17,6 +17,7 @@
 
 #include "TensorWrapper.hpp"
 
+#include <sstream>
 /**
  *  Wrap a 1D array of doubles to make a 2D
  *  tensor.  Objects of this class do not own
@@ -40,10 +41,7 @@
     // table.
     if ((m_dataLen % sizeof(double) != 0)
         || (m_numRows * m_numCols != m_dataLen/sizeof(double))) {
-      // You will have to work out the
-      // parameters to SQLException here.
-      //std::cout<<"SQLException"<<std::endl;
-      throw voltdb::SQLException(voltdb::SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
+      throw voltdb::SQLException(voltdb::SQLException::dynamic_sql_error, "Incorrect size for tensor wrapper");
     }
   }
 
@@ -52,6 +50,20 @@
   }
   int32_t TensorWrapper::getDataLen() const{
     return m_dataLen;
+  }
+
+  std::string TensorWrapper::debug() {
+      std::ostringstream ostr();
+      ostr << "[";
+      for (int ridx = 0; ridx < m_numRows; ridx += 1) {
+          ostr << "[";
+          for (int cidx = 0; cidx < m_numCols; cidx += 1) {
+              ostr << m_data[ridx*m_numRows + cidx] << ",";
+          }
+          ostr << "],";
+      }
+      ostr << "]";
+      return ostr.str();
   }
 
   /**
@@ -72,14 +84,26 @@
     m_transposed(false){
   }
 
-  TensorWrapper::TensorWrapper(const char *data, int dataLen){
+  TensorWrapper TensorWrapper::makeTensorWrapper(const char *data, int dataLen, int32_t numRows, int32_t numCols) {
+      int32_t *ptr = reinterpret_cast<int32_t*>(const_cast<char *>(data));
+      ptr[0] = M_MAGIC;
+      ptr[1] = numRows;
+      ptr[2] = numCols;
+      return TensorWrapper(data, dataLen);
+  }
+
+  TensorWrapper::TensorWrapper(const char *data, int dataLen) :
+          m_dataLen(dataLen)
+  {
 
     const int32_t *ip = (const int32_t *)data;
     int magic = ip[0];
     if(magic != M_MAGIC)
     {
-     throw voltdb::SQLException(voltdb::SQLException::dynamic_sql_error,
-                                "Unsupported non-VARBINARY type for Matrix function");
+        fprintf(stderr, "Magic number 0x%08x is wrong.  Should be 0x%08x\n",
+                magic, M_MAGIC);
+        throw voltdb::SQLException(voltdb::SQLException::dynamic_sql_error,
+                                   "Unsupported non-VARBINARY type for Matrix function");
     }
     m_numRows = ip[1];
     m_numCols = ip[2];
@@ -143,15 +167,12 @@
       col = tmp;
     }
     if ((row < 0) || (m_numRows <= row)) {
-      // You will have to work out the
-      // parameters to SQLException here.
-      throw voltdb::SQLException(voltdb::SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
-      //std::cout<<"SQLException"<<std::endl;
+      throw voltdb::SQLException(voltdb::SQLException::dynamic_sql_error, "Bad row index for creating a tensor");
     }
-    if ((col < 0) || (m_numCols <= row)) {
+    if ((col < 0) || (m_numCols <= col)) {
       // You will have to work out the
       // parameters to SQLException here.
-      throw voltdb::SQLException(voltdb::SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for Matrix function");
+      throw voltdb::SQLException(voltdb::SQLException::dynamic_sql_error, "Bad column index creating a tensor.");
       //std::cout<<"SQLException"<<std::endl;
     }
   }
