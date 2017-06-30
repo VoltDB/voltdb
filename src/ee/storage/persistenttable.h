@@ -435,6 +435,13 @@ public:
 
     bool isReplicatedTable() const { return (m_partitionColumn == -1); }
 
+    bool isCatalogTableReplicated() const {
+        if (m_isReplicated != (m_partitionColumn == -1)) {
+            VOLT_ERROR("CAUTION: detected inconsistent isReplicate flag. Table name:%s\n", m_name.c_str());
+        }
+        return m_isReplicated;
+    }
+
     /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }
 
@@ -535,7 +542,7 @@ public:
 
 private:
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
+    PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false, bool isReplicated = false);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -785,6 +792,9 @@ private:
     PersistentTable* m_deltaTable;
 
     bool m_deltaTableActive;
+
+    // Value reads from catalog table, no matter partition column exists or not
+    bool m_isReplicated;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :

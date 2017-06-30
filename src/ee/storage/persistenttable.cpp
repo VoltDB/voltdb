@@ -114,7 +114,7 @@ private:
     TableTuple& m_target;
 };
 
-PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
+PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled, bool isReplicated) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
@@ -134,7 +134,8 @@ PersistentTable::PersistentTable(int partitionColumn, char const* signature, boo
     m_pkeyIndex(NULL),
     m_mvHandler(NULL),
     m_deltaTable(NULL),
-    m_deltaTableActive(false)
+    m_deltaTableActive(false),
+    m_isReplicated(isReplicated)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -542,7 +543,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
                                 "active undo quantum, and presumably an active transaction that should be there",
                                 m_name.c_str());
         }
-        if (isReplicatedTable()) {
+        if (isCatalogTableReplicated()) {
             // For shared replicated table, in the same host site with lowest id
             // will create the actual undo action, other sites register a dummy
             // undo action as placeholder
@@ -869,7 +870,7 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
          * Create and register an undo action.
          */
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-        if (isReplicatedTable()) {
+        if (isCatalogTableReplicated()) {
             // For shared replicated table, in the same host site with lowest id
             // will create the actual undo action, other sites register a dummy
             // undo action as a placeholder
@@ -1100,7 +1101,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     if (uq) {
-        if (isReplicatedTable()) {
+        if (isCatalogTableReplicated()) {
             // For shared replicated table, in the same host site with lowest id
             // will create the actual undo action, other sites register a dummy
             // undo action as placeholder
@@ -1262,7 +1263,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     deleteFromAllIndexes(&target);
 
     if (createUndoAction) {
-        if (isReplicatedTable()) {
+        if (isCatalogTableReplicated()) {
             // For shared replicated table, in the same host site with lowest id
             // will create the actual undo action, other sites register a dummy
             // undo action as placeholder

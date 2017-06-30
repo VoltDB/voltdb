@@ -65,7 +65,7 @@ private:
     /*
      * Indicates this undo action needs to be coordinated across sites in the same host
      */
-    virtual bool isReplicatedTable() { return m_originalTable->isReplicatedTable(); }
+    virtual bool isReplicatedTable() { return m_originalTable->isCatalogTableReplicated(); }
 
 private:
     TableCatalogDelegate* m_tcd;

@@ -163,7 +163,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
                 assert(node);
                 Table* targetTable = node->getTargetTable();
                 PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
-                if (persistentTarget != NULL && persistentTarget->isReplicatedTable()) {
+                if (persistentTarget != NULL && persistentTarget->isCatalogTableReplicated()) {
                     VOLT_ERROR("PlanNodeType:%d", nextPlanNodeType);
                     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
                         // Call the execute method to actually perform whatever action

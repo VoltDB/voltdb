@@ -50,7 +50,7 @@ private:
     /*
      * Indicates this undo action needs to be coordinated across sites in the same host
      */
-    virtual bool isReplicatedTable() { return m_table->getTable().isReplicatedTable(); }
+    virtual bool isReplicatedTable() { return m_table->getTable().isCatalogTableReplicated(); }
 
 private:
     char *m_tuple;

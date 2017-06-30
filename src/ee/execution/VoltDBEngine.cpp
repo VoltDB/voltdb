@@ -784,7 +784,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
         if (table->activeTupleCount() == 0) {
             PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(table);
             if (persistenttable) {
-                if (persistenttable->isReplicatedTable()) {
+                if (persistenttable->isCatalogTableReplicated()) {
                     if (updateReplicated) {
                         // identify empty tables and mark for deletion
                         deletions.insert(delegatePair.first);
@@ -820,7 +820,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
         if (tcd) {
             Table* table = tcd->getTable();
             PersistentTable * persistenttable = dynamic_cast<PersistentTable*>(table);
-            if (persistenttable && persistenttable->isReplicatedTable()) {
+            if (persistenttable && persistenttable->isCatalogTableReplicated()) {
                 isReplicatedTable = true;
                 BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
                    VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
@@ -1288,18 +1288,17 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
 
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
-        VoltDBEngine* mpEngine = ExecutorContext::getEngine();
 
-        mpEngine->processCatalogDeletes(timestamp, true);
+        processCatalogDeletes(timestamp, true);
 
         // load up all the tables, adding all tables
-        if (mpEngine->processCatalogAdditions(timestamp, true) == false) {
+        if (processCatalogAdditions(timestamp, true) == false) {
             return false;
         }
 
-        mpEngine->rebuildTableCollections(true);
+        rebuildTableCollections(true);
 
-        mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
+        initMaterializedViewsAndLimitDeletePlans(true);
 
         SynchronizedThreadLock::signalLowestSiteFinished();
     }
@@ -1344,7 +1343,7 @@ VoltDBEngine::loadTable(int32_t tableId,
         return false;
     }
     try {
-        if (table->isReplicatedTable()) {
+        if (table->isCatalogTableReplicated()) {
             if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_isLowestSite)) {
                 table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
                 SynchronizedThreadLock::signalLowestSiteFinished();
@@ -1640,6 +1639,12 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
             continue;
         }
         Table *table = m_tables[catalogTable->relativeIndex()];
+        if (updateReplicated == catalogTable->isreplicated()) {
+            typedef std::pair<CatalogId, Table*> CatToTable;
+            BOOST_FOREACH (CatToTable tablePair, m_tables) {
+                VOLT_ERROR("updateReplicated=%d Partition %d loaded table %d at address %p thread %p\n", updateReplicated, m_partitionId, tablePair.first, tablePair.second, pthread_self());
+            }
+        }
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (persistentTable != NULL) {
             initMaterializedViews(catalogTable, persistentTable);

@@ -370,6 +370,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, tableId);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, tableId);
     bool drEnabled = catalogTable.isDRed();
+    bool isReplicated = catalogTable.isreplicated();
     m_materialized = isTableMaterialized(catalogTable);
     std::string const& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -395,7 +396,8 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
                                                     tableAllocationTargetSize,
                                                     catalogTable.tuplelimit(),
                                                     m_compactionThreshold,
-                                                    drEnabled);
+                                                    drEnabled,
+                                                    isReplicated);
     PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
     if ( ! persistentTable) {
         assert(pkeyIndexId.empty());

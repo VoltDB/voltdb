@@ -108,6 +108,5 @@ bool isTableMaterialized(const catalog::Table &table) {
     return table.materializer() != NULL;
 }
 
-
 #endif
 

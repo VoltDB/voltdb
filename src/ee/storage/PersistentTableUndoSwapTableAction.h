@@ -57,7 +57,7 @@ private:
     /*
      * Indicates this undo action needs to be coordinated across sites in the same host
      */
-    virtual bool isReplicatedTable() { return m_theTable->isReplicatedTable(); }
+    virtual bool isReplicatedTable() { return m_theTable->isCatalogTableReplicated(); }
 
 private:
     PersistentTable * const m_theTable;

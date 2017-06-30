@@ -88,7 +88,8 @@ public:
         int tableAllocationTargetSize = 0,
         int tuplelimit = INT_MAX,
         int32_t compactionThreshold = 95,
-        bool drEnabled = false);
+        bool drEnabled = false,
+        bool isReplicated = false);
 
     static StreamedTable* getStreamedTableForTest(
                 voltdb::CatalogId databaseId,
