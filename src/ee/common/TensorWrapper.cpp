@@ -101,7 +101,7 @@
   {
 
     const int32_t *ip = (const int32_t *)data;
-    int magic = ip[0];
+    int magic = (*data + 0);
     if(magic != M_MAGIC)
     {
         fprintf(stderr, "Magic number 0x%08x is wrong.  Should be 0x%08x\n",
@@ -109,8 +109,8 @@
         throw voltdb::SQLException(voltdb::SQLException::dynamic_sql_error,
                                    "Unsupported non-VARBINARY type for Matrix function");
     }
-    m_numRows = ip[1];
-    m_numCols = ip[2];
+    m_numRows = (*data + 1);
+    m_numCols = (*data + 2);
     m_data = (const double *)&(ip[3]);
     m_transposed = false;
   }
