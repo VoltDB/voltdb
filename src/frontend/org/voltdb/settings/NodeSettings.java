@@ -82,6 +82,18 @@ public interface NodeSettings extends Settings {
         return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath());
     }
 
+    default File absResolve(File path) {
+        try {
+            return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath()).getCanonicalFile();
+        } catch (IOException e) {
+            throw new SettingsException(
+                    "failed to canonicalize: " +
+                    path.toString() +
+                    "reason: " +
+                    e.getMessage());
+        }
+    }
+
     default NavigableMap<String, File> getManagedArtifactPaths() {
         return ImmutableSortedMap.<String, File>naturalOrder()
                 .put(CL_PATH_KEY, resolve(getCommandLog()))
@@ -93,7 +105,7 @@ public interface NodeSettings extends Settings {
     }
 
     default boolean archiveSnapshotDirectory() {
-        File snapshotDH = resolve(getSnapshoth());
+        File snapshotDH = absResolve(getSnapshoth());
         String [] snapshots = snapshotDH.list();
         if (snapshots == null || snapshots.length == 0) {
             return false;
@@ -138,7 +150,7 @@ public interface NodeSettings extends Settings {
     default List<String> ensureDirectoriesExist() {
         ImmutableList.Builder<String> failed = ImmutableList.builder();
         Map<String, File> managedArtifactsPaths = getManagedArtifactPaths();
-        File configDH = resolve(new File(Constants.CONFIG_DIR));
+        File configDH = absResolve(new File(Constants.CONFIG_DIR));
         File logDH = resolve(new File("log"));
         for (File path: managedArtifactsPaths.values()) {
             if (!path.exists() && !path.mkdirs()) {

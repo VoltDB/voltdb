@@ -474,10 +474,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
+                    "failed to canonicalize: " +
                     m_nodeSettings.getVoltDBRoot() +
-                    " Reason: " +
-                    e.getMessage());
+                    " reason: " +
+                    e.getMessage()
+            );
         }
     }
 
@@ -486,15 +487,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getCommandLog()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getCommandLog()).getPath();
     }
 
     @Override
@@ -502,15 +495,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getCommandLogSnapshot()).getPath();
     }
 
     @Override
@@ -518,15 +503,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getSnapshoth()).getPath();
     }
 
     @Override
@@ -534,15 +511,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getExportOverflow()).getPath();
     }
 
     @Override
@@ -550,15 +519,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getDROverflow()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getDROverflow()).getPath();
     }
 
     @Override
@@ -567,76 +528,37 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
+                    "failed to canonicalize: " +
                     m_nodeSettings.getVoltDBRoot() +
-                    " Reason: " +
-                    e.getMessage());
+                    " reason: " +
+                    e.getMessage()
+            );
         }
     }
 
     @Override
     public String getCommandLogPath() {
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getCommandLog()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getCommandLog()).getPath();
     }
 
     @Override
     public String getCommandLogSnapshotPath() {
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getCommandLogSnapshot()).getPath();
     }
 
     @Override
     public String getSnapshotPath() {
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getSnapshoth()).getPath();
     }
 
     @Override
     public String getExportOverflowPath() {
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getExportOverflow()).getPath();
     }
 
     @Override
     public String getDROverflowPath() {
-        try {
-            return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "failed to canonicalize voltdbroot: " +
-                    m_nodeSettings.resolve(m_nodeSettings.getDROverflow()) +
-                    " Reason: " +
-                    e.getMessage());
-        }
+        return m_nodeSettings.absResolve(m_nodeSettings.getDROverflow()).getPath();
     }
 
     public static String getStagedCatalogPath(String voltDbRoot) {
@@ -2646,14 +2568,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             case GET:
                 // once a voltdbroot is inited, the path properties contain the true path values
                 Settings.initialize(config.m_voltdbRoot);
-                // override the local sites count and paths
+                // only override the local sites count
                 nodeSettings = NodeSettings.create(config.asNodeSettingsMap(),
                         config.asRelativePathSettingsMap());
                 break;
             case PROBE:
                 // once a voltdbroot is inited, the path properties contain the true path values
                 Settings.initialize(config.m_voltdbRoot);
-                // override the local sites count and paths
+                // only override the local sites count
                 nodeSettings = NodeSettings.create(config.asNodeSettingsMap(),
                         config.asRelativePathSettingsMap());
                 File nodeSettingsFH = new File(getConfigDirectory(config), "path.properties");
@@ -4571,7 +4493,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
             SnapshotUtil.retrieveSnapshotFiles(
-                    m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()),
+                    m_nodeSettings.absResolve(m_nodeSettings.getSnapshoth()),
                     snapshots, filter, false, SnapshotPathType.SNAP_AUTO, hostLog);
 
             return snapshots.containsKey(nonce) ? nonce : null;

@@ -866,8 +866,8 @@ public class Inits {
                      //We have terminus so restore.
                      clenabled = false;
                  } else {
-                     clPath = paths.resolve(paths.getCommandLog()).getPath();
-                     clSnapshotPath = paths.resolve(paths.getCommandLogSnapshot()).getPath();
+                     clPath = VoltDB.instance().getCommandLogPath();
+                     clSnapshotPath = paths.absResolve(paths.getCommandLogSnapshot()).getPath();
                 }
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
