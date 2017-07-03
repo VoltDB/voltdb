@@ -1697,6 +1697,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     private void notifyNewPartitionLeaderFromBalanceSPI() {
-        ((InitiatorMailbox)m_mailbox).notifyNewPartitionLeaderOfTxnDone();
+        if (m_mailbox instanceof InitiatorMailbox) {
+            ((InitiatorMailbox)m_mailbox).notifyNewPartitionLeaderOfTxnDone();
+        }
     }
 }
