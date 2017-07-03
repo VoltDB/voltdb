@@ -310,12 +310,22 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
         for (String table : tables)
         {
+            String query1 =
+                    String.format("select * from %s",
+                                  table, table, table);
+            VoltTable[] results1 = client.callProcedure("@AdHoc", query1).getResults();
+
             client.callProcedure("InsertBoxed", table, new Long(1), "desc", new Long(100), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(2), "desc", new Long(100), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(3), "desc", new Long(100), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(6), "desc", new Long(300), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(7), "desc", new Long(300), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(8), "desc", new Long(500), new Double(14.5));
+
+            query1 =
+                    String.format("select * from %s",
+                                  table, table, table);
+            results1 = client.callProcedure("@AdHoc", query1).getResults();
 
             String query =
                 String.format("select count(*), %s.NUM from %s group by %s.NUM",
@@ -741,6 +751,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG11256();
         subTestENG12105();
         subTestENG12116();
+        subTestBoxedTypes();
     }
 
     private void subTestENG12105() throws Exception {
@@ -2833,6 +2844,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // we can see that the indexes are correct, since the
         // values are different.
         assertContentOfTable(new Object[][] {{ 10, "foo", 20, 40.0, 11, "bar", 30, 99.0 }}, vt);
+
+        truncateTables(client, new String[]{"P1", "R1"});
     }
 
     public void testExistsBugEng12204() throws Exception {
