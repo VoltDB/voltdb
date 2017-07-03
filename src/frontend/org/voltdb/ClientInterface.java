@@ -91,6 +91,7 @@ import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -1243,7 +1244,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                               invocation.getProcName(),
                                                               itm.getParameters());
                 }
-                else {
+                else if (message instanceof BalanceSPIMessage) {
+                    handlBalanceSPITask((BalanceSPIMessage)message);
+                } else {
                     // m_d is for test only
                     m_d.offer(message);
                 }
@@ -2124,8 +2127,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     /**Move partition leader from one host to another.
-     * The algo: find a partition leader from a host which hosts the most partition leaders
+     * find a partition leader from a host which hosts the most partition leaders
      * and find the host which hosts the partition replica and the least number of partition leaders.
+     * send BalanceSPIMessage to the host with older partition leader to initiate @BalanceSPI
      * Repeatedly call this task until no qualified partition is available.
      * @param hostId  The local host id
      */
@@ -2142,8 +2146,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return;
         }
 
-        int partitionId = target.getFirst();
-        int targetHostId = target.getSecond();
+        final int partitionId = target.getFirst();
+        final int targetHostId = target.getSecond();
         int partitionKey = -1;
 
         VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
@@ -2164,7 +2168,42 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return;
         }
 
+        long targetSiteHSID = CoreUtils.getHSIdFromHostAndSite(targetHostId, HostMessenger.CLIENT_INTERFACE_SITE_ID);
+        BalanceSPIMessage message = new BalanceSPIMessage(targetSiteHSID,partitionId, partitionKey);
+        m_mailbox.send(targetSiteHSID, message);
         try {
+            //spin wait till the Cartographer sees the new master
+            final long maxWaitTime = TimeUnit.MINUTES.toSeconds(2); // 2 minutes
+            long remainingWaitTime = maxWaitTime;
+            final int interval = 2;
+            while (remainingWaitTime > 0) {
+                try {
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(interval));
+                } catch (InterruptedException ignoreIt) {
+                }
+                remainingWaitTime -= interval;
+                if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
+                    break;
+                }
+            }
+        } finally {
+            CoreZK.removeSPIBalanceIndicator(m_zk);
+        }
+    }
+
+    //initiate @BalanceSPI on local CI with old partition leader
+    private void handlBalanceSPITask(BalanceSPIMessage message) {
+
+        final int targetHostId = message.getDestinationHostId();
+        final int partitionId = message.getPartitionId();
+        final int partitionKey = message.getPartitionKey();
+
+        try {
+            if (message.getDestinationLeaderHSID() != m_mailbox.getHSId()) {
+                hostLog.warn(String.format("Ignore the leader migration for partition %d on a non-local host %d.",
+                        partitionId, targetHostId));
+                return;
+            }
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
             final String procedureName = "@BalanceSPI";
             Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
@@ -2180,6 +2219,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (spi.getSerializedParams() == null) {
                 spi = MiscUtils.roundTripForCL(spi);
             }
+
             synchronized (m_executeTaskAdpater) {
                 createTransaction(m_executeTaskAdpater.connectionId(),
                         spi,
@@ -2195,21 +2235,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (resp.getStatus() == ClientResponse.SUCCESS) {
                 hostLog.info(String.format("The mastership for partition %d has been moved to host %d.",
                         partitionId, targetHostId));
-
-                //wait till the new site is indeed a master
-                final long maxWaitTime = TimeUnit.MINUTES.toSeconds(2); // 2 minutes
-                long remainingWaitTime = maxWaitTime;
-                final int interval = 5;
-                while (remainingWaitTime > 0) {
-                    try {
-                        Thread.sleep(TimeUnit.SECONDS.toMillis(interval));
-                    } catch (InterruptedException ignoreIt) {
-                    }
-                    remainingWaitTime -= interval;
-                    if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
-                        break;
-                    }
-                }
             } else {
                 //if the target host is down, ignore
                 RealVoltDB db = (RealVoltDB)VoltDB.instance();
@@ -2220,9 +2245,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
         } catch (IOException | InterruptedException e) {
-            hostLog.error(String.format("Fail to process mastership change. %s", e.getMessage()));
-        } finally {
-            CoreZK.removeSPIBalanceIndicator(m_zk);
+            hostLog.error(String.format("Fail to process leader change for partition %d: %s", partitionId, e.getMessage()));
         }
     }
 }

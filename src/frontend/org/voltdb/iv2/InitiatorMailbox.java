@@ -36,7 +36,7 @@ import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.exceptions.TransactionRestartException;
-import org.voltdb.messaging.BalanceSPITxnDrainNotificationMessage;
+import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -346,9 +346,9 @@ public class InitiatorMailbox implements Mailbox
             if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
                 return;
             }
-        }  else if (message instanceof BalanceSPITxnDrainNotificationMessage) {
-            BalanceSPITxnDrainNotificationMessage msg = (BalanceSPITxnDrainNotificationMessage)message;
-            if (msg.getNewLeaderHSID() != this.m_hsId){
+        }  else if (message instanceof BalanceSPIMessage) {
+            BalanceSPIMessage msg = (BalanceSPIMessage)message;
+            if (msg.getDestinationLeaderHSID() != this.m_hsId){
                 return;
             }
             //message comes before this site is promoted
@@ -648,7 +648,7 @@ public class InitiatorMailbox implements Mailbox
         if (m_newLeaderHSID == Long.MIN_VALUE || !((SpScheduler)m_scheduler).isDuplicateCounterEmpty()) {
             return;
         }
-        send(m_newLeaderHSID, new BalanceSPITxnDrainNotificationMessage(m_newLeaderHSID));
+        send(m_newLeaderHSID, new BalanceSPIMessage(m_newLeaderHSID));
         if (tmLog.isDebugEnabled()) {
             tmLog.debug(CoreUtils.hsIdToString(m_hsId) + " notifies " + CoreUtils.hsIdToString(m_newLeaderHSID) + " txns drained.");
         }
