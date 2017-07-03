@@ -866,7 +866,7 @@ public class Inits {
                      //We have terminus so restore.
                      clenabled = false;
                  } else {
-                     clPath = VoltDB.instance().getCommandLogPath();
+                     clPath = paths.absResolve(paths.getCommandLog()).getPath();
                      clSnapshotPath = paths.absResolve(paths.getCommandLogSnapshot()).getPath();
                 }
                 try {
