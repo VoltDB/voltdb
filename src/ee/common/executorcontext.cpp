@@ -120,6 +120,12 @@ ExecutorContext::~ExecutorContext() {
     pthread_setspecific(static_key, NULL);
 }
 
+void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
+{
+    pthread_setspecific(static_key, mapping.context);
+    ThreadLocalPool::assignThreadLocals(mapping);
+}
+
 void ExecutorContext::bindToThread()
 {
     pthread_setspecific(static_key, this);

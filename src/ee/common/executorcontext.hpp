@@ -101,6 +101,7 @@ class ExecutorContext {
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
+    static void assignThreadLocals(EngineLocals& mapping);
 
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {

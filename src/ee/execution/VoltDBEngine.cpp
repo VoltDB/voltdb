@@ -245,8 +245,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             drClusterId);
 
     // Add the engine to the global list tracking replicated tables
-    SynchronizedThreadLock::lockReplicatedResource();
     if (partitionId != 16383) {
+        SynchronizedThreadLock::lockReplicatedResource();
         VOLT_DEBUG("Initializing partition %d with context %p", m_partitionId, m_executorContext);
         EngineLocals newLocals = EngineLocals(m_partitionId);
         SynchronizedThreadLock::init(sitesPerHost, newLocals);
@@ -254,8 +254,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
             // The site thread that has the lowest siteId gets to create DR replicated stream
             VOLT_DEBUG("Initializing mp partition with context %p", EngineLocals(16383).context);
         }
+        SynchronizedThreadLock::unlockReplicatedResource();
     }
-    SynchronizedThreadLock::unlockReplicatedResource();
 }
 
 VoltDBEngine::~VoltDBEngine() {
@@ -287,31 +287,31 @@ VoltDBEngine::~VoltDBEngine() {
         // This lock is strictly defensive because sites are normally shutdown serially with a Join in between
         SynchronizedThreadLock::lockReplicatedResource();
         for (auto tcdIter = m_catalogDelegates.cbegin(); tcdIter != m_catalogDelegates.cend(); ) {
-            auto table = tcdIter->second->getPersistentTable();
-            if (!table || !table->isReplicatedTable()) {
-                delete tcdIter->second;
-                auto eraseThis = tcdIter;
-                tcdIter++;
-                m_catalogDelegates.erase(eraseThis);
+            auto eraseThis = tcdIter;
+            tcdIter++;
+            auto table = eraseThis->second->getPersistentTable();
+            if (!table) {
+                VOLT_DEBUG("Deallocating %s table", eraseThis->second->getTable()->name().c_str());
+            }
+            else if(!table->isCatalogTableReplicated()) {
+                VOLT_DEBUG("Deallocating partitioned table %s", eraseThis->second->getTable()->name().c_str());
             }
             else {
-                assert(m_drReplicatedStream);
+                assert(m_isLowestSite);
                 BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
                     if (enginePair.first == m_partitionId) {
                         continue;
                     }
                     VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
-                    auto extTcdIter = currEngine->m_catalogDelegates.find(tcdIter->first);
+                    auto extTcdIter = currEngine->m_catalogDelegates.find(eraseThis->first);
                     if (extTcdIter != currEngine->m_catalogDelegates.end()) {
                         currEngine->m_catalogDelegates.erase(extTcdIter);
                     }
                 }
-
-                auto eraseThis = tcdIter;
-                tcdIter++;
-                delete eraseThis->second;
-                m_catalogDelegates.erase(eraseThis);
+                VOLT_DEBUG("Deallocating replicated table %s", eraseThis->second->getTable()->name().c_str());
             }
+            delete eraseThis->second;
+            m_catalogDelegates.erase(eraseThis);
         }
 
         BOOST_FOREACH (TID tid, m_snapshottingTables) {
