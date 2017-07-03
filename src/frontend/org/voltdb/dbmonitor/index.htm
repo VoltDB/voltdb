@@ -1418,7 +1418,30 @@
                 </div>
         </div>
     </div>
+    <div><a href="#analysisFreqDetails" class="btn" id="showAnalysisFreqDetails" style="display:none;"></a> </div>
+    <div id="analysisFreqDetails" style="display:none">
+        <div class="overlay-title procDetailTitle ">
+           Detail view of Frequency for <span class="procedureName"></span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content overlay-content-proc-detail">
+            <div class="generateDate">
+                <div class="generateproDetails">
+                     <p>Generated on: <span class="generatedDate"></span></p>
+                </div>
+                <div class="clear"></div>
+            </div>
+            <div class="legendAnalysis"><span class="circle_green"></span>
+            <span id="spanFreqLegend">Frequency</span></div>
+             <div class="clear"></div>
 
+            <div class="proDetailsHeightAdjstment">
+            <div id="divVisualizeFreqDetail">
+                 <svg class="proDetailSvgHeight" id="visualizeFrequencyDetails"></svg>
+            </div>
+                </div>
+        </div>
+    </div>
     <div id="thresholdPopup" style="display:none">
           <div class="overlay-title ">
            Alert Threshold</span>

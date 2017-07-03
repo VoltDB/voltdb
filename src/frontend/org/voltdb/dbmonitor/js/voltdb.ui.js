@@ -2405,6 +2405,27 @@ var loadPage = function (serverName, portid) {
         }
     });
 
+    $("#showAnalysisFreqDetails").popup({
+        open: function (event, ui, ele)  {
+            var procedureName = $("#hidProcedureName").html().split(' ')[1];
+            $(".procedureName").html(procedureName);
+             //filter specific procedure calls from list of datas
+            var freqDetails = [];
+            VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+                //order items w.r.to latency
+                var latValue;
+                $(".generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
+                if(item.PROCEDURE == procedureName ){
+                    freqDetails.push({"label": item.label , "value": item.INVOCATION})
+                }
+            });
+            debugger;
+            MonitorGraphUI.RefreshFrequencyDetailGraph(freqDetails);
+        }
+    });
+
+
+
     $("#btnThreshold").popup({
         open: function (event, ui, ele) {
               if(VoltDbUI.getFromLocalStorage("usagePercentage") == undefined){

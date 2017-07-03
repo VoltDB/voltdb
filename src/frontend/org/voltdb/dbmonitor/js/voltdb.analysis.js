@@ -183,9 +183,10 @@ function loadAnalysisPage(){
                         INVOCATIONS: item.INVOCATIONS
                     }
 
-                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP});
+                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP, "INVOCATION": item.INVOCATIONS});
             });
 
+            MonitorGraphUI.initializeFrequencyDetailGraph();
             MonitorGraphUI.initializeProcedureDetailGraph();
         });
     }
