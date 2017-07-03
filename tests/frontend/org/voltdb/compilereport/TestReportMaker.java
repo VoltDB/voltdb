@@ -34,6 +34,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.utils.CatalogSizing;
+import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -59,7 +60,9 @@ public class TestReportMaker extends TestCase {
             VoltCompiler vc = new VoltCompiler(true, isXDCR); // trick it into behaving like standalone
             boolean success = vc.compileFromDDL(jarName, ddlName);
             assertTrue("Catalog compilation failed!", success);
-            report = new String(Files.readAllBytes(Paths.get("catalog-report.html")), Charsets.UTF_8);
+
+            InMemoryJarfile jarfile = new InMemoryJarfile(Files.readAllBytes(Paths.get(jarName)));
+            report = new String(jarfile.get(VoltCompiler.CATLOG_REPORT), Charsets.UTF_8);
         }
         catch (Exception e) {
         }
