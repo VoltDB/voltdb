@@ -109,5 +109,5 @@ class ImporterPage extends VoltDBManagementCenterPage {
         int dateInt = Integer.parseInt(date)
         return dateInt
     }
-
+    
 }

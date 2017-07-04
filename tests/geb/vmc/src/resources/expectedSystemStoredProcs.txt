@@ -24,3 +24,5 @@
 @GetPartitionKeys
 @Trace
 @Trace
+@SwapTables
+@ResetDR
