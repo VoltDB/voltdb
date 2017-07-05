@@ -124,9 +124,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         // respond to the coordinator with the sink HSID
         RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(), -1, sinkHSId);
         m_mailbox.send(m_coordinatorHsId, msg);
-
-        m_taskQueue.offer(this);
         m_taskQueue.setQueueDepthTracker(new QueueDepthTracker(m_partitionId));
+        m_taskQueue.offer(this);
         JOINLOG.info("P" + m_partitionId + " received initiation");
     }
 
