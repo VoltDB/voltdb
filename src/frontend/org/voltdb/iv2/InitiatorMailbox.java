@@ -348,7 +348,7 @@ public class InitiatorMailbox implements Mailbox
             }
         }  else if (message instanceof BalanceSPIMessage) {
             BalanceSPIMessage msg = (BalanceSPIMessage)message;
-            if (msg.getDestinationLeaderHSID() != this.m_hsId){
+            if (msg.getDestinationLeaderHSID() != m_hsId){
                 return;
             }
             //message comes before this site is promoted
@@ -493,7 +493,7 @@ public class InitiatorMailbox implements Mailbox
         if (!m_scheduler.isLeader() && !message.toReplica() && seenTheTxn) {
             message.setHandleByOriginalLeader(true);
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()));
+                tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + " proc:" +  message.getProcedureName());
             }
         }
         if (message.getCurrentBatchIndex() > 0 && !seenTheTxn && tmLog.isDebugEnabled()) {

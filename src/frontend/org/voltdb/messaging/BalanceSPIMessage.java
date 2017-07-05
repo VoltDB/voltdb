@@ -20,15 +20,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
 
 //The message is used to notify the new partition leader that all transactions on old leader are drained
-//or to request old partition leader to initiate @BalanceSPI
 public class BalanceSPIMessage extends VoltMessage {
 
     private long m_destinationLeaderHSID;
-    private int m_partitionId;
-    private int m_partitionKey;
 
     public BalanceSPIMessage() {
     }
@@ -38,18 +34,10 @@ public class BalanceSPIMessage extends VoltMessage {
         m_destinationLeaderHSID = hsid;
     }
 
-    public BalanceSPIMessage(long hsid, int partitionId, int partitionKey) {
-        this(hsid);
-        m_partitionId = partitionId;
-        m_partitionKey = partitionKey;
-    }
-
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
         msgsize += 8;  // m_destinationLeaderHSID
-        msgsize += 4;  // m_partitionId
-        msgsize += 4;  // m_partitionKey
         return msgsize;
     }
 
@@ -57,8 +45,6 @@ public class BalanceSPIMessage extends VoltMessage {
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.BALANCE_SPI_MESSAGE_ID);
         buf.putLong(m_destinationLeaderHSID);
-        buf.putInt(m_partitionId);
-        buf.putInt(m_partitionKey);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -66,23 +52,9 @@ public class BalanceSPIMessage extends VoltMessage {
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException {
         m_destinationLeaderHSID = buf.getLong();
-        m_partitionId = buf.getInt();
-        m_partitionKey = buf.getInt();
     }
 
     public long getDestinationLeaderHSID() {
         return m_destinationLeaderHSID;
-    }
-
-    public int getDestinationHostId() {
-        return CoreUtils.getHostIdFromHSId(m_destinationLeaderHSID);
-    }
-
-    public int getPartitionId() {
-        return m_partitionId;
-    }
-
-    public int getPartitionKey() {
-        return m_partitionKey;
     }
 }

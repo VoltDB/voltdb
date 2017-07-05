@@ -57,7 +57,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -2102,20 +2101,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
-    // The latest joined host will take over partition leader migration. The task is executed every minute by default
+    // The latest joined host will take over partition leader migration.
     private void scheduleBalanceSpiTask() {
         final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
         if (disableSpiTask) {
-            hostLog.info("SPI balance task is not scheduled.");
+            hostLog.info("BalanceSPI task is not scheduled.");
             return;
         }
         final long interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
         final long delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "10"));
         Runnable task = () -> {
-            TreeSet<Integer> hosts = (TreeSet<Integer>)(getHostMessenger().getLiveHostIds());
-            if (m_myHostId == hosts.pollLast()) {
-                m_clientInterface.balanceSPI(m_myHostId);
-            }
+                m_clientInterface.balanceSPI();
         };
 
         m_periodicWorks.add(scheduleWork(task, delay, interval, TimeUnit.SECONDS));

@@ -799,9 +799,6 @@ public class Cartographer extends StatsSource
                 int partitionCandidate = srcHost.findPartitionForMigration(targetHost);
                 if (partitionCandidate > -1) {
                     Pair<Integer, Integer> pair = new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
-                    hostLog.info(String.format("Moving mastership of partition %d to host %d.", pair.getFirst(), pair.getSecond()));
-                    VoltTable vt = peekTopology(this);
-                    hostLog.info("[getPartitionForMigration]\n" + vt.toFormattedString());
                     return pair;
                 }
             }
