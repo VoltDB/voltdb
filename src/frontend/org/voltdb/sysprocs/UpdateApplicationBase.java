@@ -35,7 +35,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltNTSystemProcedure;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
@@ -426,17 +425,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return null;
     }
 
-    protected void writeNewCatalog(byte[] catalogBytes) {
+    protected String writeNewCatalog(byte[] catalogBytes) {
         // Write the new catalog to a temporary jar file
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                                                       callNTProcedureOnAllHosts(
                                                       "@WriteCatalog",
                                                       catalogBytes);
-
-        String errMsg;
-        if((errMsg = checkCatalogJarAsyncWriteResults(cf)) != null ) {
-            throw new VoltAbortException(errMsg);
-        }
+        return checkCatalogJarAsyncWriteResults(cf);
     }
 
     protected CompletableFuture<ClientResponse> updateCatalog(CatalogChangeResult ccr) {
@@ -485,29 +480,31 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         CompletableFuture<ClientResponse> response = null;
 
-        try {
-            // write the new catalog to a temporary jar file
-            writeNewCatalog(ccr.catalogBytes);
-
-            // update the catalog jar
-            response = callProcedure("@UpdateCore",
-                                     ccr.encodedDiffCommands,
-                                     ccr.catalogHash,
-                                     ccr.catalogBytes,
-                                     ccr.expectedCatalogVersion,
-                                     ccr.deploymentString,
-                                     ccr.tablesThatMustBeEmpty,
-                                     ccr.reasonsForEmptyTables,
-                                     ccr.requiresSnapshotIsolation ? 1 : 0,
-                                     ccr.worksWithElastic ? 1 : 0,
-                                     ccr.deploymentHash,
-                                     ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                                     ccr.hasSchemaChange ?  1 : 0,
-                                     ccr.requiresNewExportGeneration ? 1 : 0);
-        } finally {
+        String errMsg;
+        // write the new catalog to a temporary jar file
+        if ((errMsg = writeNewCatalog(ccr.catalogBytes)) != null) {
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
             catalogUpdateFlag.set(false);
+            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
         }
+
+        // update the catalog jar
+        response = callProcedure("@UpdateCore",
+                                 ccr.encodedDiffCommands,
+                                 ccr.catalogHash,
+                                 ccr.catalogBytes,
+                                 ccr.expectedCatalogVersion,
+                                 ccr.deploymentString,
+                                 ccr.tablesThatMustBeEmpty,
+                                 ccr.reasonsForEmptyTables,
+                                 ccr.requiresSnapshotIsolation ? 1 : 0,
+                                 ccr.worksWithElastic ? 1 : 0,
+                                 ccr.deploymentHash,
+                                 ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                                 ccr.hasSchemaChange ?  1 : 0,
+                                 ccr.requiresNewExportGeneration ? 1 : 0);
+        VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+        catalogUpdateFlag.set(false);
 
         return response;
     }
