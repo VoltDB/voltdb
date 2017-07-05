@@ -247,6 +247,7 @@ class SubQuery implements ObjectComparator {
      *        subqueries sorted by depth within select query (deep == higher level)
      *
      */
+    @Override
     public int compare(Object a, Object b) {
 
         SubQuery sqa = (SubQuery) a;
@@ -277,4 +278,47 @@ class SubQuery implements ObjectComparator {
                                           : -1;
         }
     }
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + level;
+        result = prime * result + ((queryExpression == null) ? 0 : queryExpression.hashCode());
+        result = prime * result + ((database == null) ? 0 : database.hashCode());
+        result = prime * result + ((view == null) ? 0 : view.hashCode());
+        result = prime * result + ((table == null) ? 0 : table.hashCode());
+        result = prime * result + (isExistsPredicate ? 1231 : 1237);
+        result = prime * result + (isUniquePredicate ? 1231 : 1237);
+        result = prime * result + (isDataExpression ? 1231 : 1237);
+        result = prime * result + (isCorrelated ? 1231 : 1237);
+        result = prime * result + (uniqueRows ? 1231 : 1237);
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (other == this) {
+            return true;
+        }
+        if (other == null) {
+            return false;
+        }
+
+        if (other instanceof SubQuery) {
+            return ((SubQuery) other).level == level
+                   && ((SubQuery) other).queryExpression == queryExpression
+                   && ((SubQuery) other).database == database
+                   && ((SubQuery) other).view == view
+                   && ((SubQuery) other).table == table
+                   && ((SubQuery) other).isExistsPredicate == isExistsPredicate
+                   && ((SubQuery) other).isUniquePredicate == isUniquePredicate
+                   && ((SubQuery) other).isDataExpression == isDataExpression
+                   && ((SubQuery) other).isCorrelated == isCorrelated
+                   && ((SubQuery) other).uniqueRows == uniqueRows;
+        }
+
+        return false;
+    }
+
 }

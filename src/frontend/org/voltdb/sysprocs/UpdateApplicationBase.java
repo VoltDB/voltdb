@@ -18,9 +18,11 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
@@ -100,7 +102,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             // or null if it still needs to be filled in.
             InMemoryJarfile newCatalogJar = null;
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
-            boolean updatedClass = false;
             String deploymentString = operationString;
             if ("@UpdateApplicationCatalog".equals(invocationName)) {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
@@ -120,12 +121,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 }
                 try {
                     InMemoryJarfile modifiedJar = modifyCatalogClasses(context.catalog, oldJar, operationString,
-                            newCatalogJar, drRole == DrRoleType.XDCR);
+                            newCatalogJar, drRole == DrRoleType.XDCR, context.m_ptool.getHSQLInterface());
                     if (modifiedJar == null) {
                         newCatalogJar = oldJar;
                     } else {
                         newCatalogJar = modifiedJar;
-                        updatedClass = true;
                     }
                 }
                 catch (ClassNotFoundException e) {
@@ -214,6 +214,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 }
             }
 
+            // recompile deployment and add to catalog
+            // this is necessary, even for @UpdateClasses that does not change deployment
+            // because the catalog bytes does not contain any deployments but only schema related contents
+            // the command log reply needs it to generate a correct catalog diff
             DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
             if (dt == null) {
                 throw new PrepareDiffFailureException(
@@ -236,11 +240,12 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             if (!VoltDB.instance().isRunningWithOldVerbs()) {
                 dt.setPaths(null);
             }
+
             //Always get deployment after its adjusted.
             retval.deploymentString = CatalogUtil.getDeployment(dt, true);
-
+            // make deployment hash from string
             retval.deploymentHash =
-                CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
+                    CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify
@@ -256,7 +261,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
 
             String commands = diff.commands();
-            compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
+            compilerLog.info(diff.getDescriptionOfChanges("@UpdateClasses".equals(invocationName)));
 
             retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
             // since diff commands can be stupidly big, compress them here
@@ -309,11 +314,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
     /**
      * @return NUll if no classes changed, otherwise return the update jar file.
+     *
      * @throws ClassNotFoundException
+     * @throws VoltCompilerException
      * @throws IOException
      */
     private static InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
-            InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException, IOException
+            InMemoryJarfile newJarfile, boolean isXDCR, HSQLInterface hsql)
+                    throws IOException, ClassNotFoundException, VoltCompilerException
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
@@ -342,7 +350,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         if (newJarfile != null) {
             for (Entry<String, byte[]> e : newJarfile.entrySet()) {
                 String filename = e.getKey();
-                if (!filename.endsWith(".class")) {
+                // Ignore root level, non-class file names
+                boolean isRootFile = Paths.get(filename).getNameCount() == 1;
+                if (isRootFile && !filename.endsWith(".class")) {
                     continue;
                 }
                 foundClasses = true;
@@ -355,7 +365,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         compilerLog.info("Updating java classes available to stored procedures");
         VoltCompiler compiler = new VoltCompiler(isXDCR);
-        compiler.compileInMemoryJarfile(jarfile);
+        try {
+            compiler.compileInMemoryJarfileForUpdateClasses(jarfile, catalog, hsql);
+        } catch (ClassNotFoundException | VoltCompilerException | IOException ex) {
+            throw ex;
+        }
 
         return jarfile;
     }

@@ -20,6 +20,7 @@ package org.voltdb.importer;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,7 +54,6 @@ public class ImportManager implements ChannelChangeCallback {
     private static final VoltLogger importLog = new VoltLogger("IMPORT");
 
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
-    private volatile Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
     private final Map<String, AbstractFormatterFactory> m_formatterFactories = new HashMap<String, AbstractFormatterFactory>();
 
     /** Obtain the global ImportManager via its instance() method */
@@ -72,7 +72,7 @@ public class ImportManager implements ChannelChangeCallback {
     private Map<String, AbstractImporterFactory> m_importersByType = new HashMap<String, AbstractImporterFactory>();
     // maintains mapping of active importer config to the bundle bundle path used for communicating import processor
     // about the jars to use
-    private Map<String, ImportConfiguration> m_configsForProcessor= new HashMap<String, ImportConfiguration>();
+    private Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
 
     /**
      * Get the global instance of the ImportManager.
@@ -117,94 +117,104 @@ public class ImportManager implements ChannelChangeCallback {
                 statsCollector);
 
         m_self = em;
-        em.create(myHostId, catalogContext);
+        em.create(catalogContext);
     }
 
     /**
      * This creates a import connector from configuration provided.
-     * @param myHostId
      * @param catalogContext
      */
-    private synchronized void create(int myHostId, CatalogContext catalogContext) {
+    private synchronized void create(CatalogContext catalogContext) {
         try {
-            ImportType importElement = catalogContext.getDeployment().getImport();
-            if (importElement == null || importElement.getConfiguration().isEmpty()) {
-                return;
-            }
-            initializeChannelDistributer();
-
-            final String clusterTag = m_distributer.getClusterTag();
-
-            ImportDataProcessor newProcessor = new ImportProcessor(
-                    myHostId, m_distributer, m_statsCollector, clusterTag);
-            m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
-            m_formatterFactories.clear();
-
-            for (ImportConfiguration config : m_processorConfig.values()) {
-                Properties prop = config.getformatterProperties();
-                String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
-                try {
-                    AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
-                    if (formatterFactory == null) {
-                        URI moduleURI = URI.create(module);
-                        formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
-                        if (formatterFactory == null) {
-                            VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
-                        }
-                        m_formatterFactories.put(module, formatterFactory);
-                    }
-                    config.setFormatterFactory(formatterFactory);
-                } catch(Throwable t) {
-                    VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
-                }
-            }
-
-            discoverConfigsAndLoadBundles(catalogContext);
-            if (!m_configsForProcessor.isEmpty()) {
-                newProcessor.setProcessorConfig(m_configsForProcessor, m_loadedBundles);
-                m_processor.set(newProcessor);
-            } else {
-                m_processor.set(null);
-            }
+            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
+            startImporters(newProcessorConfig);
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
         }
     }
 
+    private synchronized void startImporters(Map<String, ImportConfiguration> newProcessorConfig) throws BundleException {
+        Preconditions.checkState(m_processor.get() == null, "Attempt to start importers when they may already be running");
+        m_processorConfig = newProcessorConfig;
+        importLog.info("Currently loaded importer modules: " + m_loadedBundles.keySet() + ", types: " + m_importersByType.keySet());
+
+        if (!newProcessorConfig.isEmpty()) {
+            initializeChannelDistributer();
+            final String clusterTag = m_distributer.getClusterTag();
+            ImportDataProcessor newProcessor = new ImportProcessor(
+                    m_myHostId, m_distributer, m_statsCollector, clusterTag);
+            newProcessor.setProcessorConfig(newProcessorConfig, m_loadedBundles);
+            m_processor.set(newProcessor);
+        } else {
+            m_processor.set(null);
+        }
+    }
+
     /**
-     * Parses importer configs and loads the bundle needed for importer into memory. Updates
-     * mapping of active importer bundle to the bundle jar needed by the impoter
-     * @param catalogContext
+     * Parses importer configs and loads the formatters and bundles needed into memory.
+     * This is used to generate a new configuration either to load or to compare with existing.
+     * @param catalogContext new catalog context
+     * @return new importer configuration
      */
-    private void discoverConfigsAndLoadBundles(CatalogContext catalogContext) {
-        m_configsForProcessor.clear();
-        for (String configName : m_processorConfig.keySet()) {
-            ImportConfiguration importConfig = m_processorConfig.get(configName);
+    private synchronized Map<String, ImportConfiguration> loadNewConfigAndBundles(CatalogContext catalogContext) {
+        Map<String, ImportConfiguration> newProcessorConfig;
+
+        ImportType importElement = catalogContext.getDeployment().getImport();
+        if (importElement == null || importElement.getConfiguration().isEmpty()) {
+            newProcessorConfig = new HashMap<>();
+        } else {
+            newProcessorConfig = CatalogUtil.getImportProcessorConfig(importElement);
+        }
+
+        Iterator<Map.Entry<String, ImportConfiguration>> iter = newProcessorConfig.entrySet().iterator();
+        while (iter.hasNext()) {
+            String configName = iter.next().getKey();
+            ImportConfiguration importConfig = newProcessorConfig.get(configName);
             Properties properties = importConfig.getmoduleProperties();
 
             String importBundleJar = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
             Preconditions.checkNotNull(importBundleJar,
                     "Import source is undefined or custom import plugin class missing.");
             String procedure = properties.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
+            assert procedure != null;
             //TODO: If processors is a list dont start till all procedures exists.
             Procedure catProc = catalogContext.procedures.get(procedure);
             if (catProc == null) {
                 catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
             }
-
             if (catProc == null) {
                 importLog.info("Importer " + configName + " Procedure " + procedure +
                         " is missing will disable this importer until the procedure becomes available.");
+                iter.remove();
                 continue;
             }
-
-            if (loadImporterBundle(properties)) {
-                m_configsForProcessor.put(configName, importConfig);
+            // NOTE: if bundle is already loaded, loadImporterBundle does nothing and returns true
+            boolean bundlePresent = loadImporterBundle(properties);
+            if (!bundlePresent) {
+                iter.remove();
             }
         }
-        if (!m_configsForProcessor.isEmpty()) {
-            importLog.info("Loaded importer modules: " + m_loadedBundles.keySet() +", types: " + m_importersByType.keySet());
+
+        m_formatterFactories.clear();
+        for (ImportConfiguration config : newProcessorConfig.values()) {
+            Properties prop = config.getformatterProperties();
+            String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+            try {
+                AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
+                if (formatterFactory == null) {
+                    URI moduleURI = URI.create(module);
+                    formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
+                    if (formatterFactory == null) {
+                        VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                    }
+                    m_formatterFactories.put(module, formatterFactory);
+                }
+                config.setFormatterFactory(formatterFactory);
+            } catch(Throwable t) {
+                VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
+            }
         }
+        return newProcessorConfig;
     }
 
 
@@ -284,20 +294,21 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
-        m_self.create(m_myHostId, catalogContext);
+        m_self.create(catalogContext);
         m_self.readyForDataInternal(catalogContext, messenger);
     }
 
-    //Call this method to restart the whole importer system. It takes current catalogcontext and hostmessenger
-    private synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
-        //Shutdown and recreate.
-        m_self.close();
-        assert(m_processor.get() == null);
-        m_self.start(catalogContext, messenger);
-    }
-
-    public void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
-        restart(catalogContext, messenger);
+    public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
+        try {
+            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
+            if (m_processorConfig == null || !m_processorConfig.equals(newProcessorConfig)) {
+                close();
+                startImporters(newProcessorConfig);
+                readyForDataInternal(catalogContext, messenger);
+            }
+        } catch (final Exception e) {
+            VoltDB.crashLocalVoltDB("Error updating importers with new DDL and/or deployment.", true, e);
+        }
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {

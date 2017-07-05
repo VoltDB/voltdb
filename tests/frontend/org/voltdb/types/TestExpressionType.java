@@ -53,6 +53,8 @@ public class TestExpressionType extends TestCase {
                      ExpressionType.get("sub"));
         assertEquals(ExpressionType.OPERATOR_MINUS,
                      ExpressionType.get("subtract"));
+        assertEquals(ExpressionType.OPERATOR_UNARY_MINUS,
+                ExpressionType.get("negate"));
         // test type not found
         assertEquals(ExpressionType.INVALID, ExpressionType.get("value"));
     }
