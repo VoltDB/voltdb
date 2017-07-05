@@ -546,7 +546,7 @@ public class UpdateCore extends VoltSystemProcedure {
             // ever write valid catalog and deployment state to ZK.
             CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
             // New update?
-            if (catalogStuff.version == expectedCatalogVersion) {
+            if (catalogStuff.version == expectedCatalogVersion + 1) {
                 if (log.isInfoEnabled()) {
                     log.info("New catalog update from: " + catalogStuff.toString());
                     log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
@@ -555,14 +555,14 @@ public class UpdateCore extends VoltSystemProcedure {
             }
             // restart?
             else {
-                if (catalogStuff.version == (expectedCatalogVersion + 1) &&
-                        Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
-                        Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)) {
-                    if (log.isInfoEnabled()) {
-                        log.info("Restarting catalog update: " + catalogStuff.toString());
-                    }
-                }
-                else {
+//                if (catalogStuff.version == (expectedCatalogVersion + 1) &&
+//                        Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
+//                        Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)) {
+//                    if (log.isInfoEnabled()) {
+//                        log.info("Restarting catalog update: " + catalogStuff.toString());
+//                    }
+//                }
+//                else {
                     String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
                             "against one version of the cluster configuration but that version was " +
                             "no longer live when attempting to apply the change.  This is likely " +
@@ -571,21 +571,21 @@ public class UpdateCore extends VoltSystemProcedure {
                             "connection to the cluster.";
                     log.warn(errmsg);
                     throw new VoltAbortException(errmsg);
-                }
+//                }
             }
 
-            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
-            // update the global version. only one site per node will accomplish this.
-            // others will see there is no work to do and gracefully continue.
-            // then update data at the local site.
-            CatalogUtil.updateCatalogToZK(
-                    zk,
-                    expectedCatalogVersion + 1,
-                    DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
-                    getUniqueId(),
-                    catalogBytes,
-                    catalogHash,
-                    deploymentBytes);
+//            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
+//            // update the global version. only one site per node will accomplish this.
+//            // others will see there is no work to do and gracefully continue.
+//            // then update data at the local site.
+//            CatalogUtil.updateCatalogToZK(
+//                    zk,
+//                    expectedCatalogVersion + 1,
+//                    DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
+//                    getUniqueId(),
+//                    catalogBytes,
+//                    catalogHash,
+//                    deploymentBytes);
 
             try {
                 performCatalogVerifyWork(
@@ -598,15 +598,15 @@ public class UpdateCore extends VoltSystemProcedure {
                 // If there is a cluster failure before this point, we will re-run
                 // the transaction with the same input args and the new state,
                 // which we will recognize as a restart and do the right thing.
-                log.debug("Catalog update cannot be applied.  Rolling back ZK state");
-                CatalogUtil.updateCatalogToZK(
-                        zk,
-                        catalogStuff.version,
-                        catalogStuff.txnId,
-                        catalogStuff.uniqueId,
-                        catalogStuff.catalogBytes,
-                        catalogStuff.getCatalogHash(),
-                        catalogStuff.deploymentBytes);
+//                log.debug("Catalog update cannot be applied.  Rolling back ZK state");
+//                CatalogUtil.updateCatalogToZK(
+//                        zk,
+//                        catalogStuff.version,
+//                        catalogStuff.txnId,
+//                        catalogStuff.uniqueId,
+//                        catalogStuff.catalogBytes,
+//                        catalogStuff.getCatalogHash(),
+//                        catalogStuff.deploymentBytes);
 
                 // hopefully this will throw a SpecifiedException if the fragment threw one
                 throw vae;

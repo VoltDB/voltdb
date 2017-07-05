@@ -18,6 +18,7 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -435,8 +436,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     }
 
     protected CompletableFuture<ClientResponse> updateCatalog(CatalogChangeResult ccr) {
-        // TODO: Create ZK node to allow only one catalog update to happen concurrently
-
         // create the catalog update blocker first
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
@@ -480,31 +479,47 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         CompletableFuture<ClientResponse> response = null;
 
-        String errMsg;
-        // write the new catalog to a temporary jar file
-        if ((errMsg = writeNewCatalog(ccr.catalogBytes)) != null) {
+        try {
+            String errMsg;
+            // write the new catalog to a temporary jar file
+            if ((errMsg = writeNewCatalog(ccr.catalogBytes)) != null) {
+                VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+                catalogUpdateFlag.set(false);
+                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
+            }
+
+            CatalogUtil.updateCatalogToZK(
+                    zk,
+                    ccr.expectedCatalogVersion + 1,
+                    getID(),
+                    getID(),
+                    ccr.catalogBytes,
+                    ccr.catalogHash,
+                    ccr.deploymentString.getBytes("UTF-8"));
+
+            // update the catalog jar
+            response = callProcedure("@UpdateCore",
+                                     ccr.encodedDiffCommands,
+                                     ccr.catalogHash,
+                                     ccr.catalogBytes,
+                                     ccr.expectedCatalogVersion,
+                                     ccr.deploymentString,
+                                     ccr.tablesThatMustBeEmpty,
+                                     ccr.reasonsForEmptyTables,
+                                     ccr.requiresSnapshotIsolation ? 1 : 0,
+                                     ccr.worksWithElastic ? 1 : 0,
+                                     ccr.deploymentHash,
+                                     ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                                     ccr.hasSchemaChange ?  1 : 0,
+                                     ccr.requiresNewExportGeneration ? 1 : 0);
+        } catch (InterruptedException | KeeperException | UnsupportedEncodingException e) {
+            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                     "Catalog update in Zookeeper failed with exception:\n" +
+                                     e.getMessage());
+        } finally {
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
             catalogUpdateFlag.set(false);
-            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
         }
-
-        // update the catalog jar
-        response = callProcedure("@UpdateCore",
-                                 ccr.encodedDiffCommands,
-                                 ccr.catalogHash,
-                                 ccr.catalogBytes,
-                                 ccr.expectedCatalogVersion,
-                                 ccr.deploymentString,
-                                 ccr.tablesThatMustBeEmpty,
-                                 ccr.reasonsForEmptyTables,
-                                 ccr.requiresSnapshotIsolation ? 1 : 0,
-                                 ccr.worksWithElastic ? 1 : 0,
-                                 ccr.deploymentHash,
-                                 ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                                 ccr.hasSchemaChange ?  1 : 0,
-                                 ccr.requiresNewExportGeneration ? 1 : 0);
-        VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
-        catalogUpdateFlag.set(false);
 
         return response;
     }
