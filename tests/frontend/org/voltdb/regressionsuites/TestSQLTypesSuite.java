@@ -47,6 +47,7 @@ import org.voltdb.utils.VoltTypeUtil;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Delete;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBoxed;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertMulti;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.ParamSetArrays;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Select;
@@ -68,7 +69,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Delete.class, Insert.class,
-            InsertBase.class, InsertMulti.class, Select.class, Update.class,
+            InsertBase.class, InsertBoxed.class, InsertMulti.class, Select.class, Update.class,
             UpdateDecimal.class, ParamSetArrays.class };
 
     /** Utility to create an array of bytes with value "b" of length "length" */
@@ -963,6 +964,19 @@ public class TestSQLTypesSuite extends RegressionSuite {
                     .getResults();
             assertEquals(0, result[0].getRowCount());
         }
+    }
+
+    public void testInsertNullBoxed() throws IOException, ProcCallException {
+        Client client = this.getClient();
+
+        VoltTable[] results = client.callProcedure("InsertBoxed", pkey.incrementAndGet(),
+                new Byte( (byte) -128), new Short( (short) -32768) ).getResults();
+
+        System.out.println("testInsertBoxedNulls" + results[1]);
+
+        results[1].advanceRow();
+        assertEquals(VoltType.NULL_TINYINT, results[1].get("A_TINYINT", VoltType.TINYINT));
+        assertEquals(VoltType.NULL_SMALLINT , results[1].get("A_TSMALLINT", VoltType.SMALLINT));
     }
 
     public void testMissingAttributeInsert_With_Defaults()
