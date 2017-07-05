@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.ClientResponseImpl;
@@ -30,8 +31,8 @@ public class WriteCatalog extends UpdateApplicationBase {
         // This should only be called once on each host
         try {
             VoltDB.instance().writeCatalogJar(catalogBytes);
-        } catch (RuntimeException e) {
-            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, e.getMessage());
+        } catch (IOException e) {
+            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, e.getMessage());
         }
 
         return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update finished locally.");
