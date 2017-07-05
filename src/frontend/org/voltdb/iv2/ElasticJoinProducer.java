@@ -27,6 +27,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB;
@@ -125,6 +126,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         m_mailbox.send(m_coordinatorHsId, msg);
 
         m_taskQueue.offer(this);
+        m_taskQueue.setQueueDepthTracker(new QueueDepthTracker(m_partitionId));
         JOINLOG.info("P" + m_partitionId + " received initiation");
     }
 
