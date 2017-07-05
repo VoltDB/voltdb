@@ -36,5 +36,4 @@ public class BasicTestUDFSuite {
     public Integer generalIntFunction(int arg0, Integer arg1) {
         return 2;
     }
-
 }

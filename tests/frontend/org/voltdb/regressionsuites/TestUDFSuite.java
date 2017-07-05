@@ -29,7 +29,6 @@ import java.util.Collections;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -37,15 +36,33 @@ import junit.framework.Test;
 
 public class TestUDFSuite extends RegressionSuite {
 
+    private void addFunction(Client client, String functionName, String methodName) throws IOException, ProcCallException {
+        try {
+            client.callProcedure("@AdHoc",
+                String.format("CREATE FUNCTION %s FROM METHOD org.voltdb_testfuncs.%s;", functionName, methodName));
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail(String.format("Should be able to CREATE FUNCTION %s FROM METHOD org.voltdb_testfuncs.%s;",
+                    functionName, methodName));
+        }
+    }
+
+    private void dropFunction(Client client, String functionName) throws IOException, ProcCallException {
+        try {
+            client.callProcedure("@AdHoc",
+                String.format("DROP FUNCTION %s;", functionName));
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail(String.format("Should be able to drop function %s", functionName));
+        }
+    }
+
     public void testFunctionNameCaseInsensitivity() throws IOException, ProcCallException {
         Client client = getClient();
-        ClientResponse cr = client.callProcedure("@AdHoc",
-                "CREATE FUNCTION testfunc FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.constantIntFunction;");
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        addFunction(client, "testfunc", "BasicTestUDFSuite.constantIntFunction");
         verifyStmtFails(client, "CREATE FUNCTION testFUNC FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.constantIntFunction;",
                 "Function \"testfunc\" is already defined");
-        cr = client.callProcedure("@AdHoc", "DROP FUNCTION testfunc;");
-        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        dropFunction(client, "testfunc");
     }
 
     public void testAddRemoveUDF() throws IOException, ProcCallException {
@@ -61,14 +78,7 @@ public class TestUDFSuite extends RegressionSuite {
                         String.format("SELECT %s(%s) FROM T;", functionName,
                                 String.join(", ", Collections.nCopies(i, "a"))),
                         "user lacks privilege or object not found: TESTFUNC");
-                try {
-                    client.callProcedure("@AdHoc",
-                        String.format("CREATE FUNCTION %s FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.%s;", functionName, methodName));
-                } catch (ProcCallException pce) {
-                    pce.printStackTrace();
-                    fail(String.format("Should be able to CREATE FUNCTION %s FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.%s;",
-                            functionName, methodName));
-                }
+                addFunction(client, functionName, "BasicTestUDFSuite." + methodName);
                 VoltTable[] results = client.callProcedure("@AdHoc",
                         String.format("SELECT %s(%s) FROM T;", functionName,
                                 String.join(", ", Collections.nCopies(i, "a")))).getResults();
@@ -76,13 +86,7 @@ public class TestUDFSuite extends RegressionSuite {
                 assertEquals(1, results.length);
                 VoltTable t = results[0];
                 assertContentOfTable(new Object[][] {{i}, {i}}, t);
-                try {
-                    client.callProcedure("@AdHoc",
-                        String.format("DROP FUNCTION %s;", functionName));
-                } catch (ProcCallException pce) {
-                    pce.printStackTrace();
-                    fail(String.format("Should be able to drop function %s", functionName));
-                }
+                dropFunction(client, functionName);
                 verifyStmtFails(client,
                         String.format("SELECT %s(%s) FROM T;", functionName,
                                 String.join(", ", Collections.nCopies(i, "a"))),

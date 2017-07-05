@@ -237,7 +237,12 @@ public class UserDefinedFunctionManager {
                 SerializationHelper.writeVarbinary(stringAsBytes, buffer);
                 break;
             case VARBINARY:
-                SerializationHelper.writeVarbinary(((byte[])value), buffer);
+                if (value instanceof byte[]) {
+                    SerializationHelper.writeVarbinary(((byte[])value), buffer);
+                }
+                else if (value instanceof Byte[]) {
+                    SerializationHelper.writeVarbinary(((Byte[])value), buffer);
+                }
                 break;
             case TIMESTAMP:
                 buffer.putLong(((TimestampType)value).getTime());
