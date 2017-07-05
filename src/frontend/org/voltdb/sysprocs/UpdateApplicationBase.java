@@ -431,7 +431,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                                                       callNTProcedureOnAllHosts(
                                                       "@WriteCatalog",
-                                                      catalogBytes);
+                                                      catalogBytes,
+                                                      WriteCatalog.WRITE);
         return checkCatalogJarAsyncWriteResults(cf);
     }
 
@@ -441,6 +442,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         // Only one catalog update at a time (since this is a NT proc, there might
         // be multiple updates issued at the same time)
+
+        // TODO: should we use a lock or just atomic flag here ? (in another word,
+        // whether to abort any concurrent operation, or to queue them up and execute
+        // one by one ?)
         if (!catalogUpdateFlag.compareAndSet(false, true)) {
             return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
                     "Can't write a new catalog when another one is in progress");
@@ -488,6 +493,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
             }
 
+            // verify the catalog, this step was originally in the MP transaction @UpdateCore
+
+
+            // update the catalog to ZooKeeper
             CatalogUtil.updateCatalogToZK(
                     zk,
                     ccr.expectedCatalogVersion + 1,
@@ -512,6 +521,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                      ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                                      ccr.hasSchemaChange ?  1 : 0,
                                      ccr.requiresNewExportGeneration ? 1 : 0);
+
         } catch (InterruptedException | KeeperException | UnsupportedEncodingException e) {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
                                      "Catalog update in Zookeeper failed with exception:\n" +

@@ -27,19 +27,37 @@ import org.voltdb.client.ClientResponse;
 
 public class WriteCatalog extends UpdateApplicationBase {
 
+    // TODO: maybe we can add another option to clean up the
+    // temporary jar files on all hosts, in case some operations
+    // failed in the middle of the way ?
+
+    public static final byte WRITE = 0;
+    public static final byte CLEAN_UP = 1;
+    public static final byte VERIFY = 2;
+
     VoltLogger log = new VoltLogger("HOST");
 
     // Write the new catalog to a temporary jar file
-    public CompletableFuture<ClientResponse> run(byte[] catalogBytes) throws Exception
+    public CompletableFuture<ClientResponse> run(byte[] catalogBytes, byte mode) throws Exception
     {
         // This should only be called once on each host
-        try {
-            VoltDB.instance().writeCatalogJar(catalogBytes);
-        } catch (IOException e) {
-            // Catalog disk write failed, include the message
-            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, e.getMessage());
+        if (mode == WRITE) {
+            try {
+                VoltDB.instance().writeCatalogJar(catalogBytes);
+            } catch (IOException e) {
+                // Catalog disk write failed, include the message
+                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, e.getMessage());
+            }
+        } else if (mode == CLEAN_UP) {
+
+        } else if (mode == VERIFY) {
+
+        } else {
+            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, "The mode " + Byte.toString(mode) +
+                                     " is not supported in @WriteCatalog operation.");
         }
 
-        return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update finished locally.");
+        return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update work finished locally with mode " +
+                                 Byte.toString(mode));
     }
 }
