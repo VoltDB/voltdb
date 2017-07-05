@@ -27,12 +27,14 @@ import org.voltdb.*;
 
 public class InsertBoxed extends VoltProcedure {
 
-    public final SQLStmt aInsert = new SQLStmt("INSERT INTO WITH_DEFAULTS (PKEY, A_TINYINT, A_SMALLINT) VALUES (?, ?, ?)");
-    public final SQLStmt aSelect = new SQLStmt("SELECT PKEY, A_TINYINT, A_SMALLINT FROM WITH_DEFAULTS WHERE PKEY = ?");
+    public final SQLStmt aInsert = new SQLStmt
+            ("INSERT INTO WITH_DEFAULTS (PKEY, A_TINYINT, A_SMALLINT, A_INTEGER, A_BIGINT) VALUES (?, ?, ?, ?, ?)");
+    public final SQLStmt aSelect = new SQLStmt
+            ("SELECT * FROM WITH_DEFAULTS WHERE PKEY = ?");
 
-    public VoltTable[] run (Integer pkey, Byte a_tinyint, Short a_smallint)
+    public VoltTable[] run (Integer pkey, Byte a_tinyint, Short a_smallint, Integer a_int, Long a_long)
     {
-        voltQueueSQL(aInsert, pkey, a_tinyint, a_smallint);
+        voltQueueSQL(aInsert, pkey, a_tinyint, a_smallint, a_int, a_long);
         voltQueueSQL(aSelect, pkey);
         return voltExecuteSQL();
     }

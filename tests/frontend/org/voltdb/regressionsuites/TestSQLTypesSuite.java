@@ -971,13 +971,16 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
         Integer p_key = pkey.incrementAndGet();
         VoltTable[] results = client.callProcedure("InsertBoxed", p_key,
-                new Byte( (byte) -128), new Short( (short) -32768) ).getResults();
+                new Byte( (byte) -128), new Short( (short) -32768),
+                new Integer(-2147483648), new Long(-9223372036854775808L) ).getResults();
 
         System.out.println("testInsertBoxedNulls" + results[1]);
 
         results[1].advanceRow();
         assertEquals(VoltType.NULL_TINYINT, results[1].get("A_TINYINT", VoltType.TINYINT));
         assertEquals(VoltType.NULL_SMALLINT, results[1].get("A_SMALLINT", VoltType.SMALLINT));
+        assertEquals(VoltType.NULL_INTEGER, results[1].get("A_INTEGER", VoltType.INTEGER));
+        assertEquals(VoltType.NULL_BIGINT, results[1].get("A_BIGINT", VoltType.BIGINT));
 
         results = client.callProcedure("@AdHoc", "SELECT * FROM WITH_DEFAULTS WHERE A_TINYINT IS NULL").getResults();
         results[0].advanceRow();
