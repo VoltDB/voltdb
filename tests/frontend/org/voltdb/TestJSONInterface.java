@@ -1021,8 +1021,6 @@ public class TestJSONInterface extends TestCase {
             } catch (HttpHostConnectException e) {
                 fail("HTTP Listener is not open after the node has rejoined.");
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         } finally {
             cluster.shutDown();
         }
