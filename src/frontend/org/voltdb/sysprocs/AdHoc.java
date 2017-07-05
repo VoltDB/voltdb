@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -31,7 +30,6 @@ import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
@@ -177,15 +175,7 @@ public class AdHoc extends AdHocNTBase {
         }
 
         // Write the new catalog to a temporary jar file
-        CompletableFuture<Map<Integer,ClientResponse>> cf =
-                                                      callNTProcedureOnAllHosts(
-                                                      "@WriteCatalog",
-                                                      ccr.catalogBytes);
-
-        String errMsg;
-        if((errMsg = checkCatalogJarAsyncWriteResults(cf)) != null ) {
-            throw new VoltAbortException(errMsg);
-        }
+        writeNewCatalog(ccr.catalogBytes);
 
         return callProcedure("@UpdateCore",
                              ccr.encodedDiffCommands,

@@ -17,13 +17,11 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
@@ -91,15 +89,7 @@ public class UpdateClasses extends UpdateApplicationBase {
         // TODO: Create ZK node to allow only one catalog update to happen concurrently
 
         // Write the new catalog to a temporary jar file
-        CompletableFuture<Map<Integer,ClientResponse>> cf =
-                                                      callNTProcedureOnAllHosts(
-                                                      "@WriteCatalog",
-                                                      ccr.catalogBytes);
-
-        String errMsg;
-        if((errMsg = checkCatalogJarAsyncWriteResults(cf)) != null ) {
-            throw new VoltAbortException(errMsg);
-        }
+        writeNewCatalog(ccr.catalogBytes);
 
         return callProcedure("@UpdateCore",
                              ccr.encodedDiffCommands,

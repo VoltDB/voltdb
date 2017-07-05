@@ -30,6 +30,9 @@ public class WriteCatalog extends UpdateApplicationBase {
     {
         // This should only be called once on each host
         try {
+            // Create the catalog update blocker first
+
+
             VoltDB.instance().writeCatalogJar(catalogBytes);
         } catch (IOException e) {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, e.getMessage());

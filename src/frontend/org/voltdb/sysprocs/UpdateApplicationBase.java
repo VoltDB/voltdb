@@ -32,6 +32,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltNTSystemProcedure;
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
@@ -415,5 +416,18 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
 
         return null;
+    }
+
+    protected void writeNewCatalog(byte[] catalogBytes) {
+        // Write the new catalog to a temporary jar file
+        CompletableFuture<Map<Integer,ClientResponse>> cf =
+                                                      callNTProcedureOnAllHosts(
+                                                      "@WriteCatalog",
+                                                      catalogBytes);
+
+        String errMsg;
+        if((errMsg = checkCatalogJarAsyncWriteResults(cf)) != null ) {
+            throw new VoltAbortException(errMsg);
+        }
     }
 }
