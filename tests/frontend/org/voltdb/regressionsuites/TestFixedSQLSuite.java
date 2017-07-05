@@ -310,22 +310,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
         for (String table : tables)
         {
-            String query1 =
-                    String.format("select * from %s",
-                                  table, table, table);
-            VoltTable[] results1 = client.callProcedure("@AdHoc", query1).getResults();
-
             client.callProcedure("InsertBoxed", table, new Long(1), "desc", new Long(100), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(2), "desc", new Long(100), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(3), "desc", new Long(100), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(6), "desc", new Long(300), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(7), "desc", new Long(300), new Double(14.5));
             client.callProcedure("InsertBoxed", table, new Long(8), "desc", new Long(500), new Double(14.5));
-
-            query1 =
-                    String.format("select * from %s",
-                                  table, table, table);
-            results1 = client.callProcedure("@AdHoc", query1).getResults();
 
             String query =
                 String.format("select count(*), %s.NUM from %s group by %s.NUM",
