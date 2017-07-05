@@ -395,10 +395,10 @@ public class AuthSystem {
             } catch (AccountExpiredException ex) {
                 VoltDB.crashGlobalVoltDB(
                         "VoltDB assigned service principal has expired", true, ex);
-            } catch(CredentialExpiredException ex) {
+            } catch (CredentialExpiredException ex) {
                 VoltDB.crashGlobalVoltDB(
                         "VoltDB assigned service principal credentials have expired", true, ex);
-            } catch(FailedLoginException ex) {
+            } catch (FailedLoginException ex) {
                 VoltDB.crashGlobalVoltDB(
                         "VoltDB failed to authenticate against kerberos", true, ex);
             }
@@ -731,6 +731,9 @@ public class AuthSystem {
             if (matched) {
                 m_authenticatedUser = m_user;
                 logAuthSuccess(m_authenticatedUser, fromAddress);
+                if (user.hasPermission(Permission.ADMIN)) {
+                	authLogger.info("You are logged in as root user");
+                }
                 return true;
             }
 
