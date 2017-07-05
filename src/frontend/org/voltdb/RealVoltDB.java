@@ -342,8 +342,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // should be able to always get a valid context without needing this lock.
     private final Object m_catalogUpdateLock = new Object();
 
-    private final Object m_writeCatalogJarLock = new Object();
-
     // add a random number to the sampler output to make it likely to be unique for this process.
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
     private final AtomicBoolean m_hasStartedSampler = new AtomicBoolean(false);
@@ -3337,13 +3335,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void writeCatalogJar(byte[] catalogBytes) throws IOException
     {
-        synchronized (m_writeCatalogJarLock) {
-            File configInfoDir = getConfigDirectory();
-            configInfoDir.mkdirs();
+        File configInfoDir = getConfigDirectory();
+        configInfoDir.mkdirs();
 
-            InMemoryJarfile.writeToFile(catalogBytes, new VoltFile(configInfoDir.getPath(),
-                                        InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
-        }
+        InMemoryJarfile.writeToFile(catalogBytes, new VoltFile(configInfoDir.getPath(),
+                                    InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
     }
 
     // Verify the integrity of the newly updated catalog stored on the ZooKeeper
@@ -3397,6 +3393,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         return true;
+    }
+
+    // Clean up the temporary jar file
+    @Override
+    public void cleanUpTempCatalogJar() {
+        File configInfoDir = getConfigDirectory();
+        if (!configInfoDir.exists()) { return; }
+
+        File tempJar = new VoltFile(configInfoDir.getPath(),
+                                    InMemoryJarfile.TMP_CATALOG_JAR_FILENAME);
+        if(tempJar.exists()) {
+            tempJar.delete();
+        }
     }
 
     @Override

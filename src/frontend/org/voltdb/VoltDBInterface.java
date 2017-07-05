@@ -179,6 +179,11 @@ public interface VoltDBInterface
         return true;
     }
 
+    default public void cleanUpTempCatalogJar()
+    {
+        return;
+    }
+
     /**
      * Updates the cluster setting of this VoltDB
      * @param settings the {@link ClusterSettings} update candidate

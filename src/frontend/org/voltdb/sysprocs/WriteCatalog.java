@@ -49,7 +49,7 @@ public class WriteCatalog extends UpdateApplicationBase {
                 return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, e.getMessage());
             }
         } else if (mode == CLEAN_UP) {
-
+            VoltDB.instance().cleanUpTempCatalogJar();
         } else if (mode == VERIFY) {
             if (!VoltDB.instance().verifyZKCatalog()) {
                 return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, "Catalog verification failed.");

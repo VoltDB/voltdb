@@ -446,6 +446,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return checkCatalogJarAsyncWriteResults(cf) == null ? true : false;
     }
 
+    // remove temproray catalog jar file on all hosts, if any
+    protected void cleanUpTempCatalog() {
+        callNTProcedureOnAllHosts("@WriteCatalog", null, WriteCatalog.CLEAN_UP);
+    }
+
     protected CompletableFuture<ClientResponse> updateCatalog(CatalogChangeResult ccr) {
         // create the catalog update blocker first
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
@@ -498,6 +503,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             String errMsg;
             // write the new catalog to a temporary jar file
             if ((errMsg = writeNewCatalog(ccr.catalogBytes)) != null) {
+                cleanUpTempCatalog();
                 VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
                 catalogUpdateFlag.set(false);
                 return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
@@ -526,6 +532,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                               oldCatalog.catalogBytes,
                                               oldCatalog.getCatalogHash(),
                                               oldCatalog.deploymentBytes);
+                cleanUpTempCatalog();
                 VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
                 catalogUpdateFlag.set(false);
                 return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
@@ -552,6 +559,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                      "Catalog update in Zookeeper failed with exception:\n" +
                                      e.getMessage());
         } finally {
+            cleanUpTempCatalog();
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
             catalogUpdateFlag.set(false);
         }
