@@ -1616,7 +1616,7 @@ public abstract class CatalogUtil {
                 if (union.size() == topics.size() + groupidToTopics.get(groupid).size()) {
                     groupidToTopics.put(groupid, union);
                 } else {
-                    throw new RuntimeException("Import failed to configure, two Kafka configurations have the same groupid and topic.");
+                    throw new RuntimeException("Invalid import configuration. Two Kafka entries have the same groupid and topic.");
                 }
             } else {
                 groupidToTopics.put(groupid, topics);
