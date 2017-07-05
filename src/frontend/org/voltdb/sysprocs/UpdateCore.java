@@ -43,7 +43,6 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -526,18 +525,18 @@ public class UpdateCore extends VoltSystemProcedure {
          * If this update works with elastic then do the update anyways
          */
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        if (worksWithElastic == 0 &&
-            !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
-            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
-        }
-
-        // write uac blocker zk node
-        VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker);
-        // check rejoin blocker node
-        if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
-            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
-        }
+//        if (worksWithElastic == 0 &&
+//            !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
+//            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
+//        }
+//
+//        // write uac blocker zk node
+//        VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker);
+//        // check rejoin blocker node
+//        if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
+//            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
+//            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
+//        }
 
         try {
             // Pull the current catalog and deployment version and hash info.  Validate that we're either:
@@ -627,7 +626,7 @@ public class UpdateCore extends VoltSystemProcedure {
                     requiresNewExportGeneration);
         } finally {
             // remove the uac blocker when exits
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
+//            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
         }
 
         // This is when the UpdateApplicationCatalog really ends in the blocking path

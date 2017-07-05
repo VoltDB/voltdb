@@ -318,6 +318,7 @@ public class CatalogContext {
         {
             // This means a @UpdateCore case, the asynchronous writing of
             // jar file has finished, rename the jar file
+            catalog_file.delete();
             catalog_tmp_file.renameTo(catalog_file);
             return null;
         } else if (!catalog_file.exists() && !catalog_tmp_file.exists()) {

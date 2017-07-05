@@ -23,7 +23,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -34,6 +37,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltNTSystemProcedure;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.client.ClientResponse;
@@ -62,6 +66,10 @@ import org.voltdb.utils.InMemoryJarfile;
 public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     protected static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    // indicates whether a catalog update is in progress
+    // using atomic operations could be much faster than using locks
+    protected static final AtomicBoolean catalogUpdateFlag = new AtomicBoolean(false);
 
     /**
      *
@@ -429,5 +437,78 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         if((errMsg = checkCatalogJarAsyncWriteResults(cf)) != null ) {
             throw new VoltAbortException(errMsg);
         }
+    }
+
+    protected CompletableFuture<ClientResponse> updateCatalog(CatalogChangeResult ccr) {
+        // TODO: Create ZK node to allow only one catalog update to happen concurrently
+
+        // create the catalog update blocker first
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+
+        // Only one catalog update at a time (since this is a NT proc, there might
+        // be multiple updates issued at the same time)
+        if (!catalogUpdateFlag.compareAndSet(false, true)) {
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
+                    "Can't write a new catalog when another one is in progress");
+        }
+
+        try {
+            // does not work with concurrent elastic operations
+            if (ccr.worksWithElastic == false &&
+                    !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
+                    catalogUpdateFlag.set(false);
+                    return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
+                                             "Can't do a catalog update while an elastic join or rejoin is active");
+                }
+
+            // only one catalog update at a time (this should not happen anyway)
+            if (zk.exists(VoltZK.uacActiveBlocker, false) != null) {
+                catalogUpdateFlag.set(false);
+                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
+                                         "Can't write a new catalog when another one is in progress");
+            }
+
+            // check rejoin blocker node
+            if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
+                catalogUpdateFlag.set(false);
+                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
+                                         "Can't do a catalog update while an elastic join or rejoin is active");
+            }
+        } catch (InterruptedException | KeeperException e) {
+            catalogUpdateFlag.set(false);
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, "Catalog update failed with exception:\n" +
+                                     e.getMessage());
+        }
+
+        // create uac blocker zk node (which may be checked in other rejoin/join operations)
+        VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker);
+
+        CompletableFuture<ClientResponse> response = null;
+
+        try {
+            // write the new catalog to a temporary jar file
+            writeNewCatalog(ccr.catalogBytes);
+
+            // update the catalog jar
+            response = callProcedure("@UpdateCore",
+                                     ccr.encodedDiffCommands,
+                                     ccr.catalogHash,
+                                     ccr.catalogBytes,
+                                     ccr.expectedCatalogVersion,
+                                     ccr.deploymentString,
+                                     ccr.tablesThatMustBeEmpty,
+                                     ccr.reasonsForEmptyTables,
+                                     ccr.requiresSnapshotIsolation ? 1 : 0,
+                                     ccr.worksWithElastic ? 1 : 0,
+                                     ccr.deploymentHash,
+                                     ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                                     ccr.hasSchemaChange ?  1 : 0,
+                                     ccr.requiresNewExportGeneration ? 1 : 0);
+        } finally {
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+            catalogUpdateFlag.set(false);
+        }
+
+        return response;
     }
 }

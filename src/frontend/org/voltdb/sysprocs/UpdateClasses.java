@@ -86,24 +86,6 @@ public class UpdateClasses extends UpdateApplicationBase {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
         }
 
-        // TODO: Create ZK node to allow only one catalog update to happen concurrently
-
-        // Write the new catalog to a temporary jar file
-        writeNewCatalog(ccr.catalogBytes);
-
-        return callProcedure("@UpdateCore",
-                             ccr.encodedDiffCommands,
-                             ccr.catalogHash,
-                             ccr.catalogBytes,
-                             ccr.expectedCatalogVersion,
-                             ccr.deploymentString,
-                             ccr.tablesThatMustBeEmpty,
-                             ccr.reasonsForEmptyTables,
-                             ccr.requiresSnapshotIsolation ? 1 : 0,
-                             ccr.worksWithElastic ? 1 : 0,
-                             ccr.deploymentHash,
-                             ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                             ccr.hasSchemaChange ?  1 : 0,
-                             ccr.requiresNewExportGeneration ? 1 : 0);
+        return updateCatalog(ccr);
     }
 }

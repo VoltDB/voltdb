@@ -20,21 +20,23 @@ package org.voltdb.sysprocs;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 
 public class WriteCatalog extends UpdateApplicationBase {
+
+    VoltLogger log = new VoltLogger("HOST");
+
     // Write the new catalog to a temporary jar file
     public CompletableFuture<ClientResponse> run(byte[] catalogBytes) throws Exception
     {
         // This should only be called once on each host
         try {
-            // Create the catalog update blocker first
-
-
             VoltDB.instance().writeCatalogJar(catalogBytes);
         } catch (IOException e) {
+            // Catalog disk write failed, include the message
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, e.getMessage());
         }
 
