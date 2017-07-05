@@ -947,7 +947,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat1 = compiler1.compileCatalogFromDDL(x1);
 
         String msg1 = CatalogUtil.compileDeployment(cat1, bad_deployment1, false);
-        assertTrue(msg1, msg1.contains("Error validating deployment configuration: Import failed to configure, two Kafka configurations have the same groupid and topic."));
+        assertTrue(msg1, msg1.contains("Error validating deployment configuration: Invalid import configuration. Two Kafka entries have the same groupid and topic."));
 
         //import with bad kafka configuration: overlapping topics
         final File tmpBad2 = VoltProjectBuilder.writeStringToTempFile(withBadImport2);
@@ -958,7 +958,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat2 = compiler2.compileCatalogFromDDL(x2);
 
         String msg2 = CatalogUtil.compileDeployment(cat2, bad_deployment2, false);
-        assertTrue(msg2, msg2.contains("Error validating deployment configuration: Import failed to configure, two Kafka configurations have the same groupid and topic."));
+        assertTrue(msg2, msg2.contains("Error validating deployment configuration: Invalid import configuration. Two Kafka entries have the same groupid and topic."));
 
         //import with bad kafka configuration: double reduntand topics;
         final File tmpBad3 = VoltProjectBuilder.writeStringToTempFile(withBadImport3);
@@ -969,7 +969,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat3 = compiler3.compileCatalogFromDDL(x3);
 
         String msg3 = CatalogUtil.compileDeployment(cat3, bad_deployment3, false);
-        assertTrue(msg3, msg3.contains("Error validating deployment configuration: Import failed to configure, two Kafka configurations have the same groupid and topic."));
+        assertTrue(msg3, msg3.contains("Error validating deployment configuration: Invalid import configuration. Two Kafka entries have the same groupid and topic."));
 
         // same topics for different groupids are okay
         final File tmpGood1 = VoltProjectBuilder.writeStringToTempFile(withGoodImport1);
@@ -1003,8 +1003,6 @@ public class TestCatalogUtil extends TestCase {
 
         String msg6 = CatalogUtil.compileDeployment(cat6, good_deployment3, false);
         assertNull(msg6);
-
-        System.out.println("Kafka importer configuration tests done.");
     }
 
     /**
