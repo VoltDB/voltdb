@@ -2,6 +2,10 @@
 -- UserDefinedTestFunctions.java, using various data types, and with
 -- various numbers of arguments.
 
+-- TODO: I'm not certain whether Byte[] (as opposed to byte[]) is a valid
+-- way to represent VARBINARY; if not, then add2VarbinaryBoxed & btrimBoxed
+-- should be removed
+
 -- First, drop all the test UDF's (user-defined functions), and remove the class
 -- containing them, in case they were loaded and created previously
 
@@ -23,47 +27,47 @@ DROP FUNCTION addYearsToTimestamp IF EXISTS;
 DROP FUNCTION add2GeographyPoint  IF EXISTS;
 DROP FUNCTION addGeographyPointToGeography IF EXISTS;
 
-DROP FUNCTION pi_UDF        IF EXISTS;
-DROP FUNCTION pi_UDF_Boxed  IF EXISTS;
-DROP FUNCTION abs_TINYINT   IF EXISTS;
-DROP FUNCTION abs_SMALLINT  IF EXISTS;
-DROP FUNCTION abs_INTEGER   IF EXISTS;
-DROP FUNCTION abs_BIGINT    IF EXISTS;
-DROP FUNCTION abs_FLOAT     IF EXISTS;
-DROP FUNCTION abs_TINYINT_Boxed  IF EXISTS;
-DROP FUNCTION abs_SMALLINT_Boxed IF EXISTS;
-DROP FUNCTION abs_INTEGER_Boxed  IF EXISTS;
-DROP FUNCTION abs_BIGINT_Boxed   IF EXISTS;
-DROP FUNCTION abs_FLOAT_Boxed    IF EXISTS;
-DROP FUNCTION abs_DECIMAL   IF EXISTS;
-DROP FUNCTION reverse       IF EXISTS;
-DROP FUNCTION numRings      IF EXISTS;
-DROP FUNCTION numPoints_UDF IF EXISTS;
+DROP FUNCTION piUdf        IF EXISTS;
+DROP FUNCTION piUdfBoxed   IF EXISTS;
+DROP FUNCTION absTinyint   IF EXISTS;
+DROP FUNCTION absSmallint  IF EXISTS;
+DROP FUNCTION absInteger   IF EXISTS;
+DROP FUNCTION absBigint    IF EXISTS;
+DROP FUNCTION absFloat     IF EXISTS;
+DROP FUNCTION absTinyintBoxed  IF EXISTS;
+DROP FUNCTION absSmallintBoxed IF EXISTS;
+DROP FUNCTION absIntegerBoxed  IF EXISTS;
+DROP FUNCTION absBigintBoxed   IF EXISTS;
+DROP FUNCTION absFloatBoxed    IF EXISTS;
+DROP FUNCTION absDecimal   IF EXISTS;
+DROP FUNCTION reverse      IF EXISTS;
+DROP FUNCTION numRings     IF EXISTS;
+DROP FUNCTION numPointsUdf IF EXISTS;
 
-DROP FUNCTION mod_TINYINT  IF EXISTS;
-DROP FUNCTION mod_SMALLINT IF EXISTS;
-DROP FUNCTION mod_INTEGER  IF EXISTS;
-DROP FUNCTION mod_BIGINT   IF EXISTS;
-DROP FUNCTION mod_FLOAT    IF EXISTS;
-DROP FUNCTION mod_TINYINT_Boxed  IF EXISTS;
-DROP FUNCTION mod_SMALLINT_Boxed IF EXISTS;
-DROP FUNCTION mod_INTEGER_Boxed  IF EXISTS;
-DROP FUNCTION mod_BIGINT_Boxed   IF EXISTS;
-DROP FUNCTION mod_FLOAT_Boxed    IF EXISTS;
-DROP FUNCTION mod_DECIMAL  IF EXISTS;
-DROP FUNCTION btrim        IF EXISTS;
-DROP FUNCTION btrim_Boxed    IF EXISTS;
+DROP FUNCTION modTinyint  IF EXISTS;
+DROP FUNCTION modSmallint IF EXISTS;
+DROP FUNCTION modInteger  IF EXISTS;
+DROP FUNCTION modBigint   IF EXISTS;
+DROP FUNCTION modFloat    IF EXISTS;
+DROP FUNCTION modTinyintBoxed  IF EXISTS;
+DROP FUNCTION modSmallintBoxed IF EXISTS;
+DROP FUNCTION modIntegerBoxed  IF EXISTS;
+DROP FUNCTION modBigintBoxed   IF EXISTS;
+DROP FUNCTION modFloatBoxed    IF EXISTS;
+DROP FUNCTION modDecimal  IF EXISTS;
+DROP FUNCTION btrim       IF EXISTS;
+DROP FUNCTION btrimBoxed     IF EXISTS;
 DROP FUNCTION concat2Varchar IF EXISTS;
 DROP FUNCTION concat3Varchar IF EXISTS;
 DROP FUNCTION concat4Varchar IF EXISTS;
 
-remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+-- Load the class containing the test UDF's (user-defined functions); but
+-- first, remove the class, in case it was loaded previously
+-- TODO: these are needed when running in sqlcmd, but don't work when running
+-- JUnit regresssionsuites tests (apparently because it only supports "true" DDL):
+--remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+--load classes testfuncs.jar;
 
--- This does not seem to work; I'm not sure whether it should:
---remove classes org.voltdb_testfuncs.UserDefinedTestException;
-
--- Load the class containing the test UDF's (user-defined functions)
-load classes testfuncs.jar;
 
 -- Create the 'add...' test UDF's, which throw all kinds of exceptions, and
 -- return various flavors of VoltDB 'null' values, when given certain special
@@ -82,9 +86,10 @@ CREATE FUNCTION add2FloatBoxed    FROM METHOD org.voltdb_testfuncs.UserDefinedTe
 CREATE FUNCTION add2Decimal   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Decimal;
 CREATE FUNCTION add2Varchar   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varchar;
 CREATE FUNCTION add2Varbinary FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varbinary;
-CREATE FUNCTION addYearsToTimestamp FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addYearsToTimestamp;
+CREATE FUNCTION add2VarbinaryBoxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2VarbinaryBoxed;
+CREATE FUNCTION addYearsToTimestamp  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addYearsToTimestamp;
 -- TODO: uncomment these once UDF's using GEOGRAPHY_POINT and GEOGRAPHY work:
---CREATE FUNCTION add2GeographyPoint  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
+--CREATE FUNCTION add2GeographyPoint FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
 --CREATE FUNCTION addGeographyPointToGeography FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography;
 
 -- Create simple test UDF's with 0 or 1 arguments (these, and the ones below,
@@ -92,38 +97,39 @@ CREATE FUNCTION addYearsToTimestamp FROM METHOD org.voltdb_testfuncs.UserDefined
 -- of their way to throw exceptions or return VoltDB null values, so they could
 -- be used by SqlCoverage):
 
-CREATE FUNCTION pi_UDF       FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.pi_UDF;
-CREATE FUNCTION pi_UDF_Boxed       FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.pi_UDF_Boxed;
-CREATE FUNCTION abs_TINYINT  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_TINYINT;
-CREATE FUNCTION abs_SMALLINT FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_SMALLINT;
-CREATE FUNCTION abs_INTEGER  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_INTEGER;
-CREATE FUNCTION abs_BIGINT   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_BIGINT;
-CREATE FUNCTION abs_FLOAT    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_FLOAT;
-CREATE FUNCTION abs_TINYINT_Boxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_TINYINT_Boxed;
-CREATE FUNCTION abs_SMALLINT_Boxed FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_SMALLINT_Boxed;
-CREATE FUNCTION abs_INTEGER_Boxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_INTEGER_Boxed;
-CREATE FUNCTION abs_BIGINT_Boxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_BIGINT_Boxed;
-CREATE FUNCTION abs_FLOAT_Boxed    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_FLOAT_Boxed;
-CREATE FUNCTION abs_DECIMAL  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.abs_DECIMAL;
-CREATE FUNCTION reverse   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.reverse;
+CREATE FUNCTION piUdf       FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.piUdf;
+CREATE FUNCTION piUdfBoxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.piUdfBoxed;
+CREATE FUNCTION absTinyint  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absTinyint;
+CREATE FUNCTION absSmallint FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absSmallint;
+CREATE FUNCTION absInteger  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absInteger;
+CREATE FUNCTION absBigint   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absBigint;
+CREATE FUNCTION absFloat    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absFloat;
+CREATE FUNCTION absTinyintBoxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absTinyintBoxed;
+CREATE FUNCTION absSmallintBoxed FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absSmallintBoxed;
+CREATE FUNCTION absIntegerBoxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absIntegerBoxed;
+CREATE FUNCTION absBigintBoxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absBigintBoxed;
+CREATE FUNCTION absFloatBoxed    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absFloatBoxed;
+CREATE FUNCTION absDecimal  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absDecimal;
+CREATE FUNCTION reverse     FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.reverse;
 -- TODO: uncomment these once UDF's using GEOGRAPHY work:
 --CREATE FUNCTION numRings  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numRings;
---CREATE FUNCTION numPoints_UDF FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numPoints;
+--CREATE FUNCTION numPointsUdf   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numPointsUdf;
 
 -- Create simple test UDF's with 2 arguments
 
-CREATE FUNCTION mod_TINYINT  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_TINYINT;
-CREATE FUNCTION mod_SMALLINT FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_SMALLINT;
-CREATE FUNCTION mod_INTEGER  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_INTEGER;
-CREATE FUNCTION mod_BIGINT   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_BIGINT;
-CREATE FUNCTION mod_FLOAT    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_FLOAT;
-CREATE FUNCTION mod_TINYINT_Boxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_TINYINT_Boxed;
-CREATE FUNCTION mod_SMALLINT_Boxed FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_SMALLINT_Boxed;
-CREATE FUNCTION mod_INTEGER_Boxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_INTEGER_Boxed;
-CREATE FUNCTION mod_BIGINT_Boxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_BIGINT_Boxed;
-CREATE FUNCTION mod_FLOAT_Boxed    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_FLOAT_Boxed;
-CREATE FUNCTION mod_DECIMAL  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.mod_DECIMAL;
-CREATE FUNCTION btrim        FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.btrim;
+CREATE FUNCTION modTinyint  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modTinyint;
+CREATE FUNCTION modSmallint FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modSmallint;
+CREATE FUNCTION modInteger  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modInteger;
+CREATE FUNCTION modBigint   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modBigint;
+CREATE FUNCTION modFloat    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modFloat;
+CREATE FUNCTION modTinyintBoxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modTinyintBoxed;
+CREATE FUNCTION modSmallintBoxed FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modSmallintBoxed;
+CREATE FUNCTION modIntegerBoxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modIntegerBoxed;
+CREATE FUNCTION modBigintBoxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modBigintBoxed;
+CREATE FUNCTION modFloatBoxed    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modFloatBoxed;
+CREATE FUNCTION modDecimal  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.modDecimal;
+CREATE FUNCTION btrim       FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.btrim;
+CREATE FUNCTION btrimBoxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.btrimBoxed;
 CREATE FUNCTION concat2Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.concat2Varchar;
 
 -- Create simple test UDF's with 3+ arguments
@@ -132,6 +138,8 @@ CREATE FUNCTION concat3Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestF
 CREATE FUNCTION concat4Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.concat4Varchar;
 
 
--- These just show that the functions have been loaded and created successfully:
-show classes;
-show functions;
+-- These just show that the functions have been loaded and created successfully
+-- TODO: these are helpful when running in sqlcmd, but don't work when running
+-- JUnit regresssionsuites tests (apparently because it only supports "true" DDL):
+--show classes;
+--show functions;

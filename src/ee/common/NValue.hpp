@@ -315,7 +315,7 @@ class NValue {
     void serializeTo(SerializeOutput &output) const;
 
     /* Serialize this NValue to an Export stream */
-    void serializeToExport_withoutNull(ExportSerializeOutput&, const bool encodeType = false) const;
+    void serializeToExport_withoutNull(ExportSerializeOutput&) const;
 
     // See comment with inlined body, below.  If NULL is supplied for
     // the pool, use the temp string pool.
@@ -3167,13 +3167,10 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
 }
 
 
-inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io, const bool encodeType) const
+inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
 {
     assert(isNull() == false);
     const ValueType type = getValueType();
-    if (encodeType) {
-        io.writeEnumInSingleByte(type);
-    }
     switch (type) {
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:

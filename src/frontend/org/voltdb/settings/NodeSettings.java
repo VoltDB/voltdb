@@ -193,15 +193,9 @@ public interface NodeSettings extends Settings {
                 throw new SettingsException("Missing VoltDB root " +
                                             "information in path.properties file.");
             }
-            File voltdbroot = getVoltDBRoot().getCanonicalFile();
-            mb.put(VOLTDBROOT_PATH_KEY, voltdbroot.getCanonicalPath());
+            mb.put(VOLTDBROOT_PATH_KEY, getVoltDBRoot().getCanonicalPath());
             for (Map.Entry<String, File> e: getManagedArtifactPaths().entrySet()) {
-                File path = e.getValue();
-                if (path.isAbsolute()) {
-                    mb.put(e.getKey(), path.getCanonicalPath());
-                } else {
-                    mb.put(e.getKey(), voltdbroot.toPath().relativize(path.getCanonicalFile().toPath()).toString());
-                }
+                mb.put(e.getKey(), e.getValue().getCanonicalPath());
             }
             mb.put(LOCAL_SITES_COUNT_KEY, Integer.toString(getLocalSitesCount()));
         } catch (IOException e) {
