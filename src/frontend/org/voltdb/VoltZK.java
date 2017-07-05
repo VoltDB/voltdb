@@ -313,4 +313,15 @@ public class VoltZK {
         }
         return true;
     }
+
+    public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {
+        try {
+            ZKUtil.deleteRecursively(zk, node);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NONODE) {
+                log.debug("Failed to remove stop node indicator " + node + " on ZK: " + e.getMessage());
+            }
+            return;
+        } catch (InterruptedException ignore) {}
+    }
 }

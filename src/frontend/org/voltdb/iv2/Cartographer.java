@@ -32,12 +32,14 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -79,7 +81,6 @@ public class Cartographer extends StatsSource
     public static final String JSON_PARTITION_ID = "partitionId";
     public static final String JSON_INITIATOR_HSID = "initiatorHSId";
     private final int m_configuredReplicationFactor;
-    private final boolean m_partitionDetectionEnabled;
 
     private final ExecutorService m_es
             = CoreUtils.getCachedSingleThreadExecutor("Cartographer", 15000);
@@ -178,7 +179,6 @@ public class Cartographer extends StatsSource
         m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
         m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi, m_MPICallback);
         m_configuredReplicationFactor = configuredReplicationFactor;
-        m_partitionDetectionEnabled = partitionDetectionEnabled;
         try {
             m_iv2Masters.start(true);
             m_iv2Mpi.start(true);
@@ -528,7 +528,7 @@ public class Cartographer extends StatsSource
     }
 
     //Check partition replicas.
-    public synchronized boolean isClusterSafeIfNodeDies(final Set<Integer> liveHids, final int hid) {
+    public synchronized boolean stopNodeIfClusterIsSafe(final Set<Integer> liveHids, final int ihid) {
         try {
             return m_es.submit(new Callable<Boolean>() {
                 @Override
@@ -544,7 +544,33 @@ public class Cartographer extends StatsSource
                         }
                     } catch (KeeperException.NoNodeException ignore) {} // shouldn't happen
                     //Otherwise we do check replicas for host
-                    return doPartitionsHaveReplicas(hid);
+                    Set<Integer> otherStoppedHids = new HashSet<Integer>();
+                    // Write the id of node to be stopped to ZK, partition detection will bypass this node.
+                    ZKUtil.addIfMissing(m_zk, ZKUtil.joinZKPath(VoltZK.host_ids_be_stopped, Integer.toString(ihid)), CreateMode.PERSISTENT, null);
+                    try {
+                        List<String> children = m_zk.getChildren(VoltZK.host_ids_be_stopped, false);
+                        for (String child : children) {
+                            int hostId = Integer.parseInt(child);
+                            otherStoppedHids.add(hostId);
+                        }
+                        otherStoppedHids.remove(ihid); /* don't count self */
+                    } catch (KeeperException.NoNodeException ignore) {}
+                    boolean safe = doPartitionsHaveReplicas(ihid, otherStoppedHids);
+                    if (safe) {
+                        m_hostMessenger.sendStopNodeNotice(ihid);
+                        // Shutdown or send poison pill
+                        int hid = m_hostMessenger.getHostId();
+                        if (hid == ihid) {
+                            //Killing myself no pill needs to be sent
+                            VoltDB.instance().halt();
+                        } else {
+                            //Send poison pill with target to kill
+                            m_hostMessenger.sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
+                        }
+                    } else {
+                        ZKUtil.deleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.host_ids_be_stopped, Integer.toString(ihid)));
+                    }
+                    return safe;
                 }
             }).get();
         } catch (InterruptedException | ExecutionException t) {
@@ -553,8 +579,9 @@ public class Cartographer extends StatsSource
         return false;
     }
 
-    private boolean doPartitionsHaveReplicas(int hid) {
+    private boolean doPartitionsHaveReplicas(int hid, Set<Integer> nodesBeingStopped) {
         hostLog.debug("Cartographer: Reloading partition information.");
+        assert (!nodesBeingStopped.contains(hid));
         List<String> partitionDirs = null;
         try {
             partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
@@ -598,6 +625,7 @@ public class Cartographer extends StatsSource
                 //Get Hosts for replicas
                 final List<Integer> replicaHost = new ArrayList<>();
                 boolean hostHasReplicas = false;
+                boolean stoppingHostHasReplicas = false;
                 for (String replica : replicas) {
                     final String split[] = replica.split("/");
                     final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
@@ -605,10 +633,16 @@ public class Cartographer extends StatsSource
                     if (hostId == hid) {
                         hostHasReplicas = true;
                     }
+                    if (nodesBeingStopped.contains(hostId)) {
+                        stoppingHostHasReplicas = true;
+                    }
                     replicaHost.add(hostId);
                 }
                 hostLog.debug("Replica Host for Partition " + pid + " " + replicaHost);
                 if (hostHasReplicas && replicaHost.size() <= 1) {
+                    return false;
+                }
+                if (hostHasReplicas && stoppingHostHasReplicas && replicaHost.size() <= nodesBeingStopped.size() + 1) {
                     return false;
                 }
             } catch (InterruptedException | KeeperException | NumberFormatException e) {

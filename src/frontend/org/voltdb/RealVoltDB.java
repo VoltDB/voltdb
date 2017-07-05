@@ -1618,7 +1618,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void hostsFailed(Set<Integer> previousHosts, Set<Integer> failedHosts)
+    public void hostsFailed(Set<Integer> failedHosts)
     {
         final ScheduledExecutorService es = getSES(true);
         if (es != null && !es.isShutdown()) {
@@ -1626,12 +1626,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 @Override
                 public void run()
                 {
-                    // Decide if the failures given could put the cluster in a split-brain
-                    // Then decide if we should shut down to ensure that at a MAXIMUM, only
-                    // one viable cluster is running.
-                    // This feature is called "Partition Detection" in the docs.
-                    m_messenger.detectNetworkPartitions(previousHosts, failedHosts);
-
                     // First check to make sure that the cluster still is viable before
                     // before allowing the fault log to be updated by the notifications
                     // generated below.
@@ -1667,8 +1661,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // when a rejoining node fails, there must be a live node that
                     // can clean things up. It's okay to skip this if the executor
                     // services are not set up yet.
+                    //
+                    // Also be defensive to cleanup stop node indicator on all live
+                    // hosts.
                     for (int hostId : failedHosts) {
                         CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
+                        VoltZK.removeStopNodeIndicator(m_messenger.getZK(),
+                                ZKUtil.joinZKPath(VoltZK.host_ids_be_stopped, Integer.toString(hostId)),
+                                hostLog);
+                        m_messenger.removeStopNodeNotice(hostId);
                     }
 
                     // If the current node hasn't finished rejoin when another

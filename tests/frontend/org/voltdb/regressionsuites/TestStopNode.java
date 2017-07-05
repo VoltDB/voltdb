@@ -24,6 +24,8 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.BackendTarget;
@@ -34,6 +36,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.collect.Sets.SetView;
 
 import junit.framework.Test;
 
@@ -74,13 +79,13 @@ public class TestStopNode extends RegressionSuite
 
     }
 
-    public void waitForHostToBeGone(int[] hids) {
-        for (int hsId : hids) {
-            waitForHostToBeGone(hsId);
-        }
+    public void waitForHostToBeGone(int hid) {
+        Set<Integer> hids = new HashSet<Integer>();
+        hids.add(hid);
+        waitForHostsToBeGone(hids);
     }
 
-    public void waitForHostToBeGone(int hid) {
+    public void waitForHostsToBeGone(Set<Integer> hids) {
         while (true) {
             Client client = null;
             VoltTable table = null;
@@ -94,22 +99,16 @@ public class TestStopNode extends RegressionSuite
                 System.out.println("Failed to get SystemInformation overview: " + ex.getMessage());
                 continue;
             }
-            boolean done = true;
+            Set<Integer> liveHids = new HashSet<Integer>();
             while (table.advanceRow()) {
-                long hc = table.getLong("HOST_ID");
-                if (hc == hid) {
-                    done = false;
-                    break;
-                }
+                liveHids.add((int)table.getLong("HOST_ID"));
             }
-            System.out.println("Host " + hid + " Still there");
-            if (done) {
-                if (client != null) {
-                    try {
-                        client.close();
-                    } catch (InterruptedException ex) {
-                    }
-                }
+            SetView<Integer> intersect = Sets.intersection(liveHids, hids);
+            if (!intersect.isEmpty()) {
+                intersect.forEach((hid) -> {
+                    if (hids.contains(hid)) System.out.println("Host " + hid + " Still there");
+                });
+            } else {
                 return;
             }
         }
@@ -174,14 +173,18 @@ public class TestStopNode extends RegressionSuite
         client.createConnection("localhost", m_config.port(0));
 
         try {
-            CountDownLatch cdl = new CountDownLatch(1);
+            CountDownLatch cdl = new CountDownLatch(3);
             byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
             client.callProcedure(new StopCallBack(cdl, expectedResponse, 4), "@StopNode", 4);
             client.callProcedure(new StopCallBack(cdl, expectedResponse, 3), "@StopNode", 3);
             client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
             cdl.await();
             if (expectedResponse == ClientResponse.SUCCESS) {
-                waitForHostToBeGone(new int[] {4, 3, 2});
+                Set<Integer> hids = new HashSet<Integer>();
+                hids.add(4);
+                hids.add(3);
+                hids.add(2);
+                waitForHostsToBeGone(hids);
             }
             client.callProcedure("@SystemInformation", "overview");
         } catch (Exception ex) {
@@ -197,6 +200,52 @@ public class TestStopNode extends RegressionSuite
             //Stop already stopped node.
             client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
             //Stop a node that should stay up
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
+            client.callProcedure("@SystemInformation", "overview");
+            client.drain();
+            cdl.await();
+        } catch (Exception pce) {
+            pce.printStackTrace();
+            lostConnect = pce.getMessage().contains("was lost before a response was received");
+        }
+        //We should never lose contact.
+        assertFalse(lostConnect);
+    }
+
+    public void testStopNodesMoreThanAllowed() throws Exception {
+        if (kfactor < 1) return;
+
+        Client client = ClientFactory.createClient();
+
+        client.createConnection("localhost", m_config.port(3));
+
+        try {
+            CountDownLatch cdl = new CountDownLatch(4);
+            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 0), "@StopNode", 0);
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 1), "@StopNode", 1);
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 3), "@StopNode", 3);  /*should stay up*/
+            cdl.await();
+            if (expectedResponse == ClientResponse.SUCCESS) {
+                Set<Integer> hids = new HashSet<Integer>();
+                hids.add(0);
+                hids.add(1);
+                hids.add(2);
+                waitForHostsToBeGone(hids);
+            }
+            client.callProcedure("@SystemInformation", "overview");
+        } catch (Exception ex) {
+            //We should not get here
+            fail();
+            ex.printStackTrace();
+        }
+        boolean lostConnect = false;
+        try {
+            CountDownLatch cdl = new CountDownLatch(2);
+            //Stop a node that should stay up
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
+            //Stop already stopped node.
             client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
             client.callProcedure("@SystemInformation", "overview");
             client.drain();
@@ -226,13 +275,13 @@ public class TestStopNode extends RegressionSuite
             kfactor = 0;
         }
         m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
-        m_config.setHasLocalServer(true);
+        m_config.setHasLocalServer(false);
         project.setPartitionDetectionEnabled(true);
         success = m_config.compile(project);
         assertTrue(success);
 
         // add this config to the set of tests to run
-        builder.addServerConfig(m_config);
+        builder.addServerConfig(m_config, false);
         return builder;
     }
 }
