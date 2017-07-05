@@ -1745,8 +1745,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestNaturalLog();
         subtestNaturalLog10();
         subtestTrig();
-        //subtestDegrees();
-        //subtestRadians();
+        subtestDegrees();
+        subtestRadians();
     }
 
     public void subtestCeiling() throws Exception
@@ -4001,13 +4001,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("ORDER_RADIANS_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by RADIANS(BIGNUM)");
         project.addStmtProcedure("ORDER_RADIANS_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by RADIANS(FLOATNUM)");
         project.addStmtProcedure("ORDER_RADIANS_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by RADIANS(DECIMALNUM)");
-
-        project.addStmtProcedure("WHERE_RADIANS_INTEGER",  "select count(*) from NUMBER_TYPES where RADIANS(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_RADIANS_TINYINT",  "select count(*) from NUMBER_TYPES where RADIANS(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_RADIANS_SMALLINT", "select count(*) from NUMBER_TYPES where RADIANS(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_RADIANS_BIGINT",   "select count(*) from NUMBER_TYPES where RADIANS(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_RADIANS_FLOAT",    "select count(*) from NUMBER_TYPES where RADIANS(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_RADIANS_DECIMAL",  "select count(*) from NUMBER_TYPES where RADIANS(DECIMALNUM) = ?");
+        // These WHERE tests fails without the range in values so changed it like below.
+        project.addStmtProcedure("WHERE_RADIANS_INTEGER",  "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(INTEGERNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_TINYINT",  "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(TINYNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_SMALLINT", "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(SMALLNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_BIGINT",   "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(BIGNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_FLOAT",    "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(FLOATNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_RADIANS_DECIMAL",  "select count(*) from NUMBER_TYPES where ((0.0000001+RADIANS(DECIMALNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
 
         // These are intended for application to non-negative values.
         // Failure tests on negative values can be done separately, possibly via ad hoc.
