@@ -474,9 +474,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize: " +
+                    "Failed to canonicalize: " +
                     m_nodeSettings.getVoltDBRoot() +
-                    " reason: " +
+                    ". Reason: " +
                     e.getMessage()
             );
         }
@@ -528,9 +528,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize: " +
+                    "Failed to canonicalize: " +
                     m_nodeSettings.getVoltDBRoot() +
-                    " reason: " +
+                    ". Reason: " +
                     e.getMessage()
             );
         }

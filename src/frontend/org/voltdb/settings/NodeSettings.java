@@ -87,9 +87,9 @@ public interface NodeSettings extends Settings {
             return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath()).getCanonicalFile();
         } catch (IOException e) {
             throw new SettingsException(
-                    "failed to canonicalize: " +
+                    "Failed to canonicalize: " +
                     path.toString() +
-                    "reason: " +
+                    ". Reason: " +
                     e.getMessage());
         }
     }

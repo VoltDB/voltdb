@@ -831,18 +831,18 @@ public class VoltDB {
 
         public Map<String,String> asRelativePathSettingsMap() {
             try {
-            Settings.initialize(m_voltdbRoot);
-            File currDir = new File("").getCanonicalFile();
-            File voltdbroot = m_voltdbRoot.getCanonicalFile();
-            String relativePath = currDir.toPath().relativize(voltdbroot.toPath()).toString();
-            return ImmutableMap.<String, String>builder()
-                    .put(NodeSettings.VOLTDBROOT_PATH_KEY, relativePath)
-                    .build();
+                Settings.initialize(m_voltdbRoot);
+                File currDir = new File("").getCanonicalFile();
+                File voltdbroot = m_voltdbRoot.getCanonicalFile();
+                String relativePath = currDir.toPath().relativize(voltdbroot.toPath()).toString();
+                return ImmutableMap.<String, String>builder()
+                        .put(NodeSettings.VOLTDBROOT_PATH_KEY, relativePath)
+                        .build();
             } catch (IOException e) {
                 throw new SettingsException(
-                        "failed to relativize voltdbroot " +
+                        "Failed to relativize voltdbroot " +
                         m_voltdbRoot.getPath() +
-                        " Reason: " +
+                        ". Reason: " +
                         e.getMessage());
             }
         }
