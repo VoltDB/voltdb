@@ -976,7 +976,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
         results[1].advanceRow();
         assertEquals(VoltType.NULL_TINYINT, results[1].get("A_TINYINT", VoltType.TINYINT));
-        assertEquals(VoltType.NULL_SMALLINT , results[1].get("A_TSMALLINT", VoltType.SMALLINT));
+        assertEquals(VoltType.NULL_SMALLINT , results[1].get("A_SMALLINT", VoltType.SMALLINT));
     }
 
     public void testMissingAttributeInsert_With_Defaults()
