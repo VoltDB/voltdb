@@ -174,6 +174,11 @@ public interface VoltDBInterface
         return;
     }
 
+    default public boolean verifyZKCatalog()
+    {
+        return true;
+    }
+
     /**
      * Updates the cluster setting of this VoltDB
      * @param settings the {@link ClusterSettings} update candidate

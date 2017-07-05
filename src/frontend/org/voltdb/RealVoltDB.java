@@ -160,6 +160,7 @@ import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.sysprocs.UpdateCore.JavaClassForTest;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
@@ -168,6 +169,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -199,6 +201,21 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * to allow test mocking.
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.HostWatcher {
+
+    static JavaClassForTest m_javaClass = new JavaClassForTest();
+
+    public final static HashMap<Integer, String> m_versionMap = new HashMap<>();
+    static {
+        m_versionMap.put(45, "Java 1.1");
+        m_versionMap.put(46, "Java 1.2");
+        m_versionMap.put(47, "Java 1.3");
+        m_versionMap.put(48, "Java 1.4");
+        m_versionMap.put(49, "Java 5");
+        m_versionMap.put(50, "Java 6");
+        m_versionMap.put(51, "Java 7");
+        m_versionMap.put(52, "Java 8");
+    }
+
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "true"));
 
     /** Default deployment file contents if path to deployment is null */
@@ -3327,6 +3344,59 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             InMemoryJarfile.writeToFile(catalogBytes, new VoltFile(configInfoDir.getPath(),
                                         InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
         }
+    }
+
+    // Verify the integrity of the newly updated catalog stored on the ZooKeeper
+    @Override
+    public boolean verifyZKCatalog() {
+        CatalogAndIds catalogStuff = null;
+        try {
+            catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+            InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.catalogBytes);
+            JarLoader testjarloader = testjar.getLoader();
+            for (String classname : testjarloader.getClassNames()) {
+                try {
+                    m_javaClass.forName(classname, true, testjarloader);
+                }
+                // LinkageError catches most of the various class loading errors we'd
+                // care about here.
+                catch (UnsupportedClassVersionError e) {
+                    String msg = "Cannot load classes compiled with a higher version of Java than currently" +
+                                 " in use. Class " + classname + " was compiled with ";
+
+                    Integer major = 0;
+                    try {
+                        major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
+                    } catch (Exception ex) {
+                        hostLog.debug("Unable to parse compile version number from UnsupportedClassVersionError.",
+                                ex);
+                    }
+
+                    if (m_versionMap.containsKey(major)) {
+                        msg = msg.concat(m_versionMap.get(major) + ", current runtime version is " +
+                                         System.getProperty("java.version") + ".");
+                    } else {
+                        msg = msg.concat("an incompatable Java version.");
+                    }
+                    hostLog.error(msg);
+                    return false;
+                }
+                catch (LinkageError | ClassNotFoundException e) {
+                    String cause = e.getMessage();
+                    if (cause == null && e.getCause() != null) {
+                        cause = e.getCause().getMessage();
+                    }
+                    String msg = "Error loading class: " + classname + " from catalog: " +
+                        e.getClass().getCanonicalName() + ", " + cause;
+                    hostLog.warn(msg);
+                    return false;
+                }
+            }
+        } catch (Exception e) {
+            return false;
+        }
+
+        return true;
     }
 
     @Override

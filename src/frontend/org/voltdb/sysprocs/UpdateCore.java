@@ -41,8 +41,6 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -51,8 +49,6 @@ import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -251,93 +247,93 @@ public class UpdateCore extends VoltSystemProcedure {
             ParameterSet params, SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSync) {
-            String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
-            String[] reasonsForEmptyTables = (String[]) params.getParam(1);
-            checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
-
-            // Send out fragments to do the initial round-trip to synchronize
-            // all the cluster sites on the start of catalog update, we'll do
-            // the actual work on the *next* round-trip below
-
-            // Don't actually care about the returned table, just need to send something
-            // back to the MPI scoreboard
-            DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
-                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
-
-            if ( ! context.isLowestSiteId()) {
-                // Any class-loading issues with the new catalog jar only need
-                // to be flagged by one site per host. So, for speed, return
-                // early from all sites except one -- the site with the lowest
-                // id on this host.
-                if (log.isInfoEnabled()) {
-                    log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-                            " completed data precheck.");
-                }
-                return success;
-            }
-
-            // We know the ZK bytes are okay because the run() method wrote them before sending
-            // out fragments
-            CatalogAndIds catalogStuff = null;
-            try {
-                catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-                InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.catalogBytes);
-                JarLoader testjarloader = testjar.getLoader();
-                for (String classname : testjarloader.getClassNames()) {
-                    try {
-                        m_javaClass.forName(classname, true, testjarloader);
-                    }
-                    // LinkageError catches most of the various class loading errors we'd
-                    // care about here.
-                    catch (UnsupportedClassVersionError e) {
-                        String msg = "Cannot load classes compiled with a higher version of Java than currently" +
-                                     " in use. Class " + classname + " was compiled with ";
-
-                        Integer major = 0;
-                        try {
-                            major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
-                        } catch (Exception ex) {
-                            log.debug("Unable to parse compile version number from UnsupportedClassVersionError.",
-                                    ex);
-                        }
-
-                        if (m_versionMap.containsKey(major)) {
-                            msg = msg.concat(m_versionMap.get(major) + ", current runtime version is " +
-                                             System.getProperty("java.version") + ".");
-                        } else {
-                            msg = msg.concat("an incompatable Java version.");
-                        }
-                        log.error(msg);
-                        throw new VoltAbortException(msg);
-                    }
-                    catch (LinkageError | ClassNotFoundException e) {
-                        String cause = e.getMessage();
-                        if (cause == null && e.getCause() != null) {
-                            cause = e.getCause().getMessage();
-                        }
-                        String msg = "Error loading class: " + classname + " from catalog: " +
-                            e.getClass().getCanonicalName() + ", " + cause;
-                        log.warn(msg);
-                        throw new VoltAbortException(e);
-                    }
-                }
-            } catch (Exception e) {
-                Throwables.propagate(e);
-            }
-
-            if (log.isInfoEnabled()) {
-                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-                        " completed data and catalog precheck.");
-            }
-            return success;
+//            String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
+//            String[] reasonsForEmptyTables = (String[]) params.getParam(1);
+//            checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
+//
+//            // Send out fragments to do the initial round-trip to synchronize
+//            // all the cluster sites on the start of catalog update, we'll do
+//            // the actual work on the *next* round-trip below
+//
+//            // Don't actually care about the returned table, just need to send something
+//            // back to the MPI scoreboard
+//            DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
+//                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+//
+//            if ( ! context.isLowestSiteId()) {
+//                // Any class-loading issues with the new catalog jar only need
+//                // to be flagged by one site per host. So, for speed, return
+//                // early from all sites except one -- the site with the lowest
+//                // id on this host.
+//                if (log.isInfoEnabled()) {
+//                    log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+//                            " completed data precheck.");
+//                }
+//                return success;
+//            }
+//
+//            // We know the ZK bytes are okay because the run() method wrote them before sending
+//            // out fragments
+//            CatalogAndIds catalogStuff = null;
+//            try {
+//                catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+//                InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.catalogBytes);
+//                JarLoader testjarloader = testjar.getLoader();
+//                for (String classname : testjarloader.getClassNames()) {
+//                    try {
+//                        m_javaClass.forName(classname, true, testjarloader);
+//                    }
+//                    // LinkageError catches most of the various class loading errors we'd
+//                    // care about here.
+//                    catch (UnsupportedClassVersionError e) {
+//                        String msg = "Cannot load classes compiled with a higher version of Java than currently" +
+//                                     " in use. Class " + classname + " was compiled with ";
+//
+//                        Integer major = 0;
+//                        try {
+//                            major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
+//                        } catch (Exception ex) {
+//                            log.debug("Unable to parse compile version number from UnsupportedClassVersionError.",
+//                                    ex);
+//                        }
+//
+//                        if (m_versionMap.containsKey(major)) {
+//                            msg = msg.concat(m_versionMap.get(major) + ", current runtime version is " +
+//                                             System.getProperty("java.version") + ".");
+//                        } else {
+//                            msg = msg.concat("an incompatable Java version.");
+//                        }
+//                        log.error(msg);
+//                        throw new VoltAbortException(msg);
+//                    }
+//                    catch (LinkageError | ClassNotFoundException e) {
+//                        String cause = e.getMessage();
+//                        if (cause == null && e.getCause() != null) {
+//                            cause = e.getCause().getMessage();
+//                        }
+//                        String msg = "Error loading class: " + classname + " from catalog: " +
+//                            e.getClass().getCanonicalName() + ", " + cause;
+//                        log.warn(msg);
+//                        throw new VoltAbortException(e);
+//                    }
+//                }
+//            } catch (Exception e) {
+//                Throwables.propagate(e);
+//            }
+//
+//            if (log.isInfoEnabled()) {
+//                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+//                        " completed data and catalog precheck.");
+//            }
+//            return success;
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate) {
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
-            log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-                    " acknowledged data and catalog prechecks.");
-            return new DependencyPair.TableDependencyPair(DEP_updateCatalogSyncAggregate,
-                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+//            log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+//                    " acknowledged data and catalog prechecks.");
+//            return new DependencyPair.TableDependencyPair(DEP_updateCatalogSyncAggregate,
+//                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
             String catalogDiffCommands = (String)params.toArray()[0];
@@ -588,11 +584,11 @@ public class UpdateCore extends VoltSystemProcedure {
 //                    deploymentBytes);
 
             try {
-                performCatalogVerifyWork(
-                        expectedCatalogVersion,
-                        tablesThatMustBeEmpty,
-                        reasonsForEmptyTables,
-                        requiresSnapshotIsolation);
+//                performCatalogVerifyWork(
+//                        expectedCatalogVersion,
+//                        tablesThatMustBeEmpty,
+//                        reasonsForEmptyTables,
+//                        requiresSnapshotIsolation);
             }
             catch (VoltAbortException vae) {
                 // If there is a cluster failure before this point, we will re-run

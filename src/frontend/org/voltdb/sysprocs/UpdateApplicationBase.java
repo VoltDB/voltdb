@@ -51,6 +51,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
@@ -436,6 +437,15 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return checkCatalogJarAsyncWriteResults(cf);
     }
 
+    protected boolean verifyZKCatalog() {
+        CompletableFuture<Map<Integer,ClientResponse>> cf =
+                                                       callNTProcedureOnAllHosts(
+                                                       "@WriteCatalog",
+                                                       null,
+                                                       WriteCatalog.VERIFY);
+        return checkCatalogJarAsyncWriteResults(cf) == null ? true : false;
+    }
+
     protected CompletableFuture<ClientResponse> updateCatalog(CatalogChangeResult ccr) {
         // create the catalog update blocker first
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
@@ -493,18 +503,33 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
             }
 
-            // verify the catalog, this step was originally in the MP transaction @UpdateCore
-
+            CatalogAndIds oldCatalog = CatalogUtil.getCatalogFromZK(zk);
 
             // update the catalog to ZooKeeper
             CatalogUtil.updateCatalogToZK(
                     zk,
                     ccr.expectedCatalogVersion + 1,
                     getID(),
-                    getID(),
+                    getID(),    // does this matter ?
                     ccr.catalogBytes,
                     ccr.catalogHash,
                     ccr.deploymentString.getBytes("UTF-8"));
+
+            // verify the catalog on each host, this step was originally in the MP transaction @UpdateCore
+            if (!verifyZKCatalog()) {
+                errMsg = "Catalog verification on ZooKeeper failed on one or more hosts.";
+                hostLog.warn(errMsg);
+                CatalogUtil.updateCatalogToZK(zk,
+                                              oldCatalog.version,
+                                              oldCatalog.txnId,
+                                              oldCatalog.uniqueId,
+                                              oldCatalog.catalogBytes,
+                                              oldCatalog.getCatalogHash(),
+                                              oldCatalog.deploymentBytes);
+                VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+                catalogUpdateFlag.set(false);
+                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
+            }
 
             // update the catalog jar
             response = callProcedure("@UpdateCore",

@@ -51,7 +51,9 @@ public class WriteCatalog extends UpdateApplicationBase {
         } else if (mode == CLEAN_UP) {
 
         } else if (mode == VERIFY) {
-
+            if (!VoltDB.instance().verifyZKCatalog()) {
+                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, "Catalog verification failed.");
+            }
         } else {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, "The mode " + Byte.toString(mode) +
                                      " is not supported in @WriteCatalog operation.");
