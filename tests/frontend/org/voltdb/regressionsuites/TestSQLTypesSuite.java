@@ -969,14 +969,19 @@ public class TestSQLTypesSuite extends RegressionSuite {
     public void testInsertNullBoxed() throws IOException, ProcCallException {
         Client client = this.getClient();
 
-        VoltTable[] results = client.callProcedure("InsertBoxed", pkey.incrementAndGet(),
+        Integer p_key = pkey.incrementAndGet();
+        VoltTable[] results = client.callProcedure("InsertBoxed", p_key,
                 new Byte( (byte) -128), new Short( (short) -32768) ).getResults();
 
         System.out.println("testInsertBoxedNulls" + results[1]);
 
         results[1].advanceRow();
         assertEquals(VoltType.NULL_TINYINT, results[1].get("A_TINYINT", VoltType.TINYINT));
-        assertEquals(VoltType.NULL_SMALLINT , results[1].get("A_SMALLINT", VoltType.SMALLINT));
+        assertEquals(VoltType.NULL_SMALLINT, results[1].get("A_SMALLINT", VoltType.SMALLINT));
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM WITH_DEFAULTS WHERE A_TINYINT IS NULL").getResults();
+        results[0].advanceRow();
+        assertEquals(p_key, results[0].get("PKEY", VoltType.INTEGER));
     }
 
     public void testMissingAttributeInsert_With_Defaults()
