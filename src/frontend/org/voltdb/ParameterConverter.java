@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.voltdb.common.Constants;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.types.GeographyPointValue;
@@ -121,7 +122,7 @@ public class ParameterConverter {
      * Corresponding code for handling hex literals appears in HSQL's ExpressionValue class
      * and in voltdb.expressions.ConstantValueExpression.
      */
-    private static Object convertStringToPrimitive(String value, final Class<?> expectedClz)
+    private static Object convertStringToPrimitiveOrPrimitiveWrapper(String value, final Class<?> expectedClz)
     throws VoltTypeException
     {
         value = value.trim();
@@ -137,17 +138,32 @@ public class ParameterConverter {
             if (expectedClz == long.class) {
                 return Long.parseLong(commaFreeValue);
             }
+            if (expectedClz == Long.class) {
+                return new Long(commaFreeValue);
+            }
             if (expectedClz == int.class) {
                 return Integer.parseInt(commaFreeValue);
+            }
+            if (expectedClz == Integer.class) {
+                return new Integer(commaFreeValue);
             }
             if (expectedClz == short.class) {
                 return Short.parseShort(commaFreeValue);
             }
+            if (expectedClz == Short.class) {
+                return new Short(commaFreeValue);
+            }
             if (expectedClz == byte.class) {
                 return Byte.parseByte(commaFreeValue);
             }
+            if (expectedClz == Byte.class) {
+                return new Byte(commaFreeValue);
+            }
             if (expectedClz == double.class) {
                 return Double.parseDouble(commaFreeValue);
+            }
+            if (expectedClz == Double.class) {
+                return new Double(commaFreeValue);
             }
         }
         // ignore the exception and fail through below
@@ -313,7 +329,7 @@ public class ParameterConverter {
             if (stringParam.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
             else if (expectedClz == String.class) return param;
             // Hack allows hex-encoded strings to be passed into byte[] params
-            else if (expectedClz == byte[].class) {
+            else if (expectedClz == byte[].class || expectedClz == Byte[].class) {
                 // regular expressions can be expensive, so don't invoke SQLParser
                 // unless the param really looks like an x-quoted literal
                 if (stringParam.startsWith("X") || stringParam.startsWith("x")) {
@@ -322,12 +338,17 @@ public class ParameterConverter {
                         stringParam = hexDigits;
                     }
                 }
-                return Encoder.hexDecode(stringParam);
+                byte[] inpArray =  Encoder.hexDecode(stringParam);
+                if (expectedClz == byte[].class)
+                    return inpArray;
+                if (expectedClz == Byte[].class)
+                    return ArrayUtils.toObject(inpArray);
             }
             // We allow all values to be passed as strings for csv loading, json, etc...
-            // This code handles primitive types. Complex types come later.
-            if (expectedClz.isPrimitive()) {
-                return convertStringToPrimitive(stringParam, expectedClz);
+            // This code handles primitive types and their wrapped types. Complex types come later.
+            if (expectedClz.isPrimitive() || expectedClz == Long.class || expectedClz == Integer.class
+                    || expectedClz == Byte.class || expectedClz == Double.class || expectedClz == Short.class) {
+                return convertStringToPrimitiveOrPrimitiveWrapper(stringParam, expectedClz);
             }
         }
         else if (inputClz == byte[].class) {
