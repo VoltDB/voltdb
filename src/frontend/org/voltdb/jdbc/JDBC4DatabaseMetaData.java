@@ -603,7 +603,6 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves the maximum number of characters this database allows in a user name.
     @Override
-
     public int getMaxUserNameLength() throws SQLException
     {
         checkClosed();

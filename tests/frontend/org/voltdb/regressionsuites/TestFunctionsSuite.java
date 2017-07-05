@@ -1920,7 +1920,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         String fname = "DEGREES";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
-        //final Set<Double> filters = null;
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = values[kk]*(180.0/Math.PI);
             filters.add(resultValues[kk]);
@@ -1937,7 +1936,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         String fname = "RADIANS";
         final double[] resultValues = new double[values.length];
         final Set<Double> filters = new HashSet<>();
-        //final Set<Double> filters = null;
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = values[kk]*(Math.PI / 180.0);
             filters.add(resultValues[kk]);

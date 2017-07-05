@@ -322,7 +322,6 @@ template<> inline NValue NValue::callUnary<FUNC_RADIANS>() const {
     return retval;
 }
 
-
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
@@ -344,7 +343,6 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     retval.getDouble() = resultDouble;
     return retval;
 }
-
 
 /**
  * FYI, http://stackoverflow.com/questions/7594508/modulo-operator-with-negative-values
