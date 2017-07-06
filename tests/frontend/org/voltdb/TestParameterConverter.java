@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
@@ -84,12 +85,28 @@ public class TestParameterConverter extends TestCase
         assertEquals(1000, ((Integer)r).intValue());
     }
 
+    public void testStringToInteger() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Integer.class, "1000");
+        assertTrue("expect integer", r.getClass() == Integer.class);
+        assertEquals(new Integer(1000), r);
+    }
+
     public void testStringToDouble() throws Exception
     {
         Object r = ParameterConverter.
             tryToMakeCompatible(double.class, "34.56");
         assertTrue("expect double", r.getClass() == Double.class);
-        assertEquals(new Double(34.56), ((Double)r).doubleValue());
+        assertEquals(34.56, ((Double)r).doubleValue());
+    }
+
+    public void testStringToBoxedDouble() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Double.class, "34.56");
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(34.56), r);
     }
 
     // Add more test unit cases
@@ -98,7 +115,15 @@ public class TestParameterConverter extends TestCase
         Object r = ParameterConverter.
             tryToMakeCompatible(double.class, "  34.56  ");
         assertTrue("expect double", r.getClass() == Double.class);
-        assertEquals(new Double(34.56), ((Double)r).doubleValue());
+        assertEquals(34.56, ((Double)r).doubleValue());
+    }
+
+    public void testStringWithWhitespaceToBoxedDouble() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Double.class, "  34.56  ");
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(34.56), r);
     }
 
     public void testCommasStringIntegerToInt() throws Exception
@@ -109,12 +134,28 @@ public class TestParameterConverter extends TestCase
         assertEquals(1100, ((Integer)r).intValue());
     }
 
+    public void testCommasStringIntegerToInteger() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Integer.class, "1,100");
+        assertTrue("expect integer", r.getClass() == Integer.class);
+        assertEquals(new Integer(1100), r);
+    }
+
     public void testCommasStringIntegerToDouble() throws Exception
     {
         Object r = ParameterConverter.
             tryToMakeCompatible(double.class, "2,301,100.23");
         assertTrue("expect integer", r.getClass() == Double.class);
-        assertEquals(new Double(2301100.23), ((Double)r).doubleValue());
+        assertEquals(2301100.23, ((Double)r).doubleValue());
+    }
+
+    public void testCommasStringIntegerToBoxedDouble() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Double.class, "2,301,100.23");
+        assertTrue("expect integer", r.getClass() == Double.class);
+        assertEquals(new Double(2301100.23), r);
     }
 
     public void testNULLToInt() throws Exception
@@ -149,6 +190,15 @@ public class TestParameterConverter extends TestCase
             tryToMakeCompatible(byte[].class, t);
         assertTrue("expect varbinary", r.getClass() == byte[].class);
         assertEquals(t, Encoder.hexEncode((byte[])r));
+    }
+
+    public void testStringToBoxedVarBinary() throws Exception
+    {
+        String t = "1E3A";
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Byte[].class, t);
+        assertTrue("expect varbinary", r.getClass() == Byte[].class);
+        assertEquals(t, Encoder.hexEncode( ArrayUtils.toPrimitive((Byte[])r) ));
     }
 
     public void testOneStringToPoint(String rep, GeographyPointValue pt, double epsilon) throws Exception {
