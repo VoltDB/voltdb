@@ -1821,7 +1821,7 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
                 "create view my_view as select id, wage, count(*), min(wage), count(*) from t group by id, wage;" +
                 "partition table t on column num;";
-        checkDDLErrorMessage(ddl, errorMsg);
+        assertTrue(compileDDL(ddl, compiler));
 
         subTestDDLCompilerMatViewJoin();
     }
