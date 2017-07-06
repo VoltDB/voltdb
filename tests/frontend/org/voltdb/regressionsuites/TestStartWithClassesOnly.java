@@ -54,14 +54,14 @@ final public class TestStartWithClassesOnly {
     public void setUp() throws Exception
     {
         InMemoryJarfile classesFile = new InMemoryJarfile();
-        String cpath = File.createTempFile("preloaded-classes", ".jar").getCanonicalPath();
-        classesFile.writeToFile(new File(cpath));
+        String classesJarToStage = File.createTempFile("preloaded-classes", ".jar").getCanonicalPath();
+        classesFile.writeToFile(new File(classesJarToStage));
 
         // Creates a cluster on the local machine using NewCLI, staging the specified schema.
         // Catalog compilation is taken care of by VoltDB itself - no need to do so explicitly.
         cluster = new LocalCluster(
                 null,
-                cpath,
+                classesJarToStage,
                 null,
                 siteCount,
                 hostCount,
@@ -92,6 +92,10 @@ final public class TestStartWithClassesOnly {
                               i, cluster.internalPort(i), cluster.adminPort(i), cluster.port(i));
         }
 
+        // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
+        int nodesWithStagedCatalog = TestStartWithSchema.countNodesWithStagedCatalog(cluster);
+        assertEquals(hostCount, nodesWithStagedCatalog);
+
         System.out.println("Verifying schema and classes are present");
         Client client = ClientFactory.createClient();
         client.createConnection("localhost", cluster.port(0));
@@ -110,10 +114,6 @@ final public class TestStartWithClassesOnly {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         assertEquals(1, response.getResults().length);
         assertEquals(1, response.getResults()[0].getRowCount());
-
-        // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
-        int nodesWithStagedCatalog = TestStartWithSchema.countNodesWithStagedCatalog(cluster);
-        assertEquals(hostCount, nodesWithStagedCatalog);
 
         client.close();
         cluster.shutDown();
