@@ -268,24 +268,6 @@
     <include name='org/voltdb/compiler/TestPartitionDDL.class' />
     <include name='org/voltdb/compiler/TestProcCompiler.class' />
     <include name='org/voltdb/compiler/TestVoltCompiler.class' />
-    <!--
-    <include name='org/voltdb/dr2/TestDR2OverReplicationFail.class' />
-    <include name='org/voltdb/dr2/TestDR2PartitionGateway.class' />
-    <include name='org/voltdb/dr2/TestDR2Producer.class' />
-    <include name='org/voltdb/dr2/TestDR2SecondaryRejoin.class' />
-    <include name='org/voltdb/dr2/TestDRConnectionService.class' />
-    <include name='org/voltdb/dr2/TestDRConsumerCoordinator.class' />
-    <include name='org/voltdb/dr2/TestDRConsumerDispatcher.class' />
-    <include name='org/voltdb/dr2/TestDRConsumerReceiveState.class' />
-    <include name='org/voltdb/dr2/TestDRConsumerSyncState.class' />
-    <include name='org/voltdb/dr2/TestDRConsumerTaskUtils.class' />
-    <include name='org/voltdb/dr2/TestDRNormalBufferReceiver.class' />
-    <include name='org/voltdb/dr2/TestDRNormalPartitionBufferReceiver.class' />
-    <include name='org/voltdb/dr2/TestDRSnapshotBufferReceiver.class' />
-    <include name='org/voltdb/dr2/TestDRSnapshotPartitionBufferReceiver.class' />
-    <include name='org/voltdb/dr2/snapshot/TestSyncSnapshotBufferQueue.class' />
-    <include name='org/voltdb/dr2/snapshot/TestSyncSnapshotTimeout.class' />
-    -->
     <include name='org/voltdb/export/TestExportDataSource.class' />
     <include name='org/voltdb/export/TestExportGeneration.class' />
     <include name='org/voltdb/export/TestExportV2Suite.class' />
@@ -333,13 +315,6 @@
     <include name='org/voltdb/catalog/TestCatalogSerialization.class' />
     <include name='org/voltdb/catalog/TestDRCatalogDiffs.class' />
     <include name='org/voltdb/client/TestClientFeatures.class' />
-    <!--
-    <include name='org/voltdb/dr2/TestDR2IdempotencyFilter.class' />
-    <include name='org/voltdb/dr2/TestDR2InvocationBuffer.class' />
-    <include name='org/voltdb/dr2/TestDR2InvocationBufferQueue.class' />
-    <include name='org/voltdb/dr2/TestDR2NewInstanceReplacesOld.class' />
-    <include name='org/voltdb/dr2/snapshot/TestSyncSnapshotResultCollector.class' />
-    -->
     <include name='org/voltdb/dtxn/Test*.class' />
     <include name='org/voltdb/export/TestExportSnapshotPreservesSequenceNumber.class' />
     <include name='org/voltdb/export/TestStreamBlockQueue.class' />
@@ -1773,7 +1748,7 @@ TEST CASES
 </target>
 
 <target name="junit_other_p3"
-    description="Execute part dr of other JUnit test suites.">
+    description="Execute part 3 of other JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
