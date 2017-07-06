@@ -149,7 +149,7 @@ public class LocalCluster extends VoltServerConfig {
     //to help matching the host id on the real cluster with the host id on the local
     //cluster
     private long m_deplayBetweenNodeStartupMS = 0;
-    private boolean m_HttpPortEnabled = false;
+    private boolean m_httpPortEnabled = false;
     private final ArrayList<EEProcess> m_eeProcs = new ArrayList<>();
     //This is additional process invironment variables that can be passed.
     // This is used to pass JMX port. Any additional use cases can use this too.
@@ -614,7 +614,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public void setHttpPortEnabled(boolean enabled) {
-        m_HttpPortEnabled = enabled;
+        m_httpPortEnabled = enabled;
     }
 
     public void setReplicationPort(int port) {
@@ -863,7 +863,7 @@ public class LocalCluster extends VoltServerConfig {
 
         templateCmdLine.leaderPort(portGenerator.nextInternalPort());
         templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
-        if (m_HttpPortEnabled) {
+        if (m_httpPortEnabled) {
             templateCmdLine.httpPort(0); // Set this value to 0 would enable http port assignment
         }
 
