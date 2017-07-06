@@ -60,6 +60,14 @@ public class TestParameterConverter extends TestCase
         assertEquals(2, ((Integer)r).intValue());
     }
 
+    public void testIntToInteger() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Integer.class, 1);
+        assertTrue("expect integer", r.getClass() == Integer.class);
+        assertEquals(new Integer(1), (Integer)r);
+    }
+
     public void testIntToLong() throws Exception
     {
         Object r = ParameterConverter.
@@ -115,6 +123,14 @@ public class TestParameterConverter extends TestCase
             tryToMakeCompatible(int.class, null);
         assertTrue("expect null integer", r.getClass() == Integer.class);
         assertEquals(VoltType.NULL_INTEGER, r);
+    }
+
+    public void testNULLToInteger() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Integer.class, null);
+        assertTrue("expect null value", r == null);
+        assertEquals(null, r);
     }
 
     public void testStringToTimestamp() throws Exception
