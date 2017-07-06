@@ -262,6 +262,27 @@ public class TestParameterConverter extends TestCase
         assertEquals(VoltType.NULL_INTEGER, ParameterConverter.tryToMakeCompatible(int.class, VoltType.NULL_INTEGER));
         assertEquals(VoltType.NULL_BIGINT, ParameterConverter.tryToMakeCompatible(long.class, VoltType.NULL_BIGINT));
         assertEquals(VoltType.NULL_FLOAT, ParameterConverter.tryToMakeCompatible(double.class, VoltType.NULL_FLOAT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Byte.class, VoltType.NULL_TINYINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Short.class, VoltType.NULL_SMALLINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Integer.class, VoltType.NULL_INTEGER));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Long.class, VoltType.NULL_BIGINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Double.class, VoltType.NULL_FLOAT));
+        assertEquals(VoltType.NULL_TINYINT, ParameterConverter.tryToMakeCompatible(byte.class, null));
+        assertEquals(VoltType.NULL_SMALLINT, ParameterConverter.tryToMakeCompatible(short.class, null));
+        assertEquals(VoltType.NULL_INTEGER, ParameterConverter.tryToMakeCompatible(int.class, null));
+        assertEquals(VoltType.NULL_BIGINT, ParameterConverter.tryToMakeCompatible(long.class, null));
+        assertEquals(VoltType.NULL_FLOAT, ParameterConverter.tryToMakeCompatible(double.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Byte.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Short.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Integer.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Long.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Double.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(byte[].class, VoltType.NULL_TINYINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Byte[].class, VoltType.NULL_TINYINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(short[].class, VoltType.NULL_SMALLINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(int[].class, VoltType.NULL_INTEGER));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(long[].class, VoltType.NULL_BIGINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(double[].class, VoltType.NULL_FLOAT));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(TimestampType.class, VoltType.NULL_TIMESTAMP));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(Timestamp.class, VoltType.NULL_TIMESTAMP));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(Date.class, VoltType.NULL_TIMESTAMP));
@@ -283,6 +304,19 @@ public class TestParameterConverter extends TestCase
         testBigDecimalFailWithInvalidConversion(long.class, new BigDecimal("10000000000000000000000000000000000"));
     }
 
+    public void testBigDecimalToBoxedLong() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Long.class, new BigDecimal(1000));
+        assertTrue("expect long", r.getClass() == Long.class);
+        assertEquals(1000L, r);
+
+        // No lossy conversion
+        testBigDecimalFailWithInvalidConversion(Long.class, new BigDecimal(1000.01));
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Long.class, new BigDecimal("10000000000000000000000000000000000"));
+    }
+
     public void testBigDecimalToInt() {
         // Normal conversion
         Object r = ParameterConverter.tryToMakeCompatible(int.class, new BigDecimal(-1000));
@@ -294,6 +328,19 @@ public class TestParameterConverter extends TestCase
 
         // No out-of-range conversion
         testBigDecimalFailWithInvalidConversion(int.class, new BigDecimal("-10000000000000000000000000000000000"));
+    }
+
+    public void testBigDecimalToInteger() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Integer.class, new BigDecimal(-1000));
+        assertTrue("expect int", r.getClass() == Integer.class);
+        assertEquals(new Integer(-1000), r);
+
+        // No lossy conversion
+        testBigDecimalFailWithInvalidConversion(Integer.class, new BigDecimal(-1000.01));
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Integer.class, new BigDecimal("-10000000000000000000000000000000000"));
     }
 
     public void testBigDecimalToShort() {
@@ -309,6 +356,19 @@ public class TestParameterConverter extends TestCase
         testBigDecimalFailWithInvalidConversion(short.class, new BigDecimal("10000000000000000000000000000000000"));
     }
 
+    public void testBigDecimalToBoxedShort() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Short.class, new BigDecimal(15));
+        assertTrue("expect short", r.getClass() == Short.class);
+        assertEquals(new Short((short) 15), r);
+
+        // No lossy conversion
+        testBigDecimalFailWithInvalidConversion(Short.class, new BigDecimal(10.99));
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Short.class, new BigDecimal("10000000000000000000000000000000000"));
+    }
+
     public void testBigDecimalToDouble() {
         // Normal conversion
         Object r = ParameterConverter.tryToMakeCompatible(double.class, new BigDecimal(-3.568));
@@ -319,6 +379,18 @@ public class TestParameterConverter extends TestCase
 
         // No out-of-range conversion
         testBigDecimalFailWithInvalidConversion(double.class, new BigDecimal("4e400"));
+    }
+
+    public void testBigDecimalToBoxedDouble() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Double.class, new BigDecimal(-3.568));
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(-3.568), r);
+
+        // Conversion to double can be lossy anyway
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Double.class, new BigDecimal("4e400"));
     }
 
     public void testBigDecimalToByte() {
@@ -332,6 +404,19 @@ public class TestParameterConverter extends TestCase
 
         // No out-of-range conversion
         testBigDecimalFailWithInvalidConversion(byte.class, new BigDecimal("10000000000000000000000000000000000"));
+    }
+
+    public void testBigDecimalToBoxedByte() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Byte.class, new BigDecimal(9));
+        assertTrue("expect byte", r.getClass() == Byte.class);
+        assertEquals(new Byte((byte) 9), r);
+
+        // No lossy conversion
+        testBigDecimalFailWithInvalidConversion(Byte.class, new BigDecimal(10.99));
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Byte.class, new BigDecimal("10000000000000000000000000000000000"));
     }
 
     /*
