@@ -76,14 +76,14 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
     private static final int ZK_CONNECTION_TIMEOUT_SECONDS = 10;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
 
-    private final KafkaExternalLoaderCLIArguments m_config;
+    private final KafkaExternalLoaderCLIArguments m_args;
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private ExecutorService m_executorService = null;
     private ExecutorService m_callbackExecutor = null;
 
-    public KafkaExternalLoader(KafkaExternalLoaderCLIArguments config) {
-        m_config = config;
+    public KafkaExternalLoader(KafkaExternalLoaderCLIArguments args) {
+        m_args = args;
     }
 
     public void initialize() throws Exception {
@@ -98,12 +98,12 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         }
 
         // If we need to prompt the user for a VoltDB password, do so.
-        m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
+        m_args.password = CLIConfig.readPasswordIfNeeded(m_args.user, m_args.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null);
-        if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
-            c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
+        final ClientConfig c_config = new ClientConfig(m_args.user, m_args.password, null);
+        if (m_args.ssl != null && !m_args.ssl.trim().isEmpty()) {
+            c_config.setTrustStoreConfigFromPropertyFile(m_args.ssl);
             c_config.enableSSL();
         }
 
@@ -111,21 +111,21 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         c_config.setProcedureCallTimeout(0);
 
         // Get the Volt host:port strings from the config, handling deprecated and default values.
-        List<String> hostPorts = m_config.getVoltHosts();
+        List<String> hostPorts = m_args.getVoltHosts();
         m_client = getVoltClient(c_config, hostPorts);
 
         KafkaBulkLoaderCallback kafkaBulkLoaderCallback = new KafkaBulkLoaderCallback();
 
-        if (m_config.useSuppliedProcedure) {
+        if (m_args.useSuppliedProcedure) {
             // Create an executor on which to run the success callback. For the direct-to-table bulk case, that loader already has an executor.
-            String procName = (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table) + "-callbackproc";
+            String procName = (m_args.useSuppliedProcedure ? m_args.procedure : m_args.table) + "-callbackproc";
             m_callbackExecutor = CoreUtils.getSingleThreadExecutor(procName + "-" + Thread.currentThread().getName());
-            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, kafkaBulkLoaderCallback, m_callbackExecutor, kafkaBulkLoaderCallback);
+            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_args.procedure, kafkaBulkLoaderCallback, m_callbackExecutor, kafkaBulkLoaderCallback);
         } else {
-            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batchsize, m_config.update, kafkaBulkLoaderCallback, kafkaBulkLoaderCallback);
+            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_args.table, m_args.batchsize, m_args.update, kafkaBulkLoaderCallback, kafkaBulkLoaderCallback);
         }
 
-        m_loader.setFlushInterval(m_config.flush, m_config.flush);
+        m_loader.setFlushInterval(m_args.flush, m_args.flush);
     }
 
     /*
@@ -136,11 +136,11 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         try {
             m_executorService = createImporterExecutor(m_loader, this, this);
 
-            if (m_config.useSuppliedProcedure) {
-                m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started using procedure: " + m_config.procedure);
+            if (m_args.useSuppliedProcedure) {
+                m_log.info("Kafka Consumer from topic: " + m_args.topic + " Started using procedure: " + m_args.procedure);
             }
             else {
-                m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started for table: " + m_config.table);
+                m_log.info("Kafka Consumer from topic: " + m_args.topic + " Started for table: " + m_args.table);
             }
 
             // Wait forever, per http://docs.oracle.com/javase/7/docs/api/java/util/concurrent/package-summary.htm
@@ -173,7 +173,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
         @Override
         public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
-            if (m_config.maxerrors <= 0) return false;
+            if (m_args.maxerrors <= 0) return false;
             if (response != null) {
                 byte status = response.getStatus();
                 if (status != ClientResponse.SUCCESS) {
@@ -182,7 +182,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
                     // If we've reached our max-error threshold, quit. Use a different error message for the various cases for
                     // troubleshooting purposes.
                     String errMsg = null;
-                    if (m_config.maxerrors > 0 && fc > m_config.maxerrors) {
+                    if (m_args.maxerrors > 0 && fc > m_args.maxerrors) {
                         errMsg = "Max error count reached, exiting.";
                     }
                     else if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
@@ -216,7 +216,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         @Override
         public boolean hasReachedErrorLimit() {
             long fc = m_failedCount.get();
-            return (m_config.maxerrors > 0 && fc > m_config.maxerrors);
+            return (m_args.maxerrors > 0 && fc > m_args.maxerrors);
         }
     }
 
@@ -277,7 +277,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
      */
     private ExecutorService createImporterExecutor(CSVDataLoader loader, final ImporterLifecycle lifecycle, final ImporterLogger logger) throws Exception {
 
-        Map<URI, KafkaStreamImporterConfig> configs = createKafkaImporterConfigFromProperties(m_config);
+        Map<URI, KafkaStreamImporterConfig> configs = createKafkaImporterConfigFromProperties(m_args);
         ExecutorService executor = Executors.newFixedThreadPool(configs.size());
         m_log.warn("Created " + configs.size() + " configurations for partitions:");
 
@@ -326,16 +326,16 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
     private FormatterBuilder createFormatterBuilder(KafkaExternalLoaderCLIArguments properties) throws Exception {
 
         FormatterBuilder fb;
-        Properties formatterProperties = m_config.m_formatterProperties;
+        Properties formatterProperties = m_args.formatterProperties;
         AbstractFormatterFactory factory;
 
         if (formatterProperties.size() > 0) {
-            String formatterClass = m_config.m_formatterProperties.getProperty("formatter");
-            String format = m_config.m_formatterProperties.getProperty("format", "csv");
+            String formatterClass = m_args.formatterProperties.getProperty("formatter");
+            String format = m_args.formatterProperties.getProperty("format", "csv");
             Class<?> classz = Class.forName(formatterClass);
             Class<?>[] ctorParmTypes = new Class[]{ String.class, Properties.class };
             Constructor<?> ctor = classz.getDeclaredConstructor(ctorParmTypes);
-            Object[] ctorParms = new Object[]{ format, m_config.m_formatterProperties };
+            Object[] ctorParms = new Object[]{ format, m_args.formatterProperties };
 
             factory = new AbstractFormatterFactory() {
                 @Override

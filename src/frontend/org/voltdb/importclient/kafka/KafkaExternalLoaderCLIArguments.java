@@ -51,7 +51,7 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     public String procedure = "";
 
     // Input formatter properties
-    public Properties m_formatterProperties = new Properties();
+    public Properties formatterProperties = new Properties();
 
     @Option(shortOpt = "t", desc = "Kafka Topic to subscribe to.")
     public String topic = "";
@@ -144,8 +144,8 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         // Load up any supplied formatter
         if (!formatter.trim().isEmpty()) {
             InputStream pfile = new FileInputStream(formatter);
-            m_formatterProperties.load(pfile);
-            String formatter = m_formatterProperties.getProperty("formatter");
+            formatterProperties.load(pfile);
+            String formatter = formatterProperties.getProperty("formatter");
             if (formatter == null || formatter.trim().isEmpty()) {
                 throw new RuntimeException("Formatter class must be specified in formatter file as formatter=<class>: " + formatter);
             }
