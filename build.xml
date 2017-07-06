@@ -340,7 +340,7 @@
     <include name='org/voltdb/dr2/TestDR2NewInstanceReplacesOld.class' />
     <include name='org/voltdb/dr2/snapshot/TestSyncSnapshotResultCollector.class' />
     -->
-    <include name='org/voltdb/dtxn/*.class' />
+    <include name='org/voltdb/dtxn/Test*.class' />
     <include name='org/voltdb/export/TestExportSnapshotPreservesSequenceNumber.class' />
     <include name='org/voltdb/export/TestStreamBlockQueue.class' />
     <include name='org/voltdb/exportclient/TestElasticSearchHttpExportClient.class' />
