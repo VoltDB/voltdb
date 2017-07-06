@@ -446,4 +446,19 @@ public class TestParameterConverter extends TestCase
         }
         assertEquals(true, hasException);
     }
+
+    public void testIntArrayToIntegerArray() throws Exception
+    {
+        int[] t = {1, 2, 3};
+        try{
+            ParameterConverter.
+                tryToMakeCompatible(Integer[].class, t);
+            /* Arrays can be quite large so it doesn't make sense to silently do the conversion
+            * and incur the performance hit. The client should serialize the correct invocation
+            * parameters */
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryScalarMakeCompatible: Unable to match parameter array:java.lang.Integer to provided int"));
+        }
+    }
 }
