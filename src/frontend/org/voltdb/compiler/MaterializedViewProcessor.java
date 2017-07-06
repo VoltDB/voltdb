@@ -300,15 +300,7 @@ public class MaterializedViewProcessor {
                     }
                 }
 
-                // Set up COUNT(*) column can be anywhere
-                //ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.groupByColumns().size());
-                //assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
-                //assert(countCol.expression.getLeft() == null);
-                //processMaterializedViewColumn(srcTable,
-                //        destColumnArray.get(stmt.groupByColumns().size()),
-                //       ExpressionType.AGGREGATE_COUNT_STAR, null);
-
-                // prepare info for aggregation columns and COUNT(*) column.
+                // prepare info for aggregation columns and COUNT(*) column(s)
                 List<AbstractExpression> aggregationExprs = new ArrayList<>();
                 boolean hasAggregationExprs = false;
                 ArrayList<AbstractExpression> minMaxAggs = new ArrayList<>();
@@ -345,7 +337,7 @@ public class MaterializedViewProcessor {
                 }
 
                 // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
-                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                for (Integer i = 0; i < minMaxAggs.size(); ++i) {
                     Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
                     IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
                     if (found != null) {
@@ -357,7 +349,7 @@ public class MaterializedViewProcessor {
 
                 // This is to fix the data type mismatch of the group by columns (and potentially other columns).
                 // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column is fixed below loop.
-                for (int i=0; i < stmt.groupByColumns().size(); i++) {
+                for (int i = 0; i < stmt.groupByColumns().size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
                     setTypeAttributesForColumn(destColumn, col.expression);
@@ -371,7 +363,8 @@ public class MaterializedViewProcessor {
                     AbstractExpression colExpr = col.expression.getLeft();
                     TupleValueExpression tve = null;
 
-                    if ( col.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR && colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+                    if ( col.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR
+                            && colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
                         tve = (TupleValueExpression)colExpr;
                     }
 
@@ -514,12 +507,6 @@ public class MaterializedViewProcessor {
 
         // check for count star in the display list
         boolean countStarFound = false;
-//        if (i < displayColCount) {
-//            AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
-//            if (coli.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
-//                countStarFound = true;
-//            }
-//        }
 
         UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
 
@@ -530,18 +517,11 @@ public class MaterializedViewProcessor {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             // Note that this expression does not catch all aggregates.
             // An instance of avg() would cause the exception.
-            // ENG-10945 - We can have count(*) anywhere after the group by columns, but a
-            // second one would fail.
+            // ENG-10945 - We can have count(*) anywhere after the group by columns and multiple count(*)(s)
             if ( outcol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
-                if ( countStarFound == false ) {
+                if ( countStarFound == false )
                     countStarFound = true;
-                    //checkExpressions.add(outcol.expression.getLeft());
-                    continue;
-                }
-                else {
-                    msg.append("cannot have count(*) more than once.");
-                    throw m_compiler.new VoltCompilerException(msg.toString());
-                }
+                continue;
             }
 
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
