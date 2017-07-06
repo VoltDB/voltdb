@@ -268,7 +268,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             fault = e;
         }
         if (fault != null) {
-            rateLimitedLog(Level.ERROR, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
+            rateLimitedLog(Level.WARN, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
             response = null;
         }
         return response;
