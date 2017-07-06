@@ -88,7 +88,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
     public void initialize() throws Exception {
 
-        // Try and load classes we need and not packaged.
+        // Check for transitive runtime dependencies that Kafka will complain about if they're missing.
         try {
             KafkaExternalLoader.class.getClassLoader().loadClass("org.I0Itec.zkclient.IZkStateListener");
             KafkaExternalLoader.class.getClassLoader().loadClass("org.apache.zookeeper.Watcher");
@@ -148,11 +148,12 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         }
         catch (Throwable terminate) {
             m_log.error("Error in Kafka Consumer", terminate);
-            System.exit(-1);
         }
         finally {
             close();
         }
+        System.exit(-1);
+
     }
 
     /*
