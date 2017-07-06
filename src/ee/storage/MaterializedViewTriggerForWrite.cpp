@@ -438,7 +438,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         m_updatedTuple.setNValue(colindex, val);
     }
 
-    m_updatedTuple.setNValue((int) m_countStarColumnIndex, count);
+    //m_updatedTuple.setNValue((int) m_countStarColumnIndex, count);
 
     int aggOffset = (int) m_groupByColumnCount;
     int minMaxAggIdx = 0;
@@ -448,12 +448,15 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
 
     // set values for the other columns
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
-                aggExprOffset = 1;
-                continue;
-        }
 
         NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
+        if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+            m_updatedTuple.setNValue( (int)(aggOffset+aggIndex),
+                                        existingValue.op_decrement());
+            aggExprOffset++;
+            continue;
+        }
+
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, aggExprOffset, oldTuple);
         NValue newValue = existingValue;
         if ( ! oldValue.isNull()) {
