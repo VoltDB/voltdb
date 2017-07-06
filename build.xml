@@ -228,23 +228,27 @@
     <!-- Standard junit fileset -->
     <include name='org/hsqldb_voltpatches/Test*.class' />
     <include name='org/voltcore/**/Test*.class' />
+    <include name='org/voltdb/TestAbstractTopology*.class' />
     <include name='org/voltdb/TestBuildString.class' />
     <include name='org/voltdb/TestCLReplayAutoCatalogUpgrade.class' />
     <include name='org/voltdb/TestExportInsertIntoSelectSuite.class' />
     <include name='org/voltdb/TestJoin.class' />
+    <include name='org/voltdb/TestLeaderElections.class' />
+    <include name='org/voltdb/TestMemoryResourceMonitor.class' />
+    <include name='org/voltdb/TestMemoryResourceSnmpTrap.class' />
     <include name='org/voltdb/TestPortPirate.class' />
+    <include name='org/voltdb/TestRejoinEndToEnd.class' />
     <include name='org/voltdb/TestReplicatedInvocation.class' />
     <include name='org/voltdb/TestRoutingEdgeCases.class' />
     <include name='org/voltdb/TestSimpleCJK.class' />
-    <include name='org/voltdb/TestSnapshotDaemon.class' />
-    <include name='org/voltdb/TestSnapshotDaemonLeaderElection.class' />
-    <include name='org/voltdb/TestSnapshotIOAgent.class' />
-    <include name='org/voltdb/TestSnapshotInitiationInfo.class' />
+    <include name='org/voltdb/TestSnapshot*.class' />
     <include name='org/voltdb/TestStartAction.class' />
     <include name='org/voltdb/TestStatsAgent.class' />
+    <include name='org/voltdb/TestStartupRecoverWithMissingHosts.class' />
     <include name='org/voltdb/TestStatsProcInputTable.class' />
     <include name='org/voltdb/TestStatsProcOutputTable.class' />
     <include name='org/voltdb/TestStatsProcProfTable.class' />
+    <include name='org/voltdb/TestStreamView.class' />
     <include name='org/voltdb/TestTableHelper.class' />
     <include name='org/voltdb/TestTheHashinator.class' />
     <include name='org/voltdb/TestTransactionIdManager.class' />
@@ -255,9 +259,8 @@
     <include name='org/voltdb/TestVoltTableUtil.class' />
     <include name='org/voltdb/TestVoltType.class' />
     <include name='org/voltdb/canonicalddl/TestCanonicalDDLThroughSQLcmd.class' />
-    <include name='org/voltdb/client/TestDistributer.class' />
-    <include name='org/voltdb/client/TestHashinatorLite.class' />
-    <include name='org/voltdb/client/TestProcedureInvocation.class' />
+    <include name='org/voltdb/catalog/Test*.class' />
+    <include name='org/voltdb/client/Test*.class' />
     <include name='org/voltdb/common/TestPermission.class' />
     <include name='org/voltdb/compiler/TestAsyncCompilerAgent.class' />
     <include name='org/voltdb/compiler/TestCatalogVersionUpgrade.class' />
@@ -298,14 +301,7 @@
     <include name='org/voltdb/exportclient/kafka/TestKafkaExportClient.class' />
     <include name='org/voltdb/groovy/TestGroovyDeployment.class' />
     <include name='org/voltdb/importer/TestChannelDistributer.class' />
-    <include name='org/voltdb/utils/TestCommandLine.class' />
-    <include name='org/voltdb/utils/TestCommandLogTracker.class' />
-    <include name='org/voltdb/utils/TestEncoder.class' />
-    <include name='org/voltdb/utils/TestHDFSUtils.class' />
-    <include name='org/voltdb/utils/TestInMemoryJarfile.class' />
-    <include name='org/voltdb/utils/TestJDBCLoader.class' />
-    <include name='org/voltdb/utils/TestSplitSQLStatements.class' />
-    <include name='org/voltdb/utils/TestSqlCmdErrorHandling.class' />
+    <include name='org/voltdb/utils/Test*.class' />
 
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
@@ -314,6 +310,7 @@
 <patternset id='junit.other.p2.path'>
     <!-- Standard junit fileset -->
     <include name='org/voltdb/TestAdhoc*.class' />
+    <include name='org/voltdb/TestAdHoc*.class' />
     <include name='org/voltdb/TestCLReplayLiveDDLSwitch.class' />
     <include name='org/voltdb/TestCLReplayStringParam.class' />
     <include name='org/voltdb/TestClientInterface.class' />
@@ -325,6 +322,7 @@
     <include name='org/voltdb/TestExpectations.class' />
     <include name='org/voltdb/TestJavaAssertionsAreOn.class' />
     <include name='org/voltdb/TestJdbcDatabaseMetaDataGenerator.class' />
+    <include name='org/voltdb/TestJSON*.class'/>
     <include name='org/voltdb/TestLikeQueries.class' />
     <include name='org/voltdb/TestLiveDDLAfterAutoUpgrade.class' />
     <include name='org/voltdb/TestLiveDDLSchemaSwitch.class' />
@@ -376,14 +374,6 @@
     <include name='org/voltdb/plannodes/TestNestLoopPlanNode.class' />
     <include name='org/voltdb/rejoin/TestIv2RejoinCoordinator.class' />
     <include name='org/voltdb/rejoin/TestPauselessRejoinEndToEnd.class' />
-    <include name='org/voltdb/utils/TestCSVLoaderCommandLoggingMP.class' />
-    <include name='org/voltdb/utils/TestCollector.class' />
-    <include name='org/voltdb/utils/TestMiscUtils.class' />
-    <include name='org/voltdb/utils/TestSQLLexer.class' />
-    <include name='org/voltdb/utils/TestSegmentPool.class' />
-    <include name='org/voltdb/utils/TestSqlCmdInterface.class' />
-    <include name='org/voltdb/utils/TestSqlCommandParserInteractive.class' />
-    <include name='org/voltdb/utils/TestVoltBulkLoader.class' />
 
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
