@@ -469,6 +469,21 @@ public class TestParameterConverter extends TestCase
         assertEquals(true, hasException);
     }
 
+    public void testArrayToScalarTypeException() throws Exception
+    {
+        int[] t = {1, 2, 3};
+        try{
+            ParameterConverter.
+                tryToMakeCompatible(Integer.class, t);
+            /* Arrays can be quite large so it doesn't make sense to silently do the conversion
+            * and incur the performance hit. The client should serialize the correct invocation
+            * parameters */
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "Array / Scalar parameter mismatch ([I to java.lang.Integer)"));
+        }
+    }
+
     public void testIntArrayToIntegerArray() throws Exception
     {
         int[] t = {1, 2, 3};
