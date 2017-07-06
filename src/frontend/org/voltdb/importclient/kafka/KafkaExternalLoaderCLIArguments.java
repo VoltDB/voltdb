@@ -158,9 +158,6 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         try (FileReader fr = new FileReader(config.trim())) {
             props.load(fr);
         }
-        catch (Exception e) {
-            // Ignore, it's ok
-        }
 
         String prop = props.getProperty("group.id", "");
         if (prop.isEmpty()) {
@@ -219,13 +216,20 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
             commitPolicy = KafkaImporterCommitPolicy.NONE.name();
         }
         if (!servers.trim().isEmpty()) {
-            warningWriter.println("Warning: --servers argument is deprecated; please use --host instead.");
+            if (!host.trim().isEmpty()) {
+                warningWriter.println("Warning: --servers argument is deprecated in favor of --host; value is ignored.");
+            }
+            else {
+                warningWriter.println("Warning: --servers argument is deprecated; please use --host instead.");
+            }
         }
         if (!port.trim().isEmpty()) {
             warningWriter.println("Warning: --port argument is deprecated, please use --host with <host:port> URIs instead.");
         }
         if (kpartitions !=0) {
             warningWriter.println("Warning: --kpartions argument is deprecated, value is ignored.");
+        }
+        if (!servers.trim().isEmpty() && !host.trim().isEmpty()) {
         }
 
         try {

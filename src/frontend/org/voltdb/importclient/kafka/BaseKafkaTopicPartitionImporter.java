@@ -510,10 +510,11 @@ public abstract class BaseKafkaTopicPartitionImporter {
 
                 //wait to fetch more if we read nothing last time.
                 if (currentFetchCount == 0) {
-                        try {
-                            Thread.sleep(m_waitSleepMs);
-                        } catch (InterruptedException ie) {
-                        }
+                    try {
+                        Thread.sleep(m_waitSleepMs);
+                    }
+                    catch (InterruptedException ie) {
+                    }
                 }
                 if (shouldCommit()) {
                     commitOffset(false);

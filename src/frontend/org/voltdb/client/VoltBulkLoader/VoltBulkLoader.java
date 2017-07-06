@@ -115,14 +115,14 @@ public class VoltBulkLoader {
     }
 
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
-            BulkLoaderFailureCallBack callback) throws Exception {
-        this(vblGlobals, tableName, maxBatchSize, upsertMode, callback, null);
+            BulkLoaderFailureCallBack failureCallback) throws Exception {
+        this(vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, null);
     }
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
-                BulkLoaderFailureCallBack callback, BulkLoaderSuccessCallback successCallback) throws Exception {
+                BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
         this.m_clientImpl = vblGlobals.m_clientImpl;
         this.m_maxBatchSize = maxBatchSize;
-        this.m_notificationCallBack = callback;
+        this.m_notificationCallBack = failureCallback;
         this.m_upsert = upsertMode;
 
         m_vblGlobals = vblGlobals;
