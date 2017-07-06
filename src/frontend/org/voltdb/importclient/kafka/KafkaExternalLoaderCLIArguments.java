@@ -154,6 +154,10 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
 
     private void initializeDefaultsFromPropertiesFile() throws Exception {
 
+        if (config.trim().isEmpty()) {
+            return;
+        }
+
         Properties props = new Properties();
         try (FileReader fr = new FileReader(config.trim())) {
             props.load(fr);

@@ -65,7 +65,8 @@ public class TestKafkaLoaderArgumentParsing {
         args.parse("KafaExternalLoader", new String[] { "--servers", "host1:100,host2:200", "--host", "host3,host4", "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
         hosts = args.getVoltHosts();
         Assert.assertEquals(Arrays.asList(new String[]{"host3:21212", "host4:21212"}), hosts);
-        Assert.assertTrue(sw.toString().startsWith("Warning: --servers argument is deprecated; please use --host instead"));
+        System.out.println(sw.toString());
+        Assert.assertTrue(sw.toString().startsWith("Warning: --servers argument is deprecated in favor of --host; value is ignored."));
 
     }
 
