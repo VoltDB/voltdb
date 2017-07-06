@@ -28,7 +28,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 /* class pipes a process's output to a file name.
  * Also watches for "Server completed initialization"
@@ -41,6 +45,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
         FileWriter m_writer ;
         BufferedReader m_input;
         String m_filename;
+        Set<String> m_foundRegexes = null;
+        Map<String, Pattern> m_regexes = null;
 
         // set m_witnessReady when the m_token byte sequence is seen.
         AtomicBoolean m_witnessedReady;
@@ -70,6 +76,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
             }
         }
 
+        PipeToFile(String filename, InputStream stream, String token,
+                   boolean appendLog, Process proc, Map<String, Pattern> patterns,
+                   Set<String> foundRegexes) {
+         this(filename, stream, token, appendLog, proc);
+         m_foundRegexes = foundRegexes;
+         m_regexes = patterns;
+     }
+
         /**
          * Allow callers to get the process object to double check for death
          */
@@ -82,6 +96,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
          */
         void setWatcher(OutputWatcher watcher) {
             m_watcher = watcher;
+        }
+
+        public void setHostId(int id) {
+            synchronized (this) {
+                m_hostId = id;
+            }
         }
 
         public int getHostId() {
@@ -137,6 +157,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
                     m_writer.write(data + "\n");
                     m_writer.flush();
+
+                    // Check for patterns on the fly
+                    if (m_regexes != null) {
+                        for (Entry<String, Pattern> tuple : m_regexes.entrySet()) {
+                            // if the pattern still has not appeared in the current host log
+                            if (!m_foundRegexes.contains(tuple.getKey())) {
+                                if (tuple.getValue().matcher(data).find()) {
+                                    m_foundRegexes.add(tuple.getKey());
+                                }
+                            }
+                        }
+                    }
                 }
                 catch (IOException ex) {
                     m_eof.set(true);
