@@ -227,7 +227,6 @@
 <patternset id='junit.other.p1.path'>
     <!-- Standard junit fileset -->
     <include name='org/hsqldb_voltpatches/Test*.class' />
-    <include name='org/voltcore/**/Test*.class' />
     <include name='org/voltdb/TestAbstractTopology*.class' />
     <include name='org/voltdb/TestBuildString.class' />
     <include name='org/voltdb/TestCLReplayAutoCatalogUpgrade.class' />
@@ -259,8 +258,6 @@
     <include name='org/voltdb/TestVoltTableUtil.class' />
     <include name='org/voltdb/TestVoltType.class' />
     <include name='org/voltdb/canonicalddl/TestCanonicalDDLThroughSQLcmd.class' />
-    <include name='org/voltdb/catalog/Test*.class' />
-    <include name='org/voltdb/client/Test*.class' />
     <include name='org/voltdb/common/TestPermission.class' />
     <include name='org/voltdb/compiler/TestAsyncCompilerAgent.class' />
     <include name='org/voltdb/compiler/TestCatalogVersionUpgrade.class' />
@@ -301,7 +298,6 @@
     <include name='org/voltdb/exportclient/kafka/TestKafkaExportClient.class' />
     <include name='org/voltdb/groovy/TestGroovyDeployment.class' />
     <include name='org/voltdb/importer/TestChannelDistributer.class' />
-    <include name='org/voltdb/utils/Test*.class' />
 
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
@@ -309,6 +305,10 @@
 
 <patternset id='junit.other.p2.path'>
     <!-- Standard junit fileset -->
+
+    <include name='org/voltcore/**/Test*.class' />
+    <include name='org/voltdb/catalog/Test*.class' />
+    <include name='org/voltdb/client/Test*.class' />
     <include name='org/voltdb/TestAdhoc*.class' />
     <include name='org/voltdb/TestAdHoc*.class' />
     <include name='org/voltdb/TestCLReplayLiveDDLSwitch.class' />
