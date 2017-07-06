@@ -201,6 +201,20 @@ public class TestParameterConverter extends TestCase
         assertEquals(t, Encoder.hexEncode( ArrayUtils.toPrimitive((Byte[])r) ));
     }
 
+    public void testByteToBoxedByte() throws Exception
+    {
+        String t = "1E3A";
+        Object byteArr = ParameterConverter.
+            tryToMakeCompatible(byte[].class, t);
+        assertTrue("expect varbinary", byteArr.getClass() == byte[].class);
+
+        Object r2 = ParameterConverter.
+                tryToMakeCompatible(Byte[].class, byteArr);
+        assertTrue("expect Byte[]", r2.getClass() == Byte[].class);
+        assertEquals(Encoder.hexEncode((byte[])byteArr),
+                Encoder.hexEncode( ArrayUtils.toPrimitive((Byte[])r2)) );
+    }
+
     public void testOneStringToPoint(String rep, GeographyPointValue pt, double epsilon) throws Exception {
         Object r = ParameterConverter.tryToMakeCompatible(GeographyPointValue.class, rep);
         assertTrue("expected GeographyPointValue", r.getClass() == GeographyPointValue.class);
