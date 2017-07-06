@@ -355,11 +355,6 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    public CommandLine addToClassPath(String classPath) {
-        this.classPath += classPath;
-        return this;
-    }
-
     public CommandLine jarFileName(String jarFileName) {
         m_pathToCatalog = jarFileName;
         return this;

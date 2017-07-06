@@ -210,14 +210,6 @@ public class LocalCluster extends VoltServerConfig {
     }
     public int getHttpOverridePort() { return m_httpOverridePort; };
 
-    private static String getBuildDir() {
-        String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
-        if (buildDir == null) {
-            buildDir = System.getProperty("user.dir") + "/obj/release";
-        }
-        return buildDir;
-    }
-
     /*
      * Enable pre-compiled regex search in logs
      */
@@ -434,7 +426,11 @@ public class LocalCluster extends VoltServerConfig {
             m_target = target;
         }
 
-        String buildDir = getBuildDir();
+        String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
+        if (buildDir == null) {
+            buildDir = System.getProperty("user.dir") + "/obj/release";
+        }
+
         String classPath = System.getProperty("java.class.path");
         if (m_jarFileName != null) {
             classPath += ":" + buildDir + File.separator + m_jarFileName;
@@ -484,10 +480,6 @@ public class LocalCluster extends VoltServerConfig {
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
         // "tag" this command line so it's clear which test started it
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
-    }
-
-    public void addTestProcsToClasspath() {
-        templateCmdLine.addToClassPath(":" + getBuildDir() + File.separator + "testprocs");
     }
 
     /** Directs this LocalCluster to initialize one of its nodes with a different schema.

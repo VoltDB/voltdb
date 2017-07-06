@@ -270,7 +270,7 @@ final public class TestInitStartAction {
         referenceFile.deleteOnExit();
         VoltCompiler compiler = new VoltCompiler(false);
         compiler.setInitializeDDLWithFiltering(true);
-        boolean success = false;
+        boolean success;
         if (schema == null) {
             success = compiler.compileEmptyCatalog(referenceFile.getAbsolutePath());
         } else {
@@ -292,7 +292,7 @@ final public class TestInitStartAction {
         assertEquals(true, stagedCatalog.equals(referenceCatalog));
 
         assertEquals(true, referenceFile.delete());
-        //If schema is not null we have a real file else we have a dummy reader.
+        // If schema is not null we have a real file else we have a dummy reader.
         if (schema != null) {
             assertEquals(true, schemaFile.delete());
         }
@@ -393,7 +393,6 @@ final public class TestInitStartAction {
      */
     @Test
     public void testInitWithNoSchema() throws Exception {
-
         try {
             new Configuration(
                     new String[]{"initialize", "voltdbroot", rootDH.getPath(), "force"});
