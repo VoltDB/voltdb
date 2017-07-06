@@ -153,7 +153,6 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
             close();
         }
         System.exit(-1);
-
     }
 
     /*
