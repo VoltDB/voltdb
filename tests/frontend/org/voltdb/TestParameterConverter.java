@@ -77,6 +77,28 @@ public class TestParameterConverter extends TestCase
         assertEquals(-1000L, ((Number)r).longValue());
     }
 
+    public void testLongToIntException() throws Exception
+    {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(int.class, -9000000000L);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (-9000000000) of type:"
+                    + " java.lang.Long is not a match or is out of range for the target parameter type: int"));
+        }
+    }
+
+    public void testLongToIntegerException() throws Exception
+    {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Integer.class, -9000000000L);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (-9000000000) of type:"
+                    + " java.lang.Long is not a match or is out of range for the target parameter type: java.lang.Integer"));
+        }
+    }
+
     public void testStringToInt() throws Exception
     {
         Object r = ParameterConverter.
