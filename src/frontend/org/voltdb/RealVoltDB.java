@@ -470,16 +470,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        try {
-            return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
-        } catch (IOException e) {
-            throw new SettingsException(
-                    "Failed to canonicalize: " +
-                    m_nodeSettings.getVoltDBRoot() +
-                    ". Reason: " +
-                    e.getMessage()
-            );
-        }
+        return getVoltDBRootPath();
     }
 
     @Override
@@ -487,7 +478,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.absResolve(m_nodeSettings.getCommandLog()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getCommandLog()).getPath();
     }
 
     @Override
@@ -495,7 +486,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.absResolve(m_nodeSettings.getCommandLogSnapshot()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getCommandLogSnapshot()).getPath();
     }
 
     @Override
@@ -503,7 +494,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.absResolve(m_nodeSettings.getSnapshoth()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshoth()).getPath();
     }
 
     @Override
@@ -511,7 +502,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.absResolve(m_nodeSettings.getExportOverflow()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportOverflow()).getPath();
     }
 
     @Override
@@ -519,7 +510,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.absResolve(m_nodeSettings.getDROverflow()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getDROverflow()).getPath();
     }
 
     @Override
@@ -538,27 +529,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getCommandLogPath() {
-        return m_nodeSettings.absResolve(m_nodeSettings.getCommandLog()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getCommandLog()).getPath();
     }
 
     @Override
     public String getCommandLogSnapshotPath() {
-        return m_nodeSettings.absResolve(m_nodeSettings.getCommandLogSnapshot()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getCommandLogSnapshot()).getPath();
     }
 
     @Override
     public String getSnapshotPath() {
-        return m_nodeSettings.absResolve(m_nodeSettings.getSnapshoth()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshoth()).getPath();
     }
 
     @Override
     public String getExportOverflowPath() {
-        return m_nodeSettings.absResolve(m_nodeSettings.getExportOverflow()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportOverflow()).getPath();
     }
 
     @Override
     public String getDROverflowPath() {
-        return m_nodeSettings.absResolve(m_nodeSettings.getDROverflow()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getDROverflow()).getPath();
     }
 
     public static String getStagedCatalogPath(String voltDbRoot) {
@@ -4493,7 +4484,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
             SnapshotUtil.retrieveSnapshotFiles(
-                    m_nodeSettings.absResolve(m_nodeSettings.getSnapshoth()),
+                    m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshoth()),
                     snapshots, filter, false, SnapshotPathType.SNAP_AUTO, hostLog);
 
             return snapshots.containsKey(nonce) ? nonce : null;

@@ -82,7 +82,7 @@ public interface NodeSettings extends Settings {
         return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath());
     }
 
-    default File absResolve(File path) {
+    default File resolveToAbsolutePath(File path) {
         try {
             return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath()).getCanonicalFile();
         } catch (IOException e) {
@@ -105,7 +105,7 @@ public interface NodeSettings extends Settings {
     }
 
     default boolean archiveSnapshotDirectory() {
-        File snapshotDH = absResolve(getSnapshoth());
+        File snapshotDH = resolveToAbsolutePath(getSnapshoth());
         String [] snapshots = snapshotDH.list();
         if (snapshots == null || snapshots.length == 0) {
             return false;
@@ -150,7 +150,7 @@ public interface NodeSettings extends Settings {
     default List<String> ensureDirectoriesExist() {
         ImmutableList.Builder<String> failed = ImmutableList.builder();
         Map<String, File> managedArtifactsPaths = getManagedArtifactPaths();
-        File configDH = absResolve(new File(Constants.CONFIG_DIR));
+        File configDH = resolveToAbsolutePath(new File(Constants.CONFIG_DIR));
         File logDH = resolve(new File("log"));
         for (File path: managedArtifactsPaths.values()) {
             if (!path.exists() && !path.mkdirs()) {

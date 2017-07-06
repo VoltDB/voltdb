@@ -866,8 +866,8 @@ public class Inits {
                      //We have terminus so restore.
                      clenabled = false;
                  } else {
-                     clPath = paths.absResolve(paths.getCommandLog()).getPath();
-                     clSnapshotPath = paths.absResolve(paths.getCommandLogSnapshot()).getPath();
+                     clPath = paths.resolveToAbsolutePath(paths.getCommandLog()).getPath();
+                     clSnapshotPath = paths.resolveToAbsolutePath(paths.getCommandLogSnapshot()).getPath();
                 }
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
