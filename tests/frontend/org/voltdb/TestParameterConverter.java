@@ -212,24 +212,112 @@ public class TestParameterConverter extends TestCase
     {
         Object r = ParameterConverter.
                 tryToMakeCompatible(byte.class, (byte)-128);
-            assertTrue("expect null value", r.getClass() == Byte.class);
-            assertEquals(VoltType.NULL_TINYINT, r);
+        assertTrue("expect null value", r.getClass() == Byte.class);
+        assertEquals(VoltType.NULL_TINYINT, r);
     }
 
     public void testNULLValueToBoxedByte() throws Exception
     {
         Object r = ParameterConverter.
                 tryToMakeCompatible(Byte.class, (byte)-128);
-            assertTrue("expect null value", r == null);
-            assertEquals(null, r);
+        assertTrue("expect null value", r == null);
+        assertEquals(null, r);
     }
 
     public void testBoxedNULLValueToBoxedByte() throws Exception
     {
+        // the function call actually converts the primitive types to boxed types
+        // because it takes java Object as parameter
+        // we need not convert it but we have it here as a sample test
         Object r = ParameterConverter.
                 tryToMakeCompatible(Byte.class, new Byte((byte)-128));
-            assertTrue("expect null value", r == null);
-            assertEquals(null, r);
+        assertTrue("expect null value", r == null);
+        assertEquals(null, r);
+    }
+
+    public void testBoxedNULLValueToByte() throws Exception
+    {
+        Object r = ParameterConverter.
+                tryToMakeCompatible(byte.class, new Byte((byte)-128));
+        assertTrue("expect null value", r.getClass() == Byte.class);
+        assertEquals(VoltType.NULL_TINYINT, r);
+    }
+
+    public void testNULLValueToShortException() throws Exception
+    {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Short.class, -32768);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: The provided int or long value: (-32768) might be interpreted "
+                    + "as smallint null. Try explicitly using a short parameter."));
+        }
+    }
+
+    public void testNULLValueToShort() throws Exception
+    {
+        Object r = ParameterConverter.
+                tryToMakeCompatible(short.class, (short)-32768);
+        assertTrue("expect null value", r.getClass() == Short.class);
+        assertEquals(VoltType.NULL_SMALLINT, r);
+    }
+
+    public void testNULLValueToBoxedShort() throws Exception
+    {
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Short.class, (short)-32768);
+        assertTrue("expect null value", r == null);
+        assertEquals(null, r);
+    }
+
+    public void testExtremeIntValueToShort() throws Exception
+    {
+        Object r = ParameterConverter.
+                tryToMakeCompatible(short.class, -2147483648);
+        assertTrue("expect null value", r.getClass() == Short.class);
+        assertEquals(VoltType.NULL_SMALLINT, r);
+    }
+
+    public void testNULLValueToIntException() throws Exception
+    {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(int.class, -2147483648L);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: The provided long value: (-2147483648) might be interpreted "
+                    + "as integer null. Try explicitly using a int parameter."));
+        }
+    }
+
+    public void testNULLValueToIntegerException() throws Exception
+    {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Integer.class, -2147483648L);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: The provided long value: (-2147483648) might be interpreted "
+                    + "as integer null. Try explicitly using a int parameter."));
+        }
+    }
+
+    public void testNULLValueToInt() throws Exception
+    {
+        Object r = ParameterConverter.
+                tryToMakeCompatible(int.class, -2147483648);
+        assertTrue("expect null value", r.getClass() == Integer.class);
+        assertEquals(VoltType.NULL_INTEGER, r);
+    }
+
+    public void testNULLValueToInteger() throws Exception
+    {
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Integer.class, -2147483648);
+
+        assertTrue("expect null value", r == null);
+        assertEquals(null, r);
     }
 
     public void testStringToTimestamp() throws Exception
