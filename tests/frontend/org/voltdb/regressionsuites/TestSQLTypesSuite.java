@@ -987,6 +987,26 @@ public class TestSQLTypesSuite extends RegressionSuite {
         assertEquals(p_key, results[0].get("PKEY", VoltType.INTEGER));
     }
 
+    public void testInsertNullValues() throws IOException, ProcCallException {
+        Client client = this.getClient();
+
+        Integer p_key = pkey.incrementAndGet();
+        VoltTable[] results = client.callProcedure("InsertBoxed", p_key,
+                null, null, null, null).getResults();
+
+        System.out.println("testInsertNullValues" + results[1]);
+
+        results[1].advanceRow();
+        assertEquals(VoltType.NULL_TINYINT, results[1].get("A_TINYINT", VoltType.TINYINT));
+        assertEquals(VoltType.NULL_SMALLINT, results[1].get("A_SMALLINT", VoltType.SMALLINT));
+        assertEquals(VoltType.NULL_INTEGER, results[1].get("A_INTEGER", VoltType.INTEGER));
+        assertEquals(VoltType.NULL_BIGINT, results[1].get("A_BIGINT", VoltType.BIGINT));
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM WITH_DEFAULTS WHERE A_TINYINT IS NULL").getResults();
+        results[0].advanceRow();
+        assertEquals(p_key, results[0].get("PKEY", VoltType.INTEGER));
+    }
+
     public void testMissingAttributeInsert_With_Defaults()
             throws NoConnectionsException, ProcCallException, IOException {
         Client client = this.getClient();
