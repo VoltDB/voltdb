@@ -19,7 +19,7 @@
 #include "boost/math/constants/constants.hpp"
 
 #ifndef M_PI
-#define M_PI 3.1415926535
+#define M_PI 3.1415926536
 #endif
 
 namespace voltdb {
@@ -296,7 +296,7 @@ template<> inline NValue NValue::callUnary<FUNC_SEC>() const {
     return retval;
 }
 
-/** implement the SQL SEC function for all numeric values */
+/** implement the SQL DEGREE function for all numeric values */
 template<> inline NValue NValue::callUnary<FUNC_DEGREES>() const {
     if (isNull()) {
         return *this;
@@ -309,7 +309,7 @@ template<> inline NValue NValue::callUnary<FUNC_DEGREES>() const {
     return retval;
 }
 
-/** implement the SQL SEC function for all numeric values */
+/** implement the SQL RADIAN function for all numeric values */
 template<> inline NValue NValue::callUnary<FUNC_RADIANS>() const {
     if (isNull()) {
         return *this;
