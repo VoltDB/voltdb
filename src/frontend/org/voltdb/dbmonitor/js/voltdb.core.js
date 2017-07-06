@@ -348,6 +348,7 @@
                 '@GC': { '0': [] },
                 '@StopNode': { '1': ['int'] },
                 '@Trace': { '2': ['varchar', 'varchar'], '1': ['varchar']},
+                '@SwapTables': { '2': ['varchar', 'varchar']}
             };
             return this;
         };
@@ -606,6 +607,7 @@
                     '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] },
                     '@GetPartitionKeys': { '1': ['VoltType (varchar)', 'Returns Table[]'] },
                     '@Trace': { '2': ['Trace Category State (varchar)', 'Category (varchar)', 'Returns Table[]'], '1': ['Trace State (varchar)', 'Returns Table[]']},
+                    '@SwapTables': { '2': ['Table Name (varchar)', 'Table Name (varchar)', 'Returns Table[]'] }
                 };
 
                 var childConnectionQueue = connection.getQueue();
