@@ -365,6 +365,16 @@ public class TestJSONInterface extends TestCase {
         return ret;
     }
 
+    public static boolean canAccessHttpPort(int port) throws Exception {
+        String url = "http://127.0.0.1:" + port + "/deployment";
+        try {
+            getUrlOverJSON(url, null, null, null, 200,  "application/json");
+            return true;
+        } catch (HttpHostConnectException e) {
+            return false;
+        }
+    }
+
     public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
         Response response = new Response();
         JSONObject jsonObj = new JSONObject(jsonStr);
@@ -985,44 +995,44 @@ public class TestJSONInterface extends TestCase {
             // Community version does not support rejoin.
             return;
         }
+        final long TIMEOUT_THRESHOLD = 60000; // One minute
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.setSecurityEnabled(false, false);
-        builder.setHTTPDPort(0);
         builder.setJSONAPIEnabled(true);
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, true);
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, true);
         try {
             boolean success = cluster.compile(builder);
             assertTrue(success);
+            cluster.setHttpPortEnabled(true);
             cluster.startUp();
 
-            String url = "http://127.0.0.1:" + cluster.httpPort(0) + "/deployment";
-            try {
-                getUrlOverJSON(url, null, null, null, 200,  "application/json");
-            } catch (HttpHostConnectException e) {
-                fail("HTTP Listener is not open when the node is on");
+            long startTime = System.currentTimeMillis();
+            int port0 = cluster.httpPort(0), port1 = cluster.httpPort(1), port2 = cluster.httpPort(2);
+            while ( !canAccessHttpPort(port0)|| !canAccessHttpPort(port1) || !canAccessHttpPort(port2)) {
+                if (System.currentTimeMillis() - startTime >= TIMEOUT_THRESHOLD) {
+                    fail("Local cluster failed to start up");
+                }
+                Thread.sleep(200);
             }
+            assertTrue("Http port failed to open when the node is on", canAccessHttpPort(port0));
 
             cluster.killSingleHost(0);
-            Thread.sleep(1000);
-            url = "http://127.0.0.1:" + cluster.httpPort(0) + "/deployment";
-            try {
-                getUrlOverJSON(url, null, null, null, 200,  "application/json");
-                fail("HTTP Listener is not closed when the node is down.");
-            } catch (HttpHostConnectException e) {
-                assertTrue(e.toString().contains("Connection refused"));
-            }
+            assertFalse("Http port failed to close when the node is offline", canAccessHttpPort(port0));
 
             cluster.recoverOne(0, 0, "", true);
-            Thread.sleep(1000);
-            url = "http://127.0.0.1:" + cluster.httpPort(2) + "/deployment";
-            try {
-                getUrlOverJSON(url, null, null, null, 200,  "application/json");
-            } catch (HttpHostConnectException e) {
-                fail("HTTP Listener is not open after the node has rejoined.");
+            startTime = System.currentTimeMillis();
+            port0 = cluster.httpPort(3);
+            while ( !canAccessHttpPort(port0)|| !canAccessHttpPort(port1) || !canAccessHttpPort(port2)) {
+                if (System.currentTimeMillis() - startTime >= TIMEOUT_THRESHOLD) {
+                    fail("Local cluster failed to rejoin");
+                }
+                Thread.sleep(200);
             }
+            assertTrue("Http port failed to open when the node is rejoined", canAccessHttpPort(port0));
+            Thread.sleep(1000);
         } finally {
-            cluster.shutDown();
+            try {cluster.shutDown();} catch (Exception e) {}
         }
     }
 
