@@ -427,12 +427,26 @@ public interface Client {
      * @param tableName Name of table that bulk inserts are to be applied to.
      * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
      * @param upsert set to true if want upsert instead of insert
-     * @param callback Callback procedure used for notification of inserts and failures.
+     * @param failureCallback Callback procedure used for notification any failures.
      * @return instance of VoltBulkLoader
      * @throws Exception if tableName can't be found in the catalog.
      */
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack callback) throws Exception;
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack callback) throws Exception;
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack failureCallback) throws Exception;
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack failureCallback) throws Exception;
+
+    /**
+     * <p>Creates a new instance of a VoltBulkLoader that is bound to this Client.
+     * Multiple instances of a VoltBulkLoader created by a single Client will share some
+     * resources, particularly if they are inserting into the same table.</p>
+     *
+     * @param tableName Name of table that bulk inserts are to be applied to.
+     * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
+     * @param upsert set to true if want upsert instead of insert
+     * @param failureCallback Callback procedure used for notification any failures.
+     * @param successCallback Callback for notifications on successful load operations.
+     * @return instance of VoltBulkLoader
+     * @throws Exception if tableName can't be found in the catalog.
+     */
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception;
 
     /**

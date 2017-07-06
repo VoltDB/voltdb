@@ -37,17 +37,20 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     private final VoltBulkLoader m_loader;
     private final BulkLoaderErrorHandler m_errHandler;
     private final AtomicLong m_failedInsertCount = new AtomicLong(0);
+    private final BulkLoaderSuccessCallback m_successCallback;
 
     public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
             BulkLoaderErrorHandler errHandler) throws Exception    {
         m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback());
         m_errHandler = errHandler;
+        m_successCallback = null;
     }
 
     public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
             BulkLoaderErrorHandler errHandler, BulkLoaderSuccessCallback successCallback) throws Exception {
         m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback(), successCallback);
         m_errHandler = errHandler;
+        m_successCallback = successCallback;
     }
 
     public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize,
@@ -68,9 +71,10 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     public class CsvFailureCallback implements BulkLoaderFailureCallBack {
         @Override
         public void callback(Object rowHandle, Object[] fieldList, ClientResponse response) {
+
             if (response.getStatus() == ClientResponse.SUCCESS) {
-                if (rowHandle instanceof BulkLoaderSuccessCallback) {
-                    ((BulkLoaderSuccessCallback) rowHandle).success(rowHandle, response);
+                if (m_successCallback != null) {
+                    m_successCallback.success(rowHandle, response);
                 }
             }
             else {

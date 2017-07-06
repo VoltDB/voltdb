@@ -23,7 +23,20 @@ package org.voltdb.importer;
  */
 public interface ImporterLifecycle {
 
+    /**
+     * Lifecycle method.
+     * @return Implementations should return true if this importer should be running, or false if it should begin the shutdown sequence.
+     */
     public boolean shouldRun();
+
+    /**
+     * Stop this importer. After a call to this method, shouldRun() should return false.
+     */
     public void stop();
+
+    /**
+     * Whether or not to submit transactions to Volt. Used only in test scenarios. See KafkaTopicTest for an example.
+     * @return
+     */
     public boolean hasTransaction();
 }
