@@ -401,26 +401,42 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return f;
     }
 
-    /** Check the calls to write the new catalog on every host asynchronously. If the write failed,
-     * return the error message, otherwise return NULL
+    /**
+     * This helper function is used to check the results from all hosts based on the provided future map.
+     * If any host returns a failure this function will print out the error messages and return a non-null
+     * String to describe the state.
+     *
+     * @param cf:   The map of states from each host to be checked
+     * @param operationName:    The name of the operation to be checked (to be printed in the log, if any
+     * error occurs). For example, "catalog update" / "catalog verification", etc.
+     * @return  A String describing the error messages. If all hosts return success, NULL is returned.
      */
-    static protected String checkCatalogJarAsyncWriteResults(CompletableFuture<Map<Integer,ClientResponse>> cf) {
+    static protected String checkCatalogUpdateAsyncResults(CompletableFuture<Map<Integer,ClientResponse>> cf,
+                                                           String operationName) {
         Map<Integer, ClientResponse>  map = null;
+        String err;
         try {
             map = cf.get();
         } catch (InterruptedException | ExecutionException e) {
-            hostLog.warn("A request to update the loaded classes has failed. More info returned to client.");
-            return e.getMessage();
+            err = "A request of NT procedure call on all hosts to check " +
+                    operationName + " async results has failed: " + e.getMessage();
+            hostLog.warn(err);
+            return err;
         }
 
-        if (map != null) {
-            for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
-                if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
-                    hostLog.warn("A response from one host for writing the catalog jar has failed.");
-                    hostLog.warn("Warning message: " + entry.getValue().getStatusString());
-                    return "A response from host " + entry.getKey() +
-                            " for writing the catalog jar has failed.";
-                }
+        if (map == null) {
+            err = "A request of NT procedure call on all hosts to check " +
+                    operationName + " async results has returned null result.";
+            hostLog.warn(err);
+            return err;
+        }
+
+        for (Entry<Integer, ClientResponse> entry : map.entrySet()) {
+            if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
+                err = "A response from host " + entry.getKey().toString() +
+                      " for " + operationName + " has failed: " + entry.getValue().getStatusString();
+                hostLog.warn(err);
+                return err;
             }
         }
 
@@ -434,7 +450,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                       "@WriteCatalog",
                                                       catalogBytes,
                                                       WriteCatalog.WRITE);
-        return checkCatalogJarAsyncWriteResults(cf);
+        return checkCatalogUpdateAsyncResults(cf, "catalog write");
     }
 
     protected boolean verifyZKCatalog() {
@@ -443,7 +459,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                        "@WriteCatalog",
                                                        null,
                                                        WriteCatalog.VERIFY);
-        return checkCatalogJarAsyncWriteResults(cf) == null ? true : false;
+        return checkCatalogUpdateAsyncResults(cf, "catalog verification") == null ? true : false;
     }
 
     // remove temproray catalog jar file on all hosts, if any

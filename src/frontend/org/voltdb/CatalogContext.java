@@ -304,12 +304,11 @@ public class CatalogContext {
     }
 
     /**
-     * Write the original JAR file to the specified path/name
+     * Write, replace or update the catalog jar based on different cases.
      * @param path
      * @param name
      * @throws IOException
      */
-    // TODO: Replace this function with the one in InMemoryJarFile
     public Runnable writeCatalogJarToFile(String path, String name) throws IOException
     {
         File catalog_file = new VoltFile(path, name);

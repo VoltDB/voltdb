@@ -32,7 +32,6 @@ public class VoltNonTransactionalProcedure {
 
     ProcedureRunnerNT m_runner = null;
 
-    // Is this a good replacement for the transactional id?
     public long getID() {
         return m_runner.m_id;
     }
