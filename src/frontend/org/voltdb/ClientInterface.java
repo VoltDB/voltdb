@@ -2135,12 +2135,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * and find the host which hosts the partition replica and the least number of partition leaders.
      * send BalanceSPIMessage to the host with older partition leader to initiate @BalanceSPI
      * Repeatedly call this task until no qualified partition is available.
+     * @param interval task execution interval
      */
-    public void balanceSPI() {
+    public void balanceSPI(int interval) {
 
+        //The candidate pair is deterministic on every host.
         Pair<Integer, Integer> target = m_cartographer.getPartitionForMigration();
         if (target == null) {
-            tmLog.info("The distribution of partition leaders is balanced among the nodes.");
+            m_rateLimitedLogger.log(EstTime.currentTimeMillis(), Level.INFO, null,
+                    "The distribution of partition leaders is balanced among the nodes.");
             return;
         }
 
@@ -2216,15 +2219,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 tmLog.info(String.format("The mastership for partition %d has been moved to host %d.",
                         partitionId, targetHostId));
               //spin wait till the Cartographer sees the new master
-              final long maxWaitTime = TimeUnit.MINUTES.toSeconds(2); // 2 minutes
-              long remainingWaitTime = maxWaitTime;
-              final int interval = 2;
+              long remainingWaitTime = TimeUnit.MINUTES.toSeconds(2); // 2 max minutes;
+              final int waitingInterval = 1;
               while (remainingWaitTime > 0) {
                   try {
-                      Thread.sleep(TimeUnit.SECONDS.toMillis(interval));
+                      Thread.sleep(TimeUnit.SECONDS.toMillis(waitingInterval));
                   } catch (InterruptedException ignoreIt) {
                   }
-                  remainingWaitTime -= interval;
+                  remainingWaitTime -= waitingInterval;
                   if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
                       break;
                   }
@@ -2241,7 +2243,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         } catch (IOException | InterruptedException e) {
             tmLog.error(String.format("Fail to process leader change for partition %d: %s", partitionId, e.getMessage()));
         } finally {
-            CoreZK.removeSPIBalanceIndicator(m_zk);
+            //wait to avoid another host to start @BalaneSPI right away
+            VoltDB.instance().scheduleWork(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        CoreZK.removeSPIBalanceIndicator(m_zk);
+                    } catch (Exception ex) {
+                        log.warn("Exception while removing @BalanceSPI ZooKeeper blocker", ex);
+                    }
+                }
+            }, interval, 0, TimeUnit.SECONDS);
         }
     }
 }
