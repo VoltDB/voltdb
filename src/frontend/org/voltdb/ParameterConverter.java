@@ -440,7 +440,7 @@ public class ParameterConverter {
         // Downcasting is handled here (e.g. long => short).
         // Time (in many forms) and Decimal are also handled below.
 
-        if ((expectedClz == int.class) && (numberParam != null)) {
+        if ((expectedClz == int.class || expectedClz == Integer.class) && (numberParam != null)) {
             long val = numberParam.longValue();
             if (val == VoltType.NULL_INTEGER) {
                 throw new VoltTypeException("tryToMakeCompatible: The provided long value: ("
@@ -451,7 +451,7 @@ public class ParameterConverter {
             if ((val <= Integer.MAX_VALUE) && (val >= Integer.MIN_VALUE))
                 return numberParam.intValue();
         }
-        else if ((expectedClz == short.class) && (numberParam != null)) {
+        else if ((expectedClz == short.class || expectedClz == Short.class) && (numberParam != null)) {
             if ((inputClz == Long.class) || (inputClz == Integer.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_SMALLINT) {
@@ -464,7 +464,7 @@ public class ParameterConverter {
                     return numberParam.shortValue();
             }
         }
-        else if ((expectedClz == byte.class) && (numberParam != null)) {
+        else if ((expectedClz == byte.class || expectedClz == Byte.class) && (numberParam != null)) {
             if ((inputClz == Long.class) || (inputClz == Integer.class) || (inputClz == Short.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_TINYINT) {
@@ -477,7 +477,7 @@ public class ParameterConverter {
                     return numberParam.byteValue();
             }
         }
-        else if ((expectedClz == double.class) && (numberParam != null)) {
+        else if ((expectedClz == double.class || expectedClz == Double.class) && (numberParam != null)) {
             return numberParam.doubleValue();
         }
         else if (expectedClz == TimestampType.class) {
