@@ -673,7 +673,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         //
         // QUEUEDEPTH
         //
-        results = client.callProcedure("@Statistics", "QUEUEDEPTH", 0).getResults();
+        results = client.callProcedure("@Statistics", "QUEUE", 0).getResults();
         // one aggregate table returned
         assertEquals(1, results.length);
         System.out.println("Test QueueDepth table: " + results[0].toString());
@@ -697,7 +697,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         // LIVECLIENTS
         //
         results = client.callProcedure("@Statistics", "MANAGEMENT", 0).getResults();
-        // eight aggregate tables returned.  Assume that we have selected the right
+        // nine aggregate tables returned.  Assume that we have selected the right
         // subset of stats internally, just check that we get stuff.
         assertEquals(9, results.length);
     }

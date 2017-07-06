@@ -28,7 +28,8 @@ import org.voltdb.iv2.SiteTasker;
 /**
  * A class to track and generate statistics regarding queue depth.
  * Generate information on instantaneous queue depth and number of tasks
- * pulled from queue, average wait time and max wait time within a 5-second window
+ * pulled from queue, average wait time and max wait time (in microseconds)
+ * within a 5-second window
  */
 public class QueueDepthTracker extends SiteStatsSource {
 
@@ -40,12 +41,12 @@ public class QueueDepthTracker extends SiteStatsSource {
     private long m_lastWaitTime;
     private Deque<QueueStatus> m_historicalData;
     private LinkedTransferQueue<SiteTasker> m_tasks;
-    private long m_maxWaitTimeWindowSize = 5000000000L; // window size set to 5 seconds
+    private long m_maxWaitTimeWindowSize = 5_000_000_000L; // window size set to 5 seconds
     private long m_maxWaitLastLogTime;
     private long m_recentMaxWaitTime;
     private long m_recentTotalWaitTime;
     private long m_recentPollCount;
-    private long m_recentWindowSize = m_maxWaitTimeWindowSize / 500;
+    private long m_recentWindowSize = m_maxWaitTimeWindowSize / 10; // recent window size set to 0.5 second
 
     public class QueueStatus {
         public long timestamp;
@@ -124,7 +125,7 @@ public class QueueDepthTracker extends SiteStatsSource {
         if (nextTask == null) {
             currentWaitTime = 0;
         } else {
-            currentWaitTime = currentTime - nextTask.getTimestamp();
+            currentWaitTime = currentTime - nextTask.getQueueOfferTime();
         }
         // check historicalMaxWaitTime, report max wait time and mean wait time in window
         long maxWaitTimeInWindow = Math.max(currentWaitTime, m_recentMaxWaitTime);
@@ -143,8 +144,9 @@ public class QueueDepthTracker extends SiteStatsSource {
         }
         rowValues[columnNameToIndex.get("CURRENT_DEPTH")] = m_depth;
         rowValues[columnNameToIndex.get("POLL_COUNT")] = totalPollCountInWindow;
-        rowValues[columnNameToIndex.get("AVG_WAIT")] = totalWaitTimeInWindow / Math.max(1, totalPollCountInWindow);
-        rowValues[columnNameToIndex.get("MAX_WAIT")] = maxWaitTimeInWindow;
+        // wait times are in microseconds
+        rowValues[columnNameToIndex.get("AVG_WAIT")] = (totalWaitTimeInWindow / Math.max(1, totalPollCountInWindow)) / 1000;
+        rowValues[columnNameToIndex.get("MAX_WAIT")] = maxWaitTimeInWindow / 1000;
 
         super.updateStatsRow(rowKey, rowValues);
     }

@@ -526,8 +526,8 @@ public class StatsAgent extends OpsAgent
         case STARVATION:
             stats = collectStats(StatsSelector.STARVATION, interval);
             break;
-        case QUEUEDEPTH:
-            stats = collectStats(StatsSelector.QUEUEDEPTH, interval);
+        case QUEUE:
+            stats = collectStats(StatsSelector.QUEUE, interval);
             break;
         case PLANNER:
             stats = collectStats(StatsSelector.PLANNER, interval);
@@ -630,7 +630,7 @@ public class StatsAgent extends OpsAgent
         VoltTable[] tStats = collectStats(StatsSelector.TABLE, interval);
         VoltTable[] indStats = collectStats(StatsSelector.INDEX, interval);
         VoltTable[] sStats = collectStats(StatsSelector.STARVATION, interval);
-        VoltTable[] qStats = collectStats(StatsSelector.QUEUEDEPTH, interval);
+        VoltTable[] qStats = collectStats(StatsSelector.QUEUE, interval);
         VoltTable[] cStats = collectStats(StatsSelector.CPU, interval);
         // Ugh, this is ugly.  Currently need to return null if
         // we're missing any of the tables so that we

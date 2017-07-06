@@ -24,14 +24,14 @@ import org.voltdb.rejoin.TaskLog;
 
 public abstract class SiteTasker {
 
-    private long timestamp = -1L;
+    private long queueOfferTime = -1L;
 
-    public void setTimestamp() {
-        timestamp = System.nanoTime();
+    public void setQueueOfferTime() {
+        queueOfferTime = System.nanoTime();
     }
 
-    public long getTimestamp() {
-        return timestamp;
+    public long getQueueOfferTime() {
+        return queueOfferTime;
     }
 
     public static abstract class SiteTaskerRunnable extends SiteTasker {

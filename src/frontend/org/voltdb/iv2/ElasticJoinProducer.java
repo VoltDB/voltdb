@@ -27,7 +27,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.QueueDepthTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB;
@@ -124,7 +123,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         // respond to the coordinator with the sink HSID
         RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(), -1, sinkHSId);
         m_mailbox.send(m_coordinatorHsId, msg);
-        m_taskQueue.setQueueDepthTracker(new QueueDepthTracker(m_partitionId));
         m_taskQueue.offer(this);
         JOINLOG.info("P" + m_partitionId + " received initiation");
     }

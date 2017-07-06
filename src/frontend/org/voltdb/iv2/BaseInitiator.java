@@ -109,13 +109,11 @@ public abstract class BaseInitiator implements Initiator
         agent.registerStatsSource(StatsSelector.STARVATION,
                                   getInitiatorHSId(),
                                   st);
-        //////////////////////////////////////////////////////////////////
         QueueDepthTracker qdt = new QueueDepthTracker(getInitiatorHSId());
         m_scheduler.setQueueDepthTracker(qdt);
-        agent.registerStatsSource(StatsSelector.QUEUEDEPTH,
+        agent.registerStatsSource(StatsSelector.QUEUE,
                                   getInitiatorHSId(),
                                   qdt);
-        ////////////////////////////////////////////////////
 
         String partitionString = " ";
         if (m_partitionId != -1) {
