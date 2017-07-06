@@ -196,6 +196,42 @@ public class TestParameterConverter extends TestCase
         assertEquals(null, r);
     }
 
+    public void testNULLValueToByteException() throws Exception
+    {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Byte.class, -128);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: The provided short, int or long value: (-128) might be interpreted "
+                    + "as tinyint null. Try explicitly using a byte parameter."));
+        }
+    }
+
+    public void testNULLValueToByte() throws Exception
+    {
+        Object r = ParameterConverter.
+                tryToMakeCompatible(byte.class, (byte)-128);
+            assertTrue("expect null value", r.getClass() == Byte.class);
+            assertEquals(VoltType.NULL_TINYINT, r);
+    }
+
+    public void testNULLValueToBoxedByte() throws Exception
+    {
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Byte.class, (byte)-128);
+            assertTrue("expect null value", r == null);
+            assertEquals(null, r);
+    }
+
+    public void testBoxedNULLValueToBoxedByte() throws Exception
+    {
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Byte.class, new Byte((byte)-128));
+            assertTrue("expect null value", r == null);
+            assertEquals(null, r);
+    }
+
     public void testStringToTimestamp() throws Exception
     {
         TimestampType t = new TimestampType();
