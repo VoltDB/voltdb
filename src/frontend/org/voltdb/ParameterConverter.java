@@ -216,7 +216,8 @@ public class ParameterConverter {
             return Array.newInstance(expectedComponentClz, 0);
         }
         // hack to make strings work with input as bytes
-        else if ((inputComponentClz == byte[].class) && (expectedComponentClz == String.class)) {
+        else if ((inputComponentClz == byte[].class || inputComponentClz == Byte[].class)
+                && (expectedComponentClz == String.class)) {
             String[] values = new String[inputLength];
             for (int i = 0; i < inputLength; i++) {
                 try {
@@ -230,12 +231,18 @@ public class ParameterConverter {
             return values;
         }
         // hack to make varbinary work with input as hex string
-        else if ((inputComponentClz == String.class) && (expectedComponentClz == byte[].class)) {
+        else if ((inputComponentClz == String.class) &&
+                (expectedComponentClz == byte[].class || expectedComponentClz == Byte[].class )) {
             byte[][] values = new byte[inputLength][];
+            Byte[][] boxvalues = new Byte[inputLength][];
             for (int i = 0; i < inputLength; i++) {
                 values[i] = Encoder.hexDecode((String) Array.get(param, i));
+                boxvalues[i] = ArrayUtils.toObject( values[i] );
             }
-            return values;
+            if (expectedComponentClz == byte[].class)
+                return values;
+            else  // if expected clz is Byte[]
+                return boxvalues;
         }
         else {
             /*
@@ -353,6 +360,7 @@ public class ParameterConverter {
         }
         else if (inputClz == byte[].class) {
             if (expectedClz == byte[].class) return param;
+            if (expectedClz == Byte[].class) return ArrayUtils.toObject((byte[]) param);
             // allow byte arrays to be passed into string parameters
             else if (expectedClz == String.class) {
                 String value = new String((byte[]) param, Constants.UTF8ENCODING);
@@ -402,8 +410,7 @@ public class ParameterConverter {
                     short result = pBigDecimal.shortValueExact();
                     return result;
                 } catch (ArithmeticException e) {} // The error will be re-thrown below
-            }
-            else if (expectedClz == byte.class || expectedClz == Byte.class) {
+            } else if (expectedClz == byte.class || expectedClz == Byte.class) {
                 try {
                     byte result = pBigDecimal.byteValueExact();
                     return result;
