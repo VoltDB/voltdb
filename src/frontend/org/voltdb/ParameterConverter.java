@@ -135,35 +135,21 @@ public class ParameterConverter {
         String commaFreeValue = thousandSeparator.matcher(value).replaceAll("");
 
         try {
-            if (expectedClz == long.class) {
+            // autoboxing converts to boxed types since this method returns a java Object
+            if (expectedClz == long.class || expectedClz == Long.class) {
                 return Long.parseLong(commaFreeValue);
             }
-            if (expectedClz == Long.class) {
-                return new Long(commaFreeValue);
-            }
-            if (expectedClz == int.class) {
+            if (expectedClz == int.class || expectedClz == Integer.class) {
                 return Integer.parseInt(commaFreeValue);
             }
-            if (expectedClz == Integer.class) {
-                return new Integer(commaFreeValue);
-            }
-            if (expectedClz == short.class) {
+            if (expectedClz == short.class || expectedClz == Short.class) {
                 return Short.parseShort(commaFreeValue);
             }
-            if (expectedClz == Short.class) {
-                return new Short(commaFreeValue);
-            }
-            if (expectedClz == byte.class) {
+            if (expectedClz == byte.class || expectedClz == Byte.class) {
                 return Byte.parseByte(commaFreeValue);
             }
-            if (expectedClz == Byte.class) {
-                return new Byte(commaFreeValue);
-            }
-            if (expectedClz == double.class) {
+            if (expectedClz == double.class || expectedClz == Double.class) {
                 return Double.parseDouble(commaFreeValue);
-            }
-            if (expectedClz == Double.class) {
-                return new Double(commaFreeValue);
             }
         }
         // ignore the exception and fail through below
