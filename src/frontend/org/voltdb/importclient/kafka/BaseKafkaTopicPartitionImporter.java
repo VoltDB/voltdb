@@ -279,7 +279,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
             fault = e;
         }
         if (fault != null) {
-            m_logger.rateLimitedLog(Level.ERROR, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
+            m_logger.rateLimitedLog(Level.WARN, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
             response = null;
         }
         return response;
