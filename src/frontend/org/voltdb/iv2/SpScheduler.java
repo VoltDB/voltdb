@@ -701,8 +701,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // is remote repair necessary?
         if (!needsRepair.isEmpty()) {
+            //to replica for repair
             Iv2InitiateTaskMessage replmsg =
-                new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+                new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message, true);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }

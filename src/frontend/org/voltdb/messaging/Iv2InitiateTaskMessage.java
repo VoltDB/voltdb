@@ -111,6 +111,13 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     public Iv2InitiateTaskMessage(long initiatorHSId,
             long coordinatorHSId, Iv2InitiateTaskMessage rhs)
     {
+        this(initiatorHSId, coordinatorHSId, rhs, false);
+    }
+
+    /** Copy constructor for repair. */
+    public Iv2InitiateTaskMessage(long initiatorHSId,
+            long coordinatorHSId, Iv2InitiateTaskMessage rhs, boolean toReplica)
+    {
         super(initiatorHSId, coordinatorHSId, rhs);
         m_isSinglePartition = rhs.m_isSinglePartition;
         m_invocation = rhs.m_invocation;
@@ -119,6 +126,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             clog.debug("Iv2InitiateTaskMessage copy constructor for repair, rhs: " + rhs, new RuntimeException());
         }
         m_connectionId = rhs.m_connectionId;
+        m_toReplica = toReplica;
     }
 
     @Override

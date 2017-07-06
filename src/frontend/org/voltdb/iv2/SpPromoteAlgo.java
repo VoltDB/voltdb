@@ -44,7 +44,6 @@ public class SpPromoteAlgo implements RepairAlgo
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
     private final boolean m_isBalanceSPI;
-    private final int m_partitionId;
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
@@ -119,7 +118,6 @@ public class SpPromoteAlgo implements RepairAlgo
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_isBalanceSPI = isBalanceSPI;
-        m_partitionId = partitionId;
     }
 
     @Override
