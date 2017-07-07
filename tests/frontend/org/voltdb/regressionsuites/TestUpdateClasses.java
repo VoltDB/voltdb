@@ -834,6 +834,9 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
                 fail("@UpdateClasses should not fail with message: " + pce.getMessage());
             }
 
+            resp = m_client.callProcedure("proc1", 3);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
             // create procedure
             resp = m_client.callProcedure("@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.updateclasses.testImportProc;");
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
