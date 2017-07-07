@@ -326,6 +326,20 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
                         + "FROM T_ENG_11497_1\n"
                         + "GROUP BY\n"
                         + "      AID;\n"
+
+                        // multiple count(*) anywhere in materialized views
+                        + "CREATE VIEW T_ENG_10945_2_VIEW\n"
+                        + "AS\n"
+                        + "   SELECT\n"
+                        + "        AID,\n"
+                        + "        MIN(AID),\n"
+                        + "        COUNT(*) AS IGNOREME,\n"
+                        + "        MAX(AID),\n"
+                        + "        COUNT(*) AS IGNOREME1,\n"
+                        + "        SUM(CAST(USD AS DECIMAL)) AS USD\n"
+                        + "FROM T_ENG_11497_1\n"
+                        + "GROUP BY\n"
+                        + "      AID;\n"
                         ;
 
         // Create some tables and some views
@@ -347,6 +361,9 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("@AdHoc", "drop view T_ENG_10945_1_VIEW;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop view T_ENG_10945_2_VIEW;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("@AdHoc", "drop table T_ENG_11497_1;");
