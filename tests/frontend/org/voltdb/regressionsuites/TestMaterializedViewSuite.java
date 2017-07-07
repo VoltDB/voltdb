@@ -980,7 +980,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         results = client.callProcedure("DeletePerson", 1, 2L, NORMALLY).getResults();
 
-        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE4").getResults();
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE5").getResults();
         assert(results != null);
         assertEquals(1, results.length);
         t = results[0];
@@ -995,7 +995,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 200, 9).getResults();
 
-        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE4").getResults();
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE5").getResults();
         assert(results != null);
         assertEquals(1, results.length);
         t = results[0];
@@ -1010,7 +1010,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 3000, 2).getResults();
 
-        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE4").getResults();
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE5").getResults();
         assert(results != null);
         assertEquals(1, results.length);
         t = results[0];
