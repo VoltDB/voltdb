@@ -39,7 +39,6 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
-    , m_countStarColumnIndex(mvInfo->countStarColumnIndex())
 {
     VOLT_TRACE("Construct MaterializedViewTriggerForInsert...");
 
@@ -320,11 +319,12 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
         std::size_t aggIndex = destCol->index() - m_groupByColumnCount;
         m_aggTypes[aggIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
         switch(m_aggTypes[aggIndex]) {
+            case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                m_countStarColumnIndex = destCol->index();
             case EXPRESSION_TYPE_AGGREGATE_SUM:
             case EXPRESSION_TYPE_AGGREGATE_COUNT:
             case EXPRESSION_TYPE_AGGREGATE_MIN:
             case EXPRESSION_TYPE_AGGREGATE_MAX:
-            case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
                 break; // legal value
             default: {
                 char message[128];

@@ -38,8 +38,7 @@ namespace voltdb {
                                                      VoltDBEngine* engine) :
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
-            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()),
-            m_countStarColumnIndex(mvHandlerInfo->countStarColumnIndex()) {
+            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()) {
         install(mvHandlerInfo, engine);
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
@@ -116,11 +115,12 @@ namespace voltdb {
             std::size_t aggIndex = destCol->index() - m_groupByColumnCount;
             m_aggTypes[aggIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
             switch(m_aggTypes[aggIndex]) {
+                case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                    m_countStarColumnIndex = destCol->index();
                 case EXPRESSION_TYPE_AGGREGATE_SUM:
                 case EXPRESSION_TYPE_AGGREGATE_COUNT:
                 case EXPRESSION_TYPE_AGGREGATE_MIN:
                 case EXPRESSION_TYPE_AGGREGATE_MAX:
-                case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
                     break; // legal value
                 default: {
                     char message[128];
