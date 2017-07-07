@@ -177,7 +177,7 @@ public class TestKafkaLoaderArgumentParsing {
         args = new KafkaExternalLoaderCLIArguments();
         args.parse("KafaExternalLoader", new String[] {  "-z", "localhost:2181", "-t", "volt-topic", "KAFKA_IMPORT" } );
 
-        Assert.assertEquals(args.timeout, KafkaExternalLoaderCLIArguments.ZK_CONNECTION_TIMEOUT_MILLIS);
+        Assert.assertEquals(args.timeout, KafkaExternalLoaderCLIArguments.KAFKA_TIMEOUT_DEFAULT_MILLIS);
         Assert.assertEquals(args.buffersize, KafkaExternalLoaderCLIArguments.KAFKA_BUFFER_SIZE_DEFAULT);
     }
 
