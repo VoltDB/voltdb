@@ -149,7 +149,6 @@ begin MaterializedViewHandlerInfo       "Information used to build and update a 
   Table? destTable                      "The table which will be updated when the source table is updated"
   int groupByColumnCount                "Number of group by columns"
   bool isSafeWithNonemptySources        "Is this a materialized view which may be created with nonempty source tables"
-  int countStarColumnIndex              "Index of the COUNT(*) column"
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"
@@ -161,7 +160,6 @@ begin MaterializedViewInfo          "Information used to build and update a mate
   IndexRef* indexForMinMax          "The name of index on srcTable which can be used to maintain min()/max()"
   Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
   bool isSafeWithNonemptySources    "Is this a materialized view which may be created with nonempty source tables"
-  int countStarColumnIndex          "Index of the COUNT(*) column"
 end
 
 begin AuthProgram javaonly "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
