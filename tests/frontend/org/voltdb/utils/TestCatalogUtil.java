@@ -960,7 +960,7 @@ public class TestCatalogUtil extends TestCase {
         String msg2 = CatalogUtil.compileDeployment(cat2, bad_deployment2, false);
         assertTrue(msg2, msg2.contains("Error validating deployment configuration: Invalid import configuration. Two Kafka entries have the same groupid and topic."));
 
-        //import with bad kafka configuration: double reduntand topics;
+        //import with bad kafka configuration: double redundant topics;
         final File tmpBad3 = VoltProjectBuilder.writeStringToTempFile(withBadImport3);
         DeploymentType bad_deployment3 = CatalogUtil.getDeployment(new FileInputStream(tmpBad3));
 
