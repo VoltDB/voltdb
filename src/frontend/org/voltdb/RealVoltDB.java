@@ -3355,7 +3355,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Verify the integrity of the newly updated catalog stored on the ZooKeeper
     @Override
-    public boolean verifyZKCatalog() {
+    public String verifyZKCatalog() {
         CatalogAndIds catalogStuff = null;
         try {
             catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
@@ -3386,7 +3386,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         msg = msg.concat("an incompatable Java version.");
                     }
                     hostLog.error(msg);
-                    return false;
+                    return msg;
                 }
                 catch (LinkageError | ClassNotFoundException e) {
                     String cause = e.getMessage();
@@ -3396,14 +3396,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     String msg = "Error loading class: " + classname + " from catalog: " +
                         e.getClass().getCanonicalName() + ", " + cause;
                     hostLog.warn(msg);
-                    return false;
+                    return msg;
                 }
             }
         } catch (Exception e) {
-            return false;
+            return e.getMessage();
         }
 
-        return true;
+        return null;
     }
 
     // Clean up the temporary jar file
@@ -4636,5 +4636,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         hostLog.error(sb.toString());
+    }
+
+    public static void setJavaClassForTest(JavaClassForTest fakeJavaClass) {
+        m_javaClass = fakeJavaClass;
     }
 }

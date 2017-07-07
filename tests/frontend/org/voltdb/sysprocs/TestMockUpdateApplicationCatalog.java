@@ -29,6 +29,7 @@ import java.io.IOException;
 import org.mockito.Matchers;
 import org.mockito.Mockito;
 import org.voltdb.OperationMode;
+import org.voltdb.RealVoltDB;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -77,7 +78,7 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
         JavaClassForTest testClass = Mockito.mock(JavaClassForTest.class);
         Mockito.when(testClass.forName(Matchers.anyString(), Matchers.anyBoolean(), Mockito.any(ClassLoader.class))).
                      thenThrow(new UnsupportedClassVersionError("Unsupported major.minor version 52.0"));
-        UpdateCore.setJavaClassForTest(testClass);
+        RealVoltDB.setJavaClassForTest(testClass);
 
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
         m_client = ClientFactory.createClient();

@@ -65,8 +65,6 @@ import com.google_voltpatches.common.base.Throwables;
  */
 @ProcInfo(singlePartition = false)
 public class UpdateCore extends VoltSystemProcedure {
-    static JavaClassForTest m_javaClass = new JavaClassForTest();
-
     VoltLogger log = new VoltLogger("HOST");
 
     private static final int DEP_updateCatalogSync = (int)
@@ -636,9 +634,5 @@ public class UpdateCore extends VoltSystemProcedure {
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);
         return (new VoltTable[] {result});
-    }
-
-    public static void setJavaClassForTest(JavaClassForTest fakeJavaClass) {
-        m_javaClass = fakeJavaClass;
     }
 }

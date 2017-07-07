@@ -51,8 +51,9 @@ public class WriteCatalog extends UpdateApplicationBase {
         } else if (mode == CLEAN_UP) {
             VoltDB.instance().cleanUpTempCatalogJar();
         } else if (mode == VERIFY) {
-            if (!VoltDB.instance().verifyZKCatalog()) {
-                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, "Catalog verification failed.");
+            String err;
+            if ((err = VoltDB.instance().verifyZKCatalog()) != null) {
+                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, err);
             }
         } else {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, "The mode " + Byte.toString(mode) +

@@ -174,9 +174,9 @@ public interface VoltDBInterface
         return;
     }
 
-    default public boolean verifyZKCatalog()
+    default public String verifyZKCatalog()
     {
-        return true;
+        return null;
     }
 
     default public void cleanUpTempCatalogJar()

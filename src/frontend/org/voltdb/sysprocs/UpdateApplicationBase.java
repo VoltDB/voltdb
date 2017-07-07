@@ -453,13 +453,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return checkCatalogUpdateAsyncResults(cf, "catalog write");
     }
 
-    protected boolean verifyZKCatalog() {
+    protected String verifyZKCatalog() {
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                                                        callNTProcedureOnAllHosts(
                                                        "@WriteCatalog",
                                                        new byte[] {0},
                                                        WriteCatalog.VERIFY);
-        return checkCatalogUpdateAsyncResults(cf, "catalog verification") == null ? true : false;
+        return checkCatalogUpdateAsyncResults(cf, "catalog verification");
     }
 
     // remove temproray catalog jar file on all hosts, if any
@@ -550,9 +550,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             zkCorrupted = true;
 
             // verify the catalog on each host, this step was originally in the MP transaction @UpdateCore
-            if (!verifyZKCatalog()) {
-                errMsg = "Catalog verification on ZooKeeper failed on one or more hosts.";
-                hostLog.warn(errMsg);
+            if ((errMsg = verifyZKCatalog()) != null) {
+                hostLog.warn("Catalog verification on ZooKeeper failed on one or more hosts.");
                 CatalogUtil.updateCatalogToZK(zk,
                                               oldCatalog.version,
                                               oldCatalog.txnId,
