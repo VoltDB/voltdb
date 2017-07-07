@@ -1816,7 +1816,7 @@ public class TestVoltCompiler extends TestCase {
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
 
-        // only one count(*) in ddl
+        // multiple count(*) in ddl
         errorMsg = "Materialized view \"MY_VIEW\" cannot have count(*) more than once";
         ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
                 "create view my_view as select id, wage, count(*), min(wage), count(*) from t group by id, wage;" +
