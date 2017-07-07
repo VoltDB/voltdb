@@ -2101,6 +2101,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
+    public boolean isClusterCompelte() {
+        return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
+    }
+
     // The latest joined host will take over partition leader migration.
     private void scheduleBalanceSpiTask() {
         final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
@@ -2111,7 +2115,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
         final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "10"));
         Runnable task = () -> {
-                m_clientInterface.balanceSPI(interval);
+            //only works if the cluster is full
+            if (isClusterCompelte()) {
+                final int maxMastersPerHost = (int)Math.ceil((double)(m_cartographer.getPartitionCount()) / m_config.m_hostCount);
+                m_clientInterface.balanceSPI(interval, maxMastersPerHost);
+            }
         };
 
         m_periodicWorks.add(scheduleWork(task, delay, interval, TimeUnit.SECONDS));

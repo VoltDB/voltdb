@@ -2137,10 +2137,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Repeatedly call this task until no qualified partition is available.
      * @param interval task execution interval
      */
-    public void balanceSPI(int interval) {
+    public void balanceSPI(int interval, int maxMastersPerHost) {
 
         //The candidate pair is deterministic on every host.
-        Pair<Integer, Integer> target = m_cartographer.getPartitionForMigration();
+        Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(maxMastersPerHost);
         if (target == null) {
             m_rateLimitedLogger.log(EstTime.currentTimeMillis(), Level.INFO, null,
                     "The distribution of partition leaders is balanced among the nodes.");
@@ -2172,6 +2172,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (partitionKey == -1) {
             tmLog.warn("Could not find the partition key for partition " + partitionId);
+            return;
+        }
+
+        RealVoltDB db = (RealVoltDB)VoltDB.instance();
+        if (!db.isClusterCompelte()) {
             return;
         }
 
@@ -2233,7 +2238,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
               }
             } else {
                 //if the target host is down, ignore
-                RealVoltDB db = (RealVoltDB)VoltDB.instance();
                 Set<Integer> liveHosts = db.getHostMessenger().getLiveHostIds();
                 if (!liveHosts.contains(targetHostId)) {
                     tmLog.error(String.format("The mastership for partition %d has not been successfully moved to host %d.",
@@ -2244,7 +2248,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             tmLog.error(String.format("Fail to process leader change for partition %d: %s", partitionId, e.getMessage()));
         } finally {
             //wait to avoid another host to start @BalaneSPI right away
-            VoltDB.instance().scheduleWork(new Runnable() {
+            db.scheduleWork(new Runnable() {
                 @Override
                 public void run() {
                     try {

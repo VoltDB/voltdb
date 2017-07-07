@@ -731,7 +731,7 @@ public class Cartographer extends StatsSource
      * with least masters.
      * @return  a partition and target host
      */
-    public Pair<Integer, Integer> getPartitionForMigration() {
+    public Pair<Integer, Integer> getPartitionForBalanceSPI(int maxMastersPerHost) {
         try {
             if (CoreZK.isPartitionCleanupInProgress(m_hostMessenger.getZK())) {
                 if (hostLog.isDebugEnabled()) {
@@ -747,9 +747,6 @@ public class Cartographer extends StatsSource
         if (liveHosts.size() == 1) {
             return null;
         }
-
-        int maximalMastersPerHost = (int)Math.ceil((double)(getPartitionCount()) / liveHosts.size());
-
         //collect host and partition info
         Map<Integer, Host> hostsMap = Maps.newHashMap();
         Iterator<Object> i = getStatsRowKeyIterator(false);
@@ -764,7 +761,7 @@ public class Cartographer extends StatsSource
             }
             Host leaderHost = hostsMap.get(leaderHostId);
             if (leaderHost == null) {
-                leaderHost = new Host(leaderHostId, maximalMastersPerHost);
+                leaderHost = new Host(leaderHostId, maxMastersPerHost);
                 hostsMap.put(leaderHostId, leaderHost);
             }
             List<Long> sites = getReplicasForPartition(partitionId);
@@ -775,7 +772,7 @@ public class Cartographer extends StatsSource
                 }
                 Host host = hostsMap.get(hostId);
                 if ( host ==  null) {
-                    host = new Host(hostId, maximalMastersPerHost);
+                    host = new Host(hostId, maxMastersPerHost);
                     hostsMap.put(hostId, host);
                 }
                 host.addPartition(partitionId, (leaderHostId == hostId));

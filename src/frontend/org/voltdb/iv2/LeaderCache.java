@@ -62,7 +62,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
 
         @Override
         public String toString() {
-            return "leader hsid: " + CoreUtils.hsIdToString(m_HSID) + ", is balance SPI requested:" + m_isBalanceSPIRequested;
+            return "leader hsid: " + CoreUtils.hsIdToString(m_HSID) + ( m_isBalanceSPIRequested ? ", BalanceSPI requested" : "");
         }
     }
 

@@ -742,6 +742,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+            replmsg.setToReplica(true);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("[SpScheduler.handleFragmentTaskMessageRepair] sending repairing msg to " + CoreUtils.hsIdCollectionToString(needsRepair) +
+                        " from " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " " + replmsg);
+            }
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
