@@ -29,7 +29,7 @@ CREATE VIEW MATPEOPLE4 (AGE, PARTITION, MIN_SALARY, NUM, MAX_CHILDREN)
     GROUP BY AGE, PARTITION;
 
 -- view to have multiple count(*) anywhere in materialized views
-CREATE VIEW MATPEOPLE5 (AGE, PARTITION, MIN_SALARY, NUM, MAX_CHILDREN)
+CREATE VIEW MATPEOPLE5 (AGE, PARTITION, MIN_SALARY, NUM, MAX_CHILDREN, NUM1, MAX_SALARY)
     AS SELECT AGE, PARTITION, MIN(SALARY), COUNT(*), MAX(CHILDREN), COUNT(*), MAX(SALARY)
     FROM PEOPLE
     GROUP BY AGE, PARTITION;
@@ -160,6 +160,11 @@ FROM ENG6511 GROUP BY d1, d2;
 -- count * anywhere with complex aggregation queries
 CREATE VIEW VENG6511expRC (d1, d2, vmin, cnt, vmax) AS
 SELECT d1, d2, MIN(abs(v1)) AS vmin, COUNT(*), MAX(abs(v1)) AS vmax
+FROM ENG6511 GROUP BY d1, d2;
+
+-- multiple count * anywhere with complex aggregation queries
+CREATE VIEW VENG6511expRCM (d1, d2, vmin, cnt, vmax, cnt1, vsum) AS
+SELECT d1, d2, MIN(abs(v1)) AS vmin, COUNT(*), MAX(abs(v1)), COUNT(*), SUM(abs(v1)) AS vsum
 FROM ENG6511 GROUP BY d1, d2;
 
 CREATE VIEW VENG6511expLR (d1, d2, cnt, vmin, vmax) AS
