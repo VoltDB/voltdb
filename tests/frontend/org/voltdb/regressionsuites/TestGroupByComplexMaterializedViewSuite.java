@@ -1769,6 +1769,10 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R4 " +
                 "GROUP BY wage, dept;" +
 
+                "CREATE VIEW V0_R5 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent, V_CNT_1) " +
+                "AS SELECT wage, dept, count(*), sum(age), sum(rent), count(*)  FROM R4 " +
+                "GROUP BY wage, dept;" +
+
                 // This R4 mv tests bigint math result type
                 "CREATE VIEW V2_R4 (V2_R4_G1, V2_R4_G2, V2_R4_CNT, V2_R4_sum_wage) " +
                 "AS SELECT dept*dept, dept+dept, count(*), SUM(wage) " +
