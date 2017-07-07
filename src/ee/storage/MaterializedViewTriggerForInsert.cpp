@@ -88,6 +88,7 @@ void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTab
     initUpdatableIndexList();
 }
 
+// aggExprOffset is needed because COUNT(*) is not part of m_aggExprs
 NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
                                                                  int aggExprOffset,
                                                                  const TableTuple& tuple) {
@@ -206,9 +207,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
                     newValue = ValueFactory::getBigIntValue(1);
                 }
             }
-            // if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
-            //         newValue = ValueFactory::getBigIntValue(1);
-            // }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
         }
         m_dest->insertPersistentTuple(m_updatedTuple, fallible);
