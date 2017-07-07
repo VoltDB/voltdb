@@ -457,14 +457,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                                                        callNTProcedureOnAllHosts(
                                                        "@WriteCatalog",
-                                                       null,
+                                                       new byte[] {0},
                                                        WriteCatalog.VERIFY);
         return checkCatalogUpdateAsyncResults(cf, "catalog verification") == null ? true : false;
     }
 
     // remove temproray catalog jar file on all hosts, if any
     protected void cleanUpTempCatalog() {
-        callNTProcedureOnAllHosts("@WriteCatalog", null, WriteCatalog.CLEAN_UP);
+        callNTProcedureOnAllHosts("@WriteCatalog", new byte[] {0}, WriteCatalog.CLEAN_UP);
     }
 
     protected CompletableFuture<ClientResponse> updateCatalog(CatalogChangeResult ccr) {
@@ -478,8 +478,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // whether to abort any concurrent operation, or to queue them up and execute
         // one by one ?)
         if (!catalogUpdateFlag.compareAndSet(false, true)) {
-            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
-                    "Can't write a new catalog when another one is in progress");
+            return makeQuickResponse(ClientResponseImpl.USER_ABORT,
+                    "Invalid catalog update. Can't write a new catalog when another one is in progress");
         }
 
         try {
@@ -487,26 +487,26 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             if (ccr.worksWithElastic == false &&
                     !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
                     catalogUpdateFlag.set(false);
-                    return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
+                    return makeQuickResponse(ClientResponseImpl.USER_ABORT,
                                              "Can't do a catalog update while an elastic join or rejoin is active");
                 }
 
             // only one catalog update at a time (this should not happen anyway)
             if (zk.exists(VoltZK.uacActiveBlocker, false) != null) {
                 catalogUpdateFlag.set(false);
-                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
+                return makeQuickResponse(ClientResponseImpl.USER_ABORT,
                                          "Can't write a new catalog when another one is in progress");
             }
 
             // check rejoin blocker node
             if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
                 catalogUpdateFlag.set(false);
-                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
+                return makeQuickResponse(ClientResponseImpl.USER_ABORT,
                                          "Can't do a catalog update while an elastic join or rejoin is active");
             }
         } catch (InterruptedException | KeeperException e) {
             catalogUpdateFlag.set(false);
-            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, "Catalog update failed with exception:\n" +
+            return makeQuickResponse(ClientResponseImpl.USER_ABORT, "Catalog update failed with exception:\n" +
                                      e.getMessage());
         }
 
@@ -515,17 +515,26 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         CompletableFuture<ClientResponse> response = null;
 
+        CatalogAndIds oldCatalog = null;
+
         try {
             String errMsg;
             // write the new catalog to a temporary jar file
             if ((errMsg = writeNewCatalog(ccr.catalogBytes)) != null) {
-                cleanUpTempCatalog();
-                VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
-                catalogUpdateFlag.set(false);
-                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
+                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
 
-            CatalogAndIds oldCatalog = CatalogUtil.getCatalogFromZK(zk);
+            oldCatalog = CatalogUtil.getCatalogFromZK(zk);
+
+            if (oldCatalog.version != ccr.expectedCatalogVersion) {
+                errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
+                         "against one version of the cluster configuration but that version was " +
+                         "no longer live when attempting to apply the change.  This is likely " +
+                         "the result of multiple concurrent attempts to change the cluster " +
+                         "configuration.  Please make such changes synchronously from a single " +
+                         "connection to the cluster.";
+                return makeQuickResponse(ClientResponseImpl.USER_ABORT, errMsg);
+            }
 
             // update the catalog to ZooKeeper
             CatalogUtil.updateCatalogToZK(
@@ -548,10 +557,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                               oldCatalog.catalogBytes,
                                               oldCatalog.getCatalogHash(),
                                               oldCatalog.deploymentBytes);
-                cleanUpTempCatalog();
-                VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
-                catalogUpdateFlag.set(false);
-                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, errMsg);
+                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
 
             // update the catalog jar
@@ -571,7 +577,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                      ccr.requiresNewExportGeneration ? 1 : 0);
 
         } catch (InterruptedException | KeeperException | UnsupportedEncodingException e) {
-            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
                                      "Catalog update in Zookeeper failed with exception:\n" +
                                      e.getMessage());
         } finally {

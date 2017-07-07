@@ -542,7 +542,9 @@ public class UpdateCore extends VoltSystemProcedure {
             // ever write valid catalog and deployment state to ZK.
             CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
             // New update?
-            if (catalogStuff.version == expectedCatalogVersion + 1) {
+            if (catalogStuff.version == expectedCatalogVersion + 1 &&
+                Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
+                Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)) {
                 if (log.isInfoEnabled()) {
                     log.info("New catalog update from: " + catalogStuff.toString());
                     log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
