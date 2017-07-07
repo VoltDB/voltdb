@@ -175,8 +175,8 @@ public abstract class AbstractImporter
     /**
      * Log a DEBUG level log message.
      *
-     * @param msgFormat
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
     @Override
     public void debug(Throwable t, String msgFormat, Object... args)
@@ -187,8 +187,8 @@ public abstract class AbstractImporter
     /**
      * Log a ERROR level log message.
      *
-     * @param msgFormat
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
     @Override
     public void error(Throwable t, String msgFormat, Object... args)
@@ -199,8 +199,8 @@ public abstract class AbstractImporter
     /**
      * Log a INFO level log message.
      *
-     * @param msgFormat
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
     @Override
     public void info(Throwable t, String msgFormat, Object... args)
@@ -211,8 +211,8 @@ public abstract class AbstractImporter
     /**
      * Log a TRACE level log message.
      *
-     * @param msgFormat
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
     protected void trace(Throwable t, String msgFormat, Object... args)
     {
@@ -222,8 +222,8 @@ public abstract class AbstractImporter
     /**
      * Log a WARN level log message.
      *
-     * @param msgFormat
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
     @Override
     public void warn(Throwable t, String msgFormat, Object... args)

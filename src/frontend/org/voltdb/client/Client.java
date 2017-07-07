@@ -441,7 +441,7 @@ public interface Client {
      *
      * @param tableName Name of table that bulk inserts are to be applied to.
      * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
-     * @param upsert set to true if want upsert instead of insert
+     * @param upsertMode set to true if want upsert instead of insert
      * @param failureCallback Callback procedure used for notification any failures.
      * @param successCallback Callback for notifications on successful load operations.
      * @return instance of VoltBulkLoader
