@@ -225,17 +225,20 @@ public class ParameterConverter {
         }
         // hack to make varbinary work with input as hex string
         else if ((inputComponentClz == String.class) &&
-                (expectedComponentClz == byte[].class || expectedComponentClz == Byte[].class )) {
+                (expectedComponentClz == byte[].class)) {
             byte[][] values = new byte[inputLength][];
-            Byte[][] boxvalues = new Byte[inputLength][];
             for (int i = 0; i < inputLength; i++) {
                 values[i] = Encoder.hexDecode((String) Array.get(param, i));
-                boxvalues[i] = ArrayUtils.toObject( values[i] );
             }
-            if (expectedComponentClz == byte[].class)
-                return values;
-            else  // if expected clz is Byte[]
-                return boxvalues;
+            return values;
+        } else if ((inputComponentClz == String.class) &&
+                (expectedComponentClz == Byte[].class)) {
+            Byte[][] boxvalues = new Byte[inputLength][];
+            for (int i = 0; i < inputLength; i++) {
+                boxvalues[i] = ArrayUtils.toObject(
+                        Encoder.hexDecode((String) Array.get(param, i)) );
+            }
+            return boxvalues;
         }
         else {
             /*
