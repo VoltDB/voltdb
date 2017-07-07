@@ -83,6 +83,7 @@ import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Permission;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.PathsType;
@@ -341,7 +342,7 @@ public class HTTPAdminListener {
 
             super.handle(target, baseRequest, request, response);
             if (baseRequest.isHandled()) return;
-            byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
+            byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar(VoltCompiler.AUTOGEN_DDL_FILE_NAME);
             String ddl = new String(reportbytes, Charsets.UTF_8);
             response.setContentType("text/plain;charset=utf-8");
             response.setStatus(HttpServletResponse.SC_OK);

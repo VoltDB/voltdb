@@ -556,6 +556,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_EXISTS: {
         return "OPERATOR_EXISTS";
     }
+    case EXPRESSION_TYPE_OPERATOR_UNARY_MINUS: {
+        return "OPERATOR_UNARY_MINUS";
+    }
     case EXPRESSION_TYPE_COMPARE_EQUAL: {
         return "COMPARE_EQUAL";
     }
@@ -699,6 +702,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_NOT;
     } else if (str == "OPERATOR_IS_NULL") {
         return EXPRESSION_TYPE_OPERATOR_IS_NULL;
+    } else if (str == "OPERATOR_UNARY_MINUS") {
+        return EXPRESSION_TYPE_OPERATOR_UNARY_MINUS;
     } else if (str == "OPERATOR_EXISTS") {
         return EXPRESSION_TYPE_OPERATOR_EXISTS;
     } else if (str == "COMPARE_EQUAL") {
@@ -777,6 +782,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
     } else if (str == "ROW_SUBQUERY") {
         return EXPRESSION_TYPE_ROW_SUBQUERY;
+    } else if (str == "SELECT_SUBQUERY") {
+        return EXPRESSION_TYPE_SELECT_SUBQUERY;
     } else if (str == "SELECT_SUBQUERY") {
         return EXPRESSION_TYPE_SELECT_SUBQUERY;
     }
