@@ -641,13 +641,16 @@ public class ChannelDistributer implements ChannelChangeCallback {
         final NavigableMap<String,AtomicInteger> hosts = m_hosts.getReference();
 
         final int seed;
+        final boolean firstTime;
 
         AssignChannels(final int seed) {
             this.seed = seed;
+            firstTime = false;
         }
 
         AssignChannels() {
             seed = System.identityHashCode(this);
+            firstTime = true;
         }
 
         @Override
@@ -715,16 +718,19 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     }
                 }
                 // wait for the last write to complete
+                int setterCount = 0;
                 for (SetNodeChannels setter: setters) {
-                    if (setter.getCallbackCode() != Code.OK && !m_done.get()) {
+                    if ((setterCount == 2 && firstTime) || (setter.getCallbackCode() != Code.OK && !m_done.get())) {
                         LOG.warn(
                                 "LEADER (" + m_hostId
                                 + ") Retrying channel assignment because write attempt to "
                                 + setter.path + " failed with " + setter.getCallbackCode()
                                );
                         m_es.submit(new GetChannels(MASTER_DN));
+// BSDBG                       m_es.submit(new AssignChannels(seed));
                         return;
                     }
+                    setterCount++;
                 }
             } catch (JSONException|IllegalArgumentException e) {
                 LOG.fatal("unable to create json document to assign imported channels to nodes", e);
