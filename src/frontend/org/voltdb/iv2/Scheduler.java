@@ -26,6 +26,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
@@ -153,6 +154,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     public void setStarvationTracker(StarvationTracker tracker) {
         m_tasks.setStarvationTracker(tracker);
+    }
+
+    public void setQueueDepthTracker(QueueDepthTracker tracker) {
+        m_tasks.setQueueDepthTracker(tracker);
     }
 
     public void setLock(Object o) {
