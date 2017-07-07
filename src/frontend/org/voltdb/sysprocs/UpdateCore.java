@@ -41,6 +41,8 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -247,30 +249,30 @@ public class UpdateCore extends VoltSystemProcedure {
             ParameterSet params, SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSync) {
-//            String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
-//            String[] reasonsForEmptyTables = (String[]) params.getParam(1);
-//            checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
-//
-//            // Send out fragments to do the initial round-trip to synchronize
-//            // all the cluster sites on the start of catalog update, we'll do
-//            // the actual work on the *next* round-trip below
-//
-//            // Don't actually care about the returned table, just need to send something
-//            // back to the MPI scoreboard
-//            DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
-//                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
-//
-//            if ( ! context.isLowestSiteId()) {
-//                // Any class-loading issues with the new catalog jar only need
-//                // to be flagged by one site per host. So, for speed, return
-//                // early from all sites except one -- the site with the lowest
-//                // id on this host.
-//                if (log.isInfoEnabled()) {
-//                    log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-//                            " completed data precheck.");
-//                }
-//                return success;
-//            }
+            String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
+            String[] reasonsForEmptyTables = (String[]) params.getParam(1);
+            checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
+
+            // Send out fragments to do the initial round-trip to synchronize
+            // all the cluster sites on the start of catalog update, we'll do
+            // the actual work on the *next* round-trip below
+
+            // Don't actually care about the returned table, just need to send something
+            // back to the MPI scoreboard
+            DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
+                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+
+            if ( ! context.isLowestSiteId()) {
+                // Any class-loading issues with the new catalog jar only need
+                // to be flagged by one site per host. So, for speed, return
+                // early from all sites except one -- the site with the lowest
+                // id on this host.
+                if (log.isInfoEnabled()) {
+                    log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                            " completed data precheck.");
+                }
+                return success;
+            }
 //
 //            // We know the ZK bytes are okay because the run() method wrote them before sending
 //            // out fragments
@@ -321,19 +323,19 @@ public class UpdateCore extends VoltSystemProcedure {
 //                Throwables.propagate(e);
 //            }
 //
-//            if (log.isInfoEnabled()) {
-//                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-//                        " completed data and catalog precheck.");
-//            }
-//            return success;
+            if (log.isInfoEnabled()) {
+                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                        " completed data and catalog precheck.");
+            }
+            return success;
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate) {
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
-//            log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-//                    " acknowledged data and catalog prechecks.");
-//            return new DependencyPair.TableDependencyPair(DEP_updateCatalogSyncAggregate,
-//                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+            log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                    " acknowledged data and catalog prechecks.");
+            return new DependencyPair.TableDependencyPair(DEP_updateCatalogSyncAggregate,
+                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
             String catalogDiffCommands = (String)params.toArray()[0];
@@ -586,11 +588,11 @@ public class UpdateCore extends VoltSystemProcedure {
 //                    deploymentBytes);
 
             try {
-//                performCatalogVerifyWork(
-//                        expectedCatalogVersion,
-//                        tablesThatMustBeEmpty,
-//                        reasonsForEmptyTables,
-//                        requiresSnapshotIsolation);
+                performCatalogVerifyWork(
+                        expectedCatalogVersion,
+                        tablesThatMustBeEmpty,
+                        reasonsForEmptyTables,
+                        requiresSnapshotIsolation);
             }
             catch (VoltAbortException vae) {
                 // If there is a cluster failure before this point, we will re-run

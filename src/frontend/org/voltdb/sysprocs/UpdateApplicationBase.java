@@ -516,6 +516,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         CompletableFuture<ClientResponse> response = null;
 
         CatalogAndIds oldCatalog = null;
+        boolean zkCorrupted = false;
 
         try {
             String errMsg;
@@ -546,6 +547,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     ccr.catalogHash,
                     ccr.deploymentString.getBytes("UTF-8"));
 
+            zkCorrupted = true;
+
             // verify the catalog on each host, this step was originally in the MP transaction @UpdateCore
             if (!verifyZKCatalog()) {
                 errMsg = "Catalog verification on ZooKeeper failed on one or more hosts.";
@@ -557,8 +560,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                               oldCatalog.catalogBytes,
                                               oldCatalog.getCatalogHash(),
                                               oldCatalog.deploymentBytes);
+                zkCorrupted = false;
                 return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
+
+            zkCorrupted = false;
 
             // update the catalog jar
             response = callProcedure("@UpdateCore",
@@ -577,6 +583,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                      ccr.requiresNewExportGeneration ? 1 : 0);
 
         } catch (InterruptedException | KeeperException | UnsupportedEncodingException e) {
+            if (zkCorrupted) {
+                // This means the catalog on ZooKeeper is corrupted and the restore process failed
+                VoltDB.crashGlobalVoltDB("Cannot update the catalog to the ZooKeeper node and the cluster must shutdown. "
+                        + "The catalog stored on ZooKeeper is corrupted.", true, e);
+            }
             return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
                                      "Catalog update in Zookeeper failed with exception:\n" +
                                      e.getMessage());
@@ -584,6 +595,26 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             cleanUpTempCatalog();
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
             catalogUpdateFlag.set(false);
+        }
+
+        // Check the result of the executed command
+        try {
+            // Roll back change
+            if (response.get().getStatus() != ClientResponseImpl.SUCCESS) {
+                CatalogUtil.updateCatalogToZK(zk,
+                        oldCatalog.version,
+                        oldCatalog.txnId,
+                        oldCatalog.uniqueId,
+                        oldCatalog.catalogBytes,
+                        oldCatalog.getCatalogHash(),
+                        oldCatalog.deploymentBytes);
+            }
+
+        } catch (InterruptedException | ExecutionException e) {
+            // Do nothing
+        } catch (KeeperException e) {
+            VoltDB.crashGlobalVoltDB("Cannot update the catalog to the ZooKeeper node and the cluster must shutdown. "
+                    + "The catalog stored on ZooKeeper is corrupted.", true, e);
         }
 
         return response;
