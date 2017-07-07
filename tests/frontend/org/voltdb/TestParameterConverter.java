@@ -300,9 +300,13 @@ public class TestParameterConverter extends TestCase
         assertEquals(null, ParameterConverter.tryToMakeCompatible(byte[].class, VoltType.NULL_TINYINT));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(Byte[].class, VoltType.NULL_TINYINT));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(short[].class, VoltType.NULL_SMALLINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Short[].class, VoltType.NULL_SMALLINT));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(int[].class, VoltType.NULL_INTEGER));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Integer[].class, VoltType.NULL_INTEGER));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(long[].class, VoltType.NULL_BIGINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Long[].class, VoltType.NULL_BIGINT));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(double[].class, VoltType.NULL_FLOAT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Double[].class, VoltType.NULL_FLOAT));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(TimestampType.class, VoltType.NULL_TIMESTAMP));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(Timestamp.class, VoltType.NULL_TIMESTAMP));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(Date.class, VoltType.NULL_TIMESTAMP));
