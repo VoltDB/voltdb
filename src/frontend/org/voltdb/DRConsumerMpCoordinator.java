@@ -29,7 +29,7 @@ public interface DRConsumerMpCoordinator {
 
     void processClientResponse(byte producerClusterId, ClientResponse response);
 
-    void becomeLeader();
+    void becomeLeader(int partitionId);
 
     void shutdown();
 }
