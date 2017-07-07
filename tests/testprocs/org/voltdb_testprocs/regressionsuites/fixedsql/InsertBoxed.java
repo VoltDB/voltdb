@@ -31,20 +31,19 @@ import org.voltdb.*;
 public class InsertBoxed extends VoltProcedure {
 
     public final SQLStmt i_p1 = new SQLStmt
-      ("INSERT INTO P1 VALUES (?, ?, ?, ?);");
+            ("INSERT INTO P1 VALUES (?, ?, ?, ?);");
 
     public final SQLStmt i_r1 = new SQLStmt
-        ("INSERT INTO R1 VALUES (?, ?, ?, ?);");
+            ("INSERT INTO R1 VALUES (?, ?, ?, ?);");
 
     public final SQLStmt i_p2 = new SQLStmt
-    ("INSERT INTO P2 VALUES (?, ?, ?, ?);");
+            ("INSERT INTO P2 VALUES (?, ?, ?, ?);");
 
     public final SQLStmt i_r2 = new SQLStmt
-      ("INSERT INTO R2 VALUES (?, ?, ?, ?);");
+            ("INSERT INTO R2 VALUES (?, ?, ?, ?);");
 
     public VoltTable[] run(String tablename, Long id, String desc, Long num,
-                    Double ratio)
-    {
+                    Double ratio) {
         if (tablename.equals("P1"))
         {
             voltQueueSQL(i_p1, id, desc, num, ratio);
