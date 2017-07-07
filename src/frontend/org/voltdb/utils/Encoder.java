@@ -17,10 +17,7 @@
 
 package org.voltdb.utils;
 
-import java.io.IOException;
-
 import org.voltdb.common.Constants;
-import org.xerial.snappy.Snappy;
 
 /**
  * Encode and decode strings and byte arrays to/from hexidecimal
@@ -116,43 +113,6 @@ public class Encoder {
             return false;
         }
         return true;
-    }
-
-    public static String compressAndBase64Encode(String string) {
-        byte[] inBytes = string.getBytes(Constants.UTF8ENCODING);
-        return compressAndBase64Encode(inBytes);
-    }
-
-    public static String compressAndBase64Encode(byte[] bytes) {
-        try {
-            byte[] outBytes = Snappy.compress(bytes);
-            return Base64.encodeToString(outBytes, false);
-        }
-        catch (IOException e) {
-            // (xin): Why not just throw IOException?
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static String decodeBase64AndDecompress(String string) {
-        if (string.length() == 0) {
-            return "";
-        }
-        byte bytes[] = decodeBase64AndDecompressToBytes(string);
-        return new String(bytes, Constants.UTF8ENCODING);
-    }
-
-    public static byte[] decodeBase64AndDecompressToBytes(String string) {
-        byte bytes[] = Base64.decodeFast(string);
-        if (string.length() == 0) {
-            return new byte[0];
-        }
-
-        try {
-            return Snappy.uncompress(bytes);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     public static String base64Encode(String string) {

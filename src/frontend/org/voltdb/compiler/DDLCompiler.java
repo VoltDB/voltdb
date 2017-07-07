@@ -90,6 +90,7 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LineReaderAdapter;
 import org.voltdb.utils.SQLCommand;
@@ -885,7 +886,7 @@ public class DDLCompiler {
 
     void compileToCatalog(Database db, boolean isXDCR) throws VoltCompilerException {
         // note this will need to be decompressed to be used
-        String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
+        String binDDL = CompressionService.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
 
         // output the xml catalog to disk

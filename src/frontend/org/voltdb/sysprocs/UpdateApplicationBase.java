@@ -44,7 +44,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.InMemoryJarfile;
 
 /**
@@ -265,7 +265,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
             retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
             // since diff commands can be stupidly big, compress them here
-            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
+            retval.encodedDiffCommands = CompressionService.compressAndBase64Encode(commands);
             retval.diffCommandsLength = commands.length();
             String emptyTablesAndReasons[][] = diff.tablesThatMustBeEmpty();
             assert(emptyTablesAndReasons.length == 2);

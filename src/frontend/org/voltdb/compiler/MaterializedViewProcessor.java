@@ -714,7 +714,7 @@ public class MaterializedViewProcessor {
     private PlanNodeTree getPlanNodeTreeFromCatalogStatement(Database db, Statement stmt) {
         PlanNodeTree pnt = new PlanNodeTree();
         try {
-            JSONObject jsonPlan = new JSONObject(org.voltdb.utils.Encoder.decodeBase64AndDecompress(
+            JSONObject jsonPlan = new JSONObject(org.voltdb.utils.CompressionService.decodeBase64AndDecompress(
                                                     stmt.getFragments().get("0").getPlannodetree()));
             pnt.loadFromJSONPlan(jsonPlan, db);
         } catch (JSONException e) {

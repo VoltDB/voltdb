@@ -51,6 +51,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
@@ -342,7 +343,7 @@ public class UpdateCore extends VoltSystemProcedure {
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
             String catalogDiffCommands = (String)params.toArray()[0];
-            String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
+            String commands = CompressionService.decodeBase64AndDecompress(catalogDiffCommands);
             int expectedCatalogVersion = (Integer)params.toArray()[1];
             boolean requiresSnapshotIsolation = ((Byte) params.toArray()[2]) != 0;
             boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[3]) != 0;
