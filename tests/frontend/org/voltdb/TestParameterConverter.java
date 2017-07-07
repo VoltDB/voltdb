@@ -547,6 +547,16 @@ public class TestParameterConverter extends TestCase
         }
     }
 
+    // arrays should be exactly the same type (including boxing)
+    public void testIntegerArray() throws Exception {
+        Integer[] t = {1, 2, 3};
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Integer[].class, t);
+        assertTrue("expect Integer[]", r.getClass() == Integer[].class);
+
+        assertEquals(t, (Integer[])r);
+    }
+
     public void testStringArrayToByteArray() throws Exception {
         String[] t = {"1234", "0A1B"};
         Object r = ParameterConverter.
