@@ -160,6 +160,10 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
         printout += " " + new_cluster_deploy
     print printout
 
+    # 2 generate schema file
+    step += 1
+    generateSchemaFileCommand(runner, hosts, files, step)
+
     # 2 initialize the new VoltDB root
     step += 1
     generateInitNewClusterCommand(runner.opts, killSet, files, new_cluster_deploy, newNodeF, step)
@@ -196,6 +200,16 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
 
     cleanup(runner.opts, files, newNodeF)
     print '[4/4] Generated online upgrade plan: upgrade-plan.txt'
+
+def generateSchemaFileCommand(runner, hosts, files, step):
+    host = hosts.hosts_by_id.itervalues().next();
+
+    command1 = '#instruction# get schema file: voltdb get --dir=%s --output=%s schema\n' %(host.voltdbroot, os.path.join(runner.opts.newRoot, 'description.sql'))
+    command2 = '#instruction# get procedure classes file: voltdb get --dir=%s --output=%s classes\n' %(host.voltdbroot, os.path.join(runner.opts.newRoot, 'procedure.jar'))
+
+    writeCommands(files[getKey(host)],
+                  'Step %d: stop node' % step,
+                  command1+command2)
 
 def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_upgrade_deploy, new_cluster_deploy, step):
     files = dict()
