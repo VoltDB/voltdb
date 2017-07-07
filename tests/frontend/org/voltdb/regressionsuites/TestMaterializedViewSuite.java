@@ -1679,6 +1679,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL_ANYWHERE").getResults()[0];
         assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL_ANYWHERE: ", tresult, vresult, EPSILON);
 
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_GLOBAL_MULTIPLE ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL_MULTIPLE").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL_MULTIPLE: ", tresult, vresult, EPSILON);
+
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_DETAIL_NOPCOL ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER_DETAIL_NOPCOL").getResults()[0];
         assertTablesAreEqual(prefix + "ORDER_DETAIL_NOPCOL: ", tresult, vresult, EPSILON);
