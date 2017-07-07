@@ -507,4 +507,14 @@ public class TestParameterConverter extends TestCase
                     "tryScalarMakeCompatible: Unable to match parameter array:java.lang.Integer to provided int"));
         }
     }
+
+    public void testStringArrayToByteArray() throws Exception {
+        String[] t = {"1234", "0A1B"};
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Byte[][].class, t);
+        assertTrue("expect Byte[][]", r.getClass() == Byte[][].class);
+
+        assertEquals(t[0], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[0]) ));
+        assertEquals(t[1], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[1]) ));
+    }
 }
