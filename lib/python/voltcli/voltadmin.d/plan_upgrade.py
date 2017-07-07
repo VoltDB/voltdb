@@ -164,37 +164,37 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
     step += 1
     generateSchemaFileCommand(runner, hosts, files, step)
 
-    # 2 initialize the new VoltDB root
+    # 3 initialize the new VoltDB root
     step += 1
     generateInitNewClusterCommand(runner.opts, killSet, files, new_cluster_deploy, newNodeF, step)
     generateInitOldClusterCommmand(runner.opts, surviveSet, files, new_cluster_deploy, hostcount / 2, step)
 
-    # 3 kill half of the cluster
+    # 4 kill half of the cluster
     step += 1
     generateStopNodeCommand(hosts, surviveSet[0], killSet, files, step)
 
-    # 4 start the new cluster
+    # 5 start the new cluster
     step += 1
     leadersString = generateStartNewClusterCommand(runner.opts, killSet, hostcount, files, newNodeF, step)
 
-    # 5 call 'voltadmin shutdown --wait' on the original cluster
+    # 6 call 'voltadmin shutdown --wait' on the original cluster
     step += 1
     generatePauseCommand(surviveSet[0], files, step)
 
-    # 6 kill the original cluster
+    # 7 kill the original cluster
     step += 1
     generateShutdownOriginClusterCommand(surviveSet[0], files, step)
 
-    # 7 run DR RESET on one node of the new cluster.
+    # 8 run DR RESET on one node of the new cluster.
     step += 1
     generateDRResetCommand(runner, surviveSet[0], killSet[0], clusterIds, files, step)
 
-    # 8 only for upgrading stand-alone cluster, disable the DR connection source for old cluster
+    # 9 only for upgrading stand-alone cluster, disable the DR connection source for old cluster
     if len(clusterIds) == 1:
         step += 1
         generateDisableDRConnectionCommand(runner.opts, surviveSet[0], files, post_upgrade_deploy, step)
 
-    # 9 rejoin the nodes being shutdown recently to the new cluster
+    # 10 rejoin the nodes being shutdown recently to the new cluster
     step += 1
     generateNodeRejoinCommand(runner.opts, surviveSet, leadersString, files, hostcount / 2, step)
 
