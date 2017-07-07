@@ -296,7 +296,7 @@ public class VoltBulkLoader {
         dummyTable[0] = new VoltTable(m_colInfo);
         ClientResponse dummyResponse = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                 dummyTable, errMessage);
-        m_notificationCallBack.callback(rowHandle, objectList, dummyResponse);
+        m_notificationCallBack.failureCallback(rowHandle, objectList, dummyResponse);
         m_loaderCompletedCnt.incrementAndGet();
     }
 

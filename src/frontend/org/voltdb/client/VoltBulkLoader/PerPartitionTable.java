@@ -221,7 +221,9 @@ public class PerPartitionTable {
                 tmpTable.addRow(row_args);
             } catch (VoltTypeException ex) {
                 // Should never happened because the bulk conversion in PerPartitionProcessor
-                // should have caught this
+                // should have caught this.
+                loaderLog.error("Type conversion exception", ex);
+                assert false: "Type conversion exception" + ex.getMessage();
                 continue;
             }
 
@@ -230,7 +232,7 @@ public class PerPartitionTable {
                 public void clientCallback(ClientResponse response) throws Exception {
                     //one insert at a time callback
                     if (response.getStatus() != ClientResponse.SUCCESS) {
-                        row.m_loader.m_notificationCallBack.callback(row.m_rowHandle, row.m_rowData, response);
+                        row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
                     }
 
                     row.m_loader.m_loaderCompletedCnt.incrementAndGet();

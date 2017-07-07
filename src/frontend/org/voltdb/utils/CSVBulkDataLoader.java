@@ -70,7 +70,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
 
     public class CsvFailureCallback implements BulkLoaderFailureCallBack {
         @Override
-        public void callback(Object rowHandle, Object[] fieldList, ClientResponse response) {
+        public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
 
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 if (m_successCallback != null) {

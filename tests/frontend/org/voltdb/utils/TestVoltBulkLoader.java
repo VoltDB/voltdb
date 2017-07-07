@@ -90,7 +90,7 @@ public class TestVoltBulkLoader extends TestCase {
     public class TestFailureCallback implements BulkLoaderFailureCallBack {
         ArrayList<Integer> failureRows = new ArrayList<Integer>(20);
         @Override
-        public void callback(Object rowHandle, Object[] fieldList, ClientResponse response) {
+        public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             failureRows.add((Integer)rowHandle);
         }
 
@@ -1335,7 +1335,7 @@ public class TestVoltBulkLoader extends TestCase {
                 bulkLoaders[i] = client.getNewBulkLoader("test1", 50, new BulkLoaderFailureCallBack() {
 
                     @Override
-                    public void callback(Object arg0, Object[] arg1, ClientResponse arg2)
+                    public void failureCallback(Object arg0, Object[] arg1, ClientResponse arg2)
                     {
                         System.out.println("Insert failed: " + arg0);
                     }

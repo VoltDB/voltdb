@@ -33,8 +33,9 @@ import org.voltdb.client.Client;
  */
 public class KafkaExternalLoaderCLIArguments extends CLIConfig {
 
-    public static int KAFKA_TIMEOUT_DEFAULT = 30000;
+    public static int KAFKA_TIMEOUT_DEFAULT_MILLIS = 30000;
     public static int KAFKA_BUFFER_SIZE_DEFAULT = 65536;
+    public static final int ZK_CONNECTION_TIMEOUT_MILLIS = 10*1000;
 
     // This is set to true when -p option is used.
     public boolean useSuppliedProcedure = false;
@@ -42,7 +43,8 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     // These values can be supplied in the properties file.
     public String groupid = "";
     public int buffersize = KAFKA_BUFFER_SIZE_DEFAULT;
-    public int timeout = KAFKA_TIMEOUT_DEFAULT;
+    public int timeout = KAFKA_TIMEOUT_DEFAULT_MILLIS;
+    public int zookeeperSessionTimeoutMillis = ZK_CONNECTION_TIMEOUT_MILLIS;
 
     @Option(shortOpt = "c", desc = "Kafka consumer properties file.")
     public String config = "";
@@ -181,6 +183,12 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
         prop = props.getProperty("socket.receive.buffer.bytes", null);
         if (prop != null) {
             buffersize = Integer.parseInt(prop);
+        }
+
+        // zookeeper.session.timeout.millis
+        prop = props.getProperty("zookeeper.session.timeout.millis", null);
+        if (prop != null) {
+            zookeeperSessionTimeoutMillis = Integer.parseInt(prop);
         }
 
     }

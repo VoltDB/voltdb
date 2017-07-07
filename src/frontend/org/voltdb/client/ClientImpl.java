@@ -1007,18 +1007,18 @@ public final class ClientImpl implements Client {
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack blfcb) throws Exception
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback) throws Exception
     {
         synchronized(m_vblGlobals) {
-            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, blfcb, null);
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, null);
         }
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack callback) throws Exception
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack failureCallback) throws Exception
     {
         synchronized(m_vblGlobals) {
-            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, callback);
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, failureCallback);
         }
     }
 

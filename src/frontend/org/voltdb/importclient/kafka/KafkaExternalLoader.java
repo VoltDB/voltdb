@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
@@ -67,13 +68,13 @@ import kafka.cluster.Broker;
  * Import Kafka data into the database, using a remote Volt client and manual offset management.
  *
  * @author jcrump
- * @since 7.4
+ * @since 7.5
  */
 public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
     private static final VoltLogger m_log = new VoltLogger("KAFKA-EXTERNAL-LOADER");
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
-    private static final int ZK_CONNECTION_TIMEOUT_SECONDS = 10;
+
     private final static AtomicLong m_failedCount = new AtomicLong(0);
 
     private final KafkaExternalLoaderCLIArguments m_args;
@@ -121,7 +122,8 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
             String procName = (m_args.useSuppliedProcedure ? m_args.procedure : m_args.table) + "-callbackproc";
             m_callbackExecutor = CoreUtils.getSingleThreadExecutor(procName + "-" + Thread.currentThread().getName());
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_args.procedure, kafkaBulkLoaderCallback, m_callbackExecutor, kafkaBulkLoaderCallback);
-        } else {
+        }
+        else {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_args.table, m_args.batchsize, m_args.update, kafkaBulkLoaderCallback, kafkaBulkLoaderCallback);
         }
 
@@ -134,7 +136,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
     private void processKafkaMessages() throws Exception {
 
         try {
-            m_executorService = createImporterExecutor(m_loader, this, this);
+            m_executorService = createImporterExecutor(this, this);
 
             if (m_args.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_args.topic + " Started using procedure: " + m_args.procedure);
@@ -178,11 +180,11 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
                 byte status = response.getStatus();
                 if (status != ClientResponse.SUCCESS) {
                     m_log.error("Failed to Insert Row: error=" + error + " response=" + ((ClientResponseImpl)response).toJSONString() + " data=" + metaData.rawLine);
-                    long fc = m_failedCount.incrementAndGet();
+                    long failCount = m_failedCount.incrementAndGet();
                     // If we've reached our max-error threshold, quit. Use a different error message for the various cases for
                     // troubleshooting purposes.
                     String errMsg = null;
-                    if (m_args.maxerrors > 0 && fc > m_args.maxerrors) {
+                    if (m_args.maxerrors > 0 && failCount > m_args.maxerrors) {
                         errMsg = "Max error count reached, exiting.";
                     }
                     else if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
@@ -275,7 +277,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
     /*
      * Create an executor with one importer per thread (per partition).
      */
-    private ExecutorService createImporterExecutor(CSVDataLoader loader, final ImporterLifecycle lifecycle, final ImporterLogger logger) throws Exception {
+    private ExecutorService createImporterExecutor(final ImporterLifecycle lifecycle, final ImporterLogger logger) throws Exception {
 
         Map<URI, KafkaStreamImporterConfig> configs = createKafkaImporterConfigFromProperties(m_args);
         ExecutorService executor = Executors.newFixedThreadPool(configs.size());
@@ -302,7 +304,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         String brokerListString;
 
         if (!properties.zookeeper.trim().isEmpty()) {
-            brokerList = getBrokersFromZookeeper(properties.zookeeper);
+            brokerList = getBrokersFromZookeeper(properties.zookeeper, properties.zookeeperSessionTimeoutMillis);
             brokerListString = StringUtils.join(brokerList.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
         }
         else {
@@ -314,10 +316,10 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokerListString);
 
         // Create the input formatter:
-        FormatterBuilder fb = createFormatterBuilder(properties);
+        FormatterBuilder builder = createFormatterBuilder(properties);
 
         return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokerList, properties.topic, properties.groupid,
-                                                properties.procedure, properties.timeout, properties.buffersize, properties.commitPolicy, fb);
+                                                properties.procedure, properties.timeout, properties.buffersize, properties.commitPolicy, builder);
     }
 
     /*
@@ -325,7 +327,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
      */
     private FormatterBuilder createFormatterBuilder(KafkaExternalLoaderCLIArguments properties) throws Exception {
 
-        FormatterBuilder fb;
+        FormatterBuilder builder;
         Properties formatterProperties = m_args.formatterProperties;
         AbstractFormatterFactory factory;
 
@@ -350,17 +352,17 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
                 }
             };
-            fb = new FormatterBuilder(format, formatterProperties);
+            builder = new FormatterBuilder(format, formatterProperties);
         }
         else {
             factory = new VoltCSVFormatterFactory();
             Properties props = new Properties();
             factory.create("csv", props);
-            fb = new FormatterBuilder("csv", props);
+            builder = new FormatterBuilder("csv", props);
         }
 
-        fb.setFormatterFactory(factory);
-        return fb;
+        builder.setFormatterFactory(factory);
+        return builder;
 
     }
 
@@ -385,7 +387,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         /*
          * Connect to Zookeeper. Throws an exception if we can't connect for any reason.
          */
-        public ZooKeeper connect(String host) throws IOException, InterruptedException {
+        public ZooKeeper connect(String host, int timeoutMillis) throws IOException, InterruptedException {
 
             final CountDownLatch latch = new CountDownLatch(1);
             Watcher w = new Watcher() {
@@ -399,8 +401,8 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
             };
 
             try {
-                zoo = new ZooKeeper(host, 10000, w, new HashSet<Long>());
-                latch.await(ZK_CONNECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                zoo = new ZooKeeper(host, timeoutMillis, w, new HashSet<Long>());
+                latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
             }
             catch (InterruptedException e) {
             }
@@ -420,12 +422,12 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
 
      }
 
-    private static List<HostAndPort> getBrokersFromZookeeper(String zookeeperHost) throws Exception {
+    private static List<HostAndPort> getBrokersFromZookeeper(String zookeeperHost, int timeoutMillis) throws InterruptedException, IOException, KeeperException {
 
         ZooKeeperConnection zkConnection = new ZooKeeperConnection();
 
         try {
-            ZooKeeper zk = zkConnection.connect(zookeeperHost);
+            ZooKeeper zk = zkConnection.connect(zookeeperHost, timeoutMillis);
             List<String> ids = zk.getChildren("/brokers/ids", false);
             ArrayList<HostAndPort> brokers = new ArrayList<HostAndPort>();
 
@@ -486,12 +488,12 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         }
 
         @Override
-        public boolean executeVolt(Object[] params, TopicPartitionInvocationCallback cb) {
+        public boolean invoke(Object[] params, TopicPartitionInvocationCallback cb) {
            try {
                m_loader.insertRow(new RowWithMetaData(StringUtils.join(params, ","), cb.getOffset(), cb), params);
            }
            catch (Exception e) {
-               m_log.error(e);
+               m_log.error("Exception from loader while inserting row", e);
                return false;
            }
            return true;

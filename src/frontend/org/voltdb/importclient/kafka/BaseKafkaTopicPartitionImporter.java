@@ -101,7 +101,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
     /*
      * Submit the supplied data to the database. Subclasses override this method with the appropriate operations.
      */
-    public abstract boolean executeVolt(Object[] params, TopicPartitionInvocationCallback cb);
+    public abstract boolean invoke(Object[] params, TopicPartitionInvocationCallback cb);
 
     public BaseKafkaTopicPartitionImporter(KafkaStreamImporterConfig config, ImporterLifecycle lifecycle, ImporterLogger logger)
     {
@@ -252,12 +252,12 @@ public abstract class BaseKafkaTopicPartitionImporter {
         }
     }
 
-    private OffsetResponse getTopicOffset(PartitionOffsetRequestInfo pori) {
+    private OffsetResponse getTopicOffset(PartitionOffsetRequestInfo offsetPartitionInfo) {
         final int partition = m_topicAndPartition.partition();
         final String topic = m_topicAndPartition.topic();
 
         kafka.javaapi.OffsetRequest earlyRq = new kafka.javaapi.OffsetRequest(
-                singletonMap(m_topicAndPartition, pori),
+                singletonMap(m_topicAndPartition, offsetPartitionInfo),
                 kafka.api.OffsetRequest.CurrentVersion(), KafkaStreamImporterConfig.CLIENT_ID
                 );
         OffsetResponse response = null;
@@ -483,7 +483,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                                 messageAndOffset.nextOffset(), callbackTracker, m_gapTracker, m_dead, m_pauseOffset);
 
                         if (m_lifecycle.hasTransaction()) {
-                            if (executeVolt(params, cb)) {
+                            if (invoke(params, cb)) {
                                 callbackTracker.produceWork();
                             }
                             else {

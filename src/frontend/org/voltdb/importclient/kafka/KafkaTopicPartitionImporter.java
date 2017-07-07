@@ -79,7 +79,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         }
 
         @Override
-        public boolean executeVolt(Object[] params, TopicPartitionInvocationCallback cb) {
+        public boolean invoke(Object[] params, TopicPartitionInvocationCallback cb) {
             return callProcedure(new Invocation(m_config.getProcedure(), params), cb);
         }
 
