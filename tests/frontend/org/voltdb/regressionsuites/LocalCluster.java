@@ -38,7 +38,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -321,8 +320,7 @@ public class LocalCluster extends VoltServerConfig {
             boolean debug,
             boolean isRejoinTest,
             Map<String, String> env) {
-        // NOTE: isRejoinTest is unused
-        this(null, null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, env);
+        this(null, null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
     }
 
     public LocalCluster(String schemaToStage,
@@ -335,6 +333,7 @@ public class LocalCluster extends VoltServerConfig {
                         BackendTarget target,
                         FailureState failureState,
                         boolean debug,
+                        boolean isRejoinTest,
                         Map<String, String> env)
     {
         m_usesStagedSchema = schemaToStage != null || classesJarToStage != null;
@@ -375,7 +374,7 @@ public class LocalCluster extends VoltServerConfig {
                         m_callingClassName + "." + m_callingMethodName);
             }
         } else {
-            Preconditions.checkArgument(m_usesStagedSchema == false, "Cannot use OldCLI catalog with staged schema and/or classes");
+            assert m_usesStagedSchema == false : "Cannot use OldCLI catalog with staged schema and/or classes";
             log.info("Instantiating LocalCluster for " + catalogJarFileName + " with class.method: " +
                     m_callingClassName + "." + m_callingMethodName);
         }
@@ -404,6 +403,8 @@ public class LocalCluster extends VoltServerConfig {
         m_failureState = m_kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<>();
         m_cmdLines = new ArrayList<>();
+        // m_userSchema and m_stagedClassesPath are only used by init.
+        // start ignores them silently if they are set.
         if (schemaToStage != null) {
             try {
                 templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
