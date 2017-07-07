@@ -560,11 +560,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                               oldCatalog.catalogBytes,
                                               oldCatalog.getCatalogHash(),
                                               oldCatalog.deploymentBytes);
-                zkCorrupted = false;
                 return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
-
-            zkCorrupted = false;
 
             // update the catalog jar
             response = callProcedure("@UpdateCore",
@@ -582,24 +579,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                      ccr.hasSchemaChange ?  1 : 0,
                                      ccr.requiresNewExportGeneration ? 1 : 0);
 
-        } catch (InterruptedException | KeeperException | UnsupportedEncodingException e) {
-            if (zkCorrupted) {
-                // This means the catalog on ZooKeeper is corrupted and the restore process failed
-                VoltDB.crashGlobalVoltDB("Cannot update the catalog to the ZooKeeper node and the cluster must shutdown. "
-                        + "The catalog stored on ZooKeeper is corrupted.", true, e);
-            }
-            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
-                                     "Catalog update in Zookeeper failed with exception:\n" +
-                                     e.getMessage());
-        } finally {
-            cleanUpTempCatalog();
-            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
-            catalogUpdateFlag.set(false);
-        }
-
-        // Check the result of the executed command
-        try {
-            // Roll back change
             if (response.get().getStatus() != ClientResponseImpl.SUCCESS) {
                 CatalogUtil.updateCatalogToZK(zk,
                         oldCatalog.version,
@@ -609,12 +588,21 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                         oldCatalog.getCatalogHash(),
                         oldCatalog.deploymentBytes);
             }
-
-        } catch (InterruptedException | ExecutionException e) {
-            // Do nothing
-        } catch (KeeperException e) {
-            VoltDB.crashGlobalVoltDB("Cannot update the catalog to the ZooKeeper node and the cluster must shutdown. "
-                    + "The catalog stored on ZooKeeper is corrupted.", true, e);
+        } catch (InterruptedException | KeeperException | UnsupportedEncodingException e) {
+            if (zkCorrupted) {
+                // This means the catalog on ZooKeeper is corrupted and the restore process failed
+                VoltDB.crashGlobalVoltDB("Cannot update the catalog to the ZooKeeper node and the cluster must shutdown. "
+                        + "The catalog stored on ZooKeeper is corrupted.", true, e);
+            }
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
+                                     "Catalog update in Zookeeper failed with exception:\n" +
+                                     e.getMessage());
+        } catch (ExecutionException e) {
+            // Cannot obtain the status from the future response
+        } finally {
+            cleanUpTempCatalog();
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+            catalogUpdateFlag.set(false);
         }
 
         return response;
