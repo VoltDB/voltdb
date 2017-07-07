@@ -255,13 +255,6 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
                 writeCommands(file,
                               'Step %d: copy deployment file' % step,
                               '%s#instruction# copy %s to %s' % (warningForDeploy, new_cluster_deploy, runner.opts.newRoot))
-        # originally it is the 5th step - get all the ddl and scp to all machines
-        host = hosts.hosts_by_id.itervalues().next();
-        file.write('#instruction# get schema file: voltdb get --dir=%s --output=%s schema' %(host.voltdbroot,
-                                                                                             os.path.join(runner.opts.newRoot, 'description.sql')))
-        file.write('#instruction# get procedure classes file: voltdb get --dir=%s --output=%s classes' %(host.voltdbroot,
-                                                                                                        os.path.join(runner.opts.newRoot, 'procedure.jar')))
-        file.write('\n')
 
     newNodeF = None
     if runner.opts.newNode is not None:
