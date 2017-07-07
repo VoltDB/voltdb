@@ -163,8 +163,8 @@ SELECT d1, d2, MIN(abs(v1)) AS vmin, COUNT(*), MAX(abs(v1)) AS vmax
 FROM ENG6511 GROUP BY d1, d2;
 
 -- multiple count * anywhere with complex aggregation queries
-CREATE VIEW VENG6511expRCM (d1, d2, vmin, cnt, vmax, cnt1, vsum) AS
-SELECT d1, d2, MIN(abs(v1)) AS vmin, COUNT(*), MAX(abs(v1)), COUNT(*), SUM(abs(v1)) AS vsum
+CREATE VIEW VENG6511expRCM (d1, d2, vmin, cnt, vmax, cnt1, vmins) AS
+SELECT d1, d2, MIN(abs(v1)) AS vmin, COUNT(*), MAX(abs(v1)), COUNT(*), MIN(v1)
 FROM ENG6511 GROUP BY d1, d2;
 
 CREATE VIEW VENG6511expLR (d1, d2, cnt, vmin, vmax) AS
