@@ -122,6 +122,19 @@ public class TestFunctions extends PlannerTestCase {
 
     }
 
+    public void testUnsupportedFuncs() {
+
+        failToCompile("SELECT  ACOS(FLOAT_TYPE) FROM NUMERICFUN",
+                "Function 'acos' is not supported in VoltDB: Custom Function");
+        failToCompile("SELECT  ASIN(FLOAT_TYPE) FROM NUMERICFUN",
+                "Function 'asin' is not supported in VoltDB: Custom Function");
+        failToCompile("SELECT  ATAN(FLOAT_TYPE) FROM NUMERICFUN",
+                "Function 'atan' is not supported in VoltDB: Custom Function");
+        failToCompile("SELECT  SIGN(FLOAT_TYPE) FROM NUMERICFUN",
+                "Function 'sign' is not supported in VoltDB: Custom Function");
+
+    }
+
     public void testLikeNoopt() {
         compile("select case when varchar_type like 'M%' then 1 end as m_state from bit;");
         compile("select case when varchar_type like '_%' then 1 end as m_state from bit;");
