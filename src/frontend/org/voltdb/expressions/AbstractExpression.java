@@ -1063,8 +1063,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      *      OPERATOR_NOT
      *      COMPARISON_IN
      *      OPERATOR_IS_NULL
-     *      AggregageExpression
-     *
+     *      AggregateExpression
+     *      OPERATOR_UNARY_MINUS
      * @return Does this expression need a right expression to be valid?
      */
     public boolean needsRightExpression() {

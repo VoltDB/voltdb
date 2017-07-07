@@ -561,19 +561,20 @@ public class LeaderAppointer implements Promotable
     {
         boolean retval = true;
         List<String> partitionDirs = null;
-
-        ImmutableSortedSet.Builder<KSafetyStats.StatsPoint> lackingReplication =
-                ImmutableSortedSet.naturalOrder();
-
         try {
             partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to read partitions from ZK", true, e);
         }
+
         //Don't fetch the values serially do it asynchronously
         Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
         Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<ZKUtil.ChildrenCallback>();
         for (String partitionDir : partitionDirs) {
+            //skip checking MP, not relevant to KSafety
+            int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+            if (pid == MpInitiator.MP_INIT_PID) continue;
+
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
                 ZKUtil.ByteArrayCallback callback = new ZKUtil.ByteArrayCallback();
@@ -586,6 +587,10 @@ public class LeaderAppointer implements Promotable
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
+
+        ImmutableSortedSet.Builder<KSafetyStats.StatsPoint> lackingReplication =
+                ImmutableSortedSet.naturalOrder();
+
         Map<Integer, Host> hostLeaderMap = Maps.newHashMap();
         ImmutableMap<Integer, Long> masters = m_iv2masters.pointInTimeCache();
         final long statTs = System.currentTimeMillis();
@@ -593,15 +598,7 @@ public class LeaderAppointer implements Promotable
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
             if (pid == MpInitiator.MP_INIT_PID) continue;
 
-            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
-                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
-                //These partitions can fail, just cleanup and remove the partition from the system
-                if (partitionNotOnHashRing) {
-                    removeAndCleanupPartition(pid);
-                    continue;
-                }
-
                 // The data of the partition dir indicates whether the partition has finished
                 // initializing or not. If not, the replicas may still be in the process of
                 // adding themselves to the dir. So don't check for k-safety if that's the case.
@@ -612,27 +609,38 @@ public class LeaderAppointer implements Promotable
                     isInitialized = partitionState[0] == LeaderElector.INITIALIZED;
                 }
 
+                List<String> replicas = childrenCallbacks.poll().getChildren();
                 if (!isInitialized) {
                     // The replicas may still be in the process of adding themselves to the dir.
                     // So don't check for k-safety if that's the case.
                     continue;
                 }
+                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
 
-                List<String> replicas = childrenCallbacks.poll().getChildren();
                 if (replicas.isEmpty()) {
+                    if (partitionNotOnHashRing) {
+                        // no replica for the new partition, clean it up
+                        removeAndCleanupPartition(pid);
+                        continue;
+                    }
                     tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
                     retval = false;
-                } else {
-                    //Record host ids for all partitions that are on the ring
-                    //so they are considered for partition detection
+                } else if (partitionNotOnHashRing) {
+                    //if a partition is not on hash ring
+                    // The replicas may still be in the process of adding themselves to the dir.
+                    continue;
+                }
+
+                assert(!partitionNotOnHashRing);
+
+                //if a partition is on hash ring, go through its partition leader assignment.
+                //masters cache is not empty only on the appointer with master LeaderCache started.
+                if (failedHosts != null && !masters.isEmpty()) {
                     for (String replica : replicas) {
-                        // TODO: better to have an example path here or wrap them into a ZKUtil
                         final String split[] = replica.split("/");
                         final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                         final int hostId = CoreUtils.getHostIdFromHSId(hsId);
-
-                        //The appointer with master LeaderCache started.
-                        if (failedHosts != null && !masters.isEmpty() && !(failedHosts.contains(hostId))) {
+                        if (!failedHosts.contains(hostId)) {
                             Host host = hostLeaderMap.get(hostId);
                             if (host == null) {
                                 host = new Host(hostId);
@@ -643,10 +651,10 @@ public class LeaderAppointer implements Promotable
                     }
                 }
                 // update k-safety statistics for initialized partitions
-                // TODO: the missing partition count may be incorrect if the failed hosts contain any of the replicas?
+                // the missing partition count may be incorrect if the failed hosts contain any of the replicas?
                 lackingReplication.add(new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size()));
-                            }
-            catch (Exception e) {
+            } catch (Exception e) {
+                String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }

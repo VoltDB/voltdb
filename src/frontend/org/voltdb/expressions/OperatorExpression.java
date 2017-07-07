@@ -33,6 +33,7 @@ import org.voltdb.utils.VoltTypeUtil;
  *   - not
  *   - cast(... as type)
  *   - case when
+ *   - - (unary minus)
  *   - alternative (unsupported?)
  */
 public class OperatorExpression extends AbstractExpression {
@@ -60,6 +61,7 @@ public class OperatorExpression extends AbstractExpression {
         case OPERATOR_IS_NULL:
         case OPERATOR_CAST:
         case OPERATOR_EXISTS:
+        case OPERATOR_UNARY_MINUS:
             return false;
         default: return true;
         }
@@ -143,6 +145,11 @@ public class OperatorExpression extends AbstractExpression {
             if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT ||
                     type == ExpressionType.OPERATOR_EXISTS) {
                 m_valueType = VoltType.BOOLEAN;
+                m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+            }
+
+            if (type == ExpressionType.OPERATOR_UNARY_MINUS) {
+                m_valueType = m_left.getValueType();
                 m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             }
             return;

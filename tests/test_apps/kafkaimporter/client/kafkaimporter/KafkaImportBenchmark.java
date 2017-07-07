@@ -148,6 +148,9 @@ public class KafkaImportBenchmark {
         @Option(desc = "Are we running the multi-stream/nmulti topic test?")
         boolean streamtest = false;
 
+        @Option(desc = "Are we importing with kafkaloader, not in-server imports?")
+        boolean loadertest = false;
+
         @Option(desc = "Number of streams and topics we're importing.")
         int streams = 1;
 
@@ -253,9 +256,14 @@ public class KafkaImportBenchmark {
                 long count = 0;
 
                 if (!config.useexport) {
-                    count = MatchChecks.getImportTableRowCount(config.alltypes, client); // imported count
+                    count = MatchChecks.getImportTableRowCount(config.alltypes?2:1, client); // imported count
                 } else {
-                    count = MatchChecks.getImportRowCount(client); // deleted count
+                    if (config.loadertest) {
+                        for (int i=0; i < config.streams; i++) {
+                            count += MatchChecks.getImportTableRowCount(i, client); // imported count
+                            log.info("kakfaimporttable" + i + ": import row count: " + count);
+                        }
+                    }
                 }
                 importProgress.add((int) count);
 
@@ -271,7 +279,9 @@ public class KafkaImportBenchmark {
                 if (sz > 1) {
                     log.info("Import Throughput " + (count - importProgress.get(sz - 2)) / period + "/s, Total Rows: " + count);
                 }
-                log.info("Import stats: " + MatchChecks.getImportStats(client));
+                if (!config.loadertest) {
+                    log.info("Import stats: " + MatchChecks.getImportStats(client));
+                }
             }
         },
         config.displayinterval * 1000,
@@ -352,7 +362,7 @@ public class KafkaImportBenchmark {
             e.printStackTrace();
         }
         try {
-            count = MatchChecks.getImportTableRowCount(false, client); // imported count
+            count = MatchChecks.getImportTableRowCount(1, client); // imported count for KAFKAIMPORTTABLE1
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -465,8 +475,8 @@ public class KafkaImportBenchmark {
 
         long[] importStatValues = MatchChecks.getImportValues(client);
         long mirrorRows = 0;
-        if (!config.streamtest) mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
-        long importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
+        if (!(config.streamtest || config.loadertest)) mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
+        long importRows = MatchChecks.getImportTableRowCount(config.alltypes?1:2, client);
         long importRowCount = 0;
         if (!config.streamtest) importRowCount = MatchChecks.getImportRowCount(client);
 
@@ -476,15 +486,17 @@ public class KafkaImportBenchmark {
                 ((--trial > 0) && ((importStatValues[OUTSTANDING_REQUESTS] > 0) || (importRows < config.expected_rows)))) {
             Thread.sleep(PAUSE_WAIT * 1000);
             importStatValues = MatchChecks.getImportValues(client);
-            if (!config.streamtest) mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
-            importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
+            if (!(config.streamtest || config.loadertest)) mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
+            importRows = MatchChecks.getImportTableRowCount(config.alltypes?1:2, client);
             // importRowCount = MatchChecks.getImportRowCount(client);
         }
 
         // some counts that might help debugging....
-        log.info("importer outstanding requests: " + importStatValues[OUTSTANDING_REQUESTS]);
+        if (!config.loadertest) { // if kafkaloader, no import stats!
+            log.info("importer outstanding requests: " + importStatValues[OUTSTANDING_REQUESTS]);
+        }
         log.info("importRows: " + importRows);
-        if (!config.streamtest) {
+        if (!(config.streamtest || config.loadertest)) {
             log.info("mirrorRows: " + mirrorRows);
             log.info("importRowCount: " + importRowCount);
         }
