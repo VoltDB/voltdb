@@ -44,6 +44,36 @@ CREATE TABLE kafkaimporttable2
     );
 PARTITION TABLE kafkaimporttable2 ON COLUMN key;
 
+CREATE TABLE kafkaimporttable3
+     (
+                  KEY   BIGINT NOT NULL,
+                  value BIGINT NOT NULL,
+                  insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                  CONSTRAINT pk_kafka_import_table3 PRIMARY KEY ( KEY )
+     );
+
+PARTITION TABLE kafkaimporttable3 ON COLUMN KEY;
+
+CREATE TABLE kafkaimporttable4
+     (
+                  KEY   BIGINT NOT NULL,
+                  value BIGINT NOT NULL,
+                  insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                  CONSTRAINT pk_kafka_import_table4 PRIMARY KEY ( KEY )
+     );
+
+PARTITION TABLE kafkaimporttable4 ON COLUMN KEY;
+
+CREATE TABLE kafkaimporttable5
+     (
+                  KEY   BIGINT NOT NULL,
+                  value BIGINT NOT NULL,
+                  insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                  CONSTRAINT pk_kafka_import_table5 PRIMARY KEY ( KEY )
+     );
+
+PARTITION TABLE kafkaimporttable5 ON COLUMN KEY;
+
 CREATE TABLE kafkamirrortable1
      (
                   KEY   BIGINT NOT NULL ,
@@ -151,5 +181,8 @@ CREATE PROCEDURE CountMirror2 as select count(*) from kafkamirrortable2;
 CREATE PROCEDURE CountImport2 as select count(*) from kafkaimporttable2;
 CREATE PROCEDURE ImportCountMinMax as select count(key), min(key), max(key) from kafkaimporttable1;
 CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE1 COLUMN key as upsert into KAFKAIMPORTTABLE1(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE3 COLUMN key as upsert into KAFKAIMPORTTABLE3(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE4 COLUMN key as upsert into KAFKAIMPORTTABLE4(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE5 COLUMN key as upsert into KAFKAIMPORTTABLE5(key, value) VALUES(?, ?);
 
 END_OF_BATCH
