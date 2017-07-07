@@ -942,4 +942,8 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    public void testConcurrentUpdateClasses() {
+
+    }
 }

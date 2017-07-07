@@ -293,6 +293,24 @@ public class VoltZK {
         }
     }
 
+    public static boolean createCatalogUpdateBlockerWithResult(ZooKeeper zk, String node)
+    {
+        try {
+            zk.create(node,
+                      null,
+                      Ids.OPEN_ACL_UNSAFE,
+                      CreateMode.EPHEMERAL);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NODEEXISTS) {
+                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
+            }
+            return false;
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
+        }
+        return true;
+    }
+
     public static boolean removeCatalogUpdateBlocker(ZooKeeper zk, String node, VoltLogger log)
     {
         try {

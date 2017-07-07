@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -67,10 +66,6 @@ import org.voltdb.utils.InMemoryJarfile;
 public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     protected static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    // indicates whether a catalog update is in progress
-    // using atomic operations could be much faster than using locks
-    protected static final AtomicBoolean catalogUpdateFlag = new AtomicBoolean(false);
 
     /**
      *
@@ -468,16 +463,17 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     }
 
     protected CompletableFuture<ClientResponse> updateCatalog(CatalogChangeResult ccr) {
+        // DEBUG
+        System.err.println("================= Start updateCatalog !!! ===================");
+
         // create the catalog update blocker first
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         // Only one catalog update at a time (since this is a NT proc, there might
         // be multiple updates issued at the same time)
 
-        // TODO: should we use a lock or just atomic flag here ? (in another word,
-        // whether to abort any concurrent operation, or to queue them up and execute
-        // one by one ?)
-        if (!catalogUpdateFlag.compareAndSet(false, true)) {
+        // create uac blocker zk node
+        if(!VoltZK.createCatalogUpdateBlockerWithResult(zk, VoltZK.uacActiveBlocker)) {
             return makeQuickResponse(ClientResponseImpl.USER_ABORT,
                     "Invalid catalog update. Can't write a new catalog when another one is in progress");
         }
@@ -485,33 +481,24 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         try {
             // does not work with concurrent elastic operations
             if (ccr.worksWithElastic == false &&
-                    !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
-                    catalogUpdateFlag.set(false);
+                    // must exclude the uacActiveBlocker itself
+                    zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1) {
+                    VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
                     return makeQuickResponse(ClientResponseImpl.USER_ABORT,
                                              "Can't do a catalog update while an elastic join or rejoin is active");
                 }
 
-            // only one catalog update at a time (this should not happen anyway)
-            if (zk.exists(VoltZK.uacActiveBlocker, false) != null) {
-                catalogUpdateFlag.set(false);
-                return makeQuickResponse(ClientResponseImpl.USER_ABORT,
-                                         "Can't write a new catalog when another one is in progress");
-            }
-
             // check rejoin blocker node
             if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
-                catalogUpdateFlag.set(false);
+                VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
                 return makeQuickResponse(ClientResponseImpl.USER_ABORT,
                                          "Can't do a catalog update while an elastic join or rejoin is active");
             }
         } catch (InterruptedException | KeeperException e) {
-            catalogUpdateFlag.set(false);
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
             return makeQuickResponse(ClientResponseImpl.USER_ABORT, "Catalog update failed with exception:\n" +
                                      e.getMessage());
         }
-
-        // create uac blocker zk node (which may be checked in other rejoin/join operations)
-        VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker);
 
         CompletableFuture<ClientResponse> response = null;
 
@@ -601,8 +588,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         } finally {
             cleanUpTempCatalog();
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
-            catalogUpdateFlag.set(false);
         }
+
+        // DEBUG
+        System.err.println("================= End updateCatalog !!! ===================");
 
         return response;
     }
