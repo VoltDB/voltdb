@@ -517,4 +517,14 @@ public class TestParameterConverter extends TestCase
         assertEquals(t[0], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[0]) ));
         assertEquals(t[1], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[1]) ));
     }
+
+    public void testEmptyStringArrayToByteArray() throws Exception {
+        String[] t = {"", ""};
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Byte[][].class, t);
+        assertTrue("expect Byte[][]", r.getClass() == Byte[][].class);
+
+        assertEquals(t[0], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[0]) ));
+        assertEquals(t[1], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[1]) ));
+    }
 }
