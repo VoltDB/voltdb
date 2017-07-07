@@ -188,6 +188,22 @@ public class TestParameterConverter extends TestCase
         assertEquals(t, Encoder.hexEncode( ArrayUtils.toPrimitive((Byte[])r) ));
     }
 
+    public void testEmptyStringToVarBinary() throws Exception {
+        String t = "";
+        Object r = ParameterConverter.
+            tryToMakeCompatible(byte[].class, t);
+        assertTrue("expect varbinary", r.getClass() == byte[].class);
+        assertEquals(t, Encoder.hexEncode((byte[])r));
+    }
+
+    public void testEmptyStringToBoxedVarBinary() throws Exception {
+        String t = "";
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Byte[].class, t);
+        assertTrue("expect varbinary", r.getClass() == Byte[].class);
+        assertEquals(t, Encoder.hexEncode( ArrayUtils.toPrimitive((Byte[])r) ));
+    }
+
     public void testByteToBoxedByte() throws Exception {
         String t = "1E3A";
         Object byteArr = ParameterConverter.
@@ -335,6 +351,29 @@ public class TestParameterConverter extends TestCase
             assertTrue(ex.getMessage().contains(
                     "tryToMakeCompatible: The provided long value: (-2147483648) might be interpreted "
                     + "as integer null. Try explicitly using a int parameter."));
+        }
+    }
+
+    // hexString should be an (even-length) hexadecimal string to be decoded
+    public void testStringTobyteException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(byte.class, "ABC");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: Unable to convert string ABC"
+                    + " to byte value for target parameter"));
+        }
+    }
+
+    public void testStringToByteException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Byte.class, "ABC");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: Unable to convert string ABC"
+                    + " to java.lang.Byte value for target parameter"));
         }
     }
 
@@ -526,5 +565,16 @@ public class TestParameterConverter extends TestCase
 
         assertEquals(t[0], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[0]) ));
         assertEquals(t[1], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[1]) ));
+    }
+
+    public void testIncorrectStringArrayToByteArray() throws Exception {
+        String[] t = {"ABC"};
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Byte[][].class, t);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "String is not properly hex-encoded"));
+        }
     }
 }
