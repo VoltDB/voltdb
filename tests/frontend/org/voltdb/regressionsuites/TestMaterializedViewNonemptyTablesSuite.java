@@ -157,35 +157,44 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
                        "create view vv1 as select a, count(*), max(b + b) from alpha group by a",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv2 as select a, max(b + b) , count(*) from alpha group by a",
+                       "create view vv2 as select a, max(b + b), count(*) from alpha group by a",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv3 as select a, count(*), max(b + b), count(*) from alpha group by a",
                        UNSAFE_OPS_STRING);
         // This should fail if alpha and beta are both populated, as
         // they are in the second test case.
         testCreateView(client,
-                       "create view vv3 as select alpha.a, count(*), max(beta.b + alpha.b) from alpha, beta group by alpha.a",
+                       "create view vv4 as select alpha.a, count(*), max(beta.b + alpha.b) from alpha, beta group by alpha.a",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv3 as select alpha.a, count(*) from alpha join beta on alpha.a / alpha.a < 1 group by alpha.a;",
+                       "create view vv4 as select alpha.a, count(*) from alpha join beta on alpha.a / alpha.a < 1 group by alpha.a;",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv3 as select alpha.a, count(*) from alpha, beta where alpha.a / alpha.a < 1 group by alpha.a;",
+                       "create view vv4 as select alpha.a, count(*) from alpha, beta where alpha.a / alpha.a < 1 group by alpha.a;",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv3 as select alpha.a/beta.b, count(*) from alpha, beta group by alpha.a/beta.b;",
+                       "create view vv4 as select alpha.a/beta.b, count(*) from alpha, beta group by alpha.a/beta.b;",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv3 as select alpha.a/beta.b, sum(alpha.a/beta.b), count(*) from alpha, beta group by alpha.a/beta.b;",
+                       "create view vv4 as select alpha.a/beta.b, sum(alpha.a/beta.b), count(*) from alpha, beta group by alpha.a/beta.b;",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv4 as select alpha.a/beta.b, count(*), sum(alpha.a/beta.b), count(*) from alpha, beta group by alpha.a/beta.b;",
                        UNSAFE_OPS_STRING);
         // This should succeed always, since the table empty is always
         // empty.
         testCreateView(client,
-                       "create view vv4 as select alpha.a, count(*), max(empty.b + empty.b) from alpha, empty group by alpha.a",
+                       "create view vv5 as select alpha.a, count(*), max(empty.b + empty.b) from alpha, empty group by alpha.a",
                        null);
         testCreateView(client,
-                       "create view vv5 as select a, count(*), max(b) from alpha group by a",
+                       "create view vv6 as select a, count(*), max(b) from alpha group by a",
                        null);
         testCreateView(client,
-                       "create view vv6 as select a, max(b), count(*) from alpha group by a",
+                       "create view vv7 as select a, max(b), count(*) from alpha group by a",
+                       null);
+        testCreateView(client,
+                       "create view vv8 as select a, min(b), count(*), max(b), count(*) from alpha group by a",
                        null);
     }
 
