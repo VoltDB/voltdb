@@ -546,6 +546,8 @@ public:
 
     std::vector<uint64_t> getBlockAddresses() const;
 
+    bool doDRActions(AbstractDRTupleStream* drStream);
+
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);

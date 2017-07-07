@@ -295,7 +295,7 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
     // Instead of recording each tuple deletion, log it as a table truncation DR.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
@@ -319,6 +319,10 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
     while (ti.next(tuple)) {
         deleteTuple(tuple, fallible);
     }
+}
+
+bool PersistentTable::doDRActions(AbstractDRTupleStream* drStream) {
+    return (drStream && drStream->drStreamStarted() && !m_isMaterialized && m_drEnabled);
 }
 
 void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
@@ -526,7 +530,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
@@ -816,7 +820,7 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     }
 
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
+    if (doDRActions(drStream) && shouldDRStream) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
@@ -976,7 +980,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     }
 
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
@@ -1189,7 +1193,7 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     // be left forgotten in case this throws.
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    if (drStream && !m_isMaterialized && m_drEnabled) {
+    if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();

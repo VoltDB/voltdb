@@ -105,6 +105,10 @@ public:
     virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
                                  int64_t uniqueId, ByteArray payloads) = 0;
 
+    bool drStreamStarted() {
+        return (m_committedSequenceNumber >= 0);
+    }
+
     bool m_enabled;
     bool m_guarded; // strongest guard, reject all actions for DRTupleStream
 

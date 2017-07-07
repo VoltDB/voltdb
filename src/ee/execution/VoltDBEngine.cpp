@@ -71,6 +71,7 @@
 #include "common/SerializableEEException.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "common/types.h"
 
 #include "executors/abstractexecutor.h"
 
@@ -562,10 +563,10 @@ void VoltDBEngine::releaseUndoToken(int64_t undoToken) {
     }
     m_undoLog.release(undoToken);
 
-    if (m_executorContext->drStream()) {
+    if (m_executorContext->drStream() && m_executorContext->drStream()->drStreamStarted()) {
         m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
     }
-    if (m_executorContext->drReplicatedStream()) {
+    if (m_executorContext->drReplicatedStream() && m_executorContext->drReplicatedStream()->drStreamStarted()) {
         m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
     }
 }
@@ -1285,9 +1286,11 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
     ByteArray payload(io.data(), io.size());
 
     quiesce(lastCommittedSpHandle);
-    m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
-            spHandle, uniqueId, payload);
-    if (m_executorContext->drReplicatedStream()) {
+    if (m_executorContext->drStream()->drStreamStarted()) {
+        m_executorContext->drStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
+                spHandle, uniqueId, payload);
+    }
+    if (m_executorContext->drReplicatedStream() && m_executorContext->drReplicatedStream()->drStreamStarted()) {
         m_executorContext->drReplicatedStream()->generateDREvent(SWAP_TABLE, lastCommittedSpHandle,
                 spHandle, uniqueId, payload);
     }
@@ -2066,9 +2069,12 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         int64_t spHandle = taskInfo.readLong();
         ByteArray payloads = taskInfo.readBinaryString();
 
-        m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
-                                                       spHandle, uniqueId, payloads);
-        if (m_executorContext->drReplicatedStream()) {
+        if (type == DR_STREAM_START || m_executorContext->drStream()->drStreamStarted()) {
+            m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
+                                                           spHandle, uniqueId, payloads);
+        }
+        if (m_executorContext->drReplicatedStream() &&
+            (type == DR_STREAM_START || m_executorContext->drReplicatedStream()->drStreamStarted())) {
             m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
                                                                      spHandle, uniqueId, payloads);
         }
