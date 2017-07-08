@@ -49,8 +49,8 @@ public class MakeInsertNodesInlineIfPossible extends MicroOptimization {
                         : null;
             // If we have a sequential scan node without an inline aggregate
             // node, which is also not an then we can inline the insert node.
-            if (( ! insertNode.isUpsert())
-                    && ( targetNode != null )
+            if (( targetNode != null )
+                    && ( ! insertNode.isUpsert())
                     && ( ! targetNode.hasInlineAggregateNode())) {
                 AbstractPlanNode parent = (insertNode.getParentCount() > 0) ? insertNode.getParent(0) : null;
                 AbstractPlanNode abstractTargetNode = targetNode.getAbstractNode();
