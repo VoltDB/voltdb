@@ -97,6 +97,6 @@ public class UpdateClasses extends UpdateApplicationBase {
                              ccr.deploymentHash,
                              ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                              ccr.hasSchemaChange ?  1 : 0,
-                             ccr.requiresNewExportGeneration ? 1 : 0);
+                             ccr.requiresNewExportGeneration ? 1 : 0, ccr.m_ccrTime);
     }
 }

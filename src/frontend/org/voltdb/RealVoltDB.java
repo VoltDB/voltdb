@@ -3334,7 +3334,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration)
+            boolean requiresNewExportGeneration,
+            long ccrTime)
     {
         try {
             synchronized(m_catalogUpdateLock) {
@@ -3382,7 +3383,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             true,
                             deploymentBytes,
                             m_messenger,
-                            hasSchemaChange);
+                            hasSchemaChange, ccrTime);
                 final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(/*m_asyncCompilerAgent,*/ m_catalogContext);
                 m_txnIdToContextTracker.put(currentTxnId,
                         new ContextTracker(
@@ -3411,7 +3412,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
 
                 // 1. update the export manager.
-                ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration, partitions);
+                ExportManager.instance().updateCatalog(m_catalogContext, ccrTime, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration, partitions);
 
                 // 1.1 Update the elastic join throughput settings
                 if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
