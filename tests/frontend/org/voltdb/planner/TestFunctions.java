@@ -132,6 +132,15 @@ public class TestFunctions extends PlannerTestCase {
                 "Function 'atan' is not supported in VoltDB: Custom Function");
         failToCompile("SELECT  SIGN(FLOAT_TYPE) FROM NUMERICFUN",
                 "Function 'sign' is not supported in VoltDB: Custom Function");
+        failToCompile("SELECT  ROUNDMAGIC(FLOAT_TYPE) FROM NUMERICFUN",
+                "Function 'roundmagic' is not supported in VoltDB: Custom Function");
+        failToCompile("SELECT  ASCII(VARCHAR_TYPE) FROM NUMERICFUN",
+                "Function 'ascii' is not supported in VoltDB: Custom Function");
+        failToCompile("SELECT  RAWTOHEX(VARBINARY_TYPE) FROM NUMERICFUN",
+                "Function 'rawtohex' is not supported in VoltDB: Custom Function");
+        failToCompile("SELECT  HEXTORAW(VARCHAR_TYPE) FROM NUMERICFUN",
+                "Function 'hextoraw' is not supported in VoltDB: Custom Function");
+        //TODO : add remaining cases (ATAN2,SOUNDEX)
 
     }
 
