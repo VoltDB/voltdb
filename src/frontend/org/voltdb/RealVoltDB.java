@@ -2228,10 +2228,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void stageSchemaFiles(Configuration config) {
-        if (config.m_userSchema == null) {
+        if (config.m_userSchema == null && config.m_stagedClassesPath == null) {
             return; // nothing to do
         }
-        assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
 
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
