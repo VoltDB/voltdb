@@ -392,11 +392,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
 //          results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null,
 //                  new Long[]{1L, 2L, 3L}, null).getResults();
 //          System.out.println(results);
-          //org.voltdb.client.ProcCallException: VOLTDB ERROR: UNEXPECTED FAILURE:
-        //org.voltdb.VoltTypeException: Procedure BoxedByteArrays: Incompatible parameter type: can not convert type 'long[]' to 'BIGINT' for arg 0 for SQL stmt: SELECT * FROM ENG_539 WHERE BIG IN (?);. Try explicitly using a long parameter.
-//          results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null,
-//                  new long[]{1L, 2L, 3L}, null).getResults();
-//          System.out.println(results);
+
+        // should not fail for primitive array of longs
+        try {
+            results = client.callProcedure("BoxedByteArrays", "LNGARR", null, null, null,
+                  new long[]{1L, 2L, 3L}, null, null).getResults();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
+                          "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
+        }
 
         // should not fail for primitive array of ints
         try {
