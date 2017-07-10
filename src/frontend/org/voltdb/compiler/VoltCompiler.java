@@ -1871,10 +1871,6 @@ public class VoltCompiler {
                 for (Statement prevStmt : prevProc.getStatements()) {
                     addStatementToCache(prevStmt);
                 }
-
-                // clear up the previous procedure contents
-                prevProc.getStatements().clear();
-                prevProc.getParameters().clear();
             }
 
             // Use the in-memory jarfile-provided class loader so that procedure
@@ -1893,6 +1889,10 @@ public class VoltCompiler {
                     // UpdateClasses does not need to update system procedures
                     continue;
                 }
+
+                // clear up the previous procedure contents before recompiling java user procedures
+                procedure.getStatements().clear();
+                procedure.getParameters().clear();
 
                 final String className = procedure.getClassname();
 
