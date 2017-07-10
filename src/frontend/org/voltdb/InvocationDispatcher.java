@@ -471,7 +471,7 @@ public final class InvocationDispatcher {
                  || "@Resume".equals(procName)
                  || "@PrepareShutdown".equals(procName))
             {
-                if (!handler.isAdmin()) {
+                if (handler.isAdmin() == false) {
                     return unexpectedFailureResponse(
                             procName + " is not available to this client",
                             task.clientHandle);
