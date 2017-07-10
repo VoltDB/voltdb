@@ -2069,12 +2069,14 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         int64_t spHandle = taskInfo.readLong();
         ByteArray payloads = taskInfo.readBinaryString();
 
-        if (type == DR_STREAM_START || m_executorContext->drStream()->drStreamStarted()) {
+        if ((type == DR_STREAM_START && !m_executorContext->drStream()->drStreamStarted())
+            || m_executorContext->drStream()->drStreamStarted()) {
             m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
                                                            spHandle, uniqueId, payloads);
         }
         if (m_executorContext->drReplicatedStream() &&
-            (type == DR_STREAM_START || m_executorContext->drReplicatedStream()->drStreamStarted())) {
+            ((type == DR_STREAM_START && !m_executorContext->drReplicatedStream()->drStreamStarted())
+             || m_executorContext->drReplicatedStream()->drStreamStarted())) {
             m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
                                                                      spHandle, uniqueId, payloads);
         }
