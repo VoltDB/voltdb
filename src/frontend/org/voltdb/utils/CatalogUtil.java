@@ -72,6 +72,7 @@ import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.HealthMonitor;
 import org.voltdb.SystemProcedureCatalog;
@@ -1355,8 +1356,15 @@ public abstract class CatalogUtil {
                 String bundlelocation = System.getProperty(VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME);
                 if (bundlelocation == null || bundlelocation.trim().length() == 0) {
                     String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-                    hostLog.info("Module base is: " + rpath + "/../bundles/");
-                    String bpath = (new File(rpath)).getParent() + "/../bundles/" + bundleUrl;
+                    if (CoreUtils.isJunitTest()) {
+                        assert rpath.endsWith("obj/release/prod/");
+                        rpath = rpath.substring(0, rpath.indexOf("/release/prod/"));
+                        bundlelocation = (new File(rpath)).getParent() + "/bundles/";
+                    } else {
+                        bundlelocation = (new File(rpath)).getParent() + "/../bundles/";
+                    }
+                    hostLog.info("Module base is: " + bundlelocation);
+                    String bpath = bundlelocation + bundleUrl;
                     is = new FileInputStream(new File(bpath));
                     bundleUrl = "file:" + bpath;
                 } else {

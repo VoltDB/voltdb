@@ -36,6 +36,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 import org.voltdb.importer.formatter.FormatterBuilder;
 
 import com.google_voltpatches.common.base.Joiner;
@@ -206,7 +208,17 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                     Joiner.on(", ").join(missingAddedURLs) + "). Pause and Resume the database to refresh the importer.");
         }
 
-        ImmutableMap<URI, AbstractImporter> newReference = builder.build();
+        ImmutableMap<URI, AbstractImporter> newReference = null;
+        if (CoreUtils.isJunitTest()) {
+            // Don't allow ENG-12034 to escape unnoticed
+            try {
+                newReference = builder.build();
+            } catch (IllegalArgumentException e){
+                VoltDB.crashGlobalVoltDB("BSDBG: ENG-12034 found", true, e);
+            }
+        } else {
+            newReference = builder.build();
+        }
         boolean success = m_importers.compareAndSet(oldReference, newReference);
         if (!m_stopping && success) { // Could fail if stop was called after we entered inside this method
             stopImporters(toStop);
