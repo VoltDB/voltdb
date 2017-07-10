@@ -1259,6 +1259,12 @@ public class CoreUtils {
         }
     }
 
+    public static void logProcedureInvocation(VoltLogger log, String userName, String where, String procedure, Level level) {
+        String msg = "User " + userName + " from " + where +
+                " issued a " + procedure;
+        printAsciiArtLog(log, msg, level);
+    }
+
     // Utility method to figure out if this is a test case.  Various junit targets in
     // build.xml set a environment variable to give us a hint
     public static boolean isJunitTest() {

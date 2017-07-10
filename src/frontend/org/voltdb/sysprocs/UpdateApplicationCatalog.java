@@ -62,7 +62,7 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                     "Use of @UpdateApplicationCatalog is forbidden.");
         }
 
-        printCatalogUpdateLog("@UpdateApplicationCatalog");
+        logCatalogUpdateInvocation("@UpdateApplicationCatalog");
 
         CatalogChangeResult ccr = null;
         try {

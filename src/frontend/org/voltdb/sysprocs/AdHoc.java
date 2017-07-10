@@ -149,7 +149,7 @@ public class AdHoc extends AdHocNTBase {
                     "Server is paused and is available in read-only mode - please try again later.");
         }
 
-        printCatalogUpdateLog(invocationName);
+        logCatalogUpdateInvocation(invocationName);
 
         CatalogChangeResult ccr = null;
         try {

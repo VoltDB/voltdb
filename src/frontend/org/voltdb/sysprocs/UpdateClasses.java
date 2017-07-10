@@ -52,7 +52,7 @@ public class UpdateClasses extends UpdateApplicationBase {
                     "to change application schema.  Use of @UpdateClasses is forbidden.");
         }
 
-        printCatalogUpdateLog("@UpdateClasses");
+        logCatalogUpdateInvocation("@UpdateClasses");
 
         CatalogChangeResult ccr = null;
         try {
