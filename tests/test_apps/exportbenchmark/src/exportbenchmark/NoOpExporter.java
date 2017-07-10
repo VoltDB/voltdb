@@ -39,6 +39,7 @@ import java.util.Properties;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.ExportRowData;
 
 public class NoOpExporter extends ExportClientBase {
 
@@ -59,7 +60,7 @@ public class NoOpExporter extends ExportClientBase {
         }
 
         @Override
-        public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException {
+        public boolean processRow(ExportRowData row) throws RestartBlockException {
             // We don't want to do anything yet
             return true;
         }

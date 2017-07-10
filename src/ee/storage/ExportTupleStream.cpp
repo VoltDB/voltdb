@@ -159,45 +159,53 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     // table name
     io.writeTextString(tableName);
-    // write metadata column names and column length
+
+    // encode name, type, length
     io.writeTextString(VOLT_TRANSACTION_ID);
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeInt(sizeof(int64_t));
+
     io.writeTextString(VOLT_EXPORT_TIMESTAMP);
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeInt(sizeof(int64_t));
+
     io.writeTextString(VOLT_EXPORT_SEQUENCE_NUMBER);
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeInt(sizeof(int64_t));
+
     io.writeTextString(VOLT_PARTITION_ID);
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeInt(sizeof(int64_t));
+
     io.writeTextString(VOLT_SITE_ID);
+    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeInt(sizeof(int64_t));
+
     io.writeTextString(VOLT_EXPORT_OPERATION);
+    io.writeEnumInSingleByte(VALUE_TYPE_TINYINT);
     io.writeInt(sizeof(int8_t));
 
     const TupleSchema::ColumnInfo *columnInfo;
-    // write table column names and length
+    // encode table columns name, type, length
     for (int i = 0; i < columnNames.size(); i++) {
         io.writeTextString(columnNames[i]);
         columnInfo = tuple.getSchema()->getColumnInfo(i);
         assert (columnInfo != NULL);
+        io.writeEnumInSingleByte(columnInfo->getVoltType());
         io.writeInt(columnInfo->length);
     }
-    // write metadata columns - type + data
-    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
+
+    // write metadata columns - data
     io.writeLong(spHandle);
-    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(timestamp);
-    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(seqNo);
-    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(m_partitionId);
-    io.writeEnumInSingleByte(VALUE_TYPE_BIGINT);
     io.writeLong(m_siteId);
 
     // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
-    io.writeEnumInSingleByte(VALUE_TYPE_TINYINT);
     io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
     // write the tuple's data
-    tuple.serializeToExport(io, METADATA_COL_CNT, nullArray, true);
+    tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
 
     // row size, generation, partition-index n column count
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);
@@ -247,7 +255,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
     return *streamHeaderSz              // row header
             + metadataSz                // meta-data column data
             + columnLength              // defined column length
-            + tuple.sizeInValues()      // types of columns
+            + tuple.sizeInValues()      // table column types
             + dataSz;                   // non-null tuple data
 }
 
