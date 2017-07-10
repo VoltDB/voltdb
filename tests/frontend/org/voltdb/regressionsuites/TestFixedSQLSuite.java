@@ -398,9 +398,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
 //                  new long[]{1L, 2L, 3L}, null).getResults();
 //          System.out.println(results);
 
+        // should not fail for primitive array of ints
+        try {
           results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null,
                   new int[]{1, 2, 3}, null).getResults();
-          System.out.println(results);
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
+                          "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [I"));
+        }
+
 
         String query =
                 String.format("select * from ENG_539");
