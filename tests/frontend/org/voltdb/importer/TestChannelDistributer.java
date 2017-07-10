@@ -29,6 +29,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingDeque;
@@ -39,6 +41,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 import org.voltcore.zk.ZKTestBase;
 
 import com.google_voltpatches.common.collect.FluentIterable;
@@ -59,9 +62,31 @@ public class TestChannelDistributer extends ZKTestBase {
     BlockingDeque<ImporterChannelAssignment> queue;
 
     public class Collector implements ChannelChangeCallback {
+
+        Map<URI, AbstractImporter> importerAssignments = new ImmutableMap.Builder<URI, AbstractImporter>().build();
+
         @Override
         public void onChange(ImporterChannelAssignment assignment) {
-            queue.offer(assignment);
+            queue.add(assignment);
+            // Mimic ImporterLifeCycleManager.onChange().
+            // This process will throw an exception if the channel assignments don't make sense.
+            ImmutableMap<URI, AbstractImporter> oldReference = ImmutableMap.copyOf(importerAssignments);
+            ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
+            builder.putAll(Maps.filterKeys(importerAssignments, ImporterLifeCycleManager.notUriIn(assignment.getRemoved())));
+            List<AbstractImporter> toStop = new ArrayList<>();
+            for (URI removed: assignment.getRemoved()) {
+                AbstractImporter importer = oldReference.get(removed);
+                if (importer != null) {
+                    toStop.add(importer);
+                }
+            }
+            List<AbstractImporter> newImporters = new ArrayList<>();
+            for (final URI added: assignment.getAdded()) {
+                AbstractImporter importer = Mockito.mock(AbstractImporter.class);
+                newImporters.add(importer);
+                builder.put(added, importer);
+            }
+            importerAssignments = builder.build();
         }
         @Override
         public void onClusterStateChange(VersionedOperationMode mode) {

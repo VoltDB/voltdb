@@ -722,6 +722,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                                 + ") Retrying channel assignment because write attempt to "
                                 + setter.path + " failed with " + setter.getCallbackCode()
                                );
+// BSDBG                        m_es.submit(new GetChannels(MASTER_DN));
                         m_es.submit(new AssignChannels(seed));
                         return;
                     }

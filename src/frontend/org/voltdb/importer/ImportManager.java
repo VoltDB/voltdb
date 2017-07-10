@@ -268,8 +268,9 @@ public class ImportManager implements ChannelChangeCallback {
 }
 
     public static int getPartitionsCount() {
-        if (m_self.m_processor.get() != null) {
-            return m_self.m_processor.get().getPartitionsCount();
+        ImportDataProcessor processor = m_self.m_processor.get();
+        if (processor != null) {
+            return processor.getPartitionsCount();
         }
         return 0;
     }
