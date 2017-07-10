@@ -1209,27 +1209,38 @@ function alertNodeClicked(obj) {
         };
 
         var getLatencyDetails = function (connection, latency) {
-
             var colIndex = {};
             var counter = 0;
-
-            connection.Metadata['@Statistics_LATENCY'].schema.forEach(function (columnInfo) {
+            var tpsClusterValue = 0;
+            var latencyClusterValue = 0;
+            var timeStamp = (new Date()).getTime();
+            connection.Metadata["@Statistics_LATENCY"].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "P99"
                 || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TPS")
                     colIndex[columnInfo["name"]] = counter;
 
                 counter++;
             });
-
+            latency["NODE_DETAILS"] = {}
             connection.Metadata['@Statistics_LATENCY'].data.forEach(function (info) {
+                //Get node details
                 var hostName = info[colIndex["HOSTNAME"]];
-                if (!latency.hasOwnProperty(hostName)) {
-                    latency[hostName] = {};
+                if (!latency["NODE_DETAILS"].hasOwnProperty(hostName)) {
+                    latency["NODE_DETAILS"][hostName] = {};
                 }
-                latency[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
-                latency[hostName]["P99"] = info[colIndex["P99"]]/1000;
-                latency[hostName]["TPS"] = info[colIndex["TPS"]];
+                latency["NODE_DETAILS"][hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                latency["NODE_DETAILS"][hostName]["P99"] = info[colIndex["P99"]]/1000;
+                latency["NODE_DETAILS"][hostName]["TPS"] = info[colIndex["TPS"]];
+
+                //Get cluster details
+                latencyClusterValue = info[colIndex["P99"]] > latencyClusterValue ? info[colIndex["P99"]] : latencyClusterValue;
+                tpsClusterValue += info[colIndex["TPS"]];
+                timeStamp = info[colIndex["TIMESTAMP"]];
             });
+            latency["CLUSTER_DETAILS"] = {};
+            latency["CLUSTER_DETAILS"]["TPS"] = tpsClusterValue;
+            latency["CLUSTER_DETAILS"]["P99"] = latencyClusterValue/1000;
+            latency["CLUSTER_DETAILS"]["TIMESTAMP"] = timeStamp;
         };
 
         var getMemoryDetails = function (connection, sysMemory, processName) {
