@@ -398,6 +398,10 @@ public class TestFixedSQLSuite extends RegressionSuite {
 //                  new long[]{1L, 2L, 3L}, null).getResults();
 //          System.out.println(results);
 
+          results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null,
+                  new int[]{1, 2, 3}, null).getResults();
+          System.out.println(results);
+
         String query =
                 String.format("select * from ENG_539");
         results = client.callProcedure("@AdHoc", query).getResults();
