@@ -114,9 +114,9 @@ public class LocalCluster extends VoltServerConfig {
     int m_replicationPort = -1;
 
     // log message pattern match results by host
-    private Map<Integer, Set<String>> m_logMessageMatchResults = null;
+    private Map<Integer, Set<String>> m_logMessageMatchResults = new ConcurrentHashMap<>();
     // log message patterns
-    private Map<String, Pattern> m_logMessageMatchPatterns = null;
+    private Map<String, Pattern> m_logMessageMatchPatterns = new ConcurrentHashMap<>();
 
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
@@ -212,17 +212,8 @@ public class LocalCluster extends VoltServerConfig {
     /*
      * Enable pre-compiled regex search in logs
      */
-    public LocalCluster(String jarFileName,
-                        List<String> regexes,
-                        int siteCount,
-                        int hostCount,
-                        int kfactor,
-                        BackendTarget target)
-    {
-        this(jarFileName, siteCount, hostCount, kfactor, target, null);
-        m_hasLocalServer = false;
-        m_logMessageMatchResults = new ConcurrentHashMap<>();
-        m_logMessageMatchPatterns = new ConcurrentHashMap<>();
+    public void setLogSearchPatterns(List<String> regexes) {
+        assert m_hasLocalServer == false;
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
