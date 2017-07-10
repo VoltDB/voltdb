@@ -493,16 +493,16 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         try {
             DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
             ccr = prepareApplicationCatalogDiff(invocationName,
-                                                null,
-                                                null,
+                                                operationBytes,
+                                                operationString,
                                                 adhocDDLStmts,
-                                                null,
-                                                false,
+                                                replayHashOverride,
+                                                isPromotion,
                                                 drRole,
-                                                true,
-                                                false,
-                                                getHostname(),
-                                                getUsername());
+                                                useAdhocDDL,
+                                                adminConnection,
+                                                hostname,
+                                                user);
         }
         catch (PrepareDiffFailureException pe) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
