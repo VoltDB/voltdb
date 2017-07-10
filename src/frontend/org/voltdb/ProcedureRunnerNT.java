@@ -543,11 +543,11 @@ public class ProcedureRunnerNT {
         m_ntProcService.isRestoring = false;
     }
 
-    protected String getConnectionIPAndPort() {
+    public String getConnectionIPAndPort() {
         return m_ccxn.getHostnameAndIPAndPort();
     }
 
-    protected boolean isUserAuthEnabled() {
+    public boolean isUserAuthEnabled() {
         return m_user.isAuthEnabled();
     }
 }

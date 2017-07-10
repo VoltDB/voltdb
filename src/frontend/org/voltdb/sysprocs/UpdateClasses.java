@@ -52,6 +52,8 @@ public class UpdateClasses extends UpdateApplicationBase {
                     "to change application schema.  Use of @UpdateClasses is forbidden.");
         }
 
+        printCatalogUpdateLog("@UpdateClasses");
+
         CatalogChangeResult ccr = null;
         try {
             ccr = prepareApplicationCatalogDiff("@UpdateClasses",
@@ -82,8 +84,6 @@ public class UpdateClasses extends UpdateApplicationBase {
         if (ccr.encodedDiffCommands.trim().length() == 0) {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
         }
-
-        printCatalogUpdateLog("@UpdateClasses");
 
         // initiate the transaction.
         return callProcedure("@UpdateCore",

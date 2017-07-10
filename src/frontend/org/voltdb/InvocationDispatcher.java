@@ -398,11 +398,9 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
             else if ("@StopNode".equals(procName)) {
-                if (user.isAuthEnabled()) {
-                    String msg = "User " + user.m_name + " from " + clientInfo +
-                                 " issued a " + procName;
-                    CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
-                }
+                String msg = "User " + user.m_name + " from " + clientInfo +
+                             " issued a " + procName;
+                CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
                 return dispatchStopNode(task);
             }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
@@ -444,19 +442,15 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.SNAPSHOTSCAN, task, ccxn);
             }
             else if ("@SnapshotDelete".equals(procName)) {
-                if (user.isAuthEnabled()) {
-                    String msg = "User " + user.m_name + " from " + clientInfo +
-                                 " issued a " + procName;
-                    CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
-                }
+                String msg = "User " + user.m_name + " from " + clientInfo +
+                             " issued a " + procName;
+                CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
             }
             else if ("@SnapshotRestore".equals(procName)) {
-                if (user.isAuthEnabled()) {
-                    String msg = "User " + user.m_name + " from " + clientInfo +
-                                 " issued a " + procName;
-                    CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
-                }
+                String msg = "User " + user.m_name + " from " + clientInfo +
+                             " issued a " + procName;
+                CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
                 if (retval != null) {
                     return retval;
@@ -477,17 +471,17 @@ public final class InvocationDispatcher {
                  || "@Resume".equals(procName)
                  || "@PrepareShutdown".equals(procName))
             {
-                if (handler.isAdmin()) {
+                if (!handler.isAdmin()) {
+                    return unexpectedFailureResponse(
+                            procName + " is not available to this client",
+                            task.clientHandle);
+                } else {
                     // After we verify the system command from an admin user, the detailed information
                     // should be printed out properly. The following message is printed at the node where
                     // the client is connected to.
                     String msg = "User " + user.m_name + " on the Admin port from " + clientInfo +
                                  " issued a " + procName;
                     CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
-                } else {
-                    return unexpectedFailureResponse(
-                            procName + " is not available to this client",
-                            task.clientHandle);
                 }
             }
         }

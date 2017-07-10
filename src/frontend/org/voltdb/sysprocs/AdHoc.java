@@ -149,6 +149,8 @@ public class AdHoc extends AdHocNTBase {
                     "Server is paused and is available in read-only mode - please try again later.");
         }
 
+        printCatalogUpdateLog(invocationName);
+
         CatalogChangeResult ccr = null;
         try {
             DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
@@ -173,8 +175,6 @@ public class AdHoc extends AdHocNTBase {
         if (ccr.encodedDiffCommands.trim().length() == 0) {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
         }
-
-        printCatalogUpdateLog(invocationName);
 
         // initiate the transaction.
         return callProcedure("@UpdateCore",

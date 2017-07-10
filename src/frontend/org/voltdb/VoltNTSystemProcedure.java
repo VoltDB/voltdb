@@ -20,7 +20,6 @@ package org.voltdb;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.client.ClientResponse;
 
 /**
@@ -60,18 +59,7 @@ public class VoltNTSystemProcedure extends VoltNonTransactionalProcedure {
         m_runner.noteRestoreCompleted();
     }
 
-    protected String getConnectionIPAndPort() {
-        return m_runner.getConnectionIPAndPort();
-    }
-
-    protected boolean isUserAuthEnabled() {
-        return m_runner.isUserAuthEnabled();
-    }
-
-    protected void printCatalogUpdateLog(String procName) {
-        if (isUserAuthEnabled()) {
-            String warnMsg = "A user from " + getConnectionIPAndPort() + " issued a " + procName + " to update the catalog.";
-            CoreUtils.printMsgLimited(warnMsg);
-        }
+    protected ProcedureRunnerNT getProcedureRunner() {
+        return m_runner;
     }
 }

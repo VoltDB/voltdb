@@ -62,6 +62,8 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                     "Use of @UpdateApplicationCatalog is forbidden.");
         }
 
+        printCatalogUpdateLog("@UpdateApplicationCatalog");
+
         CatalogChangeResult ccr = null;
         try {
             ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
@@ -97,8 +99,6 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
         if (isRestoring()) {
             noteRestoreCompleted();
         }
-
-        printCatalogUpdateLog("@UpdateApplicationCatalog");
 
         // initiate the transaction.
         return callProcedure("@UpdateCore",
