@@ -36,8 +36,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.junit.Test;
@@ -48,12 +46,15 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.CommandLog;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+
+import junit.framework.TestCase;
 
 public class TestSpSchedulerSpHandle extends TestCase
 {
@@ -72,6 +73,7 @@ public class TestSpSchedulerSpHandle extends TestCase
     private static SiteTaskerQueue getSiteTaskerQueue() {
         SiteTaskerQueue queue = new SiteTaskerQueue();
         queue.setStarvationTracker(new StarvationTracker(0));
+        queue.setQueueDepthTracker(new QueueDepthTracker(0));
         return queue;
     }
 

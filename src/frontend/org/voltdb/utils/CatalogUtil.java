@@ -141,6 +141,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
@@ -2655,45 +2656,47 @@ public abstract class CatalogUtil {
         } else {
             paths.getVoltdbroot().setPath(VoltDB.instance().getVoltDBRootPath());
         }
+        // Directly load path config from file
+        NodeSettings pathSettings = NodeSettings.create(VoltDB.instance().getConfig().asRelativePathSettingsMap());
         //snapshot
         if (paths.getSnapshots() == null) {
             PathsType.Snapshots snap = new PathsType.Snapshots();
-            snap.setPath(VoltDB.instance().getSnapshotPath());
+            snap.setPath(pathSettings.getSnapshoth().toString());
             paths.setSnapshots(snap);
         } else {
-            paths.getSnapshots().setPath(VoltDB.instance().getSnapshotPath());
+            paths.getSnapshots().setPath(pathSettings.getSnapshoth().toString());
         }
         if (paths.getCommandlog() == null) {
             //cl
             PathsType.Commandlog cl = new PathsType.Commandlog();
-            cl.setPath(VoltDB.instance().getCommandLogPath());
+            cl.setPath(pathSettings.getCommandLog().toString());
             paths.setCommandlog(cl);
         } else {
-            paths.getCommandlog().setPath(VoltDB.instance().getCommandLogPath());
+            paths.getCommandlog().setPath(pathSettings.getCommandLog().toString());
         }
         if (paths.getCommandlogsnapshot() == null) {
             //cl snap
             PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
-            clsnap.setPath(VoltDB.instance().getCommandLogSnapshotPath());
+            clsnap.setPath(pathSettings.getCommandLogSnapshot().toString());
             paths.setCommandlogsnapshot(clsnap);
         } else {
-            paths.getCommandlogsnapshot().setPath(VoltDB.instance().getCommandLogSnapshotPath());
+            paths.getCommandlogsnapshot().setPath(pathSettings.getCommandLogSnapshot().toString());
         }
         if (paths.getExportoverflow() == null) {
             //export overflow
             PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
-            exp.setPath(VoltDB.instance().getExportOverflowPath());
+            exp.setPath(pathSettings.getExportOverflow().toString());
             paths.setExportoverflow(exp);
         } else {
-            paths.getExportoverflow().setPath(VoltDB.instance().getExportOverflowPath());
+            paths.getExportoverflow().setPath(pathSettings.getExportOverflow().toString());
         }
         if (paths.getDroverflow() == null) {
             //dr overflow
             final PathsType.Droverflow droverflow = new PathsType.Droverflow();
-            droverflow.setPath(VoltDB.instance().getDROverflowPath());
+            droverflow.setPath(pathSettings.getDROverflow().toString());
             paths.setDroverflow(droverflow);
         } else {
-            paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
+            paths.getDroverflow().setPath(pathSettings.getDROverflow().toString());
         }
         return deployment;
     }
