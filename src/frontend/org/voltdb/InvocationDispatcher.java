@@ -440,11 +440,9 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.SNAPSHOTSCAN, task, ccxn);
             }
             else if ("@SnapshotDelete".equals(procName)) {
-                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName, Level.INFO);
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
             }
             else if ("@SnapshotRestore".equals(procName)) {
-                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName, Level.INFO);
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
                 if (retval != null) {
                     return retval;
@@ -470,12 +468,8 @@ public final class InvocationDispatcher {
                             procName + " is not available to this client",
                             task.clientHandle);
                 }
-                // After we verify the system command from an admin user, the detailed information
-                // should be printed out properly. The following message is printed at the node where
-                // the client is connected to.
-                String msg = "User " + user.m_name + " on the Admin port from " + clientInfo +
-                             " issued a " + procName;
-                CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
+                // Log the invocation with user name and ip information
+                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName, Level.WARN);
             }
         }
         // If you're going to copy and paste something, CnP the pattern
