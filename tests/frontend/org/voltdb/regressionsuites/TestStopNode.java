@@ -258,6 +258,52 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    public void testMixStopNodeWithNodeFailure() throws Exception {
+        if (kfactor < 1) return;
+
+        Client client = ClientFactory.createClient();
+
+        client.createConnection("localhost", m_config.port(3));
+
+        try {
+            CountDownLatch cdl = new CountDownLatch(2);
+            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
+            ((LocalCluster)getServerConfig()).killSingleHost(0);  // Create a node failure
+            client.callProcedure(new StopCallBack(cdl, expectedResponse, 1), "@StopNode", 1);
+            ((LocalCluster)getServerConfig()).killSingleHost(2);  // Create a node failure
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 3), "@StopNode", 3);  /*should stay up*/
+            cdl.await();
+            if (expectedResponse == ClientResponse.SUCCESS) {
+                Set<Integer> hids = new HashSet<Integer>();
+                hids.add(0);
+                hids.add(1);
+                hids.add(2);
+                waitForHostsToBeGone(hids, new int[] {3, 4 });
+            }
+            client.callProcedure("@SystemInformation", "overview");
+        } catch (Exception ex) {
+            //We should not get here
+            fail();
+            ex.printStackTrace();
+        }
+        boolean lostConnect = false;
+        try {
+            CountDownLatch cdl = new CountDownLatch(2);
+            //Stop a node that should stay up
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
+            //Stop already stopped node.
+            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
+            client.callProcedure("@SystemInformation", "overview");
+            client.drain();
+            cdl.await();
+        } catch (Exception pce) {
+            pce.printStackTrace();
+            lostConnect = pce.getMessage().contains("was lost before a response was received");
+        }
+        //We should never lose contact.
+        assertFalse(lostConnect);
+    }
+
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
