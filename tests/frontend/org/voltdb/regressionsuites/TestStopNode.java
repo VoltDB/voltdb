@@ -79,19 +79,19 @@ public class TestStopNode extends RegressionSuite
 
     }
 
-    public void waitForHostToBeGone(int hid) {
+    public void waitForHostToBeGone(int hid, int[] survivorHostIds) {
         Set<Integer> hids = new HashSet<Integer>();
         hids.add(hid);
-        waitForHostsToBeGone(hids);
+        waitForHostsToBeGone(hids, survivorHostIds);
     }
 
-    public void waitForHostsToBeGone(Set<Integer> hids) {
+    public void waitForHostsToBeGone(Set<Integer> hids, int[] survivorHostIds) {
         while (true) {
             Client client = null;
             VoltTable table = null;
             try {
                 Thread.sleep(1000);
-                client = getFullyConnectedClient();
+                client = getClientToSubsetHosts(survivorHostIds);
                 table = client.callProcedure("@SystemInformation", "overview").getResults()[0];
                 client.close();
                 client = null;
@@ -125,19 +125,19 @@ public class TestStopNode extends RegressionSuite
             client.callProcedure(new StopCallBack(cdl, expectedResponse, 4), "@StopNode", 4);
             cdl.await();
             if (expectedResponse == ClientResponse.SUCCESS) {
-                waitForHostToBeGone(4);
+                waitForHostToBeGone(4, new int[] {0, 1, 2, 3 });
             }
             cdl = new CountDownLatch(1);
             client.callProcedure(new StopCallBack(cdl, expectedResponse, 3), "@StopNode", 3);
             cdl.await();
             if (expectedResponse == ClientResponse.SUCCESS) {
-                waitForHostToBeGone(3);
+                waitForHostToBeGone(3, new int[] {0, 1, 2 });
             }
             cdl = new CountDownLatch(1);
             client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
             cdl.await();
             if (expectedResponse == ClientResponse.SUCCESS) {
-                waitForHostToBeGone(2);
+                waitForHostToBeGone(2, new int[] {0, 1 });
             }
             client.callProcedure("@SystemInformation", "overview");
         } catch (Exception ex) {
@@ -184,7 +184,7 @@ public class TestStopNode extends RegressionSuite
                 hids.add(4);
                 hids.add(3);
                 hids.add(2);
-                waitForHostsToBeGone(hids);
+                waitForHostsToBeGone(hids, new int[] {0, 1 });
             }
             client.callProcedure("@SystemInformation", "overview");
         } catch (Exception ex) {
@@ -232,7 +232,7 @@ public class TestStopNode extends RegressionSuite
                 hids.add(0);
                 hids.add(1);
                 hids.add(2);
-                waitForHostsToBeGone(hids);
+                waitForHostsToBeGone(hids, new int[] {3, 4 });
             }
             client.callProcedure("@SystemInformation", "overview");
         } catch (Exception ex) {
