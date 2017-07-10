@@ -526,6 +526,9 @@ public class StatsAgent extends OpsAgent
         case STARVATION:
             stats = collectStats(StatsSelector.STARVATION, interval);
             break;
+        case QUEUE:
+            stats = collectStats(StatsSelector.QUEUE, interval);
+            break;
         case PLANNER:
             stats = collectStats(StatsSelector.PLANNER, interval);
             break;
@@ -627,17 +630,18 @@ public class StatsAgent extends OpsAgent
         VoltTable[] tStats = collectStats(StatsSelector.TABLE, interval);
         VoltTable[] indStats = collectStats(StatsSelector.INDEX, interval);
         VoltTable[] sStats = collectStats(StatsSelector.STARVATION, interval);
+        VoltTable[] qStats = collectStats(StatsSelector.QUEUE, interval);
         VoltTable[] cStats = collectStats(StatsSelector.CPU, interval);
         // Ugh, this is ugly.  Currently need to return null if
         // we're missing any of the tables so that we
         // don't screw up the aggregation in handleStatsResponse (see my rant there)
         if (mStats == null || iStats == null || pStats == null ||
                 ioStats == null || tStats == null || indStats == null ||
-                sStats == null || cStats == null)
+                sStats == null || qStats == null || cStats == null)
         {
             return null;
         }
-        VoltTable[] stats = new VoltTable[8];
+        VoltTable[] stats = new VoltTable[9];
         stats[0] = mStats[0];
         stats[1] = iStats[0];
         stats[2] = pStats[0];
@@ -646,6 +650,7 @@ public class StatsAgent extends OpsAgent
         stats[5] = indStats[0];
         stats[6] = sStats[0];
         stats[7] = cStats[0];
+        stats[8] = qStats[0];
 
         return stats;
     }
