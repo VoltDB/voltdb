@@ -467,7 +467,10 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
     private void close() {
         try {
             closeExecutors();
-            m_loader.close();
+            if (m_loader != null) {
+                m_loader.close();
+                m_loader = null;
+            }
             if (m_client != null) {
                 m_client.close();
                 m_client = null;
