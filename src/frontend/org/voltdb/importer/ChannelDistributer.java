@@ -352,10 +352,13 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 !FluentIterable.from(uris).anyMatch(isNull()),
                 "uris set %s contains null elements", uris
                 );
-        Preconditions.checkState(
+        if (!uris.isEmpty()) {
+            // during shutdown, registerChannels(empty) can get called for importers that were not fully initialized.
+            Preconditions.checkState(
                 registered.contains(importer),
                 "no callbacks registered for %s", importer
                 );
+        }
 
         Predicate<ChannelSpec> forImporter = ChannelSpec.importerIs(importer);
         Function<URI,ChannelSpec> asSpec = ChannelSpec.fromUri(importer);
