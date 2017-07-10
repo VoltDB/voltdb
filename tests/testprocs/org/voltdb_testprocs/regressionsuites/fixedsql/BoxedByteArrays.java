@@ -33,12 +33,6 @@ public class BoxedByteArrays extends VoltProcedure {
     public final SQLStmt anInsert = new SQLStmt
             ("INSERT INTO ENG_539 VALUES (?, ?, ?);");
 
-//    public VoltTable[] run(String inpType, Integer id, String varbinString) {
-//
-//        voltQueueSQL(anInsert, id, varbinString);
-//        return voltExecuteSQL();
-//    }
-
     public final SQLStmt aBIGSelect = new SQLStmt
             ("SELECT * FROM ENG_539 WHERE BIG IN ?;");
 
@@ -46,7 +40,7 @@ public class BoxedByteArrays extends VoltProcedure {
             ("SELECT * FROM ENG_539 WHERE ID IN ?;");
 
     public VoltTable[] run(String inpType, Integer id, byte[] varbin,
-            byte[][] varbinArr, int[] intArr, String inpString) {
+            byte[][] varbinArr, long[] lngArr, int[] intArr, String inpString) {
 
         if (inpType.equals("VARBIN")) {
             voltQueueSQL(anInsert, id, varbin, null);
@@ -56,8 +50,8 @@ public class BoxedByteArrays extends VoltProcedure {
             voltQueueSQL(anInsert, id, null, inpString);
         } else if (inpType.equals("BIGD")) {
             voltQueueSQL(anInsert, id, null, id);
-//        } else if (inpType.equals("LNGARR")) {
-//            voltQueueSQL(aBIGSelect, intArr);
+        } else if (inpType.equals("LNGARR")) {
+            voltQueueSQL(aBIGSelect, lngArr);
         }  else if (inpType.equals("INTARR")) {
             voltQueueSQL(aINTSelect, intArr);
         }

@@ -353,12 +353,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
 
         VoltTable[] results = client.callProcedure("BoxedByteArrays", "VARBIN", new Integer(1),
-                new byte[]{(byte)0xE0, (byte)0x4F, (byte)0xD0}, null, null, null).getResults();
+                new byte[]{(byte)0xE0, (byte)0x4F, (byte)0xD0}, null, null, null, null).getResults();
         assertEquals(1, results[0].getRowCount());
 
         // String cannot be converted to VARBINARY
         try {
-            client.callProcedure("BoxedByteArrays", "STR", new Integer(2),
+            client.callProcedure("BoxedByteArrays", "STR", new Integer(2), null,
                     null, null, null, "3A");
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Incompatible parameter type: "
@@ -366,7 +366,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
 
         try {
-            client.callProcedure("BoxedByteArrays", "STR", new Integer(2),
+            client.callProcedure("BoxedByteArrays", "STR", new Integer(2), null,
                     null, null, null, "x'3A'");
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Incompatible parameter type: "
@@ -375,13 +375,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         if( !isHSQL() ) {
             // HSQL does not convert Strings to BigInt
-            client.callProcedure("BoxedByteArrays", "DSTR", new Integer(2),
+            client.callProcedure("BoxedByteArrays", "DSTR", new Integer(2), null,
                     null, null, null, "1000");
         }
 
-        client.callProcedure("BoxedByteArrays", "BIGD", new Integer(3),
+        client.callProcedure("BoxedByteArrays", "BIGD", new Integer(3), null,
                 null, null, null, null);
-        client.callProcedure("BoxedByteArrays", "BIGD", new Integer(4),
+        client.callProcedure("BoxedByteArrays", "BIGD", new Integer(4), null,
                 null, null, null, null);
 
         // should throw error
@@ -400,7 +400,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // should not fail for primitive array of ints
         try {
-          results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null,
+          results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null, null,
                   new int[]{1, 2, 3}, null).getResults();
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
