@@ -27,13 +27,9 @@ import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.ClientInterface.ExplainMode;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.CatalogChangeResult;
-import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.parser.SQLLexer;
 
 public class AdHoc extends AdHocNTBase {
@@ -149,31 +145,40 @@ public class AdHoc extends AdHocNTBase {
                     "Server is paused and is available in read-only mode - please try again later.");
         }
 
-        CatalogChangeResult ccr = null;
-        try {
-            DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
-            ccr = prepareApplicationCatalogDiff(invocationName,
-                                                null,
-                                                null,
-                                                sqlStatements.toArray(new String[0]),
-                                                null,
-                                                false,
-                                                drRole,
-                                                true,
-                                                false,
-                                                getHostname(),
-                                                getUsername());
-        }
-        catch (PrepareDiffFailureException pe) {
-            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-            return makeQuickResponse(pe.statusCode, pe.getMessage());
-        }
+//        CatalogChangeResult ccr = null;
+//        try {
+//            DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
+//            ccr = prepareApplicationCatalogDiff(invocationName,
+//                                                null,
+//                                                null,
+//                                                sqlStatements.toArray(new String[0]),
+//                                                null,
+//                                                false,
+//                                                drRole,
+//                                                true,
+//                                                false,
+//                                                getHostname(),
+//                                                getUsername());
+//        }
+//        catch (PrepareDiffFailureException pe) {
+//            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
+//            return makeQuickResponse(pe.statusCode, pe.getMessage());
+//        }
+//
+//        // case for @CatalogChangeResult
+//        if (ccr.encodedDiffCommands.trim().length() == 0) {
+//            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
+//        }
 
-        // case for @CatalogChangeResult
-        if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
-        }
-
-        return updateCatalog(ccr);
+        return updateCatalog(invocationName,
+                             null,
+                             null,
+                             sqlStatements.toArray(new String[0]),
+                             null,
+                             false,
+                             true,
+                             false,
+                             getHostname(),
+                             getUsername());
     }
 }

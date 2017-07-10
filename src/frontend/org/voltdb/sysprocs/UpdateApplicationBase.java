@@ -462,7 +462,17 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         callNTProcedureOnAllHosts("@WriteCatalog", new byte[] {0}, WriteCatalog.CLEAN_UP);
     }
 
-    protected CompletableFuture<ClientResponse> updateCatalog(CatalogChangeResult ccr) {
+    protected CompletableFuture<ClientResponse> updateCatalog(String invocationName,
+                                                              final byte[] operationBytes,
+                                                              final String operationString,
+                                                              final String[] adhocDDLStmts,
+                                                              final byte[] replayHashOverride,
+                                                              final boolean isPromotion,
+                                                              final boolean useAdhocDDL,
+                                                              boolean adminConnection,
+                                                              String hostname,
+                                                              String user)
+    {
         // DEBUG
         System.err.println("================= Start updateCatalog !!! ===================");
 
@@ -477,6 +487,42 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return makeQuickResponse(ClientResponseImpl.USER_ABORT,
                     "Invalid catalog update. Can't write a new catalog when another one is in progress");
         }
+
+        // Get the ccr and check for any inconsistencies
+        CatalogChangeResult ccr = null;
+        try {
+            DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
+            ccr = prepareApplicationCatalogDiff(invocationName,
+                                                null,
+                                                null,
+                                                adhocDDLStmts,
+                                                null,
+                                                false,
+                                                drRole,
+                                                true,
+                                                false,
+                                                getHostname(),
+                                                getUsername());
+        }
+        catch (PrepareDiffFailureException pe) {
+            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+            return makeQuickResponse(pe.statusCode, pe.getMessage());
+        }
+
+        // Log something useful about catalog upgrades when they occur.
+        if (!"@AdHoc".equals(invocationName) && ccr.upgradedFromVersion != null) {
+            hostLog.info(String.format("In order to update the application catalog it was "
+                    + "automatically upgraded from version %s.",
+                    ccr.upgradedFromVersion));
+        }
+
+        // case for @CatalogChangeResult
+        if (ccr.encodedDiffCommands.trim().length() == 0) {
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
+        }
+
 
         try {
             // does not work with concurrent elastic operations
@@ -585,6 +631,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                      e.getMessage());
         } catch (ExecutionException e) {
             // Cannot obtain the status from the future response
+            return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, "The @UpdateCore system call failed "
+                                     + "with execution exception: " +
+                                     e.getCause());
         } finally {
             cleanUpTempCatalog();
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);

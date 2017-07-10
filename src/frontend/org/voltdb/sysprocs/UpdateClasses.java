@@ -20,11 +20,8 @@ package org.voltdb.sysprocs;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.CatalogChangeResult;
-import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 /**
@@ -55,37 +52,46 @@ public class UpdateClasses extends UpdateApplicationBase {
                     "to change application schema.  Use of @UpdateClasses is forbidden.");
         }
 
-        CatalogChangeResult ccr = null;
-        try {
-            ccr = prepareApplicationCatalogDiff("@UpdateClasses",
-                                                jarfileBytes,
-                                                classesToDeleteSelector,
-                                                new String[0],
-                                                null,
-                                                false, /* isPromotion */
-                                                drRole,
-                                                useDDLSchema,
-                                                false,
-                                                getHostname(),
-                                                getUsername());
-        }
-        catch (PrepareDiffFailureException pe) {
-            hostLog.info("A request to update the loaded classes has been rejected. More info returned to client.");
-            return makeQuickResponse(pe.statusCode, pe.getMessage());
-        }
+//        CatalogChangeResult ccr = null;
+//        try {
+//            ccr = prepareApplicationCatalogDiff("@UpdateClasses",
+//                                                jarfileBytes,
+//                                                classesToDeleteSelector,
+//                                                new String[0],
+//                                                null,
+//                                                false, /* isPromotion */
+//                                                drRole,
+//                                                useDDLSchema,
+//                                                false,
+//                                                getHostname(),
+//                                                getUsername());
+//        }
+//        catch (PrepareDiffFailureException pe) {
+//            hostLog.info("A request to update the loaded classes has been rejected. More info returned to client.");
+//            return makeQuickResponse(pe.statusCode, pe.getMessage());
+//        }
+//
+//        // Log something useful about catalog upgrades when they occur.
+//        if (ccr.upgradedFromVersion != null) {
+//            hostLog.info(String.format("In order to update the application catalog it was "
+//                    + "automatically upgraded from version %s.",
+//                    ccr.upgradedFromVersion));
+//        }
+//
+//        // case for @CatalogChangeResult
+//        if (ccr.encodedDiffCommands.trim().length() == 0) {
+//            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
+//        }
 
-        // Log something useful about catalog upgrades when they occur.
-        if (ccr.upgradedFromVersion != null) {
-            hostLog.info(String.format("In order to update the application catalog it was "
-                    + "automatically upgraded from version %s.",
-                    ccr.upgradedFromVersion));
-        }
-
-        // case for @CatalogChangeResult
-        if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
-        }
-
-        return updateCatalog(ccr);
+        return updateCatalog("@UpdateClasses",
+                             jarfileBytes,
+                             classesToDeleteSelector,
+                             new String[0],
+                             null,
+                             false, /* isPromotion */
+                             useDDLSchema,
+                             false,
+                             getHostname(),
+                             getUsername());
     }
 }

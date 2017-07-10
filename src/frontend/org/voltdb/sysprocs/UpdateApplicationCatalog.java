@@ -19,12 +19,8 @@ package org.voltdb.sysprocs;
 
 import java.util.concurrent.CompletableFuture;
 
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.CatalogChangeResult;
-import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 /**
  * Non-transactional procedure to implement public @UpdateApplicationCatalog system
@@ -36,8 +32,6 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
     public CompletableFuture<ClientResponse> run(byte[] catalogJarBytes, String deploymentString) {
         // catalogJarBytes if null, when passed along, will tell the
         // catalog change planner that we want to use the current catalog.
-
-        DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
 
         boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema() && !isRestoring();
 
@@ -62,42 +56,51 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                     "Use of @UpdateApplicationCatalog is forbidden.");
         }
 
-        CatalogChangeResult ccr = null;
-        try {
-            ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
-                                                catalogJarBytes,
-                                                deploymentString,
-                                                new String[0],
-                                                null,
-                                                false, /* isPromotion */
-                                                drRole,
-                                                useDDLSchema,
-                                                false,
-                                                getHostname(),
-                                                getUsername());
-        }
-        catch (PrepareDiffFailureException pe) {
-            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-            return makeQuickResponse(pe.statusCode, pe.getMessage());
-        }
-
-        // Log something useful about catalog upgrades when they occur.
-        if (ccr.upgradedFromVersion != null) {
-            hostLog.info(String.format("In order to update the application catalog it was "
-                    + "automatically upgraded from version %s.",
-                    ccr.upgradedFromVersion));
-        }
-
-        // case for @CatalogChangeResult
-        if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
-        }
+//        CatalogChangeResult ccr = null;
+//        try {
+//            ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
+//                                                catalogJarBytes,
+//                                                deploymentString,
+//                                                new String[0],
+//                                                null,
+//                                                false, /* isPromotion */
+//                                                drRole,
+//                                                useDDLSchema,
+//                                                false,
+//                                                getHostname(),
+//                                                getUsername());
+//        }
+//        catch (PrepareDiffFailureException pe) {
+//            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
+//            return makeQuickResponse(pe.statusCode, pe.getMessage());
+//        }
+//
+//        // Log something useful about catalog upgrades when they occur.
+//        if (ccr.upgradedFromVersion != null) {
+//            hostLog.info(String.format("In order to update the application catalog it was "
+//                    + "automatically upgraded from version %s.",
+//                    ccr.upgradedFromVersion));
+//        }
+//
+//        // case for @CatalogChangeResult
+//        if (ccr.encodedDiffCommands.trim().length() == 0) {
+//            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
+//        }
 
         // This means no more @UAC calls when using DDL mode.
         if (isRestoring()) {
             noteRestoreCompleted();
         }
 
-        return updateCatalog(ccr);
+        return updateCatalog("@UpdateApplicationCatalog",
+                             catalogJarBytes,
+                             deploymentString,
+                             new String[0],
+                             null,
+                             false, /* isPromotion */
+                             useDDLSchema,
+                             false,
+                             getHostname(),
+                             getUsername());
     }
 }
