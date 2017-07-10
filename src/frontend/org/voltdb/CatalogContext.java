@@ -98,6 +98,7 @@ public class CatalogContext {
     // database settings. contains both cluster and path settings
     private final DbSettings m_dbSettings;
 
+    //This is same as unique id except when the UAC is building new catalog ccr stands for catalog change replay time.
     public final long m_ccrTime;
     /**
      * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
@@ -132,7 +133,8 @@ public class CatalogContext {
     {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
-        m_ccrTime = (ccrTime == -1L ? m_uniqueId : ccrTime);
+        //This is only set to something other than m_uniqueId when we are replaying a UAC.
+        m_ccrTime = ccrTime;
         // check the heck out of the given params in this immutable class
         if (catalog == null) {
             throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
@@ -233,7 +235,7 @@ public class CatalogContext {
             HostMessenger messenger)
     {
         this(transactionId, uniqueId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
-                version, messenger, true, null, null, -1L);
+                version, messenger, true, null, null, uniqueId);
     }
 
     public Cluster getCluster() {
