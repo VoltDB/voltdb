@@ -116,6 +116,7 @@ public class CatalogContext {
      * @param hasSchemaChange
      * @param defaultProcManager
      * @param plannerTool
+     * @param ccrTime - Catalog Change Replay Time
      */
     public CatalogContext(
             long transactionId,
@@ -134,7 +135,7 @@ public class CatalogContext {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
         //This is only set to something other than m_uniqueId when we are replaying a UAC.
-        m_ccrTime = ccrTime;
+        m_ccrTime = ((ccrTime == -1L) ? uniqueId : ccrTime);
         // check the heck out of the given params in this immutable class
         if (catalog == null) {
             throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
