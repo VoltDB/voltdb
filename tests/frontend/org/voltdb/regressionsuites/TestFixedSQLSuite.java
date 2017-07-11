@@ -388,8 +388,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
                             "Try explicitly using a long[] parameter"));
         }
 
+        try {
+            client.callProcedure("InPrimitiveArrays", "BIGDS",
+                    new String[]{"1", "2", "3"}).getResults();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
+                            "  Number of arguments provided was 3 where 1 was expected " +
+                            "for statement SELECT * FROM ENG_12105 WHERE DEC IN ?;"));
+        }
+
 //        try {
-//            client.callProcedure("InPrimitiveArrays", "LNGS",
+//            client.callProcedure("InPrimitiveArrays", "STRS",
 //                    new String[]{"1", "2", "3"}).getResults();
 //        } catch (ProcCallException e) {
 //            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +

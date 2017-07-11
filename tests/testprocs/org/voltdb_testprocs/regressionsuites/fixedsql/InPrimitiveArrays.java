@@ -35,6 +35,7 @@ public class InPrimitiveArrays extends VoltProcedure {
     public final SQLStmt aLNGSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE BIG IN ?;");
     public final SQLStmt aDBLSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE NUM IN ?;");
     public final SQLStmt aBIGDSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE DEC IN ?;");
+    public final SQLStmt aSTRSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE VCHAR IN ?;");
 
     public VoltTable[] run(String inpType, String[] inpArr) {
 
@@ -82,6 +83,10 @@ public class InPrimitiveArrays extends VoltProcedure {
                 bigdArr[i++] = new BigDecimal(s);
             }
             voltQueueSQL(aBIGDSelect, bigdArr);
+
+        } else if (inpType.equals("STRS")) {
+
+            voltQueueSQL(aSTRSelect, inpArr);
 
         }
 
