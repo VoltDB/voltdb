@@ -812,6 +812,197 @@ public class TestCatalogUtil extends TestCase {
         String msg6 = CatalogUtil.compileDeployment(cat6, bad_deployment5, false);
         assertTrue("compilation should have failed", msg6.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
         System.out.println("Import deployment tests done.");
+
+    }
+
+    public void testKafkaImporterConfigurations() throws Exception {
+
+        String bundleLocation = System.getProperty("user.dir") + "/bundles";
+        System.setProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, bundleLocation);
+        final String withBadImport1 =
+                "<?xml version='1.0'?>"
+                + "<deployment>"
+                + "<cluster hostcount='1' kfactor='0' sitesperhost='2'/>"
+                + "    <import>"
+                + "        <configuration type=\"kafka\" format=\"csv\" enabled=\"true\"> "
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">peoples</property>"
+                + "            <property name=\"groupid\">voltdb1</property>"
+                + "            <property name=\"procedure\">insertE</property>"
+                + "        </configuration>"
+                + "        <configuration type=\"kafka\" format=\"csv\" enabled=\"true\">"
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">peoples</property>"
+                + "            <property name=\"groupid\">voltdb1</property>"
+                + "            <property name=\"procedure\">insertM</property>"
+                + "        </configuration>"
+                + "    </import>"
+                + "</deployment>";
+        final String withBadImport2 =
+                "<?xml version='1.0'?>"
+                + "<deployment>"
+                + "<cluster hostcount='1' kfactor='0' sitesperhost='2'/>"
+                + "    <import>"
+                + "        <configuration type=\"kafka\" enabled=\"true\"> "
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">peoples, managers</property>"
+                + "            <property name=\"groupid\">voltdb1</property>"
+                + "            <property name=\"procedure\">insertE</property>"
+                + "        </configuration>"
+                + "        <configuration type=\"kafka\" enabled=\"true\">"
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">peoples</property>"
+                + "            <property name=\"groupid\">voltdb1</property>"
+                + "            <property name=\"procedure\">insertM</property>"
+                + "        </configuration>"
+                + "    </import>"
+                + "</deployment>";
+        final String withBadImport3 =
+                "<?xml version='1.0'?>"
+                + "<deployment>"
+                + "<cluster hostcount='1' kfactor='0' sitesperhost='2'/>"
+                + "    <import>"
+                + "        <configuration type=\"kafka\" enabled=\"true\"> "
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">peoples, managers</property>"
+                + "            <property name=\"groupid\">voltdb1</property>"
+                + "            <property name=\"procedure\">insertE</property>"
+                + "        </configuration>"
+                + "        <configuration type=\"kafka\" enabled=\"true\">"
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">managers, peoples</property>"
+                + "            <property name=\"groupid\">voltdb1</property>"
+                + "            <property name=\"procedure\">insertM</property>"
+                + "        </configuration>"
+                + "    </import>"
+                + "</deployment>";
+        final String withGoodImport1 =
+                "<?xml version='1.0'?>"
+                + "<deployment>"
+                + "<cluster hostcount='1' kfactor='0' sitesperhost='2'/>"
+                + "    <import>"
+                + "        <configuration type=\"kafka\" enabled=\"true\"> "
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">peoples</property>"
+                + "            <property name=\"groupid\">voltdb1</property>"
+                + "            <property name=\"procedure\">insertE</property>"
+                + "        </configuration>"
+                + "        <configuration type=\"kafka\" enabled=\"true\">"
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">peoples</property>"
+                + "            <property name=\"groupid\">voltdb2</property>"
+                + "            <property name=\"procedure\">insertM</property>"
+                + "        </configuration>"
+                + "    </import>"
+                + "</deployment>";
+        final String withGoodImport2 =
+                "<?xml version='1.0'?>"
+                + "<deployment>"
+                + "<cluster hostcount='1' kfactor='0' sitesperhost='2'/>"
+                + "    <import>"
+                + "        <configuration type=\"kafka\" enabled=\"true\"> "
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">peoples, managers</property>"
+                + "            <property name=\"groupid\">voltdb1</property>"
+                + "            <property name=\"procedure\">insertE</property>"
+                + "        </configuration>"
+                + "        <configuration type=\"kafka\" enabled=\"true\">"
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">peoples, managers</property>"
+                + "            <property name=\"groupid\">voltdb2</property>"
+                + "            <property name=\"procedure\">insertM</property>"
+                + "        </configuration>"
+                + "    </import>"
+                + "</deployment>";
+        final String withGoodImport3 =
+                "<?xml version='1.0'?>"
+                + "<deployment>"
+                + "<cluster hostcount='1' kfactor='0' sitesperhost='2'/>"
+                + "    <import>"
+                + "        <configuration type=\"kafka\" enabled=\"true\"> "
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">employees</property>"
+                + "            <property name=\"groupid\">voltdb1</property>"
+                + "            <property name=\"procedure\">insertE</property>"
+                + "        </configuration>"
+                + "        <configuration type=\"kafka\" enabled=\"true\">"
+                + "            <property name=\"brokers\">localhost:9092</property>"
+                + "            <property name=\"topics\">managers</property>"
+                + "            <property name=\"groupid\">voltdb2</property>"
+                + "            <property name=\"procedure\">insertM</property>"
+                + "        </configuration>"
+                + "    </import>"
+                + "</deployment>";
+
+        final String ddl =
+                "CREATE TABLE data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n";
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+
+        //import with bad kafka configuration: one redundant topic
+        final File tmpBad1 = VoltProjectBuilder.writeStringToTempFile(withBadImport1);
+        DeploymentType bad_deployment1 = CatalogUtil.getDeployment(new FileInputStream(tmpBad1));
+
+        VoltCompiler compiler1 = new VoltCompiler(false);
+        String x1[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat1 = compiler1.compileCatalogFromDDL(x1);
+
+        String msg1 = CatalogUtil.compileDeployment(cat1, bad_deployment1, false);
+        assertTrue(msg1, msg1.contains("Error validating deployment configuration: Invalid import configuration. Two Kafka entries have the same groupid and topic."));
+
+        //import with bad kafka configuration: overlapping topics
+        final File tmpBad2 = VoltProjectBuilder.writeStringToTempFile(withBadImport2);
+        DeploymentType bad_deployment2 = CatalogUtil.getDeployment(new FileInputStream(tmpBad2));
+
+        VoltCompiler compiler2 = new VoltCompiler(false);
+        String x2[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat2 = compiler2.compileCatalogFromDDL(x2);
+
+        String msg2 = CatalogUtil.compileDeployment(cat2, bad_deployment2, false);
+        assertTrue(msg2, msg2.contains("Error validating deployment configuration: Invalid import configuration. Two Kafka entries have the same groupid and topic."));
+
+        //import with bad kafka configuration: double redundant topics;
+        final File tmpBad3 = VoltProjectBuilder.writeStringToTempFile(withBadImport3);
+        DeploymentType bad_deployment3 = CatalogUtil.getDeployment(new FileInputStream(tmpBad3));
+
+        VoltCompiler compiler3 = new VoltCompiler(false);
+        String x3[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat3 = compiler3.compileCatalogFromDDL(x3);
+
+        String msg3 = CatalogUtil.compileDeployment(cat3, bad_deployment3, false);
+        assertTrue(msg3, msg3.contains("Error validating deployment configuration: Invalid import configuration. Two Kafka entries have the same groupid and topic."));
+
+        // same topics for different groupids are okay
+        final File tmpGood1 = VoltProjectBuilder.writeStringToTempFile(withGoodImport1);
+        DeploymentType good_deployment1 = CatalogUtil.getDeployment(new FileInputStream(tmpGood1));
+
+        VoltCompiler compiler4 = new VoltCompiler(false);
+        String x4[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat4 = compiler4.compileCatalogFromDDL(x4);
+
+        String msg4 = CatalogUtil.compileDeployment(cat4, good_deployment1, false);
+        assertNull(msg4);
+
+        // same topics for different groupids are okay
+        final File tmpGood2 = VoltProjectBuilder.writeStringToTempFile(withGoodImport2);
+        DeploymentType good_deployment2 = CatalogUtil.getDeployment(new FileInputStream(tmpGood2));
+
+        VoltCompiler compiler5 = new VoltCompiler(false);
+        String x5[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat5 = compiler5.compileCatalogFromDDL(x5);
+
+        String msg5 = CatalogUtil.compileDeployment(cat5, good_deployment2, false);
+        assertNull(msg5);
+
+        // different topics for different groupids are also fine
+        final File tmpGood3 = VoltProjectBuilder.writeStringToTempFile(withGoodImport3);
+        DeploymentType good_deployment3 = CatalogUtil.getDeployment(new FileInputStream(tmpGood3));
+
+        VoltCompiler compiler6 = new VoltCompiler(false);
+        String x6[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat6 = compiler6.compileCatalogFromDDL(x6);
+
+        String msg6 = CatalogUtil.compileDeployment(cat6, good_deployment3, false);
+        assertNull(msg6);
     }
 
     /**

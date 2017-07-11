@@ -1025,7 +1025,7 @@ public final class InvocationDispatcher {
         voltdb.getClientInterface().bindAdapter(alternateAdapter, null);
         SnapshotUtil.requestSnapshot(
                 sourceHandle,
-                paths.resolve(paths.getSnapshoth()).toPath().toUri().toString(),
+                paths.resolveToAbsolutePath(paths.getSnapshoth()).toPath().toUri().toString(),
                 SnapshotUtil.getShutdownSaveNonce(zkTxnId),
                 true,
                 SnapshotFormat.NATIVE,
@@ -1045,9 +1045,9 @@ public final class InvocationDispatcher {
                 snapJo.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.name()));
         switch(pathType) {
         case SNAP_AUTO:
-            return new File(paths.resolve(paths.getSnapshoth()), catFN);
+            return new File(paths.resolveToAbsolutePath(paths.getSnapshoth()), catFN);
         case SNAP_CL:
-            return new File(paths.resolve(paths.getCommandLogSnapshot()), catFN);
+            return new File(paths.resolveToAbsolutePath(paths.getCommandLogSnapshot()), catFN);
         default:
             File snapDH = new VoltFile(snapJo.getString(SnapshotUtil.JSON_PATH));
             return new File(snapDH, catFN);

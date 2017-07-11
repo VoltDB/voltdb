@@ -260,7 +260,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                         ++partitionCount;
                         URI uri;
                         try {
-                            uri = new URI("kafka", key, topic + "/partition/" + part.partitionId());
+                            uri = new URI("kafka", key, topic + "/partition/" + part.partitionId() + "/" + groupId + "/");
                         } catch (URISyntaxException ex) { // Should not happen
                             throw new KafkaConfigurationException("unable to create topic resource URI", ex);
                         }
