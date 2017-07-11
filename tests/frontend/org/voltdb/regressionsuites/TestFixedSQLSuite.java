@@ -40,6 +40,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 import org.voltdb_testprocs.regressionsuites.fixedsql.InsertBoxed;
 import org.voltdb_testprocs.regressionsuites.fixedsql.BoxedByteArrays;
+import org.voltdb_testprocs.regressionsuites.fixedsql.InPrimitiveArrays;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
@@ -54,7 +55,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class, InsertBoxed.class, TestENG1232.class, TestENG1232_2.class,
-        TestENG2423.InnerProc.class, BoxedByteArrays.class };
+        TestENG2423.InnerProc.class, BoxedByteArrays.class, InPrimitiveArrays.class };
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
@@ -345,6 +346,35 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
 
         truncateTables(client, tables);
+    }
+
+    private void subTestInPrimitiveArrays() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable[] results;
+
+        try {
+            client.callProcedure("InPrimitiveArrays", "INTS",
+                    new String[]{"1", "2", "3"}).getResults();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
+                          "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [I"));
+        }
+
+        try {
+            client.callProcedure("InPrimitiveArrays", "LNGS",
+                    new String[]{"1", "2", "3"}).getResults();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
+                            "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
+        }
+
+        String query =
+                String.format("select * from ENG_12105");
+        results = client.callProcedure("@AdHoc", query).getResults();
+        System.out.println(results);
+
+        truncateTables(client, "ENG_12105");
     }
 
     // test for boxed byte arrays
@@ -816,6 +846,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG12105();
         subTestENG12116();
         subTestBoxedTypes();
+        subTestInPrimitiveArrays();
         subTestBoxedByteArrays();
     }
 
