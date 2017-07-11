@@ -56,7 +56,6 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
-import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
 import org.voltdb.TableStreamType;
@@ -84,13 +83,14 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import com.google_voltpatches.common.base.Preconditions;
-
 import vanilla.java.affinity.impl.PosixJNAAffinity;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -688,9 +688,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
-            final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(itm.getStoredProcedureName());
-            // All durable sysprocs and non-sysprocs should not get filtered.
-            return sysproc != null && !sysproc.isDurable();
+            //All durable sysprocs and non-sysprocs should not get filtered.
+            return !CatalogUtil.isDurableProc(itm.getStoredProcedureName());
         }
         return false;
     }

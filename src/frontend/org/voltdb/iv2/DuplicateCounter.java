@@ -75,9 +75,6 @@ public class DuplicateCounter
     }
 
     int updateReplicas(List<Long> replicas) {
-
-        tmLog.error("** Update replicas freeing up responses");
-
         Set<Long> newSet = new HashSet<Long>(replicas);
         m_expectedHSIds.retainAll(newSet);
         if (m_expectedHSIds.size() == 0) {

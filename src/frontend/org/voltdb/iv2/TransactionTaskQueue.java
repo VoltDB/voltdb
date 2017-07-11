@@ -59,7 +59,9 @@ public class TransactionTaskQueue
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
         TransactionState txnState = task.getTransactionState();
-        m_maxTaskedSpHandle = Math.max(m_maxTaskedSpHandle, txnState.m_spHandle);
+        if (!txnState.isReadOnly()) {
+            m_maxTaskedSpHandle = Math.max(m_maxTaskedSpHandle, txnState.m_spHandle);
+        }
         boolean retval = false;
         if (!m_backlog.isEmpty()) {
             /*
