@@ -1259,10 +1259,13 @@ public class CoreUtils {
         }
     }
 
-    public static void logProcedureInvocation(VoltLogger log, String userName, String where, String procedure, Level level) {
+    public static void logProcedureInvocation(VoltLogger log, String userName, String where, String procedure) {
         String msg = "User " + userName + " from " + where +
                 " issued a " + procedure;
-        printAsciiArtLog(log, msg, level);
+        if ("@PrepareShutdown".equals(procedure))
+            printAsciiArtLog(log, msg, Level.INFO);
+        else
+            log.info(msg);
     }
 
     // Utility method to figure out if this is a test case.  Various junit targets in

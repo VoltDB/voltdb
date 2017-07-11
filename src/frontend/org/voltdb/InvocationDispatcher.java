@@ -397,7 +397,7 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
             else if ("@StopNode".equals(procName)) {
-                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName, Level.WARN);
+                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                 return dispatchStopNode(task);
             }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
@@ -468,7 +468,7 @@ public final class InvocationDispatcher {
                             task.clientHandle);
                 }
                 // Log the invocation with user name and ip information
-                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName, Level.WARN);
+                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
             }
         }
         // If you're going to copy and paste something, CnP the pattern
