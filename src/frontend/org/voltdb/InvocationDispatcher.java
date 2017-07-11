@@ -286,7 +286,6 @@ public final class InvocationDispatcher {
         final CatalogContext catalogContext = m_catalogContext.get();
 
         String clientInfo = ccxn.getHostnameAndIPAndPort();  // Storing the client's ip information
-        user.m_hostIP = clientInfo; // Can be passed to handlers
 
         final String procName = task.getProcName();
         final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here

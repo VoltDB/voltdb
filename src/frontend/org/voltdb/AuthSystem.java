@@ -213,11 +213,6 @@ public class AuthSystem {
         public final String m_name;
 
         /**
-         * IP information of the user
-         */
-        public String m_hostIP;
-
-        /**
          * Fast iterable list of groups this user is a member of.
          */
         private List<AuthGroup> m_groups = new ArrayList<AuthGroup>();
