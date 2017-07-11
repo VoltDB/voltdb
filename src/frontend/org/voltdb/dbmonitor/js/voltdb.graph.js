@@ -59,6 +59,7 @@
         var ChartCombinedAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartFrequencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
 
         var drChartList = {}
         var ChartCommandlog = nv.models.lineChart();
@@ -379,7 +380,13 @@
         }]
 
         var dataFrequencyDetailAnalysis = [{
-            key: "Frequency",
+            key: "Frequency Detail",
+            values: [],
+            color: "rgb(118, 189, 29)"
+        }]
+
+        var dataCombinedDetailAnalysis = [{
+            key: "Combined Detail",
             values: [],
             color: "rgb(118, 189, 29)"
         }]
@@ -426,7 +433,6 @@
             updateAnalysisChartProperties($("#visualiseFrequencyAnalysis"), ChartFrequencyAnalysis);
             d3.selectAll("#chartFrequencyAnalysis .nv-bar").on('click',
                 function(data){
-                    debugger;
                     $("#hidProcedureName").html(data.label);
                     $('#showAnalysisFreqDetails').trigger("click");
                 }
@@ -437,6 +443,12 @@
         function updateCombinedAnalysis(){
             ChartCombinedAnalysis.update();
             updateAnalysisChartProperties($("#visualiseCombinedAnalysis"), ChartCombinedAnalysis);
+             d3.selectAll("#chartCombinedAnalysis .nv-bar").on('click',
+                function(data){
+                    $("#hidProcedureName").html(data.label);
+                    $('#showAnalysisCombinedDetails').trigger("click");
+                }
+            );
         }
 
         function updateAnalysisChartProperties(chartId, chartObj){
@@ -595,6 +607,30 @@
             });
         }
 
+        this.initializeCombinedDetailGraph = function(){
+            nv.addGraph(function() {
+                ChartCombinedDetailAnalysis.x(function(d) {
+                    if(d.label.length > 20)
+                        return d.label.substring(0,20) + ".."
+                    return  d.label
+                  }).y(function(d) { return d.value }).height(barHeight)
+                  .showValues(true);
+
+                ChartCombinedDetailAnalysis.yAxis
+                    .tickFormat(d3.format(',.2f'));
+                ChartCombinedDetailAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartCombinedDetailAnalysis.yAxis.axisLabelDistance(10)
+                d3.select('#visualizeCombinedDetail')
+                    .datum(dataCombinedDetailAnalysis)
+                    .transition().duration(350)
+                    .call(ChartCombinedDetailAnalysis);
+
+                nv.utils.windowResize(ChartCombinedDetailAnalysis.update);
+                return ChartCombinedDetailAnalysis;
+            });
+        }
+
         this.RefreshAnalysisLatencyGraph = function(dataLatency, dataFrequency){
             getBarHeightAndSpacing(dataLatency, ChartLatencyAnalysis);
             dataLatencyAnalysis[0]["values"] = dataLatency;
@@ -623,8 +659,10 @@
             d3.select("#visualiseCombinedAnalysis")
                 .datum(dataCombinedAnalysis)
                 .transition().duration(500)
-                .call(chartCombinedAnalysis);
+                .call(ChartCombinedAnalysis);
         }
+
+
 
         this.RefreshLatencyDetailGraph = function(dataLatency){
             ChartLatencyDetailAnalysis.update;
@@ -638,7 +676,6 @@
         }
 
         this.RefreshFrequencyDetailGraph = function(freqDetails){
-            debugger;
             ChartFrequencyDetailAnalysis.update;
             getBarHeightAndSpacing(freqDetails, ChartFrequencyDetailAnalysis);
 
@@ -647,6 +684,17 @@
                 .datum(dataFrequencyDetailAnalysis)
                 .transition().duration(500)
                 .call(ChartFrequencyDetailAnalysis);
+        }
+
+        this.RefreshCombinedDetailGraph = function(dataCombined){
+            ChartCombinedDetailAnalysis.update;
+            getBarHeightAndSpacing(dataCombined, ChartCombinedDetailAnalysis);
+
+            dataCombinedDetailAnalysis[0]["values"] = dataCombined;
+            d3.select("#visualizeCombinedDetails")
+                .datum(dataCombinedDetailAnalysis)
+                .transition().duration(500)
+                .call(ChartCombinedDetailAnalysis);
         }
 
         nv.addGraph({

@@ -2407,6 +2407,7 @@ var loadPage = function (serverName, portid) {
 
     $("#showAnalysisFreqDetails").popup({
         open: function (event, ui, ele)  {
+
             var procedureName = $("#hidProcedureName").html().split(' ')[1];
             $(".procedureName").html(procedureName);
              //filter specific procedure calls from list of datas
@@ -2419,8 +2420,34 @@ var loadPage = function (serverName, portid) {
                     freqDetails.push({"label": item.label , "value": item.INVOCATION})
                 }
             });
-            debugger;
             MonitorGraphUI.RefreshFrequencyDetailGraph(freqDetails);
+        }
+    });
+
+    $("#showAnalysisCombinedDetails").popup({
+        open: function (event, ui, ele)  {
+            var procedureName = $("#hidProcedureName").html().split(' ')[1];
+            $(".procedureName").html(procedureName);
+             //filter specific procedure calls from list of datas
+            var combinedDetails = [];
+            var combinedWeight = 0;
+            var sumOfEachProcedure = 0;
+
+            for (var key in VoltDbAnalysis.combinedDetail){
+                var obj = VoltDbAnalysis.combinedDetail[key];
+                if(key.split('(')[0] == procedureName){
+                    //Calculate sumOfEachProcedure
+                    var sumOfEachProcedure = VoltDbUI.calculateCombinedDetailValue(obj);
+                    obj.forEach(function(subItems){
+                        combinedWeight = (((subItems.AVG/1000000) * subItems.INVOCATIONS)/sumOfEachProcedure) * 100;
+                        combinedDetails.push({"label": subItems.STATEMENT + '(' + subItems.PARTITION_ID + ')' , "value": combinedWeight})
+                        $(".generatedDate").html(VoltDbAnalysis.formatDateTime(subItems.TIMESTAMP));
+                    })
+
+                }
+            }
+
+            MonitorGraphUI.RefreshCombinedDetailGraph(combinedDetails);
         }
     });
 
@@ -2481,7 +2508,6 @@ var configureUserPreferences = function () {
             });
         },
         save: function () {
-            debugger;
             $('ul.user-preferences > li Input:checkbox').each(function (value) {
                 userPreference[$(this)[0].id] = $(this)[0].checked;
 
@@ -2876,6 +2902,14 @@ var adjustImporterGraphSpacing = function() {
                 );
             }
         };
+
+        this.calculateCombinedDetailValue=function(profileData){
+            var totalValue = 0;
+            for(var j = 0; j < profileData.length; j++){
+                totalValue += (profileData[j].AVG/1000000) * profileData[j].INVOCATIONS;
+            }
+            return totalValue;
+        }
 
         this.loadSchemaTab = function () {
             this.isSchemaTabLoading = true;

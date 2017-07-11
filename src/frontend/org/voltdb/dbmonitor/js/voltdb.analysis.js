@@ -28,6 +28,7 @@ function loadAnalysisPage(){
         return totalValue;
     }
 
+
     function checkObjForLongProcedureName(profileData){
         for(var j = 0; j < profileData.length; j++){
             if(profileData[j].PROCEDURE.length > 28){
@@ -174,6 +175,17 @@ function loadAnalysisPage(){
                 return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
             });
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
+                if(VoltDbAnalysis.combinedDetail[item.PROCEDURE + '(' + item.STATEMENT + ')'] == undefined){
+                    VoltDbAnalysis.combinedDetail[item.PROCEDURE + '(' + item.STATEMENT + ')'] = [];
+                }
+
+                VoltDbAnalysis.combinedDetail[item.PROCEDURE + '(' + item.STATEMENT + ')'].push({
+                    AVG: item.AVG_EXECUTION_TIME/1000000,
+                    INVOCATIONS: item.INVOCATIONS,
+                    PARTITION_ID : item.PARTITION_ID,
+                    STATEMENT: item.STATEMENT,
+                    TIMESTAMP: item.TIMESTAMP
+                })
                 VoltDbAnalysis.latencyDetail[item.STATEMENT + '(' + item.PARTITION_ID + ')'] =
                     {
                         AVG: item.AVG_EXECUTION_TIME/1000000,
@@ -188,7 +200,9 @@ function loadAnalysisPage(){
 
             MonitorGraphUI.initializeFrequencyDetailGraph();
             MonitorGraphUI.initializeProcedureDetailGraph();
+            MonitorGraphUI.initializeCombinedDetailGraph();
         });
+
     }
 
     $("#btnAnalyzeNow").on("click", function(){
@@ -204,6 +218,7 @@ function loadAnalysisPage(){
         this.procedureValue = {};
         this.latencyDetailValue = [];
         this.latencyDetail = {};
+        this.combinedDetail = {};
         this.partitionStatus = "SP"
         this.proceduresCount = 0;
         this.formatDateTime = function(timestamp) {
