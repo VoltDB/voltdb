@@ -30,6 +30,13 @@ import org.voltdb.*;
 )
 public class BoxedByteArrays extends VoltProcedure {
 
+//    CREATE TABLE ENG_539 (
+//            ID      INTEGER NOT NULL,
+//            VARBIN  VARBINARY(3),
+//            BIG     BIGINT,
+//            PRIMARY KEY (ID)
+//          );
+
     public final SQLStmt anInsert = new SQLStmt
             ("INSERT INTO ENG_539 VALUES (?, ?, ?);");
 
@@ -39,8 +46,11 @@ public class BoxedByteArrays extends VoltProcedure {
     public final SQLStmt aINTSelect = new SQLStmt
             ("SELECT * FROM ENG_539 WHERE ID IN ?;");
 
+    public final SQLStmt aBYTESelect = new SQLStmt
+            ("SELECT * FROM ENG_539 WHERE VARBIN IN ?;");
+
     public VoltTable[] run(String inpType, Integer id, byte[] varbin,
-            byte[][] varbinArr, long[] lngArr, int[] intArr, String inpString) {
+            byte[][] varbinArr, Long[] lngArr, Integer[] intArr, String inpString) {
 
         if (inpType.equals("VARBIN")) {
             voltQueueSQL(anInsert, id, varbin, null);
@@ -55,9 +65,9 @@ public class BoxedByteArrays extends VoltProcedure {
         }  else if (inpType.equals("INTARR")) {
             voltQueueSQL(aINTSelect, intArr);
         }
-//        else if (inpType.equals("SEL_VARBIN")) {
-//            voltQueueSQL(aSelect, varbinArr);
-//        }
+        else if (inpType.equals("SEL_VARBIN")) {
+            voltQueueSQL(aBYTESelect, varbinArr);
+        }
 //        else if (inpType.equals("SEL_STR")) {
 //            voltQueueSQL(aSelect, strArr);
 //        }

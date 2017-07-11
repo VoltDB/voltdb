@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -353,7 +354,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     private void subTestInPrimitiveArrays() throws IOException, ProcCallException
     {
         Client client = getClient();
-
+        VoltTable[] results;
 
         try {
             byte[][] byteArr = new byte[][]{ Encoder.hexDecode("0A"), Encoder.hexDecode("1E") };
@@ -430,15 +431,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
         if( !isHSQL() ) {
             // HSQL does not convert convert null to null value for TIMESTAMP
             byte[] insByteArr = Encoder.hexDecode("0A");
-            VoltTable[] results = client.callProcedure("InPrimitiveArrays", "INSBYTES", null, null,
+            results = client.callProcedure("InPrimitiveArrays", "INSBYTES", null, null,
                     null, null, null, null, null, insByteArr).getResults();
             assertEquals(1, results[0].getRowCount());
         }
 
-//        String query =
-//                String.format("select * from ENG_12105");
-//        results = client.callProcedure("@AdHoc", query).getResults();
-//        System.out.println(results);
+        String query =
+                String.format("select * from ENG_12105");
+        results = client.callProcedure("@AdHoc", query).getResults();
+        System.out.println(results);
 
         truncateTables(client, "ENG_12105");
     }
@@ -447,10 +448,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
     private void subTestBoxedByteArrays() throws IOException, ProcCallException
     {
         Client client = getClient();
+        VoltTable[] results;
 
-        VoltTable[] results = client.callProcedure("BoxedByteArrays", "VARBIN", new Integer(1),
-                new byte[]{(byte)0xE0, (byte)0x4F, (byte)0xD0}, null, null, null, null).getResults();
-        assertEquals(1, results[0].getRowCount());
+        try {
+            Byte[] boxByteArr = ArrayUtils.toObject(Encoder.hexDecode("0A"));
+            results = client.callProcedure("BoxedByteArrays", "VARBIN", new Integer(1),
+                    boxByteArr, null, null, null, null).getResults();
+            //assertEquals(1, results[0].getRowCount());
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("FIXME: Unsupported type VoltType.TINYINT"));
+        }
 
         // String cannot be converted to VARBINARY
         try {
@@ -480,33 +487,30 @@ public class TestFixedSQLSuite extends RegressionSuite {
         client.callProcedure("BoxedByteArrays", "BIGD", new Integer(4), null,
                 null, null, null, null);
 
-        // should throw error
-//        results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null,
-//                new Integer[]{1, 2, 3}, null, null).getResults();
-//        System.out.println(results);
         // Long cannot be converted to long in arrays
-//          results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null,
-//                  new Long[]{1L, 2L, 3L}, null).getResults();
-//          System.out.println(results);
-
-        // should not fail for primitive array of longs
         try {
             results = client.callProcedure("BoxedByteArrays", "LNGARR", null, null, null,
-                  new long[]{1L, 2L, 3L}, null, null).getResults();
-        } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
-                          "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
+                  new Long[]{1L, 2L, 3L}, null, null).getResults();
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("[Ljava.lang.Long; cannot be cast to [J"));
         }
 
-        // should not fail for primitive array of ints
+        // not sure why its doing the conversion
         try {
           results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null, null,
-                  new int[]{1, 2, 3}, null).getResults();
-        } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
-                          "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [I"));
+                  new Integer[]{1, 2, 3}, null).getResults();
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("[Ljava.lang.Integer; cannot be cast to [I"));
         }
 
+        try {
+            Byte[][] box2DByteArr = new Byte[][]{ ArrayUtils.toObject(Encoder.hexDecode("0A")),
+                                                    ArrayUtils.toObject(Encoder.hexDecode("1E")) };
+            results = client.callProcedure("BoxedByteArrays", "SEL_VARBIN", null, null, box2DByteArr,
+                        null, null, null).getResults();
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("Type class [Ljava.lang.Byte; not supported in parameter set arrays"));
+        }
 
         String query =
                 String.format("select * from ENG_539");
