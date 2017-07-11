@@ -42,7 +42,6 @@ import java.util.Properties;
 /** Tests a specific scenario where the importer never finishes starting up before the cluster is paused and shut down.
  * An error was being thrown to the log for a benign condition.
  * This scenario isn't Kafka specific, but is easiest to reproduce with a Kafka importer but no Kafka.
- * Created by bshaw on 7/10/17.
  */
 public class TestImporterStopAfterIncompleteStart {
     private LocalCluster m_cluster = null;
