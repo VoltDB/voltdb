@@ -392,7 +392,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("InPrimitiveArrays", "BIGDS",
                     new String[]{"1", "2", "3"}).getResults();
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n" +
                             "  Number of arguments provided was 3 where 1 was expected " +
                             "for statement SELECT * FROM ENG_12105 WHERE DEC IN ?;"));
         }
