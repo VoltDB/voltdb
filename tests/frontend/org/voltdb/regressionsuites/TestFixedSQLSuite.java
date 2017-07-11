@@ -354,32 +354,32 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable[] results;
 
         try {
-            client.callProcedure("InPrimitiveArrays", "SHORTS",
-                    new String[]{"1", "2", "3"}).getResults();
+            client.callProcedure("InPrimitiveArrays", "SHORTS", new short[]{1, 2, 3},
+                    null, null, null, null, null).getResults();
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
                           "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [S"));
         }
 
         try {
-            client.callProcedure("InPrimitiveArrays", "INTS",
-                    new String[]{"1", "2", "3"}).getResults();
+            client.callProcedure("InPrimitiveArrays", "INTS", null,
+                    new int[]{1, 2, 3}, null, null, null, null).getResults();
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
                           "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [I"));
         }
 
         try {
-            client.callProcedure("InPrimitiveArrays", "LNGS",
-                    new String[]{"1", "2", "3"}).getResults();
+            client.callProcedure("InPrimitiveArrays", "LNGS", null, null,
+                    new long[]{1L, 2L, 3L}, null, null, null).getResults();
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
                             "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
         }
 
         try {
-            client.callProcedure("InPrimitiveArrays", "DBLS",
-                    new String[]{"1", "2", "3"}).getResults();
+            client.callProcedure("InPrimitiveArrays", "DBLS", null, null, null,
+                    new double[]{1.3, 3.1, 5.2}, null, null).getResults();
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
                             "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: " +
@@ -389,21 +389,22 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
 
         try {
-            client.callProcedure("InPrimitiveArrays", "BIGDS",
-                    new String[]{"1", "2", "3"}).getResults();
+            client.callProcedure("InPrimitiveArrays", "BIGDS", null, null, null, null,
+                    new BigDecimal[]{new BigDecimal(1), new BigDecimal(2), new BigDecimal(3)}, null).getResults();
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n" +
                             "  Number of arguments provided was 3 where 1 was expected " +
                             "for statement SELECT * FROM ENG_12105 WHERE DEC IN ?;"));
         }
 
-//        try {
-//            client.callProcedure("InPrimitiveArrays", "STRS",
-//                    new String[]{"1", "2", "3"}).getResults();
-//        } catch (ProcCallException e) {
-//            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
-//                            "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
-//        }
+        try {
+            client.callProcedure("InPrimitiveArrays", "STRS", null, null, null, null, null,
+                    new String[]{"1", "2", "3"}).getResults();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n" +
+                            "  Number of arguments provided was 3 where 1 was expected " +
+                            "for statement SELECT * FROM ENG_12105 WHERE VCHAR IN ?;"));
+        }
 
         String query =
                 String.format("select * from ENG_12105");

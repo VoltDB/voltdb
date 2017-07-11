@@ -37,57 +37,21 @@ public class InPrimitiveArrays extends VoltProcedure {
     public final SQLStmt aBIGDSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE DEC IN ?;");
     public final SQLStmt aSTRSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE VCHAR IN ?;");
 
-    public VoltTable[] run(String inpType, String[] inpArr) {
+    public VoltTable[] run(String inpType, short[] shortArr, int[] intArr, long[] lngArr,
+              double[] dblArr, BigDecimal[] bigdArr, String[] strArr) {
 
         if (inpType.equals("SHORTS")) {
-
-            short[] shortArr = new short[inpArr.length];
-            int i = 0;
-            for (String s : inpArr) {
-                shortArr[i++] = Short.parseShort(s);
-            }
             voltQueueSQL(aSHORTSelect, shortArr);
-
         } else if (inpType.equals("INTS")) {
-
-            int[] intArr = new int[inpArr.length];
-            int i = 0;
-            for (String s : inpArr) {
-                intArr[i++] = Integer.parseInt(s);
-            }
             voltQueueSQL(aINTSelect, intArr);
-
         } else if (inpType.equals("LNGS")) {
-
-            long[] lngArr = new long[inpArr.length];
-            int i = 0;
-            for (String s : inpArr) {
-                lngArr[i++] = Long.parseLong(s);
-            }
             voltQueueSQL(aLNGSelect, lngArr);
-
         } else if (inpType.equals("DBLS")) {
-
-            double[] dblArr = new double[inpArr.length];
-            int i = 0;
-            for (String s : inpArr) {
-                dblArr[i++] = Double.parseDouble(s);
-            }
             voltQueueSQL(aDBLSelect, dblArr);
-
         } else if (inpType.equals("BIGDS")) {
-
-            BigDecimal[] bigdArr = new BigDecimal[inpArr.length];
-            int i = 0;
-            for (String s : inpArr) {
-                bigdArr[i++] = new BigDecimal(s);
-            }
             voltQueueSQL(aBIGDSelect, bigdArr);
-
         } else if (inpType.equals("STRS")) {
-
-            voltQueueSQL(aSTRSelect, inpArr);
-
+            voltQueueSQL(aSTRSelect, strArr);
         }
 
         return voltExecuteSQL();
