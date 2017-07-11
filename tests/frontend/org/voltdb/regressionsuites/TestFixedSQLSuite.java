@@ -377,6 +377,25 @@ public class TestFixedSQLSuite extends RegressionSuite {
                             "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
         }
 
+        try {
+            client.callProcedure("InPrimitiveArrays", "DBLS",
+                    new String[]{"1", "2", "3"}).getResults();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
+                            "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: " +
+                            "Incompatible parameter type: can not convert type 'double[]' to 'INLIST_OF_BIGINT' " +
+                            "for arg 0 for SQL stmt: SELECT * FROM ENG_12105 WHERE NUM IN ?;. " +
+                            "Try explicitly using a long[] parameter"));
+        }
+
+//        try {
+//            client.callProcedure("InPrimitiveArrays", "LNGS",
+//                    new String[]{"1", "2", "3"}).getResults();
+//        } catch (ProcCallException e) {
+//            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
+//                            "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
+//        }
+
         String query =
                 String.format("select * from ENG_12105");
         results = client.callProcedure("@AdHoc", query).getResults();

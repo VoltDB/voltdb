@@ -24,6 +24,7 @@
 package org.voltdb_testprocs.regressionsuites.fixedsql;
 
 import org.voltdb.*;
+import java.math.BigDecimal;
 //import org.apache.commons.lang.ArrayUtils;
 
 @ProcInfo(singlePartition = false)
@@ -32,6 +33,8 @@ public class InPrimitiveArrays extends VoltProcedure {
     public final SQLStmt aSHORTSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE SMALL IN ?;");
     public final SQLStmt aINTSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE ID IN ?;");
     public final SQLStmt aLNGSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE BIG IN ?;");
+    public final SQLStmt aDBLSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE NUM IN ?;");
+    public final SQLStmt aBIGDSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE DEC IN ?;");
 
     public VoltTable[] run(String inpType, String[] inpArr) {
 
@@ -61,6 +64,24 @@ public class InPrimitiveArrays extends VoltProcedure {
                 lngArr[i++] = Long.parseLong(s);
             }
             voltQueueSQL(aLNGSelect, lngArr);
+
+        } else if (inpType.equals("DBLS")) {
+
+            double[] dblArr = new double[inpArr.length];
+            int i = 0;
+            for (String s : inpArr) {
+                dblArr[i++] = Double.parseDouble(s);
+            }
+            voltQueueSQL(aDBLSelect, dblArr);
+
+        } else if (inpType.equals("BIGDS")) {
+
+            BigDecimal[] bigdArr = new BigDecimal[inpArr.length];
+            int i = 0;
+            for (String s : inpArr) {
+                bigdArr[i++] = new BigDecimal(s);
+            }
+            voltQueueSQL(aBIGDSelect, bigdArr);
 
         }
 
