@@ -52,25 +52,30 @@ public class BoxedByteArrays extends VoltProcedure {
     public VoltTable[] run(String inpType, Integer id, byte[] varbin,
             byte[][] varbinArr, Long[] lngArr, Integer[] intArr, String inpString) {
 
-        if (inpType.equals("VARBIN")) {
-            voltQueueSQL(anInsert, id, varbin, null);
-        } else if (inpType.equals("STR")) {
-            voltQueueSQL(anInsert, id, inpString, null);
-        } else if (inpType.equals("DSTR")) {
-            voltQueueSQL(anInsert, id, null, inpString);
-        } else if (inpType.equals("BIGD")) {
-            voltQueueSQL(anInsert, id, null, id);
-        } else if (inpType.equals("LNGARR")) {
-            voltQueueSQL(aBIGSelect, lngArr);
-        }  else if (inpType.equals("INTARR")) {
-            voltQueueSQL(aINTSelect, intArr);
+        switch(inpType) {
+            case "VARBIN":
+                voltQueueSQL(anInsert, id, varbin, null);
+                break;
+            case "STR":
+                voltQueueSQL(anInsert, id, inpString, null);
+                break;
+            case "DSTR":
+                voltQueueSQL(anInsert, id, null, inpString);
+                break;
+            case "BIGD":
+                voltQueueSQL(anInsert, id, null, id);
+                break;
+            case "LNGARR":
+                voltQueueSQL(aBIGSelect, lngArr);
+                break;
+            case "INTARR":
+                voltQueueSQL(aINTSelect, intArr);
+                break;
+            case "SEL_VARBIN":
+                voltQueueSQL(aBYTESelect, varbinArr);
+                break;
         }
-        else if (inpType.equals("SEL_VARBIN")) {
-            voltQueueSQL(aBYTESelect, varbinArr);
-        }
-//        else if (inpType.equals("SEL_STR")) {
-//            voltQueueSQL(aSelect, strArr);
-//        }
+
         return voltExecuteSQL();
     }
 }
