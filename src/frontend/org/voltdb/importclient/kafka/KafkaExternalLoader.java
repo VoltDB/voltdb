@@ -514,12 +514,14 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         final KafkaExternalLoaderCLIArguments cfg = new KafkaExternalLoaderCLIArguments();
         cfg.parse(KafkaExternalLoader.class.getName(), args);
 
+        KafkaExternalLoader kloader = new KafkaExternalLoader(cfg);
+
         try {
-            KafkaExternalLoader kloader = new KafkaExternalLoader(cfg);
             kloader.initialize();
             kloader.processKafkaMessages();
         }
         catch (Exception e) {
+            kloader.close();
             m_log.error("Exception in KafkaExternalLoader", e);
             System.exit(-1);
         }
