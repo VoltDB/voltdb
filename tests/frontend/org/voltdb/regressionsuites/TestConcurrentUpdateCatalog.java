@@ -1,10 +1,34 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2017 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package org.voltdb.regressionsuites;
 
 import static junit.framework.Assert.assertTrue;
 
 import java.io.File;
 
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
@@ -25,8 +49,8 @@ import org.voltdb.utils.MiscUtils;
  * The tested system calls include @AdHoc, @UpdateApplicationCatalog, @UpdateClasses
  */
 public class TestConcurrentUpdateCatalog {
-    private static final int SITES_PER_HOST = 4;
-    private static final int HOSTS = 4;
+    private static final int SITES_PER_HOST = 2;
+    private static final int HOSTS = 2;
     private static final int K = MiscUtils.isPro() ? 1 : 0;
 
     private static LocalCluster cluster = null;
@@ -98,8 +122,8 @@ public class TestConcurrentUpdateCatalog {
     /*
      * Initialization
      */
-    @BeforeClass
-    public static void init() throws Exception {
+    @Before
+    public void init() throws Exception {
         builder = new VoltProjectBuilder();
         builder.setUseDDLSchema(false);
 
@@ -113,11 +137,16 @@ public class TestConcurrentUpdateCatalog {
         cluster.startUp();
     }
 
+    @After
+    public void shutdown() throws Exception {
+        cluster.shutDown();
+    }
+
     private static ClientImpl getClient() throws Exception {
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setProcedureCallTimeout(2 * 60 * 1000); // 2 min
         Client client = ClientFactory.createClient(clientConfig);
-        client.createConnection(cluster.getAdminAddress(2));
+        client.createConnection(cluster.getAdminAddress(1));
 
         return (ClientImpl) client;
     }
