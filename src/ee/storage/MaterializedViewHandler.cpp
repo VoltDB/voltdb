@@ -296,7 +296,6 @@ namespace voltdb {
         NValue existingCount = m_existingTuple.getNValue(m_countStarColumnIndex);
         NValue deltaCount = deltaTuple.getNValue(m_countStarColumnIndex);
         NValue newCount = existingCount.op_subtract(deltaCount);
-        //m_updatedTuple.setNValue(m_countStarColumnIndex, newCount);
 
         int aggOffset = m_groupByColumnCount;
         NValue newValue;
