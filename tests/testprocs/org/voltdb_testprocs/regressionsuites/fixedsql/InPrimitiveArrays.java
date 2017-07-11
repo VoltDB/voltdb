@@ -37,8 +37,8 @@ public class InPrimitiveArrays extends VoltProcedure {
     public final SQLStmt aBIGDSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE DEC IN ?;");
     public final SQLStmt aSTRSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE VCHAR IN ?;");
 
-    public VoltTable[] run(String inpType, byte[][] byteArr, short[] shortArr, int[] intArr, long[] lngArr,
-              double[] dblArr, BigDecimal[] bigdArr, String[] strArr) {
+    public VoltTable[] run(String inpType, byte[][] byteArr, short[] shortArr, int[] intArr,
+            long[] lngArr, double[] dblArr, BigDecimal[] bigdArr, String[] strArr) {
 
         switch (inpType) {
             case "BYTES":
