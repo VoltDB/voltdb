@@ -171,6 +171,10 @@ public class CommandLine extends VoltDB.Configuration
         return m_adminPort;
     }
 
+    public int httpPort() {
+        return m_httpPort;
+    }
+
     public CommandLine internalPort(int internalPort) {
         m_internalPort = internalPort;
         return this;

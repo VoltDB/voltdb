@@ -86,6 +86,7 @@ import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
@@ -123,6 +124,7 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
+import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
@@ -361,6 +363,16 @@ public class TestJSONInterface extends TestCase {
             callProcOverJSONRaw(params, httpPort, expectedCode);
         }
         return ret;
+    }
+
+    public static boolean canAccessHttpPort(int port) throws Exception {
+        String url = "http://127.0.0.1:" + port + "/deployment";
+        try {
+            getUrlOverJSON(url, null, null, null, 200,  "application/json");
+            return true;
+        } catch (HttpHostConnectException e) {
+            return false;
+        }
     }
 
     public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
@@ -975,6 +987,52 @@ public class TestJSONInterface extends TestCase {
                 server.join();
             }
             server = null;
+        }
+    }
+
+    public void testHTTPListenerAfterRejoin() throws Exception {
+        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+            // Community version does not support rejoin.
+            return;
+        }
+        final long TIMEOUT_THRESHOLD = 60000; // One minute
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.setSecurityEnabled(false, false);
+        builder.setJSONAPIEnabled(true);
+
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, true);
+        try {
+            boolean success = cluster.compile(builder);
+            assertTrue(success);
+            cluster.setHttpPortEnabled(true);
+            cluster.startUp();
+
+            long startTime = System.currentTimeMillis();
+            int port0 = cluster.httpPort(0), port1 = cluster.httpPort(1), port2 = cluster.httpPort(2);
+            while ( !canAccessHttpPort(port0)|| !canAccessHttpPort(port1) || !canAccessHttpPort(port2)) {
+                if (System.currentTimeMillis() - startTime >= TIMEOUT_THRESHOLD) {
+                    fail("Local cluster failed to start up");
+                }
+                Thread.sleep(200);
+            }
+            assertTrue("Http port failed to open when the node is on", canAccessHttpPort(port0));
+
+            cluster.killSingleHost(0);
+            assertFalse("Http port failed to close when the node is offline", canAccessHttpPort(port0));
+
+            cluster.recoverOne(0, 0, "", true);
+            startTime = System.currentTimeMillis();
+            port0 = cluster.httpPort(3);
+            while ( !canAccessHttpPort(port0)|| !canAccessHttpPort(port1) || !canAccessHttpPort(port2)) {
+                if (System.currentTimeMillis() - startTime >= TIMEOUT_THRESHOLD) {
+                    fail("Local cluster failed to rejoin");
+                }
+                Thread.sleep(200);
+            }
+            assertTrue("Http port failed to open when the node is rejoined", canAccessHttpPort(port0));
+            Thread.sleep(1000);
+        } finally {
+            try {cluster.shutDown();} catch (Exception e) {}
         }
     }
 
