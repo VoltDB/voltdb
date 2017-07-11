@@ -28,18 +28,18 @@ import static junit.framework.Assert.assertTrue;
 import java.io.File;
 
 import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 /*
@@ -58,41 +58,68 @@ public class TestConcurrentUpdateCatalog {
 
     @Test
     public void testConcurrentUAC() throws Exception {
-        // A new catalog with new table added
+        init(false);
+        ClientImpl client = getClient();
+
         LocalCluster config = new LocalCluster("concurrentCatalogUpdate-cluster-addtable.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project = new TPCCProjectBuilder();
-        project.addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER PRIMARY KEY);");
+        project.addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER, PRIMARY KEY (A1));");
         project.setDeadHostTimeout(6);
         assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-addtable.xml"));
 
-        // A new catalog with many new tables added
         config = new LocalCluster("concurrentCatalogUpdate-cluster-addmoretable.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new VoltProjectBuilder();
-        project = new TPCCProjectBuilder();
-        project.addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER PRIMARY KEY);");
+        project.addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER, PRIMARY KEY (A1));");
         for (int i = 0; i < 100; i++) {
-            String s = "CREATE TABLE NEWTABLE" + Integer.toString(i) + " (A1 INTEGER PRIMARY KEY);";
-            project.addLiteralSchema(s);
+            project.addLiteralSchema("CREATE TABLE NEWTABLE" + Integer.toString(i) +
+                                     " (A1 INTEGER, PRIMARY KEY (A1));");
         }
         project.setDeadHostTimeout(6);
         assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-addmoretable.xml"));
 
-        ClientImpl client = getClient();
-
+        String deploymentURL = Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-base.xml");
         String newCatalogURL1 = Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-addtable.jar");
         String newCatalogURL2 = Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-addmoretable.jar");
-        String deploymentURL = Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-base.xml");
 
         SyncCallback cb1 = new SyncCallback();
-        client.updateApplicationCatalog(cb1,
-                new File(newCatalogURL1), new File(deploymentURL));
-
         SyncCallback cb2 = new SyncCallback();
-        client.updateApplicationCatalog(cb2,
-                new File(newCatalogURL2), new File(deploymentURL));
+        client.updateApplicationCatalog(cb1, new File(newCatalogURL1), new File(deploymentURL));
+        client.updateApplicationCatalog(cb2, new File(newCatalogURL2), new File(deploymentURL));
+
+        cb1.waitForResponse();
+        cb2.waitForResponse();
+
+        // System.err.println("cb1: " + Byte.toString(cb1.getResponse().getStatus()) + " " + cb1.getResponse().getStatusString());
+        // System.err.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
+
+
+        // Only one of them should succeed
+        assertTrue(ClientResponse.USER_ABORT == cb2.getResponse().getStatus()
+                || ClientResponse.USER_ABORT == cb1.getResponse().getStatus());
+        assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
+                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
+    }
+
+    @Test
+    public void testConcurrentUpdateClasses() throws Exception {
+        init(true);
+        ClientImpl client = getClient();
+
+        InMemoryJarfile jar = new InMemoryJarfile();
+        VoltCompiler comp = new VoltCompiler(false);
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.testImportProc.class);
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.TestProcWithSQLStmt.class);
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.testCreateProcFromClassProc.class);
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.NoMeaningClass.class);
+
+        SyncCallback cb1 = new SyncCallback();
+        SyncCallback cb2 = new SyncCallback();
+
+        client.callProcedure(cb1, "@UpdateClasses", jar.getFullJarBytes(), null);
+        client.callProcedure(cb2, "@UpdateClasses", jar.getFullJarBytes(), null);
 
         cb1.waitForResponse();
         cb2.waitForResponse();
@@ -104,17 +131,12 @@ public class TestConcurrentUpdateCatalog {
                 || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
     }
 
-    @Test
-    public void testConcurrentUpdateClasses() {
 
-    }
-
-    @Test
     public void testConcurrentAdHoc() {
 
     }
 
-    @Test
+
     public void testConcurrentMixedUpdate() {
 
     }
@@ -122,13 +144,13 @@ public class TestConcurrentUpdateCatalog {
     /*
      * Initialization
      */
-    @Before
-    public void init() throws Exception {
+    private void init(boolean useAdHocDDL) throws Exception {
         builder = new VoltProjectBuilder();
-        builder.setUseDDLSchema(false);
+        builder.setUseDDLSchema(useAdHocDDL);
 
         cluster = new LocalCluster("concurrentCatalogUpdate-cluster-base.jar",
                                                 SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        cluster.setNewCli(true);
         cluster.setHasLocalServer(false);
         assertTrue(cluster.compile(builder));
 
@@ -139,7 +161,8 @@ public class TestConcurrentUpdateCatalog {
 
     @After
     public void shutdown() throws Exception {
-        cluster.shutDown();
+        if (cluster != null)
+            cluster.shutDown();
     }
 
     private static ClientImpl getClient() throws Exception {
@@ -148,6 +171,7 @@ public class TestConcurrentUpdateCatalog {
         Client client = ClientFactory.createClient(clientConfig);
         client.createConnection(cluster.getAdminAddress(1));
 
+        assertTrue(client instanceof ClientImpl);
         return (ClientImpl) client;
     }
 }
