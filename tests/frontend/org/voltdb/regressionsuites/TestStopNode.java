@@ -114,70 +114,122 @@ public class TestStopNode extends RegressionSuite
         }
     }
 
-    public void testStopNode() throws Exception {
-        Client client = ClientFactory.createClient();
+//    public void testStopNode() throws Exception {
+//        Client client = ClientFactory.createClient();
+//
+//        client.createConnection("localhost", m_config.port(0));
+//
+//        try {
+//            CountDownLatch cdl = new CountDownLatch(1);
+//            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 4), "@StopNode", 4);
+//            cdl.await();
+//            if (expectedResponse == ClientResponse.SUCCESS) {
+//                waitForHostToBeGone(4, new int[] {0, 1, 2, 3 });
+//            }
+//            cdl = new CountDownLatch(1);
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 3), "@StopNode", 3);
+//            cdl.await();
+//            if (expectedResponse == ClientResponse.SUCCESS) {
+//                waitForHostToBeGone(3, new int[] {0, 1, 2 });
+//            }
+//            cdl = new CountDownLatch(1);
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
+//            cdl.await();
+//            if (expectedResponse == ClientResponse.SUCCESS) {
+//                waitForHostToBeGone(2, new int[] {0, 1 });
+//            }
+//            client.callProcedure("@SystemInformation", "overview");
+//        } catch (Exception ex) {
+//            //We should not get here
+//            fail();
+//            ex.printStackTrace();
+//        }
+//        boolean lostConnect = false;
+//        try {
+//            CountDownLatch cdl = new CountDownLatch(3);
+//            //Stop a node that should stay up
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 1), "@StopNode", 1);
+//            //Stop already stopped node.
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
+//            //Stop a node that should stay up
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
+//            client.callProcedure("@SystemInformation", "overview");
+//            client.drain();
+//            cdl.await();
+//        } catch (Exception pce) {
+//            pce.printStackTrace();
+//            lostConnect = pce.getMessage().contains("was lost before a response was received");
+//        }
+//        //We should never lose contact.
+//        assertFalse(lostConnect);
+//    }
+//
+//    public void testStopThreeNodesSimultaneously() throws Exception {
+//        if (kfactor < 1) return;
+//
+//        Client client = ClientFactory.createClient();
+//
+//        client.createConnection("localhost", m_config.port(0));
+//
+//        try {
+//            CountDownLatch cdl = new CountDownLatch(3);
+//            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 4), "@StopNode", 4);
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 3), "@StopNode", 3);
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
+//            cdl.await();
+//            if (expectedResponse == ClientResponse.SUCCESS) {
+//                Set<Integer> hids = new HashSet<Integer>();
+//                hids.add(4);
+//                hids.add(3);
+//                hids.add(2);
+//                waitForHostsToBeGone(hids, new int[] {0, 1 });
+//            }
+//            client.callProcedure("@SystemInformation", "overview");
+//        } catch (Exception ex) {
+//            //We should not get here
+//            fail();
+//            ex.printStackTrace();
+//        }
+//        boolean lostConnect = false;
+//        try {
+//            CountDownLatch cdl = new CountDownLatch(3);
+//            //Stop a node that should stay up
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 1), "@StopNode", 1);
+//            //Stop already stopped node.
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
+//            //Stop a node that should stay up
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
+//            client.callProcedure("@SystemInformation", "overview");
+//            client.drain();
+//            cdl.await();
+//        } catch (Exception pce) {
+//            pce.printStackTrace();
+//            lostConnect = pce.getMessage().contains("was lost before a response was received");
+//        }
+//        //We should never lose contact.
+//        assertFalse(lostConnect);
+//    }
 
-        client.createConnection("localhost", m_config.port(0));
 
-        try {
-            CountDownLatch cdl = new CountDownLatch(1);
-            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 4), "@StopNode", 4);
-            cdl.await();
-            if (expectedResponse == ClientResponse.SUCCESS) {
-                waitForHostToBeGone(4, new int[] {0, 1, 2, 3 });
-            }
-            cdl = new CountDownLatch(1);
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 3), "@StopNode", 3);
-            cdl.await();
-            if (expectedResponse == ClientResponse.SUCCESS) {
-                waitForHostToBeGone(3, new int[] {0, 1, 2 });
-            }
-            cdl = new CountDownLatch(1);
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
-            cdl.await();
-            if (expectedResponse == ClientResponse.SUCCESS) {
-                waitForHostToBeGone(2, new int[] {0, 1 });
-            }
-            client.callProcedure("@SystemInformation", "overview");
-        } catch (Exception ex) {
-            //We should not get here
-            fail();
-            ex.printStackTrace();
-        }
-        boolean lostConnect = false;
-        try {
-            CountDownLatch cdl = new CountDownLatch(3);
-            //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 1), "@StopNode", 1);
-            //Stop already stopped node.
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
-            //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
-            client.callProcedure("@SystemInformation", "overview");
-            client.drain();
-            cdl.await();
-        } catch (Exception pce) {
-            pce.printStackTrace();
-            lostConnect = pce.getMessage().contains("was lost before a response was received");
-        }
-        //We should never lose contact.
-        assertFalse(lostConnect);
-    }
-
-    public void testStopThreeNodesSimultaneously() throws Exception {
+    public void testConcurrentStopNode() throws Exception {
         if (kfactor < 1) return;
 
-        Client client = ClientFactory.createClient();
+        Client client1 = ClientFactory.createClient();
+        Client client2 = ClientFactory.createClient();
+        Client client3 = ClientFactory.createClient();
 
-        client.createConnection("localhost", m_config.port(0));
+        client1.createConnection("localhost", m_config.port(0));
+        client2.createConnection("localhost", m_config.port(1));
+        client3.createConnection("localhost", m_config.port(2));
 
         try {
             CountDownLatch cdl = new CountDownLatch(3);
             byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 4), "@StopNode", 4);
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 3), "@StopNode", 3);
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
+            client1.callProcedure(new StopCallBack(cdl, expectedResponse, 4), "@StopNode", 4);
+            client2.callProcedure(new StopCallBack(cdl, expectedResponse, 3), "@StopNode", 3);
+            client3.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
             cdl.await();
             if (expectedResponse == ClientResponse.SUCCESS) {
                 Set<Integer> hids = new HashSet<Integer>();
@@ -186,7 +238,7 @@ public class TestStopNode extends RegressionSuite
                 hids.add(2);
                 waitForHostsToBeGone(hids, new int[] {0, 1 });
             }
-            client.callProcedure("@SystemInformation", "overview");
+            client1.callProcedure("@SystemInformation", "overview");
         } catch (Exception ex) {
             //We should not get here
             fail();
@@ -196,13 +248,15 @@ public class TestStopNode extends RegressionSuite
         try {
             CountDownLatch cdl = new CountDownLatch(3);
             //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 1), "@StopNode", 1);
+            client1.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 1), "@StopNode", 1);
             //Stop already stopped node.
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
+            client1.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
             //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
-            client.callProcedure("@SystemInformation", "overview");
-            client.drain();
+            client1.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
+            client1.callProcedure("@SystemInformation", "overview");
+            client1.drain();
+            client2.drain();
+            client3.drain();
             cdl.await();
         } catch (Exception pce) {
             pce.printStackTrace();
@@ -212,97 +266,97 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
-    public void testStopNodesMoreThanAllowed() throws Exception {
-        if (kfactor < 1) return;
-
-        Client client = ClientFactory.createClient();
-
-        client.createConnection("localhost", m_config.port(3));
-
-        try {
-            CountDownLatch cdl = new CountDownLatch(4);
-            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 0), "@StopNode", 0);
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 1), "@StopNode", 1);
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 3), "@StopNode", 3);  /*should stay up*/
-            cdl.await();
-            if (expectedResponse == ClientResponse.SUCCESS) {
-                Set<Integer> hids = new HashSet<Integer>();
-                hids.add(0);
-                hids.add(1);
-                hids.add(2);
-                waitForHostsToBeGone(hids, new int[] {3, 4 });
-            }
-            client.callProcedure("@SystemInformation", "overview");
-        } catch (Exception ex) {
-            //We should not get here
-            fail();
-            ex.printStackTrace();
-        }
-        boolean lostConnect = false;
-        try {
-            CountDownLatch cdl = new CountDownLatch(2);
-            //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
-            //Stop already stopped node.
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
-            client.callProcedure("@SystemInformation", "overview");
-            client.drain();
-            cdl.await();
-        } catch (Exception pce) {
-            pce.printStackTrace();
-            lostConnect = pce.getMessage().contains("was lost before a response was received");
-        }
-        //We should never lose contact.
-        assertFalse(lostConnect);
-    }
-
-    public void testMixStopNodeWithNodeFailure() throws Exception {
-        if (kfactor < 1) return;
-
-        Client client = ClientFactory.createClient();
-
-        client.createConnection("localhost", m_config.port(3));
-
-        try {
-            CountDownLatch cdl = new CountDownLatch(2);
-            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
-            ((LocalCluster)getServerConfig()).killSingleHost(0);  // Create a node failure
-            client.callProcedure(new StopCallBack(cdl, expectedResponse, 1), "@StopNode", 1);
-            ((LocalCluster)getServerConfig()).killSingleHost(2);  // Create a node failure
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 3), "@StopNode", 3);  /*should stay up*/
-            cdl.await();
-            if (expectedResponse == ClientResponse.SUCCESS) {
-                Set<Integer> hids = new HashSet<Integer>();
-                hids.add(0);
-                hids.add(1);
-                hids.add(2);
-                waitForHostsToBeGone(hids, new int[] {3, 4 });
-            }
-            client.callProcedure("@SystemInformation", "overview");
-        } catch (Exception ex) {
-            //We should not get here
-            fail();
-            ex.printStackTrace();
-        }
-        boolean lostConnect = false;
-        try {
-            CountDownLatch cdl = new CountDownLatch(2);
-            //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
-            //Stop already stopped node.
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
-            client.callProcedure("@SystemInformation", "overview");
-            client.drain();
-            cdl.await();
-        } catch (Exception pce) {
-            pce.printStackTrace();
-            lostConnect = pce.getMessage().contains("was lost before a response was received");
-        }
-        //We should never lose contact.
-        assertFalse(lostConnect);
-    }
+//    public void testStopNodesMoreThanAllowed() throws Exception {
+//        if (kfactor < 1) return;
+//
+//        Client client = ClientFactory.createClient();
+//
+//        client.createConnection("localhost", m_config.port(3));
+//
+//        try {
+//            CountDownLatch cdl = new CountDownLatch(4);
+//            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 0), "@StopNode", 0);
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 1), "@StopNode", 1);
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 2), "@StopNode", 2);
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 3), "@StopNode", 3);  /*should stay up*/
+//            cdl.await();
+//            if (expectedResponse == ClientResponse.SUCCESS) {
+//                Set<Integer> hids = new HashSet<Integer>();
+//                hids.add(0);
+//                hids.add(1);
+//                hids.add(2);
+//                waitForHostsToBeGone(hids, new int[] {3, 4 });
+//            }
+//            client.callProcedure("@SystemInformation", "overview");
+//        } catch (Exception ex) {
+//            //We should not get here
+//            fail();
+//            ex.printStackTrace();
+//        }
+//        boolean lostConnect = false;
+//        try {
+//            CountDownLatch cdl = new CountDownLatch(2);
+//            //Stop a node that should stay up
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
+//            //Stop already stopped node.
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
+//            client.callProcedure("@SystemInformation", "overview");
+//            client.drain();
+//            cdl.await();
+//        } catch (Exception pce) {
+//            pce.printStackTrace();
+//            lostConnect = pce.getMessage().contains("was lost before a response was received");
+//        }
+//        //We should never lose contact.
+//        assertFalse(lostConnect);
+//    }
+//
+//    public void testMixStopNodeWithNodeFailure() throws Exception {
+//        if (kfactor < 1) return;
+//
+//        Client client = ClientFactory.createClient();
+//
+//        client.createConnection("localhost", m_config.port(3));
+//
+//        try {
+//            CountDownLatch cdl = new CountDownLatch(2);
+//            byte expectedResponse = (kfactor > 0) ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE;
+//            ((LocalCluster)getServerConfig()).killSingleHost(0);  // Create a node failure
+//            client.callProcedure(new StopCallBack(cdl, expectedResponse, 1), "@StopNode", 1);
+//            ((LocalCluster)getServerConfig()).killSingleHost(2);  // Create a node failure
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 3), "@StopNode", 3);  /*should stay up*/
+//            cdl.await();
+//            if (expectedResponse == ClientResponse.SUCCESS) {
+//                Set<Integer> hids = new HashSet<Integer>();
+//                hids.add(0);
+//                hids.add(1);
+//                hids.add(2);
+//                waitForHostsToBeGone(hids, new int[] {3, 4 });
+//            }
+//            client.callProcedure("@SystemInformation", "overview");
+//        } catch (Exception ex) {
+//            //We should not get here
+//            fail();
+//            ex.printStackTrace();
+//        }
+//        boolean lostConnect = false;
+//        try {
+//            CountDownLatch cdl = new CountDownLatch(2);
+//            //Stop a node that should stay up
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 4), "@StopNode", 4);
+//            //Stop already stopped node.
+//            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
+//            client.callProcedure("@SystemInformation", "overview");
+//            client.drain();
+//            cdl.await();
+//        } catch (Exception pce) {
+//            pce.printStackTrace();
+//            lostConnect = pce.getMessage().contains("was lost before a response was received");
+//        }
+//        //We should never lose contact.
+//        assertFalse(lostConnect);
+//    }
 
     @Override
     public void tearDown() throws Exception {

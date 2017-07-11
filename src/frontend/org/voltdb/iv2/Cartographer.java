@@ -528,19 +528,19 @@ public class Cartographer extends StatsSource
     }
 
     //Check partition replicas.
-    public synchronized boolean stopNodeIfClusterIsSafe(final Set<Integer> liveHids, final int ihid) {
+    public synchronized String stopNodeIfClusterIsSafe(final Set<Integer> liveHids, final int ihid) {
         try {
-            return m_es.submit(new Callable<Boolean>() {
+            return m_es.submit(new Callable<String>() {
                 @Override
-                public Boolean call() throws Exception {
+                public String call() throws Exception {
                     if (m_configuredReplicationFactor == 0) {
                         //Dont die in k=0 cluster
-                        return false;
+                        return "Stopping individual nodes is only allowed on a K-safe cluster";
                     }
                     // check if any node still in rejoin status
                     try {
                         if (m_zk.exists(CoreZK.rejoin_node_blocker, false) != null) {
-                            return false;
+                            return "All rejoin nodes must be completed";
                         }
                     } catch (KeeperException.NoNodeException ignore) {} // shouldn't happen
                     //Otherwise we do check replicas for host
@@ -555,8 +555,9 @@ public class Cartographer extends StatsSource
                         }
                         otherStoppedHids.remove(ihid); /* don't count self */
                     } catch (KeeperException.NoNodeException ignore) {}
-                    boolean safe = doPartitionsHaveReplicas(ihid, otherStoppedHids);
-                    if (safe) {
+                    String reason = doPartitionsHaveReplicas(ihid, otherStoppedHids);
+                    if (reason == null) {
+                        // Safe to stop
                         m_hostMessenger.sendStopNodeNotice(ihid);
                         // Shutdown or send poison pill
                         int hid = m_hostMessenger.getHostId();
@@ -568,25 +569,29 @@ public class Cartographer extends StatsSource
                             m_hostMessenger.sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
                         }
                     } else {
+                        // unsafe, clear the indicator
                         ZKUtil.deleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.host_ids_be_stopped, Integer.toString(ihid)));
                     }
-                    return safe;
+                    return reason;
                 }
             }).get();
         } catch (InterruptedException | ExecutionException t) {
             hostLog.debug("LeaderAppointer: Error in isClusterSafeIfIDie.", t);
+            return "Internal error: " + t.getMessage();
         }
-        return false;
     }
 
-    private boolean doPartitionsHaveReplicas(int hid, Set<Integer> nodesBeingStopped) {
+    // Check if partitions on host hid will have enough replicas after losing host hid.
+    // If nodesBeingStopped was set, it means there are concurrent @StopNode running,
+    // don't count replicas on those to-be-stopped nodes.
+    private String doPartitionsHaveReplicas(int hid, Set<Integer> nodesBeingStopped) {
         hostLog.debug("Cartographer: Reloading partition information.");
         assert (!nodesBeingStopped.contains(hid));
         List<String> partitionDirs = null;
         try {
             partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
         } catch (KeeperException | InterruptedException e) {
-            return false;
+            return "Failed to read ZooKeeper node " + VoltZK.leaders_initiators +": " + e.getMessage();
         }
 
         //Don't fetch the values serially do it asynchronously
@@ -602,7 +607,7 @@ public class Cartographer extends StatsSource
                 m_zk.getChildren(dir, false, childrenCallback, null);
                 childrenCallbacks.offer(childrenCallback);
             } catch (Exception e) {
-                return false;
+                return "Failed to read ZooKeeper node " + dir + ": " + e.getMessage();
             }
         }
         //Assume that we are ksafe
@@ -613,7 +618,7 @@ public class Cartographer extends StatsSource
                 byte[] partitionState = dataCallbacks.poll().getData();
                 if (partitionState != null && partitionState.length == 1) {
                     if (partitionState[0] == LeaderElector.INITIALIZING) {
-                        return false;
+                        return "StopNode is disallowed in initialization phase";
                     }
                 }
 
@@ -640,15 +645,15 @@ public class Cartographer extends StatsSource
                 }
                 hostLog.debug("Replica Host for Partition " + pid + " " + replicaHost);
                 if (hostHasReplicas && replicaHost.size() <= 1) {
-                    return false;
+                    return "Cluster doesn't have enough replicas";
                 }
                 if (hostHasReplicas && stoppingHostHasReplicas && replicaHost.size() <= nodesBeingStopped.size() + 1) {
-                    return false;
+                    return "Cluster doesn't have enough replicas. There are concurrent stop node requests, retry the command later";
                 }
             } catch (InterruptedException | KeeperException | NumberFormatException e) {
-                return false;
+                return "Failed to stop node:" + e.getMessage();
             }
         }
-        return true;
+        return null;
     }
 }
