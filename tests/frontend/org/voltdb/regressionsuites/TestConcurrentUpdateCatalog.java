@@ -58,7 +58,7 @@ public class TestConcurrentUpdateCatalog {
 
     @Test
     public void testConcurrentUAC() throws Exception {
-        init(false);
+        init(false, false);
         ClientImpl client = getClient();
 
         LocalCluster config = new LocalCluster("concurrentCatalogUpdate-cluster-addtable.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
@@ -97,7 +97,7 @@ public class TestConcurrentUpdateCatalog {
 
     @Test
     public void testConcurrentUpdateClasses() throws Exception {
-        init(true);
+        init(true, false);
         ClientImpl client = getClient();
 
         InMemoryJarfile jar = new InMemoryJarfile();
@@ -120,7 +120,7 @@ public class TestConcurrentUpdateCatalog {
 
     @Test
     public void testConcurrentAdHoc() throws Exception {
-        init(true);
+        init(true, false);
 
         ClientImpl client  = getClient();
         SyncCallback cb1 = new SyncCallback();
@@ -137,6 +137,28 @@ public class TestConcurrentUpdateCatalog {
         checkResults(cb1, cb2);
     }
 
+    @Test
+    public void testConcurrentPromote() throws Exception {
+        // This is a fake dr cluster
+        init(true, true);
+
+        ClientImpl client = getClient();
+
+        SyncCallback cb1 = new SyncCallback();
+        SyncCallback cb2 = new SyncCallback();
+        client.callProcedure(cb1, "@Promote");
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 200; i++) {
+            sb.append("CREATE TABLE K" + Integer.toString(i) + " (ID INT, A INT UNIQUE, B VARCHAR(30));");
+        }
+        client.callProcedure(cb2, "@AdHoc", sb.toString());
+
+        cb1.waitForResponse();
+        cb2.waitForResponse();
+
+        checkResults(cb1, cb2);
+    }
 
     public void testConcurrentMixedUpdate() {
 
@@ -145,9 +167,13 @@ public class TestConcurrentUpdateCatalog {
     /*
      * Initialization
      */
-    private void init(boolean useAdHocDDL) throws Exception {
+    private void init(boolean useAdHocDDL, boolean drMaster) throws Exception {
         builder = new VoltProjectBuilder();
         builder.setUseDDLSchema(useAdHocDDL);
+        if (drMaster) {
+            builder.setDRMasterHost("localhost");
+            builder.setDrReplica();
+        }
 
         cluster = new LocalCluster("concurrentCatalogUpdate-cluster-base.jar",
                                                 SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
@@ -158,6 +184,23 @@ public class TestConcurrentUpdateCatalog {
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-base.xml"));
 
         cluster.startUp();
+
+//        if (drMaster) {
+//            // Create the replica database cluster
+//            VoltProjectBuilder builder2 = new VoltProjectBuilder();
+//            builder2.setUseDDLSchema(useAdHocDDL);
+//            builder2.setDRMasterHost("localhost");
+//
+//            LocalCluster cluster2 = new LocalCluster("concurrentCatalogUpdate-cluster-replica-base.jar",
+//                                        SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+//            cluster2.setNewCli(true);
+//            cluster2.setHasLocalServer(false);
+//            cluster2.setHttpOverridePort(8090);
+//            cluster2.setHttpPortEnabled(true);
+//            assertTrue(cluster.compile(builder2));
+//
+//            cluster2.startUp();
+//        }
     }
 
     @After
