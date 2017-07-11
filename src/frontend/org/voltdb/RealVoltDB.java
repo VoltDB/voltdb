@@ -4089,7 +4089,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_consumerDRGateway.setInitialConversationMembership(expectedClusterMembers.getFirst(),
                             expectedClusterMembers.getSecond());
                 }
-                m_consumerDRGateway.initialize(m_config.m_startAction.doesRejoin() || willDoActualRecover());
+                m_consumerDRGateway.initialize(m_config.m_startAction, willDoActualRecover());
             }
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),
