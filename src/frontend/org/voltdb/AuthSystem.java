@@ -732,7 +732,7 @@ public class AuthSystem {
                 m_authenticatedUser = m_user;
                 logAuthSuccess(m_authenticatedUser, fromAddress);
                 if (user.hasPermission(Permission.ADMIN)) {
-                	authLogger.info("You are logged in as root user");
+                    authLogger.info("You are logged in as root user");
                 }
                 return true;
             }
