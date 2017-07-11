@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
@@ -36,8 +35,6 @@ import org.voltdb.sysprocs.AdHocBase;
  *
  */
 public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
-
-    private static final VoltLogger clog = new VoltLogger("CIHM");
 
     // The default MP transaction id set by client interface when
     // initiating a single-partition transaction.
@@ -90,9 +87,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_isSinglePartition = rhs.m_isSinglePartition;
         m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
-        if (clog.isDebugEnabled()) {
-            clog.debug("Iv2InitiateTaskMessage copy constructor for repair, rhs: " + rhs, new RuntimeException());
-        }
         m_connectionId = rhs.m_connectionId;
     }
 
