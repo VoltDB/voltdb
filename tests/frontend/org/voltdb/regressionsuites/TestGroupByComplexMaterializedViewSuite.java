@@ -1598,7 +1598,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 "PRIMARY KEY (F_PKEY) ); " +
 
                 "CREATE VIEW V1 (V_D1_PKEY, V_D2_PKEY, V_D3_PKEY, V_F_PKEY, CNT, SUM_V1, SUM_V2, SUM_V3) " +
-                "AS SELECT F_D1, F_D2, F_D3, F_PKEY, MIN(F_VAL1), SUM(F_VAL1), SUM(F_VAL2), SUM(F_VAL3) " +
+                "AS SELECT F_D1, F_D2, F_D3, F_PKEY, COUNT(*) + 1, SUM(F_VAL1), SUM(F_VAL2), SUM(F_VAL3) " +
                 "FROM F  GROUP BY F_D1, F_D2, F_D3, F_PKEY;"
                 ;
         try {
@@ -1614,7 +1614,39 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
         lines = captured.split("\n");
 
         assertTrue(foundLineMatching(lines,
-                ".*V1.*must have count(.*) after the GROUP BY columns \\(if any\\)*"));
+                ".*V0.*must have non-group by columns aggregated by sum, count, min or max.*"));
+
+        VoltProjectBuilder project2 = new VoltProjectBuilder();
+        project2.setCompilerDebugPrintStream(capturing);
+        literalSchema =
+                "CREATE TABLE F ( " +
+                "F_PKEY INTEGER NOT NULL, " +
+                "F_D1   INTEGER NOT NULL, " +
+                "F_D2   INTEGER NOT NULL, " +
+                "F_D3   INTEGER NOT NULL, " +
+                "F_VAL1 INTEGER NOT NULL, " +
+                "F_VAL2 INTEGER NOT NULL, " +
+                "F_VAL3 INTEGER NOT NULL, " +
+                "PRIMARY KEY (F_PKEY) ); " +
+
+                "CREATE VIEW V2 (V_D1_PKEY, V_D2_PKEY, V_D3_PKEY, V_F_PKEY, CNT, SUM_V1, SUM_V2, SUM_V3) " +
+                "AS SELECT F_D1, F_D2, F_D3, F_PKEY, MIN(F_VAL1), SUM(F_VAL1), SUM(F_VAL2), SUM(F_VAL3) " +
+                "FROM F  GROUP BY F_D1, F_D2, F_D3, F_PKEY;"
+                ;
+        try {
+            project2.addLiteralSchema(literalSchema);
+        } catch (IOException e) {
+            fail();
+        }
+
+        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project2);
+        assertFalse(success);
+        captured = capturer.toString("UTF-8");
+        lines = captured.split("\n");
+
+        assertTrue(foundLineMatching(lines,
+                ".*V2.*must have count(.*) after the GROUP BY columns \\(if any\\)*"));
 
         // Real config for tests
         VoltProjectBuilder project = new VoltProjectBuilder();
