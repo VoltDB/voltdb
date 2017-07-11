@@ -36,9 +36,10 @@ public class InPrimitiveArrays extends VoltProcedure {
     public final SQLStmt aDBLSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE NUM IN ?;");
     public final SQLStmt aBIGDSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE DEC IN ?;");
     public final SQLStmt aSTRSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE VCHAR IN ?;");
+    public final SQLStmt anInsert = new SQLStmt("INSERT INTO ENG_12105 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public VoltTable[] run(String inpType, byte[][] byteArr, short[] shortArr, int[] intArr,
-            long[] lngArr, double[] dblArr, BigDecimal[] bigdArr, String[] strArr) {
+            long[] lngArr, double[] dblArr, BigDecimal[] bigdArr, String[] strArr, byte[] insByteArr) {
 
         switch (inpType) {
             case "BYTES":
@@ -61,6 +62,12 @@ public class InPrimitiveArrays extends VoltProcedure {
                 break;
             case "STRS":
                 voltQueueSQL(aSTRSelect, strArr);
+                break;
+            case "LNGINT":
+                voltQueueSQL(aINTSelect, lngArr);
+                break;
+            case "INSBYTES":
+                voltQueueSQL(anInsert, 1, null, null, null, null, null, null, null, null, null, null, insByteArr);
                 break;
         }
 
