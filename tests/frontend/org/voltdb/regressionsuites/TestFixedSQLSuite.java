@@ -37,6 +37,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 import org.voltdb_testprocs.regressionsuites.fixedsql.InsertBoxed;
 import org.voltdb_testprocs.regressionsuites.fixedsql.BoxedByteArrays;
@@ -348,68 +349,75 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, tables);
     }
 
+    // all these tests should not actually fail
     private void subTestInPrimitiveArrays() throws IOException, ProcCallException
     {
         Client client = getClient();
-        VoltTable[] results;
+
 
         try {
-            client.callProcedure("InPrimitiveArrays", "SHORTS", new short[]{1, 2, 3},
+            byte[][] byteArr = new byte[][]{ Encoder.hexDecode("0A"), Encoder.hexDecode("1E") };
+            client.callProcedure("InPrimitiveArrays", "BYTES", byteArr, null,
                     null, null, null, null, null).getResults();
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
-                          "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [S"));
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n"
+                          + "  Unknown type VoltType.INLIST_OF_BIGINT can not be converted "
+                          + "to NULL representation for arg 0 for SQL stmt: "
+                          + "SELECT * FROM ENG_12105 WHERE VARBIN IN ?"));
         }
 
         try {
-            client.callProcedure("InPrimitiveArrays", "INTS", null,
+            client.callProcedure("InPrimitiveArrays", "SHORTS", null, new short[]{1, 2, 3},
+                    null, null, null, null, null).getResults();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                          + "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [S"));
+        }
+
+        try {
+            client.callProcedure("InPrimitiveArrays", "INTS", null, null,
                     new int[]{1, 2, 3}, null, null, null, null).getResults();
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
-                          "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [I"));
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                          + "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [I"));
         }
 
         try {
-            client.callProcedure("InPrimitiveArrays", "LNGS", null, null,
+            client.callProcedure("InPrimitiveArrays", "LNGS", null, null, null,
                     new long[]{1L, 2L, 3L}, null, null, null).getResults();
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
-                            "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                            + "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
         }
 
         try {
-            client.callProcedure("InPrimitiveArrays", "DBLS", null, null, null,
+            client.callProcedure("InPrimitiveArrays", "DBLS", null, null, null, null,
                     new double[]{1.3, 3.1, 5.2}, null, null).getResults();
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
-                            "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: " +
-                            "Incompatible parameter type: can not convert type 'double[]' to 'INLIST_OF_BIGINT' " +
-                            "for arg 0 for SQL stmt: SELECT * FROM ENG_12105 WHERE NUM IN ?;. " +
-                            "Try explicitly using a long[] parameter"));
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                            + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                            + "Incompatible parameter type: can not convert type 'double[]' to 'INLIST_OF_BIGINT' "
+                            + "for arg 0 for SQL stmt: SELECT * FROM ENG_12105 WHERE NUM IN ?;. "
+                            + "Try explicitly using a long[] parameter"));
         }
 
         try {
-            client.callProcedure("InPrimitiveArrays", "BIGDS", null, null, null, null,
+            client.callProcedure("InPrimitiveArrays", "BIGDS", null, null, null, null, null,
                     new BigDecimal[]{new BigDecimal(1), new BigDecimal(2), new BigDecimal(3)}, null).getResults();
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n" +
-                            "  Number of arguments provided was 3 where 1 was expected " +
-                            "for statement SELECT * FROM ENG_12105 WHERE DEC IN ?;"));
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n"
+                            + "  Number of arguments provided was 3 where 1 was expected "
+                            + "for statement SELECT * FROM ENG_12105 WHERE DEC IN ?;"));
         }
 
         try {
-            client.callProcedure("InPrimitiveArrays", "STRS", null, null, null, null, null,
+            client.callProcedure("InPrimitiveArrays", "STRS", null, null, null, null, null, null,
                     new String[]{"1", "2", "3"}).getResults();
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n" +
-                            "  Number of arguments provided was 3 where 1 was expected " +
-                            "for statement SELECT * FROM ENG_12105 WHERE VCHAR IN ?;"));
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n"
+                            + "  Number of arguments provided was 3 where 1 was expected "
+                            + "for statement SELECT * FROM ENG_12105 WHERE VCHAR IN ?;"));
         }
-
-        String query =
-                String.format("select * from ENG_12105");
-        results = client.callProcedure("@AdHoc", query).getResults();
-        System.out.println(results);
 
         truncateTables(client, "ENG_12105");
     }

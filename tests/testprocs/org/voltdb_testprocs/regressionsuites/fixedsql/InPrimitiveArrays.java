@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 @ProcInfo(singlePartition = false)
 public class InPrimitiveArrays extends VoltProcedure {
 
+    public final SQLStmt aBYTESelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE VARBIN IN ?;");
     public final SQLStmt aSHORTSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE SMALL IN ?;");
     public final SQLStmt aINTSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE ID IN ?;");
     public final SQLStmt aLNGSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE BIG IN ?;");
@@ -36,10 +37,13 @@ public class InPrimitiveArrays extends VoltProcedure {
     public final SQLStmt aBIGDSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE DEC IN ?;");
     public final SQLStmt aSTRSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE VCHAR IN ?;");
 
-    public VoltTable[] run(String inpType, short[] shortArr, int[] intArr, long[] lngArr,
+    public VoltTable[] run(String inpType, byte[][] byteArr, short[] shortArr, int[] intArr, long[] lngArr,
               double[] dblArr, BigDecimal[] bigdArr, String[] strArr) {
 
         switch (inpType) {
+            case "BYTES":
+                voltQueueSQL(aBYTESelect, shortArr);
+                break;
             case "SHORTS":
                 voltQueueSQL(aSHORTSelect, shortArr);
                 break;
