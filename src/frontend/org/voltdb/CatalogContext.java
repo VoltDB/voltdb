@@ -45,6 +45,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
+import static org.voltdb.compiler.CatalogChangeResult.CATALOG_CHANGE_NOREPLAY;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -135,7 +136,7 @@ public class CatalogContext {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
         //This is only set to something other than m_uniqueId when we are replaying a UAC.
-        m_ccrTime = ((ccrTime == -1L) ? uniqueId : ccrTime);
+        m_ccrTime = ((ccrTime == CATALOG_CHANGE_NOREPLAY) ? uniqueId : ccrTime);
         // check the heck out of the given params in this immutable class
         if (catalog == null) {
             throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
