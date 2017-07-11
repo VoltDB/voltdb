@@ -43,7 +43,8 @@ public class InPrimitiveArrays extends VoltProcedure {
                 intArr[i++] = Integer.parseInt(s);
             }
             voltQueueSQL(aINTSelect, intArr);
-        } else if (inpType.equals("INTS")) {
+
+        } else if (inpType.equals("LNGS")) {
 
             long[] lngArr = new long[inpArr.length];
             int i = 0;
@@ -51,6 +52,7 @@ public class InPrimitiveArrays extends VoltProcedure {
                 lngArr[i++] = Long.parseLong(s);
             }
             voltQueueSQL(aLNGSelect, lngArr);
+
         }
 
         return voltExecuteSQL();
