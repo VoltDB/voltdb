@@ -29,13 +29,22 @@ import org.voltdb.*;
 @ProcInfo(singlePartition = false)
 public class InPrimitiveArrays extends VoltProcedure {
 
+    public final SQLStmt aSHORTSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE SMALL IN ?;");
     public final SQLStmt aINTSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE ID IN ?;");
-
     public final SQLStmt aLNGSelect = new SQLStmt("SELECT * FROM ENG_12105 WHERE BIG IN ?;");
 
     public VoltTable[] run(String inpType, String[] inpArr) {
 
-        if (inpType.equals("INTS")) {
+        if (inpType.equals("SHORTS")) {
+
+            short[] shortArr = new short[inpArr.length];
+            int i = 0;
+            for (String s : inpArr) {
+                shortArr[i++] = Short.parseShort(s);
+            }
+            voltQueueSQL(aSHORTSelect, shortArr);
+
+        } else if (inpType.equals("INTS")) {
 
             int[] intArr = new int[inpArr.length];
             int i = 0;

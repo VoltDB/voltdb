@@ -354,6 +354,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable[] results;
 
         try {
+            client.callProcedure("InPrimitiveArrays", "SHORTS",
+                    new String[]{"1", "2", "3"}).getResults();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n" +
+                          "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [S"));
+        }
+
+        try {
             client.callProcedure("InPrimitiveArrays", "INTS",
                     new String[]{"1", "2", "3"}).getResults();
         } catch (ProcCallException e) {
