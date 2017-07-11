@@ -120,7 +120,7 @@ public class ParameterConverter {
     private static final Pattern thousandSeparator = Pattern.compile("\\,");
 
     /**
-     * Given a string, covert it to a primitive type or return null.
+     * Given a string, covert it to a primitive type or boxed type of the primitive type or return null.
      *
      * If the string value is a VARBINARY constant of the form X'00ABCD', and the
      * expected class is one of byte, short, int or long, then we interpret the

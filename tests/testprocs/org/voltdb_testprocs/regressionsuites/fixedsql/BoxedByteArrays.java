@@ -49,6 +49,7 @@ public class BoxedByteArrays extends VoltProcedure {
     public final SQLStmt aBYTESelect = new SQLStmt
             ("SELECT * FROM ENG_539 WHERE VARBIN IN ?;");
 
+    // Byte[] is not currently being accepted as an input array type for Java SP
     public VoltTable[] run(String inpType, Integer id, byte[] varbin,
             byte[][] varbinArr, Long[] lngArr, Integer[] intArr, String inpString) {
 
