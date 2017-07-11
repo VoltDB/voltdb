@@ -61,7 +61,7 @@ public class TickProducer extends SiteTasker implements Runnable
     public void run()
     {
         m_taskQueue.offer(this);
-
+        // check if previous task is running for more than 5 seconds
         SiteTasker task = m_taskQueue.peek();
         long currentTime = System.nanoTime();
         long headOfQueueOfferTime;
@@ -79,7 +79,6 @@ public class TickProducer extends SiteTasker implements Runnable
                     + "No other jobs will be executed until that process completes.";
             long waitTime = (currentTime - m_previousTaskPeekTime)/1_000_000_000L; // in seconds
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null, fmt, waitTime, m_partitionId);
-//            m_logger.warn(logStr);
         }
     }
 

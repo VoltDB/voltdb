@@ -126,7 +126,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         return hostsSeen.size();
     }
 
-    public void NotestInvalidCalls() throws Exception {
+    public void testInvalidCalls() throws Exception {
         System.out.println("\n\nTESTING INVALID CALLS\n\n\n");
         Client client = getFullyConnectedClient();
         //
@@ -165,7 +165,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
     // Make sure @Statistics LATENCY returns sane data in the expected formats.
     //
-    public void NotestLatencyValidity() throws Exception {
+    public void testLatencyValidity() throws Exception {
         System.out.println("\n\nTESTING LATENCY STATS VALIDITY\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -276,7 +276,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
      * Keep trying until identical timestamps are observed -
      * an implementation that gives each call a unique timestamp will still fail the test.
      */
-    public void NotestLatencyTiming() throws Exception {
+    public void testLatencyTiming() throws Exception {
         System.out.println("\n\nTESTING LATENCY STATS TIMING\n\n\n");
         Client client = getFullyConnectedClient();
 
@@ -319,7 +319,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         assertTrue(afterTimestamp > beforeTimestamp);
     }
 
-    public void NotestLatencyCompressed() throws Exception {
+    public void testLatencyCompressed() throws Exception {
         System.out.println("\n\nTESTING LATENCY_COMPRESSED STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -362,7 +362,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         assertTrue(invocations > 0);
     }
 
-    public void NotestInitiatorStatistics() throws Exception {
+    public void testInitiatorStatistics() throws Exception {
         System.out.println("\n\nTESTING INITIATOR STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -420,7 +420,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         validateRowSeenAtAllHosts(results[0], columnTargets, true);
     }
 
-    public void NotestPartitionCount() throws Exception {
+    public void testPartitionCount() throws Exception {
         System.out.println("\n\nTESTING PARTITION COUNT\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -443,7 +443,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         assertEquals(PARTITIONS, partCount);
     }
 
-    public void NotestMemoryStatistics() throws Exception {
+    public void testMemoryStatistics() throws Exception {
         System.out.println("\n\nTESTING MEMORY STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -484,7 +484,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         validateRowSeenAtAllHosts(results[0], columnTargets, true);
     }
 
-    public void NotestIOStatistics() throws Exception {
+    public void testIOStatistics() throws Exception {
         System.out.println("\n\nTESTING IO STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -514,7 +514,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         validateSchema(results[0], expectedTable);
     }
 
-    public void NotestTopoStatistics() throws Exception {
+    public void testTopoStatistics() throws Exception {
         System.out.println("\n\nTESTING TOPO STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -580,7 +580,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         assertEquals(1, results[1].getRowCount());
     }
 
-    public void NotestLiveClientsStatistics() throws Exception {
+    public void testLiveClientsStatistics() throws Exception {
         System.out.println("\n\nTESTING LIVECLIENTS STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -617,7 +617,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         assertEquals(claimRecentAnalysis(), HOSTS, hostsHeardFrom);
     }
 
-    public void NotestStarvationStatistics() throws Exception {
+    public void testStarvationStatistics() throws Exception {
         System.out.println("\n\nTESTING STARVATION STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -688,7 +688,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         validateRowSeenAtAllHosts(results[0], columnTargets, false);
     }
 
-    public void NotestManagementStats() throws Exception {
+    public void testManagementStats() throws Exception {
         System.out.println("\n\nTESTING MANAGEMENT STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
