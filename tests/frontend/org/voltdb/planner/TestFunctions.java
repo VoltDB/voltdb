@@ -142,7 +142,8 @@ public class TestFunctions extends PlannerTestCase {
                 "Function 'rawtohex' is not supported in VoltDB: Custom Function");
         failToCompile("SELECT  HEXTORAW(VARCHAR_TYPE) FROM NUMERICFUN",
                 "Function 'hextoraw' is not supported in VoltDB: Custom Function");
-        //TODO : add (ATAN2)
+        failToCompile("SELECT  ATAN2(FLOAT_TYPE,FLOAT_TYPE) FROM NUMERICFUN",
+                "user lacks privilege or object not found: ATAN2");
 
     }
 
