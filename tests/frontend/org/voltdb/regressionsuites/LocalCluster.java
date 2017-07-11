@@ -1654,7 +1654,11 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     @Override
-    synchronized public void shutDown() throws InterruptedException {
+    public void shutDown() throws InterruptedException {
+        shutDown(true);
+    }
+
+    public synchronized void shutDown(boolean clearLogMatches) throws InterruptedException {
         // there are couple of ways to shutdown. sysproc @kill could be
         // issued to listener. this would require that the test didn't
         // break the cluster somehow.  Or ... just old fashioned kill?
@@ -1672,7 +1676,7 @@ public class LocalCluster extends VoltServerConfig {
         }
         shutDownExternal();
 
-        if (m_logMessageMatchPatterns != null) {
+        if (m_logMessageMatchPatterns != null && clearLogMatches) {
             resetLogMessageMatchResults();
         }
 

@@ -23,7 +23,6 @@
 
 package org.voltdb.regressionsuites;
 
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,60 +32,33 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.importclient.socket.PullSocketImporterFactory;
+import org.voltdb.importclient.kafka.KafkaStreamImporterFactory;
 
 import java.io.File;
-import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 
-/** Importer tests that exercise ChannelDistributer, but don't inherently require something like Kafka.
+/** Tests a specific scenario where the importer never finishes starting up before the cluster is paused and shut down.
+ * An error was being thrown to the log for a benign condition.
+ * This scenario isn't Kafka specific, but is easiest to reproduce with a Kafka importer but no Kafka.
  * Created by bshaw on 7/10/17.
  */
-public class TestChannelDistributedImporterSuite {
+public class TestImporterStopAfterIncompleteStart {
     private LocalCluster m_cluster = null;
-    private Thread m_importerSource = null;
-    private CountDownLatch m_startupLatch = null;
-    private AtomicReference<Throwable> m_importerSourceException = new AtomicReference<>(null);
 
-    private static final String ERRORS_LOG_PATTERN = "ERROR";
-
-    /** Something for the importer to pull from. */
-    private class ImporterSource extends Thread {
-
-        final int m_port;
-
-        ImporterSource(int port) {
-            m_port = port;
-        }
-
-        @Override
-        public void run() {
-            try (ServerSocket socket = new ServerSocket(m_port)) {
-                Assert.assertTrue(socket.isBound());
-                m_startupLatch.countDown();
-                while (!interrupted()) {
-                    Thread.sleep(250);
-                }
-            } catch (Throwable t) {
-                m_importerSourceException.compareAndSet(null, t);
-            }
-        }
-    }
+    // This is how we know the appropriate code path was executed
+    private static final String CHANNEL_UNREGISTRATION_PATTERN = "Skipping channel un-registration for KafkaStreamImporter";
+    // Any errors except 'Failed to send topic metadata' fail the test
+    private static final String ERRORS_PATTERN = "ERROR(?!.*?Failed to send topic metadata request for topic)";
 
     @Before
     public void setUp() throws Exception {
-        final int PORT = 7001;
-        m_startupLatch = new CountDownLatch(1);
-        m_importerSource = new ImporterSource(PORT);
-        m_importerSource.start();
-        m_startupLatch.await();
+        String schema = "CREATE TABLE test ( val BIGINT NOT NULL );\n"
+                      + "PARTITION TABLE test ON COLUMN val;\n";
 
         m_cluster = new LocalCluster(
-                "CREATE TABLE test ( val BIGINT NOT NULL );",
+                schema,
                 null,
                 null,
                 1, 1, 0, 0,
@@ -95,7 +67,8 @@ public class TestChannelDistributedImporterSuite {
                 false, false, null);
 
         List<String> logSearchPatterns = new ArrayList<>(1);
-        logSearchPatterns.add(ERRORS_LOG_PATTERN);
+        logSearchPatterns.add(CHANNEL_UNREGISTRATION_PATTERN);
+        logSearchPatterns.add(ERRORS_PATTERN);
         m_cluster.setHasLocalServer(false);
         m_cluster.setLogSearchPatterns(logSearchPatterns);
         m_cluster.overrideAnyRequestForValgrind();
@@ -103,12 +76,14 @@ public class TestChannelDistributedImporterSuite {
         project.setUseDDLSchema(true);
 
         // Verify that the importer we're configuring will use ChannelDistributer
-        Assert.assertFalse(new PullSocketImporterFactory().isImporterRunEveryWhere());
+        Assert.assertFalse(new KafkaStreamImporterFactory().isImporterRunEveryWhere());
 
+        // We don't actually want Kafka to be found. Use a non-default port and don't launch Kafka.
         Properties props = RegressionSuite.buildProperties(
-                "addresses", "localhost:" + PORT,
+                "brokers", "localhost:9999",
+                "topics", "T8_KAFKATABLE",
                 "procedure", "test.insert");
-        project.addImport(true, "custom", "csv", "pullsocketimporter.jar", props);
+        project.addImport(true, "kafka", "csv", "kafkastream.jar", props);
 
         m_cluster.compileDeploymentOnly(project);
         new File(project.getPathToDeployment()).deleteOnExit();
@@ -116,27 +91,21 @@ public class TestChannelDistributedImporterSuite {
         m_cluster.startUp();
     }
 
-    @After
-    public void tearDown() throws Exception {
-        m_cluster.shutDown();
-        m_importerSource.interrupt();
-        m_importerSource.join();
-    }
-
     @Test
-    public void testImporterWithNoData() throws Exception {
+    public void test() throws Exception {
         Client client = m_cluster.createAdminClient(new ClientConfig());
         try {
-            ClientResponse response;
-            response = client.callProcedure("@Pause");
+            ClientResponse response = client.callProcedure("@Pause");
             Assert.assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            m_cluster.shutDown();
+            m_cluster.shutDown(false);
         } finally {
             client.close();
         }
         // With ENG-12070 the above procedure worked, but threw a spurious error in the log
-        Assert.assertFalse(m_cluster.verifyLogMessage(ERRORS_LOG_PATTERN));
-        Assert.assertTrue(m_cluster.verifyLogMessageNotExist(ERRORS_LOG_PATTERN));
+        Assert.assertTrue("Did not find channel unregistration message - perhaps the test is broken?",
+                m_cluster.verifyLogMessage(CHANNEL_UNREGISTRATION_PATTERN));
+        Assert.assertTrue("Found ERROR - failing test",
+                m_cluster.verifyLogMessageNotExist(ERRORS_PATTERN));
     }
 }
 
