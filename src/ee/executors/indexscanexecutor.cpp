@@ -191,6 +191,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     TableTuple temp_tuple;
+    m_projectionNode = static_cast<ProjectionPlanNode *>(m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+
     if (m_aggExec != NULL || m_insertExec != NULL) {
         const TupleSchema * inputSchema = tableIndex->getTupleSchema();
         if (m_projectionNode != NULL) {
@@ -213,7 +215,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // INLINE PROJECTION
     //
-    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION) != NULL) {
+    if (m_projectionNode) {
         m_projectionNode = static_cast<ProjectionPlanNode*>
             (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
 
