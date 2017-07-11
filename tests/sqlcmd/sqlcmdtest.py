@@ -339,6 +339,26 @@ def do_main():
                 # TODO launch a hard-coded script that verifies a clean database and healthy server
                 # ("show tables" or equivalent) after each test run to prevent cross-contamination.
 
+                childout = open(os.path.join(parent, prefix + '.out' + '.test'), 'w+')
+                print "Running.. " + os.path.join(parent, prefix + '.out' + '.test')
+
+                childerr = open(os.path.join(parent, prefix + '.err' + '.test'), 'w+')
+                print "Running.. " + os.path.join(parent, prefix + '.err' + '.test')
+                #get the result of the query in output file
+                subprocess.call(['../../bin/sqlcmd','--query=exec @Statistics table 1 --output-skip-metadata --output-format=csv'],
+                    stdout=childout)
+                # parse output file
+
+                pfile = file(os.path.join(parent, prefix + '.out' + '.test'), 'r')
+
+                for line in pfile:
+                    columns = line.split(' ')
+                    try:
+                        if columns[10] != ' ' :
+                            print "table name is :", columns[10];
+                    except IndexError:
+                        pass
+
                 # fuzz the sqlcmd output for reliable comparison
                 clean_output(parent, prefix + '.out')
                 clean_output(parent, prefix + '.err')
@@ -352,6 +372,8 @@ def do_main():
                         prefix + '.err', inpath,
                         options.refresh, reportout):
                     haddiffs = True;
+
+
     finally:
         kill_voltdb()
         print "Summary report written to file://" + os.path.abspath(options.report_file)
