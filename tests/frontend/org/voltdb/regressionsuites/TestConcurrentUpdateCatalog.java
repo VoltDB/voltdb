@@ -71,6 +71,7 @@ public class TestConcurrentUpdateCatalog {
         config = new LocalCluster("concurrentCatalogUpdate-cluster-addmoretable.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new VoltProjectBuilder();
         project.addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER, PRIMARY KEY (A1));");
+        // Add many tables to make sure this catalog is slow to write
         for (int i = 0; i < 100; i++) {
             project.addLiteralSchema("CREATE TABLE NEWTABLE" + Integer.toString(i) +
                                      " (A1 INTEGER, PRIMARY KEY (A1));");
@@ -88,18 +89,10 @@ public class TestConcurrentUpdateCatalog {
         client.updateApplicationCatalog(cb1, new File(newCatalogURL1), new File(deploymentURL));
         client.updateApplicationCatalog(cb2, new File(newCatalogURL2), new File(deploymentURL));
 
-        cb1.waitForResponse();
-        cb2.waitForResponse();
-
         // System.err.println("cb1: " + Byte.toString(cb1.getResponse().getStatus()) + " " + cb1.getResponse().getStatusString());
         // System.err.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
 
-
-        // Only one of them should succeed
-        assertTrue(ClientResponse.USER_ABORT == cb2.getResponse().getStatus()
-                || ClientResponse.USER_ABORT == cb1.getResponse().getStatus());
-        assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
-                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
+        checkResults(cb1, cb2);
     }
 
     @Test
@@ -109,6 +102,7 @@ public class TestConcurrentUpdateCatalog {
 
         InMemoryJarfile jar = new InMemoryJarfile();
         VoltCompiler comp = new VoltCompiler(false);
+        // Add some dummy classes
         comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
         comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.testImportProc.class);
         comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.TestProcWithSQLStmt.class);
@@ -121,19 +115,26 @@ public class TestConcurrentUpdateCatalog {
         client.callProcedure(cb1, "@UpdateClasses", jar.getFullJarBytes(), null);
         client.callProcedure(cb2, "@UpdateClasses", jar.getFullJarBytes(), null);
 
-        cb1.waitForResponse();
-        cb2.waitForResponse();
-
-        // Only one of them should succeed
-        assertTrue(ClientResponse.USER_ABORT == cb2.getResponse().getStatus()
-                || ClientResponse.USER_ABORT == cb1.getResponse().getStatus());
-        assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
-                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
+        checkResults(cb1, cb2);
     }
 
+    @Test
+    public void testConcurrentAdHoc() throws Exception {
+        init(true);
 
-    public void testConcurrentAdHoc() {
+        ClientImpl client  = getClient();
+        SyncCallback cb1 = new SyncCallback();
+        SyncCallback cb2 = new SyncCallback();
+        StringBuilder sb1 = new StringBuilder();
+        StringBuilder sb2 = new StringBuilder();
+        for (int i = 0; i < 200; i++) {
+            sb1.append("CREATE TABLE T" + Integer.toString(i) + " (ID INT PRIMARY KEY, A INT UNIQUE);");
+            sb2.append("CREATE TABLE K" + Integer.toString(i) + " (ID INT, A INT UNIQUE, B VARCHAR(30));");
+        }
+        client.callProcedure(cb1, "@AdHoc", sb1.toString());
+        client.callProcedure(cb2, "@AdHoc", sb2.toString());
 
+        checkResults(cb1, cb2);
     }
 
 
@@ -163,6 +164,7 @@ public class TestConcurrentUpdateCatalog {
     public void shutdown() throws Exception {
         if (cluster != null)
             cluster.shutDown();
+        cluster = null;
     }
 
     private static ClientImpl getClient() throws Exception {
@@ -173,5 +175,26 @@ public class TestConcurrentUpdateCatalog {
 
         assertTrue(client instanceof ClientImpl);
         return (ClientImpl) client;
+    }
+
+    /*
+     * Helper function to check the results of 2 concurrent calls, assuming
+     * only one of them should become the winner
+     */
+    private void checkResults(SyncCallback cb1, SyncCallback cb2) throws Exception {
+        cb1.waitForResponse();
+        cb2.waitForResponse();
+
+//        System.err.println(cb1.getResponse().getStatus());
+//        System.err.println(cb1.getResponse().getStatusString());
+//
+//        System.err.println(cb2.getResponse().getStatus());
+//        System.err.println(cb2.getResponse().getStatusString());
+
+        // Only one of them should succeed
+        assertTrue(ClientResponse.USER_ABORT == cb2.getResponse().getStatus()
+                || ClientResponse.USER_ABORT == cb1.getResponse().getStatus());
+        assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
+                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
     }
 }
