@@ -278,8 +278,8 @@ public class TestUpdateDeployment extends RegressionSuite {
         cb1.waitForResponse();
         cb2.waitForResponse();
 
-        System.err.println("cb1: " + Byte.toString(cb1.getResponse().getStatus()) + " " + cb1.getResponse().getStatusString());
-        System.err.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
+        // System.err.println("cb1: " + Byte.toString(cb1.getResponse().getStatus()) + " " + cb1.getResponse().getStatusString());
+        // System.err.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
 
         // One should succeed, the other one should fail
         assertTrue(ClientResponse.USER_ABORT == cb2.getResponse().getStatus()

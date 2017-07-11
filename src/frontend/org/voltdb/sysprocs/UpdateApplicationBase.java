@@ -473,9 +473,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                               String hostname,
                                                               String user)
     {
-        // DEBUG
-        System.err.println("================= Start updateCatalog !!! ===================");
-
         // create the catalog update blocker first
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
@@ -638,9 +635,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             cleanUpTempCatalog();
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
         }
-
-        // DEBUG
-        System.err.println("================= End updateCatalog !!! ===================");
 
         return response;
     }
