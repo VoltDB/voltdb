@@ -25,7 +25,6 @@ package org.voltdb_testprocs.regressionsuites.fixedsql;
 
 import org.voltdb.*;
 import java.math.BigDecimal;
-//import org.apache.commons.lang.ArrayUtils;
 
 @ProcInfo(singlePartition = false)
 public class InPrimitiveArrays extends VoltProcedure {
@@ -40,18 +39,25 @@ public class InPrimitiveArrays extends VoltProcedure {
     public VoltTable[] run(String inpType, short[] shortArr, int[] intArr, long[] lngArr,
               double[] dblArr, BigDecimal[] bigdArr, String[] strArr) {
 
-        if (inpType.equals("SHORTS")) {
-            voltQueueSQL(aSHORTSelect, shortArr);
-        } else if (inpType.equals("INTS")) {
-            voltQueueSQL(aINTSelect, intArr);
-        } else if (inpType.equals("LNGS")) {
-            voltQueueSQL(aLNGSelect, lngArr);
-        } else if (inpType.equals("DBLS")) {
-            voltQueueSQL(aDBLSelect, dblArr);
-        } else if (inpType.equals("BIGDS")) {
-            voltQueueSQL(aBIGDSelect, bigdArr);
-        } else if (inpType.equals("STRS")) {
-            voltQueueSQL(aSTRSelect, strArr);
+        switch (inpType) {
+            case "SHORTS":
+                voltQueueSQL(aSHORTSelect, shortArr);
+                break;
+            case "INTS":
+                voltQueueSQL(aINTSelect, intArr);
+                break;
+            case "LNGS":
+                voltQueueSQL(aLNGSelect, lngArr);
+                break;
+            case "DBLS":
+                voltQueueSQL(aDBLSelect, dblArr);
+                break;
+            case "BIGDS":
+                voltQueueSQL(aBIGDSelect, bigdArr);
+                break;
+            case "STRS":
+                voltQueueSQL(aSTRSelect, strArr);
+                break;
         }
 
         return voltExecuteSQL();
