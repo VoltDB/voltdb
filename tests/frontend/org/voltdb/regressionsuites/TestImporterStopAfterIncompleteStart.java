@@ -96,7 +96,7 @@ public class TestImporterStopAfterIncompleteStart {
         try {
             ClientResponse response = client.callProcedure("@Pause");
             Assert.assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            m_cluster.shutDown(false);
+            m_cluster.shutDown();
         } finally {
             client.close();
         }
