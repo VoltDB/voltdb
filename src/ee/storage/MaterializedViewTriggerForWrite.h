@@ -68,18 +68,21 @@ private:
                                           const NValue &initialNull,
                                           int negate_for_min,
                                           int aggIndex,
-                                          int minMaxAggIdx);
+                                          int minMaxAggIdx,
+                                          int aggExprOffset);
 
     NValue findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
                                              const NValue &existingValue,
                                              const NValue &initialNull,
                                              int negate_for_min,
-                                             int aggIndex);
+                                             int aggIndex,
+                                             int aggExprOffset);
 
     NValue findFallbackValueUsingPlan(const TableTuple& oldTuple,
                                       const NValue &initialNull,
                                       int aggIndex,
-                                      int minMaxAggIdx);
+                                      int minMaxAggIdx,
+                                      int aggExprOffset);
 
     // the source persistent table
     PersistentTable *m_srcPersistentTable;
