@@ -161,19 +161,30 @@ public class TestSplitSQLStatements {
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
     }
 
-//    @Test
-//    public void testProcSQLSplitWithCase() {
-//
-//        String sql1 = "create procedure thisproc as "
-//                + "begin "
-//                + "SELECT a, "
-//                + "CASE WHEN a > 100.00 "
-//                + "THEN 'Expensive' "
-//                + "ELSE 'Cheap' "
-//                + "END "
-//                + "FROM t; "
-//                + "end;";
-//        checkSplitter(sql1, sql1.substring(0, sql1.length() - 1));
-//    }
+    @Test
+    public void testProcSQLSplitWithCase() {
+
+        String sql = "create procedure thisproc as "
+                + "begin "
+                + "SELECT a, "
+                + "CASE WHEN a > 100.00 "
+                + "THEN 'Expensive' "
+                + "ELSE 'Cheap' "
+                + "END "
+                + "FROM t; "
+                + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        sql = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t; /*comment will still exist*/"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "select a, "
+                + "case when a > 100.00 then 'Expensive' else 'Cheap' end "
+                + "from t;"
+                + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+    }
 
 }
