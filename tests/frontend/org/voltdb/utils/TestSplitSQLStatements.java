@@ -131,4 +131,31 @@ public class TestSplitSQLStatements {
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
     }
 
+    @Test
+    public void testProcSQLSplitWithComments() {
+//          String sql = "create procedure thisproc as "
+//                + "begin \n"
+//                + "select * from t;"
+//                + "select * from r where f = 'foo';"
+//                + "select * from r where f = 'begin' or f = 'END';"
+//                + "end;";
+
+
+        String sql1 = "create procedure thisproc as "
+                  + "begin --one\n"
+                  + "select * from t;"
+                  + "select * from r where f = 'foo';"
+                  + "select * from r where f = 'begin' or f = 'END';"
+                  + "end;";
+        checkSplitter(sql1, sql1.substring(0, sql1.length() - 1));
+
+        sql1 = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t; /*comment will still exist*/"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "end;";
+        checkSplitter(sql1, sql1.substring(0, sql1.length() - 1));
+    }
+
 }
