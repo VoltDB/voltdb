@@ -345,19 +345,29 @@ def do_main():
                 childerr = open(os.path.join(parent, prefix + '.err' + '.test'), 'w+')
                 print "Running.. " + os.path.join(parent, prefix + '.err' + '.test')
                 #get the result of the query in output file
-                subprocess.call(['../../bin/sqlcmd','--query=exec @Statistics table 1 --output-skip-metadata --output-format=csv'],
+                subprocess.call(['../../bin/sqlcmd', '--query=exec @Statistics table 1', '--output-skip-metadata', '--output-format=csv'],
                     stdout=childout)
                 # parse output file
 
                 pfile = file(os.path.join(parent, prefix + '.out' + '.test'), 'r')
-
+                tableset = set()
                 for line in pfile:
-                    columns = line.split(' ')
+                    columns = line.split(',')
                     try:
-                        if columns[10] != ' ' :
-                            print "table name is :", columns[10];
+                        if columns[5] != ' ' :
+                            tablename = columns[5].replace('\"','')
+                            tableset.add(tablename)
                     except IndexError:
                         pass
+
+                # if set is not empty drop tables in batch
+                if len(tableset) :
+                    for tablename in tableset:
+                        print tablename
+                        sqlcmdopt = '--query=drop table ' + tablename
+                        subprocess.call(['../../bin/sqlcmd', sqlcmdopt])
+                        print "dropped table :" + tablename
+
 
                 # fuzz the sqlcmd output for reliable comparison
                 clean_output(parent, prefix + '.out')
