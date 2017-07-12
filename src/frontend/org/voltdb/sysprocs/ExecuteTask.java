@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
@@ -43,6 +44,7 @@ public class ExecuteTask extends VoltSystemProcedure {
     private static final int DEP_executeTask = (int) SysProcFragmentId.PF_executeTask | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_executeTaskAggregate = (int) SysProcFragmentId.PF_executeTaskAggregate;
 
+    static final VoltLogger log = new VoltLogger("TM");
 
     static VoltTable createDRTupleStreamStateResultTable()
     {
@@ -193,6 +195,16 @@ public class ExecuteTask extends VoltSystemProcedure {
     }
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] params) {
+        if (log.isDebugEnabled()) {
+            log.debug("Called ExecuteTask on MPI with param size of " + params.length);
+        }
+        if (params.length == 0) {
+            // This is a way for forcing the MPI to execute a runnable without doing anything
+            VoltTable result = new VoltTable(STATUS_SCHEMA);
+            result.addRow(STATUS_OK);
+            return new VoltTable[] {result};
+        }
+
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
 
         pfs[0] = new SynthesizedPlanFragment();

@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.concurrent.LinkedTransferQueue;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.StarvationTracker;
 
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
@@ -27,9 +28,16 @@ public class SiteTaskerQueue
 {
     private final LinkedTransferQueue<SiteTasker> m_tasks = new LinkedTransferQueue<SiteTasker>();
     private StarvationTracker m_starvationTracker;
+    private QueueDepthTracker m_queueDepthTracker;
 
     public boolean offer(SiteTasker task)
     {
+        task.setQueueOfferTime();
+        // update tracker before enqueue the task
+        // prevent another thread from polling a task and decrementing
+        // the queue depth before it is incremented
+        // i.e. avoid queueDepth < 0
+        m_queueDepthTracker.offerUpdate();
         return m_tasks.offer(task);
     }
 
@@ -37,13 +45,18 @@ public class SiteTaskerQueue
     public SiteTasker take() throws InterruptedException
     {
         SiteTasker task = m_tasks.poll();
+
         if (task == null) {
             m_starvationTracker.beginStarvation();
         } else {
+            m_queueDepthTracker.pollUpdate(task.getQueueOfferTime());
             return task;
         }
         try {
-            return CoreUtils.queueSpinTake(m_tasks);
+            task = CoreUtils.queueSpinTake(m_tasks);
+            // task is never null
+            m_queueDepthTracker.pollUpdate(task.getQueueOfferTime());
+            return task;
         } finally {
             m_starvationTracker.endStarvation();
         }
@@ -52,7 +65,11 @@ public class SiteTaskerQueue
     // Non-blocking poll on the site tasker queue.
     public SiteTasker poll()
     {
-        return m_tasks.poll();
+        SiteTasker task = m_tasks.poll();
+        if (task != null) {
+            m_queueDepthTracker.pollUpdate(task.getQueueOfferTime());
+        }
+        return task;
     }
 
     // Non-blocking peek on the site tasker queue.
@@ -67,5 +84,10 @@ public class SiteTaskerQueue
 
     public void setStarvationTracker(StarvationTracker tracker) {
         m_starvationTracker = tracker;
+    }
+
+    public void setQueueDepthTracker(QueueDepthTracker tracker) {
+        m_queueDepthTracker = tracker;
+        m_queueDepthTracker.beginQueueDepth(m_tasks.size(), m_tasks);
     }
 }
