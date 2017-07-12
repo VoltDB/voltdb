@@ -88,6 +88,22 @@ public class TestSplitSQLStatements {
                 "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;");
         checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end",
                 "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end");
+
+        String sql = "SELECT a, "
+                + "CASE WHEN a > 100.00 "
+                + "THEN 'Expensive'"
+                + "ELSE 'Cheap'"
+                + "END "
+                + "FROM t";
+        checkSplitter(sql, sql);
+
+        sql = "create procedure thisproc as "
+              + "begin "
+              + "select * from t;"
+              + "select * from r where f = 'foo';"
+              + "select * from r where f = 'begin' or f = 'END';"
+              + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
     }
 
 }
