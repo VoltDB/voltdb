@@ -32,8 +32,8 @@ public class MicroOptimizationRunner {
     private static final VoltLogger m_logger = new VoltLogger("MICROOPTIMIZER");
 
     public enum Phases {
-        SELECT_CONSTRUCTION_PHASE,
-        AFTER_BEST_SELECTION
+        DURING_PLAN_ASSEMBLY,
+        AFTER_COMPLETE_PLAN_ASSEMBLY
     };
 
     // list all of the micro optimizations here

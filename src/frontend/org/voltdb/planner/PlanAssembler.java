@@ -1161,7 +1161,7 @@ public class PlanAssembler {
         // LIMIT push down, Table count / Counting Index, Optimized Min/Max
         MicroOptimizationRunner.applyAll(plan,
                                          m_parsedSelect,
-                                         MicroOptimizationRunner.Phases.SELECT_CONSTRUCTION_PHASE);
+                                         MicroOptimizationRunner.Phases.DURING_PLAN_ASSEMBLY);
         return plan;
     }
 
@@ -1660,7 +1660,9 @@ public class PlanAssembler {
 
         // the root of the insert plan may be an InsertPlanNode, or
         // it may be a scan plan node.  We may do an inline InsertPlanNode
-        // as well.
+        // as well.  All inlining of insert nodes will be done later,
+        // in a microoptimzation.  We can't do it here, since we
+        // may need to remove uneeded projection nodes.
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
         if (subquery != null) {
@@ -1671,7 +1673,6 @@ public class PlanAssembler {
         // where to put values produced by child into the row to be inserted.
         insertNode.setFieldMap(fieldMap);
 
-        AbstractPlanNode root = insertNode;
         if (matSchema != null) {
             MaterializePlanNode matNode =
                     new MaterializePlanNode(matSchema);
@@ -1685,7 +1686,7 @@ public class PlanAssembler {
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
-            retval.rootPlanGraph = root;
+            retval.rootPlanGraph = insertNode;
             return retval;
         }
 
@@ -1693,7 +1694,7 @@ public class PlanAssembler {
         // Add a compensating sum of modified tuple counts or a limit 1
         // AND a send on top of a union-like receive node.
         boolean isReplicated = targetTable.getIsreplicated();
-        retval.rootPlanGraph = addCoordinatorToDMLNode(root, isReplicated);
+        retval.rootPlanGraph = addCoordinatorToDMLNode(insertNode, isReplicated);
         return retval;
     }
 

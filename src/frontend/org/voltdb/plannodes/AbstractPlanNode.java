@@ -469,15 +469,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     /**
      * Find the true output schema.  This may be in some child
-     * node.
+     * node.  This seems to be the search order when constructing
+     * a plan node in the EE.
      *
      * There are several cases.
-     * 1.) If the child has an output schema, that's
-     *     the one we want.
-     * 2.) If the child has no output schema but it
+     * 1.) If the child has an output schema, and if it is
+     *     not a copy of one of its children's schemas,
+     *     that's the one we want.  We know it's a copy
+     *     if m_hasSignificantOutputSchema is false.
+     * 2.) If the child has no significant output schema but it
      *     has an inline projection node, then
      *     a.) If it does <em>not</em> have an inline insert
-     *         nodde then the output schema of the child is
+     *         node then the output schema of the child is
      *         the output schema of the inline projection node.
      *     b.) If the output schema has an inline insert node
      *         then the output schema is the usual DML output
@@ -486,7 +489,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      *         this case in this function.  This function is
      *         only called from the microoptimizer to remove
      *         projection nodes.  So we don't see a projection
-     *         node on top of an inlined insert node.
+     *         node on top of a node with an inlined insert node.
      *  3.) Otherwise, the output schema is the output schema
      *      of the child's first child.  We should be able to
      *      follow the first children until we get something
@@ -498,7 +501,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * inserting into the target table.  The output schema of
      * the child node will be the output schema of the insert
      * node, which will be the usual DML schema.  This has one
-     * integer column counting the number of rows inserted.
+     * long integer column counting the number of rows inserted.
      *
      * @param node
      * @return The true output schema.  This will never return null.
@@ -512,7 +515,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         //       different there, but I think this has the corner
         //       cases covered correctly.
         while (childSchema == null || ( ! child.m_hasSignificantOutputSchema) ) {
-            AbstractPlanNode childProj = (ProjectionPlanNode)child.getInlinePlanNode(PlanNodeType.PROJECTION);
+            AbstractPlanNode childProj = child.getInlinePlanNode(PlanNodeType.PROJECTION);
             if (childProj != null) {
                 AbstractPlanNode inlineInsertNode = childProj.getInlinePlanNode(PlanNodeType.INSERT);
                 if (inlineInsertNode != null) {

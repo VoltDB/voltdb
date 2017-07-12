@@ -441,7 +441,7 @@ public class QueryPlanner {
         // can compute the best selection microoptimizations.
         MicroOptimizationRunner.applyAll(bestPlan,
                                          parsedStmt,
-                                         MicroOptimizationRunner.Phases.AFTER_BEST_SELECTION);
+                                         MicroOptimizationRunner.Phases.AFTER_COMPLETE_PLAN_ASSEMBLY);
         if (parsedStmt instanceof ParsedSelectStmt) {
             List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
             ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
