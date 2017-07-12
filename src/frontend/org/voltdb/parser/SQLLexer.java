@@ -401,7 +401,7 @@ public class SQLLexer extends SQLPatternFactory
                 }  else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
                 if ( (buf[iCur] == 'B' || buf[iCur] == 'b')
-                        && (iCur + 4 < buf.length)
+                        && (iCur <= buf.length - 5)
                         && String.copyValueOf(buf, iCur, 5).equalsIgnoreCase("BEGIN")) {
                     inBegin = true;
                     iCur += 5;
@@ -420,7 +420,7 @@ public class SQLLexer extends SQLPatternFactory
                     cQuote = buf[iCur];
                     iCur++;
                 } else if ( inBegin && (buf[iCur] == 'E' || buf[iCur] == 'e')
-                        && (iCur + 2 < buf.length)
+                        && (iCur <= buf.length - 3)
                         && String.copyValueOf(buf, iCur, 3).equalsIgnoreCase("END") ) {
                     inBegin = false;
                     iCur += 3;
