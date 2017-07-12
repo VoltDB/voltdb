@@ -29,14 +29,15 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
+import org.voltdb.QueueDepthTracker;
 import org.voltdb.StarvationTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
+import junit.framework.TestCase;
 
 public class TestTransactionTaskQueue extends TestCase
 {
@@ -44,6 +45,7 @@ public class TestTransactionTaskQueue extends TestCase
     private static SiteTaskerQueue getSiteTaskerQueue() {
         SiteTaskerQueue queue = new SiteTaskerQueue();
         queue.setStarvationTracker(new StarvationTracker(0));
+        queue.setQueueDepthTracker(new QueueDepthTracker(0));
         return queue;
     }
 

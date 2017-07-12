@@ -37,7 +37,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
@@ -192,7 +191,7 @@ public abstract class StatementCompiler {
                 plan = planner.plan();
                 assert(plan != null);
             }
-            catch (PlanningErrorException e) {
+            catch (Exception e) {
                 // These are normal expectable errors -- don't normally need a stack-trace.
                 String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") \"" +
                         catalogStmt.getSqltext() + "\".";
@@ -200,10 +199,6 @@ public abstract class StatementCompiler {
                     msg += " Error: \"" + e.getMessage() + "\"";
                 }
                 throw compiler.new VoltCompilerException(msg);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
             }
 
             // There is a hard-coded limit to the number of parameters that can be passed to the EE.
