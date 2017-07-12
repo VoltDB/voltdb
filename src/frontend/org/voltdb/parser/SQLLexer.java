@@ -387,27 +387,27 @@ public class SQLLexer extends SQLPatternFactory
                     // Move past an ordinary character.
                     iCur++;
                 }
-            } else if (inBegin) {
-                // inside BEGIN ... END for multi stmt procedure
-                // proceed till END
-                // TODO: take care of CASE END
-                if ( (buf[iCur] == 'E' || buf[iCur] == 'e')
-                        && (iCur + 2 < buf.length)
-                        && String.copyValueOf(buf, iCur, 3).equalsIgnoreCase("END") ) {
-                        inBegin = false;
-                        iCur += 3;
-                } else
-                    iCur++;
-            }
-            else {
+//            } else if (inBegin) {
+//                // inside BEGIN ... END for multi stmt procedure
+//                // proceed till END
+//                // TODO: take care of CASE END
+//                if ( (buf[iCur] == 'E' || buf[iCur] == 'e')
+//                        && (iCur + 2 < buf.length)
+//                        && String.copyValueOf(buf, iCur, 3).equalsIgnoreCase("END") ) {
+//                        inBegin = false;
+//                        iCur += 3;
+//                } else
+//                    iCur++;
+                }  else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
                 if ( (buf[iCur] == 'B' || buf[iCur] == 'b')
                         && (iCur + 4 < buf.length)
                         && String.copyValueOf(buf, iCur, 5).equalsIgnoreCase("BEGIN")) {
                     inBegin = true;
                     iCur += 5;
-                } else if (buf[iCur] == ';') {
+                } else if ( !inBegin && buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
+                    // if it is not in a BEGIN ... END
                     String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
                     if (!statement.isEmpty()) {
                         statements.add(statement);
@@ -419,6 +419,11 @@ public class SQLLexer extends SQLPatternFactory
                     // Start of quoted string.
                     cQuote = buf[iCur];
                     iCur++;
+                } else if ( inBegin && (buf[iCur] == 'E' || buf[iCur] == 'e')
+                        && (iCur + 2 < buf.length)
+                        && String.copyValueOf(buf, iCur, 3).equalsIgnoreCase("END") ) {
+                    inBegin = false;
+                    iCur += 3;
                 } else if (iCur <= buf.length - 2) {
                     // Comment (double-dash or C-style)?
                     if (buf[iCur] == '-' && buf[iCur+1] == '-') {
