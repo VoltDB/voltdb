@@ -216,7 +216,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
                     System.out.println("Fatal Response from server for: " + response.getStatusString()
                             + " for: " + rawLine);
-                    System.exit(1);
+                    //System.exit(1);
                 }
             }
 
@@ -585,6 +585,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
     public static Client getClient(ClientConfig config, String[] servers,
             int port) throws Exception {
         config.setTopologyChangeAware(true); // Set client to be topology-aware
+        config.setReconnectOnConnectionLoss(true);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
             // Try connecting servers one by one until we have a success

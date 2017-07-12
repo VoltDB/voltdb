@@ -230,17 +230,18 @@ public class PerPartitionTable {
             ProcedureCallback callback = new ProcedureCallback() {
                 @Override
                 public void clientCallback(ClientResponse response) throws Exception {
-                    //one insert at a time callback
-                    if (response.getStatus() != ClientResponse.SUCCESS) {
-                        row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
-                    }
+//                    //one insert at a time callback
+//                    if (response.getStatus() != ClientResponse.SUCCESS) {
+//                        row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
+//                    }
 
+                    // FIXME should this be only on success?
                     row.m_loader.m_loaderCompletedCnt.incrementAndGet();
                     row.m_loader.m_outstandingRowCount.decrementAndGet();
                 }
             };
 
-            loadTable(callback, tmpTable);
+            loadTableWithRetry(callback, tmpTable);
         }
     }
 
@@ -296,6 +297,29 @@ public class PerPartitionTable {
                     ClientResponse.CONNECTION_LOST, new VoltTable[0],
                     "Connection to database was lost");
             callback.clientCallback(r);
+        }
+        toSend.clearRowData();
+    }
+
+    private void loadTableWithRetry(ProcedureCallback callback, VoltTable toSend) throws Exception {
+        if (toSend.getRowCount() <= 0) {
+            return;
+        }
+        boolean connectionFailed = true;
+        while (connectionFailed) {
+            try {
+                if (m_isMP) {
+                    m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
+                } else {
+                    Object rpartitionParam = VoltType.valueToBytes(toSend.fetchRow(0).get(
+                            m_partitionedColumnIndex, m_partitionColumnType));
+                    m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
+                }
+                connectionFailed = false;
+            } catch (IOException e) {
+                // Keep retrying until connection is recovered
+                Thread.sleep(1000);
+            }
         }
         toSend.clearRowData();
     }
