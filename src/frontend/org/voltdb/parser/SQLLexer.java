@@ -327,6 +327,8 @@ public class SQLLexer extends SQLPatternFactory
         // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
         boolean statementIsComment = false;
         boolean inStatement = false;
+        // To indicate if inside multi statement procedure
+        boolean inBegin = false;
         int iCur = 0;
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
@@ -385,9 +387,26 @@ public class SQLLexer extends SQLPatternFactory
                     // Move past an ordinary character.
                     iCur++;
                 }
-            } else {
+            } else if (inBegin) {
+                // inside BEGIN ... END for multi stmt procedure
+                // proceed till END
+                // TODO: take care of CASE END
+                if ( (buf[iCur] == 'E' || buf[iCur] == 'e')
+                        && (iCur + 2 < buf.length)
+                        && String.copyValueOf(buf, iCur, 3).equalsIgnoreCase("END") ) {
+                        inBegin = false;
+                        iCur += 3;
+                } else
+                    iCur++;
+            }
+            else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
-                if (buf[iCur] == ';') {
+                if ( (buf[iCur] == 'B' || buf[iCur] == 'b')
+                        && (iCur + 4 < buf.length)
+                        && String.copyValueOf(buf, iCur, 5).equalsIgnoreCase("BEGIN")) {
+                    inBegin = true;
+                    iCur += 5;
+                } else if (buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
                     String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
                     if (!statement.isEmpty()) {
