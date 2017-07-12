@@ -76,20 +76,37 @@ public class TestSplitSQLStatements {
         checkSplitter("begin end", "begin end");
         checkSplitter("begin en", "begin en");
         checkSplitter("begin enf", "begin enf");
+
         checkSplitter("CREATE PROCEDURE foo as SELECT * from t;", "CREATE PROCEDURE foo as SELECT * from t");
-        checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; END;",
-                "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; END");
-        checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; END; abc",
-                "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; END", "abc");
+
+        String sql = "CREATE PROCEDURE foo AS "
+                + "BEGIN "
+                + "SELECT * from t; "
+                + "SELECT * from t; "
+                + "END;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        sql = "CREATE PROCEDURE foo AS "
+                + "BEGIN "
+                + "SELECT * from t; "
+                + "SELECT * from t; "
+                + "END; "
+                + "abc";
+        checkSplitter(sql,
+                "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; END", "abc");
+
+        // there is no END statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
         checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;",
                 "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;");
+
         // enf is not end of statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
         checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;",
                 "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;");
+
         checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end",
                 "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end");
 
-        String sql = "SELECT a, "
+        sql = "SELECT a, "
                 + "CASE WHEN a > 100.00 "
                 + "THEN 'Expensive'"
                 + "ELSE 'Cheap'"
