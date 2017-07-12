@@ -117,7 +117,7 @@ protected:
     std::size_t parseAggregation(catalog::MaterializedViewInfo *mvInfo);
 
     NValue getGroupByValueFromSrcTuple(int colIndex, const TableTuple& tuple);
-    NValue getAggInputFromSrcTuple(int aggIndex, const TableTuple& tuple);
+    NValue getAggInputFromSrcTuple(int aggIndex, int aggExprOffset, const TableTuple& tuple);
 
     /**
      * build a search key based on the src table value
@@ -177,6 +177,8 @@ protected:
     // How many optional agg columns in the materialized view table?
     // This MUST be declared/initialized AFTER m_aggExprs/m_aggColIndexes/m_aggTypes.
     std::size_t m_aggColumnCount;
+    // Store the index of last COUNT(*) for optimization
+    std::size_t m_countStarColumnIndex;
 
     // vector of target table indexes to update.
     // Ideally, these should be a subset of the target table indexes that
