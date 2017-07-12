@@ -79,6 +79,6 @@ public class MakeInsertNodesInlineIfPossible extends MicroOptimization {
 
     @Override
     MicroOptimizationRunner.Phases getPhase() {
-        return MicroOptimizationRunner.Phases.AFTER_BEST_SELECTION;
+        return MicroOptimizationRunner.Phases.AFTER_COMPLETE_PLAN_ASSEMBLY;
     }
 }

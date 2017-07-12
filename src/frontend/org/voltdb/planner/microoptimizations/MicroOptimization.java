@@ -50,7 +50,7 @@ public abstract class MicroOptimization {
     }
 
     MicroOptimizationRunner.Phases getPhase() {
-        return MicroOptimizationRunner.Phases.SELECT_CONSTRUCTION_PHASE;
+        return MicroOptimizationRunner.Phases.DURING_PLAN_ASSEMBLY;
     }
 
     protected abstract AbstractPlanNode recursivelyApply(AbstractPlanNode plan);

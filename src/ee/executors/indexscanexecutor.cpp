@@ -94,6 +94,17 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         setTempOutputTable(limits, m_node->getTargetTable()->name());
     }
 
+    //
+    // INLINE PROJECTION
+    //
+    m_projectionNode = static_cast<ProjectionPlanNode*>
+            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    if (m_projectionNode != NULL) {
+        m_projector = OptimizedProjector(m_projectionNode->getOutputColumnExpressions());
+        m_projector.optimize(m_projectionNode->getOutputTable()->schema(),
+                             m_node->getTargetTable()->schema());
+    }
+
     // For the moment we will not produce a plan with both an
     // inline aggregate and an inline insert node.  This just
     // confuses things.
@@ -210,18 +221,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     } else {
         temp_tuple = m_outputTable->tempTuple();
-    }
-
-    //
-    // INLINE PROJECTION
-    //
-    if (m_projectionNode) {
-        m_projectionNode = static_cast<ProjectionPlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-
-        m_projector = OptimizedProjector(m_projectionNode->getOutputColumnExpressions());
-        m_projector.optimize(temp_tuple.getSchema(),
-                             m_node->getTargetTable()->schema());
     }
 
     // Short-circuit an empty scan
