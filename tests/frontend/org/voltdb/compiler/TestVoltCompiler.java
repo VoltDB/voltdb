@@ -1719,6 +1719,18 @@ public class TestVoltCompiler extends TestCase {
                 "as select num, count(*) from (select num from t) subt group by num; \n";
         assertTrue(compileDDL(ddl, compiler));
 
+        // count(*) can be placed anywhere in materialized views
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, min_num, total) " +
+                "as select num, min(num), count(*) from t group by num; \n";
+        assertTrue(compileDDL(ddl, compiler));
+
+        // count(*) can be placed anywhere in materialized views
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 " +
+                "as select num, max(num), min(wage), count(*), sum(wage) from t group by num; \n";
+        assertTrue(compileDDL(ddl, compiler));
+
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from (select num from t limit 5) subt group by num; \n";
@@ -1798,11 +1810,18 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMsg);
 
         // count(*) is needed in ddl
-        errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).";
+        errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any)";
         ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
                 "create view my_view as select id, wage from t group by id, wage;" +
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
+
+        // multiple count(*) in ddl
+        errorMsg = "Materialized view \"MY_VIEW\" cannot have count(*) more than once";
+        ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
+                "create view my_view as select id, wage, count(*), min(wage), count(*) from t group by id, wage;" +
+                "partition table t on column num;";
+        assertTrue(compileDDL(ddl, compiler));
 
         subTestDDLCompilerMatViewJoin();
     }

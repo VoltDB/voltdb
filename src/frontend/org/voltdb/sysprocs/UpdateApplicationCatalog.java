@@ -87,10 +87,10 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
 //            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
 //        }
 
-        // This means no more @UAC calls when using DDL mode.
-        if (isRestoring()) {
-            noteRestoreCompleted();
-        }
+//        // This means no more @UAC calls when using DDL mode.
+//        if (isRestoring()) {
+//            noteRestoreCompleted();
+//        }
 
         return updateCatalog("@UpdateApplicationCatalog",
                              catalogJarBytes,

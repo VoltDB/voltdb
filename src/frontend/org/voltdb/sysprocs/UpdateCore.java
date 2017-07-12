@@ -343,6 +343,7 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[3]) != 0;
             boolean hasSchemaChange = ((Byte) params.toArray()[4]) != 0;
             boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
+            long ccrTime = (Long) params.toArray()[6];
 
             CatalogAndIds catalogStuff = null;
             try {
@@ -370,7 +371,7 @@ public class UpdateCore extends VoltSystemProcedure {
                         catalogStuff.getDeploymentHash(),
                         requireCatalogDiffCmdsApplyToEE,
                         hasSchemaChange,
-                        requiresNewExportGeneration);
+                        requiresNewExportGeneration, ccrTime);
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
@@ -459,7 +460,7 @@ public class UpdateCore extends VoltSystemProcedure {
             byte requiresSnapshotIsolation,
             byte requireCatalogDiffCmdsApplyToEE,
             byte hasSchemaChange,
-            byte requiresNewExportGeneration)
+            byte requiresNewExportGeneration, long ccrTime)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -474,7 +475,7 @@ public class UpdateCore extends VoltSystemProcedure {
                 requiresSnapshotIsolation,
                 requireCatalogDiffCmdsApplyToEE,
                 hasSchemaChange,
-                requiresNewExportGeneration);
+                requiresNewExportGeneration, ccrTime);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
@@ -512,7 +513,7 @@ public class UpdateCore extends VoltSystemProcedure {
                            byte[] deploymentHash,
                            byte requireCatalogDiffCmdsApplyToEE,
                            byte hasSchemaChange,
-                           byte requiresNewExportGeneration)
+                           byte requiresNewExportGeneration, long ccrTime)
                                    throws Exception
     {
         assert(tablesThatMustBeEmpty != null);
@@ -619,7 +620,7 @@ public class UpdateCore extends VoltSystemProcedure {
                     requiresSnapshotIsolation,
                     requireCatalogDiffCmdsApplyToEE,
                     hasSchemaChange,
-                    requiresNewExportGeneration);
+                    requiresNewExportGeneration, ccrTime);
         } finally {
             // remove the uac blocker when exits
 //            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);

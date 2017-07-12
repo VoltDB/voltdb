@@ -21,23 +21,36 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /**
  * A CSVDataLoader implementation that uses the bulk loader to insert batched rows.
  */
 public class CSVBulkDataLoader implements CSVDataLoader {
+
+    private static final VoltLogger log = new VoltLogger(CSVBulkDataLoader.class.getName());
     private final VoltBulkLoader m_loader;
     private final BulkLoaderErrorHandler m_errHandler;
     private final AtomicLong m_failedInsertCount = new AtomicLong(0);
+    private final BulkLoaderSuccessCallback m_successCallback;
 
     public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
             BulkLoaderErrorHandler errHandler) throws Exception    {
         m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback());
         m_errHandler = errHandler;
+        m_successCallback = null;
+    }
+
+    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
+            BulkLoaderErrorHandler errHandler, BulkLoaderSuccessCallback successCallback) throws Exception {
+        m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback(), successCallback);
+        m_errHandler = errHandler;
+        m_successCallback = successCallback;
     }
 
     public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize,
@@ -58,8 +71,16 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     public class CsvFailureCallback implements BulkLoaderFailureCallBack {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
-            m_failedInsertCount.incrementAndGet();
-            m_errHandler.handleError((RowWithMetaData) rowHandle, response, response.getStatusString());
+
+            if (response.getStatus() == ClientResponse.SUCCESS) {
+                if (m_successCallback != null) {
+                    m_successCallback.success(rowHandle, response);
+                }
+            }
+            else {
+                m_failedInsertCount.incrementAndGet();
+                m_errHandler.handleError((RowWithMetaData) rowHandle, response, response.getStatusString());
+            }
         }
     }
 

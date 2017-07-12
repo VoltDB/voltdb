@@ -164,7 +164,8 @@ public interface VoltDBInterface
             byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration);
+            boolean requiresNewExportGeneration,
+            long ccrTime);
 
     /**
      * Given the information, write the new catalog jar file only

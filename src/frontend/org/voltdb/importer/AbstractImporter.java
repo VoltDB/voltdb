@@ -46,7 +46,7 @@ import org.voltdb.client.ProcedureCallback;
  * because of addition/deletion of nodes to the cluster.
  */
 public abstract class AbstractImporter
-    implements InternalConnectionContext {
+    implements InternalConnectionContext, ImporterLifecycle, ImporterLogger {
 
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
 
@@ -57,6 +57,11 @@ public abstract class AbstractImporter
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
+    }
+
+    @Override
+    public boolean hasTransaction() {
+        return true;
     }
 
     /**
@@ -76,7 +81,8 @@ public abstract class AbstractImporter
      *
      * @return returns true if the importer execution should continue; false otherwise
      */
-    protected final boolean shouldRun()
+    @Override
+    public final boolean shouldRun()
     {
         return !m_stopping;
     }
@@ -99,7 +105,7 @@ public abstract class AbstractImporter
      * @param callback the callback that will receive procedure invocation status
      * @return returns true if the procedure execution went through successfully; false otherwise
      */
-    protected final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
+    public final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
             boolean result = m_importServerAdapter.callProcedure(this,
@@ -144,12 +150,14 @@ public abstract class AbstractImporter
      * @param format error message format
      * @param args arguments to format the error message
      */
-    protected void rateLimitedLog(Level level, Throwable cause, String format, Object... args)
+    @Override
+    public void rateLimitedLog(Level level, Throwable cause, String format, Object... args)
     {
         m_logger.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, level, cause, format, args);
     }
 
-    protected boolean isDebugEnabled()
+    @Override
+    public boolean isDebugEnabled()
     {
         return m_logger.isDebugEnabled();
     }
@@ -167,10 +175,11 @@ public abstract class AbstractImporter
     /**
      * Log a DEBUG level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
-    protected void debug(Throwable t, String msgFormat, Object... args)
+    @Override
+    public void debug(Throwable t, String msgFormat, Object... args)
     {
         m_logger.debug(String.format(msgFormat, args), t);
     }
@@ -178,10 +187,11 @@ public abstract class AbstractImporter
     /**
      * Log a ERROR level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
-    protected void error(Throwable t, String msgFormat, Object... args)
+    @Override
+    public void error(Throwable t, String msgFormat, Object... args)
     {
         m_logger.error(String.format(msgFormat, args), t);
     }
@@ -189,10 +199,11 @@ public abstract class AbstractImporter
     /**
      * Log a INFO level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
-    protected void info(Throwable t, String msgFormat, Object... args)
+    @Override
+    public void info(Throwable t, String msgFormat, Object... args)
     {
         m_logger.info(String.format(msgFormat, args), t);
     }
@@ -200,8 +211,8 @@ public abstract class AbstractImporter
     /**
      * Log a TRACE level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
     protected void trace(Throwable t, String msgFormat, Object... args)
     {
@@ -211,10 +222,11 @@ public abstract class AbstractImporter
     /**
      * Log a WARN level log message.
      *
-     * @param message
-     * @param t
+     * @param msgFormat Format
+     * @param t Throwable to log
      */
-    protected void warn(Throwable t, String msgFormat, Object... args)
+    @Override
+    public void warn(Throwable t, String msgFormat, Object... args)
     {
         m_logger.warn(String.format(msgFormat, args), t);
     }
@@ -244,5 +256,6 @@ public abstract class AbstractImporter
      * This is called by the importer framework to stop the importer. Any importer
      * specific resources should be closed and released here.
      */
-    protected abstract void stop();
+    @Override
+    public abstract void stop();
 }

@@ -520,6 +520,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
         }
 
+        // This means no more @UAC calls when using DDL mode.
+        if (isRestoring()) {
+            noteRestoreCompleted();
+        }
 
         try {
             // does not work with concurrent elastic operations
@@ -606,7 +610,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                      ccr.deploymentHash,
                                      ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                                      ccr.hasSchemaChange ?  1 : 0,
-                                     ccr.requiresNewExportGeneration ? 1 : 0);
+                                     ccr.requiresNewExportGeneration ? 1 : 0,
+                                     ccr.m_ccrTime);
 
             if (response.get().getStatus() != ClientResponseImpl.SUCCESS) {
                 CatalogUtil.updateCatalogToZK(zk,

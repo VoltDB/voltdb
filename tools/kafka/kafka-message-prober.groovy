@@ -37,6 +37,7 @@ import com.google.common.collect.Iterables
 import com.google.common.util.concurrent.SettableFuture
 import com.google.common.util.concurrent.ListenableFuture
 import static com.google.common.base.Throwables.getStackTraceAsString as stackTraceFor
+import com.google.common.net.HostAndPort
 
 import kafka.api.ConsumerMetadataRequest
 import kafka.api.FetchRequest
