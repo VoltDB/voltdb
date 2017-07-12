@@ -329,6 +329,8 @@ public class SQLLexer extends SQLPatternFactory
         boolean inStatement = false;
         // To indicate if inside multi statement procedure
         boolean inBegin = false;
+        // To indicate if inside CASE .. WHEN
+        int inCase = 0;
         int iCur = 0;
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
@@ -389,7 +391,11 @@ public class SQLLexer extends SQLPatternFactory
                 }
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
-                if ( (buf[iCur] == 'B' || buf[iCur] == 'b')
+                if ( (iCur <= buf.length - 4)
+                        && String.copyValueOf(buf, iCur, 4).equalsIgnoreCase("CASE")) {
+                    inCase++;
+                    iCur += 4;
+                } else if ( (buf[iCur] == 'B' || buf[iCur] == 'b')
                         && (iCur <= buf.length - 5)
                         && String.copyValueOf(buf, iCur, 5).equalsIgnoreCase("BEGIN")) {
                     inBegin = true;
@@ -411,7 +417,13 @@ public class SQLLexer extends SQLPatternFactory
                 } else if ( inBegin && (buf[iCur] == 'E' || buf[iCur] == 'e')
                         && (iCur <= buf.length - 3)
                         && String.copyValueOf(buf, iCur, 3).equalsIgnoreCase("END") ) {
-                    inBegin = false;
+                    if (inCase > 0) {
+                        inCase--;
+                    } else {
+                        // we can terminate BEGIN ... END for multi stmt proc
+                        // after all CASE ... END stmts are completed
+                        inBegin = false;
+                    }
                     iCur += 3;
                 } else if (iCur <= buf.length - 2) {
                     // Comment (double-dash or C-style)?
