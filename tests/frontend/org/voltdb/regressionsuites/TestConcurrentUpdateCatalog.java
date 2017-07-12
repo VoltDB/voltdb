@@ -160,8 +160,32 @@ public class TestConcurrentUpdateCatalog {
         checkResults(cb1, cb2);
     }
 
-    public void testConcurrentMixedUpdate() {
+    @Test
+    public void testConcurrentMixedUpdate() throws Exception {
+        init(true, false);
+        ClientImpl client = getClient();
 
+        SyncCallback cb1 = new SyncCallback();
+        SyncCallback cb2 = new SyncCallback();
+        StringBuilder sb = new StringBuilder();
+
+        InMemoryJarfile jar = new InMemoryJarfile();
+        VoltCompiler comp = new VoltCompiler(false);
+        // Add some dummy classes
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.testImportProc.class);
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.TestProcWithSQLStmt.class);
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.testCreateProcFromClassProc.class);
+        comp.addClassToJar(jar, org.voltdb_testprocs.updateclasses.NoMeaningClass.class);
+
+        for (int i = 0; i < 200; i++) {
+            sb.append("CREATE TABLE K" + Integer.toString(i) + " (ID INT, A INT UNIQUE, B VARCHAR(30));");
+        }
+
+        client.callProcedure(cb1, "@AdHoc", sb.toString());
+        client.callProcedure(cb2, "@UpdateClasses", jar.getFullJarBytes(), null);
+
+        checkResults(cb1, cb2);
     }
 
     /*
