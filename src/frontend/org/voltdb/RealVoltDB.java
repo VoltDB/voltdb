@@ -160,7 +160,6 @@ import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
-import org.voltdb.sysprocs.UpdateCore.JavaClassForTest;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
@@ -201,8 +200,6 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * to allow test mocking.
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.HostWatcher {
-
-    static JavaClassForTest m_javaClass = new JavaClassForTest();
 
     public final static HashMap<Integer, String> m_versionMap = new HashMap<>();
     static {
@@ -3362,7 +3359,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             JarLoader testjarloader = testjar.getLoader();
             for (String classname : testjarloader.getClassNames()) {
                 try {
-                    m_javaClass.forName(classname, true, testjarloader);
+                    CatalogContext.classForProcedure(classname, testjarloader);
                 }
                 // LinkageError catches most of the various class loading errors we'd
                 // care about here.
@@ -4635,9 +4632,5 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         hostLog.error(sb.toString());
-    }
-
-    public static void setJavaClassForTest(JavaClassForTest fakeJavaClass) {
-        m_javaClass = fakeJavaClass;
     }
 }

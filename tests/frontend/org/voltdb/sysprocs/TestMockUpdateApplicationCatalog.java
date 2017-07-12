@@ -23,13 +23,23 @@
 
 package org.voltdb.sysprocs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.runner.RunWith;
 import org.mockito.Matchers;
 import org.mockito.Mockito;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunner;
+import org.voltdb.CatalogContext;
 import org.voltdb.OperationMode;
-import org.voltdb.RealVoltDB;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -37,12 +47,11 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.sysprocs.UpdateCore.JavaClassForTest;
 import org.voltdb.utils.MiscUtils;
 
-import junit.framework.TestCase;
-
-public class TestMockUpdateApplicationCatalog extends TestCase {
+@RunWith(PowerMockRunner.class)
+@PrepareForTest({CatalogContext.class})
+public class TestMockUpdateApplicationCatalog {
     private ServerThread m_localServer;
     private VoltDB.Configuration m_config;
     private Client m_client;
@@ -51,7 +60,7 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
                                     org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                     org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
-    @Override
+    @Before
     public void setUp() throws Exception
     {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
@@ -75,17 +84,16 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
         success = builder.compile(Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar"), 1, 1, 0);
         assert(success);
 
-        JavaClassForTest testClass = Mockito.mock(JavaClassForTest.class);
-        Mockito.when(testClass.forName(Matchers.anyString(), Matchers.anyBoolean(), Mockito.any(ClassLoader.class))).
+        PowerMockito.spy(CatalogContext.class);
+        PowerMockito.when(CatalogContext.classForProcedure(Matchers.anyString(), Mockito.any(ClassLoader.class))).
                      thenThrow(new UnsupportedClassVersionError("Unsupported major.minor version 52.0"));
-        RealVoltDB.setJavaClassForTest(testClass);
 
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost:" + m_config.m_adminPort);
     }
 
-    @Override
+    @After
     public void tearDown() throws Exception {
         if (m_client != null) {
             m_client.close();
