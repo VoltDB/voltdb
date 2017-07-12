@@ -493,7 +493,7 @@ public class MockVoltDB implements VoltDBInterface
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
             long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
             byte[] deploymentHash, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean hasSchemaChange, boolean requiresNewExportGeneration)
+            boolean hasSchemaChange, boolean requiresNewExportGeneration, long ccrTime)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
