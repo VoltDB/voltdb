@@ -185,6 +185,20 @@ public class TestSplitSQLStatements {
                 + "from t;"
                 + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        // nested CASE-WHEN-THEN-ELSE-END
+        sql = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t; /*comment will still exist*/"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "select a, "
+                + "case when a > 100.00 then "
+                + "case when a > 1000.00 then 'Super Expensive' else 'Pricy' end "
+                + "'Expensive' else 'Cheap' end "
+                + "from t;"
+                + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
     }
 
 }
