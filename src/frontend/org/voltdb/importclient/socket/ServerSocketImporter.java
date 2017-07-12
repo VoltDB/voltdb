@@ -66,7 +66,7 @@ public class ServerSocketImporter extends AbstractImporter {
     }
 
     @Override
-    protected void stop()
+    public void stop()
     {
         try {
             m_config.getServerSocket().close();
@@ -120,6 +120,9 @@ public class ServerSocketImporter extends AbstractImporter {
                 Object params[] = null;
                 while (shouldRun()) {
                     String line = in.readLine();
+                    if (line == null) {
+                        break; // end of stream
+                    }
                     try{
                         params = formatter.transform(ByteBuffer.wrap(line.getBytes()));
                         //You should convert your data to params here.

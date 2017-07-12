@@ -19,8 +19,10 @@ package org.voltdb.client.VoltBulkLoader;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -74,19 +76,23 @@ public class PerPartitionTable {
     final String m_tableName;
     // Upsert Mode Flag
     final byte m_upsert;
+    // Callback for per-row success notification
+    final BulkLoaderSuccessCallback m_successCallback;
 
     // Callback for batch submissions to the Client. A failed request submits the entire
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
     class PartitionProcedureCallback implements ProcedureCallback {
         final List<VoltBulkLoaderRow> m_batchRowList;
+        final Map<VoltBulkLoader, Long> m_batchSizes;
 
-        PartitionProcedureCallback(List<VoltBulkLoaderRow> batchRowList) {
+        PartitionProcedureCallback(List<VoltBulkLoaderRow> batchRowList, Map<VoltBulkLoader, Long> batchSizes) {
             m_batchRowList = batchRowList;
+            m_batchSizes = batchSizes;
         }
 
         // Called by Client to inform us of the status of the bulk insert.
         @Override
-        public void clientCallback(ClientResponse response) throws InterruptedException {
+        public void clientCallback(final ClientResponse response) throws InterruptedException {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 // Queue up all rows for individual processing by originating BulkLoader's FailureProcessor.
                 m_es.execute(new Runnable() {
@@ -101,14 +107,29 @@ public class PerPartitionTable {
                 });
             }
             else {
-                m_batchRowList.get(0).m_loader.m_loaderCompletedCnt.addAndGet(m_batchRowList.size());
-                m_batchRowList.get(0).m_loader.m_outstandingRowCount.addAndGet(-1 * m_batchRowList.size());
+                // For each row in the batch, notify the caller of success, so it can do any
+                // necessary bookkeeping (like managing offsets, for example). Do this in the executor
+                // so as not to hold up the callback.
+                if (m_successCallback != null) {
+                    m_es.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            for (VoltBulkLoaderRow r : m_batchRowList) {
+                                m_successCallback.success(r.m_rowHandle, response);
+                            }
+                        }
+                    });
+                }
+                for (Map.Entry<VoltBulkLoader, Long> e : m_batchSizes.entrySet()) {
+                    e.getKey().m_loaderCompletedCnt.addAndGet(e.getValue());
+                    e.getKey().m_outstandingRowCount.addAndGet(-1 * e.getValue());
+                }
             }
         }
     }
 
     PerPartitionTable(ClientImpl clientImpl, String tableName, int partitionId, boolean isMP,
-            VoltBulkLoader firstLoader, int minBatchTriggerSize) {
+            VoltBulkLoader firstLoader, int minBatchTriggerSize, BulkLoaderSuccessCallback successCallback) {
         m_clientImpl = clientImpl;
         m_partitionId = partitionId;
         m_isMP = isMP;
@@ -121,7 +142,7 @@ public class PerPartitionTable {
         m_columnTypes = firstLoader.m_columnTypes;
         m_partitionColumnType = firstLoader.m_partitionColumnType;
         m_tableName = tableName;
-
+        m_successCallback = successCallback;
         m_table = new VoltTable(m_columnInfo);
 
         m_es = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
@@ -200,20 +221,22 @@ public class PerPartitionTable {
                 tmpTable.addRow(row_args);
             } catch (VoltTypeException ex) {
                 // Should never happened because the bulk conversion in PerPartitionProcessor
-                // should have caught this
+                // should have caught this.
+                loaderLog.error("Type conversion exception", ex);
+                assert false: "Type conversion exception" + ex.getMessage();
                 continue;
             }
 
             ProcedureCallback callback = new ProcedureCallback() {
                 @Override
                 public void clientCallback(ClientResponse response) throws Exception {
-                    row.m_loader.m_loaderCompletedCnt.incrementAndGet();
-                    row.m_loader.m_outstandingRowCount.decrementAndGet();
-
                     //one insert at a time callback
                     if (response.getStatus() != ClientResponse.SUCCESS) {
                         row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
                     }
+
+                    row.m_loader.m_loaderCompletedCnt.incrementAndGet();
+                    row.m_loader.m_outstandingRowCount.decrementAndGet();
                 }
             };
 
@@ -224,6 +247,8 @@ public class PerPartitionTable {
     private PartitionProcedureCallback buildTable() {
         ArrayList<VoltBulkLoaderRow> buf = new ArrayList<VoltBulkLoaderRow>(m_minBatchTriggerSize);
         m_partitionRowQueue.drainTo(buf, m_minBatchTriggerSize);
+
+        Map<VoltBulkLoader, Long> batchSizes = new HashMap<>();
         ListIterator<VoltBulkLoaderRow> it = buf.listIterator();
         while (it.hasNext()) {
             VoltBulkLoaderRow currRow = it.next();
@@ -243,9 +268,14 @@ public class PerPartitionTable {
                 continue;
             }
             m_table.addRow(row_args);
+
+            Long prevValue;
+            if ((prevValue = batchSizes.put(loader, 1L)) != null) {
+                batchSizes.put(loader, prevValue + 1);
+            }
         }
 
-        return new PartitionProcedureCallback(buf);
+        return new PartitionProcedureCallback(buf, batchSizes);
     }
 
     private void loadTable(ProcedureCallback callback, VoltTable toSend) throws Exception {

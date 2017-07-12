@@ -45,6 +45,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
+import static org.voltdb.compiler.CatalogChangeResult.CATALOG_CHANGE_NOREPLAY;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -98,6 +99,8 @@ public class CatalogContext {
     // database settings. contains both cluster and path settings
     private final DbSettings m_dbSettings;
 
+    //This is same as unique id except when the UAC is building new catalog ccr stands for catalog change replay time.
+    public final long m_ccrTime;
     /**
      * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
      * When @param hasSchemaChange is true, @param defaultProcManager and @param plannerTool will be created as new.
@@ -114,6 +117,7 @@ public class CatalogContext {
      * @param hasSchemaChange
      * @param defaultProcManager
      * @param plannerTool
+     * @param ccrTime - Catalog Change Replay Time
      */
     public CatalogContext(
             long transactionId,
@@ -127,10 +131,12 @@ public class CatalogContext {
             HostMessenger messenger,
             boolean hasSchemaChange,
             DefaultProcedureManager defaultProcManager,
-            PlannerTool plannerTool)
+            PlannerTool plannerTool, long ccrTime)
     {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
+        //This is only set to something other than m_uniqueId when we are replaying a UAC.
+        m_ccrTime = ((ccrTime == CATALOG_CHANGE_NOREPLAY) ? uniqueId : ccrTime);
         // check the heck out of the given params in this immutable class
         if (catalog == null) {
             throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
@@ -231,7 +237,7 @@ public class CatalogContext {
             HostMessenger messenger)
     {
         this(transactionId, uniqueId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
-                version, messenger, true, null, null);
+                version, messenger, true, null, null, uniqueId);
     }
 
     public Cluster getCluster() {
@@ -255,7 +261,8 @@ public class CatalogContext {
             boolean incrementVersion,
             byte[] deploymentBytes,
             HostMessenger messenger,
-            boolean hasSchemaChange)
+            boolean hasSchemaChange,
+            long ccrTime)
     {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
@@ -289,7 +296,8 @@ public class CatalogContext {
                     messenger,
                     hasSchemaChange,
                     m_defaultProcs,
-                    m_ptool);
+                    m_ptool,
+                    ccrTime);
         return retval;
     }
 

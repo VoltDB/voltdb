@@ -44,7 +44,7 @@ public class KafkaTopicTest {
 
         @Override
         public void run() {
-            m_importer.noTransaction = true;
+            m_importer.setTransaction(false);
             m_importer.accept();
             System.out.println("Topic Done: " + m_importer.getResourceID());
             m_cdl.countDown();

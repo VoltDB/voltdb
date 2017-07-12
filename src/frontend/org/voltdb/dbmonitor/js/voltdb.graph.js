@@ -1474,9 +1474,8 @@
             var latencyArr = []
             var latencyArrMin = []
             var latencyArrDay = []
-
-            if ($.isEmptyObject(latency) || latency == undefined || !latency.hasOwnProperty(currentServer)
-            || latency[currentServer].P99 == undefined || latency[currentServer].TIMESTAMP == undefined)
+            if ($.isEmptyObject(latency) || latency == undefined || !latency.hasOwnProperty('CLUSTER_DETAILS') ||
+            latency['CLUSTER_DETAILS'].P99 == undefined || latency['CLUSTER_DETAILS'].TIMESTAMP == undefined)
                 return;
 
             if(localStorage.latencyMin != undefined){
@@ -1531,8 +1530,8 @@
                 }
             }
 
-            var timeStamp = new Date(latency[currentServer].TIMESTAMP);
-            var lat = parseFloat(latency[currentServer].P99).toFixed(1) * 1;
+            var timeStamp = new Date(latency['CLUSTER_DETAILS'].TIMESTAMP);
+            var lat = parseFloat(latency['CLUSTER_DETAILS'].P99).toFixed(1) * 1;
 
             if (monitor.latMaxTimeStamp <= timeStamp) {
                 if (latSecCount >= 6 || monitor.latFirstData) {
@@ -1754,8 +1753,9 @@
             var transDetailsArrMin = []
             var transDetailsArrDay = []
 
-            if ($.isEmptyObject(transactionDetails) || transactionDetails == undefined || !transactionDetails.hasOwnProperty(currentServer)
-            || transactionDetails[currentServer].TPS == undefined || transactionDetails[currentServer].TIMESTAMP == undefined)
+            if ($.isEmptyObject(transactionDetails) || transactionDetails == undefined ||
+            !transactionDetails.hasOwnProperty('CLUSTER_DETAILS') || transactionDetails['CLUSTER_DETAILS'].TPS == undefined ||
+            transactionDetails['CLUSTER_DETAILS'].TIMESTAMP == undefined)
                 return;
 
             if(localStorage.transDetailsMin != undefined){
@@ -1810,8 +1810,8 @@
                 }
             }
 
-            var timeStamp = new Date(transactionDetails[currentServer].TIMESTAMP);
-            var tps = parseFloat(transactionDetails[currentServer].TPS).toFixed(1) * 1;
+            var timeStamp = new Date(transactionDetails['CLUSTER_DETAILS'].TIMESTAMP);
+            var tps = parseFloat(transactionDetails['CLUSTER_DETAILS'].TPS).toFixed(1) * 1;
 
             if (monitor.tpsMaxTimeStamp <= timeStamp) {
                 if (tpsSecCount >= 6 || monitor.tpsFirstData) {

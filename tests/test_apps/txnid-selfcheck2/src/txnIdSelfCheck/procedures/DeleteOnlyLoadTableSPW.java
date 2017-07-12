@@ -24,12 +24,11 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 
-public class DeleteOnlyLoadTableSPW extends VoltProcedure {
+public class DeleteOnlyLoadTableSPW extends ValidateLoadBase {
 
     private final SQLStmt selectStmt = new SQLStmt("SELECT * FROM T_PAYMENT50 WHERE pid=? and seq_no=?;");
     private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM T_PAYMENT50 WHERE pid=? and seq_no=?;");

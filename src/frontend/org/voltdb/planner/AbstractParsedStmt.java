@@ -255,7 +255,14 @@ public abstract class AbstractParsedStmt {
                 VoltXMLElement subChild = child.children.get(0);
                 expr = parseExpressionTree(subChild);
                 assert(expr != null);
-                expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
+                try {
+                    expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
+                } catch (PlanningErrorException ex) {
+                    String errorMsg = ex.getMessage()
+                                      + " for column '" + col.getTypeName()
+                                      + "' in the table '" + table.getTypeName() + "'";
+                    throw new PlanningErrorException(errorMsg);
+                }
                 ExpressionUtil.finalizeValueTypes(expr);
             }
             columns.put(col, expr);
