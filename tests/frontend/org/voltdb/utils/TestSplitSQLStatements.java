@@ -97,6 +97,14 @@ public class TestSplitSQLStatements {
                 + "FROM t";
         checkSplitter(sql, sql);
 
+        sql = "SELECT a, "
+                + "CASE WHEN a > 100.00 "
+                + "THEN 'Expensive'"
+                + "ELSE 'Cheap'"
+                + "END "
+                + "FROM t;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
         sql = "create procedure thisproc as "
               + "begin "
               + "select * from t;"
