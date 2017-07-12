@@ -95,6 +95,16 @@ public class TestSplitSQLStatements {
         checkSplitter(sql,
                 "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; END", "abc");
 
+        // BEGIN ... END; -- semi colon is needed after END
+        sql = "CREATE PROCEDURE foo AS "
+          + "BEGIN "
+          + "SELECT * from t; "
+          + "SELECT * from t; "
+          + "END "
+          + "abc; def";
+        checkSplitter(sql,
+          "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; END abc", "def");
+
         // there is no END statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
         checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;",
                 "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;");
@@ -133,29 +143,37 @@ public class TestSplitSQLStatements {
 
     @Test
     public void testProcSQLSplitWithComments() {
-//          String sql = "create procedure thisproc as "
-//                + "begin \n"
-//                + "select * from t;"
-//                + "select * from r where f = 'foo';"
-//                + "select * from r where f = 'begin' or f = 'END';"
-//                + "end;";
 
-
-        String sql1 = "create procedure thisproc as "
+        String sql = "create procedure thisproc as "
                   + "begin --one\n"
                   + "select * from t;"
                   + "select * from r where f = 'foo';"
                   + "select * from r where f = 'begin' or f = 'END';"
                   + "end;";
-        checkSplitter(sql1, sql1.substring(0, sql1.length() - 1));
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
 
-        sql1 = "create procedure thisproc as "
+        sql = "create procedure thisproc as "
                 + "begin \n"
                 + "select * from t; /*comment will still exist*/"
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'begin' or f = 'END';"
                 + "end;";
-        checkSplitter(sql1, sql1.substring(0, sql1.length() - 1));
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
     }
+
+//    @Test
+//    public void testProcSQLSplitWithCase() {
+//
+//        String sql1 = "create procedure thisproc as "
+//                + "begin "
+//                + "SELECT a, "
+//                + "CASE WHEN a > 100.00 "
+//                + "THEN 'Expensive' "
+//                + "ELSE 'Cheap' "
+//                + "END "
+//                + "FROM t; "
+//                + "end;";
+//        checkSplitter(sql1, sql1.substring(0, sql1.length() - 1));
+//    }
 
 }
