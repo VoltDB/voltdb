@@ -32,18 +32,27 @@ import org.voltdb.rejoin.TaskLog;
 public class TickProducer extends SiteTasker implements Runnable
 {
     private final SiteTaskerQueue m_taskQueue;
-    private final long m_taskTimeThreshold = 5_000_000_000L; // 5 seconds
+    private final long m_taskTimeThreshold;
     private final long SUPPRESS_INTERVAL = 60; // 60 seconds
     private VoltLogger m_logger;
     private int m_partitionId;
     private long m_previousTaskTimestamp = -1;
     private long m_previousTaskPeekTime = -1;
 
+
     public TickProducer(SiteTaskerQueue taskQueue)
     {
         m_taskQueue = taskQueue;
         m_logger = new VoltLogger("HOST");
         m_partitionId = taskQueue.getPartitionId();
+        // get warning threshold from deployment
+        // convert to nano seconds (default 10s)
+        m_taskTimeThreshold = 1_000_000L * VoltDB.instance()
+                                .getCatalogContext()
+                                .getDeployment()
+                                .getSystemsettings()
+                                .getProcedure()
+                                .getWarningtimeout();
     }
 
     // start schedules a 1 second tick.
@@ -61,7 +70,7 @@ public class TickProducer extends SiteTasker implements Runnable
     public void run()
     {
         m_taskQueue.offer(this);
-        // check if previous task is running for more than 5 seconds
+        // check if previous task is running for more than threshold
         SiteTasker task = m_taskQueue.peek();
         long currentTime = System.nanoTime();
         long headOfQueueOfferTime;
