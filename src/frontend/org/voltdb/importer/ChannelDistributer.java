@@ -344,6 +344,9 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 );
         if (!registered.contains(importer)) {
             if (uris.isEmpty()) {
+                // ImporterLifeCycleManager.stop() calls registerChannels() is called with an empty set of URIs.
+                // If the importer never finished starting, we hit this condition.
+                // This log message is used by the TestImporterStopAfterIncompleteStart JUnit.
                 LOG.info("Skipping channel un-registration for " + importer + " since it did not finish initialization");
                 return;
             } else {

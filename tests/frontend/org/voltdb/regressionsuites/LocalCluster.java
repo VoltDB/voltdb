@@ -51,6 +51,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -422,6 +423,11 @@ public class LocalCluster extends VoltServerConfig {
         if (buildDir == null) {
             buildDir = System.getProperty("user.dir") + "/obj/release";
         }
+        // Allow importer tests to find their bundles
+        String defaultBundleDir = System.getProperty("user.dir") + "/bundles";
+        m_additionalProcessEnv.putIfAbsent(
+                CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME,
+                System.getProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, defaultBundleDir));
 
         String classPath = System.getProperty("java.class.path");
         if (m_jarFileName != null) {
