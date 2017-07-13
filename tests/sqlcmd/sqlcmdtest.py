@@ -265,6 +265,49 @@ def compare_cleaned_to_baseline(parent, baseparent, path, inpath, do_refresh, re
             return True
     return False
 
+def delete_proc(pfile):
+    print "delete procedures .."
+    procset = set()
+    for line in pfile:
+        columns = line.split(',')
+        try:
+            if columns[2] != ' ' :
+                print columns[2]
+                procname = columns[2].replace('\"','')
+                systemgeneratedprocedures = {".insert",".update",".select",".delete",".upsert"}
+                if any( systemprocedure in procname for systemprocedure in systemgeneratedprocedures) :
+                    continue
+                procset.add(procname)
+        except IndexError:
+            pass
+
+    if len(procset) :
+        for procname in procset:
+            print procname
+            sqlcmdopt = '--query=drop procedure ' + procname + ' if exists'
+            subprocess.call(['../../bin/sqlcmd', sqlcmdopt])
+            #print "dropped procedure :" + procname
+
+
+def delete_table_and_view(pfile):
+    print "drop table and views .."
+    tableset = set()
+    for line in pfile:
+        columns = line.split(',')
+        try:
+            if columns[5] != ' ' :
+                tablename = columns[5].replace('\"','')
+                tableset.add(tablename)
+        except IndexError:
+            pass
+
+    if len(tableset) :
+        for tablename in tableset:
+            print tablename
+            sqlcmdopt = '--query=drop table ' + tablename + ' if exists cascade'
+            subprocess.call(['../../bin/sqlcmd', sqlcmdopt])
+            #print "dropped table :" + tablename
+
 
 def do_main():
     parser = OptionParser()
@@ -339,34 +382,41 @@ def do_main():
                 # TODO launch a hard-coded script that verifies a clean database and healthy server
                 # ("show tables" or equivalent) after each test run to prevent cross-contamination.
 
-                childout = open(os.path.join(parent, prefix + '.out' + '.test'), 'w+')
-                print "Running.. " + os.path.join(parent, prefix + '.out' + '.test')
+                # delete procedure
+                childout.flush()
+                childerr.flush()
 
-                childerr = open(os.path.join(parent, prefix + '.err' + '.test'), 'w+')
-                print "Running.. " + os.path.join(parent, prefix + '.err' + '.test')
+
+                childout = open(os.path.join(parent, prefix + '.out' + '.procedure'), 'w+')
+                print "Running.. " + os.path.join(parent, prefix + '.out' + '.procedure')
+
+                childerr = open(os.path.join(parent, prefix + '.err' + '.procedure'), 'w+')
+                print "Running.. " + os.path.join(parent, prefix + '.err' + '.procedure')
+
                 #get the result of the query in output file
-                subprocess.call(['../../bin/sqlcmd', '--query=exec @Statistics table 1', '--output-skip-metadata', '--output-format=csv'],
-                    stdout=childout)
+                subprocess.call(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
+                    stdout=childout, stderr=childerr)
+
+                pfile = file(os.path.join(parent, prefix + '.out' + '.procedure'), 'r')
+
+                delete_proc(pfile)
+
+                #  delete table and views
+                childout.flush()
+                childerr.flush()
+                pfile.flush()
+
+                childout = open(os.path.join(parent, prefix + '.out' + '.table'), 'w+')
+                print "Running.. " + os.path.join(parent, prefix + '.out' + '.table')
+
+                childerr = open(os.path.join(parent, prefix + '.err' + '.table'), 'w+')
+                print "Running.. " + os.path.join(parent, prefix + '.err' + '.table')
+                subprocess.call(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
+                    stdout=childout, stderr=childerr)
                 # parse output file
+                pfile = file(os.path.join(parent, prefix + '.out' + '.table'), 'r')
 
-                pfile = file(os.path.join(parent, prefix + '.out' + '.test'), 'r')
-                tableset = set()
-                for line in pfile:
-                    columns = line.split(',')
-                    try:
-                        if columns[5] != ' ' :
-                            tablename = columns[5].replace('\"','')
-                            tableset.add(tablename)
-                    except IndexError:
-                        pass
-
-                # if set is not empty drop tables in batch
-                if len(tableset) :
-                    for tablename in tableset:
-                        print tablename
-                        sqlcmdopt = '--query=drop table ' + tablename
-                        subprocess.call(['../../bin/sqlcmd', sqlcmdopt])
-                        print "dropped table :" + tablename
+                delete_table_and_view(pfile)
 
 
                 # fuzz the sqlcmd output for reliable comparison
