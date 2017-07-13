@@ -440,15 +440,15 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     protected String verifyAndWriteCatalog(byte[] catalogBytes) {
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                                                        callNTProcedureOnAllHosts(
-                                                       "@WriteCatalog",
+                                                       "@UpdateCatalogHelper",
                                                        catalogBytes,
-                                                       WriteCatalog.CHECK_AND_WRITE);
+                                                       UpdateCatalogHelper.CHECK_AND_WRITE);
         return checkCatalogUpdateAsyncResults(cf, "catalog verification and write");
     }
 
     // remove temproray catalog jar file on all hosts, if any
     protected void cleanUpTempCatalog() {
-        callNTProcedureOnAllHosts("@WriteCatalog", new byte[] {0}, WriteCatalog.CLEAN_UP);
+        callNTProcedureOnAllHosts("@UpdateCatalogHelper", new byte[] {0}, UpdateCatalogHelper.CLEAN_UP);
     }
 
     protected CompletableFuture<ClientResponse> updateCatalog(String invocationName,

@@ -160,7 +160,7 @@ import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
-import org.voltdb.sysprocs.WriteCatalog;
+import org.voltdb.sysprocs.UpdateCatalogHelper;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
@@ -3371,8 +3371,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 ex);
                     }
 
-                    if (WriteCatalog.SupportedJavaVersionMap.containsKey(major)) {
-                        msg = msg.concat(WriteCatalog.SupportedJavaVersionMap.get(major) + ", current runtime version is " +
+                    if (UpdateCatalogHelper.SupportedJavaVersionMap.containsKey(major)) {
+                        msg = msg.concat(UpdateCatalogHelper.SupportedJavaVersionMap.get(major) + ", current runtime version is " +
                                          System.getProperty("java.version") + ".");
                     } else {
                         msg = msg.concat("an incompatable Java version.");

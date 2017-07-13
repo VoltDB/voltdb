@@ -26,7 +26,20 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 
-public class WriteCatalog extends UpdateApplicationBase {
+/**
+ *
+ * This system proc is used by UpdateCore related work to write and verify
+ * the catalog bytes. The purpose of this proc is to put the catalog write
+ * work on the asynchronous thread and reduce blocking time.
+ *
+ * Modes:
+ * CHECK_AND_WRITE  Check the validity of the catalogBytes, and write to a
+ * temporary catalog jar file if successful.
+ *
+ * CLEAN_UP Delete any temporary jar file on this instance.
+ *
+ */
+public class UpdateCatalogHelper extends UpdateApplicationBase {
 
     public final static HashMap<Integer, String> SupportedJavaVersionMap = new HashMap<>();
     static {
@@ -69,7 +82,7 @@ public class WriteCatalog extends UpdateApplicationBase {
             VoltDB.instance().cleanUpTempCatalogJar();
         } else {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, "The mode " + Byte.toString(mode) +
-                                     " is not supported in @WriteCatalog operation.");
+                                     " is not supported in @UpdateCatalogHelper operation.");
         }
 
         return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update work finished locally with mode " +
