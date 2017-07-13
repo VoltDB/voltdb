@@ -4,3 +4,7 @@ auto.offset.reset=earliest
 request.timeout.ms=20000
 session.timeout.ms=10000
 fetch.max.wait.ms=10000
+
+security.protocol=SSL
+ssl.truststore.location=apprunner-keystore
+ssl.truststore.password=password

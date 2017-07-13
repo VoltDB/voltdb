@@ -99,6 +99,8 @@ private:
     // The executor vector for the view definition query.
     boost::shared_ptr<ExecutorVector> m_createQueryExecutorVector;
     const int m_groupByColumnCount;
+    // Store the index of last COUNT(*) for optimization
+    int m_countStarColumnIndex;
     int m_aggColumnCount;
     std::vector<ExpressionType> m_aggTypes;
     bool m_dirty;

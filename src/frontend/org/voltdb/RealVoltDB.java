@@ -3333,7 +3333,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration)
+            boolean requiresNewExportGeneration,
+            long ccrTime)
     {
         try {
             synchronized(m_catalogUpdateLock) {
@@ -3381,7 +3382,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             true,
                             deploymentBytes,
                             m_messenger,
-                            hasSchemaChange);
+                            hasSchemaChange, ccrTime);
                 final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(/*m_asyncCompilerAgent,*/ m_catalogContext);
                 m_txnIdToContextTracker.put(currentTxnId,
                         new ContextTracker(
