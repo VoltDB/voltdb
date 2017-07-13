@@ -24,6 +24,8 @@
 
 #include "catalog/materializedviewinfo.h"
 #include "common/executorcontext.hpp"
+#include "common/FailureInjection.h"
+#include "ConstraintFailureException.h"
 
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -60,6 +62,22 @@ StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         enableStream();
+    }
+}
+
+//Use this overloaded method to load in the null or any other constraints.
+void StreamedTable::initializeWithColumns(TupleSchema* schema,
+                                            std::vector<std::string> const& columnNames,
+                                            bool ownsTupleSchema,
+                                            int32_t compactionThreshold) {
+    assert (schema != NULL);
+
+    Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
+
+    m_allowNulls.resize(m_columnCount);
+    for (int i = m_columnCount - 1; i >= 0; --i) {
+        TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
+        m_allowNulls[i] = columnInfo->allowNull;
     }
 }
 
@@ -134,8 +152,24 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
                                   "May not use nextFreeTuple with streamed tables.");
 }
 
+bool StreamedTable::checkNulls(TableTuple& tuple) const {
+    assert (m_columnCount == tuple.sizeInValues());
+    for (int i = m_columnCount - 1; i >= 0; --i) {
+        if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
+            VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
+            return false;
+        }
+    }
+    return true;
+}
+
 bool StreamedTable::insertTuple(TableTuple &source)
 {
+    // not null checks at first
+    FAIL_IF(!checkNulls(source)) {
+        throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
+    }
+
     size_t mark = 0;
     if (m_wrapper) {
         // handle any materialized views
