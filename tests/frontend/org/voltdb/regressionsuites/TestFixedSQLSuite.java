@@ -439,36 +439,31 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
         VoltTable[] results;
 
-        try {
-            Byte[] boxByteArr = ArrayUtils.toObject(Encoder.hexDecode("0A"));
-            results = client.callProcedure("BoxedByteArrays", "VARBIN", new Integer(1),
-                    boxByteArr, null, null, null, null).getResults();
-            //assertEquals(1, results[0].getRowCount());
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("FIXME: Unsupported type VoltType.TINYINT"));
-        }
+        validateTableOfLongs(client,
+                "insert into ENG_539 values (0, "
+                + "x'ab', 1)", new long[][] {{1}});
+
+        Byte[] boxByteArr = ArrayUtils.toObject(Encoder.hexDecode("01"));
+        results = client.callProcedure("BoxedByteArrays", "VARBIN", new Integer(1),
+                boxByteArr, null, null, null, null).getResults();
+        assertEquals(1, results[0].getRowCount());
 
         // String cannot be converted to VARBINARY
-        try {
-            client.callProcedure("BoxedByteArrays", "STR", new Integer(2), null,
-                    null, null, null, "3A");
-        } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("Incompatible parameter type: "
-                        + "can not convert type 'String' to 'VARBINARY' for arg 1 for SQL stmt"));
-        }
+        String errMsg = "Incompatible parameter type: "
+                + "can not convert type 'String' to 'VARBINARY' for arg 1 for SQL stmt";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "STR", new Integer(2), null, null, null, null, "3A");
 
-        try {
-            client.callProcedure("BoxedByteArrays", "STR", new Integer(2), null,
-                    null, null, null, "x'3A'");
-        } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("Incompatible parameter type: "
-                        + "can not convert type 'String' to 'VARBINARY' for arg 1 for SQL stmt"));
-        }
+        errMsg = "Incompatible parameter type: "
+                + "can not convert type 'String' to 'VARBINARY' for arg 1 for SQL stmt";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "STR", new Integer(2), null, null, null, null, "x'3A'");
 
         if( !isHSQL() ) {
             // HSQL does not convert Strings to BigInt
-            client.callProcedure("BoxedByteArrays", "DSTR", new Integer(2), null,
-                    null, null, null, "1000");
+            results = client.callProcedure("BoxedByteArrays", "DSTR", new Integer(2), null,
+                    null, null, null, "1000").getResults();
+            assertEquals(1, results[0].getRowCount());
         }
 
         client.callProcedure("BoxedByteArrays", "BIGD", new Integer(3), null,
@@ -477,20 +472,18 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 null, null, null, null);
 
         // Long cannot be converted to long in arrays
-        try {
-            results = client.callProcedure("BoxedByteArrays", "LNGARR", null, null, null,
-                  new Long[]{1L, 2L, 3L}, null, null).getResults();
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("[Ljava.lang.Long; cannot be cast to [J"));
-        }
+        errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 4: "
+                    + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+                    + "Unable to match parameter array:java.lang.Long to provided long";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "LNGARR", null, null, null, new Long[]{1L, 2L, 3L}, null, null);
 
-        // not sure why its doing the conversion
-        try {
-          results = client.callProcedure("BoxedByteArrays", "INTARR", null, null, null, null,
-                  new Integer[]{1, 2, 3}, null).getResults();
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("[Ljava.lang.Integer; cannot be cast to [I"));
-        }
+        // Integer cannot be converted to int in arrays
+        errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 5: "
+                + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+                + "Unable to match parameter array:java.lang.Integer to provided int";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "INTARR", null, null, null, null, new Integer[]{1, 2, 3}, null);
 
         try {
             Byte[][] box2DByteArr = new Byte[][]{ ArrayUtils.toObject(Encoder.hexDecode("0A")),
@@ -861,52 +854,52 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testFixedTickets() throws Exception
     {
-//        subTestTicketEng2250_IsNull();
-//        subTestTicketEng1850_WhereOrderBy();
-//        subTestTicketEng1850_WhereOrderBy2();
-//        subTestTicketENG1232();
-//        subTestTicket309();
-//        subTestTicket196();
-//        subTestTicket201();
-//        subTestTicket216();
-//        subTestTicket194();
-//        subTestTickets227And228();
-//        subTestTicket220();
-//        subTestTicket310();
-//        subTestTicket221();
-//        subTestTicket222();
-//        subTestTicket224();
-//        subTestTicket226();
-//        subTestTicket231();
-//        subTestTicket232();
-//        subTestTicket293();
-//        subTestTicketEng397();
-//        //subTestTicketEng490();
-//        subTestTicketEng993();
-//        subTestTicketEng1316();
-//        subTestTicket2423();
-//        subTestTicket5151_ColumnDefaultNull();
-//        subTestTicket5486_NULLcomparison();
-//        subTestENG4146();
-//        subTestENG5669();
-//        subTestENG5637_VarcharVarbinaryErrorMessage();
-//        subTestENG6870();
-//        subTestENG6926();
-//        subTestENG7041ViewAndExportTable();
-//        subTestENG7349_InnerJoinWithOverflow();
-//        subTestENG7724();
-//        subTestENG7480();
-//        subTestENG8120();
-//        subTestENG9032();
-//        subTestENG9389();
-//        subTestENG9533();
-//        subTestENG9796();
-//        subTestENG11256();
-//        subTestENG12105();
-//        subTestENG12116();
-//        subTestBoxedTypes();
+        subTestTicketEng2250_IsNull();
+        subTestTicketEng1850_WhereOrderBy();
+        subTestTicketEng1850_WhereOrderBy2();
+        subTestTicketENG1232();
+        subTestTicket309();
+        subTestTicket196();
+        subTestTicket201();
+        subTestTicket216();
+        subTestTicket194();
+        subTestTickets227And228();
+        subTestTicket220();
+        subTestTicket310();
+        subTestTicket221();
+        subTestTicket222();
+        subTestTicket224();
+        subTestTicket226();
+        subTestTicket231();
+        subTestTicket232();
+        subTestTicket293();
+        subTestTicketEng397();
+        //subTestTicketEng490();
+        subTestTicketEng993();
+        subTestTicketEng1316();
+        subTestTicket2423();
+        subTestTicket5151_ColumnDefaultNull();
+        subTestTicket5486_NULLcomparison();
+        subTestENG4146();
+        subTestENG5669();
+        subTestENG5637_VarcharVarbinaryErrorMessage();
+        subTestENG6870();
+        subTestENG6926();
+        subTestENG7041ViewAndExportTable();
+        subTestENG7349_InnerJoinWithOverflow();
+        subTestENG7724();
+        subTestENG7480();
+        subTestENG8120();
+        subTestENG9032();
+        subTestENG9389();
+        subTestENG9533();
+        subTestENG9796();
+        subTestENG11256();
+        subTestENG12105();
+        subTestENG12116();
+        subTestBoxedTypes();
         subTestInPrimitiveArrays();
-        //subTestBoxedByteArrays();
+        subTestBoxedByteArrays();
     }
 
     private void subTestENG12105() throws Exception {
