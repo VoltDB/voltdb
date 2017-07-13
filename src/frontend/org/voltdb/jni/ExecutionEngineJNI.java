@@ -301,9 +301,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * engine's catalog.
      */
     @Override
-    public void coreUpdateCatalog(long timestamp, boolean isStreamUpdate, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(long timestamp, final String catalogDiffs) throws EEException {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
+        // BSDBG TODO: need to remove generation rolling from EE
+        final boolean isStreamUpdate = true;
         errorCode = nativeUpdateCatalog(pointer, timestamp, isStreamUpdate, getStringBytes(catalogDiffs));
         checkErrorCode(errorCode);
     }

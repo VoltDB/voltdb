@@ -347,7 +347,6 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean requiresSnapshotIsolation = ((Byte) params.toArray()[2]) != 0;
             boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[3]) != 0;
             boolean hasSchemaChange = ((Byte) params.toArray()[4]) != 0;
-            boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
 
             CatalogAndIds catalogStuff = null;
             try {
@@ -374,8 +373,8 @@ public class UpdateCore extends VoltSystemProcedure {
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash(),
                         requireCatalogDiffCmdsApplyToEE,
-                        hasSchemaChange,
-                        requiresNewExportGeneration);
+                        hasSchemaChange
+                );
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
@@ -389,7 +388,7 @@ public class UpdateCore extends VoltSystemProcedure {
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
                 context.updateCatalog(commands, p.getFirst(), p.getSecond(),
                         requiresSnapshotIsolation, uniqueId, spHandle,
-                        requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
+                        requireCatalogDiffCmdsApplyToEE);
 
                 if (log.isDebugEnabled()) {
                     log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
@@ -463,8 +462,7 @@ public class UpdateCore extends VoltSystemProcedure {
             int expectedCatalogVersion,
             byte requiresSnapshotIsolation,
             byte requireCatalogDiffCmdsApplyToEE,
-            byte hasSchemaChange,
-            byte requiresNewExportGeneration)
+            byte hasSchemaChange)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -478,8 +476,7 @@ public class UpdateCore extends VoltSystemProcedure {
                 expectedCatalogVersion,
                 requiresSnapshotIsolation,
                 requireCatalogDiffCmdsApplyToEE,
-                hasSchemaChange,
-                requiresNewExportGeneration);
+                hasSchemaChange);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
@@ -516,8 +513,7 @@ public class UpdateCore extends VoltSystemProcedure {
                            byte worksWithElastic,
                            byte[] deploymentHash,
                            byte requireCatalogDiffCmdsApplyToEE,
-                           byte hasSchemaChange,
-                           byte requiresNewExportGeneration)
+                           byte hasSchemaChange)
                                    throws Exception
     {
         assert(tablesThatMustBeEmpty != null);
@@ -624,8 +620,8 @@ public class UpdateCore extends VoltSystemProcedure {
                     expectedCatalogVersion,
                     requiresSnapshotIsolation,
                     requireCatalogDiffCmdsApplyToEE,
-                    hasSchemaChange,
-                    requiresNewExportGeneration);
+                    hasSchemaChange
+            );
         } finally {
             // remove the uac blocker when exits
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);

@@ -147,9 +147,8 @@ public interface VoltDBInterface
      * @param newCatalogBytes The catalog bytes.
      * @param catalogBytesHash  The SHA-1 hash of the catalog bytes
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
-     * @param currentTxnId
-     * @param currentTxnTimestamp
      * @param currentTxnId  The transaction ID at which this method is called
+     * @param currentTxnTimestamp
      * @param deploymentBytes  The deployment file bytes
      * @param deploymentHash The SHA-1 hash of the deployment file
      */
@@ -163,8 +162,7 @@ public interface VoltDBInterface
             byte[] deploymentBytes,
             byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
-            boolean hasSchemaChange,
-            boolean requiresNewExportGeneration);
+            boolean hasSchemaChange);
 
     /**
      * Updates the cluster setting of this VoltDB

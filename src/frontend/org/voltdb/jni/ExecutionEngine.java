@@ -605,19 +605,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected abstract void coreLoadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    public final void updateCatalog(final long timestamp, final boolean isStreamUpdate, final String diffCommands) throws EEException {
+    public final void updateCatalog(final long timestamp, final String diffCommands) throws EEException {
         try {
             m_startTime = 0;
             m_logDuration = INITIAL_LOG_DURATION;
             m_fragmentContext = FragmentContext.CATALOG_UPDATE;
-            coreUpdateCatalog(timestamp, isStreamUpdate, diffCommands);
+            coreUpdateCatalog(timestamp, diffCommands);
         }
         finally {
             m_fragmentContext = FragmentContext.UNKNOWN;
         }
     }
 
-    protected abstract void coreUpdateCatalog(final long timestamp, final boolean isStreamUpdate, final String diffCommands) throws EEException;
+    protected abstract void coreUpdateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
     public void setBatch(int batchIndex) {
         m_currentBatchIndex = batchIndex;

@@ -861,10 +861,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void coreUpdateCatalog(final long timestamp, final boolean isStreamUpdate, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
 
         try {
+            // BSDBG TODO this needs to be removed
+            final boolean isStreamUpdate = true; // be consistent with old behavior
+
             final byte catalogBytes[] = catalogDiffs.getBytes("UTF-8");
             verifyDataCapacity(catalogBytes.length + 100);
             m_data.clear();

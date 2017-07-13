@@ -623,7 +623,7 @@ public class ExportManager
         return m_connCount;
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration, List<Integer> partitions)
+    public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -635,6 +635,8 @@ public class ExportManager
             return;
         }
 
+        // BSDBG TODO need to remove generation rolling
+        final boolean requiresNewExportGeneration = true;
         if (!requiresNewExportGeneration) {
             exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
             return;

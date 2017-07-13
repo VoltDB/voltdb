@@ -97,7 +97,7 @@ public class TestCatalogDiffs extends TestCase {
             Catalog catUpdated)
     {
         //Default expect no generation roll, but with EE diff commands.
-        return verifyDiff(catOriginal, catUpdated, null, null, true, false, true);
+        return verifyDiff(catOriginal, catUpdated, null, null, true, true);
     }
 
     private String verifyDiff(
@@ -106,7 +106,7 @@ public class TestCatalogDiffs extends TestCase {
             boolean expectApplyCatalogDiffToEE)
     {
         //Default expect no generation roll.
-        return verifyDiff(catOriginal, catUpdated, null, null, expectApplyCatalogDiffToEE, false, true);
+        return verifyDiff(catOriginal, catUpdated, null, null, expectApplyCatalogDiffToEE, true);
     }
 
     private String verifyDiff(
@@ -115,7 +115,7 @@ public class TestCatalogDiffs extends TestCase {
             Boolean expectSnapshotIsolation,
             Boolean worksWithElastic,
             Boolean expectApplyCatalogDiffToEE,
-            Boolean expectedNewGeneration, Boolean execute)
+            Boolean execute)
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
         String commands = diff.commands();
@@ -135,10 +135,6 @@ public class TestCatalogDiffs extends TestCase {
         }
         if (expectApplyCatalogDiffToEE != null) {
             assertEquals(expectApplyCatalogDiffToEE.booleanValue(), diff.requiresCatalogDiffCmdsApplyToEE());
-        }
-        if (expectedNewGeneration != null) {
-            //TODO: Enable real check.
-            assertEquals(true, diff.requiresNewExportGeneration());
         }
         if (execute) {
             String updatedOriginalSerialized = catOriginal.serialize();
@@ -461,7 +457,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testaddtable2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testaddtable2.jar");
 
-        verifyDiff(catOriginal, catUpdated, false, null, true, false, true);
+        verifyDiff(catOriginal, catUpdated, false, null, true, true);
     }
 
     public void testDropTable() throws IOException {
@@ -480,7 +476,7 @@ public class TestCatalogDiffs extends TestCase {
         // Create a catalog with just table A
         Catalog catUpdated = getCatalogForTable("A", "droptable2");
 
-        verifyDiff(catOriginal, catUpdated, false, null, true, false, true);
+        verifyDiff(catOriginal, catUpdated, false, null, true, true);
     }
 
     public void testViewConversion() throws IOException {
@@ -521,7 +517,7 @@ public class TestCatalogDiffs extends TestCase {
     public void testAddTableColumn() throws IOException {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
-        verifyDiff(catOriginal, catUpdated, true, null, true, false, true);
+        verifyDiff(catOriginal, catUpdated, true, null, true, true);
 
         VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
@@ -533,7 +529,7 @@ public class TestCatalogDiffs extends TestCase {
     public void testRemoveTableColumn() throws IOException {
         Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumn2");
         Catalog catUpdated = getCatalogForTable("A", "removetablecolumn1");
-        verifyDiff(catOriginal, catUpdated, true, null, true, false, true);
+        verifyDiff(catOriginal, catUpdated, true, null, true, true);
 
         VoltTable t1 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40)");
@@ -548,14 +544,14 @@ public class TestCatalogDiffs extends TestCase {
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
         Catalog catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         Catalog catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiff(catOriginal, catUpdated, true, null, true, false, true);
+        verifyDiff(catOriginal, catUpdated, true, null, true, true);
 
         // even pass when crossing the inline/out-of-line boundary
         t1 = TableHelper.quickTable("(VARBINARY30)");
         t2 = TableHelper.quickTable("(VARBINARY70)");
         catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiff(catOriginal, catUpdated, true, null, true, false, true);
+        verifyDiff(catOriginal, catUpdated, true, null, true, true);
 
         // fail integer contraction if non-empty empty
         t1 = TableHelper.quickTable("(BIGINT)");
@@ -710,7 +706,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar");
 
-        verifyDiff(catOriginal, catUpdated, false, null, true, false, true);
+        verifyDiff(catOriginal, catUpdated, false, null, true, true);
     }
 
     public void testAddUniqueNonCoveringTableIndexRejectedIfNotEmpty() throws IOException {
@@ -1241,7 +1237,7 @@ public class TestCatalogDiffs extends TestCase {
 
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
-        verifyDiff(catOriginal, catUpdated, null, true, false, false, true);
+        verifyDiff(catOriginal, catUpdated, null, true, false, true);
     }
 
     public void testChangeNotCompatibleWithElasticAddProcedure() throws IOException {
@@ -1255,7 +1251,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addStmtProcedure("another_procedure", "select * from A;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
-        verifyDiff(catOriginal, catUpdated, null, false, false, false, true);
+        verifyDiff(catOriginal, catUpdated, null, false, false, true);
     }
 
     public void testChangeNotCompatibleWithElasticAddTable() throws IOException {
@@ -1269,7 +1265,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE another_table (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
-        verifyDiff(catOriginal, catUpdated, null, false, true, false, true);
+        verifyDiff(catOriginal, catUpdated, null, false, true, true);
     }
 
     public void testEnableDROnEmptyTable() throws IOException {
@@ -1498,10 +1494,10 @@ public class TestCatalogDiffs extends TestCase {
         msg = CatalogUtil.compileDeployment(modTypeCat, modTypeDepl, false);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
-        verifyDiff(newPropCat, origCat, null, null, true, true, false); // test delete
-        verifyDiff(origCat, newPropCat, null, null, true, true, false); // test add
-        verifyDiff(origCat, modPropCat, null, null, true, true, false); // test modification
-        verifyDiff(modPropCat, modTypeCat, null, null, true, true, false); // test modification
+        verifyDiff(newPropCat, origCat, null, null, true, false); // test delete
+        verifyDiff(origCat, newPropCat, null, null, true, false); // test add
+        verifyDiff(origCat, modPropCat, null, null, true, false); // test modification
+        verifyDiff(modPropCat, modTypeCat, null, null, true, false); // test modification
     }
 
     public void testAddStreamRollGeneration() throws IOException {
@@ -1541,10 +1537,10 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp5.jar"));
         Catalog catUpdatedWithNewStream = catalogForJar(testDir + File.separator + "exp5.jar");
 
-        verifyDiff(catOriginal, catUpdatedWithNewStream, null, null, true, true, false); // add stream and roll
-        verifyDiff(catOriginal, catUpdatedWithDropStream, null, null, true, true, false); // drop stream and roll
-        verifyDiff(catOriginal, catUpdatedWithNewTable, null, null, true, false, false); // add table and dont roll
-        verifyDiff(catOriginal, catUpdatedWithDroppedTable, null, null, true, false, false); // drop table and dont roll
+        verifyDiff(catOriginal, catUpdatedWithNewStream, null, null, true, false); // add stream and roll
+        verifyDiff(catOriginal, catUpdatedWithDropStream, null, null, true, false); // drop stream and roll
+        verifyDiff(catOriginal, catUpdatedWithNewTable, null, null, true, false); // add table and dont roll
+        verifyDiff(catOriginal, catUpdatedWithDroppedTable, null, null, true, false); // drop table and dont roll
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);"
@@ -1553,8 +1549,8 @@ public class TestCatalogDiffs extends TestCase {
                 + "\nCREATE VIEW V_A (C1 , NUM_A) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp6.jar"));
         Catalog catUpdatedWithStreamView = catalogForJar(testDir + File.separator + "exp6.jar");
-        verifyDiff(catOriginal, catUpdatedWithStreamView, null, null, true, false, false); // create view on stream and roll
-        verifyDiff(catUpdatedWithStreamView, catOriginal, null, null, true, false, false); // drop view on stream and roll
+        verifyDiff(catOriginal, catUpdatedWithStreamView, null, null, true, false); // create view on stream and roll
+        verifyDiff(catUpdatedWithStreamView, catOriginal, null, null, true, false); // drop view on stream and roll
 
     }
 

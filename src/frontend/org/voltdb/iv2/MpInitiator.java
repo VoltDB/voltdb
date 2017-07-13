@@ -202,11 +202,11 @@ public class MpInitiator extends BaseInitiator implements Promotable
      * is currently safe with no locking.  And yes, I'm a horrible person.
      */
     public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
+                              boolean requireCatalogDiffCmdsApplyToEE)
     {
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
         m_executionSite.updateCatalog(diffCmds, context, csp, false, true, Long.MIN_VALUE, Long.MIN_VALUE,
-                requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
+                requireCatalogDiffCmdsApplyToEE);
         MpScheduler sched = (MpScheduler)m_scheduler;
         sched.updateCatalog(diffCmds, context, csp);
     }

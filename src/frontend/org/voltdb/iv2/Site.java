@@ -393,14 +393,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation,
-                long uniqueId, long spHandle,
-                boolean requireCatalogDiffCmdsApplyToEE,
-                boolean requiresNewExportGeneration)
+                                     CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation,
+                                     long uniqueId, long spHandle,
+                                     boolean requireCatalogDiffCmdsApplyToEE)
         {
             return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation,
                     false, uniqueId, spHandle,
-                    requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
+                    requireCatalogDiffCmdsApplyToEE);
         }
 
         @Override
@@ -1503,9 +1502,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle,
-            boolean requireCatalogDiffCmdsApplyToEE,
-            boolean requiresNewExportGeneration)
+                                 boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle,
+                                 boolean requireCatalogDiffCmdsApplyToEE)
     {
         CatalogContext oldContext = m_context;
         m_context = context;
@@ -1564,10 +1562,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
         }
 
+        // BSDBG: TODO: this comment is being made out of date - can we remove quiesce?
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         m_ee.quiesce(m_lastCommittedSpHandle);
-        m_ee.updateCatalog(m_context.m_uniqueId, requiresNewExportGeneration, diffCmds);
+        m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
