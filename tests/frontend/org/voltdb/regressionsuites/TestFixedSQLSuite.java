@@ -365,17 +365,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 + "x'deadbeef');", new long[][] {{1}});
 
         if(!isHSQL()) {
-        try {
-            byte[][] byteArr = new byte[][]{ Encoder.hexDecode("0A"), Encoder.hexDecode("1E") };
-            client.callProcedure("InPrimitiveArrays", "BYTES", byteArr, null,
-                    null, null, null, null, null, null).getResults();
-        } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
-                    + "Incompatible parameter type: can not convert type 'byte[][]' to 'INLIST_OF_BIGINT' "
-                    + "for arg 0 for SQL stmt: SELECT * FROM ENG_12105 WHERE VARBIN IN ?;. "
-                    + "Try explicitly using a long[] parameter"));
-        }
+            try {
+                byte[][] byteArr = new byte[][]{ Encoder.hexDecode("0A"), Encoder.hexDecode("1E") };
+                client.callProcedure("InPrimitiveArrays", "BYTES", byteArr, null,
+                        null, null, null, null, null, null).getResults();
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                        + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                        + "Incompatible parameter type: can not convert type 'byte[][]' to 'INLIST_OF_BIGINT' "
+                        + "for arg 0 for SQL stmt: SELECT * FROM ENG_12105 WHERE VARBIN IN ?;. "
+                        + "Try explicitly using a long[] parameter"));
+            }
 
 //        String errMsg = "VOLTDB ERROR: USER ABORT\n"
 //                + "  Unknown type VoltType.INLIST_OF_BIGINT can not be converted "
@@ -389,37 +389,28 @@ public class TestFixedSQLSuite extends RegressionSuite {
 //        try {
             results = client.callProcedure("InPrimitiveArrays", "SHORTS", null, new short[]{1, 2, 3},
                     null, null, null, null, null, null).getResults();
-//        } catch (ProcCallException e) {
-//            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-//                          + "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [S"));
-//        }
+//            validateRowCount(client, "exec InPrimitiveArrays SHORTS null new short[]{1, 2, 3}"
+//                    + " null, null, null, null, null, null", 1);
+            assertEquals(1, results[0].getRowCount());
 
-//        try {
             results = client.callProcedure("InPrimitiveArrays", "INTS", null, null,
                     new int[]{0, 1, 2}, null, null, null, null, null).getResults();
-//        } catch (ProcCallException e) {
-//            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-//                          + "  org.voltdb.VoltTypeException: Unimplemented Object Type: class [I"));
-//        }
+            assertEquals(1, results[0].getRowCount());
 
-//        try {
             results = client.callProcedure("InPrimitiveArrays", "LNGS", null, null, null,
                     new long[]{1L, 2L, 3L}, null, null, null, null).getResults();
-//        } catch (ProcCallException e) {
-//            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-//                            + "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
-//        }
+            assertEquals(1, results[0].getRowCount());
 
-        try {
-            client.callProcedure("InPrimitiveArrays", "DBLS", null, null, null, null,
-                    new double[]{1.3, 3.1, 5.2}, null, null, null).getResults();
-        } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                            + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
-                            + "Incompatible parameter type: can not convert type 'double[]' to 'INLIST_OF_BIGINT' "
-                            + "for arg 0 for SQL stmt: SELECT * FROM ENG_12105 WHERE NUM IN ?;. "
-                            + "Try explicitly using a long[] parameter"));
-        }
+            try {
+                client.callProcedure("InPrimitiveArrays", "DBLS", null, null, null, null,
+                        new double[]{1.3, 3.1, 5.2}, null, null, null).getResults();
+            } catch (ProcCallException e) {
+                assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                                + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                                + "Incompatible parameter type: can not convert type 'double[]' to 'INLIST_OF_BIGINT' "
+                                + "for arg 0 for SQL stmt: SELECT * FROM ENG_12105 WHERE NUM IN ?;. "
+                                + "Try explicitly using a long[] parameter"));
+            }
 
 //        try {
 //            client.callProcedure("InPrimitiveArrays", "BIGDS", null, null, null, null, null,
@@ -430,22 +421,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
 //                            + "for statement SELECT * FROM ENG_12105 WHERE DEC IN ?;"));
 //        }
 
-//        try {
+
             results = client.callProcedure("InPrimitiveArrays", "STRS", null, null, null, null, null, null,
                     new String[]{"foo", "bar"}, null).getResults();
-//        } catch (ProcCallException e) {
-//            assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n"
-//                            + "  Number of arguments provided was 3 where 1 was expected "
-//                            + "for statement SELECT * FROM ENG_12105 WHERE VCHAR IN ?;"));
-//        }
+            assertEquals(1, results[0].getRowCount());
 
-//        try {
             results = client.callProcedure("InPrimitiveArrays", "LNGINT", null, null, null,
                     new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
-//        } catch (ProcCallException e) {
-//            assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-//                            + "  org.voltdb.VoltTypeException: Unsupported type: VoltType.INLIST_OF_BIGINT"));
-//        }
+            assertEquals(1, results[0].getRowCount());
 
             // HSQL does not convert convert null to null value for TIMESTAMP
             byte[] insByteArr = Encoder.hexDecode("0A");
@@ -453,11 +436,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                     null, null, null, null, null, insByteArr).getResults();
             assertEquals(1, results[0].getRowCount());
         }
-
-        String query =
-                String.format("select * from ENG_12105");
-        results = client.callProcedure("@AdHoc", query).getResults();
-        System.out.println(results);
 
         truncateTables(client, "ENG_12105");
     }
