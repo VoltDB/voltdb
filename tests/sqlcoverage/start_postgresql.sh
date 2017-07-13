@@ -18,6 +18,23 @@ if [[ "$OSTYPE" == darwin* ]]; then
     MKTEMP_TEMPLATE=/tmp/tmp.XXXXXXXXXX
     SHOW_LISTENING_PORTS='sudo lsof -n -u postgres | grep LISTEN'
 fi
+POSTGRES_JDBC_JAR=/home/test/jdbc/postgresql-9.4.1207.jar
+
+while [ -z "$DONE" ] ; do
+    case "$1" in
+    --postgres-jdbc-jar=.*)
+	POSTGRES_JDBC_JAR=$(echo $1 | sed 's/^[^=]*//')
+	shift
+	;;
+    "")
+	DONE=YES
+	;;
+    *)
+	echo "$0: Unknown command line parameter '$1'"
+	exit 100
+	;;
+    esac
+done
 
 # Check for & kill any postgres processes, in case there is an old one leftover
 ps -f -u postgres
@@ -32,7 +49,7 @@ export PG_PATH=$(locate pg_restore | grep /bin | grep -v /usr/bin | tail -1 | xa
 echo "PG_PATH:" $PG_PATH
 
 # Use the same version of the PostgreSQL JDBC jar, on all platforms
-export CLASSPATH=$CLASSPATH:/home/test/jdbc/postgresql-9.4.1207.jar
+export CLASSPATH=$CLASSPATH:$POSTGRES_JDBC_JAR
 echo "CLASSPATH:" $CLASSPATH
 
 # Start the PostgreSQL server, in the new temp directory

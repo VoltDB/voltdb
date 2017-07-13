@@ -99,6 +99,8 @@
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
 <property name='cmake.generator'             value='Unix Makefiles' />
+<property name='cmake.build.tool'            value="${base.dir}/tools/build_cmake.py" />
+<property name='cmake.build.source'          value="${base.dir}/src/ee" />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -1399,7 +1401,7 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} --run-all-tests" />
+        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --run-all-tests" />
     </exec>
 </target>
 
@@ -1409,7 +1411,7 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} --build-tests" />
+        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --build-tests" />
     </exec>
 </target>
 
@@ -1417,7 +1419,7 @@ NATIVE EE STUFF
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} --install" />
+        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --install" />
     </exec>
 </target>
 
@@ -1426,7 +1428,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <env key="EESKIPBUILDMAKEFILE" value="true" />
-        <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} --install" />
+        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1435,7 +1437,7 @@ NATIVE EE STUFF
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} --install" />
+        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1444,7 +1446,7 @@ NATIVE EE STUFF
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build_cmake.py --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} ----profile --install" />
+        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} ----profile --install" />
     </exec>
 </target>
 
@@ -1452,7 +1454,7 @@ NATIVE EE STUFF
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build_cmake.py  --generator='${cmake.generator}' --source-directory=${basedir} --build-type=${build} ----profile --install" />
+        <arg line="${cmake.build.tool}  --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} ----profile --install" />
     </exec>
 </target>
 
@@ -1894,7 +1896,7 @@ TEST CASES
   <!-- Whether any work needs doing is left to the C++ makefile -->
   <exec dir='.' executable='python' failonerror='true'>
     <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-    <arg line="build_cmake.py --generator='${cmake.generator}' --coverage" />
+    <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory ${cmake.build.source} --coverage" />
   </exec>
   <mkdir dir="${lcov.dir}" />
   <!-- Reset all counters -->
@@ -1956,7 +1958,7 @@ TEST CASES
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build_cmake.py --build-type=${build} test coverage" />
+        <arg line="${cmake.build.tool} --source-directory=${cmake.build.source} --build-type=${build} test coverage" />
     </exec>
 </target>
 

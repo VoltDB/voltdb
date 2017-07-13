@@ -193,16 +193,17 @@ ENDIF()
 # Names of folders in the tree
 #
 ########################################################################
+SET (VOLTDB_ROOT ${CMAKE_SOURCE_DIR}/../..)
 # This is for our sources, relative to the source directory.
-SET (VOLTDB_EE_SRC_DIR src/ee)
+SET (VOLTDB_EE_SRC_DIR ${CMAKE_SOURCE_DIR})
 # This is for test sources, relative to the source directory.
-SET(VOLTDB_EE_TEST_DIR tests/ee)
+SET(VOLTDB_EE_TEST_DIR ${VOLTDB_ROOT}/tests/ee)
 # This is where test object files go, relative to the binary directory.
 SET(VOLTDB_EE_TEST_PROGRAM_DIR cpptests)
 
 # This is for third party sources, relative to the source directory.
 # These are mostly for system include directories.
-SET (VOLTDB_THIRD_PARTY_CPP_DIR third_party/cpp)
+SET (VOLTDB_THIRD_PARTY_CPP_DIR ${VOLTDB_ROOT}/third_party/cpp)
 # This is where we install third party artifacts.
 SET (VOLTDB_THIRD_PARTY_INSTALL_DIR ${CMAKE_BINARY_DIR}/3pty-install)
 SET (VOLTDB_THIRD_PARTY_INCLUDE_DIR ${VOLTDB_THIRD_PARTY_INSTALL_DIR}/include)
@@ -210,10 +211,10 @@ SET (VOLTDB_THIRD_PARTY_INCLUDE_DIR ${VOLTDB_THIRD_PARTY_INSTALL_DIR}/include)
 SET (VOLTDB_THIRD_PARTY_OBJ_DIR ${CMAKE_BINARY_DIR}/3pty-obj)
 # We keep pcre2 in a tarball, since we don't actually make
 # any changes to it.  This keeps the git repository epsilon smaller.
-SET (VOLTDB_TARBALLS ${CMAKE_SOURCE_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR}/tarballs)
+SET (VOLTDB_TARBALLS ${VOLTDB_THIRD_PARTY_CPP_DIR}/tarballs)
 
 # Fetch the version number.
-EXECUTE_PROCESS(COMMAND cat ${CMAKE_SOURCE_DIR}/version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
+EXECUTE_PROCESS(COMMAND cat ${CMAKE_SOURCE_DIR}/../../version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
 STRING(STRIP ${VOLTDB_VERSION} VOLTDB_VERSION)
 
 # Set the log level.
@@ -451,7 +452,7 @@ SET (VOLTDB_S2GEO_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR})
 ExternalProject_Add(s2geo
   DEPENDS crypto
   PREFIX ${VOLTDB_S2GEO_PREFIX}
-  SOURCE_DIR ${CMAKE_SOURCE_DIR}/${VOLTDB_S2GEO_SRC}
+  SOURCE_DIR ${VOLTDB_S2GEO_SRC}
   CMAKE_ARGS ${VOLTDB_S2GEO_CMAKE_CONFIG}
   CMAKE_GENERATOR ${CMAKE_GENERATOR}
   BINARY_DIR ${VOLTDB_S2GEO_OBJ})
@@ -734,7 +735,7 @@ ADD_CUSTOM_TARGET(build
 #
 ########################################################################
 ENABLE_TESTING()
-SET (VOLTDB_TEST_SRC tests/ee)
+SET (VOLTDB_TEST_SRC ${VOLTDB_ROOT}/tests/ee)
 SET (VOLTDB_TEST_DIR ${CMAKE_BINARY_DIR}/tests)
 SET (VOLTDB_TEST_OBJ ${VOLTDB_TEST_DIR}/obj)
 #
