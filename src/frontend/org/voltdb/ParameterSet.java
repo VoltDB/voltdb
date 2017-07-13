@@ -134,7 +134,7 @@ public class ParameterSet implements JSONString {
                         break;
                     case FLOAT:
                         if (obj instanceof Double[])
-                            size += 2 * ((Double[])obj).length;
+                            size += 8 * ((Double[])obj).length;
                         else
                             size += 8 * ((double[])obj).length;
                         break;
