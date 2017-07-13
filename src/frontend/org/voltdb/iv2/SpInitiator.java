@@ -82,9 +82,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     break;
                 }
             }
-            //reset BalanceSPi status if it is already a leader
+            //reset BalanceSPI status if it is already a leader
             if (isAlreadyLeader) {
-                ((InitiatorMailbox)m_initiatorMailbox).startBufferTransactionsOnBalanceSPI(false);
+                ((InitiatorMailbox)m_initiatorMailbox).setBalanceSPIStatus(false);
             }
 
             if (!leaders.contains(getInitiatorHSId())) {
@@ -227,7 +227,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
-                    m_initiatorMailbox.startBufferTransactionsOnBalanceSPI(balanceSPI);
+
+                    m_initiatorMailbox.setBalanceSPIStatus(balanceSPI);
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -238,6 +239,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + "interrupted during leader promotion after "
                             + (System.currentTimeMillis() - startTime) + " ms. of "
                             + "trying. Retrying.");
+                    m_initiatorMailbox.setBalanceSPIStatus(false);
                 }
             }
             // Tag along and become the export master too

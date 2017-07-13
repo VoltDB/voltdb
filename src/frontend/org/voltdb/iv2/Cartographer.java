@@ -33,8 +33,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
-
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
@@ -669,11 +667,7 @@ public class Cartographer extends StatsSource
      */
     private static class Host implements Comparable<Host> {
 
-        static final int NULL_PARTITION = -1;
         final int m_hostId;
-
-        //max number of partition leaders per host
-        final int m_maxPartitionLeaderCount;
 
         //the master partition ids on the host
         List<Integer> m_masterPartitionIDs = Lists.newArrayList();
@@ -681,9 +675,8 @@ public class Cartographer extends StatsSource
         //the replica partition ids on the host
         List<Integer> m_replicaPartitionIDs = Lists.newArrayList();
 
-        public Host(int hostId, int maxPartitionLeaderCount) {
+        public Host(int hostId) {
             m_hostId = hostId;
-            m_maxPartitionLeaderCount = maxPartitionLeaderCount;
         }
 
         @Override
@@ -713,21 +706,6 @@ public class Cartographer extends StatsSource
             }
         }
 
-        public int findPartitionForMigration(Host targetHost) {
-
-            //cann't move onto itself
-            if (this.equals(targetHost) || m_maxPartitionLeaderCount > getPartitionLeaderCount()) {
-                return NULL_PARTITION;
-            }
-
-            for (Integer partition : m_masterPartitionIDs) {
-                if (targetHost.m_replicaPartitionIDs.contains(partition)) {
-                    return partition;
-                }
-            }
-            return NULL_PARTITION;
-        }
-
         public int getPartitionLeaderCount() {
             return m_masterPartitionIDs.size();
         }
@@ -738,31 +716,22 @@ public class Cartographer extends StatsSource
             builder.append("Host:" + m_hostId);
             builder.append(", master:" + m_masterPartitionIDs);
             builder.append(", replica:" + m_replicaPartitionIDs);
-            builder.append(", max:" + m_maxPartitionLeaderCount);
             return builder.toString();
         }
     }
 
-    /**
-     * find a partition and its target host to host its leader
-     * @return  a partition and target host
-     */
-    public Pair<Integer, Integer> getPartitionForBalanceSPI(int maxMastersPerHost) {
-        try {
-            if (CoreZK.isPartitionCleanupInProgress(m_hostMessenger.getZK())) {
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("[getPartitionForMigration] cleaning up partitions.");
-                }
-                return null;
-            }
-        } catch (KeeperException | InterruptedException e) {
-            return null;
-        }
+    //find a partition and its target host to host its leader
+    //(best effort)
+    public Pair<Integer, Integer> getPartitionForBalanceSPI(int hostCount, int localHostId) {
 
         Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
         if (liveHosts.size() == 1) {
             return null;
         }
+
+        final int maxMastersPerHost = (int)Math.ceil((double)(getPartitionCount()) / hostCount);
+        final int minMastersPerHost = (getPartitionCount() / hostCount);
+
         //collect host and partition info
         Map<Integer, Host> hostsMap = Maps.newHashMap();
         Set<Integer> allMasters = new HashSet<Integer>();
@@ -777,7 +746,7 @@ public class Cartographer extends StatsSource
             }
             Host leaderHost = hostsMap.get(leaderHostId);
             if (leaderHost == null) {
-                leaderHost = new Host(leaderHostId, maxMastersPerHost);
+                leaderHost = new Host(leaderHostId);
                 hostsMap.put(leaderHostId, leaderHost);
             }
             List<Long> sites = getReplicasForPartition(partitionId);
@@ -788,31 +757,61 @@ public class Cartographer extends StatsSource
                 }
                 Host host = hostsMap.get(hostId);
                 if (host == null) {
-                    host = new Host(hostId, maxMastersPerHost);
+                    host = new Host(hostId);
                     hostsMap.put(hostId, host);
                 }
                 host.addPartition(partitionId, (leaderHostId == hostId));
             }
         }
 
-        //sort the hosts by partition leader count, descending
-        //filter out the hosts which have the maximal number of partition leaders.
-        LinkedList<Host> hostList = hostsMap.values().stream().
-                filter(h -> h.getPartitionLeaderCount() != maxMastersPerHost).collect(Collectors.toCollection(LinkedList::new));
+        //Sort the hosts by partition leader count, descending
+        LinkedList<Host> hostList = new LinkedList<Host>(hostsMap.values());
         Collections.sort(hostList);
 
-        for ( Iterator<Host> it = hostList.iterator(); it.hasNext();) {
-            Host srcHost = it.next();
-            for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
-                Host targetHost = reverseIt.next();
-                int partitionCandidate = srcHost.findPartitionForMigration(targetHost);
-                if (partitionCandidate > Host.NULL_PARTITION) {
-                    Pair<Integer, Integer> pair = new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
-                    return pair;
-                }
+        //only move SPI from the one with most partition leaders
+        //The local ClientInterface will pick it up and start @BalanceSPI
+        Iterator<Host> it = hostList.iterator();
+        Host srcHost = it.next();
+        if (srcHost.m_hostId != localHostId) {
+            return null;
+        }
+        //The new host is the one with least number of partition leaders and the partition replica
+        for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
+            Host targetHost = reverseIt.next();
+            int partitionCandidate = findNewLeaderHost(srcHost,targetHost, maxMastersPerHost, minMastersPerHost);
+            if (partitionCandidate > -1){
+                Pair<Integer, Integer> pair = new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
+                return pair;
             }
         }
         return null;
+    }
+
+    private int findNewLeaderHost(Host src, Host target, int maxMastersPerHost, int minMastersPerHost) {
+        //cann't move onto itself
+        if (src.equals(target)) {
+            return -1;
+        }
+
+        // still have more leaders than max?
+        if (src.getPartitionLeaderCount() > maxMastersPerHost) {
+            for (Integer partition : src.m_masterPartitionIDs) {
+                if (target.m_replicaPartitionIDs.contains(partition) && target.getPartitionLeaderCount() < maxMastersPerHost) {
+                    return partition;
+                }
+            }
+        } else {
+            if (target.getPartitionLeaderCount() >= minMastersPerHost || src.getPartitionLeaderCount() <= minMastersPerHost) {
+                return -1;
+            } else {
+                for (Integer partition : src.m_masterPartitionIDs) {
+                    if (target.m_replicaPartitionIDs.contains(partition)) {
+                        return partition;
+                    }
+                }
+            }
+        }
+        return -1;
     }
 
     //Utility method to peek the topology

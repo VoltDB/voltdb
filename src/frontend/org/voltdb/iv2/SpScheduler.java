@@ -31,6 +31,7 @@ import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -127,7 +128,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         @Override
         public String toString() {
-            return "<" + TxnEgo.txnIdToString(m_txnId) + ", " + TxnEgo.txnIdToString(m_spHandle) + ">";
+            return "[txn:" + TxnEgo.txnIdToString(m_txnId) + "(" + m_txnId + "), spHandle:" + TxnEgo.txnIdToString(m_spHandle) + "(" + m_spHandle + ")]";
         }
     };
 
@@ -168,6 +169,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     long m_lastSentTruncationHandle = Long.MIN_VALUE;
     // the max schedule transaction sphandle, multi-fragments mp txn counts one
     long m_maxScheduledTxnSpHandle = Long.MIN_VALUE;
+
+    // the checkpoint transaction sphandle upon BalanceSPI is initiated
+    long m_spiCheckPoint = Long.MIN_VALUE;
 
     //The RepairLog is the same instance as the one initialized in InitiatorMailbox.
     //Iv2IniatiateTaskMessage, FragmentTaskMessage and CompleteTransactionMessage
@@ -775,7 +779,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (m_defaultConsistencyReadLevel == ReadLevel.FAST || !m_isLeader) {
                 // the initiatorHSId is the ClientInterface mailbox.
                 m_mailbox.send(message.getInitiatorHSId(), message);
-                notifyNewPartitionLeaderFromBalanceSPI();
                 return;
             }
 
@@ -784,7 +787,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 assert(m_isLeader);
                 assert(m_bufferedReadLog != null);
                 m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
-                notifyNewPartitionLeaderFromBalanceSPI();
                 return;
             }
         }
@@ -842,7 +844,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             setRepairLogTruncationHandle(spHandle);
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
-        notifyNewPartitionLeaderFromBalanceSPI();
     }
 
     // BorrowTaskMessages encapsulate a FragmentTaskMessage along with
@@ -1226,11 +1227,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         CompleteTransactionMessage msg = message;
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
 
-        // The site has not seen any fragments of the transaction yet
-        if (!m_isLeader && txn == null) {
-            return;
-        }
-
         // 1) The site is not a leader any more, thanks to spi migration but the message is intended for leader.
         //    action: advance TxnEgo, send it to all original replicas (before spi migration)
         // 2) The site is the new leader but the message is intended for replica
@@ -1250,7 +1246,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         } else {
             if(!m_isLeader) {
                 setMaxSeenTxnId(msg.getSpHandle());
-                logRepair(msg);
+                if (txn != null) {
+                    logRepair(msg);
+                }
             }
         }
         // We can currently receive CompleteTransactionMessages for multipart procedures
@@ -1330,7 +1328,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!m_isLeader && msg.isAckRequestedFromSender()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
-        notifyNewPartitionLeaderFromBalanceSPI();
     }
 
     /**
@@ -1456,9 +1453,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_duplicateCounters.remove(dcKey);
             setRepairLogTruncationHandle(spHandle);
         }
-        notifyNewPartitionLeaderFromBalanceSPI();
     }
-
 
     public void handleDumpPlanMessage(DumpPlanThenExitMessage msg)
     {
@@ -1607,7 +1602,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_maxScheduledTxnSpHandle = Math.max(m_maxScheduledTxnSpHandle, newSpHandle);
     }
 
-    private long getMaxScheduledTxnSpHandle() {
+    long getMaxScheduledTxnSpHandle() {
         return m_maxScheduledTxnSpHandle;
     }
 
@@ -1698,13 +1693,25 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    public boolean isDuplicateCounterEmpty() {
-        return m_duplicateCounters.isEmpty();
+    public void checkPointBalanceSPI() {
+        m_spiCheckPoint = getMaxScheduledTxnSpHandle();
+        tmLog.info("Balance spi checkpoint on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                    " sphandle: " + TxnEgo.txnIdSeqToString(m_spiCheckPoint));
     }
 
-    private void notifyNewPartitionLeaderFromBalanceSPI() {
-        if (m_mailbox instanceof InitiatorMailbox) {
-            ((InitiatorMailbox)m_mailbox).notifyNewPartitionLeaderOfTxnDone();
+    public boolean txnDoneBeforeCheckPoint() {
+        if (m_spiCheckPoint < 0) {
+            return false;
         }
+        List<DuplicateCounterKey> keys = m_duplicateCounters.keySet().stream()
+                .filter(k->k.m_spHandle < m_spiCheckPoint).collect(Collectors.toList());
+        if (!keys.isEmpty()) {
+            return false;
+        }
+        m_spiCheckPoint = Long.MIN_VALUE;
+        tmLog.info("Balance spi previous leader " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                " has completed transactions before checkpoint: " + TxnEgo.txnIdSeqToString(m_spiCheckPoint));
+
+        return true;
     }
 }

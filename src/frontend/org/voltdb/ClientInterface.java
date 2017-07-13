@@ -2137,25 +2137,31 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Repeatedly call this task until no qualified partition is available.
      * @param interval task execution interval
      */
-    public void balanceSPI(int interval, int maxMastersPerHost) {
+    public void balanceSPI(int interval, int hostCount) {
+
+        //grab a zk lock
+        final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
+        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Snapshot, node joining or BalanceSPI in progress, no BalanceSPI on this host");
+            }
+            return;
+        }
 
         //The candidate pair is deterministic on every host.
-        Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(maxMastersPerHost);
+        Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(hostCount, hostId);
+
+        //The host does not have any thing to do this time. It does not mean that the host does not
+        //have more partition leaders than expected. Other hosts may have more partition leaders
+        //than this one. So let other hosts do @BalanceSPI first.
         if (target == null) {
-            m_rateLimitedLogger.log(EstTime.currentTimeMillis(), Level.INFO, null,
-                    "The distribution of partition leaders is balanced among the nodes.");
+            CoreZK.removeSPIBalanceIndicator(m_zk);
             return;
         }
 
         final int partitionId = target.getFirst();
         final int targetHostId = target.getSecond();
         int partitionKey = -1;
-
-        final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
-        //execute @BalanceSPI on the local ClientInterface with the current partition leader
-        if (hostId != CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId))) {
-            return;
-        }
 
         VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
         ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
@@ -2172,21 +2178,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (partitionKey == -1) {
             tmLog.warn("Could not find the partition key for partition " + partitionId);
+            CoreZK.removeSPIBalanceIndicator(m_zk);
             return;
         }
 
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
-        if (!db.isClusterCompelte()) {
-            return;
-        }
-
-        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Snapshot or node joining in progress, @BalanceSPI will be skipped.");
-            }
-            return;
-        }
-
         try {
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
             final String procedureName = "@BalanceSPI";
@@ -2251,11 +2247,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             db.scheduleWork(new Runnable() {
                 @Override
                 public void run() {
-                    try {
-                        CoreZK.removeSPIBalanceIndicator(m_zk);
-                    } catch (Exception ex) {
-                        log.warn("Exception while removing @BalanceSPI ZooKeeper blocker", ex);
-                    }
+                    CoreZK.removeSPIBalanceIndicator(m_zk);
                 }
             }, interval, 0, TimeUnit.SECONDS);
         }

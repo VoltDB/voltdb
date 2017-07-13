@@ -199,6 +199,14 @@ public class CoreZK {
     public static boolean createSPIBalanceIndicator(ZooKeeper zk, int hostId)
     {
         try {
+            if (CoreZK.isPartitionCleanupInProgress(zk)) {
+                return false;
+            }
+        } catch (KeeperException | InterruptedException e) {
+            return false;
+        }
+
+        try {
           //snapshot in progress
             List<String> keys = zk.getChildren(VoltZK.nodes_currently_snapshotting, false);
             if (keys.isEmpty()) {
@@ -222,16 +230,6 @@ public class CoreZK {
                       CreateMode.PERSISTENT);
         } catch (KeeperException e) {
             if (e.code() == KeeperException.Code.NODEEXISTS) {
-                try {
-                    int host = ByteBuffer.wrap(zk.getData(spi_balance_blocker, false, null)).getInt();
-                    if (host != hostId) {
-                        removeSPIBalanceIndicator(zk);
-                    }
-                } catch (KeeperException e1) {
-                    if (e1.code() != KeeperException.Code.NONODE) {
-                        org.voltdb.VoltDB.crashLocalVoltDB("Unable to get the current spi balance indicator");
-                    }
-                } catch (InterruptedException e1) {}
                 return false;
             } else {
                 org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
@@ -259,7 +257,7 @@ public class CoreZK {
                 e.code() == KeeperException.Code.BADVERSION) {
                 return true;
             }
-        } catch (InterruptedException e) {
+        } catch (Exception e) {
             return false;
         }
         return false;

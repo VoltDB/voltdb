@@ -47,9 +47,6 @@ import com.google_voltpatches.common.collect.Maps;
  */
 public class MpProcedureTask extends ProcedureTask
 {
-    //initiators before master changes
-    final List<Long> m_restartHSIDs = new ArrayList<Long>();
-
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters
     // when we requeue this Task to for restart
@@ -74,7 +71,6 @@ public class MpProcedureTask extends ProcedureTask
         List<Long> copy = new ArrayList<Long>(pInitiators);
         m_restartMasters.set(copy);
         m_restartMastersMap.set(new HashMap<Integer, Long>());
-        m_restartHSIDs.addAll(pInitiators);
     }
 
     /**
@@ -84,8 +80,6 @@ public class MpProcedureTask extends ProcedureTask
      */
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
-        m_restartHSIDs.clear();
-        m_restartHSIDs.addAll(m_initiatorHSIds);
         m_initiatorHSIds.clear();
         m_initiatorHSIds.addAll(masters);
         ((MpTransactionState)getTransactionState()).updateMasters(masters, partitionMasters);
@@ -175,12 +169,11 @@ public class MpProcedureTask extends ProcedureTask
 
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             restart.setToLeader(true);
-
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " + CoreUtils.hsIdCollectionToString(m_restartHSIDs) +
+                hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " +
                         " updated masters: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
             }
-            m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_restartHSIDs), restart);
+            m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
         // We currently don't want to restart read-only MP transactions because:

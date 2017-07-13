@@ -1655,7 +1655,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     for (int hostId : failedHosts) {
                         CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
                     }
-
+                    CoreZK.removeSPIBalanceIndicator(m_messenger.getZK());
                     // If the current node hasn't finished rejoin when another
                     // node fails, fail this node to prevent locking up the
                     // system.
@@ -2112,16 +2112,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             hostLog.info("BalanceSPI task is not scheduled.");
             return;
         }
-        final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
-        final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "10"));
+        final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "30"));
+        final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "30"));
         Runnable task = () -> {
             //only works if the cluster is full
             if (isClusterCompelte()) {
-                final int maxMastersPerHost = (int)Math.ceil((double)(m_cartographer.getPartitionCount()) / m_config.m_hostCount);
-                m_clientInterface.balanceSPI(interval, maxMastersPerHost);
+                m_clientInterface.balanceSPI(interval, m_config.m_hostCount);
             }
         };
-
         m_periodicWorks.add(scheduleWork(task, delay, interval, TimeUnit.SECONDS));
     }
 

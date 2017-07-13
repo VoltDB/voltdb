@@ -24,37 +24,45 @@ import org.voltcore.messaging.VoltMessage;
 //The message is used to notify the new partition leader that all transactions on old leader are drained
 public class BalanceSPIMessage extends VoltMessage {
 
-    private long m_destinationLeaderHSID;
-
+    private long m_newLeaderHSID;
+    private long m_priorLeaderHSID;
     public BalanceSPIMessage() {
     }
 
-    public BalanceSPIMessage(long hsid) {
+    public BalanceSPIMessage(long priorHSID, long newHSID) {
         super();
-        m_destinationLeaderHSID = hsid;
+        m_priorLeaderHSID = priorHSID;
+        m_newLeaderHSID = newHSID;
     }
 
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
-        msgsize += 8;  // m_destinationLeaderHSID
+        msgsize += 8; // m_newLeaderHSID,
+        msgsize += 8; // m_priorLeaderHSID
         return msgsize;
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.BALANCE_SPI_MESSAGE_ID);
-        buf.putLong(m_destinationLeaderHSID);
+        buf.putLong(m_newLeaderHSID);
+        buf.putLong(m_priorLeaderHSID);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
 
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException {
-        m_destinationLeaderHSID = buf.getLong();
+        m_newLeaderHSID = buf.getLong();
+        m_priorLeaderHSID = buf.getLong();
     }
 
-    public long getDestinationLeaderHSID() {
-        return m_destinationLeaderHSID;
+    public long getNewLeaderHSID() {
+        return m_newLeaderHSID;
+    }
+
+    public long getPriorLeaderHSID() {
+        return m_priorLeaderHSID;
     }
 }

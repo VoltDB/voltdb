@@ -93,15 +93,6 @@ public class MpTransactionState extends TransactionState
 
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
-        //When SPI is migrated to a new host, its partition master site will be updated.
-        m_masterSwapFromSpiBalance.clear();
-        for (Map.Entry<Integer, Long> entry : partitionMasters.entrySet()) {
-            Long hsid = m_masterHSIds.get(entry.getKey());
-            if (hsid != null && hsid.longValue() != entry.getValue()) {
-                m_masterSwapFromSpiBalance.put(entry.getValue(), hsid);
-            }
-        }
-
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("[MpTransactionState] update masters from " +  CoreUtils.hsIdCollectionToString(m_useHSIds)
             + " to "+ CoreUtils.hsIdCollectionToString(masters));
@@ -477,8 +468,8 @@ public class MpTransactionState extends TransactionState
     public void restartFragment(FragmentResponseMessage message, List<Long> masters, Map<Integer, Long> partitionMastersMap) {
         final int partionId = message.getPartitionId();
         Long restartHsid = partitionMastersMap.get(partionId);
-        Long hsid = m_masterHSIds.get(partionId);
-        if (hsid != null && restartHsid != null && !hsid.equals(restartHsid)) {
+        Long hsid = message.getExecutorSiteId();
+        if (!hsid.equals(restartHsid)) {
             m_masterSwapFromSpiBalance.clear();
             m_masterSwapFromSpiBalance.put(restartHsid, hsid);
             //The very first fragment is to be rerouted to the new leader, then all the follow-up fragments are routed
