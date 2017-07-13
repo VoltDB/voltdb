@@ -18,6 +18,7 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltcore.logging.VoltLogger;
@@ -26,6 +27,18 @@ import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 
 public class WriteCatalog extends UpdateApplicationBase {
+
+    public final static HashMap<Integer, String> SupportedJavaVersionMap = new HashMap<>();
+    static {
+        SupportedJavaVersionMap.put(45, "Java 1.1");
+        SupportedJavaVersionMap.put(46, "Java 1.2");
+        SupportedJavaVersionMap.put(47, "Java 1.3");
+        SupportedJavaVersionMap.put(48, "Java 1.4");
+        SupportedJavaVersionMap.put(49, "Java 5");
+        SupportedJavaVersionMap.put(50, "Java 6");
+        SupportedJavaVersionMap.put(51, "Java 7");
+        SupportedJavaVersionMap.put(52, "Java 8");
+    }
 
     // TODO: maybe we can add another option to clean up the
     // temporary jar files on all hosts, in case some operations
@@ -52,7 +65,7 @@ public class WriteCatalog extends UpdateApplicationBase {
             VoltDB.instance().cleanUpTempCatalogJar();
         } else if (mode == VERIFY) {
             String err;
-            if ((err = VoltDB.instance().verifyZKCatalog()) != null) {
+            if ((err = VoltDB.instance().checkLoadingClasses(catalogBytes)) != null) {
                 return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, err);
             }
         } else {

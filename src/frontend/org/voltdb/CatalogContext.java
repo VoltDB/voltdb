@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import static org.voltdb.compiler.CatalogChangeResult.CATALOG_CHANGE_NOREPLAY;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -45,7 +47,6 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
-import static org.voltdb.compiler.CatalogChangeResult.CATALOG_CHANGE_NOREPLAY;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -312,7 +313,8 @@ public class CatalogContext {
     }
 
     /**
-     * Write, replace or update the catalog jar based on different cases.
+     * Write, replace or update the catalog jar based on different cases. This function
+     * assumes any IOException should lead to fatal crash.
      * @param path
      * @param name
      * @throws IOException
@@ -339,11 +341,15 @@ public class CatalogContext {
             // we must overwrite the file (the file may have been changed)
             catalog_file.delete();
             return m_jarfile.writeToFile(catalog_file);
-        } else {
-            throw new RuntimeException("Error with current catalog jar file status, \"catalog.jar\" existence"
-                    + ": " + catalog_file.exists() + " catalog.jar.tmp existence: " + catalog_tmp_file.exists() +
-                    "\nPlease make such changes synchronously from a single " + "connection to the cluster.");
         }
+
+        // The temporary catalog jar exists, yet the previous catalog jar is gone. This shouldn't happen.
+        // Current implementation will crash the local voltdb upon any IOException in this function. So as long as
+        // the voltdb instance is running and nobody deletes the previous catalog jar file, this should never
+        // happen.
+        throw new IOException("Invalid catalog jar status: cannot find any existing catalog stored on disk." +
+                "\nPlease make such changes synchronously from a single connection to the cluster.");
+
     }
 
     /**

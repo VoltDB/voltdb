@@ -448,11 +448,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return checkCatalogUpdateAsyncResults(cf, "catalog write");
     }
 
-    protected String verifyZKCatalog() {
+    protected String verifyZKCatalog(byte[] catalogBytes) {
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                                                        callNTProcedureOnAllHosts(
                                                        "@WriteCatalog",
-                                                       new byte[] {0},
+                                                       catalogBytes,
                                                        WriteCatalog.VERIFY);
         return checkCatalogUpdateAsyncResults(cf, "catalog verification");
     }
@@ -507,14 +507,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return makeQuickResponse(pe.statusCode, pe.getMessage());
         }
 
-        // Log something useful about catalog upgrades when they occur.
-        if (!"@AdHoc".equals(invocationName) && ccr.upgradedFromVersion != null) {
-            hostLog.info(String.format("In order to update the application catalog it was "
-                    + "automatically upgraded from version %s.",
-                    ccr.upgradedFromVersion));
-        }
-
-        // case for @CatalogChangeResult
         if (ccr.encodedDiffCommands.trim().length() == 0) {
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
             return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
@@ -554,10 +546,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         try {
             String errMsg;
-            // write the new catalog to a temporary jar file
-            if ((errMsg = writeNewCatalog(ccr.catalogBytes)) != null) {
-                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-            }
 
             oldCatalog = CatalogUtil.getCatalogFromZK(zk);
 
@@ -571,6 +559,17 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 return makeQuickResponse(ClientResponseImpl.USER_ABORT, errMsg);
             }
 
+            // verify the catalog on each host, this step was originally in the MP transaction @UpdateCore
+            if ((errMsg = verifyZKCatalog(ccr.catalogBytes)) != null) {
+                hostLog.warn("Catalog verification on ZooKeeper failed on one or more hosts.");
+                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+            }
+
+            // write the new catalog to a temporary jar file
+            if ((errMsg = writeNewCatalog(ccr.catalogBytes)) != null) {
+                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+            }
+
             // update the catalog to ZooKeeper
             CatalogUtil.updateCatalogToZK(
                     zk,
@@ -582,19 +581,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     ccr.deploymentString.getBytes("UTF-8"));
 
             zkCorrupted = true;
-
-            // verify the catalog on each host, this step was originally in the MP transaction @UpdateCore
-            if ((errMsg = verifyZKCatalog()) != null) {
-                hostLog.warn("Catalog verification on ZooKeeper failed on one or more hosts.");
-                CatalogUtil.updateCatalogToZK(zk,
-                                              oldCatalog.version,
-                                              oldCatalog.txnId,
-                                              oldCatalog.uniqueId,
-                                              oldCatalog.catalogBytes,
-                                              oldCatalog.getCatalogHash(),
-                                              oldCatalog.deploymentBytes);
-                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-            }
 
             // update the catalog jar
             response = callProcedure("@UpdateCore",

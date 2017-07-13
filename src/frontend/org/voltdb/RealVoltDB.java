@@ -160,6 +160,7 @@ import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.sysprocs.WriteCatalog;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
@@ -200,18 +201,6 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * to allow test mocking.
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.HostWatcher {
-
-    public final static HashMap<Integer, String> m_versionMap = new HashMap<>();
-    static {
-        m_versionMap.put(45, "Java 1.1");
-        m_versionMap.put(46, "Java 1.2");
-        m_versionMap.put(47, "Java 1.3");
-        m_versionMap.put(48, "Java 1.4");
-        m_versionMap.put(49, "Java 5");
-        m_versionMap.put(50, "Java 6");
-        m_versionMap.put(51, "Java 7");
-        m_versionMap.put(52, "Java 8");
-    }
 
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "true"));
 
@@ -1918,6 +1907,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (IOException e) {
                 hostLog.error("Failed to log catalog: " + e.getMessage(), e);
                 e.printStackTrace();
+
+                // Defensive way to avoid any future problem. The local instance should shutdown.
+                hostLog.fatal("Error when writing catalog jar to disk: " + e.getMessage());
+                // Only 1 catalog update could happen at the same time. Before shutting down the
+                // local voltdb instance, we have to remove the global lock.
+                VoltZK.removeCatalogUpdateBlocker(VoltDB.instance().getHostMessenger().getZK(),
+                                                  VoltZK.uacActiveBlocker,
+                                                  hostLog);
+                VoltDB.crashLocalVoltDB("Fatal error when writing the catalog jar to disk.", true, e);
             }
             logDeployment();
         }
@@ -3345,17 +3343,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         File configInfoDir = getConfigDirectory();
         configInfoDir.mkdirs();
 
-        InMemoryJarfile.writeToFile(catalogBytes, new VoltFile(configInfoDir.getPath(),
-                                    InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
+        InMemoryJarfile.writeToFile(catalogBytes,
+                                    new VoltFile(configInfoDir.getPath(), InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
     }
 
     // Verify the integrity of the newly updated catalog stored on the ZooKeeper
     @Override
-    public String verifyZKCatalog() {
-        CatalogAndIds catalogStuff = null;
+    public String checkLoadingClasses(byte[] catalogBytes) {
         try {
-            catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-            InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.catalogBytes);
+            InMemoryJarfile testjar = new InMemoryJarfile(catalogBytes);
             JarLoader testjarloader = testjar.getLoader();
             for (String classname : testjarloader.getClassNames()) {
                 try {
@@ -3375,8 +3371,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 ex);
                     }
 
-                    if (m_versionMap.containsKey(major)) {
-                        msg = msg.concat(m_versionMap.get(major) + ", current runtime version is " +
+                    if (WriteCatalog.SupportedJavaVersionMap.containsKey(major)) {
+                        msg = msg.concat(WriteCatalog.SupportedJavaVersionMap.get(major) + ", current runtime version is " +
                                          System.getProperty("java.version") + ".");
                     } else {
                         msg = msg.concat("an incompatable Java version.");

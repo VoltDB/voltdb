@@ -175,7 +175,7 @@ public interface VoltDBInterface
         return;
     }
 
-    default public String verifyZKCatalog()
+    default public String checkLoadingClasses(byte[] catalogBytes)
     {
         return null;
     }
