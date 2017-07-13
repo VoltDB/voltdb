@@ -1287,6 +1287,11 @@ public class CatalogDiffEngine {
             return true;
         }
 
+        // Information about user-defined functions need to be applied to EE.
+        if (suspect instanceof Function) {
+            return true;
+        }
+
         if (suspect instanceof Table || suspect instanceof TableRef ||
                 suspect instanceof Column || suspect instanceof ColumnRef ||
                 suspect instanceof Index || suspect instanceof IndexRef ||

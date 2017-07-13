@@ -104,7 +104,7 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   GroupRef* authGroups      "Groups authorized to invoke this procedure"
   bool readonly             "Can the stored procedure modify data"
   bool singlepartition      "Does the stored procedure need data on more than one partition?"
-  bool everysite	    "Does the stored procedure as a single procedure txn at every site?"
+  bool everysite            "Does the stored procedure as a single procedure txn at every site?"
   bool systemproc           "Is this procedure an internal system procedure?"
   bool defaultproc          "Is this procedure a default auto-generated CRUD procedure?"
   bool hasjava              "Is this a full java (or other JVM language) stored procedure or is it just a single stmt?"
@@ -120,10 +120,17 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   bool transactional        "Whether the code needs to access state or just run anywhere"
 end
 
-begin Function javaonly     "A user-defined function"
-  string functionName       "The name of the function"
-  string className          "The class name of the function implementation"
-  string methodName         "The method name of the function implementation"
+begin FunctionParameter      "A user-defined function parameter"
+  int parameterType          "The type of the parameter"
+end
+
+begin Function                   "A user-defined function"
+  int functionId                 "The function sequential ID"
+  string functionName            "The name of the function"
+  string className               "The class name of the function implementation"
+  string methodName              "The method name of the function implementation"
+  FunctionParameter* parameters  "The parameter types of this function"
+  int returnType                 "The return value type of this function"
 end
 
 begin Table                                  "A table (relation) in the database"

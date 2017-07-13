@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfo;
@@ -606,10 +607,8 @@ public abstract class ProcedureCompiler {
 
         try {
             procClass.newInstance();
-        } catch (InstantiationException e) {
-            throw new RuntimeException("Error instantiating procedure \"" + procClass.getName() + "\"", e);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Error instantiating procedure \"" + procClass.getName() + "\"", e);
+        } catch (InstantiationException | IllegalAccessException e) {
+            throw new RuntimeException(String.format("Error instantiating procedure \"%s\"", procClass.getName()), e);
         }
 
         // find the run() method and get the params
