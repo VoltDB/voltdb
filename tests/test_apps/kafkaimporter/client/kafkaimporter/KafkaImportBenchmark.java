@@ -154,6 +154,9 @@ public class KafkaImportBenchmark {
         @Option(desc = "Number of streams and topics we're importing.")
         int streams = 1;
 
+        @Option(desc = "Enable SSL with configuration file.")
+        String sslfile = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -193,12 +196,16 @@ public class KafkaImportBenchmark {
      * syntax (where :port is optional). Assumes 21212 if not specified otherwise.
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    static void dbconnect(String servers, int ratelimit) throws InterruptedException, Exception {
+    static void dbconnect(String servers, int ratelimit, String sslfile) throws InterruptedException, Exception {
         final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
         log.info("Connecting to VoltDB Interface...");
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setMaxTransactionsPerSecond(ratelimit);
+        if (sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(sslfile);
+            clientConfig.enableSSL();
+        }
         clientConfig.setReconnectOnConnectionLoss(true);
         client = ClientFactory.createClient(clientConfig);
 
@@ -435,7 +442,7 @@ public class KafkaImportBenchmark {
         config.parse(KafkaImportBenchmark.class.getName(), args);
 
         // connect to one or more servers, method loops until success
-        dbconnect(config.servers, config.ratelimit);
+        dbconnect(config.servers, config.ratelimit, config.sslfile);
 
         // special case for second half of offset check test.
         // we expect no rows, and give the import subsystem about a
