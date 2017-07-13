@@ -32,7 +32,7 @@ import org.voltdb.rejoin.TaskLog;
 public class TickProducer extends SiteTasker implements Runnable
 {
     private final SiteTaskerQueue m_taskQueue;
-    private final long m_taskTimeThreshold;
+    private final long m_procedureLogThreshold;
     private final long SUPPRESS_INTERVAL = 60; // 60 seconds
     private VoltLogger m_logger;
     private int m_partitionId;
@@ -47,12 +47,12 @@ public class TickProducer extends SiteTasker implements Runnable
         m_partitionId = taskQueue.getPartitionId();
         // get warning threshold from deployment
         // convert to nano seconds (default 10s)
-        m_taskTimeThreshold = 1_000_000L * VoltDB.instance()
+        m_procedureLogThreshold = 1_000_000L * VoltDB.instance()
                                 .getCatalogContext()
                                 .getDeployment()
                                 .getSystemsettings()
                                 .getProcedure()
-                                .getWarningtimeout();
+                                .getLoginfo();
     }
 
     // start schedules a 1 second tick.
@@ -82,12 +82,12 @@ public class TickProducer extends SiteTasker implements Runnable
         if (headOfQueueOfferTime != m_previousTaskTimestamp) {
             m_previousTaskTimestamp = headOfQueueOfferTime;
             m_previousTaskPeekTime = currentTime;
-        } else if (currentTime - m_previousTaskPeekTime >= m_taskTimeThreshold) {
+        } else if (currentTime - m_previousTaskPeekTime >= m_procedureLogThreshold) {
             String fmt = " A process (procedure, fragment, or operational task) is taking a long time "
                     + "-- over %d seconds -- and blocking the queue for site %d. "
                     + "No other jobs will be executed until that process completes.";
             long waitTime = (currentTime - m_previousTaskPeekTime)/1_000_000_000L; // in seconds
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null, fmt, waitTime, m_partitionId);
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.INFO, null, fmt, waitTime, m_partitionId);
         }
     }
 

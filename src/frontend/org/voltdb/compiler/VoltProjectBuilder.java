@@ -309,7 +309,7 @@ public class VoltProjectBuilder {
     private Integer m_elasticThroughput = null;
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
-    private Integer m_procedureTimeout = null;
+    private Integer m_procedureLogThreshold = null;
     private String m_rssLimit = null;
     private String m_snmpRssLimit = null;
     private Integer m_resourceCheckInterval = null;
@@ -329,8 +329,8 @@ public class VoltProjectBuilder {
         return this;
     }
 
-    public VoltProjectBuilder setProcedureTimeout(int target) {
-        m_procedureTimeout = target;
+    public VoltProjectBuilder setProcedureLogThreshold(int target) {
+        m_procedureLogThreshold = target;
         return this;
     }
 
@@ -1343,9 +1343,9 @@ public class VoltProjectBuilder {
             query.setTimeout(m_queryTimeout);
             systemSettingType.setQuery(query);
         }
-        if (m_procedureTimeout != null) {
+        if (m_procedureLogThreshold != null) {
             SystemSettingsType.Procedure procedure = factory.createSystemSettingsTypeProcedure();
-            procedure.setWarningtimeout(m_procedureTimeout);
+            procedure.setLoginfo(m_procedureLogThreshold);
             systemSettingType.setProcedure(procedure);
         }
         if (m_rssLimit != null || m_snmpRssLimit != null) {
