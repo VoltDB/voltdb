@@ -266,9 +266,6 @@ public class QueryPlanner {
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
                                                    m_paramzInfo.paramLiteralValues);
                 if (plan != null) {
-                    if (m_isUpsert) {
-                        replacePlanForUpsert(plan);
-                    }
                     if (plan.extractParamValues(m_paramzInfo)) {
                         return plan;
                     }
@@ -299,19 +296,7 @@ public class QueryPlanner {
             throw new PlanningErrorException(m_recentErrorMsg);
         }
 
-        if (m_isUpsert) {
-            replacePlanForUpsert(plan);
-        }
         return plan;
-    }
-
-    private static void replacePlanForUpsert (CompiledPlan plan) {
-        plan.rootPlanGraph = replaceInsertPlanNodeWithUpsert(plan.rootPlanGraph);
-        plan.subPlanGraph  = replaceInsertPlanNodeWithUpsert(plan.subPlanGraph);
-
-        if (plan.explainedPlan != null) {
-            plan.explainedPlan = plan.explainedPlan.replace("INSERT", "UPSERT");
-        }
     }
 
     /**
@@ -488,20 +473,6 @@ public class QueryPlanner {
 
         plan.subPlanGraph = sendNode;
         return;
-    }
-
-    public static AbstractPlanNode replaceInsertPlanNodeWithUpsert(AbstractPlanNode root) {
-        if (root == null) {
-            return null;
-        }
-
-        List<AbstractPlanNode> inserts = root.findAllNodesOfType(PlanNodeType.INSERT);
-        if (inserts.size() == 1) {
-            InsertPlanNode insertNode = (InsertPlanNode)inserts.get(0);
-            insertNode.setUpsert(true);
-        }
-
-        return root;
     }
 
     private String getOriginalSql() {

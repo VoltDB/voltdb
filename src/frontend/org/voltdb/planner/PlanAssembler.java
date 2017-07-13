@@ -1663,7 +1663,7 @@ public class PlanAssembler {
         // as well.  All inlining of insert nodes will be done later,
         // in a microoptimzation.  We can't do it here, since we
         // may need to remove uneeded projection nodes.
-        InsertPlanNode insertNode = new InsertPlanNode();
+        InsertPlanNode insertNode = new InsertPlanNode(m_parsedInsert.m_isUpsert);
         insertNode.setTargetTableName(targetTable.getTypeName());
         if (subquery != null) {
             insertNode.setSourceIsPartitioned(! subquery.getIsReplicated());

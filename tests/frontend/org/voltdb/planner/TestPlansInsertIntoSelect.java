@@ -119,6 +119,15 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
 
     public void testNoInlineInsert() {
         // No inline insert for UPSERT.
+        validatePlan("UPSERT INTO T1 SELECT ID, AAA, BBB FROM T1 ORDER BY ID;",
+                     2,
+                     PlanNodeType.SEND,
+                     PlanNodeType.LIMIT,
+                     PlanNodeType.RECEIVE,
+                     PlanNodeType.INVALID,
+                     PlanNodeType.SEND,
+                     PlanNodeType.INSERT,
+                     PlanNodeType.INDEXSCAN);
         validatePlan("UPSERT INTO T1 SELECT * FROM T2 ORDER BY ID, AAA, BBB;",
                      2,
                      PlanNodeType.SEND,
