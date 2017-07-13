@@ -55,7 +55,7 @@ public class BoxedByteArrays extends VoltProcedure {
 
         switch(inpType) {
             case "VARBIN":
-                voltQueueSQL(anInsert, id, varbin, null);
+                voltQueueSQL(anInsert, id, (Object)varbin, null);
                 break;
             case "STR":
                 voltQueueSQL(anInsert, id, inpString, null);
@@ -67,13 +67,13 @@ public class BoxedByteArrays extends VoltProcedure {
                 voltQueueSQL(anInsert, id, null, id);
                 break;
             case "LNGARR":
-                voltQueueSQL(aBIGSelect, lngArr);
+                voltQueueSQL(aBIGSelect, (Object)lngArr);
                 break;
             case "INTARR":
-                voltQueueSQL(aINTSelect, intArr);
+                voltQueueSQL(aINTSelect, (Object)intArr);
                 break;
             case "SEL_VARBIN":
-                voltQueueSQL(aBYTESelect, varbinArr);
+                voltQueueSQL(aBYTESelect, (Object)varbinArr);
                 break;
         }
 
