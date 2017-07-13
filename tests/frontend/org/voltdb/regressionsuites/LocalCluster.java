@@ -51,6 +51,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -114,9 +115,9 @@ public class LocalCluster extends VoltServerConfig {
     int m_replicationPort = -1;
 
     // log message pattern match results by host
-    private Map<Integer, Set<String>> m_logMessageMatchResults = null;
+    private Map<Integer, Set<String>> m_logMessageMatchResults = new ConcurrentHashMap<>();
     // log message patterns
-    private Map<String, Pattern> m_logMessageMatchPatterns = null;
+    private Map<String, Pattern> m_logMessageMatchPatterns = new ConcurrentHashMap<>();
 
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
@@ -212,17 +213,8 @@ public class LocalCluster extends VoltServerConfig {
     /*
      * Enable pre-compiled regex search in logs
      */
-    public LocalCluster(String jarFileName,
-                        List<String> regexes,
-                        int siteCount,
-                        int hostCount,
-                        int kfactor,
-                        BackendTarget target)
-    {
-        this(jarFileName, siteCount, hostCount, kfactor, target, null);
-        m_hasLocalServer = false;
-        m_logMessageMatchResults = new ConcurrentHashMap<>();
-        m_logMessageMatchPatterns = new ConcurrentHashMap<>();
+    public void setLogSearchPatterns(List<String> regexes) {
+        assert m_hasLocalServer == false;
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
@@ -431,6 +423,11 @@ public class LocalCluster extends VoltServerConfig {
         if (buildDir == null) {
             buildDir = System.getProperty("user.dir") + "/obj/release";
         }
+        // Allow importer tests to find their bundles
+        String defaultBundleDir = System.getProperty("user.dir") + "/bundles";
+        m_additionalProcessEnv.putIfAbsent(
+                CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME,
+                System.getProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, defaultBundleDir));
 
         String classPath = System.getProperty("java.class.path");
         if (m_jarFileName != null) {
@@ -1687,10 +1684,6 @@ public class LocalCluster extends VoltServerConfig {
             m_running = false;
         }
         shutDownExternal();
-
-        if (m_logMessageMatchPatterns != null) {
-            resetLogMessageMatchResults();
-        }
 
         VoltServerConfig.removeInstance(this);
     }
