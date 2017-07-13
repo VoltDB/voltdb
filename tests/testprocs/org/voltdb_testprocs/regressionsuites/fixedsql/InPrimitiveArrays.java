@@ -43,28 +43,28 @@ public class InPrimitiveArrays extends VoltProcedure {
 
         switch (inpType) {
             case "BYTES":
-                voltQueueSQL(aBYTESelect, shortArr);
+                voltQueueSQL(aBYTESelect, (Object)byteArr);
                 break;
             case "SHORTS":
-                voltQueueSQL(aSHORTSelect, shortArr);
+                voltQueueSQL(aSHORTSelect, (Object)shortArr);
                 break;
             case "INTS":
-                voltQueueSQL(aINTSelect, intArr);
+                voltQueueSQL(aINTSelect, (Object)intArr);
                 break;
             case "LNGS":
-                voltQueueSQL(aLNGSelect, lngArr);
+                voltQueueSQL(aLNGSelect, (Object)lngArr);
                 break;
             case "DBLS":
-                voltQueueSQL(aDBLSelect, dblArr);
+                voltQueueSQL(aDBLSelect, (Object)dblArr);
                 break;
             case "BIGDS":
-                voltQueueSQL(aBIGDSelect, bigdArr);
+                voltQueueSQL(aBIGDSelect, (Object)bigdArr);
                 break;
             case "STRS":
-                voltQueueSQL(aSTRSelect, strArr);
+                voltQueueSQL(aSTRSelect, (Object)strArr);
                 break;
             case "LNGINT":
-                voltQueueSQL(aINTSelect, lngArr);
+                voltQueueSQL(aINTSelect, (Object)lngArr);
                 break;
             case "INSBYTES":
                 voltQueueSQL(anInsert, 1, null, null, null, null, null, null, null, null, null, null, insByteArr);
