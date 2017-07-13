@@ -47,7 +47,7 @@ public class TestImporterStopAfterIncompleteStart {
     private LocalCluster m_cluster = null;
 
     // This is how we know the appropriate code path was executed
-    private static final String CHANNEL_UNREGISTRATION_PATTERN = "Skipping channel un-registration for KafkaStreamImporter";
+    private static final String CHANNEL_UNREGISTRATION_PATTERN = "Skipping channel un-registration for";
     // Any errors except 'Failed to send topic metadata' fail the test
     private static final String ERRORS_PATTERN = "ERROR(?!.*?Failed to send topic metadata request for topic)";
 
@@ -91,7 +91,7 @@ public class TestImporterStopAfterIncompleteStart {
     }
 
     @Test
-    public void test() throws Exception {
+    public void testImporterStopAfterIncompleteStart() throws Exception {
         Client client = m_cluster.createAdminClient(new ClientConfig());
         try {
             ClientResponse response = client.callProcedure("@Pause");
