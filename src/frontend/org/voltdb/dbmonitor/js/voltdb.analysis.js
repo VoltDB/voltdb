@@ -76,8 +76,9 @@ function loadAnalysisPage(){
                         $(".noDataContent").show();
 
                     }
-                    $("#tblAnalyzeNowContent").hide();
-                    $("#tblNoDataContent").show();
+                    //For data section
+                    //$("#tblAnalyzeNowContent").hide();
+                    //$("#tblNoDataContent").show();
                 }
                 $("#analysisLoader").hide();
                 VoltDbAnalysis.proceduresCount = profileData["PROCEDURE_PROFILE"].length;

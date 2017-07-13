@@ -2468,7 +2468,7 @@ var loadPage = function (serverName, portid) {
             $("#btnSaveThreshold").on("click", function () {
                 saveInLocalStorage("usagePercentage", $("#partitionThreshold").val())
                 saveInLocalStorage("frequencyForProc", $("#replicatedThreshold").val())
-                saveInLocalStorage("execTimeForProc", $("#execTime").val())
+                //saveInLocalStorage("execTimeForProc", $("#execTime").val())
                 $("#btnAnalyzeNow").trigger("click");
                 //Close the popup
                 popup.close();
