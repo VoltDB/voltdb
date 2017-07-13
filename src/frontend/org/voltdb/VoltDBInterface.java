@@ -164,7 +164,8 @@ public interface VoltDBInterface
             byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration);
+            boolean requiresNewExportGeneration,
+            long ccrTime);
 
     /**
      * Updates the cluster setting of this VoltDB

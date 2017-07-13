@@ -642,10 +642,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         final int seed;
 
-        AssignChannels(final int seed) {
-            this.seed = seed;
-        }
-
         AssignChannels() {
             seed = System.identityHashCode(this);
         }
@@ -717,12 +713,15 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 // wait for the last write to complete
                 for (SetNodeChannels setter: setters) {
                     if (setter.getCallbackCode() != Code.OK && !m_done.get()) {
+                        // NOTE: It's possible for AssignChannels to run twice in this scenario,
+                        // once by MonitorHostNodes and once by GetChannels following a node loss event.
+                        // This condition is rare, and better than having a scenario where AssignChannels is not run.
                         LOG.warn(
                                 "LEADER (" + m_hostId
                                 + ") Retrying channel assignment because write attempt to "
                                 + setter.path + " failed with " + setter.getCallbackCode()
                                );
-                        m_es.submit(new AssignChannels(seed));
+                        m_es.submit(new GetChannels(MASTER_DN));
                         return;
                     }
                 }
