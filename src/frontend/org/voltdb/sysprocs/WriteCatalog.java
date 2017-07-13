@@ -44,17 +44,21 @@ public class WriteCatalog extends UpdateApplicationBase {
     // temporary jar files on all hosts, in case some operations
     // failed in the middle of the way ?
 
-    public static final byte WRITE = 0;
+    public static final byte CHECK_AND_WRITE = 0;
     public static final byte CLEAN_UP = 1;
-    public static final byte VERIFY = 2;
 
     VoltLogger log = new VoltLogger("HOST");
 
     // Write the new catalog to a temporary jar file
-    public CompletableFuture<ClientResponse> run(byte[] catalogBytes, byte mode) throws Exception
+    public CompletableFuture<ClientResponse> run(byte[] catalogBytes, byte mode)
     {
         // This should only be called once on each host
-        if (mode == WRITE) {
+        if (mode == CHECK_AND_WRITE) {
+            String err;
+            if ((err = VoltDB.instance().checkLoadingClasses(catalogBytes)) != null) {
+                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, err);
+            }
+
             try {
                 VoltDB.instance().writeCatalogJar(catalogBytes);
             } catch (IOException e) {
@@ -63,11 +67,6 @@ public class WriteCatalog extends UpdateApplicationBase {
             }
         } else if (mode == CLEAN_UP) {
             VoltDB.instance().cleanUpTempCatalogJar();
-        } else if (mode == VERIFY) {
-            String err;
-            if ((err = VoltDB.instance().checkLoadingClasses(catalogBytes)) != null) {
-                return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, err);
-            }
         } else {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, "The mode " + Byte.toString(mode) +
                                      " is not supported in @WriteCatalog operation.");

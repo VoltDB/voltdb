@@ -271,56 +271,7 @@ public class UpdateCore extends VoltSystemProcedure {
                 }
                 return success;
             }
-//
-//            // We know the ZK bytes are okay because the run() method wrote them before sending
-//            // out fragments
-//            CatalogAndIds catalogStuff = null;
-//            try {
-//                catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-//                InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.catalogBytes);
-//                JarLoader testjarloader = testjar.getLoader();
-//                for (String classname : testjarloader.getClassNames()) {
-//                    try {
-//                        m_javaClass.forName(classname, true, testjarloader);
-//                    }
-//                    // LinkageError catches most of the various class loading errors we'd
-//                    // care about here.
-//                    catch (UnsupportedClassVersionError e) {
-//                        String msg = "Cannot load classes compiled with a higher version of Java than currently" +
-//                                     " in use. Class " + classname + " was compiled with ";
-//
-//                        Integer major = 0;
-//                        try {
-//                            major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
-//                        } catch (Exception ex) {
-//                            log.debug("Unable to parse compile version number from UnsupportedClassVersionError.",
-//                                    ex);
-//                        }
-//
-//                        if (m_versionMap.containsKey(major)) {
-//                            msg = msg.concat(m_versionMap.get(major) + ", current runtime version is " +
-//                                             System.getProperty("java.version") + ".");
-//                        } else {
-//                            msg = msg.concat("an incompatable Java version.");
-//                        }
-//                        log.error(msg);
-//                        throw new VoltAbortException(msg);
-//                    }
-//                    catch (LinkageError | ClassNotFoundException e) {
-//                        String cause = e.getMessage();
-//                        if (cause == null && e.getCause() != null) {
-//                            cause = e.getCause().getMessage();
-//                        }
-//                        String msg = "Error loading class: " + classname + " from catalog: " +
-//                            e.getClass().getCanonicalName() + ", " + cause;
-//                        log.warn(msg);
-//                        throw new VoltAbortException(e);
-//                    }
-//                }
-//            } catch (Exception e) {
-//                Throwables.propagate(e);
-//            }
-//
+
             if (log.isInfoEnabled()) {
                 log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                         " completed data and catalog precheck.");
@@ -522,18 +473,6 @@ public class UpdateCore extends VoltSystemProcedure {
          * If this update works with elastic then do the update anyways
          */
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-//        if (worksWithElastic == 0 &&
-//            !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
-//            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
-//        }
-//
-//        // write uac blocker zk node
-//        VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker);
-//        // check rejoin blocker node
-//        if (zk.exists(VoltZK.rejoinActiveBlocker, false) != null) {
-//            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
-//            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
-//        }
 
         try {
             // Pull the current catalog and deployment version and hash info.  Validate that we're either:
@@ -543,46 +482,23 @@ public class UpdateCore extends VoltSystemProcedure {
             // ever write valid catalog and deployment state to ZK.
             CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
             // New update?
-            if (catalogStuff.version == expectedCatalogVersion + 1) {
+            if (catalogStuff.version == expectedCatalogVersion) {
                 if (log.isInfoEnabled()) {
                     log.info("New catalog update from: " + catalogStuff.toString());
                     log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
                             ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
                 }
             }
-            // restart?
             else {
-//                if (catalogStuff.version == (expectedCatalogVersion + 1) &&
-//                        Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
-//                        Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)) {
-//                    if (log.isInfoEnabled()) {
-//                        log.info("Restarting catalog update: " + catalogStuff.toString());
-//                    }
-//                }
-//                else {
-                    String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
-                            "against one version of the cluster configuration but that version was " +
-                            "no longer live when attempting to apply the change.  This is likely " +
-                            "the result of multiple concurrent attempts to change the cluster " +
-                            "configuration.  Please make such changes synchronously from a single " +
-                            "connection to the cluster.";
-                    log.warn(errmsg);
-                    throw new VoltAbortException(errmsg);
-//                }
+                String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
+                        "against one version of the cluster configuration but that version was " +
+                        "no longer live when attempting to apply the change.  This is likely " +
+                        "the result of multiple concurrent attempts to change the cluster " +
+                        "configuration.  Please make such changes synchronously from a single " +
+                        "connection to the cluster.";
+                log.warn(errmsg);
+                throw new VoltAbortException(errmsg);
             }
-
-//            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
-//            // update the global version. only one site per node will accomplish this.
-//            // others will see there is no work to do and gracefully continue.
-//            // then update data at the local site.
-//            CatalogUtil.updateCatalogToZK(
-//                    zk,
-//                    expectedCatalogVersion + 1,
-//                    DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
-//                    getUniqueId(),
-//                    catalogBytes,
-//                    catalogHash,
-//                    deploymentBytes);
 
             try {
                 performCatalogVerifyWork(
@@ -592,27 +508,22 @@ public class UpdateCore extends VoltSystemProcedure {
                         requiresSnapshotIsolation);
             }
             catch (VoltAbortException vae) {
-                // If there is a cluster failure before this point, we will re-run
-                // the transaction with the same input args and the new state,
-                // which we will recognize as a restart and do the right thing.
-//                log.debug("Catalog update cannot be applied.  Rolling back ZK state");
-//                CatalogUtil.updateCatalogToZK(
-//                        zk,
-//                        catalogStuff.version,
-//                        catalogStuff.txnId,
-//                        catalogStuff.uniqueId,
-//                        catalogStuff.catalogBytes,
-//                        catalogStuff.getCatalogHash(),
-//                        catalogStuff.deploymentBytes);
-
-                // hopefully this will throw a SpecifiedException if the fragment threw one
+                log.info("Catalog verification failed: " + vae.getMessage());
                 throw vae;
-                // If there is a cluster failure after this point, we will re-run
-                // the transaction with the same input args and the old state,
-                // which will look like a new UAC transaction.  If there is no
-                // cluster failure, we leave the ZK state consistent with the
-                // catalog state which we entered here with.
             }
+
+            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
+            // update the global version. only one site per node will accomplish this.
+            // others will see there is no work to do and gracefully continue.
+            // then update data at the local site.
+            CatalogUtil.updateCatalogToZK(
+                    zk,
+                    expectedCatalogVersion + 1,
+                    DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
+                    getUniqueId(),
+                    catalogBytes,
+                    catalogHash,
+                    deploymentBytes);
 
             performCatalogUpdateWork(
                     catalogDiffCommands,

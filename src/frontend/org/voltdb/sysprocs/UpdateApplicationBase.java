@@ -18,7 +18,6 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -438,23 +437,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return null;
     }
 
-    protected String writeNewCatalog(byte[] catalogBytes) {
-        // Write the new catalog to a temporary jar file
-        CompletableFuture<Map<Integer,ClientResponse>> cf =
-                                                      callNTProcedureOnAllHosts(
-                                                      "@WriteCatalog",
-                                                      catalogBytes,
-                                                      WriteCatalog.WRITE);
-        return checkCatalogUpdateAsyncResults(cf, "catalog write");
-    }
-
-    protected String verifyZKCatalog(byte[] catalogBytes) {
+    protected String verifyAndWriteCatalog(byte[] catalogBytes) {
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                                                        callNTProcedureOnAllHosts(
                                                        "@WriteCatalog",
                                                        catalogBytes,
-                                                       WriteCatalog.VERIFY);
-        return checkCatalogUpdateAsyncResults(cf, "catalog verification");
+                                                       WriteCatalog.CHECK_AND_WRITE);
+        return checkCatalogUpdateAsyncResults(cf, "catalog verification and write");
     }
 
     // remove temproray catalog jar file on all hosts, if any
@@ -542,7 +531,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         CompletableFuture<ClientResponse> response = null;
 
         CatalogAndIds oldCatalog = null;
-        boolean zkCorrupted = false;
+        boolean writeStarted = false;
 
         try {
             String errMsg;
@@ -559,28 +548,24 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 return makeQuickResponse(ClientResponseImpl.USER_ABORT, errMsg);
             }
 
-            // verify the catalog on each host, this step was originally in the MP transaction @UpdateCore
-            if ((errMsg = verifyZKCatalog(ccr.catalogBytes)) != null) {
-                hostLog.warn("Catalog verification on ZooKeeper failed on one or more hosts.");
-                return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-            }
+            writeStarted = true;
 
             // write the new catalog to a temporary jar file
-            if ((errMsg = writeNewCatalog(ccr.catalogBytes)) != null) {
+            if ((errMsg = verifyAndWriteCatalog(ccr.catalogBytes)) != null) {
+                hostLog.info("Catalog verification and/or write failed on one or more hosts.");
                 return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
 
-            // update the catalog to ZooKeeper
-            CatalogUtil.updateCatalogToZK(
-                    zk,
-                    ccr.expectedCatalogVersion + 1,
-                    getID(),
-                    getID(),    // does this matter ?
-                    ccr.catalogBytes,
-                    ccr.catalogHash,
-                    ccr.deploymentString.getBytes("UTF-8"));
+//            // update the catalog to ZooKeeper
+//            CatalogUtil.updateCatalogToZK(
+//                    zk,
+//                    ccr.expectedCatalogVersion + 1,
+//                    getID(),
+//                    getID(),    // does this matter ?
+//                    ccr.catalogBytes,
+//                    ccr.catalogHash,
+//                    ccr.deploymentString.getBytes("UTF-8"));
 
-            zkCorrupted = true;
 
             // update the catalog jar
             response = callProcedure("@UpdateCore",
@@ -599,21 +584,20 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                      ccr.requiresNewExportGeneration ? 1 : 0,
                                      ccr.m_ccrTime);
 
+            // Have to wait until the result is ready, in order to remove the catalog update blocker
+            // at the end
             if (response.get().getStatus() != ClientResponseImpl.SUCCESS) {
-                CatalogUtil.updateCatalogToZK(zk,
-                        oldCatalog.version,
-                        oldCatalog.txnId,
-                        oldCatalog.uniqueId,
-                        oldCatalog.catalogBytes,
-                        oldCatalog.getCatalogHash(),
-                        oldCatalog.deploymentBytes);
+//                CatalogUtil.updateCatalogToZK(zk,
+//                        oldCatalog.version,
+//                        oldCatalog.txnId,
+//                        oldCatalog.uniqueId,
+//                        oldCatalog.catalogBytes,
+//                        oldCatalog.getCatalogHash(),
+//                        oldCatalog.deploymentBytes);
+            } else {
+                writeStarted = false;
             }
-        } catch (InterruptedException | KeeperException | UnsupportedEncodingException e) {
-            if (zkCorrupted) {
-                // This means the catalog on ZooKeeper is corrupted and the restore process failed
-                VoltDB.crashGlobalVoltDB("Cannot update the catalog to the ZooKeeper node and the cluster must shutdown. "
-                        + "The catalog stored on ZooKeeper is corrupted.", true, e);
-            }
+        } catch (InterruptedException | KeeperException e) {
             return makeQuickResponse(ClientResponseImpl.GRACEFUL_FAILURE,
                                      "Catalog update in Zookeeper failed with exception:\n" +
                                      e.getMessage());
@@ -623,7 +607,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                      + "with execution exception: " +
                                      e.getCause());
         } finally {
-            cleanUpTempCatalog();
+            if (writeStarted) {
+                cleanUpTempCatalog();
+            }
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
         }
 
