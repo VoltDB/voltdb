@@ -460,7 +460,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                               final boolean useAdhocDDL,
                                                               boolean adminConnection,
                                                               String hostname,
-                                                              String user)
+                                                              String user,
+                                                              boolean noteRestoreCompleted)
     {
         // create the catalog update blocker first
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
@@ -502,7 +503,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
 
         // This means no more @UAC calls when using DDL mode.
-        if (isRestoring()) {
+        if (noteRestoreCompleted && isRestoring()) {
             noteRestoreCompleted();
         }
 

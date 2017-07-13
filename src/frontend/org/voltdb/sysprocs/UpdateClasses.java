@@ -92,6 +92,7 @@ public class UpdateClasses extends UpdateApplicationBase {
                              useDDLSchema,
                              false,
                              getHostname(),
-                             getUsername());
+                             getUsername(),
+                             false);
     }
 }

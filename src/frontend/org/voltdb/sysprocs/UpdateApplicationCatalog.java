@@ -101,6 +101,7 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                              useDDLSchema,
                              false,
                              getHostname(),
-                             getUsername());
+                             getUsername(),
+                             true);
     }
 }

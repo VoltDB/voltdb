@@ -86,7 +86,8 @@ public class Promote extends UpdateApplicationBase {
                              useDDLSchema,
                              false,
                              getHostname(),
-                             getUsername());
+                             getUsername(),
+                             false);
     }
 
 }
