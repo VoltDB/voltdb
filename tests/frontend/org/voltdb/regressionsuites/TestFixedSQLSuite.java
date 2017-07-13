@@ -365,32 +365,19 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 + "x'deadbeef');", new long[][] {{1}});
 
         if(!isHSQL()) {
-            try {
-                byte[][] byteArr = new byte[][]{ Encoder.hexDecode("0A"), Encoder.hexDecode("1E") };
-                client.callProcedure("InPrimitiveArrays", "BYTES", byteArr, null,
-                        null, null, null, null, null, null).getResults();
-            } catch (ProcCallException e) {
-                assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                        + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
-                        + "Incompatible parameter type: can not convert type 'byte[][]' to 'INLIST_OF_BIGINT' "
-                        + "for arg 0 for SQL stmt: SELECT * FROM ENG_12105 WHERE VARBIN IN ?;. "
-                        + "Try explicitly using a long[] parameter"));
-            }
 
-//        String errMsg = "VOLTDB ERROR: USER ABORT\n"
-//                + "  Unknown type VoltType.INLIST_OF_BIGINT can not be converted "
-//                + "to NULL representation for arg 0 for SQL stmt: "
-//                + "SELECT * FROM ENG_12105 WHERE VARBIN IN ?";
-//        byte[][] byteArr = new byte[][]{ Encoder.hexDecode("0A"), Encoder.hexDecode("1E") };
-//        verifyProcFails(client, errMsg,
-//                "InPrimitiveArrays", "BYTES", byteArr, null,
-//                null, null, null, null, null, null);
+            String errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                    + "Incompatible parameter type: can not convert type 'byte\\[\\]\\[\\]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE VARBIN IN \\?;. "
+                    + "Try explicitly using a long\\[\\] parameter";
+            verifyProcFails(client, errMsg,
+                    "InPrimitiveArrays", "BYTES",
+                    new byte[][]{ Encoder.hexDecode("0A"), Encoder.hexDecode("1E") },
+                    null, null, null, null, null, null, null);
 
-//        try {
             results = client.callProcedure("InPrimitiveArrays", "SHORTS", null, new short[]{1, 2, 3},
                     null, null, null, null, null, null).getResults();
-//            validateRowCount(client, "exec InPrimitiveArrays SHORTS null new short[]{1, 2, 3}"
-//                    + " null, null, null, null, null, null", 1);
             assertEquals(1, results[0].getRowCount());
 
             results = client.callProcedure("InPrimitiveArrays", "INTS", null, null,
@@ -401,26 +388,33 @@ public class TestFixedSQLSuite extends RegressionSuite {
                     new long[]{1L, 2L, 3L}, null, null, null, null).getResults();
             assertEquals(1, results[0].getRowCount());
 
-            try {
-                client.callProcedure("InPrimitiveArrays", "DBLS", null, null, null, null,
-                        new double[]{1.3, 3.1, 5.2}, null, null, null).getResults();
-            } catch (ProcCallException e) {
-                assertTrue(e.getMessage().contains("VOLTDB ERROR: UNEXPECTED FAILURE:\n"
-                                + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
-                                + "Incompatible parameter type: can not convert type 'double[]' to 'INLIST_OF_BIGINT' "
-                                + "for arg 0 for SQL stmt: SELECT * FROM ENG_12105 WHERE NUM IN ?;. "
-                                + "Try explicitly using a long[] parameter"));
-            }
+            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                    + "Incompatible parameter type: can not convert type 'double\\[\\]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE NUM IN \\?;. "
+                    + "Try explicitly using a long\\[\\] parameter";
+            verifyProcFails(client, errMsg,
+                    "InPrimitiveArrays", "DBLS", null, null, null, null,
+                    new double[]{1.3, 3.1, 5.2}, null, null, null);
 
-//        try {
-//            client.callProcedure("InPrimitiveArrays", "BIGDS", null, null, null, null, null,
-//                    new BigDecimal[]{new BigDecimal(1), new BigDecimal(2), new BigDecimal(3)}, null, null).getResults();
-//        } catch (ProcCallException e) {
-//            assertTrue(e.getMessage().contains("VOLTDB ERROR: USER ABORT\n"
-//                            + "  Number of arguments provided was 3 where 1 was expected "
-//                            + "for statement SELECT * FROM ENG_12105 WHERE DEC IN ?;"));
-//        }
+            // works if we pass long[] to check for double[]
+            results = client.callProcedure("InPrimitiveArrays", "LNGDBL", null, null, null,
+                    new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
 
+            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                    + "Incompatible parameter type: can not convert type 'BigDecimal\\[\\]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE DEC IN \\?;. "
+                    + "Try explicitly using a long\\[\\] parameter";
+            verifyProcFails(client, errMsg,
+                    "InPrimitiveArrays", "BIGDS", null, null, null, null, null,
+                    new BigDecimal[]{new BigDecimal(1), new BigDecimal(2)}, null, null);
+
+            // works if we pass long[] to check for BigDecimal[]
+            results = client.callProcedure("InPrimitiveArrays", "LNGBIGD", null, null, null,
+                    new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
 
             results = client.callProcedure("InPrimitiveArrays", "STRS", null, null, null, null, null, null,
                     new String[]{"foo", "bar"}, null).getResults();
@@ -431,9 +425,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertEquals(1, results[0].getRowCount());
 
             // HSQL does not convert convert null to null value for TIMESTAMP
-            byte[] insByteArr = Encoder.hexDecode("0A");
             results = client.callProcedure("InPrimitiveArrays", "INSBYTES", null, null,
-                    null, null, null, null, null, insByteArr).getResults();
+                    null, null, null, null, null, Encoder.hexDecode("0A")).getResults();
             assertEquals(1, results[0].getRowCount());
         }
 
