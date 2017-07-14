@@ -104,7 +104,7 @@ public class ForeignHost {
                 if (!m_hostMessenger.isShuttingDown()) {
                     String msg = "Received remote hangup from foreign host " + hostnameAndIPAndPort();
                     VoltDB.dropStackTrace(msg);
-                    CoreUtils.printAsciiArtLog(hostLog, msg, Level.WARN);
+                    CoreUtils.printAsciiArtLog(hostLog, msg, Level.INFO);
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
