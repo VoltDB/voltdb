@@ -64,7 +64,7 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     @Option(desc = "Default port for VoltDB servers.")
     public String port = "";
 
-    @Option(desc = "Comma separated list of VoltDB servers (host[:port]) to connect to.")
+    @Option(shortOpt = "H", desc = "Comma separated list of VoltDB servers (host[:port]) to connect to.")
     public String host = "";
 
     @Option(shortOpt = "s", desc = "Comma separated list of VoltDB servers (host[:port]) to connect to. Deprecated; use 'host' instead.")
