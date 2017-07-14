@@ -403,13 +403,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             resultMapByHost = cf.get();
         } catch (InterruptedException | ExecutionException e) {
             err = "An invocation of procedure " + procedureName + " on all hosts failed: " + e.getMessage();
-            hostLog.error(err);
             return err;
         }
 
         if (resultMapByHost == null) {
             err = "An invocation of procedure " + procedureName + " on all hosts returned null result.";
-            hostLog.warn(err);
             return err;
         }
 
@@ -417,7 +415,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
                 err = "A response from host " + entry.getKey().toString() +
                       " for " + procedureName + " has failed: " + entry.getValue().getStatusString();
-                hostLog.warn(err);
                 return err;
             }
         }
