@@ -739,7 +739,6 @@ public class GenerateEETests extends EEPlanGenerator {
         generateTests("executors", "TestGeneratedString", GSDB);
     }
 
-
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();

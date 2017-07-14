@@ -590,6 +590,7 @@ private:
         bool isInBytes = columnInfo->inBytes;
         char *dataPtr = getWritableDataPtr(columnInfo);
         int32_t columnLength = columnInfo->length;
+
         value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
                                       allocateObjects, tempPool);
     }

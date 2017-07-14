@@ -1346,7 +1346,7 @@ class VoltTableWrapper(object):
             abort('Bad tuple index %d (%d tuples available).' % (index, len(self.table.tuples)))
         return VoltTupleWrapper(self.table.tuples[index])
     def tuples(self):
-        return [VoltTupleWrapper(t) for t in self.table.tuples]
+        return self.table.tuples
     def format_table(self, caption = None):
         return format_volt_table(self.table, caption = caption)
     def __str__(self):

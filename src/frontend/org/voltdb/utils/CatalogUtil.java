@@ -143,7 +143,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
@@ -977,6 +976,11 @@ public abstract class CatalogUtil {
         if (query == null) {
             query = new SystemSettingsType.Query();
             ss.setQuery(query);
+        }
+        SystemSettingsType.Procedure procedure = ss.getProcedure();
+        if (procedure == null) {
+            procedure = new SystemSettingsType.Procedure();
+            ss.setProcedure(procedure);
         }
         SystemSettingsType.Snapshot snap = ss.getSnapshot();
         if (snap == null) {
