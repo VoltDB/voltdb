@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -130,23 +130,23 @@ public class MeshMonitor {
             if ( ( keptmin == new Date().getMinutes() && keptsec == new Date().getSeconds() ) || firstrunconnect ) {
 		        System.out.printf( formatUTC.format( new Date()) + " %-22s %-33s "
 	        		+ " connected to remote endpoint " + m_sc.socket().getRemoteSocketAddress() + "\n"
-	        		, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress() 
+	        		, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress()
 	        	);
 		        if (firstrunconnect) {
 		        	firstrunconnect = false;
 		        }
             }
-            
+
             boolean haveOutliers = false;
-    		
+
             synchronized (receiveLock) {
                 if (m_receiveHistogram.getMaxValue() > minHiccupSize) {
                     haveOutliers = true;
-                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta receive      - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n" 
-                    	, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress() 
+                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta receive      - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n"
+                    	, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress()
                     	, m_receiveHistogram.getMaxValue(), m_receiveHistogram.getMean()
                     	, m_receiveHistogram.getValueAtPercentile(99.0), m_receiveHistogram.getValueAtPercentile(99.9)
-                    	, m_receiveHistogram.getValueAtPercentile(99.99), m_receiveHistogram.getValueAtPercentile(99.999) 
+                    	, m_receiveHistogram.getValueAtPercentile(99.99), m_receiveHistogram.getValueAtPercentile(99.999)
                     );
                 }
                 m_receiveHistogram = new Histogram(24 * 60 * 60 * 1000, 3);
@@ -154,11 +154,11 @@ public class MeshMonitor {
             synchronized (deltaLock) {
                 if (m_deltaHistogram.getMaxValue() > minHiccupSize) {
                     haveOutliers = true;
-                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta timestamp    - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n" 
+                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta timestamp    - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n"
                     	, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress()
                     	, m_deltaHistogram.getMaxValue(), m_deltaHistogram.getMean()
                     	, m_deltaHistogram.getValueAtPercentile(99.0), m_deltaHistogram.getValueAtPercentile(99.9)
-                    	, m_deltaHistogram.getValueAtPercentile(99.99), m_deltaHistogram.getValueAtPercentile(99.999)	
+                    	, m_deltaHistogram.getValueAtPercentile(99.99), m_deltaHistogram.getValueAtPercentile(99.999)
                     );
                 }
                 m_deltaHistogram = new Histogram(24 * 60 * 60 * 1000, 3);
@@ -166,11 +166,11 @@ public class MeshMonitor {
             synchronized(sendLock) {
                 if (m_sendHistogram.getMaxValue() > minHiccupSize) {
                     haveOutliers = true;
-                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta send         - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n" 
-                    	, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress() 
+                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta send         - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n"
+                    	, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress()
                     	, m_sendHistogram.getMaxValue(), m_sendHistogram.getMean()
                     	, m_sendHistogram.getValueAtPercentile(99.0), m_sendHistogram.getValueAtPercentile(99.9)
-                    	, m_sendHistogram.getValueAtPercentile(99.99), m_sendHistogram.getValueAtPercentile(99.999) 
+                    	, m_sendHistogram.getValueAtPercentile(99.99), m_sendHistogram.getValueAtPercentile(99.999)
                     );
                 }
                 m_sendHistogram = new Histogram(24 * 60 * 60 * 1000, 3);
@@ -179,14 +179,14 @@ public class MeshMonitor {
             if (haveOutliers) {
                 System.out.print(new String(baos.toByteArray(), Charsets.UTF_8));
             } else {
-            	System.out.printf( formatUTC.format(new Date()) + " %-22s %-33s " 
+            	System.out.printf( formatUTC.format(new Date()) + " %-22s %-33s "
             			+ " Threshold not reached: " + minHiccupSize + "ms; nothing to report \n"
-            			, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress() 
+            			, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress()
             	);
             }
         }
     }
-    
+
 	public static void printUsageAndExit() {
 		int minutes = new Date().getMinutes();
         System.out.println("args: minHiccupSize reportInterval [interface]:port host1 host2... hostN ");
