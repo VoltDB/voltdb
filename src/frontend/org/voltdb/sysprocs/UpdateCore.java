@@ -43,6 +43,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -52,8 +53,6 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
-
-import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Formally "UpdateApplicationCatalog", this proc represents the transactional
@@ -253,28 +252,15 @@ public class UpdateCore extends VoltSystemProcedure {
 
             // Send out fragments to do the initial round-trip to synchronize
             // all the cluster sites on the start of catalog update, we'll do
-            // the actual work on the *next* round-trip below
+            // the actual work on the second round-trip below
 
-            // Don't actually care about the returned table, just need to send something
-            // back to the MPI scoreboard
+            // Don't actually care about the returned table, just need to send something back to the MPI
             DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
 
-            if ( ! context.isLowestSiteId()) {
-                // Any class-loading issues with the new catalog jar only need
-                // to be flagged by one site per host. So, for speed, return
-                // early from all sites except one -- the site with the lowest
-                // id on this host.
-                if (log.isInfoEnabled()) {
-                    log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-                            " completed data precheck.");
-                }
-                return success;
-            }
-
             if (log.isInfoEnabled()) {
                 log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-                        " completed data and catalog precheck.");
+                        " completed data precheck.");
             }
             return success;
         }
@@ -300,7 +286,7 @@ public class UpdateCore extends VoltSystemProcedure {
             try {
                 catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
             } catch (Exception e) {
-                Throwables.propagate(e);
+                VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
             }
 
             String replayInfo = m_runner.getTxnState().isForReplay() ? " (FOR REPLAY)" : "";
@@ -464,41 +450,26 @@ public class UpdateCore extends VoltSystemProcedure {
                            byte[] deploymentHash,
                            byte requireCatalogDiffCmdsApplyToEE,
                            byte hasSchemaChange,
-                           byte requiresNewExportGeneration, long ccrTime)
+                           byte requiresNewExportGeneration,
+                           long ccrTime)
                                    throws Exception
     {
         assert(tablesThatMustBeEmpty != null);
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+
         /*
          * Validate that no elastic join is in progress, blocking this catalog update.
          * If this update works with elastic then do the update anyways
          */
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        if (worksWithElastic == 0 && zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null) {
+            throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
+        }
 
         try {
-            // Pull the current catalog and deployment version and hash info.  Validate that we're either:
-            // (a) starting a new, valid catalog or deployment update
-            // (b) restarting a valid catalog or deployment update
-            // otherwise, we can bomb out early.  This should guarantee that we only
-            // ever write valid catalog and deployment state to ZK.
-            CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
-            // New update?
-            if (catalogStuff.version == expectedCatalogVersion) {
-                if (log.isInfoEnabled()) {
-                    log.info("New catalog update from: " + catalogStuff.toString());
-                    log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
-                            ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
-                }
-            }
-            else {
-                String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
-                        "against one version of the cluster configuration but that version was " +
-                        "no longer live when attempting to apply the change.  This is likely " +
-                        "the result of multiple concurrent attempts to change the cluster " +
-                        "configuration.  Please make such changes synchronously from a single " +
-                        "connection to the cluster.";
-                log.warn(errmsg);
-                throw new VoltAbortException(errmsg);
-            }
+            // log the start of UpdateCore
+            log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
+            log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
+                    ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
 
             try {
                 performCatalogVerifyWork(
@@ -531,10 +502,11 @@ public class UpdateCore extends VoltSystemProcedure {
                     requiresSnapshotIsolation,
                     requireCatalogDiffCmdsApplyToEE,
                     hasSchemaChange,
-                    requiresNewExportGeneration, ccrTime);
+                    requiresNewExportGeneration,
+                    ccrTime);
         } finally {
             // remove the uac blocker when exits
-//            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
         }
 
         // This is when the UpdateApplicationCatalog really ends in the blocking path

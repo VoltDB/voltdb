@@ -45,6 +45,7 @@ import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 
@@ -509,6 +510,13 @@ public class CatalogContext {
     public byte[] getCatalogHash()
     {
         return catalogHash;
+    }
+
+    public String getCatalogLogString() {
+        return String.format("Catalog: TXN ID %d, catalog hash %s, deployment hash %s\n",
+                                m_transactionId,
+                                Encoder.hexEncode(catalogHash).substring(0, 10),
+                                Encoder.hexEncode(deploymentHash).substring(0, 10));
     }
 
     public InMemoryJarfile getCatalogJar() {

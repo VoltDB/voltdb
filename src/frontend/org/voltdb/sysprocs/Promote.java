@@ -19,10 +19,13 @@ package org.voltdb.sysprocs;
 
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ReplicationRole;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.compiler.CatalogChangeResult;
 
 /**
  * Non-transactional procedure to implement public @Promote system procedure.
@@ -36,58 +39,45 @@ public class Promote extends UpdateApplicationBase {
                     "@Promote issued on non-replica cluster. No action taken.");
         }
 
-        DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
-
-        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
-
         if (!allowPausedModeWork(false, isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
         }
 
-//        CatalogChangeResult ccr = null;
-//        try {
-//            ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
-//                                                null,
-//                                                null,
-//                                                new String[0],
-//                                                null,
-//                                                true, /* isPromotion */
-//                                                drRole,
-//                                                useDDLSchema,
-//                                                false,
-//                                                getHostname(),
-//                                                getUsername());
-//        }
-//        catch (PrepareDiffFailureException pe) {
-//            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-//            return makeQuickResponse(pe.statusCode, pe.getMessage());
-//        }
-//
-//        // Log something useful about catalog upgrades when they occur.
-//        if (ccr.upgradedFromVersion != null) {
-//            hostLog.info(String.format("In order to update the application catalog it was "
-//                    + "automatically upgraded from version %s.",
-//                    ccr.upgradedFromVersion));
-//        }
-//
-//        // case for @CatalogChangeResult
-//        if (ccr.encodedDiffCommands.trim().length() == 0) {
-//            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
-//        }
+        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
 
-        return updateCatalog("@UpdateApplicationCatalog",
-                             null,
-                             null,
-                             new String[0],
-                             null,
-                             true, /* isPromotion */
-                             useDDLSchema,
-                             false,
-                             getHostname(),
-                             getUsername(),
-                             false);
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog, "@UpdateApplicationCatalog");
+        if (blockerError != null) {
+            return makeQuickResponse(ClientResponse.USER_ABORT, blockerError);
+        }
+
+        CatalogChangeResult ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
+                                                                null,
+                                                                null,
+                                                                new String[0],
+                                                                null,
+                                                                true, /* isPromotion */
+                                                                useDDLSchema,
+                                                                false,
+                                                                getHostname(),
+                                                                getUsername());
+        if (ccr.errorMsg != null) {
+            compilerLog.error("@Promote has been rejected: " + ccr.errorMsg);
+            return cleanupAndMakeResponse(ClientResponse.USER_ABORT, ccr.errorMsg);
+        }
+
+        // Log something useful about catalog upgrades when they occur.
+        if (ccr.upgradedFromVersion != null) {
+            compilerLog.info(String.format("catalog was automatically upgraded from version %s.", ccr.upgradedFromVersion));
+        }
+
+        if (ccr.encodedDiffCommands.trim().length() == 0) {
+            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, "@Promote with no catalog changes was skipped.");
+        }
+
+        return updateApplication(ccr);
     }
 
 }

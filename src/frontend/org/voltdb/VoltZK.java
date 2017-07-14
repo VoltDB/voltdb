@@ -109,9 +109,10 @@ public class VoltZK {
     public static final String start_action = "/db/start_action";
     public static final String start_action_node = ZKUtil.joinZKPath(start_action, "node_");
 
-    public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "join_blocker");
-    public static final String rejoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "rejoin_blocker");
-    public static final String uacActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "uac_blocker");
+    public static final String elasticJoinActiveBlocker = catalogUpdateBlockers + "/join_blocker";
+    public static final String rejoinActiveBlocker = catalogUpdateBlockers + "/rejoin_blocker";
+    public static final String uacActiveBlocker = catalogUpdateBlockers + "/uac_blocker";
+
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
     // Synchronized State Machine
@@ -277,8 +278,19 @@ public class VoltZK {
         return Integer.parseInt(childName.split("_")[1]);
     }
 
-    public static void createCatalogUpdateBlocker(ZooKeeper zk, String node)
-    {
+    /**
+     * Create a ZK node under catalog update blocker directory.
+     * Exclusive execution of elastic join, rejoin or catalog update is checked.
+     * @param zk
+     * @param node
+     * @param hostLog
+     * @param request
+     * @return null for success, non-null for error string
+     */
+    public static String createCatalogUpdateBlocker(ZooKeeper zk, String node, VoltLogger hostLog, String request) {
+        assert (node.equals(uacActiveBlocker) ||
+                node.equals(rejoinActiveBlocker) ||
+                node.equals(elasticJoinActiveBlocker));
         try {
             zk.create(node,
                       null,
@@ -288,27 +300,46 @@ public class VoltZK {
             if (e.code() != KeeperException.Code.NODEEXISTS) {
                 VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
             }
+            // node exists
+            return "invalid request: Can't run " + request + " when another one is in progress";
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
         }
-    }
 
-    public static boolean createCatalogUpdateBlockerWithResult(ZooKeeper zk, String node)
-    {
+        /*
+         * Validate exclusive access of elastic join, rejoin, and catalog update.
+         */
+        boolean abort = true;
         try {
-            zk.create(node,
-                      null,
-                      Ids.OPEN_ACL_UNSAFE,
-                      CreateMode.EPHEMERAL);
-        } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NODEEXISTS) {
-                VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
+            switch (node) {
+            case uacActiveBlocker:
+                // UAC can not happen during node rejoin
+                // some UAC can happen with elastic join
+                abort = zk.exists(VoltZK.rejoinActiveBlocker, false) != null;
+                break;
+            case rejoinActiveBlocker:
+                // node rejoin can not happen during UAC or elastic join
+                abort = zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1;
+                break;
+            case elasticJoinActiveBlocker:
+                // elastic join can not happen during node rejoin
+                abort = zk.exists(VoltZK.rejoinActiveBlocker, false) != null;
+                break;
+            default:
+                // not possible
+                VoltDB.crashLocalVoltDB("Invalid request " + node , true, new RuntimeException("Non-supported " + request));
             }
-            return false;
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
+        } catch (Exception e) {
+            // should not be here
+            VoltDB.crashLocalVoltDB("Error reading children of ZK " + VoltZK.catalogUpdateBlockers + ": " + e.getMessage(), true, e);
         }
-        return true;
+
+        if (abort) {
+            VoltZK.removeCatalogUpdateBlocker(zk, node, hostLog);
+            return "Can't do " + request + " while another elastic join, rejoin or catalog update is active";
+        }
+        // successfully create a ZK node
+        return null;
     }
 
     public static boolean removeCatalogUpdateBlocker(ZooKeeper zk, String node, VoltLogger log)

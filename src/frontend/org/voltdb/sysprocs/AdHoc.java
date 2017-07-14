@@ -27,9 +27,13 @@ import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.ClientInterface.ExplainMode;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.parser.SQLLexer;
 
 public class AdHoc extends AdHocNTBase {
@@ -110,8 +114,6 @@ public class AdHoc extends AdHocNTBase {
             }
         }
 
-        // We have adhoc DDL.  Is it okay to run it?
-
         // check for conflicting DDL create/drop table statements.
         // unhappy if the intersection is empty
         conflictTables.retainAll(createdTables);
@@ -127,10 +129,13 @@ public class AdHoc extends AdHocNTBase {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, sb.toString());
         }
 
-        // Is it forbidden by the replication role and configured schema change method?
-        // master and UAC method chosen:
+        if (!allowPausedModeWork(false, isAdminConnection())) {
+            return makeQuickResponse(
+                    ClientResponse.SERVER_UNAVAILABLE,
+                    "Server is paused and is available in read-only mode - please try again later.");
+        }
+
         boolean useAdhocDDL = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
-        // TODO fix this hack
         if (!useAdhocDDL) {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
@@ -138,48 +143,27 @@ public class AdHoc extends AdHocNTBase {
                     "to change application schema.  AdHoc DDL is forbidden.");
         }
 
-        // TODO figure out when internalmode matters
-        if (!allowPausedModeWork(false, isAdminConnection())) {
-            return makeQuickResponse(
-                    ClientResponse.SERVER_UNAVAILABLE,
-                    "Server is paused and is available in read-only mode - please try again later.");
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog, invocationName);
+        if (blockerError != null) {
+            return makeQuickResponse(ClientResponse.USER_ABORT, blockerError);
         }
 
-//        CatalogChangeResult ccr = null;
-//        try {
-//            DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
-//            ccr = prepareApplicationCatalogDiff(invocationName,
-//                                                null,
-//                                                null,
-//                                                sqlStatements.toArray(new String[0]),
-//                                                null,
-//                                                false,
-//                                                drRole,
-//                                                true,
-//                                                false,
-//                                                getHostname(),
-//                                                getUsername());
-//        }
-//        catch (PrepareDiffFailureException pe) {
-//            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-//            return makeQuickResponse(pe.statusCode, pe.getMessage());
-//        }
-//
-//        // case for @CatalogChangeResult
-//        if (ccr.encodedDiffCommands.trim().length() == 0) {
-//            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
-//        }
+        CatalogChangeResult ccr = prepareApplicationCatalogDiff(invocationName,
+                                                null,
+                                                null,
+                                                sqlStatements.toArray(new String[0]),
+                                                null,
+                                                false,
+                                                true,
+                                                false,
+                                                getHostname(),
+                                                getUsername());
 
-        return updateCatalog(invocationName,
-                             null,
-                             null,
-                             sqlStatements.toArray(new String[0]),
-                             null,
-                             false,
-                             true,
-                             false,
-                             getHostname(),
-                             getUsername(),
-                             false);
+        if (ccr.encodedDiffCommands.trim().length() == 0) {
+            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, "@AdHoc DDL with no catalog changes was skipped.");
+        }
+
+        return updateApplication(ccr);
     }
 }

@@ -19,8 +19,12 @@ package org.voltdb.sysprocs;
 
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.CatalogChangeResult;
 
 /**
  * Non-transactional procedure to implement public @UpdateApplicationCatalog system
@@ -30,25 +34,22 @@ import org.voltdb.client.ClientResponse;
 public class UpdateApplicationCatalog extends UpdateApplicationBase {
 
     public CompletableFuture<ClientResponse> run(byte[] catalogJarBytes, String deploymentString) {
-        // catalogJarBytes if null, when passed along, will tell the
-        // catalog change planner that we want to use the current catalog.
-
-        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema() && !isRestoring();
-
-        // normalize empty string and null
-        if ((catalogJarBytes != null) && (catalogJarBytes.length == 0)) {
-            catalogJarBytes = null;
-        }
-
         if (!allowPausedModeWork(isRestoring(), isAdminConnection())) {
             return makeQuickResponse(
                     ClientResponse.SERVER_UNAVAILABLE,
                     "Server is paused and is available in read-only mode - please try again later.");
         }
-        // We have an @UAC.  Is it okay to run it?
+
+        // catalogJarBytes if null, when passed along, will tell the
+        // catalog change planner that we want to use the current catalog.
+        // normalize empty string and null
+        if ((catalogJarBytes != null) && (catalogJarBytes.length == 0)) {
+            catalogJarBytes = null;
+        }
+
+        boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema() && !isRestoring();
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen
-
         if (catalogJarBytes != null && useDDLSchema) {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
@@ -56,52 +57,43 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                     "Use of @UpdateApplicationCatalog is forbidden.");
         }
 
-//        CatalogChangeResult ccr = null;
-//        try {
-//            ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
-//                                                catalogJarBytes,
-//                                                deploymentString,
-//                                                new String[0],
-//                                                null,
-//                                                false, /* isPromotion */
-//                                                drRole,
-//                                                useDDLSchema,
-//                                                false,
-//                                                getHostname(),
-//                                                getUsername());
-//        }
-//        catch (PrepareDiffFailureException pe) {
-//            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-//            return makeQuickResponse(pe.statusCode, pe.getMessage());
-//        }
-//
-//        // Log something useful about catalog upgrades when they occur.
-//        if (ccr.upgradedFromVersion != null) {
-//            hostLog.info(String.format("In order to update the application catalog it was "
-//                    + "automatically upgraded from version %s.",
-//                    ccr.upgradedFromVersion));
-//        }
-//
-//        // case for @CatalogChangeResult
-//        if (ccr.encodedDiffCommands.trim().length() == 0) {
-//            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
-//        }
+        final String invocationName = "@UpdateApplicationCatalog";
 
-//        // This means no more @UAC calls when using DDL mode.
-//        if (isRestoring()) {
-//            noteRestoreCompleted();
-//        }
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog, invocationName);
+        if (blockerError != null) {
+            return makeQuickResponse(ClientResponse.USER_ABORT, blockerError);
+        }
 
-        return updateCatalog("@UpdateApplicationCatalog",
-                             catalogJarBytes,
-                             deploymentString,
-                             new String[0],
-                             null,
-                             false, /* isPromotion */
-                             useDDLSchema,
-                             false,
-                             getHostname(),
-                             getUsername(),
-                             true);
+        CatalogChangeResult ccr = prepareApplicationCatalogDiff(invocationName,
+                                                                catalogJarBytes,
+                                                                deploymentString,
+                                                                new String[0],
+                                                                null,
+                                                                false, /* isPromotion */
+                                                                useDDLSchema,
+                                                                false,
+                                                                getHostname(),
+                                                                getUsername());
+        if (ccr.errorMsg != null) {
+            compilerLog.error(invocationName + " has been rejected: " + ccr.errorMsg);
+            return cleanupAndMakeResponse(ClientResponse.USER_ABORT, ccr.errorMsg);
+        }
+
+        // Log something useful about catalog upgrades when they occur.
+        if (ccr.upgradedFromVersion != null) {
+            compilerLog.info(String.format("catalog was automatically upgraded from version %s.", ccr.upgradedFromVersion));
+        }
+
+        if (ccr.encodedDiffCommands.trim().length() == 0) {
+            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, invocationName +" with no catalog changes was skipped.");
+        }
+
+        // This means no more @UAC calls when using DDL mode.
+        if (isRestoring()) {
+            noteRestoreCompleted();
+        }
+
+        return updateApplication(ccr);
     }
 }
