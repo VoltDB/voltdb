@@ -2392,16 +2392,48 @@ var loadPage = function (serverName, portid) {
             var procedureName = $("#hidProcedureName").html().split(' ')[1];
             $("#procedureName").html(procedureName);
              //filter specific procedure calls from list of datas
-            var procDetails = [];
+            var procDetails = {};
+            var finalDetails = [];
+            var statement = '';
+            var avg=0;
+            var j = 0;
+            var count = 0;
+            var isMultiple= false;
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                 //order items w.r.to latency
                 var latValue;
+
                 $("#generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
                 if(item.PROCEDURE == procedureName ){
-                    procDetails.push({"label": item.label , "value": item.value})
+                    if (item.label == statement){
+
+                        avg += item.value;
+                        isMultiple = true;
+                    }
+                    else{
+                        isMultiple = false;
+                        avg = item.value;
+                    }
+
+                    if(isMultiple){
+                        while(j < VoltDbAnalysis.latencyDetailValue.length){
+                            if (VoltDbAnalysis.latencyDetailValue[j]['label'] == item.label) count += 1;
+                                j += 1;
+                        }
+
+                        procDetails[item.label] = avg/count;
+                    }
+                    else{
+                        procDetails[item.label] = avg;
+                    }
+
+                    statement = item.label;
                 }
             });
-            MonitorGraphUI.RefreshLatencyDetailGraph(procDetails);
+            for (var key in procDetails){
+                finalDetails.push({"label": key,"value": procDetails[key]})
+            }
+            MonitorGraphUI.RefreshLatencyDetailGraph(finalDetails);
         }
     });
 

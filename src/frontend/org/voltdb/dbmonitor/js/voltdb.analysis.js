@@ -172,9 +172,11 @@ function loadAnalysisPage(){
 
         voltDbRenderer.GetProcedureDetailInformation(function (procedureDetails){
             var latencyDetails = [];
-            procedureDetails["PROCEDURE_DETAIL"].sort(function(a, b) {
-                return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
-            });
+//            procedureDetails["PROCEDURE_DETAIL"].sort(function(a, b) {
+//                return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
+//            });
+
+
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
                 if(VoltDbAnalysis.combinedDetail[item.PROCEDURE + '(' + item.STATEMENT + ')'] == undefined){
                     VoltDbAnalysis.combinedDetail[item.PROCEDURE + '(' + item.STATEMENT + ')'] = [];
@@ -187,7 +189,7 @@ function loadAnalysisPage(){
                     STATEMENT: item.STATEMENT,
                     TIMESTAMP: item.TIMESTAMP
                 })
-                VoltDbAnalysis.latencyDetail[item.STATEMENT + '(' + item.PARTITION_ID + ')'] =
+                VoltDbAnalysis.latencyDetail[item.STATEMENT] =
                     {
                         AVG: item.AVG_EXECUTION_TIME/1000000,
                         MIN: item.MIN_EXECUTION_TIME/1000000,
@@ -196,7 +198,8 @@ function loadAnalysisPage(){
                         INVOCATIONS: item.INVOCATIONS
                     }
 
-                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT + '(' + item.PARTITION_ID + ')' , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP, "INVOCATION": item.INVOCATIONS});
+
+                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP, "INVOCATION": item.INVOCATIONS});
             });
 
             MonitorGraphUI.initializeFrequencyDetailGraph();
@@ -222,6 +225,7 @@ function loadAnalysisPage(){
         this.combinedDetail = {};
         this.partitionStatus = "SP"
         this.proceduresCount = 0;
+        this.latencyDetailTest = {};
         this.formatDateTime = function(timestamp) {
         var dateTime = new Date(timestamp);
         //get date
