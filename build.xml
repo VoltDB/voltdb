@@ -672,6 +672,18 @@ DISTRIBUTION
 
     <antcall target="copy_pro_bin"/>
 
+    <!-- copy meshmonitor -->
+    <mkdir dir="${dist.dir}/tools/meshmonitor" />
+    <ant antfile="${base.dir}/tools/meshmonitor/build.xml" target="dist" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
+    <copy todir="${dist.dir}/tools/meshmonitor">
+        <fileset dir="${base.dir}/tools/meshmonitor/dist" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+    </copy>
+
+
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}" defaultexcludes="yes">
