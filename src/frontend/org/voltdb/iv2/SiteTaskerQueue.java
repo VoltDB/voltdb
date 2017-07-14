@@ -29,6 +29,15 @@ public class SiteTaskerQueue
     private final LinkedTransferQueue<SiteTasker> m_tasks = new LinkedTransferQueue<SiteTasker>();
     private StarvationTracker m_starvationTracker;
     private QueueDepthTracker m_queueDepthTracker;
+    private int m_partitionId;
+
+    public SiteTaskerQueue(int partitionId) {
+        m_partitionId = partitionId;
+    }
+
+    public int getPartitionId() {
+        return m_partitionId;
+    }
 
     public boolean offer(SiteTasker task)
     {
