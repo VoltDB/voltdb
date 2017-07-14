@@ -429,7 +429,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
                 err = "A response from host " + entry.getKey().toString() +
                       " for " + operationName + " has failed: " + entry.getValue().getStatusString();
-                hostLog.warn(err);
+                hostLog.info(err);
                 return err;
             }
         }
