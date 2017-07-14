@@ -64,7 +64,9 @@ public:
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
+        std::vector<std::string> columnNames;
         for (int i = 0; i < COLUMN_COUNT; i++) {
+            columnNames.push_back(std::to_string(i));
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             columnAllowNull.push_back(false);
@@ -86,7 +88,7 @@ public:
 
         // a simple helper around the constructor that sets the
         // wrapper buffer size to the specified value
-        m_table = StreamedTable::createForTest(1024, m_context);
+        m_table = StreamedTable::createForTest(1024, m_context, m_schema, columnNames);
     }
 
     void nextQuantum(int i, int64_t tokenOffset)

@@ -65,25 +65,11 @@ StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
     }
 }
 
-//Use this overloaded method to load in the null or any other constraints.
-void StreamedTable::initializeWithColumns(TupleSchema* schema,
-                                            std::vector<std::string> const& columnNames,
-                                            bool ownsTupleSchema,
-                                            int32_t compactionThreshold) {
-    assert (schema != NULL);
-
-    Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
-
-    m_allowNulls.resize(m_columnCount);
-    for (int i = m_columnCount - 1; i >= 0; --i) {
-        TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
-        m_allowNulls[i] = columnInfo->allowNull;
-    }
-}
-
 StreamedTable *
-StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
+StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
+    TupleSchema *schema, std::vector<std::string> & columnNames) {
     StreamedTable * st = new StreamedTable(true);
+    st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
     st->m_wrapper->setDefaultCapacity(wrapperBufSize);
     return st;
 }
@@ -150,17 +136,6 @@ TBPtr StreamedTable::allocateNextBlock() {
 void StreamedTable::nextFreeTuple(TableTuple *) {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not use nextFreeTuple with streamed tables.");
-}
-
-bool StreamedTable::checkNulls(TableTuple& tuple) const {
-    assert (m_columnCount == tuple.sizeInValues());
-    for (int i = m_columnCount - 1; i >= 0; --i) {
-        if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
-            VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
-            return false;
-        }
-    }
-    return true;
 }
 
 bool StreamedTable::insertTuple(TableTuple &source)

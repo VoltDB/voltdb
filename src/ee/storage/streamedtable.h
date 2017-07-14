@@ -48,7 +48,7 @@ class StreamedTable : public Table {
 public:
     StreamedTable(bool exportEnabled, int partitionColumn = -1);
     StreamedTable(bool exportEnabled, ExportTupleStream* wrapper);
-    static StreamedTable* createForTest(size_t, ExecutorContext*);
+    static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema, std::vector<std::string> & columnNames);
 
     //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
     bool enableStream();
@@ -96,11 +96,6 @@ public:
     //Override and say how many bytes are in Java and C++
     int64_t allocatedTupleMemory() const;
 
-    bool checkNulls(TableTuple& tuple) const;
-    void initializeWithColumns(TupleSchema* schema,
-                                    std::vector<std::string> const& columnNames,
-                                    bool ownsTupleSchema,
-                                    int32_t compactionThreshold);
 
     /**
      * Get the current offset in bytes of the export stream for this Table
@@ -145,9 +140,6 @@ private:
 
     // partition key
     const int m_partitionColumn;
-
-    // CONSTRAINTS
-    std::vector<bool> m_allowNulls;
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewTriggerForStreamInsert*> m_views;
