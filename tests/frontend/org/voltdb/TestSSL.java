@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.junit.After;
 import org.junit.Test;
@@ -38,8 +39,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
-
-import com.google_voltpatches.common.collect.ImmutableMap;
 
 import junit.framework.TestCase;
 
@@ -104,7 +103,8 @@ public class TestSSL extends TestCase {
             builder.setCertStoreInfo(certStorePath, certStorePasswd);
         }
         System.setProperty("io.netty.leakDetection.level", "PARANOID");
-        Map<String,String> env = ImmutableMap.of("io.netty.leakDetection.level","PARANOID");
+        Map<String,String> env = new TreeMap<>();
+        env.put("io.netty.leakDetection.level","PARANOID");
         m_cluster = new LocalCluster("ssl.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, false, true, env);
         boolean success = m_cluster.compile(builder);
