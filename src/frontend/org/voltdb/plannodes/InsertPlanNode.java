@@ -42,9 +42,13 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
         return m_isUpsert;
     }
 
-    public InsertPlanNode(boolean isUpsert) {
+    public InsertPlanNode() {
         super();
-        m_isUpsert = true;
+    }
+
+    public InsertPlanNode(boolean isUpsert) {
+        this();
+        m_isUpsert = isUpsert;
     }
 
     public boolean getMultiPartition() {
