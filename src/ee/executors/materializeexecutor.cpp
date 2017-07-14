@@ -141,7 +141,7 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
                 std::string errorMsg = ex.message()
                                     + " '" + (output_table -> getColumnNames()).at(ctr) + "'";
 
-                throw SQLException(ex.getSqlState(), errorMsg);
+                throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
             }
         }
     }
@@ -156,7 +156,7 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
                 std::string errorMsg = ex.message()
                                     + " '" + (output_table -> getColumnNames()).at(ctr) + "'";
 
-                throw SQLException(ex.getSqlState(), errorMsg);
+                throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
             }
         }
     }

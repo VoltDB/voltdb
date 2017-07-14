@@ -1645,9 +1645,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (1,'" + var + "')");
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column 'VAR2'",
-                            var.length(), var, 2)));
+            String expected = String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column 'VAR2'",
+                                            var.length(), var, 2);
+            String errmsg = String.format("Expected '%s' to contain '%s'",
+                                          ex.getMessage(), expected);
+            assertTrue(errmsg, ex.getMessage().contains(expected));
         }
 
         var = "贾鑫";
@@ -1770,9 +1772,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2, repeat('" + var1 + "',2))");
             fail();
         } catch(Exception ex) {
-                assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
-                                      var1.length() * 2, var1 + var1, 10)));
+            String expected = String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
+                                            var1.length() * 2, var1 + var1, 10);
+            String errmsg = String.format("Expected '%s' to contain '%s'",
+                                          ex.getMessage(),
+                                          expected);
+            assertTrue(errmsg, ex.getMessage().contains(expected));
         }
 
         // Test upsert
