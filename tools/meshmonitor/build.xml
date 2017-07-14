@@ -2,12 +2,12 @@
 
     <!-- make environment var foo available as env.foo -->
     <property environment="env"/>
-    <!-- VOLTCORE env variable points to voltdb checkout -->
-    <condition property="voltcore" value="${env.VOLTCORE}" else="../..">
-      <isset property="env.VOLTCORE"/>
+    <!-- VOLTHOME env variable points to voltdb checkout -->
+    <condition property="volthome" value="${env.VOLTHOME}" else="../..">
+      <isset property="env.VOLTHOME"/>
     </condition>
 
-    <property name='voltcore.obj' value="${voltcore}/obj/release/prod"/>
+    <property name='volthome.obj' value="${volthome}/obj/release/prod"/>
 
     <target name="clean">
         <delete includeEmptyDirs="true" dir="build"/>
@@ -20,7 +20,7 @@
             includeantruntime="false"
             srcdir="src"
             destdir="build/classes">
-            <classpath path="${voltcore.obj}"/>
+            <classpath path="${volthome.obj}"/>
         </javac>
     </target>
 
@@ -29,7 +29,7 @@
         <mkdir dir="build/jar"/>
         <jar destfile="build/jar/MeshMonitor.jar">
             <fileset dir="build/classes"/>
-	    <fileset dir="${voltcore.obj}">
+	    <fileset dir="${volthome.obj}">
 	        <include name="org/HdrHistogram_voltpatches/**"/>
 		<include name="com/google_voltpatches/common/net/**"/>
 		<include name="com/google_voltpatches/common/base/**"/>

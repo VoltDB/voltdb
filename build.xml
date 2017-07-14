@@ -515,6 +515,21 @@ PRIMARY ENTRY POINTS
 </target>
 
 
+<target name="meshmmonitor">
+     <!-- copy meshmonitor -->
+    <mkdir dir="${dist.dir}/tools/meshmonitor" />
+    <ant antfile="${base.dir}/tools/meshmonitor/build.xml"
+	 target="dist" inheritAll="false" dir="${base.dir}/tools/meshmonitor">
+        <property name="build" value="${build}"/>
+    </ant>
+    <copy todir="${dist.dir}/tools/meshmonitor">
+        <fileset dir="${base.dir}/tools/meshmonitor/dist" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+    </copy>
+
+</target>
+
 <!--
 ***************************************
 DISTRIBUTION
@@ -674,8 +689,10 @@ DISTRIBUTION
 
     <!-- copy meshmonitor -->
     <mkdir dir="${dist.dir}/tools/meshmonitor" />
-    <ant antfile="${base.dir}/tools/meshmonitor/build.xml" target="dist" inheritAll="false">
-        <property name="build" value="${build}"/>
+    <ant antfile="${base.dir}/tools/meshmonitor/build.xml"
+	 target="dist" inheritAll="false"
+	 dir="${base.dir}/tools/meshmonitor">
+        <property name="volthome" value="${base.dir}"/>
     </ant>
     <copy todir="${dist.dir}/tools/meshmonitor">
         <fileset dir="${base.dir}/tools/meshmonitor/dist" defaultexcludes="yes">
