@@ -98,9 +98,12 @@
 <property name='deployment.parsergen.dir'    location='${src.gpl.dir}/org/voltdb/compiler/deploymentfile' />
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
+<!-- Some definitions the EE build process needs. -->
 <property name='cmake.generator'             value='Unix Makefiles' />
-<property name='cmake.build.tool'            value="${base.dir}/tools/build_cmake.py" />
-<property name='cmake.build.source'          value="${base.dir}/src/ee" />
+<property name='cmake.build.source'          value='${base.dir}/src/ee' />
+<property name='cmake.test.source'           value='${base.dir}/tests/ee' />
+<property name='cmake.build.obj'             value='${base.dir}' />
+<property name='cmake.build.tool'            value='${cmake.build.source}/tools/build_cmake.py' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -1401,7 +1404,16 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --run-all-tests" />
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="${cmake.build.tool}
+                   --generator='${cmake.generator}'
+                   --source-directory='${cmake.build.source}'
+                   --object-directory='${cmake.build.obj}'
+                   --test-directory='${cmake.test.source}'
+                   --build-type=${build}
+                   --run-all-tests" />
     </exec>
 </target>
 
@@ -1411,7 +1423,16 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --build-tests" />
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="${cmake.build.tool}
+                   --generator='${cmake.generator}'
+                   --source-directory='${cmake.build.source}'
+                   --object-directory='${cmake.build.obj}'
+                   --test-directory='${cmake.test.source}'
+                   --build-type=${build}
+                   --build-tests" />
     </exec>
 </target>
 
@@ -1419,7 +1440,16 @@ NATIVE EE STUFF
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --install" />
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="${cmake.build.tool}
+                   --generator='${cmake.generator}'
+                   --source-directory='${cmake.build.source}'
+                   --object-directory='${cmake.build.obj}'
+                   --test-directory='${cmake.test.source}'
+                   --build-type=${build}
+                   --install-ipc" />
     </exec>
 </target>
 
@@ -1428,7 +1458,16 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <env key="EESKIPBUILDMAKEFILE" value="true" />
-        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --install" />
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="${cmake.build.tool}
+                   --generator='${cmake.generator}'
+                   --source-directory='${cmake.build.source}'
+                   --object-directory='${cmake.build.obj}'
+                   --test-directory='${cmake.test.source}'
+                   --build-type=${build}
+                   --install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1437,7 +1476,16 @@ NATIVE EE STUFF
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} --install" />
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="${cmake.build.tool}
+                   --generator='${cmake.generator}'
+                   --source-directory='${cmake.build.source}'
+                   --object-directory='${cmake.build.obj}'
+                   --test-directory='${cmake.test.source}'
+                   --build-type=${build}
+                   --install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1446,7 +1494,17 @@ NATIVE EE STUFF
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} ----profile --install" />
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="${cmake.build.tool}
+                   --generator='${cmake.generator}'
+                   --source-directory='${cmake.build.source}'
+                   --object-directory='${cmake.build.obj}'
+                   --test-directory='${cmake.test.source}'
+                   --build-type=${build}
+                   --profile
+                   --install" />
     </exec>
 </target>
 
@@ -1454,7 +1512,17 @@ NATIVE EE STUFF
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="${cmake.build.tool}  --generator='${cmake.generator}' --source-directory=${cmake.build.source} --build-type=${build} ----profile --install" />
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="${cmake.build.tool}
+                   --generator='${cmake.generator}'
+                   --source-directory='${cmake.build.source}'
+                   --test-directory='${cmake.test.source}'
+                   --object-directory='${cmake.build.obj}'
+                   --build-type='${build}'
+                   --coverage
+                   --install" />
     </exec>
 </target>
 
@@ -1880,98 +1948,6 @@ TEST CASES
         <html destdir="jacoco-report"/>
     </jacoco:report>
 </target>
-
-<!--
-    this target is intended to be called only with antcall!
-    set two properties beforehand or as part of the call:
-    lcov.dir is the directory in which to put the coverage report
-    lcov.target is the ant target to run under coverage
--->
-<target name='with.lcov' depends="jnicompile"
-        description="Generate C++ code coverage reports.">
-  <property name="lcov.base.tracefile" value="lcov_base.info" />
-  <property name="lcov.test.tracefile" value="lcov_test.info" />
-  <property name="lcov.tracefile" value="lcov.info" />
-  <!-- Generate instrumented objects -->
-  <!-- Whether any work needs doing is left to the C++ makefile -->
-  <exec dir='.' executable='python' failonerror='true'>
-    <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-    <arg line="${cmake.build.tool} --generator='${cmake.generator}' --source-directory ${cmake.build.source} --coverage" />
-  </exec>
-  <mkdir dir="${lcov.dir}" />
-  <!-- Reset all counters -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="--directory ${build.dir}-coverage/objects"/>
-    <arg line="--zerocounters"/>
-  </exec>
-  <!-- Get baseline coverage (zero coverage) -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="--directory ${build.dir}-coverage/objects"/>
-    <arg line="-i --capture"/>
-    <arg line="--output-file ${lcov.base.tracefile}"/>
-    <arg line="-b ${src.ee.parent.dir}"/>
-  </exec>
-  <!-- Run the tests -->
-  <antcall target="lcov-unit-tests">
-    <param name="build.dir.suffix" value="-coverage" />
-  </antcall>
-  <antcall target="sqlcoverage">
-    <param name="build.dir.suffix" value="-coverage" />
-    <param name="sqlcoverage.failonerror" value="false" />
-  </antcall>
-  <!-- Get test coverage -->
-  <echo>Processing coverage</echo>
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="--directory ${build.dir}-coverage/objects"/>
-    <arg line="--capture"/>
-    <arg line="--output-file ${lcov.test.tracefile}"/>
-    <arg line="-b ${src.ee.parent.dir}"/>
-  </exec>
-  <!-- Combine the baseline coverage and the test coverage -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="-a ${lcov.base.tracefile}"/>
-    <arg line="-a ${lcov.test.tracefile}"/>
-    <arg line="-o ${lcov.tracefile}"/>
-  </exec>
-  <!-- Remove standard library and third party coverages -->
-  <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
-    <arg line="-r ${lcov.tracefile}"/>
-    <arg line='"/usr/include/*"'/>
-    <arg line='"*third_party*"'/>
-    <arg line="-o ${lcov.tracefile}"/>
-  </exec>
-  <!-- Generate HTML report -->
-  <exec dir="${lcov.dir}" executable='genhtml' failonerror="true">
-    <arg line="${lcov.tracefile}"/>
-  </exec>
-</target>
-
-<target name='lcov-report' description=''>
-    <property name="lcov.dir" location="${build.dir}-coverage/lcov" />
-    <!-- <property name="lcov.target" value="sqlcoverage" /> -->
-    <antcall target="with.lcov" />
-</target>
-
-<target
-    name='lcov-unit-tests'
-    description="Run C++ unit tests from the coverage directory">
-    <exec dir='.' executable='python' failonerror='true'>
-        <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="${cmake.build.tool} --source-directory=${cmake.build.source} --build-type=${build} test coverage" />
-    </exec>
-</target>
-
-<!-- <target -->
-<!--     name='lcov-unit-tests-report' -->
-<!--     description="Generate C++ unit test coverage reports."> -->
-<!--     <property -->
-<!--         name="lcov.dir" -->
-<!--         location="${build.dir}-coverage/lcov-unit-tests" -->
-<!--     /> -->
-<!--     <property name="lcov.target" value="lcov-unit-tests" /> -->
-<!--     <antcall target="with.lcov" /> -->
-<!-- </target> -->
 
 <target
     name='testability-report'
@@ -2445,7 +2421,6 @@ HUDSON-SPECIFIC TARGETS
 <target name='copy-coverage-files'
     description="Collect test results so that Hudson can display them even after an ant clean">
     <copy todir=".." preservelastmodified="true">
-        <fileset dir="obj/release-coverage" includes="lcov-unit-tests"/>
         <fileset dir="${build.dir}" includes="testability.result.html"/>
     </copy>
 </target>

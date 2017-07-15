@@ -1,24 +1,24 @@
 ########################################################################
 #
 # A CMake build configuration for VoltDB.  The commands for the ant
-# targets in build.xml call build_cmake.py, which calls cmake and
-# make here, so you don't really know how to use this.  But for
-# special cases this may be useful.
+# targets in build.xml call src/ee/tools/build_cmake.py, which calls
+# cmake and make here, so you don't really know how to use this.
+# But for special cases this may be useful.
 #
-# To use this, in the root of the voltdb hierarchy, run
+# To use this standalone, in the root of the voltdb hierarchy, run
 #   1.) mkdir obj/${BUILD_TYPE}
 #       where ${BUILD_TYPE} is memcheck, release or debug.
 #   2.) cd obj/${BUILD_TYPE}
 #   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE} ${SRC_DIR}
 #       where ${SRC_DIR} is the pathname of the voltdb
 #       source directory, where file is.  There are other
-#       definitions which could be added.  See build.xml.
+#       arguments which could be added.  See build.xml.
 #   4.) make -j<N> -k install
 #       where, as usual, <N> is number telling make how much parallelism
 #       to use.  Values between 1 and 8 are typical.  Higher values
 #       may produce faster builds, or they may just gum things up.
 # If this succeeds, then the build artifacts will be placed in
-# obj/${BUILD}/prod.
+# obj/${BUILD}/nativelibs and obj/${BUILD}/prod
 #
 # Note that there's the potential for making Eclipse projects here.
 # Also, there's the potential for substituting ninja for make, which
@@ -48,23 +48,51 @@
 #           below.  Their names have the form TEST_DIR/TEST_NAME.
 #           Both TEST_DIR and TEST_NAME should be simple names,
 #           and not a paths.
-#       b.) Generated tests are generated from java sources.  These
-#           don't currently work.
-#   1.) To build the tests run "make build-tests".  You
+#       b.) Generated tests are generated from java sources.
+#           These are placed in a directory in the source tree
+#           which is ignored by git.  Each time cmake is run we
+#           look at whether to generate these.  If the result
+#           of generating the file would not change the file's
+#           contents we don't actually write the file, so as to
+#           preserve the file's timestamp and not force a
+#           recompilation.
+#           i.) Generated sources are in tests/ee/generated/src
+#               but tests/ee/generated is ignored by git.
+#           ii.) Generated test binaries are placed in the same
+#               place that hand written tests are placed
+#       c.) Tests must all be unique by name.  We can't have
+#           two tests in different directories with the same
+#           name.  This simplifies some processing here.
+#   1.) Building Tests
+#       To build all the tests run "make build-all-tests".  You
 #       can use the usual -jN and -k options, of course.
 #       The tests will all go into cpptests/TEST_DIR/TEST_NAME.
-#   2.) To run the tests run "make run-all-tests."
-#   3.) To make one test executable, say
+#
+#       To build one test run "make build-test-ALPHA" where
+#       ALPHA is the name of the test.
+#
+#       To build all the tests in one directory run
+#       "make build-testdir-ALPHA" where ALPHA is the name
+#       of the directory.
+#   2.) Running Tests
+#       To run all the tests run "make run-all-tests."
+#
+#       To make one test executable, say
 #           cpptests/plannodes/PlanNodeFragmentTest,
-#       run "make PlanNodeFragmentTest.  All directories
-#       will be made.  Note that this means the test names
-#       must be globally unique without the test directories.
-#   4.) To delete all test binaries, just delete cpptests.  The
-#       build system will recreate what it needed.
+#       run "make run-test-PlanNodeFragmentTest".  All needed
+#       directories will be made, and dependences will be made
+#       as well.
+#
+#       To run all the tests in one test directory run
+#       "make run-testdir-ALPHA" where ALPHA is the name of
+#       the test directory.
+#   4.) To delete any test binaries, just delete them.  Delete
+#       cpptests to delete all test binaries.  The test system
+#       will recreate any directories which need to be made.
 #
 ########################################################################
 #
-# Dependences
+# System Dependences
 #
 ########################################################################
 #
@@ -94,7 +122,7 @@ PROJECT(VoltDB_EE)
 INCLUDE(ExternalProject)
 IF ( (CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND ( (CMAKE_VERSION VERSION_GREATER 3.0.0) OR (CMAKE_VERSION VERSION_EQUAL 3.0.0) ) )
     # Newer versions of CMake than we use set this
-    # policy on te mac.  There there is a way to set the
+    # policy on the mac.  There there is a way to set the
     # rpath which is different from Linux.  We just ignore
     # it, but we need to use the old behavior on the mac.
     CMAKE_POLICY(SET CMP0042 OLD)
@@ -115,8 +143,8 @@ ENDIF()
 # 2. Object files generally go into these folders.
 #      ${CMAKE_BINARY_DIR}  Root of the output tree.  This is
 #                           generally obj/debug, obj/release or obj/memcheck.
-#                           It will have -profile or -coverage if
-#                           those options are enabled.
+#                           It will have -profile or -coverage at the
+#                           end if those options are enabled.
 #       ${VOLTDB_THIRD_PARTY_INSTALL_DIR}
 #                           All third party artifacts on which which
 #                           voltdb depends go here, in lib or include.
@@ -145,7 +173,7 @@ ENDIF()
 #
 # Options.
 # These can be turned on and off to steer the build.
-# Note: These probably don't work.  When we enable coverage
+# Note: These don't work.  When we enable coverage
 #       and profiling this is how they will be enabled, though.
 #
 ########################################################################
@@ -193,7 +221,8 @@ ENDIF()
 # Names of folders in the tree
 #
 ########################################################################
-SET (VOLTDB_ROOT ${CMAKE_SOURCE_DIR}/../..)
+EXECUTE_PROCESS(COMMAND bash -c "cd ${CMAKE_SOURCE_DIR}/tools/findvdbroot ${CMAKE_SOURCE_DIR}"
+                OUTPUT_VARIABLE VOLTDB_ROOT)
 # This is for our sources, relative to the source directory.
 SET (VOLTDB_EE_SRC_DIR ${CMAKE_SOURCE_DIR})
 # This is for test sources, relative to the source directory.
