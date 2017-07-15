@@ -65,8 +65,13 @@ public:
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
         std::vector<std::string> columnNames;
+        //Five columns
+        columnNames.push_back("one");
+        columnNames.push_back("two");
+        columnNames.push_back("three");
+        columnNames.push_back("four");
+        columnNames.push_back("five");
         for (int i = 0; i < COLUMN_COUNT; i++) {
-            columnNames.push_back(std::to_string(i));
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             columnAllowNull.push_back(false);
