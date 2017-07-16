@@ -152,9 +152,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // projection operations in execute
     //
     int num_of_columns = -1;
-    ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-    if (projection_node != NULL) {
-        num_of_columns = static_cast<int> (projection_node->getOutputColumnExpressions().size());
+    ProjectionPlanNode* projectionNode = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    if (projectionNode != NULL) {
+        num_of_columns = static_cast<int> (projectionNode->getOutputColumnExpressions().size());
     }
     //
     // OPTIMIZATION: NESTED LIMIT
@@ -170,7 +170,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // at the TargetTable. Therefore, there is nothing we more we need
     // to do here
     //
-    if (node->getPredicate() != NULL || projection_node != NULL ||
+    if (node->getPredicate() != NULL || projectionNode != NULL ||
         limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL)
     {
         //
@@ -200,8 +200,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         assert(m_tmpOutputTable);
         if (m_aggExec != NULL || m_insertExec != NULL) {
             const TupleSchema * inputSchema = input_table->schema();
-            if (projection_node != NULL) {
-                inputSchema = projection_node->getOutputTable()->schema();
+            if (projectionNode != NULL) {
+                inputSchema = projectionNode->getOutputTable()->schema();
             }
             if (m_aggExec != NULL) {
                 temp_tuple = m_aggExec->p_execute_init(params, &pmp,
@@ -209,10 +209,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             }
             else {
                 // We may actually find out during initialization
-                // that we are done.  See the definition of InsertExecutor::p_execute_init.
-                if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable)) {
-                    return true;
-                }
+                // that we are done.  The p_execute_init operation
+                // will tell us by returning true if so.  See the
+                // definition of InsertExecutor::p_execute_init.
+                //
                 // We know we have an inline insert here.  So there
                 // must have been an insert into select.  The input
                 // schema is the schema of the output of the select
@@ -222,17 +222,18 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 //
                 // Now, we don't have a table between the inline projection
                 // and the inline insert - that's why they are
-                // inlined.  So, we don't have a handy temporary
-                // tuple.  We need to fashion one of the bits of
-                // old string we have lying around.
-                Pool *tempPool = ExecutorContext::getTempStringPool();
-                char * storage = reinterpret_cast<char*>(tempPool->allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
-                temp_tuple = TableTuple(storage, inputSchema);
+                // inlined.  The p_execute_init function will compute
+                // this and tell us by setting temp_tuple.  Note
+                // that temp_tuple is initialized if this returns
+                // false.  If it returns true all bets are off.
+                if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable, temp_tuple)) {
+                    return true;
+                }
                 // We should have as many expressions in the
                 // projection node as there are columns in the
                 // input schema if there is an inline projection.
-                assert(projection_node != NULL
-                          ? (temp_tuple.getSchema()->columnCount() == projection_node->getOutputColumnExpressions().size())
+                assert(projectionNode != NULL
+                          ? (temp_tuple.getSchema()->columnCount() == projectionNode->getOutputColumnExpressions().size())
                           : true);
             }
         }
@@ -260,14 +261,14 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 // Nested Projection
                 // Project (or replace) values from input tuple
                 //
-                if (projection_node != NULL)
+                if (projectionNode != NULL)
                 {
                     VOLT_TRACE("inline projection...");
                     // Project the scanned table row onto
                     // the columns of the select list in the
                     // select statement.
                     for (int ctr = 0; ctr < num_of_columns; ctr++) {
-                        NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
+                        NValue value = projectionNode->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
                     outputTuple(temp_tuple);

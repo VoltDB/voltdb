@@ -226,11 +226,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             temp_tuple = m_aggExec->p_execute_init(params, &pmp, inputSchema, m_outputTable, &postfilter);
         } else {
             // We may actually find out during initialization
-            // that we are done.  See the definition of InsertExecutor::p_execute_init.
-            if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable)) {
-                return true;
-            }
-            // We're in an insert from select statement.
+            // that we are done.  The p_execute_init function
+            // returns true if this is so.  See the definition
+            // of InsertExecutor::p_execute_init.
+            //
+            // We know we're in an insert from select statement.
             // The temp_tuple has as its schema the
             // set of columns of the select statement.
             // This is in the input schema.  We don't
@@ -239,14 +239,31 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // table for the projection node.  That's
             // the reason for the inline insert node,
             // after all.  So we have to construct a
-            // tuple out of the pool's memory and the
-            // input schema, which we've ferreted out.
-            Pool *tempPool = ExecutorContext::getTempStringPool();
-            char * storage = reinterpret_cast<char*>(tempPool->allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
-            temp_tuple = TableTuple(storage, inputSchema);
+            // tuple which the inline insert will be
+            // happy with.  The p_execute_init knows
+            // how to do this.  Note that temp_tuple will
+            // be initialized if this returns false.
+            if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable, temp_tuple)) {
+                return true;
+            }
+            // We should have as many expressions in the
+            // projection node as there are columns in the
+            // input schema if there is an inline projection.
+            assert(m_projectionNode != NULL
+                       ? (temp_tuple.getSchema()->columnCount() == m_projectionNode->getOutputColumnExpressions().size())
+                       : true);
         }
     } else {
         temp_tuple = m_outputTable->tempTuple();
+    }
+
+    //
+    // Optimize the projection if we can.
+    //
+    if (m_projectionNode != NULL) {
+        m_projector = OptimizedProjector(m_projectionNode->getOutputColumnExpressions());
+        m_projector.optimize(m_projectionNode->getOutputTable()->schema(),
+                             m_node->getTargetTable()->schema());
     }
 
     // Short-circuit an empty scan
