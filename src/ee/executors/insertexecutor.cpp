@@ -285,7 +285,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
             // tables with no views on them.
             // When there are views, be strict and throw mispartitioned
             // tuples to force partitioned data to be generated only
-            // where partitoned view rows are maintained.
+            // where partitioned view rows are maintained.
             if (!m_isStreamed || m_hasStreamView) {
                 throw ConstraintFailureException(
                                                  m_targetTable, m_templateTuple,

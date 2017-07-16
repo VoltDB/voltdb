@@ -97,13 +97,12 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     //
     // INLINE PROJECTION
     //
+    // We can set the projection node here.  But
+    // we can't optimize it until p_execute.  See
+    // the comment there for some insight.
+    //
     m_projectionNode = static_cast<ProjectionPlanNode*>
             (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-    if (m_projectionNode != NULL) {
-        m_projector = OptimizedProjector(m_projectionNode->getOutputColumnExpressions());
-        m_projector.optimize(m_projectionNode->getOutputTable()->schema(),
-                             m_node->getTargetTable()->schema());
-    }
 
     // For the moment we will not produce a plan with both an
     // inline aggregate and an inline insert node.  This just
@@ -201,8 +200,22 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
+    //
+    // INLINE PROJECTION
+    // The ordering here is tricky.
+    // 1.) We can look up the inline projection node any time.
+    // 2.) We need the projection node to get the input schema
+    //     correctly.
+    // 3.) We need the input schema to pass it to p_execute_init
+    //     to initialize the inline aggregate or insert node.
+    // 4.) We need to get the temp_tuple from the inline
+    //     aggregate or insert node, which must be initialized.
+    // 5.) We need the temp_tuple to be computed properly before
+    //     we can optimize the projector.
+    // This could all be done in p_init above, but it's not.
+    // It would be kind of fiddly to make that work correctly.
+    //
     TableTuple temp_tuple;
-    m_projectionNode = static_cast<ProjectionPlanNode *>(m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
 
     if (m_aggExec != NULL || m_insertExec != NULL) {
         const TupleSchema * inputSchema = tableIndex->getTupleSchema();
@@ -217,7 +230,20 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable)) {
                 return true;
             }
-            temp_tuple = m_insertExec->getTargetTable()->tempTuple();
+            // We're in an insert from select statement.
+            // The temp_tuple has as its schema the
+            // set of columns of the select statement.
+            // This is in the input schema.  We don't
+            // actually have a tuple with this schema
+            // yet, because we don't have an output
+            // table for the projection node.  That's
+            // the reason for the inline insert node,
+            // after all.  So we have to construct a
+            // tuple out of the pool's memory and the
+            // input schema, which we've ferreted out.
+            Pool *tempPool = ExecutorContext::getTempStringPool();
+            char * storage = reinterpret_cast<char*>(tempPool->allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+            temp_tuple = TableTuple(storage, inputSchema);
         }
     } else {
         temp_tuple = m_outputTable->tempTuple();

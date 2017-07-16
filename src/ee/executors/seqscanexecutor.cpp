@@ -207,13 +207,33 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 temp_tuple = m_aggExec->p_execute_init(params, &pmp,
                         inputSchema, m_tmpOutputTable, &postfilter);
             }
-            else if (m_insertExec != NULL) {
+            else {
                 // We may actually find out during initialization
                 // that we are done.  See the definition of InsertExecutor::p_execute_init.
                 if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable)) {
                     return true;
                 }
-                temp_tuple = m_insertExec->getTargetTable()->tempTuple();
+                // We know we have an inline insert here.  So there
+                // must have been an insert into select.  The input
+                // schema is the schema of the output of the select
+                // statement.  The inline projection wants to
+                // project the columns of the scanned table onto
+                // the select columns.
+                //
+                // Now, we don't have a table between the inline projection
+                // and the inline insert - that's why they are
+                // inlined.  So, we don't have a handy temporary
+                // tuple.  We need to fashion one of the bits of
+                // old string we have lying around.
+                Pool *tempPool = ExecutorContext::getTempStringPool();
+                char * storage = reinterpret_cast<char*>(tempPool->allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+                temp_tuple = TableTuple(storage, inputSchema);
+                // We should have as many expressions in the
+                // projection node as there are columns in the
+                // input schema if there is an inline projection.
+                assert(projection_node != NULL
+                          ? (temp_tuple.getSchema()->columnCount() == projection_node->getOutputColumnExpressions().size())
+                          : true);
             }
         }
         else {
@@ -243,6 +263,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 if (projection_node != NULL)
                 {
                     VOLT_TRACE("inline projection...");
+                    // Project the scanned table row onto
+                    // the columns of the select list in the
+                    // select statement.
                     for (int ctr = 0; ctr < num_of_columns; ctr++) {
                         NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
