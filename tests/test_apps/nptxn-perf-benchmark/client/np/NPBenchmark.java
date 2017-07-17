@@ -4,6 +4,8 @@ import java.util.Date;
 import java.util.Random;
 import java.util.Timer;
 import java.util.concurrent.CountDownLatch;
+import java.util.Arrays;
+import java.util.TimerTask;
 
 import org.voltdb.*;
 import org.voltdb.client.*;
@@ -36,42 +38,33 @@ class NPBenchmark {
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
-        @Option(desc = "Number of invocations.")
-        int invocations = 5;
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        long displayinterval = 5;
 
-        @Option(desc = "Number of tables")
-        int tablecount = 1000;
-
-        @Option(desc = "Stored procedure count")
-        int procedurecount = 1000;
-
-        @Option(desc = "batch size count")
-        int batchsize = 1;
+        @Option(desc = "Benchmark duration, in seconds.")
+        int duration = 20;
 
         @Option(desc = "name of the benchmark to run")
         String name = "NP Benchmark";
 
-        @Option(desc = "base working direcotry")
-        String dir = "default";
+        @Option(desc = "Warmup duration in seconds.")
+        int warmup = 2;
 
         @Option(desc = "Filename to write raw summary statistics to.")
-        String statsfile = "stats";
+        String statsfile = "stats.jj";
 
         // New options
         @Option(desc = "Percentage of NP transactions compared to SP txns")
-        Double scale = 0.5;
+        double scale = 0.5;
 
         @Option(desc = "Number of Cards")
         int cardcount = 500000;
 
+        @Option(desc = "Rate of MP txns")
+        double mprate = 0.1;
+
         @Override
         public void validate() {
-            if (procedurecount <= 0) exitWithMessageAndUsage("procedure number must be greater than 0");
-
-            if (name == null) {
-                exitWithMessageAndUsage("input benchmark can not be null");
-            }
-
             if (scale >= 1 || scale <= 0) {
                 exitWithMessageAndUsage("Invalid scale...");
             }
@@ -137,7 +130,7 @@ class NPBenchmark {
         }
 
         public ProcCallback(String procedure) {
-            this(procedure, 5l);
+            this(procedure, 25l);
     }
 
         @Override
@@ -287,17 +280,11 @@ class NPBenchmark {
         client.writeSummaryCSV(stats, config.statsfile);
     }
 
-    /**
-     * Initializes any data that needs to be loaded into VoltDB before running the benchmark
-     * Override this method for customization
-     * @throws Exception
-     */
     public void initialize() throws Exception {
         System.out.println("Generating " + config.cardcount + " cards...");
         for (int i = 0; i < config.cardcount; i++) {
-
             // generate a card
-            String pan = Integer.toString(i); // TODO - pad with zeros for 16-digits
+            String pan = generate16DString(i);
             Date now = new Date();
 
             // insert the card
@@ -340,66 +327,20 @@ class NPBenchmark {
                              1
                              );
 
-        if (rand.nextInt(100) < config.transferpct) {
-            int id1 = rand.nextInt(config.cardcount-1);
-            int id2 = rand.nextInt(config.cardcount-1);
+        if (rand.nextDouble() < config.scale) {
+            int id1 = rand.nextInt(config.cardcount - 1);
+            int id2 = rand.nextInt(config.cardcount - 1);
 
-            String pan1 = Integer.toString(id1);
-            String pan2 = Integer.toString(id2);
+            String pan1 = generate16DString(id1);
+            String pan2 = generate16DString(id2);
 
-            if (config.type.equals("SP")) {
-                client.callProcedure(new ProcCallback("Transfer",10000),
+            client.callProcedure(new ProcCallback("Transfer",10000),
                                  "Transfer",
                                  pan1,
                                  pan2,
-                                 5,
+                                 1,
                                  "USD"
                                  );
-            }
-            else {
-
-                // An approximation of the transfer transaction using an adhoc NP transaction
-                double amount = 5;
-                Date txnTime = new Date();
-                String sql = "";
-                sql += String.format("SELECT * FROM card_account WHERE pan = '%s';",pan1);
-                sql += String.format("SELECT * FROM card_account WHERE pan = '%s';",pan2);
-                sql += String.format("UPDATE card_account SET " +
-                    " balance = balance + %f," +
-                    " available_balance = available_balance + %f," +
-                    " last_activity = NOW" +
-                    " WHERE pan = '%s';", -amount, -amount, pan1);
-                sql += String.format("UPDATE card_account SET " +
-                    " balance = balance + %f," +
-                    " available_balance = available_balance + %f," +
-                    " last_activity = NOW" +
-                    " WHERE pan = '%s';", amount, amount, pan2);
-                sql += String.format("INSERT INTO card_activity VALUES ('%s',NOW,'%s','%s',%f);",
-                    pan1,
-                    "TRANSFER",
-                    "D",
-                    -amount);
-                sql += String.format("INSERT INTO card_activity VALUES ('%s',NOW,'%s','%s',%f);",
-                    pan2,
-                    "TRANSFER",
-                    "C",
-                    amount);
-                if (config.type.equals("MP")) {
-                    client.callProcedure(new ProcCallback("Transfer",10000),
-                            "@AdHoc",
-                            sql
-                            );
-                }
-                else {
-                    assert (config.type.equals("NP"));
-                    String jsonKeys = String.format("{\"Type\":\"VARCHAR\",\"Keys\":[{\"Key\":\"'%s'\"},{\"Key\":\"'%s'\"}]}", pan1, pan2);
-                    client.callProcedure(new ProcCallback("Transfer",10000),
-                            "@AdHoc_NP",
-                            sql,
-                            jsonKeys
-                            );
-                }
-            }
         }
     }
 
@@ -462,7 +403,21 @@ class NPBenchmark {
         client.close();
     }
 
-    public static void main(String[] args) {
+    // Generate a string containing 16 digits from the given integer
+    private static String generate16DString(int num) {
+        String str = Integer.toString(num);
+        int num_0 = 16 - str.length();
+
+        if (num_0 == 0)
+            return str;
+
+        char[] zeros = new char[num_0];
+        Arrays.fill(zeros, '0');
+
+        return new String(zeros) + str;
+    }
+
+    public static void main(String[] args) throws Exception {
         NPBenchmarkConfig config = new NPBenchmarkConfig();
         config.parse(NPBenchmark.class.getName(), args);
 

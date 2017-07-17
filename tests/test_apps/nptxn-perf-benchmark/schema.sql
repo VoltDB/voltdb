@@ -28,13 +28,13 @@ CREATE INDEX IDX_card_activity_pan_date ON card_activity (pan, date_time);
 END_OF_BATCH
 
 -- Update classes from jar
-LOAD CLASSES debitcredit-procs.jar;
+LOAD CLASSES np-procs.jar;
 
 -- stored procedures
-CREATE PROCEDURE FROM CLASS debitcredit.Authorize;
+CREATE PROCEDURE FROM CLASS np.Authorize;
 PARTITION PROCEDURE Authorize ON TABLE card_activity COLUMN pan PARAMETER 0;
 
-CREATE PROCEDURE FROM CLASS debitcredit.Redeem;
+CREATE PROCEDURE FROM CLASS np.Redeem;
 PARTITION PROCEDURE Redeem ON TABLE card_activity COLUMN pan PARAMETER 0;
 
-CREATE PROCEDURE FROM CLASS debitcredit.Transfer;
+CREATE PROCEDURE FROM CLASS np.Transfer;

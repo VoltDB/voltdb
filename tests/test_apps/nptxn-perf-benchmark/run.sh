@@ -32,7 +32,7 @@ BENCHMARK_JAR_NAME="np-benchmark.jar"
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function cleanUp() {
-
+    echo "Clean up..."
 }
 
 #################################
@@ -65,7 +65,9 @@ function makeJars() {
 function server-init() {
     voltdb init --force
     voltdb start -H "$STARTUPLEADERHOST"
+}
 
+function load() {
     sqlcmd < schema.sql
 }
 
@@ -74,10 +76,10 @@ function server-init() {
 ##################################
 function client() {
     java -classpath $BENCHMARK_JAR_NAME:$CLIENTCLASSPATH np.NPBenchmark \
-         --type='' \
-         --scale=''
+         --scale='0.5' \
+         --cardcount='500000' \
+         --mprate='0.1'
 }
-
 
 if [ $# -eq 0 ]; then server-init; exit; fi
 cmdargs=()

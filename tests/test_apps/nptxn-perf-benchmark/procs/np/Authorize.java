@@ -65,7 +65,7 @@ public class Authorize extends VoltProcedure {
 
     public final SQLStmt insertActivity = new SQLStmt("INSERT INTO card_activity VALUES (?,?,?,?,?);");
 
-    public long run(String from_pan,
+    public long run(String pan,
             		double amount,
             		String currency) throws VoltAbortException {
 
