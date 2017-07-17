@@ -479,6 +479,53 @@ public class TestSQLParser extends TestCase {
         assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
     }
 
+    @Test
+    public void testProcSQLSplitWithCase() {
+        List<String> queriesOut = null;
+
+        String sql = "create procedure thisproc as "
+                + "begin "
+                + "SELECT a, "
+                + "CASE WHEN a > 100.00 "
+                + "THEN 'Expensive' "
+                + "ELSE 'Cheap' "
+                + "END "
+                + "FROM t; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        sql = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t; /*comment will still exist*/"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "select a, "
+                + "case when a > 100.00 then 'Expensive' else 'Cheap' end "
+                + "from t;"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // nested CASE-WHEN-THEN-ELSE-END
+        sql = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t; /*comment will still exist*/"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "select a, "
+                + "case when a > 100.00 then "
+                + "case when a > 1000.00 then 'Super Expensive' else 'Pricy' end "
+                + "'Expensive' else 'Cheap' end "
+                + "from t;"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+    }
+
     private static final Pattern RequiredWhitespace = Pattern.compile("\\s+");
     /**
      * Match statement against pattern for all VoltDB-specific statement preambles
