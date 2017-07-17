@@ -19,13 +19,9 @@ package org.voltdb.sysprocs;
 
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.ReplicationRole;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.CatalogChangeResult;
 
 /**
  * Non-transactional procedure to implement public @Promote system procedure.
@@ -47,37 +43,16 @@ public class Promote extends UpdateApplicationBase {
 
         boolean useDDLSchema = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
 
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog, "@UpdateApplicationCatalog");
-        if (blockerError != null) {
-            return makeQuickResponse(ClientResponse.USER_ABORT, blockerError);
-        }
-
-        CatalogChangeResult ccr = prepareApplicationCatalogDiff("@UpdateApplicationCatalog",
-                                                                null,
-                                                                null,
-                                                                new String[0],
-                                                                null,
-                                                                true, /* isPromotion */
-                                                                useDDLSchema,
-                                                                false,
-                                                                getHostname(),
-                                                                getUsername());
-        if (ccr.errorMsg != null) {
-            compilerLog.error("@Promote has been rejected: " + ccr.errorMsg);
-            return cleanupAndMakeResponse(ClientResponse.USER_ABORT, ccr.errorMsg);
-        }
-
-        // Log something useful about catalog upgrades when they occur.
-        if (ccr.upgradedFromVersion != null) {
-            compilerLog.info(String.format("catalog was automatically upgraded from version %s.", ccr.upgradedFromVersion));
-        }
-
-        if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, "@Promote with no catalog changes was skipped.");
-        }
-
-        return updateApplication(ccr);
+        return updateApplication("@UpdateApplicationCatalog",
+                                null,
+                                null,
+                                new String[0],
+                                null,
+                                true, /* isPromotion */
+                                useDDLSchema,
+                                false,
+                                getHostname(),
+                                getUsername());
     }
 
 }

@@ -27,20 +27,14 @@ import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.ClientInterface.ExplainMode;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.parser.SQLLexer;
 
 public class AdHoc extends AdHocNTBase {
 
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
-        final String invocationName = "@AdHoc";
-
         if (params.size() == 0) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "Adhoc system procedure requires at least the query parameter.");
@@ -143,32 +137,15 @@ public class AdHoc extends AdHocNTBase {
                     "to change application schema.  AdHoc DDL is forbidden.");
         }
 
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog, invocationName);
-        if (blockerError != null) {
-            return makeQuickResponse(ClientResponse.USER_ABORT, blockerError);
-        }
-
-        CatalogChangeResult ccr = prepareApplicationCatalogDiff(invocationName,
-                                                null,
-                                                null,
-                                                sqlStatements.toArray(new String[0]),
-                                                null,
-                                                false,
-                                                true,
-                                                false,
-                                                getHostname(),
-                                                getUsername());
-
-        if (ccr.errorMsg != null) {
-            compilerLog.error("@AdHoc has been rejected: " + ccr.errorMsg);
-            return cleanupAndMakeResponse(ClientResponse.USER_ABORT, ccr.errorMsg);
-        }
-
-        if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, "@AdHoc DDL with no catalog changes was skipped.");
-        }
-
-        return updateApplication(ccr);
+        return updateApplication("@AdHoc",
+                                null,
+                                null,
+                                sqlStatements.toArray(new String[0]),
+                                null,
+                                false,
+                                true,
+                                false,
+                                getHostname(),
+                                getUsername());
     }
 }

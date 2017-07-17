@@ -422,8 +422,49 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return null;
     }
 
-    protected CompletableFuture<ClientResponse> updateApplication(CatalogChangeResult ccr)
+    protected CompletableFuture<ClientResponse> updateApplication(String invocationName,
+                                                                  final byte[] operationBytes,
+                                                                  final String operationString,
+                                                                  final String[] adhocDDLStmts,
+                                                                  final byte[] replayHashOverride,
+                                                                  final boolean isPromotion,
+                                                                  final boolean useAdhocDDL,
+                                                                  boolean adminConnection,
+                                                                  String hostname,
+                                                                  String user)
     {
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog, invocationName);
+        if (blockerError != null) {
+            return makeQuickResponse(ClientResponse.USER_ABORT, blockerError);
+        }
+
+        CatalogChangeResult ccr = prepareApplicationCatalogDiff(invocationName,
+                                                                operationBytes,
+                                                                operationString,
+                                                                adhocDDLStmts,
+                                                                replayHashOverride,
+                                                                isPromotion,
+                                                                useAdhocDDL,
+                                                                adminConnection,
+                                                                hostname,
+                                                                user);
+        if (ccr.errorMsg != null) {
+            compilerLog.error(invocationName + " has been rejected: " + ccr.errorMsg);
+            return cleanupAndMakeResponse(ClientResponse.USER_ABORT, ccr.errorMsg);
+        }
+        // Log something useful about catalog upgrades when they occur.
+        if (ccr.upgradedFromVersion != null) {
+            compilerLog.info(String.format("catalog was automatically upgraded from version %s.", ccr.upgradedFromVersion));
+        }
+        if (ccr.encodedDiffCommands.trim().length() == 0) {
+            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, invocationName +" with no catalog changes was skipped.");
+        }
+        if (isRestoring() && !isPromotion && "UpdateApplicationCatalog".equals(invocationName)) {
+            // This means no more @UAC calls when using DDL mode.
+            noteRestoreCompleted();
+        }
+
         String errMsg;
         // impossible to happen since we only allow catalog update sequentially
         if (VoltDB.instance().getCatalogContext().catalogVersion != ccr.expectedCatalogVersion) {

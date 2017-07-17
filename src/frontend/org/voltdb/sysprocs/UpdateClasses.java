@@ -19,13 +19,9 @@ package org.voltdb.sysprocs;
 
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.CatalogChangeResult;
 
 /**
  * Non-transactional procedure to implement public @UpdateClasses system procedure.
@@ -48,38 +44,15 @@ public class UpdateClasses extends UpdateApplicationBase {
                     "to change application schema.  Use of @UpdateClasses is forbidden.");
         }
 
-        final String invocationName = "@UpdateClasses";
-
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog, invocationName);
-        if (blockerError != null) {
-            return makeQuickResponse(ClientResponse.USER_ABORT, blockerError);
-        }
-
-        CatalogChangeResult ccr = prepareApplicationCatalogDiff(invocationName,
-                                                                jarfileBytes,
-                                                                classesToDeleteSelector,
-                                                                new String[0],
-                                                                null,
-                                                                false, /* isPromotion */
-                                                                useDDLSchema,
-                                                                false,
-                                                                getHostname(),
-                                                                getUsername());
-        if (ccr.errorMsg != null) {
-            compilerLog.error(invocationName + " has been rejected: " + ccr.errorMsg);
-            return cleanupAndMakeResponse(ClientResponse.USER_ABORT, ccr.errorMsg);
-        }
-
-        // Log something useful about catalog upgrades when they occur.
-        if (ccr.upgradedFromVersion != null) {
-            compilerLog.info(String.format("catalog was automatically upgraded from version %s.", ccr.upgradedFromVersion));
-        }
-
-        if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, invocationName +" with no catalog changes was skipped.");
-        }
-
-        return updateApplication(ccr);
+        return updateApplication("@UpdateClasses",
+                                jarfileBytes,
+                                classesToDeleteSelector,
+                                new String[0],
+                                null,
+                                false, /* isPromotion */
+                                useDDLSchema,
+                                false,
+                                getHostname(),
+                                getUsername());
     }
 }
