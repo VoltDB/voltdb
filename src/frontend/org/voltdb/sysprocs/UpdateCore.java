@@ -246,8 +246,17 @@ public class UpdateCore extends VoltSystemProcedure {
             ParameterSet params, SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSync) {
-            String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
-            String[] reasonsForEmptyTables = (String[]) params.getParam(1);
+            Byte cleanupAndFail = (Byte) params.getParam(0);
+            String[] tablesThatMustBeEmpty = (String[]) params.getParam(1);
+            String[] reasonsForEmptyTables = (String[]) params.getParam(2);
+
+            if (cleanupAndFail == 1) {
+                // cleanup temp catalog jar
+                VoltDB.instance().cleanUpTempCatalogJar();
+                throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE,
+                        "Failure case handle on the MPI, message ignored");
+            }
+
             try {
                 checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
             } catch (Exception ex) {
@@ -371,7 +380,7 @@ public class UpdateCore extends VoltSystemProcedure {
     }
 
     private final void performCatalogVerifyWork(
-            int expectedCatalogVersion,
+            byte cleanupAndFail,
             String[] tablesThatMustBeEmpty,
             String[] reasonsForEmptyTables,
             byte requiresSnapshotIsolation)
@@ -386,7 +395,8 @@ public class UpdateCore extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSync;
         pfs[0].outputDepId = DEP_updateCatalogSync;
         pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(tablesThatMustBeEmpty, reasonsForEmptyTables);
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(cleanupAndFail,
+                tablesThatMustBeEmpty, reasonsForEmptyTables);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
@@ -464,15 +474,12 @@ public class UpdateCore extends VoltSystemProcedure {
         assert(tablesThatMustBeEmpty != null);
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
-        /*
-         * Validate that no elastic join is in progress, blocking this catalog update.
-         * If this update works with elastic then do the update anyways
-         */
-        if (worksWithElastic == 0 && zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null) {
-            throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
-        }
-
         try {
+            String failureErrorMsg = null;
+            if (worksWithElastic == 0 && zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null) {
+                failureErrorMsg = "Can't do a catalog update while an elastic join is active";
+            }
+
             // log the start of UpdateCore
             log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
             log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
@@ -480,12 +487,16 @@ public class UpdateCore extends VoltSystemProcedure {
 
             try {
                 performCatalogVerifyWork(
-                        expectedCatalogVersion,
+                        failureErrorMsg == null ? (byte)0 : (byte)1, // do clean up work on each host
                         tablesThatMustBeEmpty,
                         reasonsForEmptyTables,
                         requiresSnapshotIsolation);
             }
             catch (VoltAbortException vae) {
+                if (failureErrorMsg != null) {
+                    throw new VoltAbortException(failureErrorMsg);
+                }
+
                 log.info("Catalog verification failed: " + vae.getMessage());
                 throw vae;
             }

@@ -434,9 +434,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                   String user)
     {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog, invocationName);
+        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog,
+                "catalog update(" + invocationName + ")" );
         if (blockerError != null) {
-            return makeQuickResponse(ClientResponse.USER_ABORT, blockerError);
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, blockerError);
         }
 
         CatalogChangeResult ccr = prepareApplicationCatalogDiff(invocationName,
@@ -451,7 +452,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                 user);
         if (ccr.errorMsg != null) {
             compilerLog.error(invocationName + " has been rejected: " + ccr.errorMsg);
-            return cleanupAndMakeResponse(ClientResponse.USER_ABORT, ccr.errorMsg);
+            return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
         }
         // Log something useful about catalog upgrades when they occur.
         if (ccr.upgradedFromVersion != null) {
@@ -474,7 +475,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                      "the result of multiple concurrent attempts to change the cluster " +
                      "configuration.  Please make such changes synchronously from a single " +
                      "connection to the cluster.";
-            return cleanupAndMakeResponse(ClientResponseImpl.USER_ABORT, errMsg);
+            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
         // write the new catalog to a temporary jar file

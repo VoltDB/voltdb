@@ -282,8 +282,8 @@ public class TestUpdateDeployment extends RegressionSuite {
         // System.err.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
 
         // One should succeed, the other one should fail
-        assertTrue(ClientResponse.USER_ABORT == cb2.getResponse().getStatus()
-                || ClientResponse.USER_ABORT == cb1.getResponse().getStatus());
+        assertTrue(ClientResponse.GRACEFUL_FAILURE == cb2.getResponse().getStatus()
+                || ClientResponse.GRACEFUL_FAILURE == cb1.getResponse().getStatus());
         assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
                 || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
 

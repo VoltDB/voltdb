@@ -301,7 +301,7 @@ public class VoltZK {
                 VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
             }
             // node exists
-            return "invalid request: Can't run " + request + " when another one is in progress";
+            return "Invalid " + request + " request: Can't run " + request + " when another one is in progress";
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Unable to create catalog update blocker " + node, true, e);
         }
