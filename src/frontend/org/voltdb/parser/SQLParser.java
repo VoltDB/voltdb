@@ -415,6 +415,7 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern OneWhitespace = Pattern.compile("\\s");
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleQuotedString = Pattern.compile("'[^']*'", Pattern.MULTILINE);
+    private static final Pattern MultiStmtProc = Pattern.compile("BEGIN[^']*END", Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
     private static final Pattern SingleQuotedStringContainingParameterSeparators =
             Pattern.compile(
             "'" +
@@ -1084,6 +1085,15 @@ public class SQLParser extends SQLPatternFactory
             i++;
         }
 
+        Matcher multiStmtProcMatcher = MultiStmtProc.matcher(query);
+        ArrayList<String> procFragments = new ArrayList<>();
+        i = 0;
+        while (multiStmtProcMatcher.find()) {
+            procFragments.add(multiStmtProcMatcher.group());
+            query = multiStmtProcMatcher.replaceFirst("#(SQL_PARSER_PROC_FRAGMENT#" + i + ")");
+            multiStmtProcMatcher = MultiStmtProc.matcher(query);
+            i++;
+        }
         // Strip out inline comments
         // At this point, all the quoted strings have been pulled out of the
         // code mostly because they may contain semicolons.
@@ -1103,6 +1113,13 @@ public class SQLParser extends SQLPatternFactory
         for (String fragment : sqlFragments) {
             if (fragment.isEmpty()) {
                 continue;
+            }
+            if (fragment.indexOf("#(SQL_PARSER_PROC_FRAGMENT#") > -1) {
+                int k = 0;
+                for (String procFrag : procFragments) {
+                    fragment = fragment.replace("#(SQL_PARSER_PROC_FRAGMENT#" + k + ")", procFrag);
+                    k++;
+                }
             }
             if (fragment.indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
                 int k = 0;

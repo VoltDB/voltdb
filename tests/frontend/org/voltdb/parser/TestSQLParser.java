@@ -361,6 +361,100 @@ public class TestSQLParser extends TestCase {
         assertEquals(null, SQLParser.parseFileStatement(""));
     }
 
+    public void testParseMultiStmtProc() {
+        List<String> queriesOut = null;
+
+        // parsing removes the last semi colon
+        String sql = "CREATE PROCEDURE foo as SELECT * from t;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; "
+                + "SELECT * from t; END;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // checking case sensitive
+        sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
+                + "SELECT * from t; end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // multi stmt procedure with single quoted string
+        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; "
+                + "SELECT * from t where a = ‘abced’; END";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql, queriesOut.get(0));
+
+        sql = "CREATE PROCEDURE foo AS "
+                + "BEGIN "
+                + "SELECT * from t; "
+                + "SELECT * from t; "
+                + "END; "
+                + "abc";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(2, queriesOut.size());
+        assertEquals("CREATE PROCEDURE foo AS "
+                + "BEGIN "
+                + "SELECT * from t; "
+                + "SELECT * from t; "
+                + "END", queriesOut.get(0));
+        assertEquals("abc", queriesOut.get(1));
+
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "end";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql, queriesOut.get(0));
+
+        // multiple mutli stmt procs
+//        sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
+//                + "SELECT * from t; end;";
+//        queriesOut = SQLParser.parseQuery(sql + sql);
+//        assertEquals(2, queriesOut.size());
+//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(1));
+
+//        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t;";
+//        queriesOut = SQLParser.parseQuery(sql);
+//        assertEquals(1, queriesOut.size());
+//        assertEquals(sql, queriesOut.get(0));
+
+    }
+
+    public void testParseMultiStmtProcWithComments() {
+        List<String> queriesOut = null;
+
+        // parsing removes the last semi colon
+        String sql = "create procedure thisproc as "
+                + "begin --one\n"
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        sql = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t; /*comment will still exist*/"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+    }
+
     private static final Pattern RequiredWhitespace = Pattern.compile("\\s+");
     /**
      * Match statement against pattern for all VoltDB-specific statement preambles
