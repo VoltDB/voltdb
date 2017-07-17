@@ -2207,13 +2207,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         spi.getSerializedSize(),
                         System.nanoTime());
             }
-            final long timeoutMS = 2 * 60 * 1000;
+            final long timeoutMS = 5 * 60 * 1000;
             ClientResponse resp= cb.getResponse(timeoutMS);
             if (resp.getStatus() == ClientResponse.SUCCESS) {
                 tmLog.info(String.format("The mastership for partition %d has been moved to host %d.",
                         partitionId, targetHostId));
-              //spin wait till the Cartographer sees the new master
-              long remainingWaitTime = TimeUnit.MINUTES.toSeconds(2); // 2 max minutes;
+              //spin wait till it sees the new master
+              long remainingWaitTime = TimeUnit.MINUTES.toSeconds(5); // 5 max minutes;
               final int waitingInterval = 1;
               while (remainingWaitTime > 0) {
                   try {

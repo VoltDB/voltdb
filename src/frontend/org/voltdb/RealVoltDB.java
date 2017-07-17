@@ -2121,7 +2121,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             hostLog.info("BalanceSPI task is not scheduled.");
             return;
         }
-        final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "30"));
+        final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
         final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "30"));
         Runnable task = () -> {
             //only works if the cluster is full

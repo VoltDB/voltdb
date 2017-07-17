@@ -379,11 +379,6 @@ public class InitiatorMailbox implements Mailbox
 
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
         int hostId = Integer.parseInt(params[2].toString());
-
-        if (!(VoltDB.instance().getHostMessenger().getLiveHostIds().contains(hostId))){
-            tmLog.warn(String.format("@BalanceSPI host %d is not in the cluster.", hostId));
-            return;
-        }
         Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, pid);
         if (newLeaderHSId == null || newLeaderHSId == m_hsId) {
             tmLog.warn(String.format("@BalanceSPI the partition leader is already on the host %d or the host id is invalid.", hostId));
@@ -396,10 +391,6 @@ public class InitiatorMailbox implements Mailbox
         m_repairLog.setLeaderState(false);
         m_newLeaderHSID = newLeaderHSId;
         m_balanceSPIStatus = BALANCE_SPI_STATUS.SRC_STARTED;
-        final boolean unitTest = "true".equals(System.getProperty("TEST_DISABLE_SPI_BALANCE", "false"));
-        if (unitTest) {
-            return;
-        }
 
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
@@ -417,8 +408,9 @@ public class InitiatorMailbox implements Mailbox
         if (tmLog.isDebugEnabled()) {
             tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
         }
-        tmLog.info("starting balance spi for partition " + pid + " to " +
-                CoreUtils.hsIdToString(newLeaderHSId));
+        tmLog.info("Balance spi for partition " + pid + " to " + CoreUtils.hsIdToString(newLeaderHSId));
+
+        //notify the new leader right away if the current leader has drained all transactions.
         notifyNewLeaderOfTxnDone();
     }
 
@@ -637,6 +629,7 @@ public class InitiatorMailbox implements Mailbox
     public void setBalanceSPIStatus(boolean spiBalanced) {
         if (!spiBalanced) {
             m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+            m_newLeaderHSID = Long.MIN_VALUE;
             return;
         }
 
