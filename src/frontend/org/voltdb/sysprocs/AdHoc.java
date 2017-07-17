@@ -160,6 +160,11 @@ public class AdHoc extends AdHocNTBase {
                                                 getHostname(),
                                                 getUsername());
 
+        if (ccr.errorMsg != null) {
+            compilerLog.error("@AdHoc has been rejected: " + ccr.errorMsg);
+            return cleanupAndMakeResponse(ClientResponse.USER_ABORT, ccr.errorMsg);
+        }
+
         if (ccr.encodedDiffCommands.trim().length() == 0) {
             return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, "@AdHoc DDL with no catalog changes was skipped.");
         }

@@ -313,6 +313,12 @@ public class CatalogContext {
         return m_jarfile.get(key);
     }
 
+    public enum CatalogJarWriteMode {
+        START_OR_RESTART,
+        CATALOG_UPDATE,
+        RECOVER
+    }
+
     /**
      * Write, replace or update the catalog jar based on different cases. This function
      * assumes any IOException should lead to fatal crash.
@@ -320,37 +326,40 @@ public class CatalogContext {
      * @param name
      * @throws IOException
      */
-    public Runnable writeCatalogJarToFile(String path, String name) throws IOException
+    public Runnable writeCatalogJarToFile(String path, String name, CatalogJarWriteMode mode) throws IOException
     {
-        File catalog_file = new VoltFile(path, name);
-        File catalog_tmp_file = new VoltFile(path, name + ".tmp");
-        if (catalog_file.exists() && catalog_tmp_file.exists())
-        {
+        File catalogFile = new VoltFile(path, name);
+        File catalogTmpFile = new VoltFile(path, name + ".tmp");
+
+        if (mode == CatalogJarWriteMode.CATALOG_UPDATE) {
             // This means a @UpdateCore case, the asynchronous writing of
             // jar file has finished, rename the jar file
-            catalog_file.delete();
-            catalog_tmp_file.renameTo(catalog_file);
+            catalogFile.delete();
+            catalogTmpFile.renameTo(catalogFile);
             return null;
-        } else if (!catalog_file.exists() && !catalog_tmp_file.exists()) {
-            // This happens in the beginning of cluster startup / restart,
+        }
+
+        if (mode == CatalogJarWriteMode.START_OR_RESTART) {
+            // This happens in the beginning of ,
             // when the catalog jar does not yet exist. Though the contents
             // written might be a default one and could be overwritten later
             // by @UAC, @UpdateClasses, etc.
-            return m_jarfile.writeToFile(catalog_file);
-        } else if (catalog_file.exists() && !catalog_tmp_file.exists()) {
-            // This may happen during cluster recover step, in this case
-            // we must overwrite the file (the file may have been changed)
-            catalog_file.delete();
-            return m_jarfile.writeToFile(catalog_file);
+            return m_jarfile.writeToFile(catalogFile);
         }
 
-        // The temporary catalog jar exists, yet the previous catalog jar is gone. This shouldn't happen.
-        // Current implementation will crash the local voltdb upon any IOException in this function. So as long as
-        // the voltdb instance is running and nobody deletes the previous catalog jar file, this should never
-        // happen.
-        throw new IOException("Invalid catalog jar status: cannot find any existing catalog stored on disk." +
-                "\nPlease make such changes synchronously from a single connection to the cluster.");
+        if (mode == CatalogJarWriteMode.RECOVER) {
+            // we must overwrite the file (the file may have been changed)
+            catalogFile.delete();
+            if (catalogTmpFile.exists()) {
+                // If somehow the catalog temp jar is not cleaned up, then delete it
+                catalogTmpFile.delete();
+            }
 
+            return m_jarfile.writeToFile(catalogFile);
+        }
+
+        VoltDB.crashLocalVoltDB("Unsupported mode to write catalog jar", true, null);
+        return null;
     }
 
     /**

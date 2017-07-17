@@ -248,7 +248,14 @@ public class UpdateCore extends VoltSystemProcedure {
         if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSync) {
             String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
             String[] reasonsForEmptyTables = (String[]) params.getParam(1);
-            checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
+            try {
+                checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
+            } catch (Exception ex) {
+                log.info("checking non-empty tables failed: " + ex.getMessage() +
+                         ", cleaning up temp catalog jar file");
+                VoltDB.instance().cleanUpTempCatalogJar();
+                throw ex;
+            }
 
             // Send out fragments to do the initial round-trip to synchronize
             // all the cluster sites on the start of catalog update, we'll do
