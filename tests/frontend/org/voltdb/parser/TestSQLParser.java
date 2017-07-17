@@ -415,6 +415,30 @@ public class TestSQLParser extends TestCase {
         assertEquals(1, queriesOut.size());
         assertEquals(sql, queriesOut.get(0));
 
+        // semi colon in quoted strings
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'beg;in' or f = 'END;';"
+                + "end";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql, queriesOut.get(0));
+
+        // partition clause
+        sql = "create procedure thisproc "
+                + "partition on table t column a parameter 1 "
+                + "allow operator as "
+                + "begin "
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'beg;in' or f = 'END;';"
+                + "end";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql, queriesOut.get(0));
+
         // multiple mutli stmt procs
 //        sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
 //                + "SELECT * from t; end;";
