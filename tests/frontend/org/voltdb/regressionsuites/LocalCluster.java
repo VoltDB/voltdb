@@ -51,6 +51,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -114,9 +115,9 @@ public class LocalCluster extends VoltServerConfig {
     int m_replicationPort = -1;
 
     // log message pattern match results by host
-    private Map<Integer, Set<String>> m_logMessageMatchResults = null;
+    private Map<Integer, Set<String>> m_logMessageMatchResults = new ConcurrentHashMap<>();
     // log message patterns
-    private Map<String, Pattern> m_logMessageMatchPatterns = null;
+    private Map<String, Pattern> m_logMessageMatchPatterns = new ConcurrentHashMap<>();
 
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
@@ -149,7 +150,7 @@ public class LocalCluster extends VoltServerConfig {
     //to help matching the host id on the real cluster with the host id on the local
     //cluster
     private long m_deplayBetweenNodeStartupMS = 0;
-
+    private boolean m_httpPortEnabled = false;
     private final ArrayList<EEProcess> m_eeProcs = new ArrayList<>();
     //This is additional process invironment variables that can be passed.
     // This is used to pass JMX port. Any additional use cases can use this too.
@@ -212,17 +213,8 @@ public class LocalCluster extends VoltServerConfig {
     /*
      * Enable pre-compiled regex search in logs
      */
-    public LocalCluster(String jarFileName,
-                        List<String> regexes,
-                        int siteCount,
-                        int hostCount,
-                        int kfactor,
-                        BackendTarget target)
-    {
-        this(jarFileName, siteCount, hostCount, kfactor, target, null);
-        m_hasLocalServer = false;
-        m_logMessageMatchResults = new ConcurrentHashMap<>();
-        m_logMessageMatchPatterns = new ConcurrentHashMap<>();
+    public void setLogSearchPatterns(List<String> regexes) {
+        assert m_hasLocalServer == false;
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
@@ -431,6 +423,11 @@ public class LocalCluster extends VoltServerConfig {
         if (buildDir == null) {
             buildDir = System.getProperty("user.dir") + "/obj/release";
         }
+        // Allow importer tests to find their bundles
+        String defaultBundleDir = System.getProperty("user.dir") + "/bundles";
+        m_additionalProcessEnv.putIfAbsent(
+                CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME,
+                System.getProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, defaultBundleDir));
 
         String classPath = System.getProperty("java.class.path");
         if (m_jarFileName != null) {
@@ -614,6 +611,10 @@ public class LocalCluster extends VoltServerConfig {
         }
         // Force recompilation
         m_compiled = false;
+    }
+
+    public void setHttpPortEnabled(boolean enabled) {
+        m_httpPortEnabled = enabled;
     }
 
     public void setReplicationPort(int port) {
@@ -862,6 +863,9 @@ public class LocalCluster extends VoltServerConfig {
 
         templateCmdLine.leaderPort(portGenerator.nextInternalPort());
         templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
+        if (m_httpPortEnabled) {
+            templateCmdLine.httpPort(0); // Set this value to 0 would enable http port assignment
+        }
 
         m_eeProcs.clear();
         int hostCount = m_hostCount - m_missingHostCount;
@@ -1681,10 +1685,6 @@ public class LocalCluster extends VoltServerConfig {
         }
         shutDownExternal();
 
-        if (m_logMessageMatchPatterns != null) {
-            resetLogMessageMatchResults();
-        }
-
         VoltServerConfig.removeInstance(this);
     }
 
@@ -2031,6 +2031,10 @@ public class LocalCluster extends VoltServerConfig {
 
     public int port(int hostId) {
         return m_cmdLines.get(hostId).port();
+    }
+
+    public int httpPort(int hostId) {
+        return m_cmdLines.get(hostId).httpPort();
     }
 
     public int adminPort(int hostId) {

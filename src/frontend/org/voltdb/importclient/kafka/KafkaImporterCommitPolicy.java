@@ -30,7 +30,17 @@ public enum KafkaImporterCommitPolicy {
         private static final Logger m_logger = Logger.getLogger("IMPORT");
         public static final KafkaImporterCommitPolicy fromString(String policy) {
             if (policy == null) return NONE;
-            if (policy.endsWith("ms")) return TIME;
+            if (policy.toUpperCase().equals("NONE")) return NONE;
+
+            try {
+                // If it ends in "ms", or we can parse it as a number, it's a time value.
+                if (policy.endsWith("ms")) return TIME;
+                Long.parseLong(policy);
+                return TIME;
+            }
+            catch (Exception e) {
+                // It's not a number, ignore.
+            }
             return NONE;
         };
         public static final long fromStringTriggerValue(String policy, KafkaImporterCommitPolicy prop) {

@@ -33,6 +33,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -123,6 +124,7 @@ import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
@@ -141,7 +143,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
@@ -976,6 +977,11 @@ public abstract class CatalogUtil {
             query = new SystemSettingsType.Query();
             ss.setQuery(query);
         }
+        SystemSettingsType.Procedure procedure = ss.getProcedure();
+        if (procedure == null) {
+            procedure = new SystemSettingsType.Procedure();
+            ss.setProcedure(procedure);
+        }
         SystemSettingsType.Snapshot snap = ss.getSnapshot();
         if (snap == null) {
             snap = new SystemSettingsType.Snapshot();
@@ -1369,6 +1375,7 @@ public abstract class CatalogUtil {
                 is = null;
             }
         }
+
         if (is != null) {
             try {
                 is.close();
@@ -1571,16 +1578,64 @@ public abstract class CatalogUtil {
             return;
         }
         List<String> streamList = new ArrayList<>();
+        List<ImportConfigurationType> kafkaConfigs = new ArrayList<>();
 
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
+
+            if (importConfiguration.getType().equals(ServerImportEnum.KAFKA)) {
+                kafkaConfigs.add(importConfiguration);
+            }
+
             if (!streamList.contains(importConfiguration.getModule())) {
                 streamList.add(importConfiguration.getModule());
             }
 
             checkImportProcessorConfiguration(importConfiguration);
+        }
+        validateKafkaConfig(kafkaConfigs);
+    }
+
+    /**
+     * Check whether two Kafka configurations have both the same topic and group id. If two configurations
+     * have the same group id and overlapping sets of topics, a RuntimeException will be thrown.
+     * @param configs All parsed Kafka configurations
+     */
+    private static void validateKafkaConfig(List<ImportConfigurationType> configs) {
+        if (configs.isEmpty()) {
+            return;
+        }
+        // We associate each group id with the set of topics that belong to it
+        HashMap<String, HashSet<String>> groupidToTopics = new HashMap<>();
+        for (ImportConfigurationType config : configs) {
+            String groupid = "";
+            HashSet<String> topics = new HashSet<>();
+            // Fetch topics and group id from each configuration
+            for (PropertyType pt : config.getProperty()) {
+                if (pt.getName().equals("topics")) {
+                    topics.addAll(Arrays.asList(pt.getValue().split("\\s*,\\s*")));
+                } else if (pt.getName().equals("groupid")) {
+                    groupid = pt.getValue();
+                }
+            }
+            if (groupidToTopics.containsKey(groupid)) {
+                // Under this group id, we first union the set of already-stored topics with the set of newly-seen topics.
+                HashSet<String> union = new HashSet<>(groupidToTopics.get(groupid));
+                union.addAll(topics);
+                if (union.size() == (topics.size() + groupidToTopics.get(groupid).size())) {
+                    groupidToTopics.put(groupid, union);
+                } else {
+                    // If the size of the union doesn't equal to the sum of sizes of newly-seen topic set and
+                    // already-stored topic set, those two sets must overlap with each other, which means that
+                    // there must be two configurations having the same group id and overlapping sets of topics.
+                    // Thus, we throw the RuntimeException.
+                    throw new RuntimeException("Invalid import configuration. Two Kafka entries have the same groupid and topic.");
+                }
+            } else {
+                groupidToTopics.put(groupid, topics);
+            }
         }
     }
 

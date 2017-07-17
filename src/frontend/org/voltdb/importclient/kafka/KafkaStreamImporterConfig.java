@@ -68,7 +68,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     private final KafkaImporterCommitPolicy m_commitPolicy;
     private final long m_triggerValue;
 
-    private KafkaStreamImporterConfig(URI uri, List<HostAndPort> brokers, String topic, int partition, HostAndPort partitionLeader,
+    public KafkaStreamImporterConfig(URI uri, List<HostAndPort> brokers, String topic, int partition, HostAndPort partitionLeader,
             String groupId, int fetchSize, int soTimeout, String procedure, String commitPolicy,
             FormatterBuilder formatterBuilder)
     {
@@ -229,7 +229,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         }
     }
 
-    private static Map<URI, KafkaStreamImporterConfig> getConfigsForPartitions(String key, List<HostAndPort> brokerList,
+    public static Map<URI, KafkaStreamImporterConfig> getConfigsForPartitions(String key, List<HostAndPort> brokerList,
             final String topic, String groupId, String procedure, int soTimeout, int fetchSize, String commitPolicy, FormatterBuilder formatterBuilder)
     {
         SimpleConsumer consumer = null;
@@ -260,7 +260,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                         ++partitionCount;
                         URI uri;
                         try {
-                            uri = new URI("kafka", key, topic + "/partition/" + part.partitionId());
+                            uri = new URI("kafka", key, topic + "/partition/" + part.partitionId() + "/" + groupId + "/");
                         } catch (URISyntaxException ex) { // Should not happen
                             throw new KafkaConfigurationException("unable to create topic resource URI", ex);
                         }
@@ -300,10 +300,11 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 throw new KafkaConfigurationException("Failed to get topic metadata for %s", topic);
             }
         }
+
         return configs;
     }
 
-    private static String getBrokerKey(String brokers)
+    public static String getBrokerKey(String brokers)
     {
         String key = brokers.replace(':', '_');
         key = key.replace(',', '_');
