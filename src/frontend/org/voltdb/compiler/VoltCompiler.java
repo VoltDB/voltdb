@@ -430,14 +430,19 @@ public class VoltCompiler {
             final File classesJarPath,
             final File catalogOutputPath)
     {
-        if (schemaPath == null || !schemaPath.exists()) {
+        if (schemaPath != null && !schemaPath.exists()) {
             compilerLog.error("Cannot compile nonexistent or missing schema.");
             return false;
         }
 
         List<VoltCompilerReader> ddlReaderList;
         try {
-            ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+            if (schemaPath == null) {
+                ddlReaderList = new ArrayList<>(1);
+                ddlReaderList.add(new VoltCompilerStringReader(AUTOGEN_DDL_FILE_NAME, m_emptyDDLComment));
+            } else {
+                ddlReaderList = DDLPathsToReaderList(schemaPath.getAbsolutePath());
+            }
         }
         catch (VoltCompilerException e) {
             compilerLog.error("Unable to open schema file \"" + schemaPath + "\"", e);
@@ -1871,10 +1876,6 @@ public class VoltCompiler {
                 for (Statement prevStmt : prevProc.getStatements()) {
                     addStatementToCache(prevStmt);
                 }
-
-                // clear up the previous procedure contents
-                prevProc.getStatements().clear();
-                prevProc.getParameters().clear();
             }
 
             // Use the in-memory jarfile-provided class loader so that procedure
@@ -1893,6 +1894,10 @@ public class VoltCompiler {
                     // UpdateClasses does not need to update system procedures
                     continue;
                 }
+
+                // clear up the previous procedure contents before recompiling java user procedures
+                procedure.getStatements().clear();
+                procedure.getParameters().clear();
 
                 final String className = procedure.getClassname();
 

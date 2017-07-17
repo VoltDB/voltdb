@@ -69,7 +69,7 @@ public class PullSocketImporterConfig implements ImporterConfig
     {
         String hosts = props.getProperty("addresses", "").trim();
         if (hosts.isEmpty()) {
-            throw new IllegalArgumentException("'adresses' is a required property and must be defined");
+            throw new IllegalArgumentException("'addresses' is a required property and must be defined");
         }
         String procedure = props.getProperty("procedure", "").trim();
         if (procedure.isEmpty()) {

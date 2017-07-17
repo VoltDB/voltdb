@@ -470,7 +470,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.getVoltDBRoot().getPath();
+        return getVoltDBRootPath();
     }
 
     @Override
@@ -478,7 +478,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getCommandLog()).getPath();
     }
 
     @Override
@@ -486,7 +486,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getCommandLogSnapshot()).getPath();
     }
 
     @Override
@@ -494,7 +494,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshoth()).getPath();
     }
 
     @Override
@@ -502,7 +502,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportOverflow()).getPath();
     }
 
     @Override
@@ -510,37 +510,46 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getDROverflow()).getPath();
     }
 
     @Override
     public String getVoltDBRootPath() {
-        return m_nodeSettings.getVoltDBRoot().getPath();
+        try {
+            return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
+        } catch (IOException e) {
+            throw new SettingsException(
+                    "Failed to canonicalize: " +
+                    m_nodeSettings.getVoltDBRoot() +
+                    ". Reason: " +
+                    e.getMessage()
+            );
+        }
     }
 
     @Override
     public String getCommandLogPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getCommandLog()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getCommandLog()).getPath();
     }
 
     @Override
     public String getCommandLogSnapshotPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getCommandLogSnapshot()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getCommandLogSnapshot()).getPath();
     }
 
     @Override
     public String getSnapshotPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshoth()).getPath();
     }
 
     @Override
     public String getExportOverflowPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getExportOverflow()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getExportOverflow()).getPath();
     }
 
     @Override
     public String getDROverflowPath() {
-        return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getDROverflow()).getPath();
     }
 
     public static String getStagedCatalogPath(String voltDbRoot) {
@@ -2241,10 +2250,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void stageSchemaFiles(Configuration config) {
-        if (config.m_userSchema == null) {
+        if (config.m_userSchema == null && config.m_stagedClassesPath == null) {
             return; // nothing to do
         }
-        assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
 
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
@@ -2573,13 +2581,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // once a voltdbroot is inited, the path properties contain the true path values
                 Settings.initialize(config.m_voltdbRoot);
                 // only override the local sites count
-                nodeSettings = NodeSettings.create(config.asNodeSettingsMap());
+                nodeSettings = NodeSettings.create(config.asNodeSettingsMap(),
+                        config.asRelativePathSettingsMap());
                 break;
             case PROBE:
                 // once a voltdbroot is inited, the path properties contain the true path values
                 Settings.initialize(config.m_voltdbRoot);
                 // only override the local sites count
-                nodeSettings = NodeSettings.create(config.asNodeSettingsMap());
+                nodeSettings = NodeSettings.create(config.asNodeSettingsMap(),
+                        config.asRelativePathSettingsMap());
                 File nodeSettingsFH = new File(getConfigDirectory(config), "path.properties");
                 consoleLog.info("Loaded node-specific settings from " + nodeSettingsFH.getPath());
                 hostLog.info("Loaded node-specific settings from " + nodeSettingsFH.getPath());
@@ -3345,7 +3355,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration)
+            boolean requiresNewExportGeneration,
+            long ccrTime)
     {
         try {
             synchronized(m_catalogUpdateLock) {
@@ -3393,7 +3404,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             true,
                             deploymentBytes,
                             m_messenger,
-                            hasSchemaChange);
+                            hasSchemaChange, ccrTime);
                 final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(/*m_asyncCompilerAgent,*/ m_catalogContext);
                 m_txnIdToContextTracker.put(currentTxnId,
                         new ContextTracker(
@@ -3984,17 +3995,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // start balance spi task
             scheduleBalanceSpiTask();
-        }
 
-        try {
-            if (m_adminListener != null) {
-                m_adminListener.start();
+             try {
+                if (m_adminListener != null) {
+                    m_adminListener.start();
+                }
+            } catch (Exception e) {
+                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
+                VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
             }
-        } catch (Exception e) {
-            hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
-            VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
-        }
-        if (!m_rejoining && !m_joining) {
+
             Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
@@ -4502,7 +4512,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
             SnapshotUtil.retrieveSnapshotFiles(
-                    m_nodeSettings.resolve(m_nodeSettings.getSnapshoth()),
+                    m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshoth()),
                     snapshots, filter, false, SnapshotPathType.SNAP_AUTO, hostLog);
 
             return snapshots.containsKey(nonce) ? nonce : null;

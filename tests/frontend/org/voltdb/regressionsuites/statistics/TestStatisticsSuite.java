@@ -31,8 +31,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import junit.framework.Test;
-
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.voltcore.utils.CompressionStrategySnappy;
@@ -45,6 +43,8 @@ import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
+
+import junit.framework.Test;
 
 public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
@@ -653,6 +653,40 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         validateRowSeenAtAllHosts(results[0], columnTargets, false);
     }
 
+    public void testQueueDepthStatistics() throws Exception {
+        System.out.println("\n\nTESTING QUEUEDEPTH STATS\n\n\n");
+        Client client  = getFullyConnectedClient();
+        ColumnInfo[] expectedSchema = new ColumnInfo[8];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        expectedSchema[4] = new ColumnInfo("CURRENT_DEPTH", VoltType.INTEGER);
+        expectedSchema[5] = new ColumnInfo("POLL_COUNT", VoltType.BIGINT);
+        expectedSchema[6] = new ColumnInfo("AVG_WAIT", VoltType.BIGINT);
+        expectedSchema[7] = new ColumnInfo("MAX_WAIT", VoltType.BIGINT);
+
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+
+        VoltTable[] results = null;
+        //
+        // QUEUEDEPTH
+        //
+        results = client.callProcedure("@Statistics", "QUEUE", 0).getResults();
+        // one aggregate table returned
+        assertEquals(1, results.length);
+        System.out.println("Test QueueDepth table: " + results[0].toString());
+        validateSchema(results[0], expectedTable);
+        // One row per site, we don't use HSID though, so hard to do straightforward
+        // per-site unique check.  Finesse it.
+        // We also get starvation stats for the MPI, so we need to add a site per host.
+        assertEquals(HOSTS * (SITES + 1), results[0].getRowCount());
+        results[0].advanceRow();
+        Map<String, String> columnTargets = new HashMap<String, String>();
+        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
+        validateRowSeenAtAllHosts(results[0], columnTargets, false);
+    }
+
     public void testManagementStats() throws Exception {
         System.out.println("\n\nTESTING MANAGEMENT STATS\n\n\n");
         Client client  = getFullyConnectedClient();
@@ -662,9 +696,9 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         // LIVECLIENTS
         //
         results = client.callProcedure("@Statistics", "MANAGEMENT", 0).getResults();
-        // eight aggregate tables returned.  Assume that we have selected the right
+        // nine aggregate tables returned.  Assume that we have selected the right
         // subset of stats internally, just check that we get stuff.
-        assertEquals(8, results.length);
+        assertEquals(9, results.length);
     }
 
     //
