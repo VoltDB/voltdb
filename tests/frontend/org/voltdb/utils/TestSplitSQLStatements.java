@@ -153,6 +153,25 @@ public class TestSplitSQLStatements {
                 + "select * from r where f = 'begin' or f = 'END';"
                 + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        // semi colon in quoted string
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'beg;in' or f = 'END;';"
+                + "end";
+        checkSplitter(sql, sql);
+
+        // partition clause
+        sql = "create procedure thisproc "
+                + "partition on table t column a parameter 1 "
+                + "allow operator as "
+                + "begin "
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "end";
+        checkSplitter(sql, sql);
     }
 
     @Test
