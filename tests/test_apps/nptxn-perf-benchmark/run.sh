@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+#
+# Ported and modified from https://github.com/VoltDB/voltdb/pull/3822
+#
+
 # find voltdb binaries
 if [ -e ../../bin/voltdb ]; then
     # assume this is the examples folder for a kit
@@ -23,6 +27,7 @@ STARTUPLEADERHOST="localhost"
 # list of cluster nodes separated by commas in host:[port] format
 SERVERS="localhost"
 
+PROCS_JAR_NAME="np-procs.jar"
 BENCHMARK_JAR_NAME="np-benchmark.jar"
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
@@ -30,21 +35,47 @@ function cleanUp() {
 
 }
 
+#################################
+# cleanup and generate the jars #
+#################################
+function prepare() {
+    cleanUp
+    makeJars
+}
+
+###############################################
+# start the server and initialize the schemas #
+###############################################
+function start() {
+    server-init
+}
+
 # Compile the classes, generate the bundled jar file(s)
 function makeJars() {
+    javac -cp "$APPCLASSPATH" ./procs/np/*.java
+    jar cf $PROCS_JAR_NAME -C procs np
 
+    javac -cp "$CLIENTCLASSPATH" ./client/np/*.java
+    jar cf $BENCHMARK_JAR_NAME -C client np
+
+    rm -f client/np/*.class procs/np/*.class
 }
 
 # Start the server, and load the initial schema from *.sql
 function server-init() {
+    voltdb init --force
+    voltdb start -H "$STARTUPLEADERHOST"
 
+    sqlcmd < schema.sql
 }
 
-# Start the benchmarking program
+##################################
+# Start the benchmarking program #
+##################################
 function client() {
     java -classpath $BENCHMARK_JAR_NAME:$CLIENTCLASSPATH np.NPBenchmark \
-        --type='' \
-        --scale=''
+         --type='' \
+         --scale=''
 }
 
 
