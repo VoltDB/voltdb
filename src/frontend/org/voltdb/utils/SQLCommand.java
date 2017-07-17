@@ -678,6 +678,7 @@ public class SQLCommand
         // keep from throwing off diagnostic line numbers. So "statement" may be non-empty even
         // when a sql statement has not yet started (?)
         boolean statementStarted = false;
+        boolean inMultiStmtProc = false;
         StringBuilder batch = fileInfo.isBatch() ? new StringBuilder() : null;
 
         String delimiter = (fileInfo.getOption() == FileOption.INLINEBATCH) ?
@@ -723,6 +724,21 @@ public class SQLCommand
                     }
                 }
                 return;
+            }
+
+            if (!inMultiStmtProc) {
+                // check if the statement is CREATE PROCEDURE AS BEGIN...
+                // add the current line to the statements so far entered
+                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureBeginAsSQL(statement.toString() + line);
+                if (statementMatcher.matches()) {
+                    inMultiStmtProc = true;
+                }
+            } else {
+                // check if the multi statement procedure ended
+                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(statement.toString() + line);
+                if (statementMatcher.matches()) {
+                    inMultiStmtProc = false;
+                }
             }
 
             if ( ! statementStarted) {
@@ -784,7 +800,8 @@ public class SQLCommand
             statement.append(line).append("\n");
 
             // Check if the current statement ends here and now.
-            if (SQLParser.isSemiColonTerminated(line)) {
+            // if it is a multi statement procedure, continue to execute till END
+            if (!inMultiStmtProc && SQLParser.isSemiColonTerminated(line)) {
                 if (batch == null) {
                     String statementString = statement.toString();
                     // Trim here avoids a "missing statement" error from adhoc in an edge case
