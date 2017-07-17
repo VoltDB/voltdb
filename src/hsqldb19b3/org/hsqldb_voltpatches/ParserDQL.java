@@ -4358,6 +4358,32 @@ public class ParserDQL extends ParserBase {
 
                     continue;
                 }
+                case Tokens.X_ARBITRARY : {
+                	// Note: Don't increment i here. We will
+                	//       bump it the next time we go through the
+                	//       loop, and this will match the
+                	//       Tokens.CLOSEBRACKET.
+                	boolean done = false;
+                	while ( ! done ) {
+	                    Expression e = null;
+	
+	                    e = XreadAllTypesCommonValueExpression(false);
+	
+	                    exprList.add(e);
+	                    
+	                    switch (token.tokenType) {
+	                    case Tokens.COMMA:
+	                    	read();
+	                    	continue;
+	                    case Tokens.CLOSEBRACKET:
+	                    	done = true;
+	                    	break;
+	                    default:
+	                    }
+                	}
+                    continue;
+                	
+                }
                 case Tokens.X_REPEAT : {
                     i++;
 

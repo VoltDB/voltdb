@@ -272,6 +272,7 @@ CTX.INPUT['common'] = """
  TupleOutputStreamProcessor.cpp
  MiscUtil.cpp
  debuglog.cpp
+ TensorWrapper.cpp
 """
 
 CTX.INPUT['execution'] = """
