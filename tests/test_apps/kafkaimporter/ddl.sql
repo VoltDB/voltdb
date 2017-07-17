@@ -78,6 +78,7 @@ CREATE TABLE kafkamirrortable1
      (
                   KEY   BIGINT NOT NULL ,
                   value BIGINT NOT NULL ,
+                  import_count BIGINT DEFAULT 0,
                   insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
                   CONSTRAINT pk_kafkamirrortable PRIMARY KEY ( KEY )
      );
@@ -174,6 +175,11 @@ CREATE PROCEDURE PARTITION ON TABLE Kafkamirrortable2 COLUMN key FROM class kafk
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertFinal;
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.MatchRows;
 
+CREATE PROCEDURE PARTITION ON TABLE KAFKAIMPORTTABLE1 COLUMN key FROM class kafkaimporter.db.procedures.InsertImportWithCount1;
+CREATE PROCEDURE PARTITION ON TABLE KAFKAIMPORTTABLE3 COLUMN key FROM class kafkaimporter.db.procedures.InsertImportWithCount3;
+CREATE PROCEDURE PARTITION ON TABLE KAFKAIMPORTTABLE4 COLUMN key FROM class kafkaimporter.db.procedures.InsertImportWithCount4;
+CREATE PROCEDURE PARTITION ON TABLE KAFKAIMPORTTABLE5 COLUMN key FROM class kafkaimporter.db.procedures.InsertImportWithCount5;
+
 CREATE PROCEDURE CountMirror1 as select count(*) from kafkamirrortable1;
 CREATE PROCEDURE CountImport1 as select count(*) from kafkaimporttable1;
 
@@ -181,8 +187,9 @@ CREATE PROCEDURE CountMirror2 as select count(*) from kafkamirrortable2;
 CREATE PROCEDURE CountImport2 as select count(*) from kafkaimporttable2;
 CREATE PROCEDURE ImportCountMinMax as select count(key), min(key), max(key) from kafkaimporttable1;
 CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE1 COLUMN key as upsert into KAFKAIMPORTTABLE1(key, value) VALUES(?, ?);
-CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE3 COLUMN key as upsert into KAFKAIMPORTTABLE3(key, value) VALUES(?, ?);
-CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE4 COLUMN key as upsert into KAFKAIMPORTTABLE4(key, value) VALUES(?, ?);
-CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE5 COLUMN key as upsert into KAFKAIMPORTTABLE5(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly1 PARTITION ON TABLE KAFKAIMPORTTABLE1 COLUMN key as upsert into KAFKAIMPORTTABLE1(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly2 PARTITION ON TABLE KAFKAIMPORTTABLE3 COLUMN key as upsert into KAFKAIMPORTTABLE3(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly3 PARTITION ON TABLE KAFKAIMPORTTABLE4 COLUMN key as upsert into KAFKAIMPORTTABLE4(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly4 PARTITION ON TABLE KAFKAIMPORTTABLE5 COLUMN key as upsert into KAFKAIMPORTTABLE5(key, value) VALUES(?, ?);
 
 END_OF_BATCH
