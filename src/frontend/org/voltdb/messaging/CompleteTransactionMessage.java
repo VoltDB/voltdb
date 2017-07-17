@@ -30,6 +30,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_requiresAck;
     boolean m_rollbackForFault;
 
+    //indicate if this message is sent to partition leader
+    boolean m_toLeader;
+    boolean m_ackRequestedFromSender;
     int m_hash;
     int m_flags = 0;
     static final int ISROLLBACK = 0;
@@ -78,6 +81,8 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(ISROLLBACK, isRollback);
         setBit(REQUIRESACK, requiresAck);
         setBit(ISRESTART, isRestart);
+        m_toLeader = false;
+        m_ackRequestedFromSender = true;
     }
 
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId, CompleteTransactionMessage msg)
@@ -106,11 +111,27 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         return m_hash;
     }
 
+    public void setToLeader(boolean toLeader) {
+        m_toLeader = toLeader;
+    }
+
+    public boolean isToLeader() {
+        return m_toLeader;
+    }
+
+    public void setAckRequestedFromSender(boolean ackRequestedFromSender) {
+        m_ackRequestedFromSender = ackRequestedFromSender;
+    }
+
+    public boolean isAckRequestedFromSender() {
+        return m_ackRequestedFromSender;
+    }
+
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4 + 4;
+        msgsize += 4 + 4 + 1 + 1;
         return msgsize;
     }
 
@@ -121,6 +142,8 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.flattenToBuffer(buf);
         buf.putInt(m_hash);
         buf.putInt(m_flags);
+        buf.put((byte)(m_toLeader ? 1 : 0));
+        buf.put((byte)(m_ackRequestedFromSender ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -131,6 +154,8 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.initFromBuffer(buf);
         m_hash = buf.getInt();
         m_flags = buf.getInt();
+        m_toLeader = (buf.get() == 1);
+        m_ackRequestedFromSender = (buf.get() == 1);
         assert(buf.capacity() == buf.position());
     }
 
@@ -141,11 +166,11 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("COMPLETE_TRANSACTION (FROM COORD: ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
-        sb.append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(TxnEgo.txnIdToString(m_txnId) + "(" + m_txnId + ")");
         sb.append("\n SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
-
+        sb.append("\n  TRUNCATION HANDLE:" + getTruncationHandle());
         sb.append("\n  HASH: " + String.valueOf(m_hash));
 
         if (isRollback())
@@ -156,6 +181,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 
         if (isRestart()) {
             sb.append("\n  THIS IS A TRANSACTION RESTART");
+        }
+
+        if (isToLeader()) {
+            sb.append("\n  SEND TO LEADER");
         }
 
         return sb.toString();

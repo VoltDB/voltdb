@@ -53,6 +53,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.Site;
@@ -1250,8 +1251,14 @@ public class ProcedureRunner {
            }
        }
        else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
-           status = ClientResponse.TXN_RESTART;
-           msg.append("TRANSACTION RESTART\n");
+           TransactionRestartException te = (TransactionRestartException)e;
+           if (te.isMisrouted()) {
+               status = ClientResponse.TXN_MISROUTED;
+               msg.append("TRANSACTION MISROUTED\n");
+           } else {
+               status = ClientResponse.TXN_RESTART;
+               msg.append("TRANSACTION RESTART\n");
+           }
        }
        // SpecifiedException means the dev wants control over status and message
        else if (e.getClass() == SpecifiedException.class) {

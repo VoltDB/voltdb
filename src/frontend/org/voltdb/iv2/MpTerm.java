@@ -20,7 +20,7 @@ package org.voltdb.iv2;
 import java.lang.InterruptedException;
 
 import java.util.*;
-
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 
 import com.google_voltpatches.common.base.Supplier;
@@ -33,6 +33,7 @@ import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -57,20 +58,29 @@ public class MpTerm implements Term
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache)
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
             ImmutableSortedSet.Builder<Long> builder = ImmutableSortedSet.naturalOrder();
-            for (Long HSId : cache.values()) {
-                builder.add(HSId);
+            HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
+            boolean balanceSPIRequested = false;
+            for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
+                long hsid = e.getValue().m_HSID;
+                builder.add(hsid);
+                cacheCopy.put(e.getKey(), hsid);
+
+                //The master change is triggered via @BalanceSPI
+                if (e.getValue().m_isBalanceSPIRequested && !(m_knownLeaders.contains(hsid))) {
+                    balanceSPIRequested = true;
+                }
             }
             final SortedSet<Long> updatedLeaders = builder.build();
-            tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(updatedLeaders));
-            tmLog.debug(m_whoami
-                      + "LeaderCache change handler updating leader list to: "
-                      + CoreUtils.hsIdCollectionToString(updatedLeaders));
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + "LeaderCache change updating leader list to: "
+                        + CoreUtils.hsIdCollectionToString(updatedLeaders) + ". BalanceSPI:" + balanceSPIRequested);
+            }
             m_knownLeaders = updatedLeaders;
 
-            m_mailbox.updateReplicas(new ArrayList<Long>(m_knownLeaders), cache);
+            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy, balanceSPIRequested);
         }
     };
 

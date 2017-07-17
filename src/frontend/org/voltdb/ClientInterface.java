@@ -74,6 +74,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltcore.utils.ssl.SSLConfiguration;
+import org.voltcore.zk.CoreZK;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -89,6 +90,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -113,6 +115,10 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
  *
  */
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
+
+    public static final String DROP_TXN_RECOVERY = "Transaction dropped during fault recovery";
+    public static final String DROP_TXN_MASTERSHIP = "Transaction dropped due to change in mastership."
+                        + " It is possible the transaction was committed";
 
     static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
     static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
@@ -161,8 +167,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
-    private static final RateLimitedLogger m_rateLimitedLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(60), authLog, Level.WARN);
 
+    static final VoltLogger tmLog = new VoltLogger("TM");
+
+    private static final RateLimitedLogger m_rateLimitedLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(60), authLog, Level.WARN);
 
     /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
     public enum ExplainMode {
@@ -943,9 +951,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // by the ReplaySequencer and just remove the handle from the CIHM
             // without removing any handles before it which we haven't seen yet.
             ClientInterfaceHandleManager.Iv2InFlight clientData;
-            if (clientResponse != null &&
+            if (response.isMisrouted() || (clientResponse != null &&
                     clientResponse.getStatusString() != null &&
-                    clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
+                    clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION))) {
                 clientData = cihm.removeHandle(response.getClientInterfaceHandle());
             }
             else {
@@ -1006,8 +1014,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         private boolean restartTransaction(int messageSize, long nowNanos)
         {
-            if (response.isMispartitioned()) {
-                // Restart a mis-partitioned transaction
+            if (response.isMispartitioned() || response.isMisrouted()) {
+                // Restart a mis-partitioned or mis-routed transaction
                 assert response.getInvocation() != null;
                 assert response.getCurrentHashinatorConfig() != null;
                 assert(catProc != null);
@@ -1025,17 +1033,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     return false;
                 }
 
-                boolean isReadonly = catProc.getReadonly();
-
                 try {
                     ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                    int partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
-                            ppi.type, response.getInvocation());
+                    int partition = MpInitiator.MP_INIT_PID;
+                    if (ppi != null) {
+                        partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
+                                                        ppi.type, response.getInvocation());
+                    }
                     createTransaction(cihm.connection.connectionId(),
                             response.getInvocation(),
-                            isReadonly,
-                            true, // Only SP could be mis-partitioned
-                            false, // Only SP could be mis-partitioned
+                            catProc.getReadonly(),
+                            partition != MpInitiator.MP_INIT_PID,
+                            catProc.getEverysite(),
                             partition,
                             messageSize,
                             nowNanos);
@@ -1046,7 +1055,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
                 }
             }
-
             return false;
         }
     }
@@ -1196,6 +1204,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         //Pass it to the network thread like a ninja
                         //Only the network can use the CIHM
                         cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
+                        Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                     }
                 }
                 else if (message instanceof BinaryPayloadMessage) {
@@ -1319,6 +1328,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         List<Iv2InFlight> transactions =
                 cihm.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
 
+        if (!transactions.isEmpty()) {
+            Iv2Trace.logFailoverTransaction(partitionId, initiatorHSId, transactions.size());
+        }
+
         for (Iv2InFlight inFlight : transactions) {
             ClientResponseImpl response =
                     new ClientResponseImpl(
@@ -1326,8 +1339,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                             null,
                             new VoltTable[0],
-                            "Transaction dropped due to change in mastership. " +
-                            "It is possible the transaction was committed");
+                            DROP_TXN_MASTERSHIP);
             response.setClientHandle(inFlight.m_clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
             buf.putInt(buf.capacity() - 4);
@@ -2109,5 +2121,128 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     void handleFailedHosts(Set<Integer> failedHosts) {
         m_dispatcher.handleFailedHosts(failedHosts);
+    }
+
+    /**Move partition leader from one host to another.
+     * find a partition leader from a host which hosts the most partition leaders
+     * and find the host which hosts the partition replica and the least number of partition leaders.
+     * send BalanceSPIMessage to the host with older partition leader to initiate @BalanceSPI
+     * Repeatedly call this task until no qualified partition is available.
+     * @param interval task execution interval
+     */
+    public void balanceSPI(int interval, int hostCount) {
+
+        //grab a zk lock
+        final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
+        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Snapshot, node joining or BalanceSPI in progress, no BalanceSPI on this host");
+            }
+            return;
+        }
+
+        //The candidate pair is deterministic on every host.
+        Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(hostCount, hostId);
+
+        //The host does not have any thing to do this time. It does not mean that the host does not
+        //have more partition leaders than expected. Other hosts may have more partition leaders
+        //than this one. So let other hosts do @BalanceSPI first.
+        if (target == null) {
+            CoreZK.removeSPIBalanceIndicator(m_zk);
+            return;
+        }
+
+        final int partitionId = target.getFirst();
+        final int targetHostId = target.getSecond();
+        int partitionKey = -1;
+
+        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+        ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
+        partitionKeys.flattenToBuffer(buf);
+        buf.flip();
+        VoltTable keyCopy = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+        keyCopy.resetRowPosition();
+        while (keyCopy.advanceRow()) {
+            if (partitionId == keyCopy.getLong("PARTITION_ID")) {
+                partitionKey = (int)(keyCopy.getLong("PARTITION_KEY"));
+                break;
+            }
+        }
+
+        if (partitionKey == -1) {
+            tmLog.warn("Could not find the partition key for partition " + partitionId);
+            CoreZK.removeSPIBalanceIndicator(m_zk);
+            return;
+        }
+
+        RealVoltDB db = (RealVoltDB)VoltDB.instance();
+        try {
+            SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
+            final String procedureName = "@BalanceSPI";
+            Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
+            Procedure proc = procedureConfig.asCatalogProcedure();
+            StoredProcedureInvocation spi = new StoredProcedureInvocation();
+            spi.setProcName(procedureName);
+
+            tmLog.info(String.format("Migrating the mastership of partition %d to host %d (partition key %d)",
+                    partitionId, targetHostId, partitionKey));
+
+            if (tmLog.isDebugEnabled()) {
+                VoltTable vt = Cartographer.peekTopology(m_cartographer);
+                tmLog.debug("[@balanceSPI]\n" + vt.toFormattedString());
+            }
+            spi.setParams(partitionKey, partitionId, targetHostId);
+            spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
+            if (spi.getSerializedParams() == null) {
+                spi = MiscUtils.roundTripForCL(spi);
+            }
+
+            synchronized (m_executeTaskAdpater) {
+                createTransaction(m_executeTaskAdpater.connectionId(),
+                        spi,
+                        proc.getReadonly(),
+                        proc.getSinglepartition(),
+                        proc.getEverysite(),
+                        partitionId,
+                        spi.getSerializedSize(),
+                        System.nanoTime());
+            }
+            final long timeoutMS = 5 * 60 * 1000;
+            ClientResponse resp= cb.getResponse(timeoutMS);
+            if (resp.getStatus() == ClientResponse.SUCCESS) {
+                tmLog.info(String.format("The mastership for partition %d has been moved to host %d.",
+                        partitionId, targetHostId));
+              //spin wait till it sees the new master
+              long remainingWaitTime = TimeUnit.MINUTES.toSeconds(5); // 5 max minutes;
+              final int waitingInterval = 1;
+              while (remainingWaitTime > 0) {
+                  try {
+                      Thread.sleep(TimeUnit.SECONDS.toMillis(waitingInterval));
+                  } catch (InterruptedException ignoreIt) {
+                  }
+                  remainingWaitTime -= waitingInterval;
+                  if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
+                      break;
+                  }
+              }
+            } else {
+                //if the target host is down, ignore
+                Set<Integer> liveHosts = db.getHostMessenger().getLiveHostIds();
+                if (!liveHosts.contains(targetHostId)) {
+                    tmLog.error(String.format("The mastership for partition %d has not been successfully moved to host %d.",
+                            partitionId, targetHostId));
+                }
+            }
+        } catch (IOException | InterruptedException e) {
+            tmLog.error(String.format("Fail to process leader change for partition %d: %s", partitionId, e.getMessage()));
+        } finally {
+            //wait to avoid another host to start @BalaneSPI right away
+            db.scheduleWork(new Runnable() {
+                @Override
+                public void run() {
+                    CoreZK.removeSPIBalanceIndicator(m_zk);
+                }
+            }, interval, 0, TimeUnit.SECONDS);
+        }
     }
 }

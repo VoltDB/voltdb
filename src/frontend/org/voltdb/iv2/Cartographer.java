@@ -20,9 +20,11 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -31,7 +33,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
@@ -48,14 +49,17 @@ import org.voltdb.AbstractTopology;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
-
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.collect.Sets;
@@ -78,17 +82,21 @@ public class Cartographer extends StatsSource
 
     public static final String JSON_PARTITION_ID = "partitionId";
     public static final String JSON_INITIATOR_HSID = "initiatorHSId";
+
     private final int m_configuredReplicationFactor;
     private final boolean m_partitionDetectionEnabled;
-
     private final ExecutorService m_es
             = CoreUtils.getCachedSingleThreadExecutor("Cartographer", 15000);
 
     // This message used to be sent by the SP or MP initiator when they accepted a promotion.
     // For dev speed, we'll detect mastership changes here and construct and send this message to the
     // local client interface so we can keep the CIs implementation
-    private void sendLeaderChangeNotify(long hsId, int partitionId)
+    private void sendLeaderChangeNotify(long hsId, int partitionId, boolean balanceSPI)
     {
+        if (balanceSPI) return;
+        hostLog.info("[Cartographer] Sending leader change notification with new leader:" +
+                CoreUtils.hsIdToString(hsId) + " for partition:" + partitionId);
+
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
@@ -100,7 +108,7 @@ public class Cartographer extends StatsSource
             m_hostMessenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
                         HostMessenger.CLIENT_INTERFACE_SITE_ID),
                     bpm);
-        }
+          }
         catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to propogate leader promotion to client interface.", true, e);
         }
@@ -109,12 +117,13 @@ public class Cartographer extends StatsSource
     LeaderCache.Callback m_MPICallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
             // Every MPI change means a new single MPI.  Just do the right thing here
             int pid = MpInitiator.MP_INIT_PID;
             // Can be zero-length at startup
             if (cache.size() > 0) {
-                sendLeaderChangeNotify(cache.get(pid), pid);
+                hostLog.info("[Cartographer MP] Sending leader change notification with new leader:");
+                sendLeaderChangeNotify(cache.get(pid).m_HSID, pid, false);
             }
         }
     };
@@ -122,25 +131,43 @@ public class Cartographer extends StatsSource
     LeaderCache.Callback m_SPIMasterCallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
             // We know there's a 1:1 mapping between partitions and HSIds in this map.
             // let's flip it
             Map<Long, Integer> hsIdToPart = new HashMap<Long, Integer>();
-            for (Entry<Integer, Long> e : cache.entrySet()) {
-                hsIdToPart.put(e.getValue(), e.getKey());
+            Set<LeaderCallBackInfo> newMasters = new HashSet<LeaderCallBackInfo>();
+            Set<Long> newHSIDs = Sets.newHashSet();
+            for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
+                Long hsid = e.getValue().m_HSID;
+                newHSIDs.add(hsid);
+                hsIdToPart.put(hsid, e.getKey());
+                if (!m_currentSPMasters.contains(hsid)) {
+                    // we want to see items which are present in the new map but not in the old,
+                    // these are newly promoted SPIs
+                    newMasters.add(e.getValue());
+                }
             }
-            Set<Long> newMasters = new HashSet<Long>();
-            newMasters.addAll(cache.values());
-            // we want to see items which are present in the new map but not in the old,
-            // these are newly promoted SPIs
-            newMasters.removeAll(m_currentSPMasters);
             // send the messages indicating promotion from here for each new master
-            for (long newMaster : newMasters) {
-                sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster));
+            for (LeaderCallBackInfo newMasterInfo : newMasters) {
+                Long newMaster = newMasterInfo.m_HSID;
+                sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster), newMasterInfo.m_isBalanceSPIRequested);
+            }
+
+            if (hostLog.isDebugEnabled()) {
+                Set<String> masters = Sets.newHashSet();
+                m_currentSPMasters.forEach((k) -> {
+                    masters.add(CoreUtils.hsIdToString(k));
+                });
+                hostLog.debug("[Cartographer] SP masters:" + masters);
+                masters.clear();
+                cache.values().forEach((k) -> {
+                    masters.add(CoreUtils.hsIdToString(k.m_HSID));
+                });
+                hostLog.debug("[Cartographer]Updated SP masters:" + masters + ". New masters:" + newMasters);
             }
 
             m_currentSPMasters.clear();
-            m_currentSPMasters.addAll(cache.values());
+            m_currentSPMasters.addAll(newHSIDs);
         }
     };
 
@@ -254,6 +281,15 @@ public class Cartographer extends StatsSource
         return m_iv2Masters.get(partitionId);
     }
 
+    /**
+     * validate partition id
+     * @param partitionId  The partition id
+     * @return return true if the partition id is valid
+     */
+    public boolean hasPartition(int partitionId) {
+        return ((LeaderCache)m_iv2Masters).contain(partitionId);
+    }
+
     // This used to be the method to get this on SiteTracker
     public long getHSIdForMultiPartitionInitiator()
     {
@@ -350,15 +386,22 @@ public class Cartographer extends StatsSource
         }
         catch (KeeperException.NoNodeException e) {
             //Can happen when partitions are being removed
-        } catch (KeeperException ke) {
-            org.voltdb.VoltDB.crashLocalVoltDB("KeeperException getting replicas for partition: " + partition,
-                    true, ke);
+        } catch (KeeperException | InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Exception getting replicas for partition: " + partition,
+                    true, e);
         }
-        catch (InterruptedException ie) {
-            org.voltdb.VoltDB.crashLocalVoltDB("InterruptedException getting replicas for partition: " +
-                    partition, true, ie);
-        }
+
         return retval;
+    }
+
+    public Long getHSIDForPartitionHost(int hostId, int partition) {
+        List<Long> hsids = getReplicasForPartition(partition);
+        for (Long hsid: hsids) {
+           if (hostId ==CoreUtils.getHostIdFromHSId(hsid)){
+               return hsid;
+           }
+        }
+        return null;
     }
 
     /**
@@ -617,5 +660,182 @@ public class Cartographer extends StatsSource
             }
         }
         return true;
+    }
+
+    /**
+     * used to calculate the partition candidate for migration
+     */
+    private static class Host implements Comparable<Host> {
+
+        final int m_hostId;
+
+        //the master partition ids on the host
+        List<Integer> m_masterPartitionIDs = Lists.newArrayList();
+
+        //the replica partition ids on the host
+        List<Integer> m_replicaPartitionIDs = Lists.newArrayList();
+
+        public Host(int hostId) {
+            m_hostId = hostId;
+        }
+
+        @Override
+        public int compareTo(Host other){
+            return (other.m_masterPartitionIDs.size() - m_masterPartitionIDs.size());
+        }
+
+        @Override
+        public int hashCode() {
+            return m_hostId;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof Host) {
+                Host info = (Host)obj;
+                return m_hostId == info.m_hostId;
+            }
+            return false;
+        }
+
+        public void addPartition(Integer partitionId, boolean master) {
+            if (master) {
+                m_masterPartitionIDs.add(partitionId);
+            } else {
+                m_replicaPartitionIDs.add(partitionId);
+            }
+        }
+
+        public int getPartitionLeaderCount() {
+            return m_masterPartitionIDs.size();
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder builder = new StringBuilder();
+            builder.append("Host:" + m_hostId);
+            builder.append(", master:" + m_masterPartitionIDs);
+            builder.append(", replica:" + m_replicaPartitionIDs);
+            return builder.toString();
+        }
+    }
+
+    //find a partition and its target host to host its leader
+    //(best effort)
+    public Pair<Integer, Integer> getPartitionForBalanceSPI(int hostCount, int localHostId) {
+
+        Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
+        if (liveHosts.size() == 1) {
+            return null;
+        }
+
+        final int maxMastersPerHost = (int)Math.ceil((double)(getPartitionCount()) / hostCount);
+        final int minMastersPerHost = (getPartitionCount() / hostCount);
+
+        //collect host and partition info
+        Map<Integer, Host> hostsMap = Maps.newHashMap();
+        Set<Integer> allMasters = new HashSet<Integer>();
+        allMasters.addAll(m_iv2Masters.pointInTimeCache().keySet());
+        for ( Iterator<Integer> it = allMasters.iterator(); it.hasNext();) {
+            Integer partitionId = it.next();
+            int leaderHostId = CoreUtils.getHostIdFromHSId(m_iv2Masters.pointInTimeCache().get(partitionId));
+
+            //sanity check to make sure that the topology is not in the middle of leader promotion
+            if (!liveHosts.contains(new Integer(leaderHostId))) {
+                return null;
+            }
+            Host leaderHost = hostsMap.get(leaderHostId);
+            if (leaderHost == null) {
+                leaderHost = new Host(leaderHostId);
+                hostsMap.put(leaderHostId, leaderHost);
+            }
+            List<Long> sites = getReplicasForPartition(partitionId);
+            for (long site : sites) {
+                int hostId = CoreUtils.getHostIdFromHSId(site);
+                if (!liveHosts.contains(new Integer(hostId))) {
+                    return null;
+                }
+                Host host = hostsMap.get(hostId);
+                if (host == null) {
+                    host = new Host(hostId);
+                    hostsMap.put(hostId, host);
+                }
+                host.addPartition(partitionId, (leaderHostId == hostId));
+            }
+        }
+
+        //Sort the hosts by partition leader count, descending
+        LinkedList<Host> hostList = new LinkedList<Host>(hostsMap.values());
+        Collections.sort(hostList);
+
+        //only move SPI from the one with most partition leaders
+        //The local ClientInterface will pick it up and start @BalanceSPI
+        Iterator<Host> it = hostList.iterator();
+        Host srcHost = it.next();
+        if (srcHost.m_hostId != localHostId) {
+            return null;
+        }
+        //The new host is the one with least number of partition leaders and the partition replica
+        for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
+            Host targetHost = reverseIt.next();
+            int partitionCandidate = findNewLeaderHost(srcHost,targetHost, maxMastersPerHost, minMastersPerHost);
+            if (partitionCandidate > -1){
+                Pair<Integer, Integer> pair = new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
+                return pair;
+            }
+        }
+        return null;
+    }
+
+    private int findNewLeaderHost(Host src, Host target, int maxMastersPerHost, int minMastersPerHost) {
+        //cann't move onto itself
+        if (src.equals(target)) {
+            return -1;
+        }
+
+        // still have more leaders than max?
+        if (src.getPartitionLeaderCount() > maxMastersPerHost) {
+            for (Integer partition : src.m_masterPartitionIDs) {
+                if (target.m_replicaPartitionIDs.contains(partition) && target.getPartitionLeaderCount() < maxMastersPerHost) {
+                    return partition;
+                }
+            }
+        } else {
+            if (target.getPartitionLeaderCount() >= minMastersPerHost || src.getPartitionLeaderCount() <= minMastersPerHost) {
+                return -1;
+            } else {
+                for (Integer partition : src.m_masterPartitionIDs) {
+                    if (target.m_replicaPartitionIDs.contains(partition)) {
+                        return partition;
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
+    //Utility method to peek the topology
+    public static VoltTable peekTopology(Cartographer cart) {
+        ColumnInfo[] column = new ColumnInfo[3];
+        column[0] = new ColumnInfo("Partition", VoltType.BIGINT);
+        column[1] = new ColumnInfo("Sites", VoltType.STRING);
+        column[2] = new ColumnInfo("Leader", VoltType.STRING);
+        VoltTable t = new VoltTable(column);
+
+        Iterator<Object> i = cart.getStatsRowKeyIterator(false);
+        while (i.hasNext()) {
+            Object rowKey = i.next();
+            long leader;
+            List<Long> sites = new ArrayList<Long>();
+            if (rowKey.equals(MpInitiator.MP_INIT_PID)) {
+                leader = cart.getHSIdForMultiPartitionInitiator();
+                sites.add(leader);
+            } else {
+                leader = cart.m_iv2Masters.pointInTimeCache().get(rowKey);
+                sites.addAll(cart.getReplicasForPartition((Integer)rowKey));
+            }
+            t.addRow(rowKey, CoreUtils.hsIdCollectionToString(sites), CoreUtils.hsIdToString(leader));
+        }
+        return t;
     }
 }

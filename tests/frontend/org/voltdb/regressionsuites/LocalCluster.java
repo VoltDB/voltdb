@@ -2162,6 +2162,11 @@ public class LocalCluster extends VoltServerConfig {
         return (m_siteCount * m_hostCount) / (m_kfactor + 1);
     }
 
+    @Override
+    public int getKfactor() {
+        return m_kfactor;
+    }
+
     /**
      * Parse the output file produced by valgrind and produce a JUnit failure if
      * valgrind found any errors.

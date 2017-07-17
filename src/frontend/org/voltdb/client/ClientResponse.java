@@ -83,6 +83,11 @@ public interface ClientResponse {
     public static final byte OPERATIONAL_FAILURE = -9;
 
     /**
+     * Status code indicating that the transaction is mis-routed. The transaction will be restarted.
+     */
+    public static final byte TXN_MISROUTED = -10;
+
+    /**
      * Default value for the user specified app status code field
      */
     public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;

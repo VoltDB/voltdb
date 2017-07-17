@@ -25,7 +25,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -33,6 +32,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
@@ -94,6 +94,7 @@ public class VoltZK {
     public static final String commandlog_init_barrier = "/db/commmandlog_init_barrier";
 
     // leader election
+    private static final String BALANCE_SPI_SUFFIX = "_BALANCE_SPI_REQUEST";
     public static final String iv2masters = "/db/iv2masters";
     public static final String iv2appointees = "/db/iv2appointees";
     public static final String iv2mpi = "/db/iv2mpi";
@@ -101,6 +102,50 @@ public class VoltZK {
     public static final String leaders_initiators = "/db/leaders/initiators";
     public static final String leaders_globalservice = "/db/leaders/globalservice";
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
+
+    public static final String debugLeadersInfo(ZooKeeper zk) {
+        StringBuilder builder = new StringBuilder("ZooKeeper:\n");
+        printZKDir(zk, iv2masters, builder);
+        printZKDir(zk, iv2appointees, builder);
+        printZKDir(zk, iv2mpi, builder);
+        printZKDir(zk, leaders_initiators, builder);
+        printZKDir(zk, leaders_globalservice, builder);
+
+        return builder.toString();
+    }
+
+    private static final void printZKDir(ZooKeeper zk, String dir, StringBuilder builder) {
+        builder.append(dir).append(":\t ");
+        try {
+            List<String> keys = zk.getChildren(dir, null);
+            boolean isData = false;
+            for (String key: keys) {
+                String path = ZKUtil.joinZKPath(dir, key);
+                byte[] arr = zk.getData(path, null, null);
+
+                if (arr != null) {
+                    String data = new String(arr, "UTF-8");
+                    if ((iv2masters.equals(dir) || iv2appointees.equals(dir)) && !isHSIdFromBalanceSPIRequest(data)) {
+                        data = CoreUtils.hsIdToString(Long.parseLong(data));
+                    }
+                    isData = true;
+                    builder.append(key).append(" -> ").append(data).append(",");
+                } else {
+                    // path may be a dir instead
+                    List<String> children = zk.getChildren(path, null);
+                    if (children != null) {
+                        builder.append("\n");
+                        printZKDir(zk, path, builder);
+                    }
+                }
+            }
+            if (isData) {
+                builder.append("\n");
+            }
+        } catch (KeeperException | InterruptedException | UnsupportedEncodingException e) {
+            builder.append(e.getMessage());
+        }
+    }
 
     // flag of initialization process complete
     public static final String init_completed = "/db/init_completed";
@@ -308,5 +353,31 @@ public class VoltZK {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Generate a HSID string with BALANCE_SPI_SUFFIX information.
+     * When this string is updated, we can tell the reason why HSID is changed.
+     */
+    public static String suffixHSIdsWithBalanceSPIRequest(Long HSId) {
+        return Long.toString(HSId) + BALANCE_SPI_SUFFIX;
+    }
+
+    /**
+     * Is the data string hsid written because of balance SPI request?
+     */
+    public static boolean isHSIdFromBalanceSPIRequest(String hsid) {
+        return hsid.endsWith(BALANCE_SPI_SUFFIX);
+    }
+
+    /**
+     * Given a data string, figure out what's the long HSID number. Usually the data string
+     * is read from the zookeeper node.
+     */
+    public static long getHSId(String hsid) {
+        if (isHSIdFromBalanceSPIRequest(hsid)) {
+            return Long.parseLong(hsid.substring(0, hsid.length() - BALANCE_SPI_SUFFIX.length()));
+        }
+        return Long.parseLong(hsid);
     }
 }

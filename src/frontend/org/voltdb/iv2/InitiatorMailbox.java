@@ -23,25 +23,32 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.Consistency;
+import org.voltdb.Consistency.ReadLevel;
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
-
-import com.google_voltpatches.common.base.Supplier;
 import org.voltdb.messaging.RepairLogTruncationMessage;
+import com.google_voltpatches.common.base.Supplier;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -59,17 +66,30 @@ public class InitiatorMailbox implements Mailbox
         SCHEDULE_IN_SITE_THREAD = Boolean.valueOf(System.getProperty("SCHEDULE_IN_SITE_THREAD", "true"));
     }
 
+    public static enum BALANCE_SPI_STATUS {
+        NONE,  //no or complete balance spi
+        SRC_TXN_DRAINED, //new master is notified that old master has drained
+        SRC_STARTED, // @BalanceSPI on old master has been started
+        DEST_TXN_RESTART // new master needs txn restart before old master drains txns
+    }
+
     VoltLogger hostLog = new VoltLogger("HOST");
     VoltLogger tmLog = new VoltLogger("TM");
 
-    private final int m_partitionId;
+    protected final int m_partitionId;
     protected final Scheduler m_scheduler;
     protected final HostMessenger m_messenger;
     protected final RepairLog m_repairLog;
     private final JoinProducerBase m_joinProducer;
     private final LeaderCacheReader m_masterLeaderCache;
     private long m_hsId;
-    private RepairAlgo m_algo;
+    protected RepairAlgo m_algo;
+    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
+
+    //Queue all the transactions on the new master after SPI balance till it receives a message
+    //from its older master which has drained all the transactions.
+    private long m_newLeaderHSID = Long.MIN_VALUE;
+    private BALANCE_SPI_STATUS m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
 
     /*
      * Hacky global map of initiator mailboxes to support assertions
@@ -96,12 +116,20 @@ public class InitiatorMailbox implements Mailbox
         enableWritingIv2FaultLogInternal();
     }
 
-    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
-        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId);
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami, boolean isBalanceSPI) {
+        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId, isBalanceSPI);
+        if (hostLog.isDebugEnabled()) {
+
+            hostLog.debug("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
+                    m_partitionId + ", survivors: " + CoreUtils.hsIdCollectionToString(survivors.get()));
+        }
         setRepairAlgoInternal(ra);
         return ra;
     }
 
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
+        return constructRepairAlgo(survivors, whoami, false);
+    }
     protected void setRepairAlgoInternal(RepairAlgo algo)
     {
         assert(lockingVows());
@@ -168,6 +196,8 @@ public class InitiatorMailbox implements Mailbox
          * Only used for an assertion on locking.
          */
         m_allInitiatorMailboxes.add(this);
+
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     public JoinProducerBase getJoinProducer()
@@ -282,6 +312,7 @@ public class InitiatorMailbox implements Mailbox
     protected void deliverInternal(VoltMessage message) {
         assert(lockingVows());
         logRxMessage(message);
+        notifyNewLeaderOfTxnDone();
         boolean canDeliver = m_scheduler.sequenceForReplay(message);
         if (message instanceof DumpMessage) {
             hostLog.warn("Received DumpMessage at " + CoreUtils.hsIdToString(m_hsId));
@@ -307,16 +338,150 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
-
+        else if (message instanceof Iv2InitiateTaskMessage) {
+            if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
+                return;
+            }
+            initiateSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
+        } else if (message instanceof FragmentTaskMessage) {
+            if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
+                return;
+            }
+        }  else if (message instanceof BalanceSPIMessage) {
+            setBalanceSPIStatus((BalanceSPIMessage)message);
+            return;
+        }
         if (canDeliver) {
             //For a message delivered to partition leaders, the message may not have the updated transaction id yet.
             //The scheduler of partition leader will advance the transaction id, update the message and add it to repair log.
             //so that the partition leader and replicas have the consistent items in their repair logs.
             m_scheduler.deliver(message);
         } else {
-            //Add messages which are not delivered to scheduler to the repair log right away.
             m_repairLog.deliver(message);
         }
+    }
+
+    // If @BalanceSPI comes in, set up new partition leader selection and
+    // mark this site as non-leader. All the transactions (sp and mp) which are sent to partition leader will be
+    // rerouted from this moment on until the transactions are correctly routed to new leader.
+    private void initiateSPIMigrationIfRequested(Iv2InitiateTaskMessage msg) {
+
+        if (!"@BalanceSPI".equals(msg.getStoredProcedureName())) {
+            return;
+        }
+
+        final Object[] params = msg.getParameters();
+        int pid = Integer.parseInt(params[1].toString());
+        if (pid != m_partitionId) {
+            tmLog.warn(String.format("@BalanceSPI executed at a wrong partition %d for partition %d.", m_partitionId, pid));
+            return;
+        }
+
+        RealVoltDB db = (RealVoltDB)VoltDB.instance();
+        int hostId = Integer.parseInt(params[2].toString());
+        Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, pid);
+        if (newLeaderHSId == null || newLeaderHSId == m_hsId) {
+            tmLog.warn(String.format("@BalanceSPI the partition leader is already on the host %d or the host id is invalid.", hostId));
+            return;
+        }
+
+        SpScheduler scheduler = (SpScheduler)m_scheduler;
+        scheduler.checkPointBalanceSPI();
+        scheduler.m_isLeader = false;
+        m_repairLog.setLeaderState(false);
+        m_newLeaderHSID = newLeaderHSId;
+        m_balanceSPIStatus = BALANCE_SPI_STATUS.SRC_STARTED;
+
+        LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
+        try {
+            leaderAppointee.start(true);
+            leaderAppointee.put(pid, VoltZK.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId));
+        } catch (InterruptedException | ExecutionException | KeeperException e) {
+            VoltDB.crashLocalVoltDB("fail to start SPI migration",true, e);
+        } finally {
+            try {
+                leaderAppointee.shutdown();
+            } catch (InterruptedException e) {
+            }
+        }
+
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
+        }
+        tmLog.info("Balance spi for partition " + pid + " to " + CoreUtils.hsIdToString(newLeaderHSId));
+
+        //notify the new leader right away if the current leader has drained all transactions.
+        notifyNewLeaderOfTxnDone();
+    }
+
+    // After the SPI migration has been requested, all the sp requests will be sent back to the sender
+    // if these requests are intended for leader. Client interface will restart these transactions.
+    private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
+        if (message.toReplica()) {
+            return false;
+        }
+
+        if (message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.FAST
+                && m_balanceSPIStatus == BALANCE_SPI_STATUS.NONE) {
+            return false;
+        }
+
+        //at this point, the message is intended to be sent to partition leader
+        //Transaction restart cases:
+        //(1) The site has been demoted, not a leader any more,  but receives messages which are intended to the leader
+        //(2) The site becomes new leader via @BalanceSPI. Transactions will be restarted before is gets notification from old
+        //    leader that transactions on older leader have been drained
+        if (!m_scheduler.isLeader() || (m_scheduler.isLeader() && m_balanceSPIStatus == BALANCE_SPI_STATUS.DEST_TXN_RESTART)) {
+            InitiateResponseMessage response = new InitiateResponseMessage(message);
+            response.setMisrouted(message.getStoredProcedureInvocation());
+            response.m_sourceHSId = getHSId();
+            deliver(response);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Restarting txn on:" + CoreUtils.hsIdToString(m_hsId) + " " + message);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    // After SPI migration has been requested, the fragments which are sent to leader site should be restarted.
+    private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
+        if (m_scheduler.isLeader() || message.toReplica()) {
+            return false;
+        }
+
+        boolean seenTheTxn = (((SpScheduler)m_scheduler).getTransaction(message.getTxnId()) != null);
+
+        // If a fragment is part of a transaction which have not been seen on this site, restart it.
+        if (!seenTheTxn) {
+            FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
+            TransactionRestartException restart = new TransactionRestartException(
+                    "Transaction being restarted due to SPI migration.", message.getTxnId());
+            restart.setMisrouted(true);
+            response.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
+            response.m_sourceHSId = getHSId();
+            response.setPartitionId(m_partitionId);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("misRoutedFragMsg on site:" + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
+            }
+            deliver(response);
+            return true;
+        }
+
+        // A transaction may have multiple batches or fragments. If the first batch or fragment has already been
+        // processed, the follow-up batches or fragments should also be processed on this site.
+        if (!m_scheduler.isLeader() && !message.toReplica() && seenTheTxn) {
+            message.setHandleByOriginalLeader(true);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + " proc:" +  message.getProcedureName());
+            }
+        }
+        if (message.getCurrentBatchIndex() > 0 && !seenTheTxn && tmLog.isDebugEnabled()) {
+            tmLog.debug("The batch index of the fragment: " + message.getCurrentBatchIndex() + ". It is the 1st time on:"
+                    + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
+        }
+        return false;
     }
 
     @Override
@@ -380,11 +545,6 @@ public class InitiatorMailbox implements Mailbox
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
-        tmLog.debug(""
-            + CoreUtils.hsIdToString(getHSId())
-            + " handling repair log request id " + req.getRequestId()
-            + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");
-
         for (Iv2RepairLogResponseMessage log : logs) {
             send(message.m_sourceHSId, log);
         }
@@ -446,5 +606,68 @@ public class InitiatorMailbox implements Mailbox
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         if (m_joinProducer == null) return;
         m_joinProducer.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
+    }
+
+    //The new partition leader is notified by previous partition leader
+    //that previous partition leader has drained its txns
+    private void setBalanceSPIStatus(BalanceSPIMessage message) {
+
+        if (m_balanceSPIStatus == BALANCE_SPI_STATUS.NONE) {
+            //message comes before this site is promoted
+            m_balanceSPIStatus = BALANCE_SPI_STATUS.SRC_TXN_DRAINED;
+        } else if (m_balanceSPIStatus == BALANCE_SPI_STATUS.DEST_TXN_RESTART) {
+            //if the new leader has been promoted, stop restarting txns.
+            m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+        }
+
+        tmLog.info("Balance spi new leader " +
+                CoreUtils.hsIdToString(m_hsId) + " is notified by previous leader " +
+                CoreUtils.hsIdToString(message.getPriorLeaderHSID()) + ". status:" + m_balanceSPIStatus);
+    }
+
+    //the site for new partition leader
+    public void setBalanceSPIStatus(boolean spiBalanced) {
+        if (!spiBalanced) {
+            m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+            m_newLeaderHSID = Long.MIN_VALUE;
+            return;
+        }
+
+        //The previous leader has already drained all txns
+        if (m_balanceSPIStatus == BALANCE_SPI_STATUS.SRC_TXN_DRAINED) {
+            m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+            tmLog.info("Balance spi transactions on previous partition leader are drained. New leader:" +
+                            CoreUtils.hsIdToString(m_hsId) + " status:" + m_balanceSPIStatus);
+            return;
+        }
+
+        //Wait for the notification from old partition leader
+        m_balanceSPIStatus = BALANCE_SPI_STATUS.DEST_TXN_RESTART;
+        tmLog.info("Balance spi restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " status:" + m_balanceSPIStatus);
+    }
+
+    //Old master notifies new master that the transactions before the checkpoint on old master have been drained.
+    //Then new master can proceed to process transactions.
+    public void notifyNewLeaderOfTxnDone() {
+
+        //return quickly to avoid performance hit
+        if (m_newLeaderHSID == Long.MIN_VALUE ) {
+            return;
+        }
+
+        SpScheduler scheduler = (SpScheduler)m_scheduler;
+        if (!scheduler.txnDoneBeforeCheckPoint()) {
+            return;
+        }
+
+        BalanceSPIMessage message = new BalanceSPIMessage(m_hsId, m_newLeaderHSID);
+        send(message.getNewLeaderHSID(), message);
+
+        //reset status on the old partition leader
+        m_newLeaderHSID = Long.MIN_VALUE;
+        m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+
+        tmLog.info("Balance spi previous leader " + CoreUtils.hsIdToString(m_hsId) + " notifies new leader " +
+                CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_balanceSPIStatus);
     }
 }

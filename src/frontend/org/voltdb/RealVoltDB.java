@@ -1664,7 +1664,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     for (int hostId : failedHosts) {
                         CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
                     }
-
+                    CoreZK.removeSPIBalanceIndicator(m_messenger.getZK());
                     // If the current node hasn't finished rejoin when another
                     // node fails, fail this node to prevent locking up the
                     // system.
@@ -2108,6 +2108,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (em != null) { em.setupMaintenaceTasks(); }
 
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
+    }
+
+    public boolean isClusterCompelte() {
+        return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
+    }
+
+    // The latest joined host will take over partition leader migration.
+    private void scheduleBalanceSpiTask() {
+        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
+        if (disableSpiTask) {
+            hostLog.info("BalanceSPI task is not scheduled.");
+            return;
+        }
+        final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
+        final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "30"));
+        Runnable task = () -> {
+            //only works if the cluster is full
+            if (isClusterCompelte()) {
+                m_clientInterface.balanceSPI(interval, m_config.m_hostCount);
+            }
+        };
+        m_periodicWorks.add(scheduleWork(task, delay, interval, TimeUnit.SECONDS));
     }
 
     private void startHealthMonitor() {
@@ -3760,6 +3782,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else {
                 logRecoveryCompleted = true;
             }
+
             // Join creates a truncation snapshot as part of the join process,
             // so there is no need to wait for the truncation snapshot requested
             // above to finish.
@@ -3777,6 +3800,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_joining = false;
                 consoleLog.info(String.format("Node %s completed", actionName));
             }
+
+            //start balance spi task
+            scheduleBalanceSpiTask();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
@@ -3967,7 +3993,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData(m_catalogContext, m_messenger);
 
-            try {
+            // start balance spi task
+            scheduleBalanceSpiTask();
+
+             try {
                 if (m_adminListener != null) {
                     m_adminListener.start();
                 }

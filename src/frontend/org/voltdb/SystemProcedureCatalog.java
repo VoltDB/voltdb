@@ -196,6 +196,7 @@ public class SystemProcedureCatalog {
         builder.put("@CheckUpgradePlanNT",      new Config("org.voltdb.sysprocs.CheckUpgradePlanNT",       true,  false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false ));
         builder.put("@PrerequisitesCheckNT",    new Config("org.voltdb.sysprocs.CheckUpgradePlanNT$PrerequisitesCheckNT",
                                                                                                            false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false ));
+        builder.put("@BalanceSPI",              new Config("org.voltdb.sysprocs.BalanceSPI",               true,  true,  false, 0,    VoltType.BIGINT,    true,  true,  true,  false,     false,  false,            true  ));
         listing = builder.build();
     }
 }

@@ -47,7 +47,6 @@ import com.google_voltpatches.common.collect.Maps;
  */
 public class MpProcedureTask extends ProcedureTask
 {
-
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters
     // when we requeue this Task to for restart
@@ -69,7 +68,8 @@ public class MpProcedureTask extends ProcedureTask
         m_isRestart = isRestart;
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);
-        m_restartMasters.set(new ArrayList<Long>());
+        List<Long> copy = new ArrayList<Long>(pInitiators);
+        m_restartMasters.set(copy);
         m_restartMastersMap.set(new HashMap<Integer, Long>());
     }
 
@@ -103,6 +103,10 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        if ( hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + this + "\nLeaders:" + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
+        }
+
         final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
         if (traceLog != null) {
@@ -112,7 +116,6 @@ public class MpProcedureTask extends ProcedureTask
                                                        "txnId", TxnEgo.txnIdToString(getTxnId())));
         }
 
-        hostLog.debug("STARTING: " + this);
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txnState;
         // Check for restarting sysprocs
@@ -143,7 +146,10 @@ public class MpProcedureTask extends ProcedureTask
             completeInitiateTask(siteConnection);
             errorResp.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(errorResp);
-            hostLog.debug("SYSPROCFAIL: " + this);
+
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("SYSPROCFAIL: " + this);
+            }
             return;
         }
 
@@ -162,6 +168,11 @@ public class MpProcedureTask extends ProcedureTask
                     m_msg.isForReplay());
 
             restart.setTruncationHandle(m_msg.getTruncationHandle());
+            restart.setToLeader(true);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " +
+                        " updated masters: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
+            }
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
@@ -174,20 +185,40 @@ public class MpProcedureTask extends ProcedureTask
         // anyway, so not restarting the read is currently harmless.
         // We could actually restart this here, since we have the invocation, but let's be consistent?
         int status = response.getClientResponseData().getStatus();
-        if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {
-            if (!response.shouldCommit()) {
-                txn.setNeedsRollback(true);
+        if (status == ClientResponse.TXN_MISROUTED) {
+            if (m_msg.isReadOnly()) {
+                if (!response.shouldCommit()) {
+                    txn.setNeedsRollback(true);
+                }
+                completeInitiateTask(siteConnection);
+                response.m_sourceHSId = m_initiator.getHSId();
+                response.setMisrouted(m_msg.getStoredProcedureInvocation());
+                m_initiator.deliver(response);
+            } else {
+                restartTransaction();
             }
-            completeInitiateTask(siteConnection);
-            // Set the source HSId (ugh) to ourselves so we track the message path correctly
-            response.m_sourceHSId = m_initiator.getHSId();
-            m_initiator.deliver(response);
-            execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-            hostLog.debug("COMPLETE: " + this);
-        }
-        else {
-            restartTransaction();
-            hostLog.debug("RESTART: " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("[MpProcedureTask]MISROUTED-RESTART: " + this);
+            }
+        } else {
+            if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {
+                if (!response.shouldCommit()) {
+                    txn.setNeedsRollback(true);
+                }
+                completeInitiateTask(siteConnection);
+                // Set the source HSId (ugh) to ourselves so we track the message path correctly
+                response.m_sourceHSId = m_initiator.getHSId();
+                m_initiator.deliver(response);
+                execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("[MpProcedureTask]COMPLETE: " + this);
+                }
+            } else {
+                restartTransaction();
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("[MpProcedureTask]RESTART: " + this);
+                }
+            }
         }
 
         if (traceLog != null) {
@@ -231,7 +262,14 @@ public class MpProcedureTask extends ProcedureTask
                 m_msg.isForReplay());
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
-        m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
+        complete.setToLeader(true);
+        final List<Long> initiatorHSIds = new ArrayList<Long>();
+        if (((MpTransactionState)m_txnState).isFragmentRestarted()) {
+            initiatorHSIds.addAll(((MpTransactionState)m_txnState).getMasterHSIDs());
+        } else {
+            initiatorHSIds.addAll(m_initiatorHSIds);
+        }
+        m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());
     }

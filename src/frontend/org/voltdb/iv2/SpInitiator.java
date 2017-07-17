@@ -17,12 +17,16 @@
 
 package org.voltdb.iv2;
 
+import java.util.Arrays;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -38,10 +42,11 @@ import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
-
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -51,21 +56,44 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 public class SpInitiator extends BaseInitiator implements Promotable
 {
     final private LeaderCache m_leaderCache;
-    private boolean m_promoted = false;
     private final TickProducer m_tickProducer;
-
+    private boolean m_promoted = false;
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache)
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
-            for (Long HSId : cache.values()) {
-                if (HSId == getInitiatorHSId()) {
+            boolean isAlreadyLeader = m_initiatorMailbox.m_scheduler.m_isLeader;
+            String hsidStr = CoreUtils.hsIdToString(m_initiatorMailbox.getHSId());
+            if (cache != null && tmLog.isDebugEnabled()) {
+                tmLog.debug(hsidStr + " [SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
+                tmLog.debug(hsidStr + " [SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
+            }
+
+            Set<Long> leaders = Sets.newHashSet();
+            for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
+                Long HSId = entry.getValue().m_HSID;
+                leaders.add(HSId);
+                if (HSId == getInitiatorHSId()){
                     if (!m_promoted) {
-                        acceptPromotion();
+                        acceptPromotionImpl(entry.getValue().m_isBalanceSPIRequested);
                         m_promoted = true;
                     }
                     break;
+                }
+            }
+            //reset BalanceSPI status if it is already a leader
+            if (isAlreadyLeader) {
+                ((InitiatorMailbox)m_initiatorMailbox).setBalanceSPIStatus(false);
+            }
+
+            if (!leaders.contains(getInitiatorHSId())) {
+                m_promoted = false;
+                if (m_term != null) {
+                    m_term.shutdown();
+                }
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(CoreUtils.hsIdToString(getInitiatorHSId()) + " is not a partition leader.");
                 }
             }
         }
@@ -141,10 +169,13 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public void acceptPromotion()
+    public void acceptPromotion() {
+        acceptPromotionImpl(false);
+    }
+
+    private void acceptPromotionImpl(boolean balanceSPI)
     {
         try {
-
             long startTime = System.currentTimeMillis();
             Boolean success = false;
             m_term = createTerm(m_messenger.getZK(),
@@ -152,15 +183,13 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_whoami);
             m_term.start();
             while (!success) {
-                RepairAlgo repair =
-                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
 
                 // if rejoining, a promotion can not be accepted. If the rejoin is
                 // in-progress, the loss of the master will terminate the rejoin
                 // anyway. If the rejoin has transferred data but not left the rejoining
                 // state, it will respond REJOINING to new work which will break
                 // the MPI and/or be unexpected to external clients.
-                if (!m_initiatorMailbox.acceptPromotion()) {
+                if (!balanceSPI && !m_initiatorMailbox.acceptPromotion()) {
                     tmLog.error(m_whoami
                             + "rejoining site can not be promoted to leader. Terminating.");
                     VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
@@ -169,6 +198,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
+                RepairAlgo repair =
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, balanceSPI);
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
@@ -181,12 +212,23 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     tmLog.info(m_whoami
                              + "finished leader promotion. Took "
                              + (System.currentTimeMillis() - startTime) + " ms.");
-
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
-                    iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    if (balanceSPI) {
+                        String hsidStr = VoltZK.suffixHSIdsWithBalanceSPIRequest(m_initiatorMailbox.getHSId());
+                        iv2masters.put(m_partitionId,hsidStr);
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug("Site " + CoreUtils.hsIdToString(m_initiatorMailbox.getHSId()) +
+                                    " becomes new leader from SPI balance request.");
+                        }
+                    } else {
+                        iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+                    }
+
+                    m_initiatorMailbox.setBalanceSPIStatus(balanceSPI);
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -197,10 +239,15 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + "interrupted during leader promotion after "
                             + (System.currentTimeMillis() - startTime) + " ms. of "
                             + "trying. Retrying.");
+                    m_initiatorMailbox.setBalanceSPIStatus(false);
                 }
             }
             // Tag along and become the export master too
-            ExportManager.instance().acceptMastership(m_partitionId);
+            // leave the export on the former leader, now a replica
+            if (!balanceSPI) {
+                ExportManager.instance().acceptMastership(m_partitionId);
+            }
+            //m_isBalanceSPIRequested = false;
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
