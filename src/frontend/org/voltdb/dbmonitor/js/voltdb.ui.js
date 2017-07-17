@@ -2400,7 +2400,6 @@ var loadPage = function (serverName, portid) {
             var count = 0;
             var isMultiple= false;
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
-                //order items w.r.to latency
                 var latValue;
 
                 $("#generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
@@ -2439,20 +2438,35 @@ var loadPage = function (serverName, portid) {
 
     $("#showAnalysisFreqDetails").popup({
         open: function (event, ui, ele)  {
-
+            var statement = '';
+            var totalInvocations=0;
             var procedureName = $("#hidProcedureName").html().split(' ')[1];
             $(".procedureName").html(procedureName);
              //filter specific procedure calls from list of datas
-            var freqDetails = [];
+            var finalDetails = [];
+            var freqDetails = {};
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                 //order items w.r.to latency
                 var latValue;
                 $(".generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
                 if(item.PROCEDURE == procedureName ){
-                    freqDetails.push({"label": item.label , "value": item.INVOCATION})
+                    if (item.label == statement){
+                        totalInvocations += item.INVOCATION;
+                    }
+                    else{
+                        totalInvocations = item.INVOCATION;
+                    }
+
+                    freqDetails[item.label] = totalInvocations;
+
+                    statement = item.label;
+
                 }
             });
-            MonitorGraphUI.RefreshFrequencyDetailGraph(freqDetails);
+             for (var key in freqDetails){
+                finalDetails.push({"label": key,"value": freqDetails[key]})
+            }
+            MonitorGraphUI.RefreshFrequencyDetailGraph(finalDetails);
         }
     });
 
