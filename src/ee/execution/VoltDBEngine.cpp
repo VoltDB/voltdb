@@ -563,10 +563,10 @@ void VoltDBEngine::releaseUndoToken(int64_t undoToken) {
     }
     m_undoLog.release(undoToken);
 
-    if (m_executorContext->drStream() && m_executorContext->drStream()->drStreamStarted()) {
+    if (m_executorContext->drStream()) {
         m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
     }
-    if (m_executorContext->drReplicatedStream() && m_executorContext->drReplicatedStream()->drStreamStarted()) {
+    if (m_executorContext->drReplicatedStream()) {
         m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
     }
 }
@@ -2069,14 +2069,12 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         int64_t spHandle = taskInfo.readLong();
         ByteArray payloads = taskInfo.readBinaryString();
 
-        if ((type == DR_STREAM_START && !m_executorContext->drStream()->drStreamStarted())
-            || m_executorContext->drStream()->drStreamStarted()) {
+        if (type == DR_STREAM_START || m_executorContext->drStream()->drStreamStarted()) {
             m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
                                                            spHandle, uniqueId, payloads);
         }
         if (m_executorContext->drReplicatedStream() &&
-            ((type == DR_STREAM_START && !m_executorContext->drReplicatedStream()->drStreamStarted())
-             || m_executorContext->drReplicatedStream()->drStreamStarted())) {
+            (type == DR_STREAM_START || m_executorContext->drReplicatedStream()->drStreamStarted())) {
             m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
                                                                      spHandle, uniqueId, payloads);
         }
