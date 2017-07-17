@@ -85,6 +85,16 @@ CREATE TABLE kafkamirrortable1
 
 PARTITION TABLE kafkamirrortable1 ON COLUMN KEY;
 
+CREATE TABLE importNoMatch
+     (
+                  KEY   BIGINT NOT NULL ,
+                  value BIGINT NOT NULL ,
+                  streamNumber  BIGINT DEFAULT 0,
+                  CONSTRAINT pk_importNoMatch PRIMARY KEY ( KEY )
+     );
+
+PARTITION TABLE importNoMatch ON COLUMN KEY;
+
 CREATE TABLE kafkamirrortable2
     (
           key                     BIGINT        NOT NULL
