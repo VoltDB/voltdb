@@ -178,11 +178,11 @@ function loadAnalysisPage(){
 
 
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
-                if(VoltDbAnalysis.combinedDetail[item.PROCEDURE + '(' + item.STATEMENT + ')'] == undefined){
-                    VoltDbAnalysis.combinedDetail[item.PROCEDURE + '(' + item.STATEMENT + ')'] = [];
+                if(VoltDbAnalysis.combinedDetail[item.PROCEDURE] == undefined){
+                    VoltDbAnalysis.combinedDetail[item.PROCEDURE] = [];
                 }
 
-                VoltDbAnalysis.combinedDetail[item.PROCEDURE + '(' + item.STATEMENT + ')'].push({
+                VoltDbAnalysis.combinedDetail[item.PROCEDURE].push({
                     AVG: item.AVG_EXECUTION_TIME/1000000,
                     INVOCATIONS: item.INVOCATIONS,
                     PARTITION_ID : item.PARTITION_ID,

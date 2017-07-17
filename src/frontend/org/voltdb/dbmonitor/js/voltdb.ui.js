@@ -2387,6 +2387,7 @@ var loadPage = function (serverName, portid) {
         }
     });
 
+
     $("#showAnalysisDetails").popup({
         open: function (event, ui, ele)  {
             var procedureName = $("#hidProcedureName").html().split(' ')[1];
@@ -2475,25 +2476,39 @@ var loadPage = function (serverName, portid) {
             var procedureName = $("#hidProcedureName").html().split(' ')[1];
             $(".procedureName").html(procedureName);
              //filter specific procedure calls from list of datas
-            var combinedDetails = [];
+            var combinedDetails = {};
             var combinedWeight = 0;
             var sumOfEachProcedure = 0;
+            var statement = '';
+            var finalDetails = []
 
             for (var key in VoltDbAnalysis.combinedDetail){
                 var obj = VoltDbAnalysis.combinedDetail[key];
-                if(key.split('(')[0] == procedureName){
+                if(key == procedureName){
                     //Calculate sumOfEachProcedure
                     var sumOfEachProcedure = VoltDbUI.calculateCombinedDetailValue(obj);
                     obj.forEach(function(subItems){
-                        combinedWeight = (((subItems.AVG/1000000) * subItems.INVOCATIONS)/sumOfEachProcedure) * 100;
-                        combinedDetails.push({"label": subItems.STATEMENT + '(' + subItems.PARTITION_ID + ')' , "value": combinedWeight})
+                        if(subItems.STATEMENT == statement){
+                            combinedWeight += (((subItems.AVG/1000000) * subItems.INVOCATIONS)/sumOfEachProcedure) * 100;
+                        }
+                        else
+                        {
+                            combinedWeight = (((subItems.AVG/1000000) * subItems.INVOCATIONS)/sumOfEachProcedure) * 100;
+                        }
+                        statement = subItems.STATEMENT;
+                        combinedDetails[subItems.STATEMENT]= combinedWeight;
+
                         $(".generatedDate").html(VoltDbAnalysis.formatDateTime(subItems.TIMESTAMP));
                     })
+
+                    for (var key in combinedDetails){
+                        finalDetails.push({"label": key,"value": combinedDetails[key]})
+                    }
 
                 }
             }
 
-            MonitorGraphUI.RefreshCombinedDetailGraph(combinedDetails);
+            MonitorGraphUI.RefreshCombinedDetailGraph(finalDetails);
         }
     });
 
