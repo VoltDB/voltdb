@@ -97,12 +97,16 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     //
     // INLINE PROJECTION
     //
-    // We can set the projection node here.  But
-    // we can't optimize it until p_execute.  See
-    // the comment there for some insight.
-    //
     m_projectionNode = static_cast<ProjectionPlanNode*>
             (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    //
+    // Optimize the projection if we can.
+    //
+    if (m_projectionNode != NULL) {
+        m_projector = OptimizedProjector(m_projectionNode->getOutputColumnExpressions());
+        m_projector.optimize(m_projectionNode->getOutputTable()->schema(),
+                             m_node->getTargetTable()->schema());
+    }
 
     // For the moment we will not produce a plan with both an
     // inline aggregate and an inline insert node.  This just
@@ -201,29 +205,34 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     //
-    // INLINE PROJECTION
-    // The ordering here is tricky.
-    // 1.) We can look up the inline projection node any time.
-    // 2.) We need the projection node to get the input schema
-    //     correctly.
-    // 3.) We need the input schema to pass it to p_execute_init
-    //     to initialize the inline aggregate or insert node.
-    // 4.) We need to get the temp_tuple from the inline
-    //     aggregate or insert node, which must be initialized.
-    // 5.) We need the temp_tuple to be computed properly before
-    //     we can optimize the projector.
-    // This could all be done in p_init above, but it's not.
-    // It would be kind of fiddly to make that work correctly.
+    // Set the temp_tuple.  The data flow is:
+    //
+    //  scannedTable -+-> inline Project -+-> inline Node -+-> outputTable
+    //                |                   ^                ^
+    //                |                   |                |
+    //                V                   V                |
+    //                +-------------------+----------------+
+    // A tuple comes out of the scanned table, through the inline Project if
+    // there is one, through the inline Node, aggregate or insert, if there
+    // is one and into the output table.  The scanned table and the
+    // output table have their schemas and we can get a temp tuple from
+    // them if we need it.  The middle node, between the inline project
+    // and the inline Node, doesn't have a table.  So, in this case,
+    // we need to create a tuple with the appropriate schema.  This
+    // will be the output schema of the inline project node.  The tuple
+    // temp_tuple is exactly this tuple.
     //
     TableTuple temp_tuple;
 
     if (m_aggExec != NULL || m_insertExec != NULL) {
-        const TupleSchema * inputSchema = tableIndex->getTupleSchema();
+        const TupleSchema * temp_tuple_schema;
         if (m_projectionNode != NULL) {
-            inputSchema = m_projectionNode->getOutputTable()->schema();
+            temp_tuple_schema = m_projectionNode->getOutputTable()->schema();
+        } else {
+            temp_tuple_schema = tableIndex->getTupleSchema();
         }
         if (m_aggExec != NULL) {
-            temp_tuple = m_aggExec->p_execute_init(params, &pmp, inputSchema, m_outputTable, &postfilter);
+            temp_tuple = m_aggExec->p_execute_init(params, &pmp, temp_tuple_schema, m_outputTable, &postfilter);
         } else {
             // We may actually find out during initialization
             // that we are done.  The p_execute_init function
@@ -242,8 +251,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // tuple which the inline insert will be
             // happy with.  The p_execute_init knows
             // how to do this.  Note that temp_tuple will
-            // be initialized if this returns false.
-            if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable, temp_tuple)) {
+            // not be initialized if this returns false.
+            if (m_insertExec->p_execute_init(temp_tuple_schema, m_tmpOutputTable, temp_tuple)) {
                 return true;
             }
             // We should have as many expressions in the
@@ -255,15 +264,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     } else {
         temp_tuple = m_outputTable->tempTuple();
-    }
-
-    //
-    // Optimize the projection if we can.
-    //
-    if (m_projectionNode != NULL) {
-        m_projector = OptimizedProjector(m_projectionNode->getOutputColumnExpressions());
-        m_projector.optimize(m_projectionNode->getOutputTable()->schema(),
-                             m_node->getTargetTable()->schema());
     }
 
     // Short-circuit an empty scan
