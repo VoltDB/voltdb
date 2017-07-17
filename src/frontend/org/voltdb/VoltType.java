@@ -309,7 +309,7 @@ public enum VoltType {
             // Normally, only compatible NON-ARRAY types are listed,
             // but byte array is included here as the special case
             // most suitable representation of VARBINARY.
-            new Class[] {byte[].class, },
+            new Class[] {byte[].class, Byte[].class},
             byte[][].class,
             'l',
             java.sql.Types.VARBINARY,  // java.sql.Types DATA_TYPE
