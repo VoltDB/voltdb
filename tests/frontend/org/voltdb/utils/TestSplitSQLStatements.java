@@ -139,6 +139,20 @@ public class TestSplitSQLStatements {
               + "select * from r where f = 'begin' or f = 'END';"
               + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        // multiple multi stmt procs
+        sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
+                + "SELECT * from t; end;";
+        checkSplitter(sql + sql, sql.substring(0, sql.length() - 1), sql.substring(0, sql.length() - 1));
+
+        // new line after first statement in the multi stmt proc
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "select * from t;\n"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
     }
 
     @Test
