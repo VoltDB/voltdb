@@ -3709,7 +3709,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             if (m_producerDRGateway != null && !m_producerDRGateway.isStarted()) {
                 // Initialize DR producer and consumer start listening on the DR ports
-                hostLog.info("Initializing DRProducer");
                 initializeDRProducer();
                 createDRConsumerIfNeeded();
                 prepareReplication();
