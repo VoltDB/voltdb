@@ -1580,6 +1580,8 @@ public class Tokens {
     static final int X_OPTION      = 731;
     static final int X_REPEAT      = 732;
     static final int X_POS_INTEGER = 733;
+    // Arbitrary number of expressions.
+    static final int X_ARBITRARY   = 742;
 
     //
     public static final int X_VALUE                    = 734;
