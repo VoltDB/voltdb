@@ -172,6 +172,13 @@ public class TestSplitSQLStatements {
                 + "select * from r where f = 'foo';"
                 + "end";
         checkSplitter(sql, sql);
+
+        sql = "create procedure p as begin "
+                + "select emptycase from R; "
+                + "select caseofbeer from R; "
+                + "select suitcaseofbeer from R; "
+                + "end";
+        checkSplitter(sql, sql);
     }
 
     @Test
