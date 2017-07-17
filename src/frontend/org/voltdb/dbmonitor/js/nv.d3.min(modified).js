@@ -827,16 +827,6 @@
 
                         trowEnter3.append("td")
                             .html(VoltDbAnalysis.latencyDetail[d.data.label].INVOCATIONS);
-
-                    var trowEnter4 = tbodyEnter
-                        .append("tr");
-
-                        trowEnter4.append("td")
-                        .html("Partition ID")
-
-                        trowEnter4.append("td")
-                            .html(VoltDbAnalysis.latencyDetail[d.data.label].PARTITION_ID);
-
                 }
 
                 var html = table.node().outerHTML;
