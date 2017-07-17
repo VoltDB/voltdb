@@ -32,6 +32,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
@@ -265,9 +266,6 @@ public class QueryPlanner {
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
                                                    m_paramzInfo.paramLiteralValues);
                 if (plan != null) {
-                    if (m_isUpsert) {
-                        replacePlanForUpsert(plan);
-                    }
                     if (plan.extractParamValues(m_paramzInfo)) {
                         return plan;
                     }
@@ -298,19 +296,7 @@ public class QueryPlanner {
             throw new PlanningErrorException(m_recentErrorMsg);
         }
 
-        if (m_isUpsert) {
-            replacePlanForUpsert(plan);
-        }
         return plan;
-    }
-
-    private static void replacePlanForUpsert (CompiledPlan plan) {
-        plan.rootPlanGraph = replaceInsertPlanNodeWithUpsert(plan.rootPlanGraph);
-        plan.subPlanGraph  = replaceInsertPlanNodeWithUpsert(plan.subPlanGraph);
-
-        if (plan.explainedPlan != null) {
-            plan.explainedPlan = plan.explainedPlan.replace("INSERT", "UPSERT");
-        }
     }
 
     /**
@@ -436,7 +422,11 @@ public class QueryPlanner {
         // Execute the generateOutputSchema and resolveColumnIndexes once for the best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
-
+        // Now that the plan is all together we
+        // can compute the best selection microoptimizations.
+        MicroOptimizationRunner.applyAll(bestPlan,
+                                         parsedStmt,
+                                         MicroOptimizationRunner.Phases.AFTER_COMPLETE_PLAN_ASSEMBLY);
         if (parsedStmt instanceof ParsedSelectStmt) {
             List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
             ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
@@ -483,20 +473,6 @@ public class QueryPlanner {
 
         plan.subPlanGraph = sendNode;
         return;
-    }
-
-    public static AbstractPlanNode replaceInsertPlanNodeWithUpsert(AbstractPlanNode root) {
-        if (root == null) {
-            return null;
-        }
-
-        List<AbstractPlanNode> inserts = root.findAllNodesOfType(PlanNodeType.INSERT);
-        if (inserts.size() == 1) {
-            InsertPlanNode insertNode = (InsertPlanNode)inserts.get(0);
-            insertNode.setUpsert(true);
-        }
-
-        return root;
     }
 
     private String getOriginalSql() {

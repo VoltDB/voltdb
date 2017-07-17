@@ -26,7 +26,6 @@
 #include <queue>
 #include <vector>
 #include <deque>
-#include <sstream>
 #include "harness.h"
 
 #include "common/executorcontext.hpp"
@@ -61,18 +60,21 @@ public:
         m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool,
                                         noEngine, "", 0, NULL, NULL, 0);
 
-        std::vector<std::string> columnNames;
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
-        ostringstream os;
+        std::vector<std::string> columnNames;
+        //Five columns
+        columnNames.push_back("one");
+        columnNames.push_back("two");
+        columnNames.push_back("three");
+        columnNames.push_back("four");
+        columnNames.push_back("five");
         for (int i = 0; i < COLUMN_COUNT; i++) {
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             columnAllowNull.push_back(false);
-            os.str(""); os << std::dec << i;
-            columnNames.push_back(os.str());
         }
         m_schema =
           TupleSchema::createTupleSchemaForTest(columnTypes,
@@ -91,7 +93,7 @@ public:
 
         // a simple helper around the constructor that sets the
         // wrapper buffer size to the specified value
-        m_table = StreamedTable::createForTest(1024, m_context, m_schema, columnNames, false);
+        m_table = StreamedTable::createForTest(1024, m_context, m_schema, columnNames);
     }
 
     void nextQuantum(int i, int64_t tokenOffset)
