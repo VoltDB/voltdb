@@ -67,6 +67,7 @@ function server-init() {
     voltdb start -H "$STARTUPLEADERHOST"
 }
 
+# Load the schema
 function load() {
     sqlcmd < schema.sql
 }
