@@ -3637,7 +3637,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 	margin:1px 2px -1px 0;
 }
 
-.proDetailsHeightAdjstment {height:400px; /*overflow-x:hidden;*/ overflow-y:auto; width:750px;}
+.proDetailsHeightAdjstment {height:400px; overflow-x:hidden; overflow-y:auto;}
 .proDetailsBarDiagram { margin:0; padding:0;height:400px; width:850px;}
 .generateDate { background-color:#f0f0f0; padding: 5px 0;}
 .generateproDetails { float:right;padding-right: 85px; }
@@ -3656,7 +3656,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .partitioned .rightPart input[type="text"], .replicated .rightRep input[type="text"] { width: 50px; padding: 0 0 0 3px;}
 .overlay-content-proc-detail {
     padding: 20px;
-    min-width: 450px;
+    min-width: 750px;
     height: auto;
     overflow-y: auto;
     overflow-x: hidden;
