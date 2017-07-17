@@ -52,7 +52,7 @@ class MiniSite extends Thread implements MeshAide
     Set<Long> m_currentHSIds = new HashSet<Long>();
     Set<Long> m_failedHSIds = new HashSet<Long>();
     Random m_rand;
-    final private static int MAX_INJECTED_DELAY = 10; // in milliseconds, for error injection only
+    final private static int MAX_INJECTED_DELAY = 50; // in milliseconds, larger if you want to simulate slow network
 
     MiniSite(Mailbox mbox, Set<Long> HSIds, DisconnectFailedHostsCallback callback,
             VoltLogger logger, long givenSeed)
