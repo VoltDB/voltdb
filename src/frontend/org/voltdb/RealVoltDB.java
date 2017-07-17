@@ -168,6 +168,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
+import org.voltdb.utils.FailedLoginCounter;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
@@ -358,6 +359,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     boolean m_durable = false;
 
     private int m_maxThreadsCount;
+
+    private FailedLoginCounter m_counter = new FailedLoginCounter();
 
     @Override
     public boolean isRunningWithOldVerbs() {
@@ -4578,4 +4581,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         hostLog.error(sb.toString());
     }
+
+	public FailedLoginCounter getFailedLoginCounter() {
+		return m_counter;
+	}
+
+	public void setFailedLoginCounter(FailedLoginCounter counter) {
+		m_counter = counter;
+	}
 }

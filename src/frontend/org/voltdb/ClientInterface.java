@@ -95,6 +95,7 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.security.AuthenticationRequest;
+import org.voltdb.utils.FailedLoginCounter;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
@@ -705,6 +706,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 boolean authenticated = arq.authenticate(hashScheme, socket.socket().getRemoteSocketAddress().toString());
 
                 if (!authenticated) {
+                	FailedLoginCounter counter = ((RealVoltDB)VoltDB.instance()).getFailedLoginCounter();
+                	long timestamp = System.currentTimeMillis();
+                	counter.logMessage(timestamp, username);
+                	((RealVoltDB)VoltDB.instance()).setFailedLoginCounter(counter);
+                	int count = counter.getCount(username);
+
                     Exception faex = arq.getAuthenticationFailureException();
 
                     boolean isItIo = false;
@@ -717,7 +724,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                  "):", faex);
                     } else {
                         authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                                     "): user " + username + " failed authentication.");
+                                     "): user " + username + " failed authentication. " + count + " times in the last minute.");
                     }
                     //Send negative response
                     if (!isItIo) {
