@@ -71,7 +71,6 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     StreamedTable * st = new StreamedTable(true);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
     st->m_wrapper->setDefaultCapacity(wrapperBufSize);
-    st->initializeWithColumns(schema, columnNames, takeOwnership);
     return st;
 }
 
