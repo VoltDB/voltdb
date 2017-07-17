@@ -401,6 +401,10 @@ def do_main():
 
                 delete_proc(pfile)
 
+                # delete files after use
+                os.remove(os.path.join(parent, prefix + '.out' + '.procedure'))
+                os.remove(os.path.join(parent, prefix + '.err' + '.procedure'))
+
                 #  delete table and views
                 childout.flush()
                 childerr.flush()
@@ -417,6 +421,10 @@ def do_main():
                 pfile = file(os.path.join(parent, prefix + '.out' + '.table'), 'r')
 
                 delete_table_and_view(pfile)
+
+                # delete files after use
+                os.remove(os.path.join(parent, prefix + '.out' + '.table'))
+                os.remove(os.path.join(parent, prefix + '.err' + '.table'))
 
 
                 # fuzz the sqlcmd output for reliable comparison
