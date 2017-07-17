@@ -20,6 +20,7 @@
 from voltcli.hostinfo import Host
 from voltcli.hostinfo import Hosts
 from voltcli import utility
+import sys
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -69,3 +70,5 @@ def stop(runner):
                                     [thost.id],
                                     check_status=False)
         print response
+        if response.status() != 1:  # not SUCCESS
+            sys.exit(1)
