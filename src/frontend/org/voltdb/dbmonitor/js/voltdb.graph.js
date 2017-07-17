@@ -632,7 +632,10 @@
         }
 
         this.RefreshAnalysisLatencyGraph = function(dataLatency, dataFrequency){
+            ChartLatencyAnalysis.update;
             getBarHeightAndSpacing(dataLatency, ChartLatencyAnalysis);
+            ChartLatencyAnalysis.height(barHeight);
+            $("#chartLatencyAnalysis").css("height", barHeight-10);
             dataLatencyAnalysis[0]["values"] = dataLatency;
             d3.select("#visualiseLatencyAnalysis")
                 .datum(dataLatencyAnalysis)
@@ -643,7 +646,8 @@
         this.RefreshAnalysisFrequencyGraph = function(dataFrequency){
             ChartFrequencyAnalysis.update;
             getBarHeightAndSpacing(dataFrequency, ChartFrequencyAnalysis);
-
+            ChartFrequencyAnalysis.height(barHeight);
+            $("#chartFrequencyAnalysis").css("height", barHeight-10);
             dataFrequencyAnalysis[0]["values"] = dataFrequency;
             d3.select("#visualiseFrequencyAnalysis")
                 .datum(dataFrequencyAnalysis)
@@ -654,7 +658,8 @@
         this.RefreshAnalysisCombinedGraph = function(dataCombined){
             ChartCombinedAnalysis.update;
             getBarHeightAndSpacing(dataCombined, ChartCombinedAnalysis);
-
+            ChartCombinedAnalysis.height(barHeight);
+            $("#chartCombinedAnalysis").css("height", barHeight-10);
             dataCombinedAnalysis[0]["values"] = dataCombined;
             d3.select("#visualiseCombinedAnalysis")
                 .datum(dataCombinedAnalysis)
@@ -667,7 +672,8 @@
         this.RefreshLatencyDetailGraph = function(dataLatency){
             ChartLatencyDetailAnalysis.update;
             getBarHeightAndSpacing(dataLatency, ChartLatencyDetailAnalysis);
-
+            ChartLatencyDetailAnalysis.height(barHeight);
+            $("#divVisualizeLatencyDetail").css("height", barHeight-10);
             dataLatencyDetailAnalysis[0]["values"] = dataLatency;
             d3.select("#visualizeLatencyDetail")
                 .datum(dataLatencyDetailAnalysis)
@@ -678,7 +684,8 @@
         this.RefreshFrequencyDetailGraph = function(freqDetails){
             ChartFrequencyDetailAnalysis.update;
             getBarHeightAndSpacing(freqDetails, ChartFrequencyDetailAnalysis);
-
+            ChartFrequencyDetailAnalysis.height(barHeight);
+            $("#divVisualizeFreqDetail").css("height", barHeight-10);
             dataFrequencyDetailAnalysis[0]["values"] = freqDetails;
             d3.select("#visualizeFrequencyDetails")
                 .datum(dataFrequencyDetailAnalysis)
@@ -689,7 +696,8 @@
         this.RefreshCombinedDetailGraph = function(dataCombined){
             ChartCombinedDetailAnalysis.update;
             getBarHeightAndSpacing(dataCombined, ChartCombinedDetailAnalysis);
-
+            ChartCombinedDetailAnalysis.height(barHeight);
+            $("#divVisualizeCombinedDetail").css("height", barHeight-10);
             dataCombinedDetailAnalysis[0]["values"] = dataCombined;
             d3.select("#visualizeCombinedDetails")
                 .datum(dataCombinedDetailAnalysis)
