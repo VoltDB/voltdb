@@ -810,8 +810,13 @@
                     trowEnter1.append("td")
                     .html("Min Execution Time")
 
+                    var statement = d.data.label;
+                    if(statement.indexOf(')') !== -1){
+                        statement = d.data.label.split(') ')[1]
+                    }
+
                     trowEnter1.append("td")
-                        .html(VoltDbAnalysis.latencyDetail[d.data.label.split(') ')[1]].MIN + " ms");
+                        .html(VoltDbAnalysis.latencyDetail[statement].MIN + " ms");
 
                     var trowEnter2 = tbodyEnter
                         .append("tr");
@@ -820,7 +825,7 @@
                         .html("Max Execution Time")
 
                         trowEnter2.append("td")
-                            .html(VoltDbAnalysis.latencyDetail[d.data.label.split(') ')[1]].MAX + " ms");
+                            .html(VoltDbAnalysis.latencyDetail[statement].MAX + " ms");
 
                     var trowEnter3 = tbodyEnter
                         .append("tr");
@@ -828,8 +833,10 @@
                         trowEnter3.append("td")
                         .html("Invocations")
 
+
+
                         trowEnter3.append("td")
-                            .html(VoltDbAnalysis.latencyDetail[d.data.label.split(') ')[1]].INVOCATIONS);
+                            .html(VoltDbAnalysis.latencyDetail[statement].INVOCATIONS);
                 }
 
                 var html = table.node().outerHTML;
