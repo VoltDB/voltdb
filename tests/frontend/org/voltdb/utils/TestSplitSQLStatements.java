@@ -116,13 +116,14 @@ public class TestSplitSQLStatements {
         checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end",
                 "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end");
 
+        String sql1 = "abc";
         sql = "SELECT a, "
                 + "CASE WHEN a > 100.00 "
                 + "THEN 'Expensive'"
                 + "ELSE 'Cheap'"
                 + "END "
-                + "FROM t";
-        checkSplitter(sql, sql);
+                + "FROM t;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length()-1), sql1);
 
         sql = "SELECT a, "
                 + "CASE WHEN a > 100.00 "
@@ -130,7 +131,7 @@ public class TestSplitSQLStatements {
                 + "ELSE 'Cheap'"
                 + "END "
                 + "FROM t;";
-        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
 
         sql = "create procedure thisproc as "
               + "begin "
@@ -138,7 +139,7 @@ public class TestSplitSQLStatements {
               + "select * from r where f = 'foo';"
               + "select * from r where f = 'begin' or f = 'END';"
               + "end;";
-        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
 
         // multiple multi stmt procs
         sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
@@ -152,7 +153,7 @@ public class TestSplitSQLStatements {
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'begin' or f = 'END';"
                 + "end;";
-        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
 
         // semi colon in quoted string
         sql = "create procedure thisproc as "
@@ -160,8 +161,8 @@ public class TestSplitSQLStatements {
                 + "select * from t;"
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'beg;in' or f = 'END;';"
-                + "end";
-        checkSplitter(sql, sql);
+                + "end;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
 
         // partition clause
         sql = "create procedure thisproc "
@@ -170,36 +171,50 @@ public class TestSplitSQLStatements {
                 + "begin "
                 + "select * from t;"
                 + "select * from r where f = 'foo';"
-                + "end";
-        checkSplitter(sql, sql);
+                + "end;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
 
         sql = "create procedure p as begin "
                 + "select emptycase from R; "
                 + "select caseofbeer from R; "
                 + "select suitcaseofbeer from R; "
-                + "end";
-        checkSplitter(sql, sql);
+                + "end;";
+        checkSplitter(sql + sql1, sql.substring(0, sql.length() - 1), sql1);
 
         // begin as table name
         sql = "create procedure p as begin "
                 + "select emptycase from begin; "
                 + "select caseofbeer from R; "
-                + "end";
-        checkSplitter(sql, sql);
+                + "end;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
 
         // begin as column name
         sql = "create procedure p as begin "
                 + "select emptycase from S; "
                 + "select begin from R; "
-                + "end";
-        checkSplitter(sql, sql);
+                + "end;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
 
         // begin as table and column name
         sql = "create procedure p as begin "
                 + "select begin.begin from begin; "
                 + "select emptycase from R; "
-                + "end";
-        checkSplitter(sql, sql);
+                + "end;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
+
+//        // end as table name
+//        sql = "create procedure p as begin "
+//                + "select emptycase from end; "
+//                + "select caseofbeer from R; "
+//                + "end";
+//        checkSplitter(sql, sql);
+//
+//        // end as column name
+//        sql = "create procedure p as begin "
+//                + "select end from begin; "
+//                + "select caseofbeer from R; "
+//                + "end";
+//        checkSplitter(sql, sql);
     }
 
     @Test
