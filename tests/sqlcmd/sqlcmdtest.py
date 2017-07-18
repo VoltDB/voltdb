@@ -266,7 +266,6 @@ def compare_cleaned_to_baseline(parent, baseparent, path, inpath, do_refresh, re
     return False
 
 def delete_proc(pfile):
-    print "delete procedures .."
     procset = set()
     for line in pfile:
         columns = line.split(',')
@@ -282,15 +281,26 @@ def delete_proc(pfile):
             pass
 
     if len(procset) :
+        childin = open(('batchsql.ddl'), 'w+')
+        childin.write('file -inlinebatch EOB'+ '\n' + '\n')
         for procname in procset:
             print procname
-            sqlcmdopt = '--query=drop procedure ' + procname + ' if exists'
-            subprocess.call(['../../bin/sqlcmd', sqlcmdopt])
-            #print "dropped procedure :" + procname
+            sqlcmdopt = 'DROP PROCEDURE ' + procname + ' IF EXISTS;'
+            childin.write(sqlcmdopt+ '\n')
+        childin.write('\n'+ 'EOB' + '\n')
+        childin.close()
+
+
+        childin = open('batchsql.ddl', 'r')
+        childout = open(('batchsql.ddl.out'), 'w+')
+        childerr = open(('batchsql.ddl.err'), 'w+')
+        print "Running subprocess.."
+        subprocess.call(['../../bin/sqlcmd'],
+                        stdin=childin, stdout=childout, stderr=childerr)
+
 
 
 def delete_table_and_view(pfile):
-    print "drop table and views .."
     tableset = set()
     for line in pfile:
         columns = line.split(',')
@@ -302,11 +312,21 @@ def delete_table_and_view(pfile):
             pass
 
     if len(tableset) :
+        childin = open(('batchsql.ddl'), 'w+')
+        childin.write('file -inlinebatch EOB'+ '\n' + '\n')
         for tablename in tableset:
             print tablename
-            sqlcmdopt = '--query=drop table ' + tablename + ' if exists cascade'
-            subprocess.call(['../../bin/sqlcmd', sqlcmdopt])
-            #print "dropped table :" + tablename
+            sqlcmdopt = 'DROP TABLE ' + tablename + ' IF EXISTS CASCADE;'
+            childin.write(sqlcmdopt+ '\n')
+        childin.write('\n'+ 'EOB' + '\n')
+        childin.close()
+
+        childin = open('batchsql.ddl', 'r')
+        childout = open(('batchsql.ddl.out'), 'w+')
+        childerr = open(('batchsql.ddl.err'), 'w+')
+        print "Running subprocess.."
+        subprocess.call(['../../bin/sqlcmd'],
+                        stdin=childin, stdout=childout, stderr=childerr)
 
 
 def do_main():
