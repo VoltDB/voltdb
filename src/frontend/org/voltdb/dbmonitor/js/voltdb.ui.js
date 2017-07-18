@@ -2387,7 +2387,6 @@ var loadPage = function (serverName, portid) {
         }
     });
 
-
     $("#showAnalysisDetails").popup({
         open: function (event, ui, ele)  {
             var procedureName = $("#hidProcedureName").html().split(' ')[1];
@@ -2403,6 +2402,7 @@ var loadPage = function (serverName, portid) {
             var i =0;
             var containLongName = false;
 
+
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                 var newStatement = '';
                 var latValue;
@@ -2417,7 +2417,7 @@ var loadPage = function (serverName, portid) {
                         newStatement = item.STATEMENT;
                     }
 
-                    if (newStatement.split(') ')[1] == statement.split(') ')[1]){
+                    if (newStatement == statement){
 
                         avg += item.value;
                         isMultiple = true;
@@ -2502,8 +2502,11 @@ var loadPage = function (serverName, portid) {
                     if(containLongName){
                         newStatement = (i + 1) + ") " + item.STATEMENT;
                     }
+                    else{
+                        newStatement = item.STATEMENT;
+                    }
 
-                    if (newStatement.split(') ')[1] == statement.split(') ')[1]){
+                    if (newStatement == statement){
                         totalInvocations += item.INVOCATION;
                     }
                     else{
@@ -2545,19 +2548,18 @@ var loadPage = function (serverName, portid) {
             var finalDetails = [];
             var i=0;
             var containLongName = false;
-            debugger;
             for (var key in VoltDbAnalysis.combinedDetail){
 
                 var newStatement = '';
                 var obj = VoltDbAnalysis.combinedDetail[key];
                 if(key == procedureName){
-                    debugger;
                     containLongName = checkObjForLongStatementName(obj, procedureName);
                     if(containLongName){
                         newStatement = (i + 1) + ") " + VoltDbAnalysis.combinedDetail[key].STATEMENT;
                     }
                     //Calculate sumOfEachProcedure
                     var sumOfEachProcedure = VoltDbUI.calculateCombinedDetailValue(obj);
+
                     obj.forEach(function(subItems){
 
                         if(subItems.STATEMENT == statement){
