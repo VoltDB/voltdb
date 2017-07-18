@@ -201,20 +201,6 @@ public class TestSplitSQLStatements {
                 + "select emptycase from R; "
                 + "end;";
         checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
-
-//        // end as table name
-//        sql = "create procedure p as begin "
-//                + "select emptycase from end; "
-//                + "select caseofbeer from R; "
-//                + "end";
-//        checkSplitter(sql, sql);
-//
-//        // end as column name
-//        sql = "create procedure p as begin "
-//                + "select end from begin; "
-//                + "select caseofbeer from R; "
-//                + "end";
-//        checkSplitter(sql, sql);
     }
 
     @Test
