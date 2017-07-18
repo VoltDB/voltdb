@@ -25,6 +25,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -706,12 +707,31 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 boolean authenticated = arq.authenticate(hashScheme, socket.socket().getRemoteSocketAddress().toString());
 
                 if (!authenticated) {
-                	FailedLoginCounter counter = ((RealVoltDB)VoltDB.instance()).getFailedLoginCounter();
-                	long timestamp = System.currentTimeMillis();
-                	counter.logMessage(timestamp, username);
-                	((RealVoltDB)VoltDB.instance()).setFailedLoginCounter(counter);
-                	int count = counter.getCount(username);
-
+                    FailedLoginCounter[] FLCArray = ((RealVoltDB)VoltDB.instance()).getFLCArray();
+                    int bucket = (int) (Thread.currentThread().getId() % 128);
+                    FailedLoginCounter counter = null;
+                    if (FLCArray[bucket] != null) {
+                        counter = FLCArray[bucket];
+                    } else {
+                        counter = new FailedLoginCounter();
+                    }
+                    long timestamp = System.currentTimeMillis();
+                    for (FailedLoginCounter ctr: FLCArray) {
+                        try {
+                            if (ctr != null) {
+                                ctr.checkCounter(timestamp);
+                            }
+                        } catch (ParseException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+                    }
+                    counter.logMessage(timestamp, username);
+                    FLCArray[bucket] = counter;
+                    int count = 0;
+                    System.out.println("Before: count is " + count);
+                    count = loopArray(FLCArray, username);
+                    System.out.println("After: count is " + count);
                     Exception faex = arq.getAuthenticationFailureException();
 
                     boolean isItIo = false;
@@ -764,6 +784,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             responseBuffer.put(buildString).flip();
             messagingChannel.writeMessage(responseBuffer);
             return handler;
+        }
+
+        private int loopArray(FailedLoginCounter[] fLCArray, String user) {
+            int res = 0;
+            for (FailedLoginCounter ctr: fLCArray) {
+                if (ctr != null) {
+                    res += ctr.getCount(user);
+                }
+            }
+            return res;
         }
     }
 
