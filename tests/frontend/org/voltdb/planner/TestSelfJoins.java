@@ -47,7 +47,10 @@ public class TestSelfJoins  extends PlannerTestCase {
 
     public void testSelfJoin() {
         AbstractPlanNode pn = compile("select * FROM R1 A JOIN R1 B ON A.C = B.C WHERE B.A > 0 AND A.C < 3");
-        pn = pn.getChild(0).getChild(0);
+        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof NestLoopPlanNode);
         assertEquals(4, pn.getOutputSchema().getColumns().size());
         assertEquals(2, pn.getChildCount());
@@ -65,7 +68,10 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, ss.getPredicate().getExpressionType());
 
         pn = compile("select * FROM R1 JOIN R1 B ON R1.C = B.C");
-        pn = pn.getChild(0).getChild(0);
+        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof NestLoopPlanNode);
         assertEquals(4, pn.getOutputSchema().getColumns().size());
         assertEquals(2, pn.getChildCount());
@@ -81,7 +87,10 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals("B", ss.getTargetTableAlias());
 
         pn = compile("select A.A, A.C, B.A, B.C FROM R1 A JOIN R1 B ON A.C = B.C");
-        pn = pn.getChild(0).getChild(0);
+        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof NestLoopPlanNode);
         assertEquals(4, pn.getOutputSchema().getColumns().size());
 
@@ -102,7 +111,10 @@ public class TestSelfJoins  extends PlannerTestCase {
         // A.A > 1 Outer Join Expr stays at the the NLJ as pre-join predicate
         // B.A < 0 Inner Join Expr is pushed down to the inner SeqScan node
         AbstractPlanNode pn = compile("select * FROM R1 A LEFT JOIN R1 B ON A.C = B.C AND A.A > 1 AND B.A < 0");
-        pn = pn.getChild(0).getChild(0);
+        pn = pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof NestLoopPlanNode);
         NestLoopPlanNode nl = (NestLoopPlanNode) pn;
         assertNotNull(nl.getPreJoinPredicate());
@@ -162,7 +174,10 @@ public class TestSelfJoins  extends PlannerTestCase {
         apn = compile("select * FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 ORDER BY B.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Some day, the wasteful projection node will not be here to skip.
-        pn = apn.getChild(0).getChild(0);
+        pn = apn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         nlij = (NestLoopIndexPlanNode) pn;
         assertNull(nlij.getPreJoinPredicate());
@@ -185,7 +200,10 @@ public class TestSelfJoins  extends PlannerTestCase {
         apn = compile("select * FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 ORDER BY B.A, B.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Some day, the wasteful projection node will not be here to skip.
-        pn = apn.getChild(0).getChild(0);
+        pn = apn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn instanceof NestLoopIndexPlanNode);
@@ -210,7 +228,10 @@ public class TestSelfJoins  extends PlannerTestCase {
         apn = compile("select * FROM R2 A, R2 B WHERE A.A = B.A AND B.A > 1 ORDER BY B.A, B.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Some day, the wasteful projection node will not be here to skip.
-        pn = apn.getChild(0).getChild(0);
+        pn = apn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         nlij = (NestLoopIndexPlanNode) pn;
         assertNull(nlij.getPreJoinPredicate());
@@ -257,7 +278,10 @@ public class TestSelfJoins  extends PlannerTestCase {
         apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 GROUP BY B.A, B.C ORDER BY B.A, B.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Some day, the wasteful projection node will not be here to skip.
-        pn = apn.getChild(0).getChild(0);
+        pn = apn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
         assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));

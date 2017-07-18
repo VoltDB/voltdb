@@ -64,7 +64,7 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     @Option(desc = "Default port for VoltDB servers.")
     public String port = "";
 
-    @Option(desc = "Comma separated list of VoltDB servers (host[:port]) to connect to.")
+    @Option(shortOpt = "H", desc = "Comma separated list of VoltDB servers (host[:port]) to connect to.")
     public String host = "";
 
     @Option(shortOpt = "s", desc = "Comma separated list of VoltDB servers (host[:port]) to connect to. Deprecated; use 'host' instead.")
@@ -89,7 +89,7 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     public String formatter = "";
 
     @Option(desc = "Batch size for writing to VoltDB.")
-    public int batchsize = 200;
+    public int batch = 200;
 
     @AdditionalArgs(desc = "Insert the data into this table.")
     public String table = "";
@@ -97,11 +97,11 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     @Option(desc = "Use upsert instead of insert.", hasArg = false)
     public boolean update = false;
 
-    @Option(desc = "Enable SSL, optionally provide configuration file.")
+    @Option(desc = "Enable SSL connection to Volt, optionally provide configuration file.")
     public String ssl = "";
 
     @Option(desc = "Kafka time-based commit policy interval in milliseconds.  Default is to use manual offset commit.")
-    public String commitPolicy = "";
+    public String commitpolicy = "";
 
     @Option(shortOpt = "k", desc = "Number of Kafka Topic Partitions. Deprecated; value is ignored.")
     int kpartitions = 0;
@@ -196,7 +196,7 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
     @Override
     public void validate() {
 
-        if (batchsize < 0) {
+        if (batch < 0) {
             exitWithMessageAndUsage("batch size number must be >= 0");
         }
         if (flush <= 0) {
@@ -224,8 +224,8 @@ public class KafkaExternalLoaderCLIArguments extends CLIConfig {
             update = false;
             exitWithMessageAndUsage("update is not applicable when stored procedure specified");
         }
-        if (commitPolicy.trim().isEmpty()) {
-            commitPolicy = KafkaImporterCommitPolicy.NONE.name();
+        if (commitpolicy.trim().isEmpty()) {
+            commitpolicy = KafkaImporterCommitPolicy.NONE.name();
         }
         if (!servers.trim().isEmpty()) {
             if (!host.trim().isEmpty()) {
