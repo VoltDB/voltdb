@@ -2400,42 +2400,81 @@ var loadPage = function (serverName, portid) {
             var j = 0;
             var count = 0;
             var isMultiple= false;
-            VoltDbAnalysis.latencyDetailValue.forEach (function(item){
-                var latValue;
+            var i =0;
+            var containLongName = false;
 
+            VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+                var newStatement = '';
+                var latValue;
                 $("#generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
                 if(item.PROCEDURE == procedureName ){
-                    if (item.label == statement){
+                    containLongName = checkObjForLongStatementName(VoltDbAnalysis.latencyDetailValue, procedureName);
+
+                    if(containLongName){
+                        newStatement = (i + 1) + ") " + item.STATEMENT;
+                    }
+                    else{
+                        newStatement = item.STATEMENT;
+                    }
+
+                    if (newStatement.split(') ')[1] == statement.split(') ')[1]){
 
                         avg += item.value;
                         isMultiple = true;
                     }
                     else{
+                        i++;
                         isMultiple = false;
                         avg = item.value;
                     }
 
                     if(isMultiple){
                         while(j < VoltDbAnalysis.latencyDetailValue.length){
-                            if (VoltDbAnalysis.latencyDetailValue[j]['label'] == item.label) count += 1;
+                            if (VoltDbAnalysis.latencyDetailValue[j]['STATEMENT'] == item.STATEMENT) count += 1;
                                 j += 1;
                         }
 
-                        procDetails[item.label] = avg/count;
+                        if(containLongName)
+                            procDetails[newStatement.split(') ')[1]] = avg/count;
+                        else
+                            procDetails[newStatement] = avg/count;
                     }
                     else{
-                        procDetails[item.label] = avg;
+                        if(containLongName)
+                            procDetails[newStatement.split(') ')[1]] = avg;
+                        else
+                            procDetails[newStatement] = avg;
                     }
 
-                    statement = item.label;
+                    statement = newStatement;
                 }
             });
+
+            var k=0;
             for (var key in procDetails){
-                finalDetails.push({"label": key,"value": procDetails[key]})
+                if(containLongName){
+                    finalDetails.push({"label": (k+1) + ") " + key,"value": procDetails[key]})
+                }
+                else{
+                    finalDetails.push({"label": key,"value": procDetails[key]})
+                }
+                k++;
             }
             MonitorGraphUI.RefreshLatencyDetailGraph(finalDetails);
         }
     });
+
+     function checkObjForLongStatementName(profileData, procedureName){
+        for(var j = 0; j < profileData.length; j++){
+            if(profileData[j].PROCEDURE == procedureName){
+                if(profileData[j].STATEMENT.length > 14){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 
     $("#showAnalysisFreqDetails").popup({
         open: function (event, ui, ele)  {
@@ -2446,30 +2485,53 @@ var loadPage = function (serverName, portid) {
              //filter specific procedure calls from list of datas
             var finalDetails = [];
             var freqDetails = {};
+            var i =0;
+            var containLongName = false;
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+                var newStatement = '';
                 //order items w.r.to latency
                 var latValue;
+
+
+
                 $(".generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
                 if(item.PROCEDURE == procedureName ){
-                    if (item.label == statement){
+
+                      containLongName = checkObjForLongStatementName(VoltDbAnalysis.latencyDetailValue, procedureName);
+
+                    if(containLongName){
+                        newStatement = (i + 1) + ") " + item.STATEMENT;
+                    }
+
+                    if (newStatement.split(') ')[1] == statement.split(') ')[1]){
                         totalInvocations += item.INVOCATION;
                     }
                     else{
+                        i++;
                         totalInvocations = item.INVOCATION;
                     }
 
-                    freqDetails[item.label] = totalInvocations;
+                    freqDetails[item.STATEMENT] = totalInvocations;
 
-                    statement = item.label;
+                    statement = newStatement;
 
                 }
             });
-             for (var key in freqDetails){
-                finalDetails.push({"label": key,"value": freqDetails[key]})
+
+            var k=0;
+            for (var key in freqDetails){
+                if(containLongName){
+                    finalDetails.push({"label": (k+1) + ") " + key,"value": freqDetails[key]})
+                }
+                else{
+                    finalDetails.push({"label": key,"value": freqDetails[key]})
+                }
+                k++;
             }
             MonitorGraphUI.RefreshFrequencyDetailGraph(finalDetails);
         }
     });
+
 
     $("#showAnalysisCombinedDetails").popup({
         open: function (event, ui, ele)  {
@@ -2480,29 +2542,50 @@ var loadPage = function (serverName, portid) {
             var combinedWeight = 0;
             var sumOfEachProcedure = 0;
             var statement = '';
-            var finalDetails = []
-
+            var finalDetails = [];
+            var i=0;
+            var containLongName = false;
+            debugger;
             for (var key in VoltDbAnalysis.combinedDetail){
+
+                var newStatement = '';
                 var obj = VoltDbAnalysis.combinedDetail[key];
                 if(key == procedureName){
+                    debugger;
+                    containLongName = checkObjForLongStatementName(obj, procedureName);
+                    if(containLongName){
+                        newStatement = (i + 1) + ") " + VoltDbAnalysis.combinedDetail[key].STATEMENT;
+                    }
                     //Calculate sumOfEachProcedure
                     var sumOfEachProcedure = VoltDbUI.calculateCombinedDetailValue(obj);
                     obj.forEach(function(subItems){
+
                         if(subItems.STATEMENT == statement){
                             combinedWeight += (((subItems.AVG/1000000) * subItems.INVOCATIONS)/sumOfEachProcedure) * 100;
                         }
                         else
                         {
+                            i++;
                             combinedWeight = (((subItems.AVG/1000000) * subItems.INVOCATIONS)/sumOfEachProcedure) * 100;
                         }
                         statement = subItems.STATEMENT;
                         combinedDetails[subItems.STATEMENT]= combinedWeight;
-
                         $(".generatedDate").html(VoltDbAnalysis.formatDateTime(subItems.TIMESTAMP));
                     })
 
+//                    for (var key in combinedDetails){
+//                        finalDetails.push({"label": key,"value": combinedDetails[key]})
+//                    }
+
+                    var k=0;
                     for (var key in combinedDetails){
-                        finalDetails.push({"label": key,"value": combinedDetails[key]})
+                        if(containLongName){
+                            finalDetails.push({"label": (k+1) + ") " + key,"value": combinedDetails[key]})
+                        }
+                        else{
+                            finalDetails.push({"label": key,"value": combinedDetails[key]})
+                        }
+                        k++;
                     }
 
                 }

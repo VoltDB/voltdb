@@ -38,6 +38,15 @@ function loadAnalysisPage(){
         return false;
     }
 
+    function checkObjForLongStatementName(profileData){
+        for(var j = 0; j < profileData.length; j++){
+            if(profileData[j].STATEMENT.length > 14){
+                return true;
+            }
+        }
+        return false;
+    }
+
     function formatAnalysisLegend(isMP, isP){
         if(isMP && isP){
             $("#legendAnalysisMP").hide();
@@ -176,7 +185,6 @@ function loadAnalysisPage(){
 //                return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
 //            });
 
-
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
                 if(VoltDbAnalysis.combinedDetail[item.PROCEDURE] == undefined){
                     VoltDbAnalysis.combinedDetail[item.PROCEDURE] = [];
@@ -187,7 +195,8 @@ function loadAnalysisPage(){
                     INVOCATIONS: item.INVOCATIONS,
                     PARTITION_ID : item.PARTITION_ID,
                     STATEMENT: item.STATEMENT,
-                    TIMESTAMP: item.TIMESTAMP
+                    TIMESTAMP: item.TIMESTAMP,
+                    PROCEDURE: item.PROCEDURE
                 })
                 VoltDbAnalysis.latencyDetail[item.STATEMENT] =
                     {
@@ -199,7 +208,7 @@ function loadAnalysisPage(){
                     }
 
 
-                VoltDbAnalysis.latencyDetailValue.push({"label": item.STATEMENT , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP, "INVOCATION": item.INVOCATIONS});
+                VoltDbAnalysis.latencyDetailValue.push({"STATEMENT": item.STATEMENT , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP, "INVOCATION": item.INVOCATIONS});
             });
 
             MonitorGraphUI.initializeFrequencyDetailGraph();
