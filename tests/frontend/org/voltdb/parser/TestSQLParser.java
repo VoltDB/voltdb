@@ -364,6 +364,8 @@ public class TestSQLParser extends TestCase {
     public void testParseMultiStmtProc() {
         List<String> queriesOut = null;
 
+        // The test sql queries include a semi colon at the end. If the statement has been
+        // parsed completely, the semi colon will be removed and the statement is returned
         // parsing removes the last semi colon
         String sql = "CREATE PROCEDURE foo as SELECT * from t;";
         queriesOut = SQLParser.parseQuery(sql);
@@ -385,10 +387,10 @@ public class TestSQLParser extends TestCase {
 
         // multi stmt procedure with single quoted string
         sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; "
-                + "SELECT * from t where a = ‘abced’; END";
+                + "SELECT * from t where a = ‘abced’; END;";
         queriesOut = SQLParser.parseQuery(sql);
         assertEquals(1, queriesOut.size());
-        assertEquals(sql, queriesOut.get(0));
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
 
         sql = "CREATE PROCEDURE foo AS "
                 + "BEGIN "
@@ -410,10 +412,10 @@ public class TestSQLParser extends TestCase {
                 + "select * from t;"
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'begin' or f = 'END';"
-                + "end";
+                + "end;";
         queriesOut = SQLParser.parseQuery(sql);
         assertEquals(1, queriesOut.size());
-        assertEquals(sql, queriesOut.get(0));
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
 
         // semi colon in quoted strings
         sql = "create procedure thisproc as "
@@ -421,10 +423,10 @@ public class TestSQLParser extends TestCase {
                 + "select * from t;"
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'beg;in' or f = 'END;';"
-                + "end";
+                + "end;";
         queriesOut = SQLParser.parseQuery(sql);
         assertEquals(1, queriesOut.size());
-        assertEquals(sql, queriesOut.get(0));
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
 
         // partition clause
         sql = "create procedure thisproc "
@@ -434,10 +436,10 @@ public class TestSQLParser extends TestCase {
                 + "select * from t;"
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'beg;in' or f = 'END;';"
-                + "end";
+                + "end;";
         queriesOut = SQLParser.parseQuery(sql);
         assertEquals(1, queriesOut.size());
-        assertEquals(sql, queriesOut.get(0));
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
 
         // multiple mutli stmt procs
 //        sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
@@ -473,6 +475,54 @@ public class TestSQLParser extends TestCase {
                 + "select * from t; /*comment will still exist*/"
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'begin' or f = 'END';"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // case inside longer strings
+        sql = "create procedure p as begin "
+                + "select emptycase from R; "
+                + "select caseofbeer from R; "
+                + "select suitcaseofbeer from R; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // end inside longer strings
+        sql = "create procedure p as begin "
+                + "select emptycase from R; "
+                + "select caseofbeer from R; "
+                + "select endofbeer from R; "
+                + "select frontend from R; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // begin as table name
+        sql = "create procedure p as begin "
+                + "select emptycase from begin; "
+                + "select caseofbeer from R; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // begin as column name
+        sql = "create procedure p as begin "
+                + "select emptycase from S; "
+                + "select begin from R; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // begin as table and column name
+        sql = "create procedure p as begin "
+                + "select begin.begin from begin; "
+                + "select emptycase from R; "
                 + "end;";
         queriesOut = SQLParser.parseQuery(sql);
         assertEquals(1, queriesOut.size());
