@@ -63,7 +63,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
         @Override
         public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
-            boolean isAlreadyLeader = m_initiatorMailbox.m_scheduler.m_isLeader;
             String hsidStr = CoreUtils.hsIdToString(m_initiatorMailbox.getHSId());
             if (cache != null && tmLog.isDebugEnabled()) {
                 tmLog.debug(hsidStr + " [SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
@@ -81,10 +80,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     }
                     break;
                 }
-            }
-            //reset BalanceSPI status if it is already a leader
-            if (isAlreadyLeader) {
-                ((InitiatorMailbox)m_initiatorMailbox).setBalanceSPIStatus(false);
             }
 
             if (!leaders.contains(getInitiatorHSId())) {

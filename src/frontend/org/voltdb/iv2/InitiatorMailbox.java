@@ -388,7 +388,6 @@ public class InitiatorMailbox implements Mailbox
         SpScheduler scheduler = (SpScheduler)m_scheduler;
         scheduler.checkPointBalanceSPI();
         scheduler.m_isLeader = false;
-        m_repairLog.setLeaderState(false);
         m_newLeaderHSID = newLeaderHSId;
         m_balanceSPIStatus = BALANCE_SPI_STATUS.SRC_STARTED;
 
@@ -474,7 +473,7 @@ public class InitiatorMailbox implements Mailbox
         if (!m_scheduler.isLeader() && !message.toReplica() && seenTheTxn) {
             message.setHandleByOriginalLeader(true);
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + " proc:" +  message.getProcedureName());
+                tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
             }
         }
         if (message.getCurrentBatchIndex() > 0 && !seenTheTxn && tmLog.isDebugEnabled()) {
@@ -666,7 +665,7 @@ public class InitiatorMailbox implements Mailbox
         //reset status on the old partition leader
         m_newLeaderHSID = Long.MIN_VALUE;
         m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
-
+        m_repairLog.setLeaderState(false);
         tmLog.info("Balance spi previous leader " + CoreUtils.hsIdToString(m_hsId) + " notifies new leader " +
                 CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_balanceSPIStatus);
     }
