@@ -563,26 +563,30 @@ UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executor
     return result;
 }
 
-NValue VoltDBEngine::callUserDefinedFunction(int functionId, const std::vector<NValue>& arguments) {
+NValue VoltDBEngine::callJavaUserDefinedFunction(int functionId, const std::vector<NValue>& arguments) {
     resetUDFOutputBuffer();
 
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     if (info == NULL) {
-        // There must be serious inconsistency in the catalog so this could happen.
+        // There must be serious inconsistency in the catalog if this could happen.
         throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
     }
     // Serialize UDF parameters to the buffer.
     for (int i = 0; i < arguments.size(); i++) {
         arguments[i].castAs(info->paramTypes[i]).serializeTo(m_udfOutput);
     }
-    if (m_topend->callJavaUserDefinedFunction(functionId) != 0) {
-        // Error handling
-    }
-    // After the the invocation, read the return value from the buffer.
     ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
-    NValue retval = ValueFactory::getNValueOfType(info->returnType);
-    retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
-    return retval;
+    if (m_topend->callJavaUserDefinedFunction(functionId) == 0) {
+        // After the the invocation, read the return value from the buffer.
+        NValue retval = ValueFactory::getNValueOfType(info->returnType);
+        retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
+        return retval;
+    }
+    else {
+        // Error handling
+        string errorMsg = udfResultIn.readTextString();
+        throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
+    }
 }
 
 void VoltDBEngine::releaseUndoToken(int64_t undoToken) {

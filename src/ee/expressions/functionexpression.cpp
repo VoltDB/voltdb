@@ -224,7 +224,7 @@ public:
         for (int i = 0; i < m_args.size(); ++i) {
             nValue[i] = m_args[i]->eval(tuple1, tuple2);
         }
-        return m_engine->callUserDefinedFunction(m_functionId, nValue);
+        return m_engine->callJavaUserDefinedFunction(m_functionId, nValue);
     }
 
     std::string debugInfo(const std::string &spacer) const {

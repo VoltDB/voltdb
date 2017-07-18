@@ -37,7 +37,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class UserDefinedFunctionManager {
 
-    static final String ORGVOLTDB_PROCNAME_ERROR_FMT =
+    static final String ORGVOLTDB_FUNCCNAME_ERROR_FMT =
             "VoltDB does not support function classes with package names " +
             "that are prefixed with \"org.voltdb\". Please use a different " +
             "package name and retry. The class name was %s.";
@@ -62,7 +62,7 @@ public class UserDefinedFunctionManager {
             }
             catch (final ClassNotFoundException e) {
                 if (className.startsWith("org.voltdb.")) {
-                    String msg = String.format(ORGVOLTDB_PROCNAME_ERROR_FMT, className);
+                    String msg = String.format(ORGVOLTDB_FUNCCNAME_ERROR_FMT, className);
                     VoltDB.crashLocalVoltDB(msg, false, null);
                 }
                 else {

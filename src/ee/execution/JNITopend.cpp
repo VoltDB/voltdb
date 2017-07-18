@@ -398,26 +398,9 @@ std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
 }
 
 int JNITopend::callJavaUserDefinedFunction(int32_t functionId) {
-    int retval = (int)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
-                                              m_callJavaUserDefinedFunctionMID,
-                                              functionId);
-    jthrowable exception = m_jniEnv->ExceptionOccurred();
-    if (exception) {
-        JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 1);
-        if (jni_frame.checkResult() < 0) {
-            VOLT_ERROR("Unable to load dependency: jni frame error.");
-            throw std::exception();
-        }
-        m_jniEnv->ExceptionClear();
-        jstring exceptionMsg = (jstring)m_jniEnv->CallObjectMethod(exception, m_getMessageFromThrowableMID);
-        if (exceptionMsg == NULL) {
-            throw SQLException(SQLException::volt_user_defined_function_error, "User-defined function threw an error with null error message.");
-        }
-        const char* errorMsg = m_jniEnv->GetStringUTFChars(exceptionMsg, NULL);
-        std::string strErrorMsg(errorMsg);
-        throw SQLException(SQLException::volt_user_defined_function_error, strErrorMsg);
-    }
-    return retval;
+    return (int)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
+                                        m_callJavaUserDefinedFunctionMID,
+                                        functionId);
 }
 
 void JNITopend::crashVoltDB(FatalException e) {

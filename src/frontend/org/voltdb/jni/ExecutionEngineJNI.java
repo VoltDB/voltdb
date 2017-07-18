@@ -18,6 +18,7 @@
 package org.voltdb.jni;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
@@ -33,11 +34,13 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.UserDefinedFunctionManager.UserDefinedFunctionRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -749,7 +752,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public int callJavaUserDefinedFunction(int functionId) throws Throwable {
         UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
         assert(udfRunner != null);
-        udfRunner.call(m_udfBuffer);
+        Throwable throwable = null;
+        try {
+            udfRunner.call(m_udfBuffer);
+        }
+        catch (InvocationTargetException ex1) {
+            throwable = ex1.getCause();
+        }
+        catch (Exception ex2) {
+            throwable = ex2;
+        }
+        if (throwable != null) {
+            m_udfBuffer.clear();
+            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+            return -1;
+        }
         return 0;
     }
 
