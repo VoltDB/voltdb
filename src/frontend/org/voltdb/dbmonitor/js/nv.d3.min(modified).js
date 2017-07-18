@@ -621,7 +621,7 @@
                 if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
                     currentTime = d.data.label.split(" ")[1]
 
-                if (d.series[0].key == "Avg Execution Time")
+                if (d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail")
                     {
                         currentTime = d.data.label.split("(")[0]
                         if(currentTime.indexOf("<") >= 0){
@@ -671,7 +671,7 @@
                     else if(chartContainer == null){
                         if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time")
                             unit = " ms"
-                        else if(d.series[0].key == "Frequency")
+                        else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail")
                             unit = ""
                         else
                             unit = " %"
@@ -697,12 +697,15 @@
                         .append("div")
                         .style("background-color", function (p) { return p.color });
                 else{
-                    if((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Combined") && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "Multi Partitioned")
+                    if((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Combined") && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "Multi Partitioned"){
                         trowEnter.append("td")
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
-                    else
+                    } else {
+                        var keyName = d.series[0].key;
+                        keyName = (keyName == "Frequency Detail" ? "Frequency":(keyName == "Combined Detail" ? "Combined" : keyName));
                         trowEnter.append("td")
-                            .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ d.series[0].key +"</span>" );
+                            .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ keyName +"</span>" );
+                    }
                 }
                 //trowEnter.append("td")
                 //    .classed("key", true)
@@ -715,9 +718,9 @@
                     trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
-                } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
+                } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail") && chartContainer == null){
                     trowEnter.append("td")
-                        .html(function (p, i) { return (d.series[0].key != "Frequency" ? (d.series[0].key == "Combined" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
+                        .html(function (p, i) { return (d.series[0].key != "Frequency"  && d.series[0].key != "Frequency Detail" ? (d.series[0].key == "Combined" || d.series[0].key == "Combined Detail" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
                 } else {
                     trowEnter.append("td")
                         .classed("value", true)
@@ -800,7 +803,7 @@
                     }
                 }
 
-                if((d.series[0].key == "Avg Execution Time") && chartContainer == null){
+                if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail") && chartContainer == null){
                     var trowEnter1 = tbodyEnter.selectAll("tr")
                     .append("tr");
 

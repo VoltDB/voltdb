@@ -585,7 +585,7 @@
                     return  d.label
                   }).y(function(d) { return d.value }).height(barHeight)
                   .showValues(true);
-
+                ChartLatencyDetailAnalysis.valueFormat(d3.format(',.6f'));
                 ChartLatencyDetailAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
                 ChartLatencyDetailAnalysis.xAxis
@@ -610,9 +610,9 @@
                     return  d.label
                   }).y(function(d) { return d.value }).height(barHeight)
                   .showValues(true);
-
+                ChartFrequencyDetailAnalysis.valueFormat(d3.format(',.0d'));
                 ChartFrequencyDetailAnalysis.yAxis
-                    .tickFormat(d3.format(',.2f'));
+                    .tickFormat(d3.format(',.0d'));
                 ChartFrequencyDetailAnalysis.xAxis
                     .axisLabelDistance(10)
                 ChartFrequencyDetailAnalysis.yAxis.axisLabelDistance(10)
@@ -635,7 +635,7 @@
                     return  d.label
                   }).y(function(d) { return d.value }).height(barHeight)
                   .showValues(true);
-
+                ChartCombinedDetailAnalysis.valueFormat(d3.format(',.3f'));
                 ChartCombinedDetailAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
                 ChartCombinedDetailAnalysis.xAxis
