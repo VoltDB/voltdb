@@ -524,16 +524,6 @@ public class KafkaImportBenchmark {
             }
         }
 
-        /***
-        if ((exportRowCount != (importStatValues[SUCCESSES] + importStatValues[FAILURES])) && config.useexport) {
-            log.error("Export count '" + exportRowCount +
-                "' does not match import stats count '" +
-                (importStatValues[SUCCESSES] + importStatValues[FAILURES]) +
-                "' test fails.");
-            testResult = false;
-        }
-        ***/
-
         if (!config.useexport && !config.streamtest) {
             testResult = MatchChecks.checkPounderResults(config.expected_rows, client);
         }
