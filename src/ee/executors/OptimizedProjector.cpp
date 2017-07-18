@@ -258,12 +258,14 @@ std::string ProjectStep::debug() const {
     return oss.str();
 }
 
-void dumpSteps(const std::string& title, const ProjectStepSet& steps) {
-    std::cout << "\n" << title << " steps:\n";
-    BOOST_FOREACH(const ProjectStep& step, steps) {
-        std::cout << "  " << step.debug() << "\n";
+std::string OptimizedProjector::debug(const std::string& title) const {
+    std::ostringstream oss;
+    oss << "\n" << title << " steps:\n";
+    BOOST_FOREACH(const ProjectStep& step, *m_steps) {
+        oss << "  " << step.debug() << "\n";
     }
-    std::cout << "\n";
+    oss << "\n";
+    return oss.str();
 }
 
 static uint32_t getNumBytesForMemcpy(const TupleSchema::ColumnInfo* colInfo) {

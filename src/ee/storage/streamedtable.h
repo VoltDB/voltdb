@@ -49,11 +49,7 @@ class StreamedTable : public Table {
 public:
     StreamedTable(bool exportEnabled, int partitionColumn = -1);
     StreamedTable(bool exportEnabled, ExportTupleStream* wrapper);
-    static StreamedTable* createForTest(size_t wrapperBufSize,
-            ExecutorContext *ctx,
-            TupleSchema *schema,
-            const std::vector<std::string> &columnNames,
-            bool takeOwnership);
+    static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema, std::vector<std::string> & columnNames);
 
     //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
     bool enableStream();

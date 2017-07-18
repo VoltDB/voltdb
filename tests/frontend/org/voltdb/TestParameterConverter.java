@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
@@ -44,81 +45,126 @@ public class TestParameterConverter extends TestCase
     // Tests use naming convention:
     // (invocation deserialized type) To (stored procedure parameter type)
 
-    public void testIntegerToInt() throws Exception
-    {
+    public void testIntegerToInt() throws Exception {
         Object r = ParameterConverter.
             tryToMakeCompatible(int.class, new Integer(1));
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1, ((Integer)r).intValue());
     }
 
-    public void testIntToInt() throws Exception
-    {
+    public void testIntToInt() throws Exception {
         Object r = ParameterConverter.
             tryToMakeCompatible(int.class, 2);
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(2, ((Integer)r).intValue());
     }
 
-    public void testIntToLong() throws Exception
-    {
+    public void testIntToInteger() throws Exception {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Integer.class, 1);
+        assertTrue("expect integer", r.getClass() == Integer.class);
+        assertEquals(new Integer(1), (Integer)r);
+    }
+
+    public void testIntToLong() throws Exception {
         Object r = ParameterConverter.
             tryToMakeCompatible(long.class, -1000);
         assertTrue("expect long", r instanceof Number);
         assertEquals(-1000L, ((Number)r).longValue());
     }
 
-    public void testStringToInt() throws Exception
-    {
+    public void testLongToIntException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(int.class, -9000000000L);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (-9000000000) of type:"
+                    + " java.lang.Long is not a match or is out of range for the target parameter type: int"));
+        }
+    }
+
+    public void testLongToIntegerException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Integer.class, -9000000000L);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (-9000000000) of type:"
+                    + " java.lang.Long is not a match or is out of range for the target parameter type: java.lang.Integer"));
+        }
+    }
+
+    public void testStringToInt() throws Exception {
         Object r = ParameterConverter.
             tryToMakeCompatible(int.class, "1000");
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1000, ((Integer)r).intValue());
     }
 
-    public void testStringToDouble() throws Exception
-    {
+    public void testStringToInteger() throws Exception {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Integer.class, "1000");
+        assertTrue("expect integer", r.getClass() == Integer.class);
+        assertEquals(new Integer(1000), r);
+    }
+
+    public void testStringToDouble() throws Exception {
         Object r = ParameterConverter.
             tryToMakeCompatible(double.class, "34.56");
         assertTrue("expect double", r.getClass() == Double.class);
-        assertEquals(new Double(34.56), ((Double)r).doubleValue());
+        assertEquals(34.56, ((Double)r).doubleValue());
+    }
+
+    public void testStringToBoxedDouble() throws Exception {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Double.class, "34.56");
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(34.56), r);
     }
 
     // Add more test unit cases
-    public void testStringWithWhitespaceToDouble() throws Exception
-    {
+    public void testStringWithWhitespaceToDouble() throws Exception {
         Object r = ParameterConverter.
             tryToMakeCompatible(double.class, "  34.56  ");
         assertTrue("expect double", r.getClass() == Double.class);
-        assertEquals(new Double(34.56), ((Double)r).doubleValue());
+        assertEquals(34.56, ((Double)r).doubleValue());
     }
 
-    public void testCommasStringIntegerToInt() throws Exception
-    {
+    public void testStringWithWhitespaceToBoxedDouble() throws Exception {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Double.class, "  34.56  ");
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(34.56), r);
+    }
+
+    public void testCommasStringIntegerToInt() throws Exception {
         Object r = ParameterConverter.
             tryToMakeCompatible(int.class, "1,100");
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1100, ((Integer)r).intValue());
     }
 
-    public void testCommasStringIntegerToDouble() throws Exception
-    {
+    public void testCommasStringIntegerToInteger() throws Exception {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Integer.class, "1,100");
+        assertTrue("expect integer", r.getClass() == Integer.class);
+        assertEquals(new Integer(1100), r);
+    }
+
+    public void testCommasStringIntegerToDouble() throws Exception {
         Object r = ParameterConverter.
             tryToMakeCompatible(double.class, "2,301,100.23");
         assertTrue("expect integer", r.getClass() == Double.class);
-        assertEquals(new Double(2301100.23), ((Double)r).doubleValue());
+        assertEquals(2301100.23, ((Double)r).doubleValue());
     }
 
-    public void testNULLToInt() throws Exception
-    {
+    public void testCommasStringIntegerToBoxedDouble() throws Exception {
         Object r = ParameterConverter.
-            tryToMakeCompatible(int.class, null);
-        assertTrue("expect null integer", r.getClass() == Integer.class);
-        assertEquals(VoltType.NULL_INTEGER, r);
+            tryToMakeCompatible(Double.class, "2,301,100.23");
+        assertTrue("expect integer", r.getClass() == Double.class);
+        assertEquals(new Double(2301100.23), r);
     }
 
-    public void testStringToTimestamp() throws Exception
-    {
+    public void testStringToTimestamp() throws Exception {
         TimestampType t = new TimestampType();
         Object r = ParameterConverter.
             tryToMakeCompatible(TimestampType.class, t);
@@ -126,13 +172,49 @@ public class TestParameterConverter extends TestCase
         assertEquals(t, r);
     }
 
-    public void testStringToVarBinary() throws Exception
-    {
+    public void testStringToVarBinary() throws Exception {
         String t = "1E3A";
         Object r = ParameterConverter.
             tryToMakeCompatible(byte[].class, t);
         assertTrue("expect varbinary", r.getClass() == byte[].class);
         assertEquals(t, Encoder.hexEncode((byte[])r));
+    }
+
+    public void testStringToBoxedVarBinary() throws Exception {
+        String t = "1E3A";
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Byte[].class, t);
+        assertTrue("expect varbinary", r.getClass() == Byte[].class);
+        assertEquals(t, Encoder.hexEncode( ArrayUtils.toPrimitive((Byte[])r) ));
+    }
+
+    public void testEmptyStringToVarBinary() throws Exception {
+        String t = "";
+        Object r = ParameterConverter.
+            tryToMakeCompatible(byte[].class, t);
+        assertTrue("expect varbinary", r.getClass() == byte[].class);
+        assertEquals(t, Encoder.hexEncode((byte[])r));
+    }
+
+    public void testEmptyStringToBoxedVarBinary() throws Exception {
+        String t = "";
+        Object r = ParameterConverter.
+            tryToMakeCompatible(Byte[].class, t);
+        assertTrue("expect varbinary", r.getClass() == Byte[].class);
+        assertEquals(t, Encoder.hexEncode( ArrayUtils.toPrimitive((Byte[])r) ));
+    }
+
+    public void testByteToBoxedByte() throws Exception {
+        String t = "1E3A";
+        Object byteArr = ParameterConverter.
+            tryToMakeCompatible(byte[].class, t);
+        assertTrue("expect varbinary", byteArr.getClass() == byte[].class);
+
+        Object r2 = ParameterConverter.
+                tryToMakeCompatible(Byte[].class, byteArr);
+        assertTrue("expect Byte[]", r2.getClass() == Byte[].class);
+        assertEquals(Encoder.hexEncode((byte[])byteArr),
+                Encoder.hexEncode( ArrayUtils.toPrimitive((Byte[])r2)) );
     }
 
     public void testOneStringToPoint(String rep, GeographyPointValue pt, double epsilon) throws Exception {
@@ -189,19 +271,110 @@ public class TestParameterConverter extends TestCase
         testOneStringToPolygon(geogRep, geog);
     }
 
-    public void testNulls()
-    {
+    public void testNulls() {
         assertEquals(VoltType.NULL_TINYINT, ParameterConverter.tryToMakeCompatible(byte.class, VoltType.NULL_TINYINT));
         assertEquals(VoltType.NULL_SMALLINT, ParameterConverter.tryToMakeCompatible(short.class, VoltType.NULL_SMALLINT));
         assertEquals(VoltType.NULL_INTEGER, ParameterConverter.tryToMakeCompatible(int.class, VoltType.NULL_INTEGER));
         assertEquals(VoltType.NULL_BIGINT, ParameterConverter.tryToMakeCompatible(long.class, VoltType.NULL_BIGINT));
         assertEquals(VoltType.NULL_FLOAT, ParameterConverter.tryToMakeCompatible(double.class, VoltType.NULL_FLOAT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Byte.class, VoltType.NULL_TINYINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Short.class, VoltType.NULL_SMALLINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Integer.class, VoltType.NULL_INTEGER));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Long.class, VoltType.NULL_BIGINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Double.class, VoltType.NULL_FLOAT));
+        assertEquals(VoltType.NULL_TINYINT, ParameterConverter.tryToMakeCompatible(byte.class, null));
+        assertEquals(VoltType.NULL_SMALLINT, ParameterConverter.tryToMakeCompatible(short.class, null));
+        assertEquals(VoltType.NULL_INTEGER, ParameterConverter.tryToMakeCompatible(int.class, null));
+        assertEquals(VoltType.NULL_BIGINT, ParameterConverter.tryToMakeCompatible(long.class, null));
+        assertEquals(VoltType.NULL_FLOAT, ParameterConverter.tryToMakeCompatible(double.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Byte.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Short.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Integer.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Long.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Double.class, null));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(byte[].class, VoltType.NULL_TINYINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Byte[].class, VoltType.NULL_TINYINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(short[].class, VoltType.NULL_SMALLINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Short[].class, VoltType.NULL_SMALLINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(int[].class, VoltType.NULL_INTEGER));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Integer[].class, VoltType.NULL_INTEGER));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(long[].class, VoltType.NULL_BIGINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Long[].class, VoltType.NULL_BIGINT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(double[].class, VoltType.NULL_FLOAT));
+        assertEquals(null, ParameterConverter.tryToMakeCompatible(Double[].class, VoltType.NULL_FLOAT));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(TimestampType.class, VoltType.NULL_TIMESTAMP));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(Timestamp.class, VoltType.NULL_TIMESTAMP));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(Date.class, VoltType.NULL_TIMESTAMP));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(java.sql.Date.class, VoltType.NULL_TIMESTAMP));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(String.class, VoltType.NULL_STRING_OR_VARBINARY));
         assertEquals(null, ParameterConverter.tryToMakeCompatible(BigDecimal.class, VoltType.NULL_DECIMAL));
+    }
+
+    public void testNULLValueToByteException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Byte.class, -128);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: The provided short, int or long value: (-128) might be interpreted "
+                    + "as tinyint null. Try explicitly using a byte parameter."));
+        }
+    }
+
+    public void testNULLValueToShortException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Short.class, -32768);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: The provided int or long value: (-32768) might be interpreted "
+                    + "as smallint null. Try explicitly using a short parameter."));
+        }
+    }
+
+    public void testNULLValueToIntException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(int.class, -2147483648L);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: The provided long value: (-2147483648) might be interpreted "
+                    + "as integer null. Try explicitly using a int parameter."));
+        }
+    }
+
+    public void testNULLValueToIntegerException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Integer.class, -2147483648L);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: The provided long value: (-2147483648) might be interpreted "
+                    + "as integer null. Try explicitly using a int parameter."));
+        }
+    }
+
+    // hexString should be an (even-length) hexadecimal string to be decoded
+    public void testStringTobyteException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(byte.class, "ABC");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: Unable to convert string ABC"
+                    + " to byte value for target parameter"));
+        }
+    }
+
+    public void testStringToByteException() throws Exception {
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Byte.class, "ABC");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryToMakeCompatible: Unable to convert string ABC"
+                    + " to java.lang.Byte value for target parameter"));
+        }
     }
 
     public void testBigDecimalToLong() {
@@ -217,6 +390,19 @@ public class TestParameterConverter extends TestCase
         testBigDecimalFailWithInvalidConversion(long.class, new BigDecimal("10000000000000000000000000000000000"));
     }
 
+    public void testBigDecimalToBoxedLong() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Long.class, new BigDecimal(1000));
+        assertTrue("expect long", r.getClass() == Long.class);
+        assertEquals(1000L, r);
+
+        // No lossy conversion
+        testBigDecimalFailWithInvalidConversion(Long.class, new BigDecimal(1000.01));
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Long.class, new BigDecimal("10000000000000000000000000000000000"));
+    }
+
     public void testBigDecimalToInt() {
         // Normal conversion
         Object r = ParameterConverter.tryToMakeCompatible(int.class, new BigDecimal(-1000));
@@ -228,6 +414,19 @@ public class TestParameterConverter extends TestCase
 
         // No out-of-range conversion
         testBigDecimalFailWithInvalidConversion(int.class, new BigDecimal("-10000000000000000000000000000000000"));
+    }
+
+    public void testBigDecimalToInteger() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Integer.class, new BigDecimal(-1000));
+        assertTrue("expect int", r.getClass() == Integer.class);
+        assertEquals(new Integer(-1000), r);
+
+        // No lossy conversion
+        testBigDecimalFailWithInvalidConversion(Integer.class, new BigDecimal(-1000.01));
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Integer.class, new BigDecimal("-10000000000000000000000000000000000"));
     }
 
     public void testBigDecimalToShort() {
@@ -243,6 +442,19 @@ public class TestParameterConverter extends TestCase
         testBigDecimalFailWithInvalidConversion(short.class, new BigDecimal("10000000000000000000000000000000000"));
     }
 
+    public void testBigDecimalToBoxedShort() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Short.class, new BigDecimal(15));
+        assertTrue("expect short", r.getClass() == Short.class);
+        assertEquals(new Short((short) 15), r);
+
+        // No lossy conversion
+        testBigDecimalFailWithInvalidConversion(Short.class, new BigDecimal(10.99));
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Short.class, new BigDecimal("10000000000000000000000000000000000"));
+    }
+
     public void testBigDecimalToDouble() {
         // Normal conversion
         Object r = ParameterConverter.tryToMakeCompatible(double.class, new BigDecimal(-3.568));
@@ -253,6 +465,18 @@ public class TestParameterConverter extends TestCase
 
         // No out-of-range conversion
         testBigDecimalFailWithInvalidConversion(double.class, new BigDecimal("4e400"));
+    }
+
+    public void testBigDecimalToBoxedDouble() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Double.class, new BigDecimal(-3.568));
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(-3.568), r);
+
+        // Conversion to double can be lossy anyway
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Double.class, new BigDecimal("4e400"));
     }
 
     public void testBigDecimalToByte() {
@@ -268,6 +492,19 @@ public class TestParameterConverter extends TestCase
         testBigDecimalFailWithInvalidConversion(byte.class, new BigDecimal("10000000000000000000000000000000000"));
     }
 
+    public void testBigDecimalToBoxedByte() {
+        // Normal conversion
+        Object r = ParameterConverter.tryToMakeCompatible(Byte.class, new BigDecimal(9));
+        assertTrue("expect byte", r.getClass() == Byte.class);
+        assertEquals(new Byte((byte) 9), r);
+
+        // No lossy conversion
+        testBigDecimalFailWithInvalidConversion(Byte.class, new BigDecimal(10.99));
+
+        // No out-of-range conversion
+        testBigDecimalFailWithInvalidConversion(Byte.class, new BigDecimal("10000000000000000000000000000000000"));
+    }
+
     /*
      * The helper function to test lossy / out-of-range conversions from BigDecimal. This function
      * expects the conversion to fail.
@@ -280,5 +517,74 @@ public class TestParameterConverter extends TestCase
             hasException = true;
         }
         assertEquals(true, hasException);
+    }
+
+    public void testArrayToScalarTypeException() throws Exception {
+        int[] t = {1, 2, 3};
+        try{
+            ParameterConverter.
+                tryToMakeCompatible(Integer.class, t);
+            /* Arrays can be quite large so it doesn't make sense to silently do the conversion
+            * and incur the performance hit. The client should serialize the correct invocation
+            * parameters */
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "Array / Scalar parameter mismatch ([I to java.lang.Integer)"));
+        }
+    }
+
+    public void testIntArrayToIntegerArray() throws Exception {
+        int[] t = {1, 2, 3};
+        try{
+            ParameterConverter.
+                tryToMakeCompatible(Integer[].class, t);
+            /* Arrays can be quite large so it doesn't make sense to silently do the conversion
+            * and incur the performance hit. The client should serialize the correct invocation
+            * parameters */
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "tryScalarMakeCompatible: Unable to match parameter array:java.lang.Integer to provided int"));
+        }
+    }
+
+    // arrays should be exactly the same type (including boxing)
+    public void testIntegerArray() throws Exception {
+        Integer[] t = {1, 2, 3};
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Integer[].class, t);
+        assertTrue("expect Integer[]", r.getClass() == Integer[].class);
+
+        assertEquals(t, (Integer[])r);
+    }
+
+    public void testStringArrayToByteArray() throws Exception {
+        String[] t = {"1234", "0A1B"};
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Byte[][].class, t);
+        assertTrue("expect Byte[][]", r.getClass() == Byte[][].class);
+
+        assertEquals(t[0], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[0]) ));
+        assertEquals(t[1], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[1]) ));
+    }
+
+    public void testEmptyStringArrayToByteArray() throws Exception {
+        String[] t = {"", ""};
+        Object r = ParameterConverter.
+                tryToMakeCompatible(Byte[][].class, t);
+        assertTrue("expect Byte[][]", r.getClass() == Byte[][].class);
+
+        assertEquals(t[0], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[0]) ));
+        assertEquals(t[1], Encoder.hexEncode( ArrayUtils.toPrimitive( ((Byte[][])r)[1]) ));
+    }
+
+    public void testIncorrectStringArrayToByteArray() throws Exception {
+        String[] t = {"ABC"};
+        try {
+            ParameterConverter.
+                tryToMakeCompatible(Byte[][].class, t);
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "String is not properly hex-encoded"));
+        }
     }
 }
