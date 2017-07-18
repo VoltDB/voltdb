@@ -197,11 +197,6 @@ public class ExportGeneration implements Generation {
         m_isContinueingGeneration = true; // (catalogGen == m_timestamp);
     }
 
-    //This checks if the on disk generation is a catalog generation.
-    public boolean isContinueingGeneration() {
-        return m_isContinueingGeneration;
-    }
-
     boolean initializeGenerationFromDisk(final CatalogMap<Connector> connectors, HostMessenger messenger) {
         Set<Integer> partitions = new HashSet<Integer>();
 
@@ -416,19 +411,6 @@ public class ExportGeneration implements Generation {
         createAndRegisterAckMailboxes(partitionsInUse, messenger);
     }
 
-    void initializeMissingPartitionsFromCatalog(
-            final CatalogMap<Connector> connectors,
-            int hostId,
-            HostMessenger messenger,
-            List<Integer> partitions) {
-        Set<Integer> missingPartitions = new HashSet<Integer>();
-        findMissingDataSources(partitions, missingPartitions);
-        if (missingPartitions.size() > 0) {
-            exportLog.info("Found Missing partitions for continueing generation: " + missingPartitions);
-            initializeGenerationFromCatalog(connectors, hostId, messenger, new ArrayList(missingPartitions));
-        }
-    }
-
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
         m_mailboxesZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "mailboxes";
 
@@ -638,7 +620,7 @@ public class ExportGeneration implements Generation {
      * Create a datasource based on an ad file
      */
     private void addDataSource(File adFile, Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, isContinueingGeneration());
+        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, true);
         partitions.add(source.getPartitionId());
         if (source.getGeneration() != this.m_timestamp) {
             throw new IOException("Failed to load generation from disk invalid data source generation found.");
@@ -664,7 +646,6 @@ public class ExportGeneration implements Generation {
     private void addDataSources(Table table, int hostId, List<Integer> partitions)
     {
         for (Integer partition : partitions) {
-
             /*
              * IOException can occur if there is a problem
              * with the persistent aspects of the datasource storage
@@ -675,21 +656,25 @@ public class ExportGeneration implements Generation {
                     dataSourcesForPartition = new HashMap<String, ExportDataSource>();
                     m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
                 }
-                Column partColumn = table.getPartitioncolumn();
-                ExportDataSource exportDataSource = new ExportDataSource(
-                        m_onSourceDrained,
-                        "database",
-                        table.getTypeName(),
-                        partition,
-                        table.getSignature(),
-                        m_timestamp,
-                        table.getColumns(),
-                        partColumn,
-                        m_directory.getPath());
+                if (!dataSourcesForPartition.containsKey(table.getSignature())) {
+                    Column partColumn = table.getPartitioncolumn();
+                    ExportDataSource exportDataSource = new ExportDataSource(
+                            m_onSourceDrained,
+                            "database",
+                            table.getTypeName(),
+                            partition,
+                            table.getSignature(),
+                            m_timestamp,
+                            table.getColumns(),
+                            partColumn,
+                            m_directory.getPath());
+                    exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
+                            " signature " + table.getSignature() + " partition id " + partition);
+                    dataSourcesForPartition.put(table.getSignature(), exportDataSource);
+                } else {
+                    exportLog.info("BSDBG: found table signature " + table.getSignature() + " for table " + table.getTypeName() + " which already exists");
+                }
                 m_numSources++;
-                exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
-                        " signature " + table.getSignature() + " partition id " + partition);
-                dataSourcesForPartition.put(table.getSignature(), exportDataSource);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB(
                         "Error creating datasources for table " +
@@ -698,15 +683,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    //Find missing partitions from this generation typicaally called for current generation to fill in missing partitions
-    private void findMissingDataSources(List<Integer> partitions, Set<Integer> missingPartitions) {
-        for (Integer partition : partitions) {
-            Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
-            if (dataSourcesForPartition == null) {
-                missingPartitions.add(partition);
-            }
-        }
-    }
+
 
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
         //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));

@@ -111,16 +111,10 @@ public class StandaloneExportGeneration implements Generation {
     /**
      * Constructor to create a generation based on one that has been persisted to disk
      * @param generationDirectory
-     * @param generationTimestamp
      * @throws IOException
      */
     public StandaloneExportGeneration(File generationDirectory) throws IOException {
         m_directory = generationDirectory;
-    }
-
-    @Override
-    public boolean isContinueingGeneration() {
-        return false;
     }
 
     boolean initializeGenerationFromDisk(final Connector conn, HostMessenger ignored) {

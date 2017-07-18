@@ -26,8 +26,6 @@ import org.voltcore.messaging.HostMessenger;
  */
 public interface Generation {
 
-    public boolean isContinueingGeneration();
-
     public void kickOffLeaderElection(final HostMessenger messenger);
 
     public void acceptMastershipTask(int partitionId);
