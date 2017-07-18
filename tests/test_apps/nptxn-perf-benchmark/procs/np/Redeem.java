@@ -67,7 +67,7 @@ public class Redeem extends VoltProcedure {
 
 
     public long run(String pan,
-    				double amount,
+                    double amount,
                     String currency,
                     int preAuth) throws VoltAbortException {
 
