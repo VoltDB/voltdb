@@ -67,7 +67,9 @@ function server-init() {
     voltdb start -H "$STARTUPLEADERHOST"
 }
 
-# Load the schema
+###################
+# Load the schema #
+###################
 function load() {
     sqlcmd < schema.sql
 }
@@ -77,10 +79,10 @@ function load() {
 ##################################
 function client() {
     java -classpath $BENCHMARK_JAR_NAME:$CLIENTCLASSPATH np.NPBenchmark \
-         --scale='0.5' \
+         --scale='0.6' \
          --cardcount='500000' \
          --mprate='0.02' \
-         --skew='0.99'
+         --skew='0.0'
 }
 
 if [ $# -eq 0 ]; then server-init; exit; fi
