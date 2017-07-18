@@ -275,6 +275,7 @@ class NPBenchmark {
         ProcCallback.printProcedureResults("Authorize");
         ProcCallback.printProcedureResults("Redeem");
         ProcCallback.printProcedureResults("Transfer");
+        ProcCallback.printProcedureResults("Select");
 
         // Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
