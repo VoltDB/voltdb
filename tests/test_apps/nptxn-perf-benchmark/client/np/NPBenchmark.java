@@ -51,7 +51,7 @@ class NPBenchmark {
         int warmup = 2;
 
         @Option(desc = "Filename to write raw summary statistics to.")
-        String statsfile = "stats.jj";
+        String statsfile = "stats";
 
         // New options
         @Option(desc = "Percentage of NP transactions compared to SP txns")
@@ -61,7 +61,7 @@ class NPBenchmark {
         int cardcount = 500000;
 
         @Option(desc = "Rate of MP txns")
-        double mprate = 0.1;
+        double mprate = 0.05;
 
         @Override
         public void validate() {
@@ -309,7 +309,7 @@ class NPBenchmark {
      * Performs one iteration of the benchmark
      */
     public void iterate() throws Exception {
-        int id = rand.nextInt(config.cardcount-1);
+        int id = rand.nextInt(config.cardcount - 1);
         String pan = Integer.toString(id);
 
         client.callProcedure(new ProcCallback("Authorize"),
@@ -319,6 +319,7 @@ class NPBenchmark {
                              "USD"
                              );
 
+        pan = Integer.toString(rand.nextInt(config.cardcount - 1));
         client.callProcedure(new ProcCallback("Redeem"),
                              "Redeem",
                              pan,
@@ -327,20 +328,38 @@ class NPBenchmark {
                              1
                              );
 
-        if (rand.nextDouble() < config.scale) {
-            int id1 = rand.nextInt(config.cardcount - 1);
-            int id2 = rand.nextInt(config.cardcount - 1);
+        for (int i = 0; i < 2; i++) {
+            // 2p txn
+            if (rand.nextDouble() < config.scale) {
+                int id1 = rand.nextInt(config.cardcount - 1);
+                int id2 = rand.nextInt(config.cardcount - 1);
 
-            String pan1 = generate16DString(id1);
-            String pan2 = generate16DString(id2);
+                String pan1 = generate16DString(id1);
+                String pan2 = generate16DString(id2);
 
-            client.callProcedure(new ProcCallback("Transfer",10000),
-                                 "Transfer",
-                                 pan1,
-                                 pan2,
-                                 1,
-                                 "USD"
-                                 );
+                client.callProcedure(new ProcCallback("Transfer",10000),
+                                     "Transfer",
+                                     pan1,
+                                     pan2,
+                                     1,
+                                     "USD"
+                                     );
+            }
+
+            // mp txn
+            if (rand.nextDouble() < config.mprate) {
+                int id1 = rand.nextInt(config.cardcount - 1);
+                int id2 = id1 + 2000 < config.cardcount ?
+                          id1 + 2000 : config.cardcount - 1;
+
+                String pan1 = generate16DString(id1);
+                String pan2 = generate16DString(id2);
+
+                client.callProcedure(new ProcCallback("Select"),
+                                     "Select",
+                                     pan1,
+                                     pan2);
+            }
         }
     }
 
@@ -407,9 +426,6 @@ class NPBenchmark {
     private static String generate16DString(int num) {
         String str = Integer.toString(num);
         int num_0 = 16 - str.length();
-
-        if (num_0 == 0)
-            return str;
 
         char[] zeros = new char[num_0];
         Arrays.fill(zeros, '0');
