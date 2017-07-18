@@ -179,6 +179,27 @@ public class TestSplitSQLStatements {
                 + "select suitcaseofbeer from R; "
                 + "end";
         checkSplitter(sql, sql);
+
+        // begin as table name
+        sql = "create procedure p as begin "
+                + "select emptycase from begin; "
+                + "select caseofbeer from R; "
+                + "end";
+        checkSplitter(sql, sql);
+
+        // begin as column name
+        sql = "create procedure p as begin "
+                + "select emptycase from S; "
+                + "select begin from R; "
+                + "end";
+        checkSplitter(sql, sql);
+
+        // begin as table and column name
+        sql = "create procedure p as begin "
+                + "select begin.begin from begin; "
+                + "select emptycase from R; "
+                + "end";
+        checkSplitter(sql, sql);
     }
 
     @Test
