@@ -127,7 +127,7 @@ PersistentTable::PersistentTable(int partitionColumn, char const* signature, boo
     m_surgeon(*this),
     m_tableForStreamIndexing(NULL),
     m_isMaterialized(isMaterialized),
-    m_drEnabled(drEnabled),
+    m_drEnabled(drEnabled && !isMaterialized),
     m_noAvailableUniqueIndex(false),
     m_smallestUniqueIndex(NULL),
     m_smallestUniqueIndexCrc(0),
@@ -322,7 +322,7 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
 }
 
 bool PersistentTable::doDRActions(AbstractDRTupleStream* drStream) {
-    return (drStream && drStream->drStreamStarted() && !m_isMaterialized && m_drEnabled);
+    return (drStream && drStream->drStreamStarted() && m_drEnabled);
 }
 
 void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,

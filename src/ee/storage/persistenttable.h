@@ -461,7 +461,7 @@ public:
     int getDRTimestampColumnIndex() const { return m_drTimestampColumnIndex; }
 
     // for test purpose
-    void setDR(bool flag) { m_drEnabled = flag; }
+    void setDR(bool flag) { m_drEnabled = flag && !m_isMaterialized; }
 
     void setTupleLimit(int32_t newLimit) { m_tupleLimit = newLimit; }
 
