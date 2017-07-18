@@ -1,0 +1,33 @@
+<deployment>
+  <cluster hostcount="1" kfactor="0" schema="ddl" sitesperhost="4"/>
+  <partition-detection enabled="false"/>
+  <heartbeat timeout="15"/>
+  <httpd>
+    <jsonapi enabled="true"/>
+  </httpd>
+  <export>
+    <configuration enabled="false" target="default" type="kafka">
+      <property name="bootstrap.servers">bshaw-desktop:9092</property>
+      <property name="acks">1</property>
+      <property name="skipinternals">true</property>
+      <property name="topic.prefix">T8_</property>
+    </configuration>
+    <configuration enabled="true" target="dolphin" type="file">
+      <property name="type">tsv</property>
+      <property name="nonce">dolphin</property>
+      <property name="skipinternals">true</property>
+      <property name="batched">false</property>
+    </configuration>
+  </export>
+  <commandlog enabled="true" synchronous="true">
+    <frequency/>
+  </commandlog>
+  <systemsettings>
+    <temptables/>
+    <snapshot priority="6"/>
+    <resourcemonitor>
+      <memorylimit size="0"/>
+    </resourcemonitor>
+  </systemsettings>
+  <dr id="1"/>
+</deployment>
