@@ -1508,7 +1508,7 @@ public abstract class CatalogUtil {
             if (catconn == null) {
                 if (connectorEnabled) {
                     if (DR_CONFLICTS_TABLE_EXPORT_GROUP.equals(targetName)) {
-                        hostLog.error("Export configuration enabled and provided for export target " +
+                        throw new RuntimeException("Export configuration enabled and provided for export target " +
                                 targetName +
                                 " in deployment file however no export " +
                                 "tables are assigned to the this target. " +
