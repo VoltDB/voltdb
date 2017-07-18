@@ -171,7 +171,8 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
 }
 
 bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
-                                    TempTable *newOutputTable) {
+                                    TempTable *newOutputTable,
+                                    TableTuple &temp_tuple) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
     assert(inputSchema);
@@ -228,7 +229,13 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
                                "single-row" : "multi-row"),
                m_engine->getPartitionId());
     VOLT_DEBUG("Offset of partition column is %d", m_partitionColumn);
+    //
+    // Return a tuple whose schema we can use as an
+    // input.
+    //
     m_tempPool = ExecutorContext::getTempStringPool();
+    char *storage = static_cast<char *>(m_tempPool->allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+    temp_tuple = TableTuple(storage, inputSchema);
     return false;
 }
 
@@ -285,7 +292,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
             // tables with no views on them.
             // When there are views, be strict and throw mispartitioned
             // tuples to force partitioned data to be generated only
-            // where partitoned view rows are maintained.
+            // where partitioned view rows are maintained.
             if (!m_isStreamed || m_hasStreamView) {
                 throw ConstraintFailureException(
                                                  m_targetTable, m_templateTuple,
@@ -358,8 +365,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // we only insert on one site.  For all other sites we just
     // do nothing.
     //
+    TableTuple inputTuple;
     const TupleSchema *inputSchema = m_inputTable->schema();
-    if (p_execute_init(inputSchema, m_tmpOutputTable)) {
+    if (p_execute_init(inputSchema, m_tmpOutputTable, inputTuple)) {
         p_execute_finish();
         return true;
     }
@@ -369,7 +377,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
     //
     TableIterator iterator = m_inputTable->iterator();
-    TableTuple inputTuple = TableTuple(inputSchema);
     while (iterator.next(inputTuple)) {
         p_execute_tuple(inputTuple);
     }
