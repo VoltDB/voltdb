@@ -38,8 +38,9 @@ public class TestPlansWhereBoolean extends PlannerTestCase {
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
         if (tablePartitioned) {
-            assertTrue(pn instanceof ProjectionPlanNode);
-            pn = pn.getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
         }
         else {
             assertTrue(pn instanceof SeqScanPlanNode);

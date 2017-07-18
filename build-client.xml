@@ -73,6 +73,9 @@
         <include name='javaee-api-6.0.jar' />
     </fileset>
     <fileset dir='${vendor.lib.dir}'>
+        <include name='commons-lang-2.6.jar' />
+    </fileset>
+    <fileset dir='${vendor.lib.dir}'>
         <include name='javassist-3.20.0-GA.jar' />
     </fileset>
     <fileset dir='${lib.dir}'>
