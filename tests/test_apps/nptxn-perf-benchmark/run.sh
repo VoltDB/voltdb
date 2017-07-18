@@ -79,7 +79,8 @@ function client() {
     java -classpath $BENCHMARK_JAR_NAME:$CLIENTCLASSPATH np.NPBenchmark \
          --scale='0.5' \
          --cardcount='500000' \
-         --mprate='0.05'
+         --mprate='0.02' \
+         --skew='0.99'
 }
 
 if [ $# -eq 0 ]; then server-init; exit; fi

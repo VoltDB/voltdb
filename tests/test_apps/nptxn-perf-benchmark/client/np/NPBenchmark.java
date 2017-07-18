@@ -63,6 +63,9 @@ class NPBenchmark {
         @Option(desc = "Rate of MP txns")
         double mprate = 0.05;
 
+        @Option(desc = "Data skew ratio")
+        double skew = 0.2;
+
         @Override
         public void validate() {
             if (scale >= 1 || scale <= 0) {
@@ -310,7 +313,8 @@ class NPBenchmark {
      * Performs one iteration of the benchmark
      */
     public void iterate() throws Exception {
-        int id = rand.nextInt(config.cardcount - 1);
+        double range = ((double) config.cardcount - 1) * (1.0 - config.skew);
+        int id = rand.nextInt((int) range);
         String pan = Integer.toString(id);
 
         client.callProcedure(new ProcCallback("Authorize"),
@@ -320,7 +324,7 @@ class NPBenchmark {
                              "USD"
                              );
 
-        pan = Integer.toString(rand.nextInt(config.cardcount - 1));
+        pan = Integer.toString(rand.nextInt((int) range));
         client.callProcedure(new ProcCallback("Redeem"),
                              "Redeem",
                              pan,
@@ -332,8 +336,8 @@ class NPBenchmark {
         for (int i = 0; i < 2; i++) {
             // 2p txn
             if (rand.nextDouble() < config.scale) {
-                int id1 = rand.nextInt(config.cardcount - 1);
-                int id2 = rand.nextInt(config.cardcount - 1);
+                int id1 = rand.nextInt((int) range);
+                int id2 = rand.nextInt((int) range);
 
                 String pan1 = generate16DString(id1);
                 String pan2 = generate16DString(id2);
@@ -349,7 +353,7 @@ class NPBenchmark {
 
             // mp txn
             if (rand.nextDouble() < config.mprate) {
-                int id1 = rand.nextInt(config.cardcount - 1);
+                int id1 = rand.nextInt((int) range);
                 int id2 = id1 + 2000 < config.cardcount ?
                           id1 + 2000 : config.cardcount - 1;
 
