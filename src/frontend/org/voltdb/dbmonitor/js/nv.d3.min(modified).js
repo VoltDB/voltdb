@@ -623,7 +623,7 @@
 
                 if (d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail")
                     {
-                        currentTime = d.data.label.split("(")[0]
+                        currentTime = d.data.label.split(" ")[1]
                         if(currentTime.indexOf("<") >= 0){
                         currentTime = currentTime.replace("<", "&lt;");
                         currentTime = currentTime.replace(">", "&gt;");
