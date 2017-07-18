@@ -121,10 +121,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Create a new data source.
      * @param db
      * @param tableName
-     * @param isReplicated
      * @param partitionId
-     * @param HSId
-     * @param tableId
      * @param catalogMap
      */
     public ExportDataSource(
@@ -476,28 +473,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean endOfStream, boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         if (endOfStream) {
-            assert(!m_endOfStream);
-            assert(buffer == null);
-            assert(!sync);
-
-            m_endOfStream = endOfStream;
-
-            if (m_committedBuffers.isEmpty()) {
-                exportLog.info("Pushed EOS buffer with 0 bytes remaining");
-                if (m_pollFuture != null) {
-                    m_pollFuture.set(null);
-                    m_pollFuture = null;
-                }
-                if (m_onDrain != null) {
-                    m_drainTraceForDebug = new Exception("Push USO " + uso + " endOfStream " + endOfStream +
-                                                         " poll " + poll);
-                    m_onDrain.run();
-                }
-            } else {
-                exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId +
-                        " with first unpolled uso " + m_firstUnpolledUso + " and remaining bytes " +
-                        m_committedBuffers.sizeInBytes());
-            }
+            VoltDB.crashLocalVoltDB("BSDBG: end of stream encountered");
+            //onEndOfStream(uso, buffer, sync, poll);
             return;
         }
         assert(!m_endOfStream);
@@ -688,6 +665,35 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
         return stashOrSubmitTask(runnable, false, false);
+    }
+
+    // FIXME remove me
+    private void onEndOfStream(long uso,
+                               ByteBuffer buffer,
+                               boolean sync,
+                               boolean poll) throws Exception {
+        assert(!m_endOfStream);
+        assert(buffer == null);
+        assert(!sync);
+
+        m_endOfStream = true;
+
+        if (m_committedBuffers.isEmpty()) {
+            exportLog.info("Pushed EOS buffer with 0 bytes remaining");
+            if (m_pollFuture != null) {
+                m_pollFuture.set(null);
+                m_pollFuture = null;
+            }
+            if (m_onDrain != null) {
+                m_drainTraceForDebug = new Exception("Push USO " + uso + " endOfStream true poll " + poll);
+                m_onDrain.run();
+            }
+        } else {
+            exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId +
+                    " with first unpolled uso " + m_firstUnpolledUso + " and remaining bytes " +
+                    m_committedBuffers.sizeInBytes());
+        }
+        throw new RuntimeException("BSDBG end of stream was called");
     }
 
     public ListenableFuture<?> close() {

@@ -194,7 +194,7 @@ public class ExportGeneration implements Generation {
             throw new IOException("Invalid Generation directory, directory name must be a number.");
         }
 
-        m_isContinueingGeneration = (catalogGen == m_timestamp);
+        m_isContinueingGeneration = true; // (catalogGen == m_timestamp);
     }
 
     //This checks if the on disk generation is a catalog generation.
@@ -658,18 +658,6 @@ public class ExportGeneration implements Generation {
         }
         dataSourcesForPartition.put( source.getSignature(), source);
         m_numSources++;
-    }
-
-    /*
-     * An unfortunate test only method for supplying a mock source
-     */
-    public void addDataSource(ExportDataSource source) {
-        Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(source.getPartitionId());
-        if (dataSourcesForPartition == null) {
-            dataSourcesForPartition = new HashMap<String, ExportDataSource>();
-            m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
-        }
-        dataSourcesForPartition.put(source.getSignature(), source);
     }
 
     // silly helper to add datasources for a table catalog object
