@@ -37,7 +37,12 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 
 public class TestQueryTimeout extends RegressionSuite {
 
-    private static final int TIMEOUT = 1000;
+    private static final double TIMEOUT_INCREASE = 50.0;
+    private static final double TIMEOUT_DECREASE = 1/500.0;
+
+    private static final int TIMEOUT_NORMAL = 1000;
+    private static final int TIMEOUT_LONG   = (int)(1000 * TIMEOUT_INCREASE);
+    private static final int TIMEOUT_SHORT  = (int)(1000 * TIMEOUT_DECREASE);
 
     // DEBUG build of EE runs much slower, so the timing part is not deterministic.
     private static String ERRORMSG = "A SQL query was terminated after";
@@ -103,7 +108,7 @@ public class TestQueryTimeout extends RegressionSuite {
         Client client = this.getClient();
         loadTables(client, 0, 5000);
 
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         //
         // Replicated table procedure tests
@@ -149,7 +154,7 @@ public class TestQueryTimeout extends RegressionSuite {
         Client client = this.getClient();
         loadTables(client, 10000, 3000);
 
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         //
         // Partition table procedure tests
@@ -185,7 +190,7 @@ public class TestQueryTimeout extends RegressionSuite {
 
     private void checkTimeoutIncreasedProcSucceed(boolean sync, Client client, String procName, Object...params)
             throws IOException, ProcCallException, InterruptedException {
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         try {
             client.callProcedure(procName, params);
@@ -196,26 +201,27 @@ public class TestQueryTimeout extends RegressionSuite {
                        ex.getMessage().contains(ERRORMSG));
         }
 
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         // increase the individual timeout value in order to succeed running this long procedure
         if (sync) {
             try {
-                client.callProcedureWithTimeout(TIMEOUT*50, procName, params);
+                client.callProcedureWithTimeout(TIMEOUT_LONG, procName, params);
             }
             catch (Exception ex) {
                 System.err.println(ex.getMessage());
-                fail(procName + " is supposed to succeed!");
+                fail(procName + " is supposed to succeed but failed with message: !"
+                        + ex.getMessage());
             }
         }
         else {
-            client.callProcedureWithTimeout(m_callback, TIMEOUT*50, procName, params);
+            client.callProcedureWithTimeout(m_callback, TIMEOUT_LONG, procName, params);
             client.drain();
             checkCallbackSuccess();
         }
 
         // check the global timeout value again
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         // run the same procedure again to verify the global timeout value still applies
         try {
@@ -227,12 +233,12 @@ public class TestQueryTimeout extends RegressionSuite {
                        ex.getMessage().contains(ERRORMSG));
         }
 
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
     }
 
     private void checkTimeoutIncreasedProcFailed(boolean sync, Client client, String procName, Object...params)
             throws IOException, ProcCallException, InterruptedException {
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         try {
             client.callProcedure(procName, params);
@@ -243,13 +249,13 @@ public class TestQueryTimeout extends RegressionSuite {
                        ex.getMessage().contains(ERRORMSG));
         }
 
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         // increase the individual timeout value in order to succeed running this long procedure
         // However, for non-admin user, timeout value can not override system timeout value.
         if (sync) {
             try {
-                client.callProcedureWithTimeout(TIMEOUT*50, procName, params);
+                client.callProcedureWithTimeout(TIMEOUT_LONG, procName, params);
                 fail(procName + PROMPTMSG);
             }
             catch (Exception ex) {
@@ -258,13 +264,13 @@ public class TestQueryTimeout extends RegressionSuite {
             }
         }
         else {
-            client.callProcedureWithTimeout(m_callback, TIMEOUT*50, procName, params);
+            client.callProcedureWithTimeout(m_callback, TIMEOUT_LONG, procName, params);
             client.drain();
             checkCallbackTimeoutError(ERRORMSG);
         }
 
         // check the global timeout value again
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         // run the same procedure again to verify the global timeout value still applies
         try {
@@ -276,26 +282,28 @@ public class TestQueryTimeout extends RegressionSuite {
                        ex.getMessage().contains(ERRORMSG));
         }
 
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
     }
 
     private void checkTimeoutDecreaseProcFailed(boolean sync, Client client, String procName, Object...params)
             throws IOException, ProcCallException, InterruptedException {
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         try {
             client.callProcedure(procName, params);
         }
         catch (Exception ex) {
-            fail(procName + " is supposed to succeed, but failed with message +\n" + ex.getMessage());
+            fail(procName +
+                    " is supposed to succeed, but failed with message "
+                    + ex.getMessage());
         }
 
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         // decrease the individual timeout value in order to timeout the running this long procedure
         if (sync) {
             try {
-                client.callProcedureWithTimeout(TIMEOUT / 500, procName, params);
+                client.callProcedureWithTimeout(TIMEOUT_SHORT, procName, params);
                 fail(procName + PROMPTMSG);
             }
             catch (Exception ex) {
@@ -304,23 +312,27 @@ public class TestQueryTimeout extends RegressionSuite {
             }
         }
         else {
-            client.callProcedureWithTimeout(m_callback, TIMEOUT / 500, procName, params);
+            client.callProcedureWithTimeout(m_callback, TIMEOUT_SHORT, procName, params);
             client.drain();
             checkCallbackTimeoutError(ERRORMSG);;
         }
 
         // check the global timeout value again
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
 
         // run the same procedure again to verify the global timeout value still applies
         try {
             client.callProcedure(procName, params);
         }
         catch (Exception ex) {
-            fail(procName + " is supposed to succeed!");
+            fail(procName
+                    + " is supposed to succeed, but failed with message "
+                    + ex.getMessage()
+                    + "\n");
+            ex.printStackTrace();
         }
 
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
     }
 
     private void checkIndividualProcTimeout(Client client, boolean isAdmin)
@@ -345,7 +357,7 @@ public class TestQueryTimeout extends RegressionSuite {
             // truncate the data
             truncateTables(client);
             // load more data
-            loadTables(client, 10000, 3000);
+            loadTables(client, 5000, 3000);
 
             if (isAdmin) {
                 checkTimeoutIncreasedProcSucceed(sync, client, "SPPartitionReadOnlyProc", 1);
@@ -419,7 +431,7 @@ public class TestQueryTimeout extends RegressionSuite {
         // negative timeout value
         String errorMsg = "Timeout value can't be negative";
         try {
-            client.callProcedureWithTimeout(TIMEOUT * -1, "PartitionReadOnlyProc");
+            client.callProcedureWithTimeout(TIMEOUT_NORMAL * -1, "PartitionReadOnlyProc");
             fail();
         }
         catch (Exception ex) {
@@ -428,7 +440,7 @@ public class TestQueryTimeout extends RegressionSuite {
         }
 
         try {
-            client.callProcedureWithTimeout(m_callback, TIMEOUT * -1, "PartitionReadOnlyProc");
+            client.callProcedureWithTimeout(m_callback, TIMEOUT_NORMAL * -1, "PartitionReadOnlyProc");
             client.drain();
             fail();
         }
@@ -439,7 +451,7 @@ public class TestQueryTimeout extends RegressionSuite {
 
         // Integer overflow
         try {
-            client.callProcedureWithTimeout(TIMEOUT * Integer.MAX_VALUE, "PartitionReadOnlyProc");
+            client.callProcedureWithTimeout(TIMEOUT_NORMAL * Integer.MAX_VALUE, "PartitionReadOnlyProc");
             fail();
         }
         catch (Exception ex) {
@@ -455,7 +467,7 @@ public class TestQueryTimeout extends RegressionSuite {
 
         if (sync) {
             try {
-                client.callProcedureWithTimeout(TIMEOUT / 500, procName, params);
+                client.callProcedureWithTimeout(TIMEOUT_SHORT, procName, params);
             }
             catch (Exception ex) {
                 System.err.println(ex.getMessage());
@@ -463,7 +475,7 @@ public class TestQueryTimeout extends RegressionSuite {
             }
         }
         else {
-            client.callProcedureWithTimeout(m_callback, TIMEOUT / 500, procName, params);
+            client.callProcedureWithTimeout(m_callback, TIMEOUT_SHORT, procName, params);
             client.drain();
             checkCallbackSuccess();
         }
@@ -513,7 +525,7 @@ public class TestQueryTimeout extends RegressionSuite {
             fail();
         }
         project.addProcedures(PROCEDURES);
-        project.setQueryTimeout(TIMEOUT);
+        project.setQueryTimeout(TIMEOUT_NORMAL);
 
         UserInfo users[] = new UserInfo[] {
                 new UserInfo("adminUser", "password", new String[] {"AdMINISTRATOR"}),
