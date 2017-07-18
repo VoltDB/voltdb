@@ -223,6 +223,7 @@ public class SQLCommand
         m_returningToPromptAfterError = false;
         final StringBuilder statement = new StringBuilder();
         boolean isRecall = false;
+        boolean inMultiStmtProc = false;
 
         while (true) {
             String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
@@ -236,10 +237,38 @@ public class SQLCommand
                 statement.setLength(0);
                 line = "EXIT;";
             }
+            // if it is a multi statement procedure
+            if(!inMultiStmtProc) {
+                // check if the statement is CREATE PROCEDURE AS BEGIN...
+                // add the current line to the statements so far entered
+                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureBeginAsSQL(statement.toString() + ' ' + line);
+                if (statementMatcher.matches()) {
+                    System.out.print("INTERACTIVE MODE - matched begin procedure - executeImmediate=false");
+                    inMultiStmtProc = true;
+                    statement.append(line + "\n");
+                    continue;
+                }
+            } else if ( line.indexOf(";") > 0 ) {
+                /* check if the multi statement procedure is complete
+                 * Multi statement procedure can be complete only by a semi colon
+                 * We need to extract substring till the semi colon since the
+                 * regular expression matches the create procedure as begin .. end; syntax
+                 * Since the sqlcmd allows for more user input after the semi colon,
+                 * we need to make sure that the multi statement procedure actually gets matched
+                 */
+                String lineTillSemiColon = line.substring(0, line.indexOf(";") + 1);
+                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(
+                        statement.toString() + ' ' + lineTillSemiColon);
+                if (statementMatcher.matches()) {
+                    System.out.print("INTERACTIVE MODE - matched FULL procedure - executeImmediate=true");
+                    inMultiStmtProc = false;
+                }
+            }
 
             // Was there a line-ending semicolon typed at the prompt?
             // This mostly matters for "non-directive" statements.
-            boolean executeImmediate = SQLParser.isSemiColonTerminated(line);
+            boolean executeImmediate = !inMultiStmtProc && SQLParser.isSemiColonTerminated(line);
+
 
             // When we are tracking the progress of a multi-line statement,
             // avoid coincidentally recognizing mid-statement SQL content as sqlcmd
