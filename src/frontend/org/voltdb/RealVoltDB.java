@@ -3386,8 +3386,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (cause == null && e.getCause() != null) {
                         cause = e.getCause().getMessage();
                     }
-                    String msg = "Error loading class: " + classname + " from catalog: " +
-                        e.getClass().getCanonicalName() + ", " + cause;
+                    String msg = "Error loading class \'" + classname + "\': " +
+                        e.getClass().getCanonicalName() + " for " + cause;
                     hostLog.warn(msg);
                     return msg;
                 }
