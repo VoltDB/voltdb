@@ -160,8 +160,6 @@ public class ExportGeneration implements Generation {
     private final Map<Integer, String> m_partitionLeaderZKName = new HashMap<Integer, String>();
     private final Set<Integer> m_partitionsIKnowIAmTheLeader = new HashSet<Integer>();
 
-    //This is maintained to detect if this is a continueing generation or not
-    private final boolean m_isContinueingGeneration;
     /**
      * Constructor to create a new generation of export data
      * @param exportOverflowDirectory
@@ -175,7 +173,6 @@ public class ExportGeneration implements Generation {
                 throw new IOException("Could not create " + m_directory + " Rejoin: " + isRejoin);
             }
         }
-        m_isContinueingGeneration = true;
 
         exportLog.info("Creating new export generation " + m_timestamp + " Rejoin: " + isRejoin);
     }
@@ -193,8 +190,6 @@ public class ExportGeneration implements Generation {
         } catch (NumberFormatException ex) {
             throw new IOException("Invalid Generation directory, directory name must be a number.");
         }
-
-        m_isContinueingGeneration = true; // (catalogGen == m_timestamp);
     }
 
     boolean initializeGenerationFromDisk(final CatalogMap<Connector> connectors, HostMessenger messenger) {
@@ -646,6 +641,7 @@ public class ExportGeneration implements Generation {
     private void addDataSources(Table table, int hostId, List<Integer> partitions)
     {
         for (Integer partition : partitions) {
+
             /*
              * IOException can occur if there is a problem
              * with the persistent aspects of the datasource storage
@@ -671,8 +667,6 @@ public class ExportGeneration implements Generation {
                     exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
                             " signature " + table.getSignature() + " partition id " + partition);
                     dataSourcesForPartition.put(table.getSignature(), exportDataSource);
-                } else {
-                    exportLog.info("BSDBG: found table signature " + table.getSignature() + " for table " + table.getTypeName() + " which already exists");
                 }
                 m_numSources++;
             } catch (IOException e) {
@@ -682,8 +676,6 @@ public class ExportGeneration implements Generation {
             }
         }
     }
-
-
 
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
         //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));

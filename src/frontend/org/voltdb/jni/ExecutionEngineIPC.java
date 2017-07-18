@@ -367,6 +367,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     String signature = new String(signatureBytes, "UTF-8");
                     long uso = getBytes(8).getLong();
                     boolean sync = getBytes(1).get() == 1 ? true : false;
+                    // TODO: remove isEndOfGeneration and the generation ID since both are unused
                     boolean isEndOfGeneration = getBytes(1).get() == 1 ? true : false;
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(

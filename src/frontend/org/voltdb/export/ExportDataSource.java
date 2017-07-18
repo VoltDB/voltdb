@@ -301,8 +301,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } else {
             nonce = m_tableName + "_" + crc.getValue() + "_" + hsid + "_" + m_partitionId;
         }
-        //If on disk generation matches catalog generation we dont do end of stream as it will be appended to.
-        m_endOfStream = !isContinueingGeneration;
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
@@ -473,11 +471,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean endOfStream, boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         if (endOfStream) {
+            // TODO: remove endOfStream altogether
             VoltDB.crashLocalVoltDB("BSDBG: end of stream encountered");
-            //onEndOfStream(uso, buffer, sync, poll);
             return;
         }
-        assert(!m_endOfStream);
+
         if (buffer != null) {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
@@ -598,17 +596,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         return;
                     }
                     m_committedBuffers.truncateToTxnId(txnId);
-
-                    if (m_committedBuffers.isEmpty() && m_endOfStream) {
-                        if (m_pollFuture != null) {
-                            m_pollFuture.set(null);
-                            m_pollFuture = null;
-                        }
-                        if (m_onDrain != null) {
-                            m_drainTraceForDebug = new Exception("Truncation txnId " + txnId);
-                            m_onDrain.run();
-                        }
-                    }
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, t);
                 }
@@ -665,35 +652,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
         return stashOrSubmitTask(runnable, false, false);
-    }
-
-    // FIXME remove me
-    private void onEndOfStream(long uso,
-                               ByteBuffer buffer,
-                               boolean sync,
-                               boolean poll) throws Exception {
-        assert(!m_endOfStream);
-        assert(buffer == null);
-        assert(!sync);
-
-        m_endOfStream = true;
-
-        if (m_committedBuffers.isEmpty()) {
-            exportLog.info("Pushed EOS buffer with 0 bytes remaining");
-            if (m_pollFuture != null) {
-                m_pollFuture.set(null);
-                m_pollFuture = null;
-            }
-            if (m_onDrain != null) {
-                m_drainTraceForDebug = new Exception("Push USO " + uso + " endOfStream true poll " + poll);
-                m_onDrain.run();
-            }
-        } else {
-            exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId +
-                    " with first unpolled uso " + m_firstUnpolledUso + " and remaining bytes " +
-                    m_committedBuffers.sizeInBytes());
-        }
-        throw new RuntimeException("BSDBG end of stream was called");
     }
 
     public ListenableFuture<?> close() {
@@ -762,19 +720,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             StreamBlock first_unpolled_block = null;
 
-            if (m_endOfStream && m_committedBuffers.isEmpty()) {
-                //Returning null indicates end of stream
-                try {
-                    fut.set(null);
-                } catch (RejectedExecutionException reex) {
-                    //We are closing source.
-                }
-                if (m_onDrain != null) {
-                    m_drainTraceForDebug = new Exception();
-                    m_onDrain.run();
-                }
-                return;
-            }
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();

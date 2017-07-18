@@ -20,7 +20,14 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
@@ -73,8 +80,7 @@ public class ExportManager
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    private ExportGeneration m_generation = null; // BSDBG
-    //private final COWSortedMap<Long,ExportGeneration> m_generations = new COWSortedMap<Long, ExportGeneration>();
+    private final AtomicReference<ExportGeneration> m_generation = new AtomicReference<>(null);
 
     /*
      * When a generation is drained store a the id so
@@ -86,7 +92,6 @@ public class ExportManager
     //Keep track of initial or last generation that was set in EE but has no Java side as export is disabled and misconfigured.
     //Typically start with table pointing to bad target. fix target and unfix it again...keep doing this and you will
     //have a generation thats last one which has not java side as export s disabled.
-    private static long m_lastNonEnabledGeneration = 0;
     private final HostMessenger m_messenger;
 
     /**
@@ -160,6 +165,7 @@ public class ExportManager
                     return;
                 }
             }
+            // TODO: is there any benefit in queuing a runnable which only calls m_onGenerationDrainedForTruncation.release()?
             //After all generations drained processors can not be null as above check should kick you out.
             ExportDataProcessor proc = m_processor.get();
             if (proc == null) {
@@ -170,7 +176,6 @@ public class ExportManager
                 public void run() {
                     try {
                         throw new IllegalStateException("BSDBG: not allowed to roll generations");
-                        //rollToNextGeneration(m_generation);
                     } catch (RuntimeException e) {
                         exportLog.error("Error rolling to next export generation", e);
                     } catch (Exception e) {
@@ -184,104 +189,6 @@ public class ExportManager
         }
 
     }
-
-    /*
-    private void rollToNextGeneration(ExportGeneration drainedGeneration) throws Exception {
-        //ExportDataProcessor newProcessor = null;
-        //ExportDataProcessor oldProcessor = null;
-        //boolean installNewProcessor = false;
-        ExportManager instance = instance();
-        synchronized (instance) {
-            if (m_generations.containsValue(drainedGeneration)) {
-                m_generations.remove(drainedGeneration.m_timestamp);
-                m_generationGhosts.add(drainedGeneration.m_timestamp);
-                //If I am draining current generation create new processor. Otherwise its just older on disk generations
-                // that are getting drained.
-                //installNewProcessor = (m_processor.get().getExportGeneration() == drainedGeneration);
-                exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
-            } else {
-                //installNewProcessor = false;
-                exportLog.warn("Finished draining a generation that is not known to export generations.");
-            }
-
-            try {
-                if (m_loaderClass != null && !m_generations.isEmpty()) {
-                    //Pick next generation.
-                    ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
-                    if (installNewProcessor) {
-                        exportLog.info("Creating connector " + m_loaderClass);
-                        final Class<?> loaderClass = Class.forName(m_loaderClass);
-                        newProcessor = (ExportDataProcessor) loaderClass.newInstance();
-                        newProcessor.addLogger(exportLog);
-                        newProcessor.setExportGeneration(nextGeneration);
-                        newProcessor.setProcessorConfig(m_processorConfig);
-                        newProcessor.readyForData(false);
-                    } else {
-                        //Just set the next generation.
-                        m_processor.get().setExportGeneration(nextGeneration);
-                        //make sure so that we can re acquire.
-                        m_processor.get().startPolling();
-                    //}
-
-                    if (!nextGeneration.isContinueingGeneration()) {
-                    */
-                        /*
-                         * Changes in partition count can make the load balancing strategy not capture
-                         * all partitions for data that was from a previously larger cluster.
-                         * For those use a naive leader election strategy that is implemented
-                         * by export generation.
-                         */
-                    //    nextGeneration.kickOffLeaderElection(m_messenger);
-                    //} else {
-                        /*
-                         * This strategy is the one that piggy backs on
-                         * regular partition mastership distribution to determine
-                         * who will process export data for different partitions.
-                         * We stashed away all the ones we have mastership of
-                         * in m_masterOfPartitions
-                         */
-                        /*
-                        for (Integer partitionId : m_masterOfPartitions) {
-                            nextGeneration.acceptMastershipTask(partitionId);
-                        }
-                    }
-                    */
-                    /*
-                    if (installNewProcessor && newProcessor != null) {
-                        //If we installed new processor get old one to shutdown.
-                        oldProcessor = m_processor.getAndSet(newProcessor);
-                    }
-                    */
-                    /*
-                } else {
-                    //We deleted last of the generation as we dropped the last stream
-                    exportLog.info("Last stream dropped processor will be removed: " + m_loaderClass);
-                    //oldProcessor =
-                            m_processor.getAndSet(null);
-                }
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
-            }
-        }
-        */
-
-        /*
-         * The old processor should shutdown if we installed a new processor.
-         */
-        /*
-        if (oldProcessor != null && installNewProcessor) {
-            oldProcessor.shutdown();
-        }
-        try {
-            //We close and delete regardless
-            drainedGeneration.closeAndDelete(m_messenger);
-        } catch (IOException e) {
-            //Warn users if close or delete of PBDs has issues the generation is closed and thus on startup will be attempted
-            //to load and delete if empty.
-            exportLog.warn("Failed to close and delete generation files.", e);
-        }
-    }
-    */
 
     /**
      * Construct ExportManager using catalog.
@@ -335,10 +242,11 @@ public class ExportManager
          * Only the first generation will have a processor which
          * makes it safe to accept mastership.
          */
-        if (m_generation == null) {
+        ExportGeneration generation = m_generation.get();
+        if (generation == null) {
             return;
         }
-        m_generation.acceptMastershipTask(partitionId);
+        generation.acceptMastershipTask(partitionId);
     }
 
     /**
@@ -456,22 +364,25 @@ public class ExportManager
              * If this is startup there is no existing generation created for new export data
              * So construct one here, otherwise use the one provided
              */
+            ExportGeneration generation = m_generation.get();
             if (startup) {
-                if (m_generation == null){
+                if (generation == null){
                     final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_ccrTime,
                             exportOverflowDirectory, isRejoin);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
-                    m_generation = currentGeneration;
+                    generation = currentGeneration;
+                    m_generation.set(generation);
                 } else {
                     exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used and appended to");
                 }
-                m_generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+                generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
             }
+            assert generation != null;
             /*
              * For the newly constructed processor, provide it the oldest known generation
              */
-            newProcessor.setExportGeneration(m_generation);
+            newProcessor.setExportGeneration(generation);
             newProcessor.readyForData(startup);
 
             if (!startup) {
@@ -486,7 +397,7 @@ public class ExportManager
                  * in m_masterOfPartitions
                  */
                 for( Integer partitionId: m_masterOfPartitions) {
-                    m_generation.acceptMastershipTask(partitionId);
+                    generation.acceptMastershipTask(partitionId);
                 }
             }
         }
@@ -509,6 +420,7 @@ public class ExportManager
             return;
         }
         if (files.length > 1) {
+            // TODO this is not approved UX
             VoltDB.crashLocalVoltDB("BSDBG: there's more than one generation in export_overflow");
         }
         for (File f : files) {
@@ -526,12 +438,8 @@ public class ExportManager
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
             if (generation.initializeGenerationFromDisk(connectors, m_messenger)) {
-                if (m_generation == null) {
-                    m_generation = generation;
-                } else {
-                    VoltDB.crashLocalVoltDB("BSDBG: attempting to overwrite generation");
-                }
-                //m_generations.put( generation.m_timestamp, generation);
+                assert (m_generation.get() == null);
+                m_generation.set(generation);
             } else {
                 String list[] = generationDirectory.list();
                 if (list != null && list.length == 0) {
@@ -612,7 +520,6 @@ public class ExportManager
         updateProcessorConfig(connectors);
         long genid = catalogContext.m_ccrTime;
         if (m_processorConfig.isEmpty()) {
-            exportLog.info("BSDBG: bailed out of updateCatalog because processorConfig is empty");
             return;
         }
 
@@ -620,7 +527,6 @@ public class ExportManager
             exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
             return;
         }
-
         /**
          * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
          * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
@@ -630,18 +536,19 @@ public class ExportManager
             exportLog.info("Skipped rolling generations as generation not created in EE.");
             return;
         }
-
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-        if (m_generation == null) {
+        ExportGeneration generation = m_generation.get();
+        if (generation == null) {
             try {
-                m_generation = new ExportGeneration(genid, exportOverflowDirectory, false);
-                m_generation.setGenerationDrainRunnable(new GenerationDrainRunnable(m_generation));
+                generation = new ExportGeneration(genid, exportOverflowDirectory, false);
+                generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
+                m_generation.set(generation);
             } catch (IOException e1) {
                 VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
             }
         }
 
-        m_generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+        generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
 
         /*
          * If there is no existing export processor, create an initial one.
@@ -651,37 +558,37 @@ public class ExportManager
             exportLog.info("First stream created processor will be initialized: " + m_loaderClass);
             createInitialExportProcessor(catalogContext, connectors, false, partitions, false);
         } else {
+            // TODO: generation rolling used setExportGeneration() and startPolling(); do we need to call startPolling() for any reason?
             m_processor.get().setProcessorConfig(m_processorConfig);
-            // BSDBG: override m_generation with itself, but this activates all the ExportDataSource
-            m_processor.get().setExportGeneration(m_generation);
-            // BSDBG: this seems very dangerous to do on a running processor, but live vicariously
+            // override m_generation with itself to activate all the ExportDataSource
+            m_processor.get().setExportGeneration(generation);
             m_processor.get().readyForData(false);
-            // BSDBG: this may be safe
             for( Integer partitionId: m_masterOfPartitions) {
-                m_generation.acceptMastershipTask(partitionId);
+                generation.acceptMastershipTask(partitionId);
             }
         }
     }
 
     public void shutdown() {
-        m_generation.close(m_messenger);
+        ExportGeneration generation = m_generation.getAndSet(null);
+        if (generation != null) {
+            generation.close(m_messenger);
+        }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
             proc.shutdown();
         }
-        m_generation = null;
     }
 
     public static long getQueuedExportBytes(int partitionId, String signature) {
         ExportManager instance = instance();
         try {
-            if (instance.m_generation == null) {
+            ExportGeneration generation = instance.m_generation.get();
+            if (generation == null) {
                 //This is now fine as you could get a stats tick and have no generation if you dropped last table.
                 return 0;
             }
-
-            long exportBytes = instance.m_generation.getQueuedExportBytes( partitionId, signature);
-            return exportBytes;
+            return generation.getQueuedExportBytes( partitionId, signature);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Failed to get export queued bytes.", e);
@@ -709,8 +616,9 @@ public class ExportManager
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
         try {
-            ExportGeneration generation = instance.m_generation;
+            ExportGeneration generation = instance.m_generation.get();
             if (generation == null) {
+                // TODO: this should probably be an error, not a crash. It still should not happen.
                 VoltDB.crashLocalVoltDB("BSDBG: pushed export buffer before generation was initialized");
                 /*
                 if (buffer != null) {
@@ -730,7 +638,8 @@ public class ExportManager
         exportLog.info("Truncating export data after txnId " + snapshotTxnId);
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
-        if (m_generation != null && m_generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
+        ExportGeneration generation = m_generation.get();
+        if (generation != null && generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
             try {
                 m_onGenerationDrainedForTruncation.acquire();
             } catch (InterruptedException e) {
@@ -741,9 +650,9 @@ public class ExportManager
 
     public static synchronized void sync(final boolean nofsync) {
         exportLog.info("Syncing export data");
-        ExportManager instance = instance();
-        if (instance.m_generation != null) {
-            instance.m_generation.sync(nofsync);
+        ExportGeneration generation = instance().m_generation.get();
+        if (generation != null) {
+            generation.sync(nofsync);
         }
     }
 }
