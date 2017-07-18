@@ -39,8 +39,8 @@ import org.voltdb.VoltTable;
 public class InsertImportWithCount4 extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
     public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable4 " + sqlSuffix);
-    public final SQLStmt incrementMirrorRow = new SQLStmt("UPDATE kafkamirrortable4 SET import_count=import_count+1 WHERE key = ? and value = ?");
-    public final SQLStmt insertError = new SQLStmt("INSERT into importnomatch (key, value, streamnumber) values(key, value, 4");
+    public final SQLStmt incrementMirrorRow = new SQLStmt("UPDATE kafkamirrortable1 SET import_count=import_count+1 WHERE key = ? and value = ?");
+    public final SQLStmt insertError = new SQLStmt("INSERT into importnomatch (key, value, streamnumber) values(?, ?, 4)");
 
     public long run(long key, long value)
     {

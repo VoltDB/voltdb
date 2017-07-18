@@ -15,7 +15,7 @@ CREATE TABLE kafkaimporttable1
 
 PARTITION TABLE kafkaimporttable1 ON COLUMN KEY;
 
-CREATE TABLE kafkaimporttable2
+CREATE TABLE kafkaimporttable5
     (
           key                       BIGINT        NOT NULL
         , value                     BIGINT        NOT NULL
@@ -42,7 +42,17 @@ CREATE TABLE kafkaimporttable2
         , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 
     );
-PARTITION TABLE kafkaimporttable2 ON COLUMN key;
+PARTITION TABLE kafkaimporttable5 ON COLUMN key;
+
+CREATE TABLE kafkaimporttable2
+     (
+                  KEY   BIGINT NOT NULL,
+                  value BIGINT NOT NULL,
+                  insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                  CONSTRAINT pk_kafka_import_table2 PRIMARY KEY ( KEY )
+     );
+
+PARTITION TABLE kafkaimporttable2 ON COLUMN KEY;
 
 CREATE TABLE kafkaimporttable3
      (
@@ -63,16 +73,6 @@ CREATE TABLE kafkaimporttable4
      );
 
 PARTITION TABLE kafkaimporttable4 ON COLUMN KEY;
-
-CREATE TABLE kafkaimporttable5
-     (
-                  KEY   BIGINT NOT NULL,
-                  value BIGINT NOT NULL,
-                  insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                  CONSTRAINT pk_kafka_import_table5 PRIMARY KEY ( KEY )
-     );
-
-PARTITION TABLE kafkaimporttable5 ON COLUMN KEY;
 
 CREATE TABLE kafkamirrortable1
      (
@@ -186,20 +186,20 @@ CREATE PROCEDURE FROM class kafkaimporter.db.procedures.InsertFinal;
 CREATE PROCEDURE FROM class kafkaimporter.db.procedures.MatchRows;
 
 CREATE PROCEDURE PARTITION ON TABLE KAFKAIMPORTTABLE1 COLUMN key FROM class kafkaimporter.db.procedures.InsertImportWithCount1;
+CREATE PROCEDURE PARTITION ON TABLE KAFKAIMPORTTABLE2 COLUMN key FROM class kafkaimporter.db.procedures.InsertImportWithCount2;
 CREATE PROCEDURE PARTITION ON TABLE KAFKAIMPORTTABLE3 COLUMN key FROM class kafkaimporter.db.procedures.InsertImportWithCount3;
 CREATE PROCEDURE PARTITION ON TABLE KAFKAIMPORTTABLE4 COLUMN key FROM class kafkaimporter.db.procedures.InsertImportWithCount4;
-CREATE PROCEDURE PARTITION ON TABLE KAFKAIMPORTTABLE5 COLUMN key FROM class kafkaimporter.db.procedures.InsertImportWithCount5;
 
 CREATE PROCEDURE CountMirror1 as select count(*) from kafkamirrortable1;
 CREATE PROCEDURE CountImport1 as select count(*) from kafkaimporttable1;
 
 CREATE PROCEDURE CountMirror2 as select count(*) from kafkamirrortable2;
-CREATE PROCEDURE CountImport2 as select count(*) from kafkaimporttable2;
+CREATE PROCEDURE CountImport4 as select count(*) from kafkaimporttable4;
 CREATE PROCEDURE ImportCountMinMax as select count(key), min(key), max(key) from kafkaimporttable1;
 CREATE PROCEDURE InsertOnly PARTITION ON TABLE KAFKAIMPORTTABLE1 COLUMN key as upsert into KAFKAIMPORTTABLE1(key, value) VALUES(?, ?);
 CREATE PROCEDURE InsertOnly1 PARTITION ON TABLE KAFKAIMPORTTABLE1 COLUMN key as upsert into KAFKAIMPORTTABLE1(key, value) VALUES(?, ?);
-CREATE PROCEDURE InsertOnly2 PARTITION ON TABLE KAFKAIMPORTTABLE3 COLUMN key as upsert into KAFKAIMPORTTABLE3(key, value) VALUES(?, ?);
-CREATE PROCEDURE InsertOnly3 PARTITION ON TABLE KAFKAIMPORTTABLE4 COLUMN key as upsert into KAFKAIMPORTTABLE4(key, value) VALUES(?, ?);
-CREATE PROCEDURE InsertOnly4 PARTITION ON TABLE KAFKAIMPORTTABLE5 COLUMN key as upsert into KAFKAIMPORTTABLE5(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly2 PARTITION ON TABLE KAFKAIMPORTTABLE2 COLUMN key as upsert into KAFKAIMPORTTABLE2(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly3 PARTITION ON TABLE KAFKAIMPORTTABLE3 COLUMN key as upsert into KAFKAIMPORTTABLE3(key, value) VALUES(?, ?);
+CREATE PROCEDURE InsertOnly4 PARTITION ON TABLE KAFKAIMPORTTABLE4 COLUMN key as upsert into KAFKAIMPORTTABLE4(key, value) VALUES(?, ?);
 
 END_OF_BATCH

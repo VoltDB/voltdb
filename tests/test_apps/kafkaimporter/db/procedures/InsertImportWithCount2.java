@@ -36,11 +36,11 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class InsertImportWithCount5 extends VoltProcedure {
+public class InsertImportWithCount2 extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
-    public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable5 " + sqlSuffix);
-    public final SQLStmt incrementMirrorRow = new SQLStmt("UPDATE kafkamirrortable5 SET import_count=import_count+1 WHERE key = ? and value = ?");
-    public final SQLStmt insertError = new SQLStmt("INSERT into importnomatch (key, value, streamnumber) values(key, value, 5");
+    public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable2 " + sqlSuffix);
+    public final SQLStmt incrementMirrorRow = new SQLStmt("UPDATE kafkamirrortable1 SET import_count=import_count+1 WHERE key = ? and value = ?");
+    public final SQLStmt insertError = new SQLStmt("INSERT into importnomatch (key, value, streamnumber) values(?, ?, 2)");
 
     public long run(long key, long value)
     {

@@ -22,16 +22,8 @@
  */
 
 /*
- * Stored procedure for ExportBenchmark
+ * Is this still used in the Kafka importer?
  *
- * 2 tables -- all datatypes with nullable and not nullable variants
- *
- * Call the SP with DB tables insert count and export tables insert count.
- * This allows mixing DB insert to export insert ratio, following the recent
- * Flipkart customer case where export rows could exceed DB inserts as much as 10:1.
- *
- * Since DB inserts and export inserts are parameterized, it's possible to try many
- * variations in the test driver.
  */
 
 package kafkaimporter.db.procedures;
