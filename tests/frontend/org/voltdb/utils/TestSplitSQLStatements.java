@@ -174,12 +174,22 @@ public class TestSplitSQLStatements {
                 + "end;";
         checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
 
+        // case inside longer strings
         sql = "create procedure p as begin "
                 + "select emptycase from R; "
                 + "select caseofbeer from R; "
                 + "select suitcaseofbeer from R; "
                 + "end;";
         checkSplitter(sql + sql1, sql.substring(0, sql.length() - 1), sql1);
+
+        // end inside longer strings
+        sql = "create procedure p as begin "
+                + "select emptycase from R; "
+                + "select caseofbeer from R; "
+                + "select endofbeer from R; "
+                + "select frontend from R; "
+                + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
 
         // begin as table name
         sql = "create procedure p as begin "
