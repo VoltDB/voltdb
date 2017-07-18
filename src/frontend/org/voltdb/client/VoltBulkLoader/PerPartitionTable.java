@@ -230,10 +230,10 @@ public class PerPartitionTable {
             ProcedureCallback callback = new ProcedureCallback() {
                 @Override
                 public void clientCallback(ClientResponse response) throws Exception {
-//                    //one insert at a time callback
-//                    if (response.getStatus() != ClientResponse.SUCCESS) {
-//                        row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
-//                    }
+                    //one insert at a time callback
+                    if (response.getStatus() != ClientResponse.SUCCESS) {
+                        row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
+                    }
 
                     // FIXME should this be only on success?
                     row.m_loader.m_loaderCompletedCnt.incrementAndGet();
