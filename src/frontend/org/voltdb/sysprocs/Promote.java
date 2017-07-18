@@ -49,10 +49,7 @@ public class Promote extends UpdateApplicationBase {
                                 new String[0],
                                 null,
                                 true, /* isPromotion */
-                                useDDLSchema,
-                                false,
-                                getHostname(),
-                                getUsername());
+                                useDDLSchema);
     }
 
 }

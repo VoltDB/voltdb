@@ -59,10 +59,7 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                                 new String[0],
                                 null,
                                 false, /* isPromotion */
-                                useDDLSchema,
-                                false,
-                                getHostname(),
-                                getUsername());
+                                useDDLSchema);
 
     }
 }

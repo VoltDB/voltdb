@@ -50,9 +50,6 @@ public class UpdateClasses extends UpdateApplicationBase {
                                 new String[0],
                                 null,
                                 false, /* isPromotion */
-                                useDDLSchema,
-                                false,
-                                getHostname(),
-                                getUsername());
+                                useDDLSchema);
     }
 }

@@ -1898,7 +1898,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
 
-        // For now this function is still needed during recover
         private void logCatalogAndDeployment(CatalogJarWriteMode mode) {
             File configInfoDir = getConfigDirectory();
             configInfoDir.mkdirs();
@@ -1906,13 +1905,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             try {
                 m_catalogContext.writeCatalogJarToFile(configInfoDir.getPath(), "catalog.jar", mode);
             } catch (IOException e) {
-                hostLog.error("Failed to log catalog: " + e.getMessage(), e);
+                hostLog.error("Failed to writing catalog jar to disk: " + e.getMessage(), e);
                 e.printStackTrace();
 
-                // Defensive way to avoid any future problem. The local instance should shutdown.
-                hostLog.fatal("Error when writing catalog jar to disk: " + e.getMessage());
-                // Only 1 catalog update could happen at the same time. Before shutting down the
-                // local voltdb instance, we have to remove the global lock.
                 VoltZK.removeCatalogUpdateBlocker(VoltDB.instance().getHostMessenger().getZK(),
                                                   VoltZK.uacActiveBlocker,
                                                   hostLog);
@@ -3403,7 +3398,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void cleanUpTempCatalogJar() {
         File configInfoDir = getConfigDirectory();
-        if (!configInfoDir.exists()) { return; }
+        if (!configInfoDir.exists())
+            return;
 
         File tempJar = new VoltFile(configInfoDir.getPath(),
                                     InMemoryJarfile.TMP_CATALOG_JAR_FILENAME);

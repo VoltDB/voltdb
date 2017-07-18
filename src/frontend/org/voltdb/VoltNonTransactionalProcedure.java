@@ -32,10 +32,6 @@ public class VoltNonTransactionalProcedure {
 
     ProcedureRunnerNT m_runner = null;
 
-    public long getID() {
-        return m_runner.m_id;
-    }
-
     /**
      * Calls a procedure (either transactional or not) and returns a CompletableFuture that can
      * be returned from the procedure.

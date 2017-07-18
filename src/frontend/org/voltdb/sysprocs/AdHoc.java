@@ -143,9 +143,6 @@ public class AdHoc extends AdHocNTBase {
                                 sqlStatements.toArray(new String[0]),
                                 null,
                                 false,
-                                true,
-                                false,
-                                getHostname(),
-                                getUsername());
+                                true);
     }
 }

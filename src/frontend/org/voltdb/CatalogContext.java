@@ -408,7 +408,7 @@ public class CatalogContext {
     }
 
     public static Class<?> classForProcedure(String procedureClassName, ClassLoader loader)
-        throws ClassNotFoundException {
+            throws ClassNotFoundException {
         // this is a safety mechanism to prevent catalog classes overriding VoltDB stuff
         if (procedureClassName.startsWith("org.voltdb.")) {
             return Class.forName(procedureClassName);

@@ -89,9 +89,6 @@ public class TestConcurrentUpdateCatalog {
         client.updateApplicationCatalog(cb1, new File(newCatalogURL1), new File(deploymentURL));
         client.updateApplicationCatalog(cb2, new File(newCatalogURL2), new File(deploymentURL));
 
-        // System.err.println("cb1: " + Byte.toString(cb1.getResponse().getStatus()) + " " + cb1.getResponse().getStatusString());
-        // System.err.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
-
         checkResults(cb1, cb2);
     }
 
@@ -208,23 +205,6 @@ public class TestConcurrentUpdateCatalog {
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("concurrentCatalogUpdate-cluster-base.xml"));
 
         cluster.startUp();
-
-//        if (drMaster) {
-//            // Create the replica database cluster
-//            VoltProjectBuilder builder2 = new VoltProjectBuilder();
-//            builder2.setUseDDLSchema(useAdHocDDL);
-//            builder2.setDRMasterHost("localhost");
-//
-//            LocalCluster cluster2 = new LocalCluster("concurrentCatalogUpdate-cluster-replica-base.jar",
-//                                        SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-//            cluster2.setNewCli(true);
-//            cluster2.setHasLocalServer(false);
-//            cluster2.setHttpOverridePort(8090);
-//            cluster2.setHttpPortEnabled(true);
-//            assertTrue(cluster.compile(builder2));
-//
-//            cluster2.startUp();
-//        }
     }
 
     @After

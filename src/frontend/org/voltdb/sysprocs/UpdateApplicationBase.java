@@ -81,7 +81,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                     final byte[] replayHashOverride,
                                                                     final boolean isPromotion,
                                                                     final boolean useAdhocDDL,
-                                                                    boolean adminConnection,
                                                                     String hostname,
                                                                     String user)
     {
@@ -433,10 +432,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                   final String[] adhocDDLStmts,
                                                                   final byte[] replayHashOverride,
                                                                   final boolean isPromotion,
-                                                                  final boolean useAdhocDDL,
-                                                                  boolean adminConnection,
-                                                                  String hostname,
-                                                                  String user)
+                                                                  final boolean useAdhocDDL)
     {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog,
@@ -445,16 +441,23 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, blockerError);
         }
 
-        CatalogChangeResult ccr = prepareApplicationCatalogDiff(invocationName,
-                                                                operationBytes,
-                                                                operationString,
-                                                                adhocDDLStmts,
-                                                                replayHashOverride,
-                                                                isPromotion,
-                                                                useAdhocDDL,
-                                                                adminConnection,
-                                                                hostname,
-                                                                user);
+        CatalogChangeResult ccr = null;
+        try {
+            ccr = prepareApplicationCatalogDiff(invocationName,
+                                                operationBytes,
+                                                operationString,
+                                                adhocDDLStmts,
+                                                replayHashOverride,
+                                                isPromotion,
+                                                useAdhocDDL,
+                                                getHostname(),
+                                                getUsername());
+        } catch (Exception e) {
+            String errorMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
+            compilerLog.error(errorMsg);
+            return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, errorMsg);
+        }
+
         if (ccr.errorMsg != null) {
             compilerLog.error(invocationName + " has been rejected: " + ccr.errorMsg);
             return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
