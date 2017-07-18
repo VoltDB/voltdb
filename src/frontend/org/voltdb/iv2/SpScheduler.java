@@ -1708,10 +1708,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!keys.isEmpty()) {
             return false;
         }
-        m_spiCheckPoint = Long.MIN_VALUE;
         tmLog.info("Balance spi previous leader " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
                 " has completed transactions before checkpoint: " + TxnEgo.txnIdSeqToString(m_spiCheckPoint));
-
+        m_spiCheckPoint = Long.MIN_VALUE;
         return true;
     }
 }

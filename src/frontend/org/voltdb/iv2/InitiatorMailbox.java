@@ -663,10 +663,10 @@ public class InitiatorMailbox implements Mailbox
         send(message.getNewLeaderHSID(), message);
 
         //reset status on the old partition leader
-        m_newLeaderHSID = Long.MIN_VALUE;
         m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
         m_repairLog.setLeaderState(false);
         tmLog.info("Balance spi previous leader " + CoreUtils.hsIdToString(m_hsId) + " notifies new leader " +
                 CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_balanceSPIStatus);
+        m_newLeaderHSID = Long.MIN_VALUE;
     }
 }
