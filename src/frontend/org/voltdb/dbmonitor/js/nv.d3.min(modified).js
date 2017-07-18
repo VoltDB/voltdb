@@ -621,7 +621,7 @@
                 if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
                     currentTime = d.data.label.split(" ")[1]
 
-                if (d.series[0].key == "Avg Execution Time")
+                if (d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail")
                     {
                         currentTime = d.data.label.split("(")[0]
                         if(currentTime.indexOf("<") >= 0){
@@ -671,7 +671,7 @@
                     else if(chartContainer == null){
                         if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time")
                             unit = " ms"
-                        else if(d.series[0].key == "Frequency")
+                        else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail")
                             unit = ""
                         else
                             unit = " %"
@@ -715,7 +715,7 @@
                     trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
-                } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
+                } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail") && chartContainer == null){
                     trowEnter.append("td")
                         .html(function (p, i) { return (d.series[0].key != "Frequency" ? (d.series[0].key == "Combined" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
                 } else {
@@ -800,7 +800,8 @@
                     }
                 }
 
-                if((d.series[0].key == "Avg Execution Time") && chartContainer == null){
+                if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail") && chartContainer == null){
+                    debugger;
                     var trowEnter1 = tbodyEnter.selectAll("tr")
                     .append("tr");
 
