@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.COWSortedMap;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
@@ -306,9 +305,10 @@ public class ExportManager
             List<Integer> partitions)
             throws ExportManager.SetupException
     {
-        ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
+        assert m_self == null;
+        ExportManager em = new ExportManager(myHostId, catalogContext, messenger);
         if (forceCreate) {
-            em.clearOverflowData(catalogContext);
+            em.clearOverflowData();
         }
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
@@ -316,9 +316,6 @@ public class ExportManager
         if (hasEnabledConnectors(connectors)) {
             em.createInitialExportProcessor(catalogContext, connectors, true, partitions, isRejoin);
         }
-        //else {
-        //    m_lastNonEnabledGeneration = catalogContext.m_ccrTime;
-        //}
     }
 
     static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
@@ -385,13 +382,11 @@ public class ExportManager
     private ExportManager(
             int myHostId,
             CatalogContext catalogContext,
-            HostMessenger messenger,
-            List<Integer> partitions)
+            HostMessenger messenger)
     throws ExportManager.SetupException
     {
         m_hostId = myHostId;
         m_messenger = messenger;
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
         if (!hasEnabledConnectors(connectors)) {
@@ -414,7 +409,7 @@ public class ExportManager
         return m_messenger;
     }
 
-    private void clearOverflowData(CatalogContext catContext) throws ExportManager.SetupException {
+    private void clearOverflowData() throws ExportManager.SetupException {
         String overflowDir = VoltDB.instance().getExportOverflowPath();
         try {
             exportLog.info(
@@ -474,20 +469,16 @@ public class ExportManager
              * So construct one here, otherwise use the one provided
              */
             if (startup) {
-                assert m_generation == null; // m_generations.isEmpty();
-                //if (!m_generations.containsKey(catalogContext.m_ccrTime)) {
-                if (m_generation == null){ //m_generations.isEmpty()) {
+                if (m_generation == null){
                     final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_ccrTime,
                             exportOverflowDirectory, isRejoin);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
                     currentGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
                     m_generation = currentGeneration;
-                    //m_generations.put(catalogContext.m_ccrTime, currentGeneration);
                 } else {
                     exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used and appended to");
-                    //ExportGeneration currentGeneration = m_generations.get(catalogContext.m_ccrTime);
-                    ExportGeneration currentGeneration = m_generation;//m_generations.pollFirstEntry().getValue();
+                    ExportGeneration currentGeneration = m_generation;
                     currentGeneration.initializeMissingPartitionsFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 }
             }
@@ -657,7 +648,7 @@ public class ExportManager
         updateProcessorConfig(connectors);
         long genid = catalogContext.m_ccrTime;
         if (m_processorConfig.isEmpty()) {
-            //m_lastNonEnabledGeneration = genid;
+            exportLog.info("BSDBG: bailed out of updateCatalog because processorConfig is empty");
             return;
         }
 
@@ -665,6 +656,7 @@ public class ExportManager
             exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
             return;
         }
+
         /**
          * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
          * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
@@ -676,23 +668,16 @@ public class ExportManager
         }
 
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-        ExportGeneration newGeneration = null;
         if (m_generation == null) {
             try {
-                newGeneration = new ExportGeneration(genid, exportOverflowDirectory, false);
-                newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
+                m_generation = new ExportGeneration(genid, exportOverflowDirectory, false);
+                m_generation.setGenerationDrainRunnable(new GenerationDrainRunnable(m_generation));
             } catch (IOException e1) {
                 VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
             }
-        } else {
-            newGeneration = m_generation;
         }
 
-        newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-
-        if (m_generation == null) {
-            m_generation = newGeneration; //m_generations.put(genid, newGeneration);
-        }
+        m_generation.initializeMissingPartitionsFromCatalog(connectors, m_hostId, m_messenger, partitions);
 
         /*
          * If there is no existing export processor, create an initial one.
@@ -705,33 +690,23 @@ public class ExportManager
     }
 
     public void shutdown() {
-        /*
-        for (ExportGeneration generation : m_generations.values()) {
-            generation.close(m_messenger);
-        }
-        */
         m_generation.close(m_messenger);
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
             proc.shutdown();
         }
-        //m_generations.clear();
+        m_generation = null;
     }
 
     public static long getQueuedExportBytes(int partitionId, String signature) {
         ExportManager instance = instance();
         try {
-            //Map<Long, ExportGeneration> generations = instance.m_generations;
             if (instance.m_generation == null) {
                 //This is now fine as you could get a stats tick and have no generation if you dropped last table.
                 return 0;
             }
 
-            long exportBytes = 0;
-            //for (ExportGeneration generation : generations.values()) {
-                exportBytes += instance.m_generation.getQueuedExportBytes( partitionId, signature);
-            //}
-
+            long exportBytes = instance.m_generation.getQueuedExportBytes( partitionId, signature);
             return exportBytes;
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
@@ -760,34 +735,16 @@ public class ExportManager
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
         try {
-            //ExportGeneration generation = instance.m_generations.get(exportGeneration);
-            //Map.Entry<Long, ExportGeneration> entry = instance.m_generations.pollFirstEntry();
-            ExportGeneration generation = instance.m_generation;//(entry == null) ? null : entry.getValue();
+            ExportGeneration generation = instance.m_generation;
             if (generation == null) {
                 VoltDB.crashLocalVoltDB("BSDBG: pushed export buffer before generation was initialized");
+                /*
                 if (buffer != null) {
                     DBBPool.wrapBB(buffer).discard();
                 }
-
-                /*
-                 * If the generation was already drained it is fine for a buffer to come late and miss it
-                 */
-                /*
-                synchronized(instance) {
-                    if (exportGeneration ==  m_lastNonEnabledGeneration) {
-                        exportLog.info("Push from last generation which had no export enabled.");
-                        return;
-                    }
-                    if (!instance.m_generationGhosts.contains(exportGeneration)) {
-                        exportLog.error("Could not a find an export generation " + exportGeneration +
-                        ". Should be impossible. Discarding export data");
-                        assert(false);
-                    }
-                }
-                */
                 return;
+                */
             }
-
             generation.pushExportBuffer(partitionId, signature, uso, buffer, sync, endOfStream);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
@@ -797,24 +754,22 @@ public class ExportManager
 
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
         exportLog.info("Truncating export data after txnId " + snapshotTxnId);
-        //for (ExportGeneration generation : m_generations.values()) {
-            //If the generation was completely drained, wait for the task to finish running
-            //by waiting for the permit that will be generated
-            if (m_generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
-                try {
-                    m_onGenerationDrainedForTruncation.acquire();
-                } catch (InterruptedException e) {
-                    VoltDB.crashLocalVoltDB("Interrupted truncating export data", true, e);
-                }
+        //If the generation was completely drained, wait for the task to finish running
+        //by waiting for the permit that will be generated
+        if (m_generation != null && m_generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
+            try {
+                m_onGenerationDrainedForTruncation.acquire();
+            } catch (InterruptedException e) {
+                VoltDB.crashLocalVoltDB("Interrupted truncating export data", true, e);
             }
-        //}
+        }
     }
 
     public static synchronized void sync(final boolean nofsync) {
         exportLog.info("Syncing export data");
         ExportManager instance = instance();
-        //for (ExportGeneration generation : instance.m_generations.values()) {
-        instance.m_generation.sync(nofsync);
-        //}
+        if (instance.m_generation != null) {
+            instance.m_generation.sync(nofsync);
+        }
     }
 }
