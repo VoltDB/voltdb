@@ -463,7 +463,7 @@ public abstract class CatalogUtil {
      * @param <T> The type of item to sort.
      * @param items The set of catalog items.
      * @param sortFieldName The name of the field to sort on.
-     * @param An output list of catalog items, sorted on the specified field.
+     * @param result An output list of catalog items, sorted on the specified field.
      */
     public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
         result.addAll(getSortedCatalogItems(items, sortFieldName    ));
@@ -1507,11 +1507,19 @@ public abstract class CatalogUtil {
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
-                    hostLog.info("Export configuration enabled and provided for export target " +
-                                 targetName +
-                                 " in deployment file however no export " +
-                                 "tables are assigned to the this target. " +
-                                 "Export target " + targetName + " will be disabled.");
+                    if (DR_CONFLICTS_TABLE_EXPORT_GROUP.equals(targetName)) {
+                        hostLog.error("Export configuration enabled and provided for export target " +
+                                targetName +
+                                " in deployment file however no export " +
+                                "tables are assigned to the this target. " +
+                                "DR Conflicts cannot be handled.");
+                    } else {
+                        hostLog.info("Export configuration enabled and provided for export target " +
+                                targetName +
+                                " in deployment file however no export " +
+                                "tables are assigned to the this target. " +
+                                "Export target " + targetName + " will be disabled.");
+                    }
                 }
                 continue;
             }
