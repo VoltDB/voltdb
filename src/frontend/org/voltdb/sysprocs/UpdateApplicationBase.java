@@ -24,6 +24,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
@@ -474,6 +475,17 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             noteRestoreCompleted();
         }
 
+        try {
+            if (!ccr.worksWithElastic && zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null) {
+                return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE,
+                        "Can't do a catalog update while an elastic join is active");
+            }
+        } catch (KeeperException | InterruptedException e) {
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+            VoltDB.crashLocalVoltDB("Error reading ZK node " + VoltZK.elasticJoinActiveBlocker + ": " + e.getMessage(),
+                                    true, e);
+        }
+
         String errMsg;
         // impossible to happen since we only allow catalog update sequentially
         if (VoltDB.instance().getCatalogContext().catalogVersion != ccr.expectedCatalogVersion) {
@@ -503,7 +515,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                              ccr.tablesThatMustBeEmpty,
                              ccr.reasonsForEmptyTables,
                              ccr.requiresSnapshotIsolation ? 1 : 0,
-                             ccr.worksWithElastic ? 1 : 0,
                              ccr.deploymentHash,
                              ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                              ccr.hasSchemaChange ?  1 : 0,
