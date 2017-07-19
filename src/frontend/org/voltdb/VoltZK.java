@@ -324,7 +324,7 @@ public class VoltZK {
                 break;
             case elasticJoinActiveBlocker:
                 // elastic join can not happen during node rejoin
-                abort = zk.exists(VoltZK.rejoinActiveBlocker, false) != null;
+                abort = zk.getChildren(VoltZK.catalogUpdateBlockers, false).size() > 1;
                 break;
             default:
                 // not possible
@@ -346,7 +346,7 @@ public class VoltZK {
     public static boolean removeCatalogUpdateBlocker(ZooKeeper zk, String node, VoltLogger log)
     {
         try {
-            ZKUtil.deleteRecursively(zk, node);
+            zk.delete(node, -1);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
                 if (log != null) {
