@@ -617,7 +617,8 @@
                     return '';
                 }
                 var currentTime = d.value
-                if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
+
+                if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Total Processing Time") && chartContainer == null)
                     currentTime = d.data.label.split(" ")[1]
 
                 if (d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail")
@@ -695,7 +696,7 @@
                         .append("div")
                         .style("background-color", function (p) { return p.color });
                 else{
-                    if((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Combined") && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "Multi Partitioned"){
+                    if((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Total Processing Time") && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "Multi Partitioned"){
                         trowEnter.append("td")
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
                     } else {
@@ -716,9 +717,9 @@
                     trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
-                } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail") && chartContainer == null){
+                } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Total Processing Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail") && chartContainer == null){
                     trowEnter.append("td")
-                        .html(function (p, i) { return (d.series[0].key != "Frequency"  && d.series[0].key != "Frequency Detail" ? (d.series[0].key == "Combined" || d.series[0].key == "Combined Detail" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
+                        .html(function (p, i) { return (d.series[0].key != "Frequency"  && d.series[0].key != "Frequency Detail" ? (d.series[0].key == "Total Processing Time" || d.series[0].key == "Combined Detail" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
                 } else {
                     trowEnter.append("td")
                         .classed("value", true)
@@ -739,7 +740,7 @@
                             .style("border-top-color", opacityScale(opacity));
                     }
                 });
-                if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null){
+                if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Total Processing Time") && chartContainer == null){
                     var trowEnter0 = tbodyEnter.selectAll("tr")
                     .append("tr");
 
@@ -767,15 +768,15 @@
                             .html(VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS);
                     }
 
-                    if(d.series[0].key != "Combined"){
+                    if(d.series[0].key != "Total Processing Time"){
                         var trowEnter3 = tbodyEnter
                         .append("tr");
 
                         trowEnter3.append("td")
-                        .html("Combined")
+                        .html("Total Processing Time")
 
                         trowEnter3.append("td")
-                            .html(VoltDbAnalysis.procedureValue[d.data.label].COMBINED.toFixed(3) + " %");
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].TOTAL_PROCESSING_TIME.toFixed(3) + " %");
                     }
 
                     if(d.series[0].key != "Execution Time"){
@@ -9126,8 +9127,8 @@
                         .attr('y', x.rangeBand() / (data.length * 2))
                         .attr('dy', '.32em')
                         .attr('style', function(d, i){
-                            if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Combined")
-                            && VoltDbAnalysis.procedureValue[d.label].COMBINED > VoltDbUI.getFromLocalStorage("usagePercentage")
+                            if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Total Processing Time")
+                            && VoltDbAnalysis.procedureValue[d.label].TOTAL_PROCESSING_TIME > VoltDbUI.getFromLocalStorage("usagePercentage")
                             && VoltDbAnalysis.procedureValue[d.label].TYPE == "Multi Partitioned")
                                 return "fill:#C12026"
                         })
@@ -9146,8 +9147,8 @@
                         .attr("width", "22px")
                         .attr('y', (x.rangeBand() / (data.length * 2)) -15)
                         .html(function (d, i){
-                            if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Combined")
-                            && VoltDbAnalysis.procedureValue[d.label].COMBINED > VoltDbUI.getFromLocalStorage("usagePercentage")
+                            if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Total Processing Time")
+                            && VoltDbAnalysis.procedureValue[d.label].TOTAL_PROCESSING_TIME > VoltDbUI.getFromLocalStorage("usagePercentage")
                             && VoltDbAnalysis.procedureValue[d.label].TYPE == "Multi Partitioned")
                                 return "&#9888;";
                             else
@@ -9162,7 +9163,7 @@
                         .attr('x', function (d, i) {
                             var charLength = d.value.toString().length - 1
                             var xLength = getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) + 16;
-                            if(d.key == "Combined")
+                            if(d.key == "Total Processing Time")
                                 xLength += VoltDbAnalysis.proceduresCount > 1 ? (2 * charLength) : 35 + (2.5 * charLength);//xLength - 70;
                             else
                                 xLength += (6.5 * charLength);

@@ -368,7 +368,7 @@
         }]
 
         var dataCombinedAnalysis = [{
-            key: "Combined",
+            key: "Total Processing Time",
             values: [],
             color: "rgb(27, 135, 200)"
         }]
