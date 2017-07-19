@@ -28,17 +28,17 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Enumeration;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.runner.RunWith;
-import org.mockito.Matchers;
-import org.mockito.Mockito;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
-import org.voltdb.CatalogContext;
+import org.junit.Test;
 import org.voltdb.OperationMode;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
@@ -49,8 +49,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.MiscUtils;
 
-@RunWith(PowerMockRunner.class)
-@PrepareForTest({CatalogContext.class})
 public class TestMockUpdateApplicationCatalog {
     private ServerThread m_localServer;
     private VoltDB.Configuration m_config;
@@ -84,10 +82,6 @@ public class TestMockUpdateApplicationCatalog {
         success = builder.compile(Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar"), 1, 1, 0);
         assert(success);
 
-        PowerMockito.spy(CatalogContext.class);
-        PowerMockito.when(CatalogContext.classForProcedure(Matchers.anyString(), Mockito.any(ClassLoader.class))).
-                     thenThrow(new UnsupportedClassVersionError("Unsupported major.minor version 52.0"));
-
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost:" + m_config.m_adminPort);
@@ -103,15 +97,56 @@ public class TestMockUpdateApplicationCatalog {
         }
     }
 
-    public void testVersionCheck() throws IOException, ClassNotFoundException {
+    @Test
+    public void testInvalidCatalogJar() throws IOException, ClassNotFoundException {
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+
+        String tempjarURL = newCatalogURL + ".tmp";
+        JarOutputStream jos = new JarOutputStream(new FileOutputStream(tempjarURL));
+
+        // Create a corrupted new catalog jar
+        JarFile jarFile = new JarFile(new File(newCatalogURL));
+        for (Enumeration<JarEntry> e = jarFile.entries(); e.hasMoreElements();) {
+            JarEntry je = e.nextElement();
+            System.err.println(je.getName());
+
+            if (!je.getName().contains(".class")) {
+                // Other files
+                jos.putNextEntry(je);
+                InputStream is = jarFile.getInputStream(je);
+                byte[] bytes = new byte[2048];
+                int numOfBytes;
+                while ((numOfBytes = is.read(bytes)) != -1) {
+                    jos.write(bytes, 0, numOfBytes);
+                }
+                is.close();
+            } else {
+                // Corrupt the class files paths
+                JarEntry newJe = new JarEntry("fake/" + je.getName());
+                jos.putNextEntry(newJe);
+                InputStream is = jarFile.getInputStream(je);
+                byte[] bytes = new byte[2048];
+                int numOfBytes;
+                while ((numOfBytes = is.read(bytes)) != -1) {
+                    jos.write(bytes, 0, numOfBytes);
+                }
+                is.close();
+            }
+        }
+
+        jos.close();
+
+        // Replace the jar
+        new File(newCatalogURL).delete();
+        new File(tempjarURL).renameTo(new File(newCatalogURL));
+
         try {
             m_client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
             fail("Update catalog should fail with version error.");
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("Cannot load classes compiled with a higher version"));
-            assertTrue(e.getMessage().contains("Java 8"));
+            assertTrue(e.getMessage().contains("NoClassDefFoundError"));
+            assertTrue(e.getMessage().contains("Error loading class"));
         }
     }
 }
