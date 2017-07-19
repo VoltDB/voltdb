@@ -32,6 +32,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -443,7 +444,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1, P_D2 from P order by P_D2");
             assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
@@ -508,7 +512,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
             assertEquals("P_T", ((SeqScanPlanNode) pn).getTargetTableAlias());
             // Subquery
-            pn = pn.getChild(0).getChild(0);
+            pn = pn.getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateMergeReceive(pn, true, new int[] {0});
             pn = frags.get(1).getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
@@ -538,7 +545,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
             assertEquals("P_T", ((SeqScanPlanNode) pn).getTargetTableAlias());
             // Subquery
-            pn = pn.getChild(0).getChild(0);
+            pn = pn.getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateMergeReceive(pn, false, new int[] {0});
             pn = frags.get(1).getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
@@ -561,7 +571,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by indexed_non_partition_key (P_D1);"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1, max(P_D2) from P where P_D1 > 0 group by P_D1 order by P_D1");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, true, false, false, false);
             // Make sure partition index scan is a range scan
             pn = frags.get(1).getChild(0);
@@ -576,7 +589,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by indexed_non_partition_key(P_D3, P_D2);"
             List<AbstractPlanNode> frags =  compileToFragments(
                   "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, true, false, false, false);
         }
         {
@@ -587,7 +603,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by indexed_non_partition_key(P_D3, P_D2);"
             List<AbstractPlanNode> frags =  compileToFragments(
                   "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D3 order by P_D3, P_D2");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, true, false, false, false);
         }
         {
@@ -598,7 +617,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by indexed_non_partition_key(P_D1);"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1, P_D2, max(P_D2) from P group by P_D1, P_D2 order by P_D1");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, false, true, false, false);
         }
         {
@@ -609,7 +631,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by indexed_non_partition_key(P_D3, P_D2);"
             List<AbstractPlanNode> frags =  compileToFragments(
                   "select P_D1, P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D1, P_D3 order by P_D3, P_D2");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, false, true, false, false);
         }
         {
@@ -620,7 +645,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by part of indexed_non_partition_key (P_D3);"
             List<AbstractPlanNode> frags =  compileToFragments(
                   "select P_D1, P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D1, P_D3 order by P_D3");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, false, true, false, false);
         }
         {
@@ -631,7 +659,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          order by indexed_partition_key(P_D0);"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select max(P_D2), P_D0 from P group by P_D0  order by P_D0");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, false, false, false, false);
         }
         {
@@ -642,7 +673,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          order by indexed_partition_key(P_D0);"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select max(P_D2), P_D1 from P group by P_D1, P_D0 order by P_D0");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, false, false, false, false);
         }
         {
@@ -654,7 +688,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D3, P_D2, P_D0, max (P_D1) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, false, false, false, false);
         }
         {
@@ -665,7 +702,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by indexed_non_partition_key;"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "SELECT min(P_D2), max(P_D2), P_D1 from P where P_D1 > 0 group by P_D1 order by P_D1;");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             validateAggregatedMergeReceive(pn, true, false, false, false);
         }
     }
@@ -679,7 +719,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //    Hash AGGREGATION ops: SUM(V_P1_ABS.V_CNT), SUM(V_P1_ABS.V_SUM_AGE)
             //     RECEIVE FROM ALL PARTITIONS
             List<AbstractPlanNode> frags =  compileToFragments("Select V_G1, sum(V_CNT), max(v_sum_age) from V_P1_ABS GROUP BY V_G1 ORDER BY V_G1");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
@@ -711,7 +754,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          order by aggregate;"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1, max(P_D2) from P group by P_D1 order by max(P_D2)");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
@@ -751,7 +797,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          order by non_indexed_partition;"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P1_D0, max(P1_D2) from P1 group by P1_D0 order by P1_D0");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
@@ -763,7 +812,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by indexed_non_partition_key1, non_indexed_non_partition_col2;"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D3, P_D1, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D1 order by P_D1, P_D3");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            };
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
@@ -775,7 +827,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            order by indexed_non_partition_key1, non_indexed_non_partition_col2;"
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D3, P_D1, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D1 order by P_D3, P_D1");
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            if (pn instanceof ProjectionPlanNode) {
+                pn = pn.getChild(0);
+            }
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
     }
@@ -804,7 +859,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
     private void validateMergeReceive(String sql, boolean hasLimit, int[] sortColumnIdx) {
         List<AbstractPlanNode> frags =  compileToFragments(sql);
         assertEquals(2, frags.size());
-        AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+        AbstractPlanNode pn = frags.get(0).getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         validateMergeReceive(pn, hasLimit, sortColumnIdx);
     }
 

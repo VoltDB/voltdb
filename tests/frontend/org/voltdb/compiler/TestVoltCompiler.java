@@ -474,7 +474,8 @@ public class TestVoltCompiler extends TestCase {
 
         VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
-        assertFalse(success);
+        // boxed tupes are supported ENG-539
+        assertTrue(success);
     }
 
     public void testDDLWithNoLengthString() throws IOException {
