@@ -270,6 +270,7 @@ def delete_proc(pfile):
     procset = set()
     for line in pfile:
         columns = line.split(',')
+        # column[2] gives the procedure name. using set to discard duplicates among partition.
         try:
             if columns[2] != ' ' :
                 procname = columns[2].replace('\"','')
@@ -304,6 +305,7 @@ def delete_table_and_view(pfile):
     tableset = set()
     for line in pfile:
         columns = line.split(',')
+        # column[5] gives the table and views. using set to discard duplicates among partition.
         try:
             if columns[5] != ' ' :
                 tablename = columns[5].replace('\"','')
