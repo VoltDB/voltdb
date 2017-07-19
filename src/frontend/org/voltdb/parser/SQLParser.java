@@ -275,18 +275,6 @@ public class SQLParser extends SQLPatternFactory
             );
 
     /**
-     * IMPORT CLASS with pattern for matching classfiles in
-     * the current classpath.
-     */
-    private static final Pattern PAT_IMPORT_CLASS = Pattern.compile(
-            "(?i)" +                                // (ignore case)
-            "\\A" +                                 // (start statement)
-            "IMPORT\\s+CLASS\\s+" +                 // IMPORT CLASS
-            "([^;]+)" +                             // (1) class matching pattern
-            ";\\z"                                  // (end statement)
-            );
-
-    /**
      * Regex to parse the CREATE ROLE statement with optional WITH clause.
      * Leave the WITH clause argument as a single group because regexes
      * aren't capable of producing a variable number of groups.
@@ -678,16 +666,6 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchDRTable(String statement)
     {
         return PAT_DR_TABLE.matcher(statement);
-    }
-
-    /**
-     * Match statement against import class pattern
-     * @param statement  statement to match against
-     * @return           pattern matcher object
-     */
-    public static Matcher matchImportClass(String statement)
-    {
-        return PAT_IMPORT_CLASS.matcher(statement);
     }
 
     /**
