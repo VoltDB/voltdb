@@ -294,6 +294,33 @@ public class SQLLexer extends SQLPatternFactory
         return null;
     }
 
+    /* to match tokens like 'CASE', 'BEGIN', 'END'
+     * the tokens should not be embedded in other strings like column names or table names
+     * the tokens can be followed by operators with/without whitespaces
+     * eg: emptycase, caseofbeer, suitcaseofbeer,
+     * (id+0)end+100, suit2case3ofbeer, 100+case
+     */
+    private static boolean matchToken (String buffer, int position, String token) {
+
+        final int tokLength = token.length();
+        final int bufLength = buffer.length();
+        final char firstLo = Character.toLowerCase(token.charAt(0));
+        final char firstUp = Character.toUpperCase(token.charAt(0));
+
+        if( (position == 0 || !Character.isLetterOrDigit(buffer.charAt(position-1)))
+                // perform a region match only if the first character matches
+                && (buffer.charAt(position) == firstLo || buffer.charAt(position) == firstUp)
+                // match only if the length of the remaining string is the atleast the length of the token
+                && (position <= bufLength - tokLength)
+                // search for token
+                && buffer.regionMatches(true, position, token, 0, tokLength)
+                // character after token is non alphanumeric i.e., token is not embedded in an identifier
+                && (position + tokLength == bufLength || !Character.isLetterOrDigit(buffer.charAt(position + tokLength))) )
+            return true;
+        else
+            return false;
+    }
+
     /**
      * Split SQL statements on semi-colons with quoted string and comment support.
      *
@@ -393,18 +420,15 @@ public class SQLLexer extends SQLPatternFactory
                 }
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
-                if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]))
-                        && (buf[iCur] == 'c' || buf[iCur] == 'C') // perform a region match only if the first character matches
-                        && (iCur <= buf.length - 4)
-                        && bufStr.regionMatches(true, iCur, "case", 0, 4)
-                        && (iCur+4 == buf.length || !Character.isLetterOrDigit(buf[iCur+4]) )) {
+//                if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]))
+//                        && (buf[iCur] == 'c' || buf[iCur] == 'C') // perform a region match only if the first character matches
+//                        && (iCur <= buf.length - 4)
+//                        && bufStr.regionMatches(true, iCur, "case", 0, 4)
+//                        && (iCur+4 == buf.length || !Character.isLetterOrDigit(buf[iCur+4]) )) {
+                if( matchToken(bufStr, iCur, "case") ) {
                     inCase++;
                     iCur += 4;
-                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1])) // if beginning of statement or identifier
-                        && (buf[iCur] == 'b' || buf[iCur] == 'B')
-                        && (iCur <= buf.length - 5)
-                        && bufStr.regionMatches(true, iCur, "begin", 0, 5)
-                        && (iCur+5 == buf.length || !Character.isLetterOrDigit(buf[iCur+5])) ) {
+                } else if ( matchToken(bufStr, iCur, "begin") ) {
                     inBegin = true;
                     iCur += 5;
                 } else if ( !inBegin && buf[iCur] == ';') {
@@ -421,11 +445,7 @@ public class SQLLexer extends SQLPatternFactory
                     // Start of quoted string.
                     cQuote = buf[iCur];
                     iCur++;
-                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]))
-                        && inBegin && (buf[iCur] == 'E' || buf[iCur] == 'e')
-                        && (iCur <= buf.length - 3)
-                        && bufStr.regionMatches(true, iCur, "end", 0, 3)
-                        && (iCur+3 == buf.length || !Character.isLetterOrDigit(buf[iCur+3])) ) {
+                } else if ( matchToken(bufStr, iCur, "end") ) {
                     if (inCase > 0) {
                         inCase--;
                     } else {
