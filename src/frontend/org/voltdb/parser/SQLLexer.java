@@ -422,11 +422,6 @@ public class SQLLexer extends SQLPatternFactory
                 }
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
-//                if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]))
-//                        && (buf[iCur] == 'c' || buf[iCur] == 'C') // perform a region match only if the first character matches
-//                        && (iCur <= buf.length - 4)
-//                        && bufStr.regionMatches(true, iCur, "case", 0, 4)
-//                        && (iCur+4 == buf.length || !Character.isLetterOrDigit(buf[iCur+4]) )) {
                 if( matchToken(bufStr, iCur, "case") ) {
                     inCase++;
                     iCur += 4;
