@@ -2401,8 +2401,9 @@ var loadPage = function (serverName, portid) {
             var isMultiple= false;
             var i =0;
             var containLongName = false;
-
-
+            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
+            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
+            var invocations = 0;
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                 var newStatement = '';
                 var latValue;
@@ -2417,8 +2418,31 @@ var loadPage = function (serverName, portid) {
                         newStatement = item.STATEMENT;
                     }
 
-                    if (newStatement == statement){
+                    var comp1 = newStatement.indexOf(') ') !== -1 ? newStatement.split(') ')[1]: newStatement;
+                    var comp2 = statement.indexOf(') ') !== -1 ? statement.split(') ')[1]: statement;
+                    if (comp1 == comp2){
+                        if(item.MIN < smallest){
+                            smallest = item.MIN;
+                        }
 
+                        if(item.MAX > largest){
+                           largest = item.MAX;
+                        }
+
+                        if(VoltDbUI.executionDetails[comp1] == undefined){
+                            VoltDbUI.executionDetails[comp1]={};
+                        }
+                        debugger;
+                        if(item.type == "Single Partitioned"){
+                            invocations += item.INVOCATION;
+                        }
+                        else{
+                            invocations = item.INVOCATION;
+                        }
+
+                        VoltDbUI.executionDetails[comp1]["MIN"] = smallest;
+                        VoltDbUI.executionDetails[comp1]["MAX"] = largest;
+                        VoltDbUI.executionDetails[comp1]["INVOCATION"] = invocations;
                         avg += item.value;
                         isMultiple = true;
                     }
@@ -2447,6 +2471,7 @@ var loadPage = function (serverName, portid) {
                     }
 
                     statement = newStatement;
+
                 }
             });
 
@@ -3005,6 +3030,7 @@ var adjustImporterGraphSpacing = function() {
         this.gutterInstanceHor = null;
         this.gutterInstanceVer = null;
         this.vars = {};
+        this.executionDetails = {};
         //load schema tab and table and views tabs inside sql query
         this.refreshSqlAndSchemaTab = function () {
             this.loadSchemaTab();

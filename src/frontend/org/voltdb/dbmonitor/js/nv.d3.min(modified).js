@@ -617,17 +617,15 @@
                     return '';
                 }
                 var currentTime = d.value
-
                 if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Combined") && chartContainer == null)
                     currentTime = d.data.label.split(" ")[1]
 
                 if (d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail")
                     {
-                        currentTime = d.data.label.split(" ")[1]
-                        if(currentTime.indexOf("<") >= 0){
-                        currentTime = currentTime.replace("<", "&lt;");
-                        currentTime = currentTime.replace(">", "&gt;");
-                        }
+                        if(d.data.label.indexOf(' ') != -1)
+                            currentTime = d.data.label.split(" ")[1]
+                        else
+                            currentTime = d.data.label
                     }
 
                 var isPartitionIdleGraph = false
@@ -816,7 +814,7 @@
                     }
 
                     trowEnter1.append("td")
-                        .html(VoltDbAnalysis.latencyDetail[statement].MIN + " ms");
+                        .html(VoltDbUI.executionDetails[statement].MIN/1000000+ " ms");
 
                     var trowEnter2 = tbodyEnter
                         .append("tr");
@@ -825,7 +823,7 @@
                         .html("Max Execution Time")
 
                         trowEnter2.append("td")
-                            .html(VoltDbAnalysis.latencyDetail[statement].MAX + " ms");
+                            .html(VoltDbUI.executionDetails[statement].MAX/1000000+ " ms");
 
                     var trowEnter3 = tbodyEnter
                         .append("tr");
@@ -836,7 +834,7 @@
 
 
                         trowEnter3.append("td")
-                            .html(VoltDbAnalysis.latencyDetail[statement].INVOCATIONS);
+                            .html(VoltDbUI.executionDetails[statement].INVOCATION);
                 }
 
                 var html = table.node().outerHTML;

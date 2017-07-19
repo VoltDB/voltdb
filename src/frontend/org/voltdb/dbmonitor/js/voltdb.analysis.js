@@ -184,7 +184,17 @@ function loadAnalysisPage(){
 //                return parseFloat(b.AVG_EXECUTION_TIME) - parseFloat(a.AVG_EXECUTION_TIME);
 //            });
 
+
+             //find procedure type
+
+
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
+                var type = "Single Partitioned";
+                if(procedureName == item.PROCEDURE && item.PARTITION_ID == 16383){
+                    type = "Multi Partitioned"
+                    return false;
+                }
+
                 if(VoltDbAnalysis.combinedDetail[item.PROCEDURE] == undefined){
                     VoltDbAnalysis.combinedDetail[item.PROCEDURE] = [];
                 }
@@ -211,7 +221,7 @@ function loadAnalysisPage(){
 
 
                 if(item.STATEMENT != "<ALL>"){
-                    VoltDbAnalysis.latencyDetailValue.push({"STATEMENT": item.STATEMENT , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP, "INVOCATION": item.INVOCATIONS});
+                    VoltDbAnalysis.latencyDetailValue.push({"type": type,  "STATEMENT": item.STATEMENT , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP, "INVOCATION": item.INVOCATIONS, "MIN": item.MIN_EXECUTION_TIME, "MAX": item.MAX_EXECUTION_TIME});
                 }
             });
 
