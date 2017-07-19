@@ -285,9 +285,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     // specified for this table and whether or not there is an inlined
     // projection.
     //
-    // If there is an projection, then we'll just steal that
+    // If there is an inline projection, then we'll just steal that
     // output schema as our own.
-    // If there is no inlined insert or projection, then, if there are no scan columns
+    // If there is no existing projection, then, if there are no scan columns
     // specified, use the entire table's schema as the output schema.
     // Otherwise add an inline projection that projects the scan columns
     // and then take that output schema as our own.
