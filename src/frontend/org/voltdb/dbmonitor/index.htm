@@ -409,7 +409,7 @@
                     <div class="analysisBody">
                         <div class="analysisWrap">
                             <div class="setThreshold">
-                                <a href="#thresholdPopup" id="btnThreshold">Alert Threshold</a>
+                                <a href="#thresholdPopup" id="btnThreshold">Settings</a>
                             </div>
                             <a id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</a>
                             <!--<button id="btnAnalyzeNow" class="analyzeBtn" style="display: block;">Analyze Now</button>-->
@@ -492,8 +492,8 @@
                                                 </div>
                                                 <div id="tabCombined" class="tab_content tab_content_procedure">
                                                     <div style="height: 400px; overflow-y:auto;">
-                                                        <div id="chartCombinedAnalysis" >
-                                                          <svg id="visualiseCombinedAnalysis"></svg>
+                                                        <div id="chartProcessingTimeAnalysis" >
+                                                          <svg id="visualiseProcessingTimeAnalysis"></svg>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1467,20 +1467,25 @@
         </div>
     </div>
     <div id="thresholdPopup" style="display:none">
-          <div class="overlay-title ">
-           Alert Threshold</span>
+        <div class="overlay-title ">
+           <span>Settings</span>
+
         </div>
-
         <div class="overlay-content setThresholdPopContent">
-
+            <div>
+                <div class="settingMessage">
+                   Set the thresholds at which graphs highlight entries.
+                   Any entries above the following settings will be highlighted and explained in the area below the graph.
+                </div>
+            </div>
             <table width="100%" cellpadding="0" cellspacing="0" class="alertThresholdTbl">
                 <tr>
-                    <td>Combined usage for multi-partitioned procedure</td>
-                    <td><input type="text" id="partitionThreshold">%</td>
+                    <td>Total Processing Time</td>
+                    <td><input type="text" id="partitionThreshold">ms</td>
                 </tr>
                 <tr>
-                    <td>Frequency for procedure</td>
-                    <td><input type="text" value="" id="replicatedThreshold"></td>
+                    <td>Average Execution Time</td>
+                    <td><input type="text" value="" id="averageExecutionTime">ms</td>
                 </tr>
                 <!--<tr>-->
                     <!--<td>Execution Time for procedure</td>-->

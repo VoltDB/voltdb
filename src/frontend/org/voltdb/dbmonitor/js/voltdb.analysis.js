@@ -101,17 +101,21 @@ function loadAnalysisPage(){
                 var sumOfAllProcedure = calculateCombinedValue(profileData["PROCEDURE_PROFILE"])
                 var isMPPresent = false;
                 var isPPresent = false;
-                var partitionThreshold = VoltDbUI.getFromLocalStorage("usagePercentage");
-                var frequencyThreshold = VoltDbUI.getFromLocalStorage("frequencyForProc");
+                var totalProcessingTime = VoltDbUI.getFromLocalStorage("totalProcessingTime");
+                var averageExecutionTime = VoltDbUI.getFromLocalStorage("averageExecutionTime");
 
-                if(partitionThreshold == undefined){
-                    partitionThreshold = 20;
+                if(totalProcessingTime == undefined){
+                    totalProcessingTime = 20;
+                }
+
+                if(averageExecutionTime == undefined){
+                    averageExecutionTime = 500;
                 }
                 for(var i = 0; i < profileData["PROCEDURE_PROFILE"].length; i++){
                     if(i == 0)
                         timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
 
-                    var combinedWeight = (((profileData["PROCEDURE_PROFILE"][i].AVG/1000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS)/sumOfAllProcedure) * 100;
+                    var calculatedProcessingTime = (profileData["PROCEDURE_PROFILE"][i].AVG/1000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS;
                     var procedureName = profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
                     var avgExecTime = profileData["PROCEDURE_PROFILE"][i].AVG / 1000000;
                     var invocation = profileData["PROCEDURE_PROFILE"][i].INVOCATIONS;
@@ -136,20 +140,19 @@ function loadAnalysisPage(){
                     var warningString = '';
                     var warningToolTip = '';
 
-                    if(combinedWeight > partitionThreshold && partitionThreshold != "" && isMPPresent) {
+                    if(calculatedProcessingTime > totalProcessingTime && totalProcessingTime != "") {
                         $("#analysisRemarks").show();
                         $("#procedureWarningSection").show();
-                        warningString = "<p>" + procedureName.split(" ")[1] + " has combined usage greater than "+ partitionThreshold +"%.</p>";
-                        warningToolTip = procedureName.split(" ")[1] + " <br> has combined usage greater <br> than "+ partitionThreshold +"%.";
+                        warningString = "<p>" + procedureName.split(" ")[1] + " has total processing time greater than "+ totalProcessingTime +"ms.</p>";
+                        warningToolTip = procedureName.split(" ")[1] + " <br> has total processing time greater <br> than "+ totalProcessingTime +"ms.";
                     }
 
-                    if(frequencyThreshold != undefined && frequencyThreshold != ""){
-                        if(invocation > frequencyThreshold){
+                    if(averageExecutionTime != undefined && averageExecutionTime != ""){
+                        if(avgExecTime > averageExecutionTime){
                             $("#analysisRemarks").show();
                             $("#procedureWarningSection").show();
-                            warningString = warningString + "<p>" + procedureName.split(" ")[1] + " has frequency greater than "+ frequencyThreshold +".</p>"
-                            warningToolTip = warningToolTip + "<br>"+ procedureName.split(" ")[1] + " <br> has frequency greater than <br> than "+ frequencyThreshold +".";
-    //                        $("#procedureWarning").append("<p>" + procedureName.split(" ")[1] + " has frequency greater than "+ frequencyThreshold +"%.</p>");
+                            warningString = warningString + "<p>" + procedureName.split(" ")[1] + " has average execution time greater than "+ averageExecutionTime +"ms.</p>"
+                            warningToolTip = warningToolTip + "<br/>"+ procedureName.split(" ")[1] + " <br/>has average execution time greater<br/> than "+ averageExecutionTime +"ms.";
                         }
                     }
 
@@ -159,14 +162,14 @@ function loadAnalysisPage(){
                         {
                             AVG: avgExecTime,
                             INVOCATIONS: invocation,
-                            TOTAL_PROCESSING_TIME: combinedWeight,
+                            TOTAL_PROCESSING_TIME: calculatedProcessingTime,
                             TYPE:type,
                             WEIGHTED_PERC: wtPercentage,
                             WARNING: warningToolTip
                         }
                     dataLatency.push({"label": procedureName , "value": avgExecTime})
                     dataFrequency.push({"label": procedureName, "value": invocation})
-                    dataCombined.push({"label": procedureName, "value": combinedWeight})
+                    dataCombined.push({"label": procedureName, "value": calculatedProcessingTime})
                 }
                 var formatDate = VoltDbAnalysis.formatDateTime(timestamp);
                 $("#analysisDate").html(formatDate);
@@ -233,8 +236,11 @@ function loadAnalysisPage(){
     }
 
     $("#btnAnalyzeNow").on("click", function(){
-        if(VoltDbUI.getFromLocalStorage("usagePercentage") == undefined){
-           saveInLocalStorage("usagePercentage", 20)
+        if(VoltDbUI.getFromLocalStorage("totalProcessingTime") == undefined){
+           saveInLocalStorage("totalProcessingTime", 20)
+        }
+        if(VoltDbUI.getFromLocalStorage("averageExecutionTime") == undefined){
+            saveInLocalStorage("averageExecutionTime", 500)
         }
         fetchData();
     })

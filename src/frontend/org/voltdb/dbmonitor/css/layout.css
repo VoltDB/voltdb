@@ -3601,7 +3601,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     height:390px;
     padding:10px 10px 0;
 }
-#visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseCombinedAnalysis.nvd3-svg {height:100% !important; width:100%!important;}
+#visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseProcessingTimeAnalysis.nvd3-svg {height:100% !important; width:100%!important;}
 
 .legendAnalysis { float:right;margin:15px 120px 0 0;}
 .circle {
@@ -3649,7 +3649,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .analysisRemarks h1{ font-weight:bold; text-decoration:underline;}
 .analysisRemarks h2 {font-weight:bold; padding:15px 0 0 10px;}
 .analysisRemarks p { padding:0 0 0 20px; font-size:13px;line-height:20px;}
-.setThresholdPopContent { min-width:350px;}
+.setThresholdPopContent { max-width:450px;}
 .partitioned{ padding:0 0 10px 0;}
 .partitioned .leftPart, .replicated .leftRep { float:left;}
 .partitioned .rightPart, .replicated .rightRep {float:right;}
@@ -3677,6 +3677,7 @@ generateProcedureDate { float:right;padding-right: 85px;}
     padding-left: 10px;
 }
 .alertThresholdTbl tr td input[type="text"]{ width:40px; padding:0 0 0 2px; margin:0 3px 0 0}
+.settingMessage {background-color:#f0f0f0; padding: 5px;margin: 0px 0px 20px 0px;}
 /********************analysis End *****************/
 /********************jquery us css override*****************/
 
