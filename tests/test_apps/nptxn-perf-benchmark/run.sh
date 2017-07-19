@@ -82,6 +82,7 @@ function load() {
 function client() {
     load
     java -classpath $BENCHMARK_JAR_NAME:$CLIENTCLASSPATH np.NPBenchmark \
+         --servers="$SERVERS" \
          --scale=0.6 \
          --cardcount=500000 \
          --mprate=0.02 \
