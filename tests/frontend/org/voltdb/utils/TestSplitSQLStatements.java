@@ -182,12 +182,28 @@ public class TestSplitSQLStatements {
                 + "end;";
         checkSplitter(sql + sql1, sql.substring(0, sql.length() - 1), sql1);
 
+        // case inside longer strings with numbers and letters
+        sql = "create procedure p as begin "
+                + "select empty1case from R; "
+                + "select case2ofbeer from R; "
+                + "select suit2case3ofbeer from R; "
+                + "end;";
+        checkSplitter(sql + sql1, sql.substring(0, sql.length() - 1), sql1);
+
         // end inside longer strings
         sql = "create procedure p as begin "
                 + "select emptycase from R; "
                 + "select caseofbeer from R; "
                 + "select endofbeer from R; "
                 + "select frontend from R; "
+                + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        // end inside longer strings with numbers and letters
+        sql = "create procedure p as begin "
+                + "select cas1end3ofbeer from R; "
+                + "select end2ofbeer from R; "
+                + "select front1end from R; "
                 + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
 
@@ -271,6 +287,19 @@ public class TestSplitSQLStatements {
                 + "from t;"
                 + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        // case with no whitespace before it
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "SELECT a, "
+                + "100+CASE WHEN a > 100.00 "
+                + "THEN 10 "
+                + "ELSE 5 "
+                + "END "
+                + "FROM t; "
+                + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
     }
 
 }

@@ -391,17 +391,17 @@ public class SQLLexer extends SQLPatternFactory
                 }
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
-                if ( (iCur == 0 || Character.isWhitespace(buf[iCur-1]) || buf[iCur-1] == ';')
+                if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]) || buf[iCur-1] == ';')
                         && (iCur <= buf.length - 4)
                         && String.copyValueOf(buf, iCur, 4).equalsIgnoreCase("CASE")
-                        && (iCur+4 == buf.length || Character.isWhitespace(buf[iCur+4]) )) {
+                        && (iCur+4 == buf.length || !Character.isLetterOrDigit(buf[iCur+4]) )) {
                     inCase++;
                     iCur += 4;
-                } else if ( (iCur == 0 || Character.isWhitespace(buf[iCur-1]) || buf[iCur-1] == ';') // if beginning of string or whitespace character before "begin"
+                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]) || buf[iCur-1] == ';') // if beginning of string or whitespace character before "begin"
                         && (buf[iCur] == 'B' || buf[iCur] == 'b')
                         && (iCur <= buf.length - 5)
                         && String.copyValueOf(buf, iCur, 5).equalsIgnoreCase("BEGIN")
-                        && (iCur+5 == buf.length || Character.isWhitespace(buf[iCur+5])) ) {
+                        && (iCur+5 == buf.length || !Character.isLetterOrDigit(buf[iCur+5])) ) {
                     inBegin = true;
                     iCur += 5;
                 } else if ( !inBegin && buf[iCur] == ';') {
@@ -418,11 +418,11 @@ public class SQLLexer extends SQLPatternFactory
                     // Start of quoted string.
                     cQuote = buf[iCur];
                     iCur++;
-                } else if ( (iCur == 0 || Character.isWhitespace(buf[iCur-1]) || buf[iCur-1] == ';')
+                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]) || buf[iCur-1] == ';')
                         && inBegin && (buf[iCur] == 'E' || buf[iCur] == 'e')
                         && (iCur <= buf.length - 3)
                         && String.copyValueOf(buf, iCur, 3).equalsIgnoreCase("END")
-                        && (iCur+3 == buf.length || Character.isWhitespace(buf[iCur+3]) || buf[iCur+3] == ';') ) {
+                        && (iCur+3 == buf.length || !Character.isLetterOrDigit(buf[iCur+3]) || buf[iCur+3] == ';') ) {
                     if (inCase > 0) {
                         inCase--;
                     } else {
