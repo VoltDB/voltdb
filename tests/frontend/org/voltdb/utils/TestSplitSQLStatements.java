@@ -308,6 +308,18 @@ public class TestSplitSQLStatements {
                 + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
 
+        sql = "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then t.a + 100 else t.a end; "
+                + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end; "
+                + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        String sql1 = "select * from R;";
+        sql = "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then t.a + 100 else t.a end; "
+                + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end; "
+                + "end;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1.substring(0, sql1.length() - 1));
     }
 
 }
