@@ -189,14 +189,17 @@ function loadAnalysisPage(){
                     VoltDbAnalysis.combinedDetail[item.PROCEDURE] = [];
                 }
 
-                VoltDbAnalysis.combinedDetail[item.PROCEDURE].push({
-                    AVG: item.AVG_EXECUTION_TIME/1000000,
-                    INVOCATIONS: item.INVOCATIONS,
-                    PARTITION_ID : item.PARTITION_ID,
-                    STATEMENT: item.STATEMENT,
-                    TIMESTAMP: item.TIMESTAMP,
-                    PROCEDURE: item.PROCEDURE
-                })
+                if(item.STATEMENT != "<ALL>"){
+                    VoltDbAnalysis.combinedDetail[item.PROCEDURE].push({
+                        AVG: item.AVG_EXECUTION_TIME/1000000,
+                        INVOCATIONS: item.INVOCATIONS,
+                        PARTITION_ID : item.PARTITION_ID,
+                        STATEMENT: item.STATEMENT,
+                        TIMESTAMP: item.TIMESTAMP,
+                        PROCEDURE: item.PROCEDURE
+                    })
+                }
+
                 VoltDbAnalysis.latencyDetail[item.STATEMENT] =
                     {
                         AVG: item.AVG_EXECUTION_TIME/1000000,
@@ -207,7 +210,9 @@ function loadAnalysisPage(){
                     }
 
 
-                VoltDbAnalysis.latencyDetailValue.push({"STATEMENT": item.STATEMENT , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP, "INVOCATION": item.INVOCATIONS});
+                if(item.STATEMENT != "<ALL>"){
+                    VoltDbAnalysis.latencyDetailValue.push({"STATEMENT": item.STATEMENT , "value": item.AVG_EXECUTION_TIME/1000000, "PROCEDURE": item.PROCEDURE, "TIMESTAMP": item.TIMESTAMP, "INVOCATION": item.INVOCATIONS});
+                }
             });
 
             MonitorGraphUI.initializeFrequencyDetailGraph();
