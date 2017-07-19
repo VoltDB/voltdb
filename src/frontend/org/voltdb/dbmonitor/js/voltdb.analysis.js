@@ -187,7 +187,6 @@ function loadAnalysisPage(){
 
              //find procedure type
 
-
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
                 var type = "Single Partitioned";
                 if(procedureName == item.PROCEDURE && item.PARTITION_ID == 16383){
@@ -206,7 +205,8 @@ function loadAnalysisPage(){
                         PARTITION_ID : item.PARTITION_ID,
                         STATEMENT: item.STATEMENT,
                         TIMESTAMP: item.TIMESTAMP,
-                        PROCEDURE: item.PROCEDURE
+                        PROCEDURE: item.PROCEDURE,
+                        TYPE: type
                     })
                 }
 

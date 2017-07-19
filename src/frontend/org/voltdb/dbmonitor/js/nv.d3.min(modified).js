@@ -668,7 +668,7 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time")
+                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time"|| d.series[0].key == "Total Processing Time")
                             unit = " ms"
                         else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail")
                             unit = ""
@@ -701,7 +701,7 @@
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
                     } else {
                         var keyName = d.series[0].key;
-                        keyName = (keyName == "Frequency Detail" ? "Frequency":(keyName == "Combined Detail" ? "Combined" : keyName));
+                        keyName = (keyName == "Frequency Detail" ? "Frequency":(keyName == "Combined Detail" ? "Total Processing Time" : keyName));
                         trowEnter.append("td")
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ keyName +"</span>" );
                     }
@@ -776,7 +776,7 @@
                         .html("Total Processing Time")
 
                         trowEnter3.append("td")
-                            .html(VoltDbAnalysis.procedureValue[d.data.label].TOTAL_PROCESSING_TIME.toFixed(3) + " %");
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].TOTAL_PROCESSING_TIME.toFixed(3) + " ms");
                     }
 
                     if(d.series[0].key != "Execution Time"){
