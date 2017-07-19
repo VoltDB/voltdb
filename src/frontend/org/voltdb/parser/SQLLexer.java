@@ -300,7 +300,7 @@ public class SQLLexer extends SQLPatternFactory
      * eg: emptycase, caseofbeer, suitcaseofbeer,
      * (id+0)end+100, suit2case3ofbeer, 100+case
      */
-    private static boolean matchToken (String buffer, int position, String token) {
+    private static boolean matchToken(String buffer, int position, String token) {
 
         final int tokLength = token.length();
         final int bufLength = buffer.length();
