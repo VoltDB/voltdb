@@ -26,6 +26,7 @@ import java.util.Queue;
 import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -41,7 +42,7 @@ import org.voltdb.types.PlanNodeType;
 public class InlineOrderByIntoMergeReceive extends MicroOptimization {
 
     @Override
-    protected AbstractPlanNode recursivelyApply(AbstractPlanNode planNode)
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode planNode, AbstractParsedStmt parsedStmt)
     {
         assert(planNode != null);
 
@@ -51,7 +52,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         // multi-partition DML statement context. That's no longer
         // simply a matter of removing the Send/Receive pair without
         // side effects.
-        if (m_parsedStmt.topmostParentStatementIsDML()) {
+        if (parsedStmt.topmostParentStatementIsDML()) {
             return planNode; // Do not apply the optimization.
         }
 
