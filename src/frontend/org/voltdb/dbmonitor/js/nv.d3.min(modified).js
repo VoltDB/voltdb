@@ -9128,9 +9128,8 @@
                         .attr('dy', '.32em')
                         .attr('style', function(d, i){
                             if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Total Processing Time")
-                            && (VoltDbAnalysis.procedureValue[d.label].TOTAL_PROCESSING_TIME > VoltDbUI.getFromLocalStorage("usagePercentage")
-                            || VoltDbAnalysis.procedureValue[d.label].AVG > VoltDbUI.getFromLocalStorage("averageExecutionTime"))
-                            && VoltDbAnalysis.procedureValue[d.label].TYPE == "Multi Partitioned")
+                            && (VoltDbAnalysis.procedureValue[d.label].TOTAL_PROCESSING_TIME > VoltDbUI.getFromLocalStorage("totalProcessingTime")
+                            || VoltDbAnalysis.procedureValue[d.label].AVG > VoltDbUI.getFromLocalStorage("averageExecutionTime")))
                                 return "fill:#C12026"
                         })
                         .text(function (d, i) {
@@ -9149,9 +9148,8 @@
                         .attr('y', (x.rangeBand() / (data.length * 2)) -15)
                         .html(function (d, i){
                             if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Total Processing Time")
-                            && (VoltDbAnalysis.procedureValue[d.label].TOTAL_PROCESSING_TIME > VoltDbUI.getFromLocalStorage("usagePercentage")
-                            || VoltDbAnalysis.procedureValue[d.label].AVG > VoltDbUI.getFromLocalStorage("averageExecutionTime"))
-                            && VoltDbAnalysis.procedureValue[d.label].TYPE == "Multi Partitioned")
+                            && (VoltDbAnalysis.procedureValue[d.label].TOTAL_PROCESSING_TIME > VoltDbUI.getFromLocalStorage("totalProcessingTime")
+                            || VoltDbAnalysis.procedureValue[d.label].AVG > VoltDbUI.getFromLocalStorage("averageExecutionTime")))
                                 return "&#9888;";
                             else
                                 return "";

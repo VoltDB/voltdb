@@ -2626,20 +2626,20 @@ var loadPage = function (serverName, portid) {
 
     $("#btnThreshold").popup({
         open: function (event, ui, ele) {
-            if(VoltDbUI.getFromLocalStorage("usagePercentage") == undefined){
-                saveInLocalStorage("usagePercentage", 20)
+            if(VoltDbUI.getFromLocalStorage("totalProcessingTime") == undefined){
+                saveInLocalStorage("totalProcessingTime", 20)
             }
             if(VoltDbUI.getFromLocalStorage("averageExecutionTime") == undefined){
                 saveInLocalStorage("averageExecutionTime", 500)
             }
-            $("#partitionThreshold").val(VoltDbUI.getFromLocalStorage("usagePercentage"))
+            $("#partitionThreshold").val(VoltDbUI.getFromLocalStorage("totalProcessingTime"))
             $("#averageExecutionTime").val(VoltDbUI.getFromLocalStorage("averageExecutionTime"))
         },
        afterOpen: function () {
             var popup = $(this)[0];
             $("#btnSaveThreshold").unbind("click");
             $("#btnSaveThreshold").on("click", function () {
-                saveInLocalStorage("usagePercentage", $("#partitionThreshold").val())
+                saveInLocalStorage("totalProcessingTime", $("#partitionThreshold").val())
                 saveInLocalStorage("averageExecutionTime", $("#averageExecutionTime").val())
                 //saveInLocalStorage("execTimeForProc", $("#execTime").val())
                 $("#btnAnalyzeNow").trigger("click");
