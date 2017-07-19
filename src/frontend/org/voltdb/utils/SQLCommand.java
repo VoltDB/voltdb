@@ -224,6 +224,7 @@ public class SQLCommand
         final StringBuilder statement = new StringBuilder();
         boolean isRecall = false;
         boolean inMultiStmtProc = false;
+        final StringBuilder multiStmtLog = new StringBuilder();
 
         while (true) {
             String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
@@ -235,15 +236,16 @@ public class SQLCommand
                 // mistake. That case works differently now, so this code path
                 // MAY be dead. If not, cut our losses by rigging a quick exit.
                 statement.setLength(0);
+                multiStmtLog.setLength(0);
                 line = "EXIT;";
             }
             // if it is a multi statement procedure
             if(!inMultiStmtProc) {
                 // check if the statement is CREATE PROCEDURE AS BEGIN...
                 // add the current line to the statements so far entered
-                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureBeginAsSQL(statement.toString() + ' ' + line);
+                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureBeginAsSQL(
+                        statement.toString() + '\n' + line);
                 if (statementMatcher.matches()) {
-                    System.out.print("INTERACTIVE MODE - matched begin procedure - executeImmediate=false");
                     inMultiStmtProc = true;
                     statement.append(line + "\n");
                     continue;
@@ -258,9 +260,16 @@ public class SQLCommand
                  */
                 String lineTillSemiColon = line.substring(0, line.indexOf(";") + 1);
                 Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(
-                        statement.toString() + ' ' + lineTillSemiColon);
+                        statement.toString() + '\n' + lineTillSemiColon);
                 if (statementMatcher.matches()) {
-                    System.out.print("INTERACTIVE MODE - matched FULL procedure - executeImmediate=true");
+                    /* end of multi stmt procedure
+                     * store the mutli stmt procedure into a separate buffer
+                     * to enable parsing of more multi statement procedures
+                     */
+                    multiStmtLog.append(statement.toString()+ '\n' + lineTillSemiColon);
+                    String temp = statement.substring(line.indexOf(";") + 2);
+                    statement.setLength(0);
+                    statement.append(temp);
                     inMultiStmtProc = false;
                 }
             }
@@ -353,6 +362,10 @@ public class SQLCommand
                 RecallableSessionLines.add(line);
                 if (executeImmediate) {
                     statement.append(line + "\n");
+                    if (multiStmtLog.length() > 0) {
+                        executeStatements(multiStmtLog.toString(), null, 0);
+                        multiStmtLog.setLength(0);
+                    }
                     executeStatements(statement.toString(), null, 0);
                     if (m_testFrontEndOnly) {
                         break; // test mode expects this early return before end of input.
