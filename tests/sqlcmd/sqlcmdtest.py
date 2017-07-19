@@ -266,12 +266,12 @@ def compare_cleaned_to_baseline(parent, baseparent, path, inpath, do_refresh, re
     return False
 
 def delete_proc(pfile):
+    # drop procedure left in between any tests
     procset = set()
     for line in pfile:
         columns = line.split(',')
         try:
             if columns[2] != ' ' :
-                print columns[2]
                 procname = columns[2].replace('\"','')
                 systemgeneratedprocedures = {".insert",".update",".select",".delete",".upsert"}
                 if any( systemprocedure in procname for systemprocedure in systemgeneratedprocedures) :
@@ -281,26 +281,26 @@ def delete_proc(pfile):
             pass
 
     if len(procset) :
-        childin = open(('batchsql.ddl'), 'w+')
+        filename =  'batchsql.ddl'
+        childin = open(filename, 'w+')
         childin.write('file -inlinebatch EOB'+ '\n' + '\n')
         for procname in procset:
-            print procname
             sqlcmdopt = 'DROP PROCEDURE ' + procname + ' IF EXISTS;'
             childin.write(sqlcmdopt+ '\n')
-        childin.write('\n'+ 'EOB' + '\n')
+        childin.write('\n'+ 'EOB' )
         childin.close()
 
+        childin = open(filename, 'r')
+        childout = open((filename + '.out'), 'w+')
+        childerr = open((filename + '.err'), 'w+')
 
-        childin = open('batchsql.ddl', 'r')
-        childout = open(('batchsql.ddl.out'), 'w+')
-        childerr = open(('batchsql.ddl.err'), 'w+')
-        print "Running subprocess.."
         subprocess.call(['../../bin/sqlcmd'],
                         stdin=childin, stdout=childout, stderr=childerr)
 
 
 
 def delete_table_and_view(pfile):
+    # drop table (unique) and all its views left in between any tests
     tableset = set()
     for line in pfile:
         columns = line.split(',')
@@ -312,19 +312,19 @@ def delete_table_and_view(pfile):
             pass
 
     if len(tableset) :
-        childin = open(('batchsql.ddl'), 'w+')
+        filename =  'batchsql.ddl'
+        childin = open(filename, 'w+')
         childin.write('file -inlinebatch EOB'+ '\n' + '\n')
         for tablename in tableset:
-            print tablename
             sqlcmdopt = 'DROP TABLE ' + tablename + ' IF EXISTS CASCADE;'
             childin.write(sqlcmdopt+ '\n')
-        childin.write('\n'+ 'EOB' + '\n')
+        childin.write('\n'+ 'EOB' )
         childin.close()
 
-        childin = open('batchsql.ddl', 'r')
-        childout = open(('batchsql.ddl.out'), 'w+')
-        childerr = open(('batchsql.ddl.err'), 'w+')
-        print "Running subprocess.."
+        childin = open(filename, 'r')
+        childout = open((filename + '.out'), 'w+')
+        childerr = open((filename + '.err'), 'w+')
+
         subprocess.call(['../../bin/sqlcmd'],
                         stdin=childin, stdout=childout, stderr=childerr)
 
@@ -399,21 +399,13 @@ def do_main():
                     subprocess.call(['../../bin/sqlcmd'],
                         stdin=childin, stdout=childout, stderr=childerr)
 
-                # TODO launch a hard-coded script that verifies a clean database and healthy server
-                # ("show tables" or equivalent) after each test run to prevent cross-contamination.
-
-                # delete procedure
+                # Verify a clean database by dropping any procedure,views and table after each test to prevent cross-contamination.
                 childout.flush()
                 childerr.flush()
 
-
                 childout = open(os.path.join(parent, prefix + '.out' + '.procedure'), 'w+')
-                print "Running.. " + os.path.join(parent, prefix + '.out' + '.procedure')
-
                 childerr = open(os.path.join(parent, prefix + '.err' + '.procedure'), 'w+')
-                print "Running.. " + os.path.join(parent, prefix + '.err' + '.procedure')
 
-                #get the result of the query in output file
                 subprocess.call(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
                     stdout=childout, stderr=childerr)
 
@@ -421,28 +413,27 @@ def do_main():
 
                 delete_proc(pfile)
 
-                # delete files after use
+                #clean up
                 os.remove(os.path.join(parent, prefix + '.out' + '.procedure'))
                 os.remove(os.path.join(parent, prefix + '.err' + '.procedure'))
 
-                #  delete table and views
+
                 childout.flush()
                 childerr.flush()
                 pfile.flush()
 
                 childout = open(os.path.join(parent, prefix + '.out' + '.table'), 'w+')
-                print "Running.. " + os.path.join(parent, prefix + '.out' + '.table')
-
                 childerr = open(os.path.join(parent, prefix + '.err' + '.table'), 'w+')
-                print "Running.. " + os.path.join(parent, prefix + '.err' + '.table')
+
                 subprocess.call(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
                     stdout=childout, stderr=childerr)
-                # parse output file
+
                 pfile = file(os.path.join(parent, prefix + '.out' + '.table'), 'r')
+
 
                 delete_table_and_view(pfile)
 
-                # delete files after use
+                # clean up
                 os.remove(os.path.join(parent, prefix + '.out' + '.table'))
                 os.remove(os.path.join(parent, prefix + '.err' + '.table'))
 
