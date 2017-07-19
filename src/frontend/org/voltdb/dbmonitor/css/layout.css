@@ -3643,7 +3643,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
 .generateproDetails { float:right;padding-right: 85px; }
 .generateproDetails p {padding-left:10px;}
 .proDetailSvgHeight { overflow:initial; height:95%!important; padding:0 0 0 30px;}
-.analysisDate { position:relative; top:24px;}
+.analysisDate { position:relative; top:24px; float:right}
 .tab_content_data { padding-top:10px;}
 .analysisRemarks { padding:15px; background:#F1F1F1; border:1px solid #cccccc;}
 .analysisRemarks h1{ font-weight:bold; text-decoration:underline;}

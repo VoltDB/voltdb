@@ -11,7 +11,7 @@ function loadAnalysisPage(){
         } else if($($(this)[0]).text() == "Combined"){
             $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Combined(" : "Combined");
         } else {
-            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Execution Time(" : "Execution Time");
+            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Average Execution Time(" : "Average Execution Time");
         }
         //this method is called twice to ensure graph reloads properly
         VoltDbAnalysis.refreshChart();
