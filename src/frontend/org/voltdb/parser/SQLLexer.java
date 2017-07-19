@@ -400,7 +400,7 @@ public class SQLLexer extends SQLPatternFactory
                         && (iCur+4 == buf.length || !Character.isLetterOrDigit(buf[iCur+4]) )) {
                     inCase++;
                     iCur += 4;
-                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1])) // if beginning of string or whitespace character before "begin"
+                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1])) // if beginning of statement or identifier
                         && (buf[iCur] == 'b' || buf[iCur] == 'B')
                         && (iCur <= buf.length - 5)
                         && bufStr.regionMatches(true, iCur, "begin", 0, 5)
