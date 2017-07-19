@@ -47,7 +47,7 @@ function prepare() {
 # start the server and initialize the schemas #
 ###############################################
 function start() {
-    server-init
+    server
 }
 
 # Compile the classes, generate the bundled jar file(s)
