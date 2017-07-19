@@ -96,7 +96,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                     });
                 }
             }
-            else {
+            else if (status != ClientResponse.CONNECTION_LOST){
                 m_failedCount.incrementAndGet();
                 m_errHandler.handleError(m_csvLine, response, response.getStatusString());
             }
@@ -159,25 +159,31 @@ public class CSVTupleDataLoader implements CSVDataLoader {
 
     @Override
     public void insertRow(RowWithMetaData metaData, Object[] values) throws InterruptedException {
-        try {
-            PartitionSingleExecuteProcedureCallback cbmt =
-                    new PartitionSingleExecuteProcedureCallback(metaData);
-            if (!m_client.callProcedure(cbmt, m_insertProcedure, values)) {
-                m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
-                ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                        new VoltTable[0], "Failed to call procedure.", 0);
-                m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+        boolean connectionFailed = true;
+        while (connectionFailed) {
+            try {
+                PartitionSingleExecuteProcedureCallback cbmt =
+                        new PartitionSingleExecuteProcedureCallback(metaData);
+                if (!m_client.callProcedure(cbmt, m_insertProcedure, values)) {
+                    m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
+                    ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                            new VoltTable[0], "Failed to call procedure.", 0);
+                    m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+                }
+                connectionFailed = false;
+            } catch (NoConnectionsException ex) {
+//                ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+//                        new VoltTable[0], "Failed to call procedure.", 0);
+//                m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+                Thread.sleep(1000);
+            } catch (IOException ex) {
+//                ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+//                        new VoltTable[0], "Failed to call procedure.", 0);
+//                m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+                Thread.sleep(1000);
+            } catch (Exception ex) {
+                m_errHandler.handleError(metaData, null, ex.toString());
             }
-        } catch (NoConnectionsException ex) {
-            ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0], "Failed to call procedure.", 0);
-            m_errHandler.handleError(metaData, response, "Failed to call procedure.");
-        } catch (IOException ex) {
-            ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0], "Failed to call procedure.", 0);
-            m_errHandler.handleError(metaData, response, "Failed to call procedure.");
-        } catch (Exception ex) {
-            m_errHandler.handleError(metaData, null, ex.toString());
         }
     }
 
