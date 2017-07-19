@@ -307,7 +307,8 @@ public class SQLLexer extends SQLPatternFactory
         final char firstLo = Character.toLowerCase(token.charAt(0));
         final char firstUp = Character.toUpperCase(token.charAt(0));
 
-        if( (position == 0 || !Character.isLetterOrDigit(buffer.charAt(position-1)))
+        if(     // character before token is non alphanumeric i.e., token is not embedded in an identifier
+                (position == 0 || !Character.isLetterOrDigit(buffer.charAt(position-1)))
                 // perform a region match only if the first character matches
                 && (buffer.charAt(position) == firstLo || buffer.charAt(position) == firstUp)
                 // match only if the length of the remaining string is the atleast the length of the token
@@ -315,7 +316,8 @@ public class SQLLexer extends SQLPatternFactory
                 // search for token
                 && buffer.regionMatches(true, position, token, 0, tokLength)
                 // character after token is non alphanumeric i.e., token is not embedded in an identifier
-                && (position + tokLength == bufLength || !Character.isLetterOrDigit(buffer.charAt(position + tokLength))) )
+                && (position + tokLength == bufLength || !Character.isLetterOrDigit(buffer.charAt(position + tokLength)))
+                )
             return true;
         else
             return false;
