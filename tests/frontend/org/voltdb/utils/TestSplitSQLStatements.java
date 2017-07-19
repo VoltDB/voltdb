@@ -300,6 +300,14 @@ public class TestSplitSQLStatements {
                 + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
 
+        // case/end with no whitespace before and after it
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "SELECT a, "
+                + "select case when id < 0 then (id+0)end+100 from aaa;"
+                + "end;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
     }
 
 }
