@@ -115,7 +115,7 @@ function loadAnalysisPage(){
                     if(i == 0)
                         timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
 
-                    var combinedWeight = (((profileData["PROCEDURE_PROFILE"][i].AVG/1000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS)/sumOfAllProcedure) * 100;
+                    var calculatedProcessingTime = (profileData["PROCEDURE_PROFILE"][i].AVG/1000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS;
                     var procedureName = profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
                     var avgExecTime = profileData["PROCEDURE_PROFILE"][i].AVG / 1000000;
                     var invocation = profileData["PROCEDURE_PROFILE"][i].INVOCATIONS;
@@ -140,11 +140,11 @@ function loadAnalysisPage(){
                     var warningString = '';
                     var warningToolTip = '';
 
-                    if(combinedWeight > totalProcessingTime && totalProcessingTime != "") {
+                    if(calculatedProcessingTime > totalProcessingTime && totalProcessingTime != "") {
                         $("#analysisRemarks").show();
                         $("#procedureWarningSection").show();
-                        warningString = "<p>" + procedureName.split(" ")[1] + " has total processing time greater than "+ totalProcessingTime +"%.</p>";
-                        warningToolTip = procedureName.split(" ")[1] + " <br> has total processing time greater <br> than "+ totalProcessingTime +"%.";
+                        warningString = "<p>" + procedureName.split(" ")[1] + " has total processing time greater than "+ totalProcessingTime +"ms.</p>";
+                        warningToolTip = procedureName.split(" ")[1] + " <br> has total processing time greater <br> than "+ totalProcessingTime +"ms.";
                     }
 
                     if(averageExecutionTime != undefined && averageExecutionTime != ""){
@@ -162,14 +162,14 @@ function loadAnalysisPage(){
                         {
                             AVG: avgExecTime,
                             INVOCATIONS: invocation,
-                            TOTAL_PROCESSING_TIME: combinedWeight,
+                            TOTAL_PROCESSING_TIME: calculatedProcessingTime,
                             TYPE:type,
                             WEIGHTED_PERC: wtPercentage,
                             WARNING: warningToolTip
                         }
                     dataLatency.push({"label": procedureName , "value": avgExecTime})
                     dataFrequency.push({"label": procedureName, "value": invocation})
-                    dataCombined.push({"label": procedureName, "value": combinedWeight})
+                    dataCombined.push({"label": procedureName, "value": calculatedProcessingTime})
                 }
                 var formatDate = VoltDbAnalysis.formatDateTime(timestamp);
                 $("#analysisDate").html(formatDate);

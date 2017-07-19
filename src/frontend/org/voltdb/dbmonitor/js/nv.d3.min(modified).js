@@ -668,7 +668,7 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time")
+                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time" || d.series[0].key == "Total Processing Time")
                             unit = " ms"
                         else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail")
                             unit = ""
@@ -719,7 +719,7 @@
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
                 } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Total Processing Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail") && chartContainer == null){
                     trowEnter.append("td")
-                        .html(function (p, i) { return (d.series[0].key != "Frequency"  && d.series[0].key != "Frequency Detail" ? (d.series[0].key == "Total Processing Time" || d.series[0].key == "Combined Detail" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
+                        .html(function (p, i) { return (d.series[0].key != "Frequency"  && d.series[0].key != "Frequency Detail" ? (d.series[0].key == "Combined Detail" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
                 } else {
                     trowEnter.append("td")
                         .classed("value", true)
@@ -749,14 +749,6 @@
                     trowEnter0.append("td")
                         .html(VoltDbAnalysis.procedureValue[d.data.label].TYPE == undefined ? "Unknown" : VoltDbAnalysis.procedureValue[d.data.label].TYPE);
 
-                    var trowEnter1 = tbodyEnter
-                    .append("tr");
-
-                    trowEnter1.append("td")
-                    .html("AverageExecTime*Invocation")
-                    trowEnter1.append("td")
-                        .html((VoltDbAnalysis.procedureValue[d.data.label].AVG * VoltDbAnalysis.procedureValue[d.data.label].INVOCATIONS).toFixed(6) + " ms");
-
                     if(d.series[0].key != "Frequency"){
                         var trowEnter2 = tbodyEnter
                         .append("tr");
@@ -776,7 +768,7 @@
                         .html("Total Processing Time")
 
                         trowEnter3.append("td")
-                            .html(VoltDbAnalysis.procedureValue[d.data.label].TOTAL_PROCESSING_TIME.toFixed(3) + " %");
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].TOTAL_PROCESSING_TIME.toFixed(6) + " ms");
                     }
 
                     if(d.series[0].key != "Execution Time"){
@@ -9161,10 +9153,10 @@
                     bars.watchTransition(renderWatch, 'multibarhorizontal: bars')
                         .select('foreignObject')
                         .attr('x', function (d, i) {
-                            var charLength = d.value.toString().length - 1
+                            var charLength = d.key == "Total Processing Time" ? d.value.toFixed(6).toString().length : d.value.toString().length;
                             var xLength = getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) + 16;
                             if(d.key == "Total Processing Time")
-                                xLength += VoltDbAnalysis.proceduresCount > 1 ? (2 * charLength) : 35 + (2.5 * charLength);//xLength - 70;
+                                xLength += VoltDbAnalysis.proceduresCount > 1 ? (6.5 * charLength) : 35 + (6.5 * charLength);
                             else
                                 xLength += (6.5 * charLength);
                             return xLength;
