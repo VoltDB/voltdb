@@ -55,7 +55,7 @@ CREATE TABLE stations (
 
 CREATE TABLE trains (
   train_id            SMALLINT          NOT NULL,
-  name                  VARCHAR(25 BYTES) NOT NULL,
+  name                VARCHAR(25) NOT NULL,
   CONSTRAINT PK_trains PRIMARY KEY (train_id)
 );
 

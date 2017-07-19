@@ -81,6 +81,7 @@ function init() {
     sqlcmd < ddl.sql
     echo "----Loading Stations----"
     csvloader --servers $SERVERS --file data/stations.csv --reportdir log stations
+    csvloader --servers $SERVERS --file data/trains.csv --reportdir log trains
 }
 
 # run this target to see what command line options the client offers
