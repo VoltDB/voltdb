@@ -102,7 +102,7 @@ function loadAnalysisPage(){
                 var isMPPresent = false;
                 var isPPresent = false;
                 var partitionThreshold = VoltDbUI.getFromLocalStorage("usagePercentage");
-                var frequencyThreshold = VoltDbUI.getFromLocalStorage("frequencyForProc");
+                var averageExecutionTime = VoltDbUI.getFromLocalStorage("averageExecutionTime");
 
                 if(partitionThreshold == undefined){
                     partitionThreshold = 20;
@@ -143,13 +143,12 @@ function loadAnalysisPage(){
                         warningToolTip = procedureName.split(" ")[1] + " <br> has combined usage greater <br> than "+ partitionThreshold +"%.";
                     }
 
-                    if(frequencyThreshold != undefined && frequencyThreshold != ""){
-                        if(invocation > frequencyThreshold){
+                    if(averageExecutionTime != undefined && averageExecutionTime != ""){
+                        if(avgExecTime > averageExecutionTime){
                             $("#analysisRemarks").show();
                             $("#procedureWarningSection").show();
-                            warningString = warningString + "<p>" + procedureName.split(" ")[1] + " has frequency greater than "+ frequencyThreshold +".</p>"
-                            warningToolTip = warningToolTip + "<br>"+ procedureName.split(" ")[1] + " <br> has frequency greater than <br> than "+ frequencyThreshold +".";
-    //                        $("#procedureWarning").append("<p>" + procedureName.split(" ")[1] + " has frequency greater than "+ frequencyThreshold +"%.</p>");
+                            warningString = warningString + "<p>" + procedureName.split(" ")[1] + " has average execution time greater than "+ averageExecutionTime +"ms.</p>"
+                            warningToolTip = warningToolTip + "<br/>"+ procedureName.split(" ")[1] + " <br/>has average execution time greater<br/> than "+ averageExecutionTime +"ms.";
                         }
                     }
 
@@ -225,6 +224,9 @@ function loadAnalysisPage(){
     $("#btnAnalyzeNow").on("click", function(){
         if(VoltDbUI.getFromLocalStorage("usagePercentage") == undefined){
            saveInLocalStorage("usagePercentage", 20)
+        }
+        if(VoltDbUI.getFromLocalStorage("averageExecutionTime") == undefined){
+            saveInLocalStorage("averageExecutionTime", 500)
         }
         fetchData();
     })
