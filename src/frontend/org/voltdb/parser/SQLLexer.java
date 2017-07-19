@@ -331,6 +331,8 @@ public class SQLLexer extends SQLPatternFactory
         boolean inBegin = false;
         // To indicate if inside CASE .. WHEN
         int inCase = 0;
+        // needed for string region matching
+        String bufStr = new String(buf);
         int iCur = 0;
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
@@ -391,16 +393,17 @@ public class SQLLexer extends SQLPatternFactory
                 }
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
-                if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]) || buf[iCur-1] == ';')
+                if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]))
+                        && (buf[iCur] == 'c' || buf[iCur] == 'C') // perform a region match only if the first character matches
                         && (iCur <= buf.length - 4)
-                        && String.copyValueOf(buf, iCur, 4).equalsIgnoreCase("CASE")
+                        && bufStr.regionMatches(true, iCur, "case", 0, 4)
                         && (iCur+4 == buf.length || !Character.isLetterOrDigit(buf[iCur+4]) )) {
                     inCase++;
                     iCur += 4;
-                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]) || buf[iCur-1] == ';') // if beginning of string or whitespace character before "begin"
-                        && (buf[iCur] == 'B' || buf[iCur] == 'b')
+                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1])) // if beginning of string or whitespace character before "begin"
+                        && (buf[iCur] == 'b' || buf[iCur] == 'B')
                         && (iCur <= buf.length - 5)
-                        && String.copyValueOf(buf, iCur, 5).equalsIgnoreCase("BEGIN")
+                        && bufStr.regionMatches(true, iCur, "begin", 0, 5)
                         && (iCur+5 == buf.length || !Character.isLetterOrDigit(buf[iCur+5])) ) {
                     inBegin = true;
                     iCur += 5;
@@ -418,11 +421,11 @@ public class SQLLexer extends SQLPatternFactory
                     // Start of quoted string.
                     cQuote = buf[iCur];
                     iCur++;
-                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]) || buf[iCur-1] == ';')
+                } else if ( (iCur == 0 || !Character.isLetterOrDigit(buf[iCur-1]))
                         && inBegin && (buf[iCur] == 'E' || buf[iCur] == 'e')
                         && (iCur <= buf.length - 3)
-                        && String.copyValueOf(buf, iCur, 3).equalsIgnoreCase("END")
-                        && (iCur+3 == buf.length || !Character.isLetterOrDigit(buf[iCur+3]) || buf[iCur+3] == ';') ) {
+                        && bufStr.regionMatches(true, iCur, "end", 0, 3)
+                        && (iCur+3 == buf.length || !Character.isLetterOrDigit(buf[iCur+3])) ) {
                     if (inCase > 0) {
                         inCase--;
                     } else {
