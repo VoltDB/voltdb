@@ -294,6 +294,9 @@ public class MpProcedureTask extends ProcedureTask
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        if (m_msg != null) {
+            sb.append("\n" + m_msg);
+        }
         return sb.toString();
     }
 }

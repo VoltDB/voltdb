@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.exceptions.TransactionRestartException;
@@ -165,14 +166,14 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             if (tt instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
                 if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("Repair updating task: " + next + " with masters: " + masters);
+                    tmLog.debug("Repair updating task: " + next + " with masters: " + CoreUtils.hsIdCollectionToString(masters));
                 }
                 next.updateMasters(masters, partitionMasters);
             }
             else if (tt instanceof EveryPartitionTask) {
                 EveryPartitionTask next = (EveryPartitionTask)tt;
                 if (tmLog.isDebugEnabled())  {
-                    tmLog.debug("Repair updating EPT task: " + next + " with masters: " + masters);
+                    tmLog.debug("Repair updating EPT task: " + next + " with masters: " + CoreUtils.hsIdCollectionToString(masters));
                 }
                 next.updateMasters(masters);
             }

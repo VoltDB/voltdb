@@ -662,6 +662,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof CompleteTransactionMessage) {
             // It should be safe to just send CompleteTransactionMessages to everyone.
+            //if it gets here, the message is for the leader to repair from MpScheduler
+            ((CompleteTransactionMessage) message).setToLeader(true);
             handleCompleteTransactionMessage((CompleteTransactionMessage)message);
         }
         else {
@@ -1696,7 +1698,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void checkPointBalanceSPI() {
         m_spiCheckPoint = getMaxScheduledTxnSpHandle();
         tmLog.info("Balance spi checkpoint on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                    " sphandle: " + TxnEgo.txnIdSeqToString(m_spiCheckPoint));
+                    " sphandle: " + m_spiCheckPoint);
     }
 
     public boolean txnDoneBeforeCheckPoint() {
@@ -1706,10 +1708,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<DuplicateCounterKey> keys = m_duplicateCounters.keySet().stream()
                 .filter(k->k.m_spHandle < m_spiCheckPoint).collect(Collectors.toList());
         if (!keys.isEmpty()) {
+            if (tmLog.isDebugEnabled()) {
+                StringBuilder builder = new StringBuilder();
+                for (DuplicateCounterKey dc : keys) {
+                    builder.append(TxnEgo.txnIdToString(dc.m_txnId) + "(" + dc.m_spHandle + "),");
+                    DuplicateCounter counter = m_duplicateCounters.get(dc);
+                    builder.append(counter.m_openMessage + "\n");
+                }
+                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphanle:" + m_spiCheckPoint + "\n" + builder.toString());
+            }
             return false;
         }
         tmLog.info("Balance spi previous leader " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                " has completed transactions before checkpoint: " + TxnEgo.txnIdSeqToString(m_spiCheckPoint));
+                " has completed transactions before sphandle: " + m_spiCheckPoint);
         m_spiCheckPoint = Long.MIN_VALUE;
         return true;
     }
