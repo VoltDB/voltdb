@@ -53,6 +53,12 @@ CREATE TABLE stations (
   CONSTRAINT PK_stations PRIMARY KEY (station_id)
 );
 
+CREATE TABLE trains (
+  train_id            SMALLINT          NOT NULL,
+  name                  VARCHAR(25 BYTES) NOT NULL,
+  CONSTRAINT PK_trains PRIMARY KEY (train_id)
+);
+
 -------------- PARTITIONED TABLES -----------------------------------------------
 CREATE TABLE cards(
   card_id               INTEGER        NOT NULL,
@@ -72,10 +78,18 @@ CREATE TABLE activity(
   card_id               INTEGER        NOT NULL,
   date_time             TIMESTAMP      NOT NULL,
   station_id            SMALLINT       NOT NULL,
-  activity_code         TINYINT        NOT NULL, -- 1=entry, 2=purchase
+  activity_code         TINYINT        NOT NULL, -- 1=entry, 2=purchase, 0=Exit
   amount                INTEGER        NOT NULL
 );
 PARTITION TABLE activity ON COLUMN card_id;
+
+CREATE TABLE train_activity(
+  train_id              INTEGER        NOT NULL,
+  station_id            INTEGER        NOT NULL,
+  arrival_time          TIMESTAMP,
+  dep_time              TIMESTAMP,
+);
+PARTITION TABLE train_activity ON COLUMN station_id;
 
 CREATE STREAM card_alert_export PARTITION ON COLUMN card_id EXPORT TO TARGET alertstream (
   card_id               INTEGER        NOT NULL,
