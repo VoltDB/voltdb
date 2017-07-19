@@ -89,7 +89,7 @@ def save(runner):
     response = runner.call_proc('@SnapshotSave', columns,
                                 ['{%s}' % (','.join(raw_json_opts))])
     res_table = response.table(0)
-    has_failure = any([t.column(3) != 'SUCCESS' for t in res_table.tuples()])
+    has_failure = any([t[3] != 'SUCCESS' for t in res_table.tuples()])
     print res_table.format_table(caption = 'Snapshot Save Results')
     if has_failure:
         sys.exit(1)

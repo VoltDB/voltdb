@@ -43,7 +43,7 @@ public class TestTransactionTaskQueue extends TestCase
 {
 
     private static SiteTaskerQueue getSiteTaskerQueue() {
-        SiteTaskerQueue queue = new SiteTaskerQueue();
+        SiteTaskerQueue queue = new SiteTaskerQueue(0);
         queue.setStarvationTracker(new StarvationTracker(0));
         queue.setQueueDepthTracker(new QueueDepthTracker(0));
         return queue;

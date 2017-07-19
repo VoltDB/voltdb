@@ -655,14 +655,14 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
         lookaheadNextGroupForAggs(tableWindow);
         // Advance to the end of the current group.
         for (int idx = 0; idx < tableWindow.m_orderByGroupSize; idx += 1) {
-            VOLT_TRACE("MiddleEdge: Window = %s", m_tableWindow->debug().c_str());
+            VOLT_TRACE("MiddleEdge: Window = %s", tableWindow.debug().c_str());
             tableWindow.m_middleEdge.next(nextTuple);
             m_pmp->countdownProgress();
             m_aggregateRow->recordPassThroughTuple(nextTuple);
             insertOutputTuple();
         }
         endGroupForAggs(tableWindow, etype);
-        VOLT_TRACE("FirstEdge: %s", m_tableWindow->debug().c_str());
+        VOLT_TRACE("FirstEdge: %s", tableWindow.debug().c_str());
     }
     VOLT_TRACE("WindowFunctionExecutor: finalizing..");
 
@@ -707,18 +707,18 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
         lookaheadOneRowForAggs(nextTuple, tableWindow);
     }
     do {
-        VOLT_TRACE("findNextEdge(loopStart): %s", m_tableWindow->debug().c_str());
+        VOLT_TRACE("findNextEdge(loopStart): %s", tableWindow.debug().c_str());
         if (tableWindow.m_leadingEdge.next(nextTuple)) {
             initPartitionByKeyTuple(nextTuple);
             initOrderByKeyTuple(nextTuple);
             if (compareTuples(getInProgressPartitionByKeyTuple(),
                               getLastPartitionByKeyTuple()) != 0) {
-                VOLT_TRACE("findNextEdge(Partition): %s", m_tableWindow->debug().c_str());
+                VOLT_TRACE("findNextEdge(Partition): %s", tableWindow.debug().c_str());
                 return START_OF_PARTITION_GROUP;
             }
             if (compareTuples(getInProgressOrderByKeyTuple(),
                               getLastOrderByKeyTuple()) != 0) {
-                VOLT_TRACE("findNextEdge(Group): %s", m_tableWindow->debug().c_str());
+                VOLT_TRACE("findNextEdge(Group): %s", tableWindow.debug().c_str());
                 return START_OF_PARTITION_BY_GROUP;
             }
             tableWindow.m_orderByGroupSize += 1;

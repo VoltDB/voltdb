@@ -441,6 +441,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_INET6_ATON:
             ret = new UnaryFunctionExpression<FUNC_INET6_ATON>((*arguments)[0]);
             break;
+        case FUNC_DEGREES:
+            ret = new UnaryFunctionExpression<FUNC_DEGREES>((*arguments)[0]);
+            break;
+        case FUNC_RADIANS:
+            ret = new UnaryFunctionExpression<FUNC_RADIANS>((*arguments)[0]);
+            break;
         default:
             return NULL;
         }

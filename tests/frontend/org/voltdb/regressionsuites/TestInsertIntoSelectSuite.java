@@ -338,8 +338,77 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "CREATE TABLE source_r2 (bi bigint not null," +
                 "vc varchar(4)," +
                 "ii integer," +
-                "ti tinyint);"
-                );
+                "ti tinyint);" +
+
+                // test that we can do inline insert with a sequential
+                // scan node.  Everything is partitioned.
+                "CREATE TABLE ENG12834_SRC ( " +
+                "  ID         BIGINT NOT NULL, " +
+                "  NONE       VARCHAR(10), " +
+                "  A1         VARCHAR(10), " +
+                "  A2         VARCHAR(20) " +
+                "); " +
+                "PARTITION TABLE ENG12834_SRC ON COLUMN ID; " +
+
+                // test that we can do inline insert with an index
+                // scan node.
+                "CREATE TABLE ENG12834_SRC_INDEX ( " +
+                "  ID         BIGINT NOT NULL PRIMARY KEY, " +
+                "  NONE       VARCHAR(10), " +
+                "  A1         VARCHAR(10), " +
+                "  A2         VARCHAR(20) " +
+                "); " +
+                "PARTITION TABLE ENG12834_SRC_INDEX ON COLUMN ID; " +
+
+                "CREATE TABLE ENG12834_DST ( " +
+                "  ID         BIGINT PRIMARY KEY NOT NULL, " +
+                "  DEF        INTEGER DEFAULT 100, " +
+                "  A1         VARCHAR(10), " +
+                "  A2         VARCHAR(20) " +
+                "); " +
+                "PARTITION TABLE ENG12834_DST ON COLUMN ID; " +
+
+                "CREATE TABLE ENG12834_P0 ( " +
+                "                 ID      INTEGER NOT NULL, " +
+                "                 TINY    TINYINT, " +
+                "                 SMALL   SMALLINT, " +
+                "                 INT     INTEGER, " +
+                "                 BIG     BIGINT, " +
+                "                 NUM     FLOAT, " +
+                "                 DEC     DECIMAL, " +
+                "                 VCHAR_INLINE     VARCHAR(14), " +
+                "                 VCHAR_INLINE_MAX VARCHAR(63 BYTES), " +
+                "                 VCHAR            VARCHAR(64 BYTES), " +
+                "                 VCHAR_JSON       VARCHAR(1000), " +
+                "                 TIME    TIMESTAMP, " +
+                "                 VARBIN  VARBINARY(100), " +
+                "                 POINT   GEOGRAPHY_POINT, " +
+                "                 POLYGON GEOGRAPHY " +
+                "                 ); " +
+                "PARTITION TABLE ENG12834_P0 ON COLUMN ID; " +
+
+                "CREATE TABLE ENG12834_R7 ( " +
+                "                 ID      INTEGER  UNIQUE, " +
+                "                 TINY    TINYINT  UNIQUE, " +
+                "                 SMALL   SMALLINT UNIQUE, " +
+                "                 INT     INTEGER  UNIQUE, " +
+                "                 BIG     BIGINT   UNIQUE, " +
+                "                 NUM     FLOAT    UNIQUE, " +
+                "                 DEC     DECIMAL  UNIQUE, " +
+                "                 VCHAR_INLINE     VARCHAR(42 BYTES)   UNIQUE, " +
+                "                 VCHAR_INLINE_MAX VARCHAR(15)         UNIQUE, " +
+                "                 VCHAR            VARCHAR(16)         UNIQUE, " +
+                "                 VCHAR_JSON       VARCHAR(4000 BYTES) UNIQUE, " +
+                "                 TIME    TIMESTAMP       UNIQUE, " +
+                "                 VARBIN  VARBINARY(100)  UNIQUE, " +
+                "                 POINT   GEOGRAPHY_POINT, " +
+                "                 POLYGON GEOGRAPHY, " +
+                "                 PRIMARY KEY (ID, VCHAR, VARBIN), " +
+                "                 LIMIT PARTITION ROWS 6 EXECUTE " +
+                "                 (DELETE FROM ENG12834_R7 ORDER BY ID, VCHAR, VARBIN LIMIT 3) " +
+                "); " +
+                ""
+                  );
 
         sb.append(
 
@@ -470,9 +539,31 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
         clearTargetTables(client);
+
+        clearENG12834Tables(client);
     }
 
-    private static void initializeTables(Client client) throws Exception {
+    private static void clearENG12834Tables(Client client) throws Exception {
+        ClientResponse cr;
+
+        cr = client.callProcedure("@AdHoc", "truncate table ENG12834_P0;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "truncate table ENG12834_R7;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "truncate table ENG12834_SRC;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "truncate table ENG12834_SRC_INDEX;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "truncate table ENG12834_DST;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+
+    }
+    private void initializeTables(Client client) throws Exception {
 
         ClientResponse resp = null;
 
@@ -532,6 +623,36 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             resp = client.callProcedure("SOURCE_R2.insert", j, Long.toHexString(j * -11).substring(0, 3), j * -11, -((j * 11) % 128));
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         }
+
+        assertEmptyTable(client, "ENG12834_SRC");
+        assertEmptyTable(client, "ENG12834_SRC_INDEX");
+        assertEmptyTable(client, "ENG12834_DST");
+        resp = client.callProcedure("ENG12834_SRC.insert", 10, "mumble", "bazzle", "zazzle");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        resp = client.callProcedure("ENG12834_SRC.insert", 11, "zozzle", "zizzle", "drome");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        resp = client.callProcedure("ENG12834_SRC_INDEX.insert", 10, "mumble", "bazzle", "zazzle");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        resp = client.callProcedure("ENG12834_SRC_INDEX.insert", 11, "zozzle", "zizzle", "drome");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        if ( ! isHSQL() ) {
+            assertEmptyTable(client, "ENG12834_P0");
+            assertEmptyTable(client, "ENG12834_R7");
+            resp = client.callProcedure("@AdHoc", "INSERT INTO ENG12834_R7 (ID, NUM)   VALUES (100, -9076199947.9223885);");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        }
+    }
+
+    private static void assertEmptyTable(Client client, String tableName) throws IOException, NoConnectionsException, ProcCallException {
+        ClientResponse resp;
+        VoltTable vt;
+        String SQL = String.format("select count(*) from %s;", tableName);
+        resp = client.callProcedure("@AdHoc", SQL);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        vt = resp.getResults()[0];
+        assertContentOfTable(new Object[][] { { Long.valueOf(0) } }, vt);
     }
 
     private static VoltTable getRows(Client client, String adHocQuery) throws NoConnectionsException, IOException, ProcCallException {
@@ -914,5 +1035,49 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                         actualNumRows, numRowsInserted);
             }
         }
+    }
+
+    public void testENG12834() throws Exception {
+        Client client = getClient();
+
+        initializeTables(client);
+        // Make sure we can insert into
+        // a subset of ENG12834_DST's columns.
+        testENG12834Project(client, "ENG12834_SRC");
+        testENG12834Project(client, "ENG12834_SRC_INDEX");
+
+        if ( ! isHSQL() ) {
+            // We have somewhat different behavior here.
+            // HSQLDB throws a constraint error which we don't.
+            ClientResponse cr;
+            String SQL = "INSERT INTO ENG12834_P0  SELECT   *  FROM ENG12834_R7  T1     ORDER BY SMALL DESC;";
+            validateDMLTupleCount(client, SQL, 1);
+            cr = client.callProcedure("@AdHoc", "SELECT * FROM ENG12834_P0;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            Object [][] expected = new Object[][] {
+                { Integer.valueOf(100), null, null, null, null, Double.valueOf(-9076199947.9223885),
+                  null, null, null, null, null, null, null, null, null }
+            };
+            assertContentOfTable(expected, cr.getResults()[0]);
+        }
+    }
+
+    private void testENG12834Project(Client client, String tableName) throws IOException, NoConnectionsException, ProcCallException {
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", "truncate table ENG12834_DST;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        String SQL = String.format("insert into ENG12834_DST (id, a1, a2) select id, a1, a2 from %s;",
+                                   tableName);
+        validateDMLTupleCount(client, SQL, 2);
+        cr = client.callProcedure("@AdHoc", "select * from ENG12834_DST order by id;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        Object[][] expected;
+        expected = new Object[][] {
+            { Integer.valueOf(10), Integer.valueOf(100), "bazzle", "zazzle" },
+            { Integer.valueOf(11), Integer.valueOf(100), "zizzle", "drome"  },
+
+        };
+        VoltTable vt = cr.getResults()[0];
+        assertContentOfTable(expected, vt);
     }
 }

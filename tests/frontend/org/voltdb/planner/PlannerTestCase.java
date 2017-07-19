@@ -24,8 +24,10 @@
 package org.voltdb.planner;
 
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.EmptyStackException;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
@@ -149,8 +151,11 @@ public class PlannerTestCase extends TestCase {
 
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql) {
-        boolean planForSinglePartitionFalse = false;
-        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, m_noJoinOrder);
+        return compileToFragments(sql, false);
+    }
+
+    protected List<AbstractPlanNode> compileToFragments(String sql, boolean planForSinglePartition) {
+        return compileWithJoinOrderToFragments(sql, planForSinglePartition, m_noJoinOrder);
     }
 
     protected List<AbstractPlanNode> compileToFragmentsForSinglePartition(String sql) {
@@ -190,6 +195,10 @@ public class PlannerTestCase extends TestCase {
         assertFalse(pn.isEmpty());
         assertTrue(pn.get(0) != null);
         if (planForSinglePartition) {
+            if (pn.size() != 1) {
+                System.err.printf("Plan: %s\n", pn);
+                System.err.printf("Error: pn.size == %d, should be 1\n", pn.size());
+            }
             assertTrue(pn.size() == 1);
         }
         return pn;
@@ -232,12 +241,17 @@ public class PlannerTestCase extends TestCase {
      */
     protected AbstractPlanNode compileToTopDownTree(String sql,
             int nOutputColumns, PlanNodeType... nodeTypes) {
+        return compileToTopDownTree(sql, nOutputColumns, false, nodeTypes);
+    }
+
+    protected AbstractPlanNode compileToTopDownTree(String sql,
+            int nOutputColumns, boolean hasOptionalSelectProjection, PlanNodeType... nodeTypes) {
         // Yes, we ARE assuming that test queries don't
         // contain quoted question marks.
         int paramCount = StringUtils.countMatches(sql, "?");
         AbstractPlanNode result = compileSPWithJoinOrder(sql, paramCount, null);
         assertEquals(nOutputColumns, result.getOutputSchema().size());
-        assertTopDownTree(result, nodeTypes);
+        assertTopDownTree(result, hasOptionalSelectProjection, nodeTypes);
         return result;
     }
 
@@ -430,12 +444,28 @@ public class PlannerTestCase extends TestCase {
     protected static AbstractPlanNode followAssertedLeftChain(
             AbstractPlanNode start,
             PlanNodeType startType, PlanNodeType... nodeTypes) {
+        return followAssertedLeftChain(start, false, startType, nodeTypes);
+    }
+
+    protected static AbstractPlanNode followAssertedLeftChain(
+            AbstractPlanNode start,
+            boolean hasOptionalProjection,
+            PlanNodeType startType,
+            PlanNodeType... nodeTypes)
+    {
         AbstractPlanNode result = start;
         assertEquals(startType, result.getPlanNodeType());
-        for (PlanNodeType type : nodeTypes) {
+        for (int nodeNumber = 0; nodeNumber < nodeTypes.length; nodeNumber += 1) {
+            PlanNodeType type = nodeTypes[nodeNumber];
             assertTrue(result.getChildCount() > 0);
             result = result.getChild(0);
-            assertEquals(type, result.getPlanNodeType());
+            if (hasOptionalProjection
+                    && (nodeNumber == 0)
+                    && (result.getPlanNodeType() == PlanNodeType.PROJECTION)) {
+                nodeNumber -= 1;
+            } else {
+                assertEquals(type, result.getPlanNodeType());
+            }
         }
         return result;
     }
@@ -466,14 +496,14 @@ public class PlannerTestCase extends TestCase {
 
     /**
      * Assert that a two-fragment plan's coordinator fragment does a simple
-     * projection.
+     * projection.  Sometimes the projection is optimized away, and
+     * that's ok.
      **/
     protected static void assertProjectingCoordinator(
             List<AbstractPlanNode> lpn) {
         AbstractPlanNode pn;
         pn = lpn.get(0);
-        assertTopDownTree(pn, PlanNodeType.SEND,
-                PlanNodeType.PROJECTION,
+        assertTopDownTreeWithOptionalSelectProjection(pn, PlanNodeType.SEND,
                 PlanNodeType.RECEIVE);
     }
 
@@ -488,13 +518,14 @@ public class PlannerTestCase extends TestCase {
         NestLoopPlanNode nlj;
         SeqScanPlanNode seqScan;
         pn = lpn.get(0);
-        assertTopDownTree(pn, PlanNodeType.SEND,
-                PlanNodeType.PROJECTION,
+        assertTopDownTree(pn,
+                true,
+                PlanNodeType.SEND,
                 PlanNodeType.NESTLOOP,
                 PlanNodeType.SEQSCAN,
                 PlanNodeType.RECEIVE);
-        node = followAssertedLeftChain(pn, PlanNodeType.SEND,
-                PlanNodeType.PROJECTION,
+        node = followAssertedLeftChain(pn, true,
+                PlanNodeType.SEND,
                 PlanNodeType.NESTLOOP);
         nlj = (NestLoopPlanNode) node;
         assertEquals(JoinType.LEFT, nlj.getJoinType());
@@ -519,6 +550,12 @@ public class PlannerTestCase extends TestCase {
             System.out.printf("      Node type %s\n", root.getPlanNodeType());
             for (int idx = 1; idx < root.getChildCount(); idx += 1) {
                 System.out.printf("        Child %d: %s\n", idx, root.getChild(idx).getPlanNodeType());
+            }
+            for (Entry<PlanNodeType, AbstractPlanNode> entry : root.getInlinePlanNodes().entrySet()) {
+                System.out.printf("        Inline %s\n", entry.getKey());
+            }
+            for (Entry<PlanNodeType, AbstractPlanNode> entry : root.getInlinePlanNodes().entrySet()) {
+                System.out.printf("        Inline %s\n", entry.getKey());
             }
         }
     }
@@ -586,9 +623,22 @@ public class PlannerTestCase extends TestCase {
      **/
     protected static void assertTopDownTree(AbstractPlanNode start,
             PlanNodeType... nodeTypes) {
+        assertTopDownTree(start, false, nodeTypes);
+    }
+
+    protected static void assertTopDownTreeWithOptionalSelectProjection(AbstractPlanNode start,
+            PlanNodeType... nodeTypes) {
+        assertTopDownTree(start, true, nodeTypes);
+    }
+
+    protected static void assertTopDownTree(AbstractPlanNode start,
+                                            boolean hasOptionalProjection,
+                                            PlanNodeType ... nodeTypes) {
         Stack<AbstractPlanNode> stack = new Stack<>();
         stack.push(start);
-        for (PlanNodeType type : nodeTypes) {
+
+        for (int nodeNumber = 0; nodeNumber < nodeTypes.length; nodeNumber += 1) {
+            PlanNodeType type = nodeTypes[nodeNumber];
             // Process each node before its children or later siblings.
             AbstractPlanNode parent;
             try {
@@ -606,6 +656,21 @@ public class PlannerTestCase extends TestCase {
                         " with " + childCount + " direct children.");
                 continue;
             }
+            // If we have specified that this has an optional
+            // projection node, then we may find a projection
+            // node at node number 1.  This is from the select
+            // list projection, but we may have optimized it away.
+            if (nodeNumber == 1 && hasOptionalProjection) {
+                if (PlanNodeType.PROJECTION == parent.getPlanNodeType()) {
+                    assertEquals(1, parent.getChildCount());
+                    // We don't actually want to use up this
+                    // type from nodeTypes.  So undo the increment
+                    // we are about to do.
+                    nodeNumber -= 1;
+                    stack.push(parent.getChild(0));
+                    continue;
+                }
+            }
             assertEquals(type, parent.getPlanNodeType());
             // Iterate from the last child to the first.
             while (childCount > 0) {
@@ -619,11 +684,41 @@ public class PlannerTestCase extends TestCase {
                 stack.isEmpty());
     }
 
+    protected class PlanWithInlineNodes {
+        PlanNodeType m_type = null;
+
+        List<PlanNodeType> m_branches = new ArrayList<>();
+        public PlanWithInlineNodes(PlanNodeType mainType, PlanNodeType ... nodes) {
+            m_type = mainType;
+            for (PlanNodeType node : nodes) {
+                m_branches.add(node);
+            }
+        }
+
+        public String match(AbstractPlanNode node) {
+            PlanNodeType mainNodeType = node.getPlanNodeType();
+            if (m_type != mainNodeType) {
+                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s",
+                                     m_type, mainNodeType);
+            }
+            for (PlanNodeType nodeType : m_branches) {
+                AbstractPlanNode inlineNode = node.getInlinePlanNode(nodeType);
+                if (inlineNode == null) {
+                    return String.format("Expected inline node type %s but didn't find it.",
+                                         nodeType.name());
+                }
+            }
+            if (m_branches.size() != node.getInlinePlanNodes().size()) {
+                return String.format("Expected %d inline nodes, found %d", m_branches.size(), node.getInlinePlanNodes().size());
+            }
+            return null;
+        }
+    }
+
     /**
-     * Validate a plan, ignoring inline nodes.  This is kind of like
+     * Validate a plan.  This is kind of like
      * PlannerTestCase.compileToTopDownTree.  The differences are
      * <ol>
-     *   <li>We only look out out-of-line nodes,</li>
      *   <li>We can compile MP plans and SP plans, and</li>
      *   <li>The boundaries between fragments in MP plans
      *       are marked with PlanNodeType.INVALID.</li>
@@ -637,9 +732,9 @@ public class PlannerTestCase extends TestCase {
      * @param numberOfFragments The number of expected fragments.
      * @param types The plan node types of the inline and out-of-line nodes.
      *              If types[idx] is a PlanNodeType, then the node should
-     *              have no inline children.  If types[idx] is an array of
-     *              PlanNodeType values then the node has the type types[idx][0],
-     *              and it should have types[idx][1..] as inline children.
+     *              have no inline children.  If types[idx] is an object of
+     *              type PlanWithInlineNode then it has the main node type,
+     *              and node types of the inline children as well.
      */
     protected void validatePlan(String SQL,
                                 int numberOfFragments,
@@ -671,14 +766,13 @@ public class PlannerTestCase extends TestCase {
                     fail(String.format("Expected %d plan nodes, but found more.", types.length));
                 }
                 if (types[idx] instanceof PlanNodeType) {
-                    assertEquals(types[idx], plan.getPlanNodeType());
-                } else if (types[idx] instanceof PlanNodeType[]) {
-                    PlanNodeType childTypes[] = (PlanNodeType[])(types[idx]);
-                    assertEquals(childTypes[0], plan.getPlanNodeType());
-                    for (int tidx = 1; tidx < childTypes.length; tidx += 1) {
-                        PlanNodeType childType = childTypes[tidx];
-                        assertTrue(String.format("Expected inline node of type %s", childType),
-                                   plan.getInlinePlanNode(childType) != null);
+                    assertEquals(String.format("Expected %s plan node but found %s", types[idx], plan.getPlanNodeType()),
+                                 types[idx], plan.getPlanNodeType());
+                } else if (types[idx] instanceof PlanWithInlineNodes) {
+                    PlanWithInlineNodes branch = (PlanWithInlineNodes)types[idx];
+                    String error = branch.match(plan);
+                    if (error != null) {
+                        fail(error);
                     }
                 } else {
                     fail("Expected a PlanNodeType or an array of PlanNodeTypes here.");
