@@ -244,11 +244,9 @@ public class SQLCommand
                 // check if the statement is CREATE PROCEDURE AS BEGIN...
                 // add the current line to the statements so far entered
                 Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureBeginAsSQL(
-                        statement.toString() + '\n' + line);
+                        statement.toString() + line);
                 if (statementMatcher.matches()) {
                     inMultiStmtProc = true;
-                    statement.append(line + "\n");
-                    continue;
                 }
             } else if ( line.indexOf(";") > 0 ) {
                 /* check if the multi statement procedure is complete
@@ -260,17 +258,23 @@ public class SQLCommand
                  */
                 String lineTillSemiColon = line.substring(0, line.indexOf(";") + 1);
                 Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(
-                        statement.toString() + '\n' + lineTillSemiColon);
+                        statement.toString() + lineTillSemiColon);
                 if (statementMatcher.matches()) {
                     /* end of multi stmt procedure
+                     * if the line is not semi colon terminated, there are more statements
+                     * after the current multi stmt procedure.
                      * store the mutli stmt procedure into a separate buffer
                      * to enable parsing of more multi statement procedures
+                     * Make the current statement buffer to the string after
+                     * the multi stmt procedure
                      */
-                    multiStmtLog.append(statement.toString()+ '\n' + lineTillSemiColon);
-                    String temp = statement.substring(line.indexOf(";") + 2);
-                    statement.setLength(0);
-                    statement.append(temp);
                     inMultiStmtProc = false;
+                    if ( !SQLParser.isSemiColonTerminated(line) ) {
+                        multiStmtLog.append(statement.toString() + lineTillSemiColon + "\n");
+                        // need to process line after the semi colon
+                        line = line.substring(line.indexOf(";") + 2, line.length());
+                        statement.setLength(0);
+                    }
                 }
             }
 
