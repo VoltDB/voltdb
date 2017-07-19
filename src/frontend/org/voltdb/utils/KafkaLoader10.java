@@ -472,6 +472,7 @@ public class KafkaLoader10 {
      */
     public static Client getClient(ClientConfig config, String[] servers) throws Exception {
         config.setTopologyChangeAware(true);
+        config.setReconnectOnConnectionLoss(true);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
             try {

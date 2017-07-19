@@ -424,6 +424,7 @@ public class KafkaLoader {
      */
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {
         config.setTopologyChangeAware(true);
+        config.setReconnectOnConnectionLoss(true);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
             try {
