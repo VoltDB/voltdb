@@ -266,7 +266,7 @@ def compare_cleaned_to_baseline(parent, baseparent, path, inpath, do_refresh, re
     return False
 
 def delete_proc(pfile):
-    # drop procedure left in between any tests
+    # drop any procedures left in between any tests
     procset = set()
     for line in pfile:
         columns = line.split(',')
