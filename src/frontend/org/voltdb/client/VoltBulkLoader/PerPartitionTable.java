@@ -235,7 +235,6 @@ public class PerPartitionTable {
                         row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
                     }
 
-                    // FIXME should this be only on success?
                     row.m_loader.m_loaderCompletedCnt.incrementAndGet();
                     row.m_loader.m_outstandingRowCount.decrementAndGet();
                 }
@@ -305,8 +304,8 @@ public class PerPartitionTable {
         if (toSend.getRowCount() <= 0) {
             return;
         }
-        boolean connectionFailed = true;
-        while (connectionFailed) {
+
+        while (true) {
             try {
                 if (m_isMP) {
                     m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
@@ -315,9 +314,10 @@ public class PerPartitionTable {
                             m_partitionedColumnIndex, m_partitionColumnType));
                     m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
                 }
-                connectionFailed = false;
+                // Table loaded successfully. So move on
+                break;
             } catch (IOException e) {
-                // Keep retrying until connection is recovered
+                // Connection failed. Retry every one second
                 Thread.sleep(1000);
             }
         }

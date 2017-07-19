@@ -96,6 +96,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                     });
                 }
             }
+            // Connection lost response is ignored because this data loader has auto-reconnect feature
             else if (status != ClientResponse.CONNECTION_LOST){
                 m_failedCount.incrementAndGet();
                 m_errHandler.handleError(m_csvLine, response, response.getStatusString());
@@ -159,8 +160,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
 
     @Override
     public void insertRow(RowWithMetaData metaData, Object[] values) throws InterruptedException {
-        boolean connectionFailed = true;
-        while (connectionFailed) {
+        while (true) {
             try {
                 PartitionSingleExecuteProcedureCallback cbmt =
                         new PartitionSingleExecuteProcedureCallback(metaData);
@@ -170,18 +170,16 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                             new VoltTable[0], "Failed to call procedure.", 0);
                     m_errHandler.handleError(metaData, response, "Failed to call procedure.");
                 }
-                connectionFailed = false;
+                // Row inserted successfully, so move on
+                break;
             } catch (NoConnectionsException ex) {
-//                ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-//                        new VoltTable[0], "Failed to call procedure.", 0);
-//                m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+                // Connection failed. Retry every one second
                 Thread.sleep(1000);
             } catch (IOException ex) {
-//                ClientResponse response = new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-//                        new VoltTable[0], "Failed to call procedure.", 0);
-//                m_errHandler.handleError(metaData, response, "Failed to call procedure.");
+                // Connection failed. Retry every one second
                 Thread.sleep(1000);
             } catch (Exception ex) {
+                // Exceptions not pertaining to connection problems are thrown out
                 m_errHandler.handleError(metaData, null, ex.toString());
             }
         }

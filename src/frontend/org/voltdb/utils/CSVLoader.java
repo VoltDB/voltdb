@@ -216,7 +216,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
                     System.out.println("Fatal Response from server for: " + response.getStatusString()
                             + " for: " + rawLine);
-                    //System.exit(1);
+                    System.exit(1);
                 }
             }
 
