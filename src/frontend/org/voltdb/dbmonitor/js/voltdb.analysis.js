@@ -8,8 +8,8 @@ function loadAnalysisPage(){
     $("#ulProcedure li a").on("click", function(){
         if($($(this)[0]).text() == "Frequency"){
             $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Frequency(" : "Frequency");
-        } else if($($(this)[0]).text() == "Combined"){
-            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Combined(" : "Combined");
+        } else if($($(this)[0]).text() == "Total Processing Time"){
+            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Total Processing Time(" : "Total Processing Time");
         } else {
             $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Average Execution Time(" : "Average Execution Time");
         }
@@ -159,7 +159,7 @@ function loadAnalysisPage(){
                         {
                             AVG: avgExecTime,
                             INVOCATIONS: invocation,
-                            COMBINED: combinedWeight,
+                            TOTAL_PROCESSING_TIME: combinedWeight,
                             TYPE:type,
                             WEIGHTED_PERC: wtPercentage,
                             WARNING: warningToolTip
