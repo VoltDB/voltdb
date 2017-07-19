@@ -109,6 +109,14 @@ public class TestGetTablesAndIndexes extends PlannerTestCase {
                 "INDEX SCAN",
                 Arrays.asList("CUSTOMER", "ITEM"),
                 Arrays.asList("VOLTDB_AUTOGEN_IDX_CT_CUSTOMER_C_W_ID_C_D_ID_C_LAST_C_FIRST"));
+        // Following query tests the TUPLE_SCAN plan node (TupleScanPlanNode)
+        assertTablesAndIndexes("select * "
+                + "from customer "
+                + "where (c_id,c_w_id) > (select ol_o_id, ol_d_id from order_line where ol_w_id = 0)",
+                "INDEX SCAN",
+                Arrays.asList("CUSTOMER", "ORDER_LINE"),
+                Arrays.asList("VOLTDB_AUTOGEN_IDX_CT_CUSTOMER_C_W_ID_C_D_ID_C_LAST_C_FIRST",
+                        "IDX_ORDER_LINE_TREE"));
     }
 
     private void assertUpdatedTable(String stmt, String expectedTable) {
