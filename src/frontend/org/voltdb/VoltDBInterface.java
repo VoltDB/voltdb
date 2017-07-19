@@ -24,7 +24,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
@@ -153,7 +152,7 @@ public interface VoltDBInterface
      * @param deploymentBytes  The deployment file bytes
      * @param deploymentHash The SHA-1 hash of the deployment file
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
+    public CatalogContext catalogUpdate(
             String diffCommands,
             byte[] newCatalogBytes,
             byte[] catalogBytesHash,
@@ -189,9 +188,9 @@ public interface VoltDBInterface
      * Updates the cluster setting of this VoltDB
      * @param settings the {@link ClusterSettings} update candidate
      * @param expectedVersionId version of the current instance (same as the Zookeeper node)
-     * @return a {@link Pair} of {@link CatalogContext} and {@link CatalogSpecificPlanner}
+     * @return {@link CatalogContext}
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(ClusterSettings settings, int expectedVersionId);
+    public CatalogContext settingsUpdate(ClusterSettings settings, int expectedVersionId);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

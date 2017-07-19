@@ -61,7 +61,6 @@ public class CatalogContext {
         }
     }
 
-
     // THE CATALOG!
     public final Catalog catalog;
 
@@ -77,7 +76,6 @@ public class CatalogContext {
     private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
     public final UUID deploymentHashForConfig;
-    public final long m_transactionId;
     public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
     // Default procs are loaded on the fly
@@ -107,7 +105,6 @@ public class CatalogContext {
      * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
      * When @param hasSchemaChange is true, @param defaultProcManager and @param plannerTool will be created as new.
      * Otherwise, it will try to use the ones passed in to save CPU cycles for performance reason.
-     * @param transactionId
      * @param uniqueId
      * @param catalog
      * @param settings
@@ -122,7 +119,6 @@ public class CatalogContext {
      * @param ccrTime - Catalog Change Replay Time
      */
     public CatalogContext(
-            long transactionId,
             long uniqueId,
             Catalog catalog,
             DbSettings settings,
@@ -135,7 +131,6 @@ public class CatalogContext {
             DefaultProcedureManager defaultProcManager,
             PlannerTool plannerTool, long ccrTime)
     {
-        m_transactionId = transactionId;
         m_uniqueId = uniqueId;
         //This is only set to something other than m_uniqueId when we are replaying a UAC.
         m_ccrTime = ((ccrTime == CATALOG_CHANGE_NOREPLAY) ? uniqueId : ccrTime);
@@ -217,7 +212,6 @@ public class CatalogContext {
 
     /**
      * Constructor of @CatalogConext used when creating brand-new instances.
-     * @param transactionId
      * @param uniqueId
      * @param catalog
      * @param settings
@@ -228,7 +222,6 @@ public class CatalogContext {
      * @param messenger
      */
     public CatalogContext(
-            long transactionId,
             long uniqueId,
             Catalog catalog,
             DbSettings settings,
@@ -238,7 +231,7 @@ public class CatalogContext {
             int version,
             HostMessenger messenger)
     {
-        this(transactionId, uniqueId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
+        this(uniqueId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
                 version, messenger, true, null, null, uniqueId);
     }
 
@@ -255,7 +248,6 @@ public class CatalogContext {
     }
 
     public CatalogContext update(
-            long txnId,
             long uniqueId,
             byte[] catalogBytes,
             byte[] catalogBytesHash,
@@ -287,7 +279,6 @@ public class CatalogContext {
         }
         CatalogContext retval =
             new CatalogContext(
-                    txnId,
                     uniqueId,
                     newCatalog,
                     this.m_dbSettings,
@@ -522,8 +513,7 @@ public class CatalogContext {
     }
 
     public String getCatalogLogString() {
-        return String.format("Catalog: TXN ID %d, catalog hash %s, deployment hash %s\n",
-                                m_transactionId,
+        return String.format("Catalog: catalog hash %s, deployment hash %s",
                                 Encoder.hexEncode(catalogHash).substring(0, 10),
                                 Encoder.hexEncode(deploymentHash).substring(0, 10));
     }

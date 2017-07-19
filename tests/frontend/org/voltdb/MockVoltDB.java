@@ -294,7 +294,7 @@ public class MockVoltDB implements VoltDBInterface
         long now = System.currentTimeMillis();
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
 
-        m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0, m_hostMessenger) {
+        m_context = new CatalogContext(now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0, m_hostMessenger) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -489,7 +489,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
+    public CatalogContext catalogUpdate(String diffCommands,
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
             long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
             byte[] deploymentHash, boolean requireCatalogDiffCmdsApplyToEE,
@@ -499,7 +499,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(ClusterSettings settings, int expectedVersionId)
+    public CatalogContext settingsUpdate(ClusterSettings settings, int expectedVersionId)
     {
         throw new UnsupportedOperationException("unimplemented");
     }

@@ -54,7 +54,6 @@ import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
@@ -319,16 +318,13 @@ public class Inits {
                                     MpInitiator.MP_INIT_PID);
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
-                    long catalogTxnId;
-                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
-
                     // Need to get the deployment bytes from the starter catalog context
                     byte[] deploymentBytes = m_rvdb.getCatalogContext().getDeploymentBytes();
 
                     // publish the catalog bytes to ZK
                     CatalogUtil.updateCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
-                            0, catalogTxnId,
+                            0,
                             catalogUniqueId,
                             catalogBytes,
                             null,
@@ -419,7 +415,6 @@ public class Inits {
 
             try {
                 m_rvdb.m_catalogContext = new CatalogContext(
-                        catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
                         new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_nodeSettings),

@@ -39,7 +39,6 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DRLogSegmentId;
@@ -393,20 +392,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation,
+                boolean requiresSnapshotIsolation,
                 long uniqueId, long spHandle,
                 boolean requireCatalogDiffCmdsApplyToEE,
                 boolean requiresNewExportGeneration)
         {
-            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation,
+            return Site.this.updateCatalog(diffCmds, context, requiresSnapshotIsolation,
                     false, uniqueId, spHandle,
                     requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
         }
 
         @Override
-        public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+        public boolean updateSettings(CatalogContext context)
         {
-            return Site.this.updateSettings(context, csp);
+            return Site.this.updateSettings(context);
         }
 
         @Override
@@ -1502,7 +1501,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
-    public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
+    public boolean updateCatalog(String diffCmds, CatalogContext context,
             boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration)
@@ -1511,7 +1510,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
-        m_loadedProcedures.loadProcedures(m_context, csp, false);
+        m_loadedProcedures.loadProcedures(m_context, false);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs
@@ -1583,10 +1582,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * @param csp catalog specific planner
      * @return true if it succeeds
      */
-    public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp) {
+    public boolean updateSettings(CatalogContext context) {
         m_context = context;
         // here you could bring the timeout settings
-        m_loadedProcedures.loadProcedures(m_context, csp);
+        m_loadedProcedures.loadProcedures(m_context);
         return true;
     }
 
@@ -1709,6 +1708,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
     }
 
+    @Override
     public void setDRStreamEnd(long spHandle, long uniqueId) {
         generateDREvent(
                 EventType.DR_STREAM_END, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
