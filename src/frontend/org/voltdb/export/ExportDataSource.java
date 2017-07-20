@@ -87,7 +87,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnLengths = new ArrayList<Integer>();
     private long m_firstUnpolledUso = 0;
     private final StreamBlockQueue m_committedBuffers;
-    private boolean m_endOfStream = false;
     private Runnable m_onDrain;
     private Runnable m_onMastership;
     private SettableFuture<BBContainer> m_pollFuture;
@@ -468,13 +467,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             long uso,
             ByteBuffer buffer,
             boolean sync,
-            boolean endOfStream, boolean poll) throws Exception {
+            boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
-        if (endOfStream) {
-            // TODO: remove endOfStream altogether
-            VoltDB.crashLocalVoltDB("BSDBG: end of stream encountered");
-            return;
-        }
 
         if (buffer != null) {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
@@ -538,11 +532,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
+        if (endOfStream) {
+            // TODO: remove endOfStream altogether
+            VoltDB.crashLocalVoltDB("BSDBG: end of stream encountered in ExportDataSource.pushExportBuffer");
+            return;
+        }
         ListeningExecutorService es = getExecutorService();
         if (es == null) {
             //If we have not activated lets get the buffer in overflow and dont poll
             try {
-                pushExportBufferImpl(uso, buffer, sync, endOfStream, false);
+                pushExportBufferImpl(uso, buffer, sync, false);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
             } finally {
@@ -562,7 +561,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     try {
                         if (!es.isShutdown()) {
                             //Since we are part of active generation we poll too
-                            pushExportBufferImpl(uso, buffer, sync, endOfStream, true /* poll */);
+                            pushExportBufferImpl(uso, buffer, sync, true /* poll */);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);

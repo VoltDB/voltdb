@@ -209,7 +209,6 @@ public class ExportManager
             List<Integer> partitions)
             throws ExportManager.SetupException
     {
-        assert m_self == null;
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger);
         if (forceCreate) {
             em.clearOverflowData();
