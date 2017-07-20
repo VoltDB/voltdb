@@ -496,7 +496,7 @@ public class SQLLexer extends SQLPatternFactory
         } else {
             // we only check for incomplete multi statement procedures right now
             // add a mandatory space..
-            results.incompleteStmt = String.copyValueOf(buf, iStart, iCur - iStart).trim() + ' ';
+            results.incompleteStmt = String.copyValueOf(buf, iStart, iCur - iStart);
         }
 
         results.completelyParsedStmts = statements;
