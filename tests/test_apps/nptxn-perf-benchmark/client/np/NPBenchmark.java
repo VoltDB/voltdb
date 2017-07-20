@@ -352,24 +352,25 @@ class NPBenchmark {
      * Performs one iteration of the benchmark
      */
     public void iterate() throws Exception {
-        double range = ((double) config.cardcount - 1) * (1.0 - config.skew);
+        double count = ((double) config.cardcount) * (1.0 - config.skew);
+        int offset = (int) (((double) config.cardcount) / 2.0 - count / 2.0);
 
         for (int i = 0; i < 2; i++) {
             // 2P transaction
-            String pan1 = generate16DString(rand.nextInt((int) range));
-            String pan2 = generate16DString(rand.nextInt((int) range));
+            String pan1 = generate16DString(rand.nextInt(config.cardcount));
+            String pan2 = generate16DString(rand.nextInt((int) count) + offset);    // a smaller range of entities
 
             client.callProcedure(new ProcCallback("Transfer",10000),
                                     "Transfer",
                                     pan1,
                                     pan2,
-                                    1,
+                                    rand.nextDouble() < 0.5 ? -1 : 1,   // random transfer direction
                                     "USD"
                                     );
 
             if (rand.nextDouble() < config.mprate) {
                 // MP transaction
-                int id1 = rand.nextInt((int) range);
+                int id1 = rand.nextInt(config.cardcount);
                 int id2 = id1 + 2000 < config.cardcount ?
                           id1 + 2000 : config.cardcount - 1;
 
@@ -385,8 +386,8 @@ class NPBenchmark {
 
         // SP transaction
         if (rand.nextDouble() < config.sprate) {
-            String pan1 = generate16DString(rand.nextInt((int) range));
-            String pan2 = generate16DString(rand.nextInt((int) range));
+            String pan1 = generate16DString(rand.nextInt(config.cardcount));
+            String pan2 = generate16DString(rand.nextInt(config.cardcount));
 
             client.callProcedure(new ProcCallback("Authorize"),
                                  "Authorize",
