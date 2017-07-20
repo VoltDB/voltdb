@@ -294,6 +294,35 @@ public class SQLLexer extends SQLPatternFactory
         return null;
     }
 
+    /* to match tokens like 'CASE', 'BEGIN', 'END'
+     * the tokens should not be embedded in other strings like column names or table names
+     * the tokens can be followed by operators with/without whitespaces
+     * eg: emptycase, caseofbeer, suitcaseofbeer,
+     * (id+0)end+100, suit2case3ofbeer, 100+case
+     */
+    private static boolean matchToken(String buffer, int position, String token) {
+
+        final int tokLength = token.length();
+        final int bufLength = buffer.length();
+        final char firstLo = Character.toLowerCase(token.charAt(0));
+        final char firstUp = Character.toUpperCase(token.charAt(0));
+
+        if(     // character before token is non alphanumeric i.e., token is not embedded in an identifier
+                (position == 0 || !Character.isLetterOrDigit(buffer.charAt(position-1)))
+                // perform a region match only if the first character matches
+                && (buffer.charAt(position) == firstLo || buffer.charAt(position) == firstUp)
+                // match only if the length of the remaining string is the atleast the length of the token
+                && (position <= bufLength - tokLength)
+                // search for token
+                && buffer.regionMatches(true, position, token, 0, tokLength)
+                // character after token is non alphanumeric i.e., token is not embedded in an identifier
+                && (position + tokLength == bufLength || !Character.isLetterOrDigit(buffer.charAt(position + tokLength)))
+                )
+            return true;
+        else
+            return false;
+    }
+
     /**
      * Split SQL statements on semi-colons with quoted string and comment support.
      *
@@ -327,6 +356,12 @@ public class SQLLexer extends SQLPatternFactory
         // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
         boolean statementIsComment = false;
         boolean inStatement = false;
+        // To indicate if inside multi statement procedure
+        boolean inBegin = false;
+        // To indicate if inside CASE .. WHEN
+        int inCase = 0;
+        // needed for string region matching
+        String bufStr = new String(buf);
         int iCur = 0;
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
@@ -387,8 +422,15 @@ public class SQLLexer extends SQLPatternFactory
                 }
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
-                if (buf[iCur] == ';') {
+                if( matchToken(bufStr, iCur, "case") ) {
+                    inCase++;
+                    iCur += 4;
+                } else if ( matchToken(bufStr, iCur, "begin") ) {
+                    inBegin = true;
+                    iCur += 5;
+                } else if ( !inBegin && buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
+                    // if it is not in a BEGIN ... END
                     String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
                     if (!statement.isEmpty()) {
                         statements.add(statement);
@@ -400,6 +442,15 @@ public class SQLLexer extends SQLPatternFactory
                     // Start of quoted string.
                     cQuote = buf[iCur];
                     iCur++;
+                } else if ( matchToken(bufStr, iCur, "end") ) {
+                    if (inCase > 0) {
+                        inCase--;
+                    } else {
+                        // we can terminate BEGIN ... END for multi stmt proc
+                        // after all CASE ... END stmts are completed
+                        inBegin = false;
+                    }
+                    iCur += 3;
                 } else if (iCur <= buf.length - 2) {
                     // Comment (double-dash or C-style)?
                     if (buf[iCur] == '-' && buf[iCur+1] == '-') {
