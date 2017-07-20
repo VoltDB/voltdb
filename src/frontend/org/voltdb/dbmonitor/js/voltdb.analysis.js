@@ -1,5 +1,7 @@
 var latencyDetails = [];
 function loadAnalysisPage(){
+    VoltDbAnalysis.setDefaultAnalysisSettings();
+
     $("#tabProcedureBtn").trigger("click");
     $("#tabAnalysis li a").on("click", function(){
         VoltDbAnalysis.refreshChart();
@@ -18,8 +20,6 @@ function loadAnalysisPage(){
         VoltDbAnalysis.refreshChart();
     })
 
-
-
     function calculateCombinedValue(profileData){
         var totalValue = 0;
         for(var j = 0; j < profileData.length; j++){
@@ -27,7 +27,6 @@ function loadAnalysisPage(){
         }
         return totalValue;
     }
-
 
     function checkObjForLongProcedureName(profileData){
         for(var j = 0; j < profileData.length; j++){
@@ -94,23 +93,20 @@ function loadAnalysisPage(){
                 //order the procedure by  their (avg_exec_time * #of invocation) value
                 profileData["PROCEDURE_PROFILE"].sort(function(a,b) {return ((b.AVG * b.INVOCATIONS) > (a.AVG * a.INVOCATIONS)) ? 1 : (((a.AVG * a.INVOCATIONS) > (b.AVG * b.INVOCATIONS)) ? -1 : 0);} );
                 var containLongName = checkObjForLongProcedureName(profileData["PROCEDURE_PROFILE"])
-                var dataLatency = [];
-                var dataFrequency = [];
-                var dataCombined = [];
+                var dataLatencyProcedures = [];
+                var dataLatencySysProcedures = [];
+                var dataFrequencySysProcedures = [];
+                var dataFrequencyProcedures = [];
+                var dataCombinedProcedures = [];
+                var dataCombinedSysProcedures = [];
                 var timestamp;
                 var sumOfAllProcedure = calculateCombinedValue(profileData["PROCEDURE_PROFILE"])
                 var isMPPresent = false;
                 var isPPresent = false;
                 var totalProcessingTime = VoltDbUI.getFromLocalStorage("totalProcessingTime");
                 var averageExecutionTime = VoltDbUI.getFromLocalStorage("averageExecutionTime");
+                var showHideSysProcedures = VoltDbUI.getFromLocalStorage("showHideSysProcedures");
 
-                if(totalProcessingTime == undefined){
-                    totalProcessingTime = 20;
-                }
-
-                if(averageExecutionTime == undefined){
-                    averageExecutionTime = 500;
-                }
                 for(var i = 0; i < profileData["PROCEDURE_PROFILE"].length; i++){
                     if(i == 0)
                         timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
@@ -167,17 +163,28 @@ function loadAnalysisPage(){
                             WEIGHTED_PERC: wtPercentage,
                             WARNING: warningToolTip
                         }
-                    dataLatency.push({"label": procedureName , "value": avgExecTime})
-                    dataFrequency.push({"label": procedureName, "value": invocation})
-                    dataCombined.push({"label": procedureName, "value": calculatedProcessingTime})
+                    if(procedureName.indexOf("org.voltdb.sysprocs") > -1){
+                        dataLatencySysProcedures.push({"label": procedureName , "value": avgExecTime});
+                        dataFrequencySysProcedures.push({"label": procedureName, "value": invocation});
+                        dataCombinedSysProcedures.push({"label": procedureName, "value": calculatedProcessingTime});
+                    } else {
+                        dataLatencyProcedures.push({"label": procedureName , "value": avgExecTime});
+                        dataFrequencyProcedures.push({"label": procedureName, "value": invocation});
+                        dataCombinedProcedures.push({"label": procedureName, "value": calculatedProcessingTime});
+                    }
                 }
                 var formatDate = VoltDbAnalysis.formatDateTime(timestamp);
                 $("#analysisDate").html(formatDate);
                 formatAnalysisLegend(isMPPresent, isPPresent);
                 MonitorGraphUI.initializeAnalysisGraph();
-                MonitorGraphUI.RefreshAnalysisLatencyGraph(dataLatency);
-                MonitorGraphUI.RefreshAnalysisFrequencyGraph(dataFrequency);
-                MonitorGraphUI.RefreshAnalysisCombinedGraph(dataCombined);
+                if(showHideSysProcedures){
+                    dataLatencyProcedures = $.merge(dataLatencyProcedures, dataLatencySysProcedures);
+                    dataFrequencyProcedures = $.merge(dataFrequencyProcedures, dataFrequencySysProcedures);
+                    dataCombinedProcedures = $.merge(dataFrequencyProcedures, dataFrequencySysProcedures);
+                }
+                MonitorGraphUI.RefreshAnalysisLatencyGraph(dataLatencyProcedures);
+                MonitorGraphUI.RefreshAnalysisFrequencyGraph(dataFrequencyProcedures);
+                MonitorGraphUI.RefreshAnalysisCombinedGraph(dataCombinedProcedures);
             })
         })
 
@@ -236,12 +243,6 @@ function loadAnalysisPage(){
     }
 
     $("#btnAnalyzeNow").on("click", function(){
-        if(VoltDbUI.getFromLocalStorage("totalProcessingTime") == undefined){
-           saveInLocalStorage("totalProcessingTime", 20)
-        }
-        if(VoltDbUI.getFromLocalStorage("averageExecutionTime") == undefined){
-            saveInLocalStorage("averageExecutionTime", 500)
-        }
         fetchData();
     })
 }
@@ -256,39 +257,51 @@ function loadAnalysisPage(){
         this.proceduresCount = 0;
         this.latencyDetailTest = {};
         this.formatDateTime = function(timestamp) {
-        var dateTime = new Date(timestamp);
-        //get date
-        var days = dateTime.getDate();
-        var months = dateTime.getMonth() + 1;
-        var years = dateTime.getFullYear();
+            var dateTime = new Date(timestamp);
+            //get date
+            var days = dateTime.getDate();
+            var months = dateTime.getMonth() + 1;
+            var years = dateTime.getFullYear();
 
-        days = days < 10 ? "0" + days : days;
-        months = months < 10 ? "0" + months : months;
+            days = days < 10 ? "0" + days : days;
+            months = months < 10 ? "0" + months : months;
 
-        //get time
-        var timePeriod = "AM"
-        var hours = dateTime.getHours();
-        var minutes = dateTime.getMinutes();
-        var seconds = dateTime.getSeconds();
+            //get time
+            var timePeriod = "AM"
+            var hours = dateTime.getHours();
+            var minutes = dateTime.getMinutes();
+            var seconds = dateTime.getSeconds();
 
-        timePeriod = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        hours = hours ? hours : 12;
-        hours = hours < 10 ? "0" + hours : hours
-        minutes = minutes < 10 ? "0" + minutes : minutes;
-        seconds = seconds < 10 ? "0" + seconds : seconds;
+            timePeriod = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            hours = hours < 10 ? "0" + hours : hours
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
 
-        //get final date time
-        var date = months + "/" + days + "/" + years;
-        var time = hours + ":" + minutes + ":" + seconds + " " + timePeriod;
-        return date + " " + time;
-    };
+            //get final date time
+            var date = months + "/" + days + "/" + years;
+            var time = hours + ":" + minutes + ":" + seconds + " " + timePeriod;
+            return date + " " + time;
+        };
 
-     this.refreshChart= function(){
-        setTimeout(function(){
-            window.dispatchEvent(new Event('resize'));
-        },200)
-    }
+        this.refreshChart= function(){
+            setTimeout(function(){
+                window.dispatchEvent(new Event('resize'));
+            },200)
+        }
+
+        this.setDefaultAnalysisSettings = function(){
+            if(VoltDbUI.getFromLocalStorage("totalProcessingTime") == undefined){
+               saveInLocalStorage("totalProcessingTime", 3000)
+            }
+            if(VoltDbUI.getFromLocalStorage("averageExecutionTime") == undefined){
+                saveInLocalStorage("averageExecutionTime", 500)
+            }
+            if(VoltDbUI.getFromLocalStorage("showHideSysProcedures") == undefined){
+                saveInLocalStorage("showHideSysProcedures", true)
+            }
+        }
     });
 
 

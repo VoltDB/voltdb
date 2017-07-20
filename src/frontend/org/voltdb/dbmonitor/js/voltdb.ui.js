@@ -2727,14 +2727,19 @@ var loadPage = function (serverName, portid) {
 
     $("#btnThreshold").popup({
         open: function (event, ui, ele) {
-            if(VoltDbUI.getFromLocalStorage("totalProcessingTime") == undefined){
-                saveInLocalStorage("totalProcessingTime", 20)
-            }
-            if(VoltDbUI.getFromLocalStorage("averageExecutionTime") == undefined){
-                saveInLocalStorage("averageExecutionTime", 500)
-            }
             $("#partitionThreshold").val(VoltDbUI.getFromLocalStorage("totalProcessingTime"))
             $("#averageExecutionTime").val(VoltDbUI.getFromLocalStorage("averageExecutionTime"))
+            $("#trShowHideSysProcedures").remove();
+            $("#tblAnalysisSettings").append('<tr id="trShowHideSysProcedures">' +
+                                                '<td>Show System Procedures</td>' +
+                                                '<td style="text-align:right"><input type="checkbox" value="" id="chkSystemProcedure"></td>' +
+                                                '<td></td>' +
+                                            '</tr>');
+            $('#chkSystemProcedure').iCheck({
+                checkboxClass: 'icheckbox_square-aero customCheckbox',
+                increaseArea: '20%'
+            });
+            $("#chkSystemProcedure").iCheck(VoltDbUI.getFromLocalStorage("showHideSysProcedures") ? 'check' : 'uncheck');
         },
        afterOpen: function () {
             var popup = $(this)[0];
@@ -2742,7 +2747,7 @@ var loadPage = function (serverName, portid) {
             $("#btnSaveThreshold").on("click", function () {
                 saveInLocalStorage("totalProcessingTime", $("#partitionThreshold").val())
                 saveInLocalStorage("averageExecutionTime", $("#averageExecutionTime").val())
-                //saveInLocalStorage("execTimeForProc", $("#execTime").val())
+                saveInLocalStorage("showHideSysProcedures", $("#chkSystemProcedure").is(':checked'))
                 $("#btnAnalyzeNow").trigger("click");
                 //Close the popup
                 popup.close();
