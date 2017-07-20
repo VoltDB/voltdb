@@ -2406,7 +2406,6 @@ var loadPage = function (serverName, portid) {
                  $("#spanAnalysisLegend").hide();
                  $("#execTimeLegend").hide();
             }
-
             getTooltipValues(procedureName);
 
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
@@ -2673,14 +2672,15 @@ var loadPage = function (serverName, portid) {
     function getTooltipValues(procedureName){
         VoltDbUI.executionDetails = {};
         var statement = '';
-        var invocations = 0;
 
         VoltDbAnalysis.latencyDetailValue.forEach (function(item){
             var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
             var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
 
-
             if(item.PROCEDURE == procedureName ){
+                 if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
+                        VoltDbUI.executionDetails[item.STATEMENT]={};
+                    }
                 if (statement == item.STATEMENT){
                     if(item.MIN < smallest){
                         smallest = item.MIN;
@@ -2690,20 +2690,19 @@ var loadPage = function (serverName, portid) {
                        largest = item.MAX;
                     }
 
-                     if(item.type == "Single Partitioned"){
-                        invocations += item.INVOCATION;
-                     }
-                     else{
-                        invocations = item.INVOCATION;
-                     }
-
-                    if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
-                        VoltDbUI.executionDetails[item.STATEMENT]={};
+                    if(item.type == "Single Partitioned"){
+                        VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] += item.INVOCATION;
+                    }
+                    else{
+                        VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = item.INVOCATION;
                     }
 
                     VoltDbUI.executionDetails[item.STATEMENT]["MIN"] = smallest;
                     VoltDbUI.executionDetails[item.STATEMENT]["MAX"] = largest;
-                    VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = invocations;
+//                    VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = invocations;
+                }
+                else{
+                    VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = item.INVOCATION;
                 }
             }
             statement = item.STATEMENT;
