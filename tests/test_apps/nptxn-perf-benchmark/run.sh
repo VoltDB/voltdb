@@ -31,7 +31,7 @@ PROCS_JAR_NAME="np-procs.jar"
 BENCHMARK_JAR_NAME="np-benchmark.jar"
 
 # remove binaries, logs, runtime artifacts, etc...
-function cleanUp() {
+function clean() {
     rm -f client/np/*.class procs/np/*.class
     rm -f *.jar stats
 }
@@ -40,7 +40,7 @@ function cleanUp() {
 # cleanup and generate the jars #
 #################################
 function prepare() {
-    cleanUp
+    clean
     makeJars
 }
 
@@ -64,7 +64,7 @@ function makeJars() {
 
 # Start the server, and load the initial schema from *.sql
 function server() {
-    cleanUp
+    clean
     makeJars
     voltdb init --force
     voltdb start -H "$STARTUPLEADERHOST"
