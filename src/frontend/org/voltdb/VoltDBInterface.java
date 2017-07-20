@@ -168,6 +168,24 @@ public interface VoltDBInterface
             long ccrTime);
 
     /**
+     * Given the information, write the new catalog jar file only
+     */
+    default public void writeCatalogJar(byte[] newCatalogBytes) throws IOException
+    {
+        return;
+    }
+
+    default public String checkLoadingClasses(byte[] catalogBytes)
+    {
+        return null;
+    }
+
+    default public void cleanUpTempCatalogJar()
+    {
+        return;
+    }
+
+    /**
      * Updates the cluster setting of this VoltDB
      * @param settings the {@link ClusterSettings} update candidate
      * @param expectedVersionId version of the current instance (same as the Zookeeper node)
