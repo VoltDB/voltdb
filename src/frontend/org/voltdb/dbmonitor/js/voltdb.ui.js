@@ -2401,9 +2401,11 @@ var loadPage = function (serverName, portid) {
             var isMultiple= false;
             var i =0;
             var containLongName = false;
-            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var invocations = 0;
+
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                 $("#spanAnalysisLegend").hide();
+                 $("#execTimeLegend").hide();
+            }
 
             getTooltipValues(procedureName);
 
@@ -2421,16 +2423,9 @@ var loadPage = function (serverName, portid) {
                     else{
                         newStatement = item.STATEMENT;
                     }
-
                     var comp1 = newStatement.indexOf(') ') !== -1 ? newStatement.split(') ')[1]: newStatement;
                     var comp2 = statement.indexOf(') ') !== -1 ? statement.split(') ')[1]: statement;
                     if (comp1 == comp2){
-                        if(item.type == "Single Partitioned"){
-                            invocations += item.INVOCATION;
-                        }
-                        else{
-                            invocations = item.INVOCATION;
-                        }
                         avg += item.value;
                         isMultiple = true;
                     }
@@ -2462,7 +2457,7 @@ var loadPage = function (serverName, portid) {
 
                 }
             });
-
+            debugger;
             if($.isEmptyObject(procDetails)){
                 $("#spanAnalysisLegend").hide();
                 $("#execTimeLegend").hide();
@@ -2508,9 +2503,12 @@ var loadPage = function (serverName, portid) {
             var freqDetails = {};
             var i =0;
             var containLongName = false;
-            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var invocations = 0;
+
+
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                $("#spanFreqLegend").hide();
+                $("#freqLegend").hide();
+            }
 
             getTooltipValues(procedureName);
 
@@ -2534,12 +2532,6 @@ var loadPage = function (serverName, portid) {
                     var comp1 = newStatement.indexOf(') ') !== -1 ? newStatement.split(') ')[1]: newStatement;
                     var comp2 = statement.indexOf(') ') !== -1 ? statement.split(') ')[1]: statement;
                     if (comp1 == comp2){
-                        if(item.type == "Single Partitioned"){
-                            invocations += item.INVOCATION;
-                        }
-                        else{
-                            invocations = item.INVOCATION;
-                        }
                         totalInvocations += item.INVOCATION;
                     }
                     else{
@@ -2590,11 +2582,17 @@ var loadPage = function (serverName, portid) {
             var finalDetails = [];
             var i=0;
             var containLongName = false;
-            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var invocations = 0;
+
+            debugger;
+
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                 $("#spanCombinedLegend").hide();
+                 $("#totalProcTimeLegend").hide();
+            }
 
             getTooltipValues(procedureName);
+
+
 
             for (var key in VoltDbAnalysis.combinedDetail){
 
@@ -2675,10 +2673,12 @@ var loadPage = function (serverName, portid) {
     function getTooltipValues(procedureName){
         VoltDbUI.executionDetails = {};
         var statement = '';
+        var invocations = 0;
+
         VoltDbAnalysis.latencyDetailValue.forEach (function(item){
             var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
             var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var invocations = 0;
+
 
             if(item.PROCEDURE == procedureName ){
                 if (statement == item.STATEMENT){
@@ -2689,6 +2689,13 @@ var loadPage = function (serverName, portid) {
                     if(item.MAX > largest){
                        largest = item.MAX;
                     }
+
+                     if(item.type == "Single Partitioned"){
+                        invocations += item.INVOCATION;
+                     }
+                     else{
+                        invocations = item.INVOCATION;
+                     }
 
                     if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
                         VoltDbUI.executionDetails[item.STATEMENT]={};

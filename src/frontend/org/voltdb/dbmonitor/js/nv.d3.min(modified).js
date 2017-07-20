@@ -621,7 +621,7 @@
                 if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Total Processing Time") && chartContainer == null)
                     currentTime = d.data.label.split(" ")[1]
 
-                if (d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail")
+                if (d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Processing Time Detail")
                     {
                         if(d.data.label.indexOf(' ') != -1)
                             currentTime = d.data.label.split(" ")[1]
