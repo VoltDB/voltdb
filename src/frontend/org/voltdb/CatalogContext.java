@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import static org.voltdb.compiler.CatalogChangeResult.CATALOG_CHANGE_NOREPLAY;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -43,9 +45,9 @@ import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
-import static org.voltdb.compiler.CatalogChangeResult.CATALOG_CHANGE_NOREPLAY;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -311,20 +313,53 @@ public class CatalogContext {
         return m_jarfile.get(key);
     }
 
+    public enum CatalogJarWriteMode {
+        START_OR_RESTART,
+        CATALOG_UPDATE,
+        RECOVER
+    }
+
     /**
-     * Write the original JAR file to the specified path/name
+     * Write, replace or update the catalog jar based on different cases. This function
+     * assumes any IOException should lead to fatal crash.
      * @param path
      * @param name
      * @throws IOException
      */
-    public Runnable writeCatalogJarToFile(String path, String name) throws IOException
+    public Runnable writeCatalogJarToFile(String path, String name, CatalogJarWriteMode mode) throws IOException
     {
-        File catalog_file = new VoltFile(path, name);
-        if (catalog_file.exists())
-        {
-            catalog_file.delete();
+        File catalogFile = new VoltFile(path, name);
+        File catalogTmpFile = new VoltFile(path, name + ".tmp");
+
+        if (mode == CatalogJarWriteMode.CATALOG_UPDATE) {
+            // This means a @UpdateCore case, the asynchronous writing of
+            // jar file has finished, rename the jar file
+            catalogFile.delete();
+            catalogTmpFile.renameTo(catalogFile);
+            return null;
         }
-        return m_jarfile.writeToFile(catalog_file);
+
+        if (mode == CatalogJarWriteMode.START_OR_RESTART) {
+            // This happens in the beginning of ,
+            // when the catalog jar does not yet exist. Though the contents
+            // written might be a default one and could be overwritten later
+            // by @UAC, @UpdateClasses, etc.
+            return m_jarfile.writeToFile(catalogFile);
+        }
+
+        if (mode == CatalogJarWriteMode.RECOVER) {
+            // we must overwrite the file (the file may have been changed)
+            catalogFile.delete();
+            if (catalogTmpFile.exists()) {
+                // If somehow the catalog temp jar is not cleaned up, then delete it
+                catalogTmpFile.delete();
+            }
+
+            return m_jarfile.writeToFile(catalogFile);
+        }
+
+        VoltDB.crashLocalVoltDB("Unsupported mode to write catalog jar", true, null);
+        return null;
     }
 
     /**
@@ -373,7 +408,7 @@ public class CatalogContext {
     }
 
     public static Class<?> classForProcedure(String procedureClassName, ClassLoader loader)
-        throws ClassNotFoundException {
+            throws ClassNotFoundException {
         // this is a safety mechanism to prevent catalog classes overriding VoltDB stuff
         if (procedureClassName.startsWith("org.voltdb.")) {
             return Class.forName(procedureClassName);
@@ -484,6 +519,13 @@ public class CatalogContext {
     public byte[] getCatalogHash()
     {
         return catalogHash;
+    }
+
+    public String getCatalogLogString() {
+        return String.format("Catalog: TXN ID %d, catalog hash %s, deployment hash %s\n",
+                                m_transactionId,
+                                Encoder.hexEncode(catalogHash).substring(0, 10),
+                                Encoder.hexEncode(deploymentHash).substring(0, 10));
     }
 
     public InMemoryJarfile getCatalogJar() {

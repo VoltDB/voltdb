@@ -60,6 +60,9 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     private static final long serialVersionUID = 1L;
     protected final JarLoader m_loader = new JarLoader();
 
+    public static final String CATALOG_JAR_FILENAME = "catalog.jar";
+    public static final String TMP_CATALOG_JAR_FILENAME = "catalog.jar.tmp";
+
     ///////////////////////////////////////////////////////
     // CONSTRUCTION
     ///////////////////////////////////////////////////////
@@ -152,6 +155,34 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     ///////////////////////////////////////////////////////
     // OUTPUT
     ///////////////////////////////////////////////////////
+
+    // Static helper function for writing the contents of
+    // the catalog to the specified location, this greatly
+    // saves the time for various conversion. The bytes are
+    // directly transformed and written to the specified file
+    public static void writeToFile(byte[] catalogBytes, File file) throws IOException {
+        JarOutputStream jarOut = new JarOutputStream(new FileOutputStream(file));
+
+        JarInputStream jarIn = new JarInputStream(new ByteArrayInputStream(catalogBytes));
+        JarEntry catEntry = null;
+        JarInputStreamReader reader = new JarInputStreamReader();
+        while ((catEntry = jarIn.getNextJarEntry()) != null) {
+            byte[] value = reader.readEntryFromStream(jarIn);
+            String key = catEntry.getName();
+
+            assert (value != null);
+            JarEntry entry = new JarEntry(key);
+            entry.setSize(value.length);
+            entry.setTime(System.currentTimeMillis());
+            jarOut.putNextEntry(entry);
+            jarOut.write(value);
+            jarOut.flush();
+            jarOut.closeEntry();
+        }
+
+        jarOut.finish();
+        jarIn.close();
+    }
 
     public Runnable writeToFile(File file) throws IOException {
         final FileOutputStream output = new FileOutputStream(file);

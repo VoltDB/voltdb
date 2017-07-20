@@ -116,7 +116,7 @@ public class NTProcedureService {
     // (doesn't run nt procs if started by other nt procs)
     // from 1 to 20 threads in parallel, with an unbounded queue
     private final ExecutorService m_primaryExecutorService = new ThreadPoolExecutor(
-            1,
+            20,
             20,
             60,
             TimeUnit.SECONDS,
