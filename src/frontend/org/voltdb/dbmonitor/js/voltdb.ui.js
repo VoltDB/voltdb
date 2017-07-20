@@ -2403,7 +2403,6 @@ var loadPage = function (serverName, portid) {
             var containLongName = false;
             var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
             var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var invocations = 0;
 
             getTooltipValues(procedureName);
 
@@ -2425,12 +2424,6 @@ var loadPage = function (serverName, portid) {
                     var comp1 = newStatement.indexOf(') ') !== -1 ? newStatement.split(') ')[1]: newStatement;
                     var comp2 = statement.indexOf(') ') !== -1 ? statement.split(') ')[1]: statement;
                     if (comp1 == comp2){
-                        if(item.type == "Single Partitioned"){
-                            invocations += item.INVOCATION;
-                        }
-                        else{
-                            invocations = item.INVOCATION;
-                        }
                         avg += item.value;
                         isMultiple = true;
                     }
@@ -2508,9 +2501,6 @@ var loadPage = function (serverName, portid) {
             var freqDetails = {};
             var i =0;
             var containLongName = false;
-            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var invocations = 0;
 
             getTooltipValues(procedureName);
 
@@ -2534,12 +2524,6 @@ var loadPage = function (serverName, portid) {
                     var comp1 = newStatement.indexOf(') ') !== -1 ? newStatement.split(') ')[1]: newStatement;
                     var comp2 = statement.indexOf(') ') !== -1 ? statement.split(') ')[1]: statement;
                     if (comp1 == comp2){
-                        if(item.type == "Single Partitioned"){
-                            invocations += item.INVOCATION;
-                        }
-                        else{
-                            invocations = item.INVOCATION;
-                        }
                         totalInvocations += item.INVOCATION;
                     }
                     else{
@@ -2675,10 +2659,12 @@ var loadPage = function (serverName, portid) {
     function getTooltipValues(procedureName){
         VoltDbUI.executionDetails = {};
         var statement = '';
+        var invocations = 0;
+
         VoltDbAnalysis.latencyDetailValue.forEach (function(item){
             var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
             var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var invocations = 0;
+
 
             if(item.PROCEDURE == procedureName ){
                 if (statement == item.STATEMENT){
@@ -2689,6 +2675,13 @@ var loadPage = function (serverName, portid) {
                     if(item.MAX > largest){
                        largest = item.MAX;
                     }
+
+                     if(item.type == "Single Partitioned"){
+                        invocations += item.INVOCATION;
+                     }
+                     else{
+                        invocations = item.INVOCATION;
+                     }
 
                     if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
                         VoltDbUI.executionDetails[item.STATEMENT]={};
