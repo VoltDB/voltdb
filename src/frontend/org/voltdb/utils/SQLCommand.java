@@ -724,7 +724,6 @@ public class SQLCommand
         // keep from throwing off diagnostic line numbers. So "statement" may be non-empty even
         // when a sql statement has not yet started (?)
         boolean statementStarted = false;
-        boolean inMultiStmtProc = false;
         StringBuilder batch = fileInfo.isBatch() ? new StringBuilder() : null;
 
         String delimiter = (fileInfo.getOption() == FileOption.INLINEBATCH) ?
@@ -771,22 +770,6 @@ public class SQLCommand
                 }
                 return;
             }
-
-            if (!inMultiStmtProc) {
-                // check if the statement is CREATE PROCEDURE AS BEGIN...
-                // add the current line to the statements so far entered
-                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureBeginAsSQL(statement.toString() + line);
-                if (statementMatcher.matches()) {
-                    inMultiStmtProc = true;
-                }
-            }
-//            else {
-//                // check if the multi statement procedure ended
-//                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(statement.toString() + line);
-//                if (statementMatcher.matches()) {
-//                    inMultiStmtProc = false;
-//                }
-//            }
 
             if ( ! statementStarted) {
                 if (line.trim().equals("") || SQLParser.isWholeLineComment(line)) {
@@ -848,18 +831,26 @@ public class SQLCommand
 
             // Check if the current statement ends here and now.
             // if it is a multi statement procedure, continue to execute till END
-            if (!inMultiStmtProc && SQLParser.isSemiColonTerminated(line)) {
+            if (SQLParser.isSemiColonTerminated(line)) {
                 if (batch == null) {
                     String statementString = statement.toString();
                     // Trim here avoids a "missing statement" error from adhoc in an edge case
                     // like a blank line from stdin.
                     if ( ! statementString.trim().isEmpty()) {
                         //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                        executeStatements(statementString, callback, reader.getLineNumber());
+                        String incompleteSt = executeStatements(statementString, callback, reader.getLineNumber());
+                        if (incompleteSt != null) {
+                            statement = new StringBuilder(incompleteSt);
+                        }
+                        else {
+                            statement.setLength(0);
+                            statementStarted = false;
+                        }
+                    } else {
+                        statement.setLength(0);
+                        statementStarted = false;
                     }
-                    statement.setLength(0);
                 }
-                statementStarted = false;
             }
             else {
                 // Disable directive processing until end of statement.
@@ -875,7 +866,7 @@ public class SQLCommand
     // the end of a statement. It could give a false negative for something as
     // simple as an end-of-line comment.
     //
-    private static void executeStatements(String statements, DDLParserCallback callback, int lineNum)
+    private static String executeStatements(String statements, DDLParserCallback callback, int lineNum)
     {
         // TODO: send back incomplete statements?
         SplitStmtResults parsedOutput = SQLParser.parseQuery(statements);
@@ -884,6 +875,7 @@ public class SQLCommand
         for (String statement: parsedStatements) {
             executeStatement(statement, callback, lineNum);
         }
+        return parsedOutput.incompleteStmt;
     }
 
     private static void executeStatement(String statement, DDLParserCallback callback, int lineNum)
