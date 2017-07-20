@@ -97,8 +97,8 @@ function loadAnalysisPage(){
                 var dataLatencySysProcedures = [];
                 var dataFrequencySysProcedures = [];
                 var dataFrequencyProcedures = [];
-                var dataCombinedProcedures = [];
-                var dataCombinedSysProcedures = [];
+                var dataTotalProcessingProcedures = [];
+                var dataTotalProcessingSysProcedures = [];
                 var timestamp;
                 var sumOfAllProcedure = calculateCombinedValue(profileData["PROCEDURE_PROFILE"])
                 var isMPPresent = false;
@@ -110,7 +110,6 @@ function loadAnalysisPage(){
                 for(var i = 0; i < profileData["PROCEDURE_PROFILE"].length; i++){
                     if(i == 0)
                         timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
-
                     var calculatedProcessingTime = (profileData["PROCEDURE_PROFILE"][i].AVG/1000000) * profileData["PROCEDURE_PROFILE"][i].INVOCATIONS;
                     var procedureName = profileData["PROCEDURE_PROFILE"][i].PROCEDURE;
                     var avgExecTime = profileData["PROCEDURE_PROFILE"][i].AVG / 1000000;
@@ -166,11 +165,11 @@ function loadAnalysisPage(){
                     if(procedureName.indexOf("org.voltdb.sysprocs") > -1){
                         dataLatencySysProcedures.push({"label": procedureName , "value": avgExecTime});
                         dataFrequencySysProcedures.push({"label": procedureName, "value": invocation});
-                        dataCombinedSysProcedures.push({"label": procedureName, "value": calculatedProcessingTime});
+                        dataTotalProcessingSysProcedures.push({"label": procedureName, "value": calculatedProcessingTime});
                     } else {
                         dataLatencyProcedures.push({"label": procedureName , "value": avgExecTime});
                         dataFrequencyProcedures.push({"label": procedureName, "value": invocation});
-                        dataCombinedProcedures.push({"label": procedureName, "value": calculatedProcessingTime});
+                        dataTotalProcessingProcedures.push({"label": procedureName, "value": calculatedProcessingTime});
                     }
                 }
                 var formatDate = VoltDbAnalysis.formatDateTime(timestamp);
@@ -180,11 +179,11 @@ function loadAnalysisPage(){
                 if(showHideSysProcedures){
                     dataLatencyProcedures = $.merge(dataLatencyProcedures, dataLatencySysProcedures);
                     dataFrequencyProcedures = $.merge(dataFrequencyProcedures, dataFrequencySysProcedures);
-                    dataCombinedProcedures = $.merge(dataFrequencyProcedures, dataFrequencySysProcedures);
+                    dataTotalProcessingProcedures = $.merge(dataTotalProcessingProcedures, dataTotalProcessingSysProcedures);
                 }
                 MonitorGraphUI.RefreshAnalysisLatencyGraph(dataLatencyProcedures);
                 MonitorGraphUI.RefreshAnalysisFrequencyGraph(dataFrequencyProcedures);
-                MonitorGraphUI.RefreshAnalysisCombinedGraph(dataCombinedProcedures);
+                MonitorGraphUI.RefreshAnalysisCombinedGraph(dataTotalProcessingProcedures);
             })
         })
 

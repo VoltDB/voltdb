@@ -498,7 +498,7 @@
                   .showValues(true);
 
                 $("#chartLatencyAnalysis").css("height", barHeight-10)
-                ChartLatencyAnalysis.valueFormat(d3.format(',.6f'));
+                ChartLatencyAnalysis.valueFormat(d3.format(',.3f'));
                 ChartLatencyAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
                 ChartLatencyAnalysis.xAxis
@@ -554,7 +554,7 @@
                     .showValues(true);
 
                 $("#chartProcessingTimeAnalysis").css("height", barHeight-10)
-                ChartProcessingTimeAnalysis.valueFormat(d3.format(',.6f'));
+                ChartProcessingTimeAnalysis.valueFormat(d3.format(',.3f'));
                 ChartProcessingTimeAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
                 ChartProcessingTimeAnalysis.xAxis
