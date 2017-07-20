@@ -55,7 +55,7 @@ public class InsertImport2 extends VoltProcedure {
                     "type_null_varchar25, type_not_null_varchar25, type_null_varchar128, " +
                     "type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024)" +
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable5 " + sqlSuffix);
+    public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable2 " + sqlSuffix);
     public final SQLStmt deleteMirrorRow = new SQLStmt(
             "DELETE FROM kafkaMirrorTable2 WHERE key = ? AND value = ?"
             );
