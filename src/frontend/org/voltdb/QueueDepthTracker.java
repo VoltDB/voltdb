@@ -16,11 +16,12 @@
  */
 package org.voltdb;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.iv2.SiteTasker;
@@ -33,17 +34,13 @@ import org.voltdb.iv2.SiteTasker;
  */
 public class QueueDepthTracker extends SiteStatsSource {
 
-    public QueueDepthTracker(long siteId) {
-        super(siteId, false);
-        m_historicalData = new ArrayDeque<QueueStatus>();
-    }
-    private int m_depth;
+    private final AtomicInteger m_depth;
     private long m_lastWaitTime;
     private Deque<QueueStatus> m_historicalData;
     private LinkedTransferQueue<SiteTasker> m_tasks;
     private long m_maxWaitTimeWindowSize = 5_000_000_000L; // window size set to 5 seconds
     private long m_maxWaitLastLogTime;
-    private long m_recentMaxWaitTime;
+    private volatile long m_recentMaxWaitTime;
     private long m_recentTotalWaitTime;
     private long m_recentPollCount;
     private long m_recentWindowSize = m_maxWaitTimeWindowSize / 10; // recent window size set to 0.5 second
@@ -62,19 +59,31 @@ public class QueueDepthTracker extends SiteStatsSource {
         }
     }
 
-    public synchronized void offerUpdate() {
-        m_depth++;
+    public QueueDepthTracker(long siteId, LinkedTransferQueue<SiteTasker> tasks) {
+        super(siteId, false);
+        m_historicalData = new ConcurrentLinkedDeque<>();
+        m_depth = new AtomicInteger(tasks.size());
+        m_lastWaitTime = 0;
+        m_maxWaitLastLogTime = System.nanoTime();
+        m_recentMaxWaitTime = 0;
+        m_recentTotalWaitTime = 0;
+        m_recentPollCount = 0;
+        m_tasks = tasks;
     }
 
-    public synchronized void pollUpdate(long offerTime) {
-        m_depth--;
+    public void offerUpdate() {
+        m_depth.incrementAndGet();
+    }
+
+    public void pollUpdate(long offerTime) {
+        m_depth.decrementAndGet();
         long currentTime = System.nanoTime();
         m_lastWaitTime = currentTime - offerTime;
         // if max wait time was last logged less than m_recentWindowSize ago
         // keep the max wait time in m_recentMaxWaitTime
         // or log and reset the recentMaxWaitTime, update last log time
         if (currentTime - m_maxWaitLastLogTime < m_recentWindowSize) {
-            m_recentMaxWaitTime = Math.max(m_recentMaxWaitTime, m_lastWaitTime);
+            if (m_recentMaxWaitTime < m_lastWaitTime) m_recentMaxWaitTime = m_lastWaitTime;
             m_recentTotalWaitTime += m_lastWaitTime;
             m_recentPollCount++;
         } else {
@@ -95,18 +104,6 @@ public class QueueDepthTracker extends SiteStatsSource {
         }
     }
 
-    public synchronized void beginQueueDepth(int depth, LinkedTransferQueue<SiteTasker> tasks) {
-
-        m_depth = depth;
-        m_lastWaitTime = 0;
-        m_maxWaitLastLogTime = System.nanoTime();
-        m_recentMaxWaitTime = 0;
-        m_recentTotalWaitTime = 0;
-        m_recentPollCount = 0;
-        m_tasks = tasks;
-    }
-
-
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
@@ -117,7 +114,7 @@ public class QueueDepthTracker extends SiteStatsSource {
     }
 
     @Override
-    protected synchronized void updateStatsRow(Object rowKey, Object rowValues[]) {
+    protected void updateStatsRow(Object rowKey, Object rowValues[]) {
         long currentTime = System.nanoTime();
         // check if current wait time exceeds the maxWaitTime
         long currentWaitTime;
