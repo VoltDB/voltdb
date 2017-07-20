@@ -267,6 +267,7 @@ def compare_cleaned_to_baseline(parent, baseparent, path, inpath, do_refresh, re
 
 def delete_proc(pfile):
     # drop any procedures left in between any tests
+    systemgeneratedprocedures = {".insert",".update",".select",".delete",".upsert"}
     procset = set()
     for line in pfile:
         columns = line.split(',')
@@ -274,7 +275,6 @@ def delete_proc(pfile):
         try:
             if columns[2] != ' ' :
                 procname = columns[2].replace('\"','')
-                systemgeneratedprocedures = {".insert",".update",".select",".delete",".upsert"}
                 if any( systemprocedure in procname for systemprocedure in systemgeneratedprocedures) :
                     continue
                 procset.add(procname)
@@ -330,6 +330,43 @@ def delete_table_and_view(pfile):
         subprocess.call(['../../bin/sqlcmd'],
                         stdin=childin, stdout=childout, stderr=childerr)
 
+def test_drop_table_proc_view():
+    for files in os.listdir("test_droptableproc"):
+        if files.endswith(".in"):
+            print 'running test.. ' + (os.path.join("./test_droptableproc", files))
+            childin = open(os.path.join("./test_droptableproc", files),'r')
+            childout = open( os.path.join("./test_droptableproc", files + '.out'), 'w+')
+            childerr = open(os.path.join("./test_droptableproc", files + '.err'), 'w+')
+            subprocess.call(['../../bin/sqlcmd'],
+                        stdin=childin, stdout=childout, stderr=childerr)
+
+            childout.flush()
+            childerr.flush()
+
+            childout = open(os.path.join("./test_droptableproc", files + '.proc' + '.out'), 'w+')
+            childerr = open(os.path.join("./test_droptableproc", files + '.proc' +'.err'), 'w+')
+
+            subprocess.call(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
+                stdout=childout, stderr=childerr)
+
+            pfile = file(os.path.join("./test_droptableproc", files + '.proc' + '.out'), 'r')
+
+            delete_proc(pfile)
+
+            childout.flush()
+            childerr.flush()
+
+            childout = open(os.path.join("./test_droptableproc", files + '.table' + '.out'), 'w+')
+            childerr = open(os.path.join("./test_droptableproc", files + '.table' +'.err'), 'w+')
+
+            subprocess.call(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
+                    stdout=childout, stderr=childerr)
+
+            pfile = file(os.path.join("./test_droptableproc", files + '.table' + '.out'), 'r')
+
+            delete_table_and_view(pfile)
+
+
 
 def do_main():
     parser = OptionParser()
@@ -363,6 +400,9 @@ def do_main():
     # option or automatic-but-verbosely -- to detect and use an already running
     # VoltDB server and remember to leave it running on exit.
     launch_and_wait_on_voltdb(reportout)
+
+    # start testing of drop table,proc and views
+    test_drop_table_proc_view()
 
     # Except in refresh mode, any diffs change the scripts exit code to fail ant/jenkins
     haddiffs = False
