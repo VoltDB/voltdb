@@ -18,32 +18,91 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
+import org.json_voltpatches.JSONException;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.PlanSelector;
 
 public class MicroOptimizationRunner {
+    private static final VoltLogger m_logger = new VoltLogger("MICROOPTIMIZER");
+
+    public enum Phases {
+        DURING_PLAN_ASSEMBLY,
+        AFTER_COMPLETE_PLAN_ASSEMBLY
+    };
 
     // list all of the micro optimizations here
-    static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
+    static Map<Phases, List<MicroOptimization>> optimizations = new HashMap<>();
+
+    static void addOptimization(MicroOptimization opt) {
+        Phases phase = opt.getPhase();
+        List<MicroOptimization> optlist = optimizations.get(phase);
+        if (optlist == null) {
+            optlist = new ArrayList<>();
+            optimizations.put(phase, optlist);
+        }
+        optlist.add(opt);
+    }
     static {
         // The orders here is important
-        optimizations.add(new PushdownLimits());
-        optimizations.add(new ReplaceWithIndexCounter());
-        optimizations.add(new ReplaceWithIndexLimit());
+        addOptimization(new PushdownLimits());
+        addOptimization(new ReplaceWithIndexCounter());
+        addOptimization(new ReplaceWithIndexLimit());
 
         // Inline aggregation has to be applied after Index counter and Index Limit with MIN/MAX.
-        optimizations.add(new InlineAggregation());
+        addOptimization(new InlineAggregation());
 
         // MP ORDER BY Optimization
-        optimizations.add(new InlineOrderByIntoMergeReceive());
+        addOptimization(new InlineOrderByIntoMergeReceive());
+
+        // Remove Unnecessary Projection nodes.  This is applied
+        // at a later phase then the previous optimizations.
+        addOptimization(new RemoveUnnecessaryProjectNodes());
+        addOptimization(new MakeInsertNodesInlineIfPossible());
     }
 
-    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
+    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt, Phases phase)
     {
-        for (int i = 0; i < optimizations.size(); i++) {
-            MicroOptimization opt = optimizations.get(i);
+        List<MicroOptimization> opts = optimizations.get(phase);
+        if (opts != null) {
+            if (m_logger.isDebugEnabled()) {
+                String sqlString = plan.sql;
+                if (sqlString == null) {
+                    sqlString = plan.toString();
+                }
+                m_logger.debug("Micro Optimizer phase " + phase.name());
+                m_logger.debug("SQL: " + sqlString + "\n");
+            }
+        }
+        for (MicroOptimization opt : opts) {
+            if (m_logger.isDebugEnabled()) {
+                String planString = null;
+                try {
+                    planString = PlanSelector.outputPlanDebugString(plan.rootPlanGraph);
+                } catch (JSONException ex) {
+                    planString = ex.getMessage();
+                }
+                m_logger.debug("Microoptimization: " + opt + "\n"
+                           + "Input:\n" + plan.explainedPlan + "\n"
+                           + ":-----------:\n"
+                           + planString
+                           + "\n");
+            }
             opt.apply(plan, parsedStmt);
+            if (m_logger.isDebugEnabled()) {
+                String planString = null;
+                try {
+                    planString = PlanSelector.outputPlanDebugString(plan.rootPlanGraph);
+                } catch (JSONException ex) {
+                    planString = ex.getMessage();
+                }
+                m_logger.debug("Output:\n" + planString + "\n");
+            }
         }
     }
 }

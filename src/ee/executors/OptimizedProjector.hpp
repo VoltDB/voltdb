@@ -114,6 +114,7 @@ public:
      *  broken up. */
     void permuteOnIndexBitForTest(int numBits, int bitToFlip);
 
+    std::string debug(const std::string &title) const;
 
 private:
 

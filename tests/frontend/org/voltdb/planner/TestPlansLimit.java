@@ -121,7 +121,7 @@ public class TestPlansLimit extends PlannerTestCase {
         AbstractPlanNode p;
         if (isMultiPart) {
             assertTrue(pn.size() == 2);
-            p = pn.get(0).getChild(0).getChild(0);
+            p = pn.get(0).getChild(0);
             if (p.getPlanNodeType() == PlanNodeType.PROJECTION) {
                 p = p.getChild(0);
             }
@@ -191,8 +191,9 @@ public class TestPlansLimit extends PlannerTestCase {
         AbstractPlanNode p;
 
         p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        p = p.getChild(0);
+        if (p instanceof ProjectionPlanNode) {
+            p = p.getChild(0);
+        }
         if (p instanceof MergeReceivePlanNode) {
             assertNotNull(p.getInlinePlanNode(PlanNodeType.ORDERBY));
             AbstractPlanNode aggr = AggregatePlanNode.getInlineAggregationNode(p);
@@ -219,8 +220,9 @@ public class TestPlansLimit extends PlannerTestCase {
         AbstractPlanNode p;
 
         p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        p = p.getChild(0);
+        if (p instanceof ProjectionPlanNode) {
+            p = p.getChild(0);
+        }
         assertTrue(p instanceof MergeReceivePlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
         assertNotNull(p.getInlinePlanNode(PlanNodeType.ORDERBY));
