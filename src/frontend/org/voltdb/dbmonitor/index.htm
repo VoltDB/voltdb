@@ -1478,38 +1478,18 @@
                    Any entries above the following settings will be highlighted and explained in the area below the graph.
                 </div>
             </div>
-            <table width="100%" cellpadding="0" cellspacing="0" class="alertThresholdTbl">
+            <table id="tblAnalysisSettings" width="100%" cellpadding="0" cellspacing="0" class="alertThresholdTbl">
                 <tr>
-                    <td>Total Processing Time</td>
-                    <td><input type="text" id="partitionThreshold">ms</td>
+                    <td width="50%">Total Processing Time</td>
+                    <td width="30%" style="text-align:right"><input type="text" id="partitionThreshold"></td>
+                    <td width="20%">ms</td>
                 </tr>
                 <tr>
                     <td>Average Execution Time</td>
-                    <td><input type="text" value="" id="averageExecutionTime">ms</td>
+                    <td style="text-align:right"><input type="text" value="" id="averageExecutionTime"></td>
+                    <td>ms</td>
                 </tr>
-                <!--<tr>-->
-                    <!--<td>Execution Time for procedure</td>-->
-                    <!--<td><input type="text" value="" id="execTime">ms</td>-->
-                <!--</tr>-->
             </table>
-
-           <!-- <div class="partitioned">
-                <div class="leftPart">Combined usage for multi-partitioned procedure</div>
-                <div class="rightPart"><input type="text" id="partitionThreshold">%</div>
-                <div class="clear"></div>
-            </div>
-
-            <div class="replicated">
-                <div class="leftRep">Frequency for procedure</div>
-                <div class="rightRep"><input type="text" value="" id="replicatedThreshold"></div>
-                <div class="clear"></div>
-            </div>
-
-             <div class="replicated">
-                <div class="leftRep">Execution Time for procedure</div>
-                <div class="rightRep"><input type="text" value="" id="execTime">ms</div>
-                <div class="clear"></div>
-            </div>-->
         </div>
        <div class="overlay-btns">
            <a id="btnSaveThreshold" class="btn">Save</a>
