@@ -1,5 +1,27 @@
 #!/usr/bin/env bash
 
+# This file is part of VoltDB.
+# Copyright (C) 2008-2017 VoltDB Inc.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
 #
 # Ported and modified from https://github.com/VoltDB/voltdb/pull/3822
 #
@@ -39,7 +61,7 @@ function clean() {
 #################################
 # cleanup and generate the jars #
 #################################
-function prepare() {
+function jars() {
     clean
     makeJars
 }
@@ -73,7 +95,7 @@ function server() {
 ###################
 # Load the schema #
 ###################
-function load() {
+function init() {
     sqlcmd < schema.sql
 }
 
@@ -81,7 +103,7 @@ function load() {
 # Start the benchmarking program #
 ##################################
 function client() {
-    load
+    init
     java -classpath $BENCHMARK_JAR_NAME:$CLIENTCLASSPATH np.NPBenchmark \
          --servers="$SERVERS" \
          --sprate=0.6 \
@@ -91,13 +113,22 @@ function client() {
          --duration=30
 }
 
+###################
+# Print help info #
+###################
+function help() {
+    echo "Usage: run.sh [cmd]"
+    echo "[cmd] option: "
+    echo "             [NO_OPTION]: same as running \"run.sh server\""
+    echo "             server: generate the need jars, initialize and start the voltdb instance"
+    echo "             client: start running the benchmark"
+    echo "             clean: clean the temporary files"
+}
+
 if [ $# -eq 0 ]; then server; exit; fi
 cmdargs=()
 if [ $# -gt 1 ]; then
-    for ((i=2; i<=$#; i++)); do
-    	# ${!i} reference the value in the input args
-		cmdargs+=" ${!i}"
-	done
+    help
 fi
 
 echo "${0}: Performing ${1} ${cmdargs}..."
