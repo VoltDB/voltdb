@@ -98,6 +98,7 @@ import org.voltcore.utils.VersionChecker;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
@@ -160,6 +161,7 @@ import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.sysprocs.VerifyCatalogAndWriteJar;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
@@ -168,6 +170,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -199,6 +202,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * to allow test mocking.
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.HostWatcher {
+
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "true"));
 
     /** Default deployment file contents if path to deployment is null */
@@ -1894,16 +1898,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
 
-        private void logCatalogAndDeployment() {
-
+        private void logCatalogAndDeployment(CatalogJarWriteMode mode) {
             File configInfoDir = getConfigDirectory();
             configInfoDir.mkdirs();
 
             try {
-                m_catalogContext.writeCatalogJarToFile(configInfoDir.getPath(), "catalog.jar");
+                m_catalogContext.writeCatalogJarToFile(configInfoDir.getPath(), "catalog.jar", mode);
             } catch (IOException e) {
-                hostLog.error("Failed to log catalog: " + e.getMessage(), e);
+                hostLog.error("Failed to writing catalog jar to disk: " + e.getMessage(), e);
                 e.printStackTrace();
+
+                VoltZK.removeCatalogUpdateBlocker(VoltDB.instance().getHostMessenger().getZK(),
+                                                  VoltZK.uacActiveBlocker,
+                                                  hostLog);
+                VoltDB.crashLocalVoltDB("Fatal error when writing the catalog jar to disk.", true, e);
             }
             logDeployment();
         }
@@ -1929,7 +1937,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         @Override
         public void run() {
             logConfigInfo();
-            logCatalogAndDeployment();
+            logCatalogAndDeployment(CatalogJarWriteMode.START_OR_RESTART);
         }
     }
 
@@ -3320,6 +3328,85 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private final HashMap<Long, ContextTracker>m_txnIdToContextTracker =
         new HashMap<>();
 
+    /*
+     * Write the catalog jar to a temporary jar file, this function
+     * is supposed to be called in an NT proc
+     */
+    @Override
+    public void writeCatalogJar(byte[] catalogBytes) throws IOException
+    {
+        File configInfoDir = getConfigDirectory();
+        configInfoDir.mkdirs();
+
+        InMemoryJarfile.writeToFile(catalogBytes,
+                                    new VoltFile(configInfoDir.getPath(), InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
+    }
+
+    // Verify the integrity of the newly updated catalog stored on the ZooKeeper
+    @Override
+    public String checkLoadingClasses(byte[] catalogBytes) {
+        try {
+            InMemoryJarfile testjar = new InMemoryJarfile(catalogBytes);
+            JarLoader testjarloader = testjar.getLoader();
+            for (String classname : testjarloader.getClassNames()) {
+                try {
+                    CatalogContext.classForProcedure(classname, testjarloader);
+                }
+                // LinkageError catches most of the various class loading errors we'd
+                // care about here.
+                catch (UnsupportedClassVersionError e) {
+                    String msg = "Cannot load classes compiled with a higher version of Java than currently" +
+                                 " in use. Class " + classname + " was compiled with ";
+
+                    Integer major = 0;
+                    try {
+                        major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
+                    } catch (Exception ex) {
+                        hostLog.debug("Unable to parse compile version number from UnsupportedClassVersionError.",
+                                ex);
+                    }
+
+                    if (VerifyCatalogAndWriteJar.SupportedJavaVersionMap.containsKey(major)) {
+                        msg = msg.concat(VerifyCatalogAndWriteJar.SupportedJavaVersionMap.get(major) + ", current runtime version is " +
+                                         System.getProperty("java.version") + ".");
+                    } else {
+                        msg = msg.concat("an incompatable Java version.");
+                    }
+                    hostLog.error(msg);
+                    return msg;
+                }
+                catch (LinkageError | ClassNotFoundException e) {
+                    String cause = e.getMessage();
+                    if (cause == null && e.getCause() != null) {
+                        cause = e.getCause().getMessage();
+                    }
+                    String msg = "Error loading class \'" + classname + "\': " +
+                        e.getClass().getCanonicalName() + " for " + cause;
+                    hostLog.warn(msg);
+                    return msg;
+                }
+            }
+        } catch (Exception e) {
+            return e.getMessage();
+        }
+
+        return null;
+    }
+
+    // Clean up the temporary jar file
+    @Override
+    public void cleanUpTempCatalogJar() {
+        File configInfoDir = getConfigDirectory();
+        if (!configInfoDir.exists())
+            return;
+
+        File tempJar = new VoltFile(configInfoDir.getPath(),
+                                    InMemoryJarfile.TMP_CATALOG_JAR_FILENAME);
+        if(tempJar.exists()) {
+            tempJar.delete();
+        }
+    }
+
     @Override
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
             String diffCommands,
@@ -3485,7 +3572,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
                 }
 
-                new ConfigLogging().logCatalogAndDeployment();
+                new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
 
                 // log system setting information if the deployment config has changed
                 if (!Arrays.equals(oldDeployHash, m_catalogContext.deploymentHash)) {
