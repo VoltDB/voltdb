@@ -33,7 +33,7 @@ BENCHMARK_JAR_NAME="np-benchmark.jar"
 # remove binaries, logs, runtime artifacts, etc...
 function cleanUp() {
     rm -f client/np/*.class procs/np/*.class
-    rm -f *.jar
+    rm -f *.jar stats
 }
 
 #################################

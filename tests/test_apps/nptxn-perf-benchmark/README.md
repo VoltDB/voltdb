@@ -10,6 +10,7 @@ The primary purpose of using 2 other types of procedures is to test how a 2P/NP 
 - Make sure the **voltdb/bin** is in your PATH
 - In one terminal, run `./run.sh`
 - In the 2nd terminal, run `./run.sh client` to start the benchmark
+- Run `./run.sh cleanUp` to remove the generated files
 
 ### Parameters
 - `--sprate` The ratio of SP txns compared to 2P txns. Must be between 0 and 1. (default 0.6)
