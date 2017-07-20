@@ -25,6 +25,7 @@ package org.voltcore.agreement;
 
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -50,9 +51,11 @@ class MiniSite extends Thread implements MeshAide
     Set<Long> m_initialHSIds = new HashSet<Long>();
     Set<Long> m_currentHSIds = new HashSet<Long>();
     Set<Long> m_failedHSIds = new HashSet<Long>();
+    Random m_rand;
+    final private static int MAX_INJECTED_DELAY = 10; // in milliseconds, for error injection only
 
     MiniSite(Mailbox mbox, Set<Long> HSIds, DisconnectFailedHostsCallback callback,
-            VoltLogger logger)
+            VoltLogger logger, long givenSeed)
     {
         m_siteLog = logger;
         m_initialHSIds.addAll(HSIds);
@@ -60,6 +63,12 @@ class MiniSite extends Thread implements MeshAide
         m_mailbox = mbox;
         m_arbiter = new MeshArbiter(mbox.getHSId(), mbox, this);
         m_failedHosts = callback;
+        long seed = System.currentTimeMillis() + mbox.getHSId();
+        if (givenSeed != 0L) {
+            seed = givenSeed;
+        }
+        logger.info("MiniSite seed:" + seed);
+        m_rand = new Random(seed);
     }
 
     void shutdown()
@@ -83,6 +92,10 @@ class MiniSite extends Thread implements MeshAide
     }
 
     public void reportFault(long faultingSite) {
+        try {
+            Thread.sleep(m_rand.nextInt(MAX_INJECTED_DELAY));
+        } catch (InterruptedException ingoreit) {}
+
         if (m_siteLog.isDebugEnabled()) {
             m_siteLog.debug("Reported fault: " + faultingSite + ", witnessed?: true" );
         }
@@ -92,6 +105,10 @@ class MiniSite extends Thread implements MeshAide
     }
 
     public void reportFault(FaultMessage fm) {
+        try {
+            Thread.sleep(m_rand.nextInt(MAX_INJECTED_DELAY));
+        } catch (InterruptedException ingoreit) {}
+
         fm.m_sourceHSId = m_mailbox.getHSId();
         if (m_siteLog.isDebugEnabled()) {
             m_siteLog.debug("Reporting fault: " + fm);
