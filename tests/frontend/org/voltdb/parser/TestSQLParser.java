@@ -574,6 +574,48 @@ public class TestSQLParser extends TestCase {
         queriesOut = SQLParser.parseQuery(sql);
         assertEquals(1, queriesOut.size());
         assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+     // case with no whitespace before it
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "SELECT a, "
+                + "100+CASE WHEN a > 100.00 "
+                + "THEN 10 "
+                + "ELSE 5 "
+                + "END "
+                + "FROM t; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // case/end with no whitespace before and after it
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "SELECT a, "
+                + "select case when id < 0 then (id+0)end+100 from aaa;"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        sql = "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then t.a + 100 else t.a end; "
+                + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql);
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        String sql1 = "select * from R;";
+        sql = "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then t.a + 100 else t.a end; "
+                + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql+sql1);
+        assertEquals(2, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+        assertEquals(sql1.substring(0, sql1.length() - 1), queriesOut.get(1));
     }
 
     private static final Pattern RequiredWhitespace = Pattern.compile("\\s+");
