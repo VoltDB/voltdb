@@ -1857,6 +1857,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         if (! isHSQL()) {
             System.out.println("Now testing view data catching-up.");
             try {
+                client.callProcedure("@AdHoc", "DROP PROCEDURE TruncateMatViewDataMP;");
                 client.callProcedure("@AdHoc", "DROP VIEW ORDER_DETAIL_WITHPCOL;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -1875,6 +1876,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                                    "JOIN ORDERITEMS ON ORDERS.ORDER_ID = ORDERITEMS.ORDER_ID " +
                                    "JOIN PRODUCTS ON ORDERITEMS.PID = PRODUCTS.PID " +
                     "GROUP BY CUSTOMERS.NAME, ORDERS.ORDER_ID;");
+                client.callProcedure("@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to create a view.");
