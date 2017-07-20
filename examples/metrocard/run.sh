@@ -79,8 +79,9 @@ function server() {
 function init() {
     jars-ifneeded
     sqlcmd < ddl.sql
-    echo "----Loading Stations----"
-    csvloader --servers $SERVERS --file data/stations.csv --reportdir log stations
+    echo "----Loading Redline Stations----"
+    #csvloader --servers $SERVERS --file data/stations.csv --reportdir log stations
+    csvloader --servers $SERVERS --file data/redline.csv --reportdir log stations
     csvloader --servers $SERVERS --file data/trains.csv --reportdir log trains
 }
 
