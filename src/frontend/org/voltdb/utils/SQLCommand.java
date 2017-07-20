@@ -221,10 +221,8 @@ public class SQLCommand
         // Reset the error state to avoid accidentally ignoring future FILE content
         // after a file had runtime errors (ENG-7335).
         m_returningToPromptAfterError = false;
-        final StringBuilder statement = new StringBuilder();
+        StringBuilder statement = new StringBuilder();
         boolean isRecall = false;
-        boolean inMultiStmtProc = false;
-        final StringBuilder multiStmtLog = new StringBuilder();
 
         while (true) {
             String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
@@ -236,51 +234,12 @@ public class SQLCommand
                 // mistake. That case works differently now, so this code path
                 // MAY be dead. If not, cut our losses by rigging a quick exit.
                 statement.setLength(0);
-                multiStmtLog.setLength(0);
                 line = "EXIT;";
-            }
-            // if it is a multi statement procedure
-            if(!inMultiStmtProc) {
-                // check if the statement is CREATE PROCEDURE AS BEGIN...
-                // add the current line to the statements so far entered
-                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureBeginAsSQL(
-                        statement.toString() + line);
-                if (statementMatcher.matches()) {
-                    inMultiStmtProc = true;
-                }
-            } else if ( line.indexOf(";") > 0 ) {
-                /* check if the multi statement procedure is complete
-                 * Multi statement procedure can be complete only by a semi colon
-                 * We need to extract substring till the semi colon since the
-                 * regular expression matches the create procedure as begin .. end; syntax
-                 * Since the sqlcmd allows for more user input after the semi colon,
-                 * we need to make sure that the multi statement procedure actually gets matched
-                 */
-                String lineTillSemiColon = line.substring(0, line.indexOf(";") + 1);
-                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(
-                        statement.toString() + lineTillSemiColon);
-                if (statementMatcher.matches()) {
-                    /* end of multi stmt procedure
-                     * if the line is not semi colon terminated, there are more statements
-                     * after the current multi stmt procedure.
-                     * store the mutli stmt procedure into a separate buffer
-                     * to enable parsing of more multi statement procedures
-                     * Make the current statement buffer to the string after
-                     * the multi stmt procedure
-                     */
-                    inMultiStmtProc = false;
-                    if ( !SQLParser.isSemiColonTerminated(line) ) {
-                        multiStmtLog.append(statement.toString() + lineTillSemiColon + "\n");
-                        // need to process line after the semi colon
-                        line = line.substring(line.indexOf(";") + 2, line.length());
-                        statement.setLength(0);
-                    }
-                }
             }
 
             // Was there a line-ending semicolon typed at the prompt?
             // This mostly matters for "non-directive" statements.
-            boolean executeImmediate = !inMultiStmtProc && SQLParser.isSemiColonTerminated(line);
+            boolean executeImmediate = SQLParser.isSemiColonTerminated(line);
 
 
             // When we are tracking the progress of a multi-line statement,
@@ -366,15 +325,15 @@ public class SQLCommand
                 RecallableSessionLines.add(line);
                 if (executeImmediate) {
                     statement.append(line + "\n");
-                    if (multiStmtLog.length() > 0) {
-                        executeStatements(multiStmtLog.toString(), null, 0);
-                        multiStmtLog.setLength(0);
+                    String incompleteSt = executeStatements(statement.toString(), null, 0);
+                    if (incompleteSt != null)
+                        statement = new StringBuilder(incompleteSt);
+                    else {
+                        if (m_testFrontEndOnly) {
+                            break; // test mode expects this early return before end of input.
+                        }
+                        statement.setLength(0);
                     }
-                    executeStatements(statement.toString(), null, 0);
-                    if (m_testFrontEndOnly) {
-                        break; // test mode expects this early return before end of input.
-                    }
-                    statement.setLength(0);
                     continue;
                 }
             }
