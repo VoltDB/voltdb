@@ -1702,6 +1702,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     public boolean txnDoneBeforeCheckPoint() {
+
+        //return right away to avoid performance penalty
         if (m_spiCheckPoint < 0) {
             return false;
         }
@@ -1712,10 +1714,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 StringBuilder builder = new StringBuilder();
                 for (DuplicateCounterKey dc : keys) {
                     builder.append(TxnEgo.txnIdToString(dc.m_txnId) + "(" + dc.m_spHandle + "),");
-                    DuplicateCounter counter = m_duplicateCounters.get(dc);
-                    builder.append(counter.m_openMessage + "\n");
                 }
-                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphanle:" + m_spiCheckPoint + "\n" + builder.toString());
+                tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphandle:" + m_spiCheckPoint + "\n" + builder.toString());
             }
             return false;
         }
