@@ -34,6 +34,7 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.SplitStmtResults;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -792,6 +793,11 @@ public class SQLParser extends SQLPatternFactory
         return PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL.matcher(statement);
     }
 
+//    public static boolean isCreateMultiStmtProcedureAsSQLComplete(String statement)
+//    {
+//        return false;
+//    }
+
     /**
      * Match statement against pattern for create procedure as script
      * with allow/partition clauses
@@ -1090,7 +1096,8 @@ public class SQLParser extends SQLPatternFactory
     }
 
     // TODO: replace calls to this redundant function with call to SQLLexer.splitStatements
-    public static List<String> parseQuery(String query)
+//    public static List<String> parseQuery(String query)
+    public static SplitStmtResults parseQuery(String query)
     {
         if (query == null) {
             return null;
@@ -1120,7 +1127,9 @@ public class SQLParser extends SQLPatternFactory
           // comment text containing a semicolon does not cause an erroneous statement
           // split mid-comment.
         query = EndOfLineComment.matcher(query).replaceAll("");
-        ArrayList<String> queries = (ArrayList<String>) SQLLexer.splitStatements(query);
+//        ArrayList<String> queries = (ArrayList<String>) SQLLexer.splitStatements(query);
+        return SQLLexer.splitStatements(query);
+//        ArrayList<String> queries = (ArrayList<String>) SQLLexer.splitStatements(query).completelyParsedStmts;
 
 //        /*
 //         * replace all escaped single quotes with the #(SQL_PARSER_ESCAPE_SINGLE_QUOTE) tag
@@ -1205,7 +1214,7 @@ public class SQLParser extends SQLPatternFactory
 //            fragment = fragment.replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
 //            queries.add(fragment);
 //        }
-        return queries;
+//        return queries;
     }
 
     // Process the quirky syntax for "exec" arguments -- a procedure name and

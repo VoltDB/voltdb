@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.voltdb.utils.SplitStmtResults;
 
 /**
  * Provides an API for performing various lexing operations on SQL/DML/DDL text.
@@ -341,8 +342,10 @@ public class SQLLexer extends SQLPatternFactory
      * @param sql raw SQL text to split
      * @return list of individual SQL statements
      */
-    public static List<String> splitStatements(final String sql) {
+//    public static List<String> splitStatements(final String sql) {
+      public static SplitStmtResults splitStatements(final String sql) {
         List<String> statements = new ArrayList<>();
+        SplitStmtResults results = new SplitStmtResults();
 
         // strip out comments
         String sqlNoComments = SQLParser.AnyWholeLineComments.matcher(sql).replaceAll("");
@@ -484,13 +487,20 @@ public class SQLLexer extends SQLPatternFactory
             }
         }
         // Get the last statement, if any.
-        if (iStart < buf.length) {
+        // we are still processing a multi statement procedure if we are still in begin...end
+        if (!inBegin && iStart < buf.length) {
             String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
             if (!statement.isEmpty()) {
                 statements.add(statement);
             }
+        } else {
+            // we only check for incomplete multi statement procedures right now
+            results.incompleteStmt = String.copyValueOf(buf, iStart, iCur - iStart).trim();
         }
-        return statements;
+
+        results.completelyParsedStmts = statements;
+        return results;
+//        return statements;
     }
 
     /**

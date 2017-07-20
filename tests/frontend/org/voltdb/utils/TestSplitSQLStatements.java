@@ -41,7 +41,7 @@ public class TestSplitSQLStatements {
     }
 
     private void checkSplitter(final String strIn, final String... strsCmp) {
-        final List<String> strsOut = SQLLexer.splitStatements(strIn);
+        final List<String> strsOut = SQLLexer.splitStatements(strIn).completelyParsedStmts;
         assertEquals(strsCmp.length, strsOut.size());
         for (int i = 0; i < strsCmp.length; ++i) {
             assertEquals(strsCmp[i], strsOut.get(i));

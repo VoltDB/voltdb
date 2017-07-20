@@ -51,7 +51,7 @@ public class AdHocSpForTest extends AdHocNTBase {
             userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
         }
 
-        List<String> sqlStatements = SQLLexer.splitStatements(sql);
+        List<String> sqlStatements = SQLLexer.splitStatements(sql).completelyParsedStmts;
         if (sqlStatements.size() != 1) {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,

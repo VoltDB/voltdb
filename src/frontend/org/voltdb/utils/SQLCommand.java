@@ -779,13 +779,14 @@ public class SQLCommand
                 if (statementMatcher.matches()) {
                     inMultiStmtProc = true;
                 }
-            } else {
-                // check if the multi statement procedure ended
-                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(statement.toString() + line);
-                if (statementMatcher.matches()) {
-                    inMultiStmtProc = false;
-                }
             }
+//            else {
+//                // check if the multi statement procedure ended
+//                Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(statement.toString() + line);
+//                if (statementMatcher.matches()) {
+//                    inMultiStmtProc = false;
+//                }
+//            }
 
             if ( ! statementStarted) {
                 if (line.trim().equals("") || SQLParser.isWholeLineComment(line)) {
@@ -877,7 +878,9 @@ public class SQLCommand
     private static void executeStatements(String statements, DDLParserCallback callback, int lineNum)
     {
         // TODO: send back incomplete statements?
-        List<String> parsedStatements = SQLParser.parseQuery(statements);
+        SplitStmtResults parsedOutput = SQLParser.parseQuery(statements);
+//        List<String> parsedStatements = SQLParser.parseQuery(statements);
+        List<String> parsedStatements = parsedOutput.completelyParsedStmts;
         for (String statement: parsedStatements) {
             executeStatement(statement, callback, lineNum);
         }
@@ -1389,7 +1392,7 @@ public class SQLCommand
         try {
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
             getInteractiveQueries(reader);
-            return SQLParser.parseQuery(m_testFrontEndResult);
+            return SQLParser.parseQuery(m_testFrontEndResult).completelyParsedStmts;
         } catch (Exception ioe) {}
         return null;
     }
@@ -1456,7 +1459,7 @@ public class SQLCommand
                 kerberos = "VoltDBClient";
             }
             else if (arg.startsWith("--query=")) {
-                List<String> argQueries = SQLParser.parseQuery(arg.substring(8));
+                List<String> argQueries = SQLParser.parseQuery(arg.substring(8)).completelyParsedStmts;
                 if (!argQueries.isEmpty()) {
                     if (queries == null) {
                         queries = argQueries;
