@@ -29,12 +29,14 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
@@ -134,6 +136,8 @@ public class ExportManager
     private int m_exportTablesCount = 0;
 
     private int m_connCount = 0;
+
+    private final ExecutorService m_dataProcessorHandler = CoreUtils.getSingleThreadExecutor("ImportProcessor");
 
     /*
      * Issue a permit when a generation is drained so that when we are truncating if a generation
@@ -341,10 +345,7 @@ public class ExportManager
             boolean isRejoin) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
-            ExportDataProcessor newProcessor = null;
-            final Class<?> loaderClass = Class.forName(m_loaderClass);
-            newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-            newProcessor.addLogger(exportLog);
+            ExportDataProcessor newProcessor = getNewProcessor();
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
 
@@ -557,16 +558,46 @@ public class ExportManager
         if (m_processor.get() == null) {
             exportLog.info("First stream created processor will be initialized: " + m_loaderClass);
             createInitialExportProcessor(catalogContext, connectors, false, partitions, false);
-        } else {
-            // TODO: generation rolling used setExportGeneration() and startPolling(); do we need to call startPolling() for any reason?
-            m_processor.get().setProcessorConfig(m_processorConfig);
-            // override m_generation with itself to activate all the ExportDataSource
-            m_processor.get().setExportGeneration(generation);
-            m_processor.get().readyForData(false);
-            for( Integer partitionId: m_masterOfPartitions) {
-                generation.acceptMastershipTask(partitionId);
-            }
         }
+        else {
+            // install new processor
+            swapWithNewProcessor(generation);
+        }
+    }
+
+    private  ExportDataProcessor getNewProcessor() throws ClassNotFoundException, InstantiationException, IllegalAccessException {
+        final Class<?> loaderClass = Class.forName(m_loaderClass);
+        ExportDataProcessor newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+        newProcessor.addLogger(exportLog);
+        return newProcessor;
+    }
+
+    // remove and install new processor
+    private void swapWithNewProcessor(ExportGeneration generation) {
+        java.util.concurrent.Future<?> task = m_dataProcessorHandler.submit(new Runnable() {
+
+            @Override
+            public void run() {
+
+                ExportDataProcessor newProcessor = null;
+                try {
+                    newProcessor = getNewProcessor();
+                }
+                catch (Exception crash) {
+                    VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
+                }
+                newProcessor.setProcessorConfig(m_processorConfig);
+                // override m_generation with itself to activate all the ExportDataSource
+                newProcessor.setExportGeneration(generation);
+                newProcessor.readyForData(false);
+                ExportDataProcessor oldProcessor = m_processor.getAndSet(newProcessor);
+                oldProcessor.shutdown();
+
+            }
+        });
+
+//        task.get();
+
     }
 
     public void shutdown() {
