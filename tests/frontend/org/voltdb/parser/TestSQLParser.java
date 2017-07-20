@@ -40,6 +40,7 @@ import org.voltdb.parser.SQLParser.ExecuteCallResults;
 import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.SplitStmtResults;
 
 import com.google_voltpatches.common.base.Joiner;
 
@@ -363,108 +364,115 @@ public class TestSQLParser extends TestCase {
         assertEquals(null, SQLParser.parseFileStatement(""));
     }
 
-    private void checkSplitter(final String strIn, final String... strsCmp) {
-        final List<String> strsOut = SQLParser.parseQuery(strIn).completelyParsedStmts;
-        assertEquals(strsCmp.length, strsOut.size());
-        for (int i = 0; i < strsCmp.length; ++i) {
-            assertEquals(strsCmp[i], strsOut.get(i));
-        }
-    }
-//    public void testParseMultiStmtProc() {
-//        List<String> queriesOut = null;
-//
-//        // The test sql queries include a semi colon at the end. If the statement has been
-//        // parsed completely, the semi colon will be removed and the statement is returned
-//        // parsing removes the last semi colon
-//        String sql = "CREATE PROCEDURE foo as SELECT * from t;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; "
-//                + "SELECT * from t; END;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        // checking case sensitive
+    // no need to test here since the same parser function is used
+    public void testParseMultiStmtProc() {
+        List<String> queriesOut = null;
+
+        // The test sql queries include a semi colon at the end. If the statement has been
+        // parsed completely, the semi colon will be removed and the statement is returned
+        // parsing removes the last semi colon
+        String sql = "CREATE PROCEDURE foo as SELECT * from t;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; "
+                + "SELECT * from t; END;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // checking case sensitive
+        sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
+                + "SELECT * from t; end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // multi stmt procedure with single quoted string
+        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; "
+                + "SELECT * from t where a = ‘abced’; END;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        sql = "CREATE PROCEDURE foo AS "
+                + "BEGIN "
+                + "SELECT * from t; "
+                + "SELECT * from t; "
+                + "END; "
+                + "abc";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(2, queriesOut.size());
+        assertEquals("CREATE PROCEDURE foo AS "
+                + "BEGIN "
+                + "SELECT * from t; "
+                + "SELECT * from t; "
+                + "END", queriesOut.get(0));
+        assertEquals("abc", queriesOut.get(1));
+
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // semi colon in quoted strings
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'beg;in' or f = 'END;';"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // partition clause
+        sql = "create procedure thisproc "
+                + "partition on table t column a parameter 1 "
+                + "allow operator as "
+                + "begin "
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'beg;in' or f = 'END;';"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // incomplete statement
+        sql = "create procedure thisproc "
+                + "partition on table t column a parameter 1 "
+                + "allow operator as "
+                + "begin "
+                + "select * from t;"
+                + "select * from r where f = 'foo';";
+
+        SplitStmtResults parsedOut = SQLParser.parseQuery(sql);
+        queriesOut = parsedOut.completelyParsedStmts;
+        assertEquals(0, queriesOut.size());
+        assertEquals(sql, parsedOut.incompleteStmt);
+
+        // multiple mutli stmt procs
 //        sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
 //                + "SELECT * from t; end;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        // multi stmt procedure with single quoted string
-//        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; "
-//                + "SELECT * from t where a = ‘abced’; END;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        sql = "CREATE PROCEDURE foo AS "
-//                + "BEGIN "
-//                + "SELECT * from t; "
-//                + "SELECT * from t; "
-//                + "END; "
-//                + "abc";
-//        queriesOut = SQLParser.parseQuery(sql);
+//        queriesOut = SQLParser.parseQuery(sql + sql);
 //        assertEquals(2, queriesOut.size());
-//        assertEquals("CREATE PROCEDURE foo AS "
-//                + "BEGIN "
-//                + "SELECT * from t; "
-//                + "SELECT * from t; "
-//                + "END", queriesOut.get(0));
-//        assertEquals("abc", queriesOut.get(1));
-//
-//        sql = "create procedure thisproc as "
-//                + "begin "
-//                + "select * from t;"
-//                + "select * from r where f = 'foo';"
-//                + "select * from r where f = 'begin' or f = 'END';"
-//                + "end;";
+//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(1));
+
+//        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t;";
 //        queriesOut = SQLParser.parseQuery(sql);
 //        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        // semi colon in quoted strings
-//        sql = "create procedure thisproc as "
-//                + "begin "
-//                + "select * from t;"
-//                + "select * from r where f = 'foo';"
-//                + "select * from r where f = 'beg;in' or f = 'END;';"
-//                + "end;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        // partition clause
-//        sql = "create procedure thisproc "
-//                + "partition on table t column a parameter 1 "
-//                + "allow operator as "
-//                + "begin "
-//                + "select * from t;"
-//                + "select * from r where f = 'foo';"
-//                + "select * from r where f = 'beg;in' or f = 'END;';"
-//                + "end;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        // multiple mutli stmt procs
-////        sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
-////                + "SELECT * from t; end;";
-////        queriesOut = SQLParser.parseQuery(sql + sql);
-////        assertEquals(2, queriesOut.size());
-////        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-////        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(1));
-//
-////        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t;";
-////        queriesOut = SQLParser.parseQuery(sql);
-////        assertEquals(1, queriesOut.size());
-////        assertEquals(sql, queriesOut.get(0));
-//
-//    }
-//
+//        assertEquals(sql, queriesOut.get(0));
+
+    }
+
 //    public void testParseMultiStmtProcWithComments() {
 //        List<String> queriesOut = null;
 //
@@ -544,94 +552,102 @@ public class TestSQLParser extends TestCase {
 //        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
 //    }
 //
-//    @Test
-//    public void testProcSQLSplitWithCase() {
-//        List<String> queriesOut = null;
-//
-//        String sql = "create procedure thisproc as "
-//                + "begin "
-//                + "SELECT a, "
-//                + "CASE WHEN a > 100.00 "
-//                + "THEN 'Expensive' "
-//                + "ELSE 'Cheap' "
-//                + "END "
-//                + "FROM t; "
-//                + "end;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        sql = "create procedure thisproc as "
-//                + "begin \n"
-//                + "select * from t; /*comment will still exist*/"
-//                + "select * from r where f = 'foo';"
-//                + "select * from r where f = 'begin' or f = 'END';"
-//                + "select a, "
-//                + "case when a > 100.00 then 'Expensive' else 'Cheap' end "
-//                + "from t;"
-//                + "end;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        // nested CASE-WHEN-THEN-ELSE-END
-//        sql = "create procedure thisproc as "
-//                + "begin \n"
-//                + "select * from t; /*comment will still exist*/"
-//                + "select * from r where f = 'foo';"
-//                + "select * from r where f = 'begin' or f = 'END';"
-//                + "select a, "
-//                + "case when a > 100.00 then "
-//                + "case when a > 1000.00 then 'Super Expensive' else 'Pricy' end "
-//                + "'Expensive' else 'Cheap' end "
-//                + "from t;"
-//                + "end;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//     // case with no whitespace before it
-//        sql = "create procedure thisproc as "
-//                + "begin "
-//                + "SELECT a, "
-//                + "100+CASE WHEN a > 100.00 "
-//                + "THEN 10 "
-//                + "ELSE 5 "
-//                + "END "
-//                + "FROM t; "
-//                + "end;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        // case/end with no whitespace before and after it
-//        sql = "create procedure thisproc as "
-//                + "begin "
-//                + "SELECT a, "
-//                + "select case when id < 0 then (id+0)end+100 from aaa;"
-//                + "end;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        sql = "create procedure mumble as begin "
-//                + "select * from t order by case when t.a < 1 then t.a + 100 else t.a end; "
-//                + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end; "
-//                + "end;";
-//        queriesOut = SQLParser.parseQuery(sql);
-//        assertEquals(1, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//
-//        String sql1 = "select * from R;";
-//        sql = "create procedure mumble as begin "
-//                + "select * from t order by case when t.a < 1 then t.a + 100 else t.a end; "
-//                + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end; "
-//                + "end;";
-//        queriesOut = SQLParser.parseQuery(sql+sql1);
-//        assertEquals(2, queriesOut.size());
-//        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
-//        assertEquals(sql1.substring(0, sql1.length() - 1), queriesOut.get(1));
-//    }
+    @Test
+    public void testProcSQLSplitWithCase() {
+        List<String> queriesOut = null;
+
+        String sql = "create procedure thisproc as "
+                + "begin "
+                + "SELECT a, "
+                + "CASE WHEN a > 100.00 "
+                + "THEN 'Expensive' "
+                + "ELSE 'Cheap' "
+                + "END "
+                + "FROM t; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        sql = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t; /*comment will still exist*/"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "select a, "
+                + "case when a > 100.00 then 'Expensive' else 'Cheap' end "
+                + "from t;"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // nested CASE-WHEN-THEN-ELSE-END
+        sql = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t; /*comment will still exist*/"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "select a, "
+                + "case when a > 100.00 then "
+                + "case when a > 1000.00 then 'Super Expensive' else 'Pricy' end "
+                + "'Expensive' else 'Cheap' end "
+                + "from t;"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+     // case with no whitespace before it
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "SELECT a, "
+                + "100+CASE WHEN a > 100.00 "
+                + "THEN 10 "
+                + "ELSE 5 "
+                + "END "
+                + "FROM t; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        // case/end with no whitespace before and after it
+        sql = "create procedure thisproc as "
+                + "begin "
+                + "SELECT a, "
+                + "select case when id < 0 then (id+0)end+100 from aaa;"
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        sql = "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then t.a + 100 else t.a end; "
+                + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
+        assertEquals(1, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+
+        String sql1 = "select * from R;";
+        sql = "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then t.a + 100 else t.a end; "
+                + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end; "
+                + "end;";
+        queriesOut = SQLParser.parseQuery(sql+sql1).completelyParsedStmts;
+        assertEquals(2, queriesOut.size());
+        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+        assertEquals(sql1.substring(0, sql1.length() - 1), queriesOut.get(1));
+
+        sql = "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then t.a + 100 else t.a end; "
+                + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end;";
+        SplitStmtResults parsedOut = SQLParser.parseQuery(sql);
+        queriesOut = parsedOut.completelyParsedStmts;
+        assertEquals(0, queriesOut.size());
+        assertEquals(sql, parsedOut.incompleteStmt);
+    }
 
     private static final Pattern RequiredWhitespace = Pattern.compile("\\s+");
     /**
