@@ -1,4 +1,0 @@
-## Instructions
-- Make sure the voltdb/bin is in your PATH
-- In one terminal, run `./run.sh prepare` followed by `./run.sh start`
-- In the 2nd terminal, run `./run.sh load` followed by `./run.sh client`

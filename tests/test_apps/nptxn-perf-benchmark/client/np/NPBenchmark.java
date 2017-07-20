@@ -97,8 +97,8 @@ class NPBenchmark {
         String statsfile = "stats";
 
         // New options
-        @Option(desc = "Percentage of NP transactions compared to SP txns")
-        double scale = 0.5;
+        @Option(desc = "Percentage of SP transactions compared to NP txns")
+        double sprate = 0.5;
 
         @Option(desc = "Number of Cards")
         int cardcount = 500000;
@@ -111,12 +111,24 @@ class NPBenchmark {
 
         @Override
         public void validate() {
-            if (scale >= 1 || scale <= 0) {
-                exitWithMessageAndUsage("Invalid scale...");
+            if (sprate > 1 || sprate < 0) {
+                exitWithMessageAndUsage("Invalid sprate...");
             }
 
             if (cardcount <= 0)
                 exitWithMessageAndUsage("Invalid cardcount...");
+
+            if (mprate > 1 || mprate < 0) {
+                exitWithMessageAndUsage("Invalid mprate...");
+            }
+
+            if (skew < 0 || skew >= 1) {
+                exitWithMessageAndUsage("Invalid skew...");
+            }
+
+            if (duration <= 0) {
+                exitWithMessageAndUsage("Invalid duration...");
+            }
         }
     }
 
@@ -357,57 +369,54 @@ class NPBenchmark {
      */
     public void iterate() throws Exception {
         double range = ((double) config.cardcount - 1) * (1.0 - config.skew);
-        int id = rand.nextInt((int) range);
-        String pan = Integer.toString(id);
-
-        client.callProcedure(new ProcCallback("Authorize"),
-                             "Authorize",
-                             pan,
-                             25,
-                             "USD"
-                             );
-
-        pan = Integer.toString(rand.nextInt((int) range));
-        client.callProcedure(new ProcCallback("Redeem"),
-                             "Redeem",
-                             pan,
-                             25,
-                             "USD",
-                             1
-                             );
 
         for (int i = 0; i < 2; i++) {
-            // 2p txn
-            if (rand.nextDouble() < config.scale) {
-                int id1 = rand.nextInt((int) range);
-                int id2 = rand.nextInt((int) range);
+            // 2P transaction
+            String pan1 = generate16DString(rand.nextInt((int) range));
+            String pan2 = generate16DString(rand.nextInt((int) range));
 
-                String pan1 = generate16DString(id1);
-                String pan2 = generate16DString(id2);
+            client.callProcedure(new ProcCallback("Transfer",10000),
+                                    "Transfer",
+                                    pan1,
+                                    pan2,
+                                    1,
+                                    "USD"
+                                    );
 
-                client.callProcedure(new ProcCallback("Transfer",10000),
-                                     "Transfer",
-                                     pan1,
-                                     pan2,
-                                     1,
-                                     "USD"
-                                     );
-            }
-
-            // mp txn
             if (rand.nextDouble() < config.mprate) {
+                // MP transaction
                 int id1 = rand.nextInt((int) range);
                 int id2 = id1 + 2000 < config.cardcount ?
                           id1 + 2000 : config.cardcount - 1;
 
-                String pan1 = generate16DString(id1);
-                String pan2 = generate16DString(id2);
+                pan1 = generate16DString(id1);
+                pan2 = generate16DString(id2);
 
                 client.callProcedure(new ProcCallback("Select"),
                                      "Select",
                                      pan1,
                                      pan2);
             }
+        }
+
+        // SP transaction
+        if (rand.nextDouble() < config.sprate) {
+            String pan1 = generate16DString(rand.nextInt((int) range));
+            String pan2 = generate16DString(rand.nextInt((int) range));
+
+            client.callProcedure(new ProcCallback("Authorize"),
+                                 "Authorize",
+                                 pan1,
+                                 1,
+                                 "USD"
+                                 );
+            client.callProcedure(new ProcCallback("Redeem"),
+                                 "Redeem",
+                                 pan1,
+                                 1,
+                                 "USD",
+                                 1
+                                 );
         }
     }
 

@@ -60,9 +60,28 @@ public class Select extends VoltProcedure {
     public final SQLStmt selActv = new SQLStmt("SELECT * FROM card_activity WHERE pan >= ? and pan < ?;");
 
     public long run (String start, String end) {
+        int startPan = Integer.parseInt(start);
+        int endPan = Integer.parseInt(end);
+
+        double totalBalance = 0;
+        double totalTransfer = 0;
+
         voltQueueSQL(selAcct, EXPECT_NON_EMPTY, start, end);
         voltQueueSQL(selActv, start, end);
         VoltTable results[] = voltExecuteSQL(true);
-        return 1;
+
+        // Do a random lookup query and see if the total
+        // transfer amount is larger than the total balance
+        VoltTable tb1 = results[0];
+        while (tb1.advanceRow()) {
+            totalBalance += tb1.getDouble(3);
+        }
+
+        VoltTable tb2 = results[1];
+        while (tb2.advanceRow()) {
+            totalTransfer += tb2.getDouble(4);
+        }
+
+        return totalTransfer > totalBalance ? 1 : 0;
     }
 }

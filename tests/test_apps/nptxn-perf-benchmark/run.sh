@@ -30,9 +30,10 @@ SERVERS="localhost"
 PROCS_JAR_NAME="np-procs.jar"
 BENCHMARK_JAR_NAME="np-benchmark.jar"
 
-# remove binaries, logs, runtime artifacts, etc... but keep the jars
+# remove binaries, logs, runtime artifacts, etc...
 function cleanUp() {
     rm -f client/np/*.class procs/np/*.class
+    rm -f *.jar
 }
 
 #################################
@@ -83,7 +84,7 @@ function client() {
     load
     java -classpath $BENCHMARK_JAR_NAME:$CLIENTCLASSPATH np.NPBenchmark \
          --servers="$SERVERS" \
-         --scale=0.6 \
+         --sprate=0.6 \
          --cardcount=500000 \
          --mprate=0.02 \
          --skew=0.0 \
