@@ -2401,8 +2401,11 @@ var loadPage = function (serverName, portid) {
             var isMultiple= false;
             var i =0;
             var containLongName = false;
-            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
+
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                 $("#spanAnalysisLegend").hide();
+                 $("#execTimeLegend").hide();
+            }
 
             getTooltipValues(procedureName);
 
@@ -2420,7 +2423,6 @@ var loadPage = function (serverName, portid) {
                     else{
                         newStatement = item.STATEMENT;
                     }
-
                     var comp1 = newStatement.indexOf(') ') !== -1 ? newStatement.split(') ')[1]: newStatement;
                     var comp2 = statement.indexOf(') ') !== -1 ? statement.split(') ')[1]: statement;
                     if (comp1 == comp2){
@@ -2455,7 +2457,7 @@ var loadPage = function (serverName, portid) {
 
                 }
             });
-
+            debugger;
             if($.isEmptyObject(procDetails)){
                 $("#spanAnalysisLegend").hide();
                 $("#execTimeLegend").hide();
@@ -2501,6 +2503,12 @@ var loadPage = function (serverName, portid) {
             var freqDetails = {};
             var i =0;
             var containLongName = false;
+
+
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                $("#spanFreqLegend").hide();
+                $("#freqLegend").hide();
+            }
 
             getTooltipValues(procedureName);
 
@@ -2574,11 +2582,17 @@ var loadPage = function (serverName, portid) {
             var finalDetails = [];
             var i=0;
             var containLongName = false;
-            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var invocations = 0;
+
+            debugger;
+
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                 $("#spanCombinedLegend").hide();
+                 $("#totalProcTimeLegend").hide();
+            }
 
             getTooltipValues(procedureName);
+
+
 
             for (var key in VoltDbAnalysis.combinedDetail){
 
