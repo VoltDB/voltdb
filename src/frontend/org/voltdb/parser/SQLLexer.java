@@ -343,6 +343,11 @@ public class SQLLexer extends SQLPatternFactory
      */
     public static List<String> splitStatements(final String sql) {
         List<String> statements = new ArrayList<>();
+
+        // strip out comments
+        String sqlNoComments = SQLParser.AnyWholeLineComments.matcher(sql).replaceAll("");
+        sqlNoComments = SQLParser.EndOfLineComment.matcher(sqlNoComments).replaceAll("");
+        // TODO: use sqlNoComments instead of sql
         // Use a character array for efficient character-at-a-time scanning.
         char[] buf = sql.toCharArray();
         // Set to null outside of quoted segments or the quote character inside them.
@@ -360,6 +365,7 @@ public class SQLLexer extends SQLPatternFactory
         boolean inBegin = false;
         // To indicate if inside CASE .. WHEN
         int inCase = 0;
+        // TODO: remove the bufStr and use sqlNoComments
         // needed for string region matching
         String bufStr = new String(buf);
         int iCur = 0;

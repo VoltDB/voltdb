@@ -466,9 +466,15 @@ public class TestSQLParser extends TestCase {
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'begin' or f = 'END';"
                 + "end;";
+        String expected = "create procedure thisproc as "
+                + "begin \n"
+                + "select * from t;"
+                + "select * from r where f = 'foo';"
+                + "select * from r where f = 'begin' or f = 'END';"
+                + "end";
         queriesOut = SQLParser.parseQuery(sql);
         assertEquals(1, queriesOut.size());
-        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
+        assertEquals(expected, queriesOut.get(0));
 
         sql = "create procedure thisproc as "
                 + "begin \n"
