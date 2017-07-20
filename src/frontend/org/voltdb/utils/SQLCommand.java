@@ -876,6 +876,7 @@ public class SQLCommand
     //
     private static void executeStatements(String statements, DDLParserCallback callback, int lineNum)
     {
+        // TODO: send back incomplete statements?
         List<String> parsedStatements = SQLParser.parseQuery(statements);
         for (String statement: parsedStatements) {
             executeStatement(statement, callback, lineNum);
