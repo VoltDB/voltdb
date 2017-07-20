@@ -668,7 +668,7 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time" || d.series[0].key == "Total Processing Time")
+                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time" || d.series[0].key == "Total Processing Time" || d.series[0].key == "Processing Time Detail")
                             unit = " ms"
                         else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail")
                             unit = ""
@@ -701,7 +701,7 @@
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
                     } else {
                         var keyName = d.series[0].key;
-                        keyName = (keyName == "Frequency Detail" ? "Frequency":(keyName == "Combined Detail" ? "Total Processing Time" : keyName));
+                        keyName = (keyName == "Frequency Detail" ? "Frequency":(keyName == "Processing Time Detail" ? "Total Processing Time" : keyName));
                         trowEnter.append("td")
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ keyName +"</span>" );
                     }
@@ -717,9 +717,9 @@
                     trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
-                } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Total Processing Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail") && chartContainer == null){
+                } else if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Total Processing Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Processing Time Detail") && chartContainer == null){
                     trowEnter.append("td")
-                        .html(function (p, i) { return (d.series[0].key != "Frequency"  && d.series[0].key != "Frequency Detail" ? (d.series[0].key == "Combined Detail" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
+                        .html(function (p, i) { return (d.series[0].key != "Frequency"  && d.series[0].key != "Frequency Detail" ? (d.series[0].key == "Processing Time Detail" ? p.value.toFixed(3) : p.value.toFixed(6)) : p.value)+ unit });
                 } else {
                     trowEnter.append("td")
                         .classed("value", true)
@@ -740,6 +740,7 @@
                             .style("border-top-color", opacityScale(opacity));
                     }
                 });
+
                 if((d.series[0].key == "Execution Time" || d.series[0].key == "Frequency" || d.series[0].key == "Total Processing Time") && chartContainer == null){
                     var trowEnter0 = tbodyEnter.selectAll("tr")
                     .append("tr");
@@ -794,7 +795,7 @@
                     }
                 }
 
-                if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Combined Detail") && chartContainer == null){
+                if((d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Processing Time Detail") && chartContainer == null){
                     var trowEnter1 = tbodyEnter.selectAll("tr")
                     .append("tr");
 

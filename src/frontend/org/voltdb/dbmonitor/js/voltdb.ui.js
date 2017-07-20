@@ -2410,7 +2410,8 @@ var loadPage = function (serverName, portid) {
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                 var newStatement = '';
                 var latValue;
-                $("#generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
+//                $("#generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
+
                 if(item.PROCEDURE == procedureName ){
                     containLongName = checkObjForLongStatementName(VoltDbAnalysis.latencyDetailValue, procedureName);
 
@@ -2462,6 +2463,15 @@ var loadPage = function (serverName, portid) {
                 }
             });
 
+            if($.isEmptyObject(procDetails)){
+                $("#spanAnalysisLegend").hide();
+                $("#execTimeLegend").hide();
+            }
+            else{
+                $("#spanAnalysisLegend").show();
+                $("#execTimeLegend").show();
+            }
+
             var k=0;
             for (var key in procDetails){
                 if(containLongName){
@@ -2509,7 +2519,7 @@ var loadPage = function (serverName, portid) {
                 //order items w.r.to latency
                 var latValue;
 
-                $(".generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
+//                $(".generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
                 if(item.PROCEDURE == procedureName ){
 
                     containLongName = checkObjForLongStatementName(VoltDbAnalysis.latencyDetailValue, procedureName);
@@ -2543,6 +2553,15 @@ var loadPage = function (serverName, portid) {
 
                 }
             });
+
+            if($.isEmptyObject(freqDetails)){
+                $("#spanFreqLegend").hide();
+                $("#freqLegend").hide();
+            }
+            else{
+                $("#spanFreqLegend").show();
+                $("#freqLegend").show();
+            }
 
             var k=0;
             for (var key in freqDetails){
@@ -2589,34 +2608,51 @@ var loadPage = function (serverName, portid) {
 
                     //Calculate sumOfEachProcedure
 //                    var sumOfEachProcedure = VoltDbUI.calculateCombinedDetailValue(obj);
-
                     obj.forEach(function(subItems){
                         if(subItems.STATEMENT == statement){
                             count = objectLength(obj, statement);
 
                             if(subItems.TYPE == "Single Partitioned"){
-                                combinedWeight += (subItems.AVG/1000000) * subItems.INVOCATIONS
+                                combinedWeight += subItems.AVG * subItems.INVOCATIONS
                             }
-                            else{
-                                combinedWeight += (subItems.AVG/1000000) * subItems.INVOCATIONS
+                            else{ //For Multi partitioned
+                                combinedWeight += subItems.AVG
                             }
+
+
                         }
                         else{
                             i++;
                             if(subItems.TYPE == "Single Partitioned"){
-                                combinedWeight = (subItems.AVG/1000000) * subItems.INVOCATIONS
+                                combinedWeight = subItems.AVG * subItems.INVOCATIONS
                             }
                             else{
-                                i++;
-                                combinedWeight = (subItems.AVG/1000000) * subItems.INVOCATIONS
+                                combinedWeight = subItems.AVG * subItems.INVOCATIONS
                             }
 
                         }
 
                         statement = subItems.STATEMENT;
-                        combinedDetails[subItems.STATEMENT]= combinedWeight;
-                        $(".generatedDate").html(VoltDbAnalysis.formatDateTime(subItems.TIMESTAMP));
+
+                        if(subItems.TYPE == "Single Partitioned"){
+                            combinedDetails[subItems.STATEMENT]= combinedWeight;
+                        }
+                        else{
+                            combinedWeight = (combinedWeight/count) * subItems.INVOCATIONS
+                            combinedDetails[subItems.STATEMENT]= combinedWeight;
+                        }
+//                        $(".generatedDate").html(VoltDbAnalysis.formatDateTime(subItems.TIMESTAMP));
                     })
+
+                    if($.isEmptyObject(combinedDetails)){
+                        $("#spanCombinedLegend").hide();
+                        $("#totalProcTimeLegend").hide();
+                    }
+                    else{
+                        $("#spanCombinedLegend").show();
+                        $("#totalProcTimeLegend").show();
+                    }
+
 
                     var k=0;
                     for (var key in combinedDetails){

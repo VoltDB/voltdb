@@ -386,7 +386,7 @@
         }]
 
         var dataCombinedDetailAnalysis = [{
-            key: "Combined Detail",
+            key: "Processing Time Detail",
             values: [],
             color: "rgb(118, 189, 29)"
         }]
