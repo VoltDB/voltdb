@@ -221,12 +221,12 @@ ENDIF()
 # Names of folders in the tree
 #
 ########################################################################
-EXECUTE_PROCESS(COMMAND bash -c "cd ${CMAKE_SOURCE_DIR}/tools/findvdbroot ${CMAKE_SOURCE_DIR}"
+EXECUTE_PROCESS(COMMAND bash -c "${CMAKE_SOURCE_DIR}/tools/findvdbroot.sh"
                 OUTPUT_VARIABLE VOLTDB_ROOT)
-# This is for our sources, relative to the source directory.
-SET (VOLTDB_EE_SRC_DIR ${CMAKE_SOURCE_DIR})
-# This is for test sources, relative to the source directory.
-SET(VOLTDB_EE_TEST_DIR ${VOLTDB_ROOT}/tests/ee)
+STRING(STRIP ${VOLTDB_ROOT} VOLTDB_ROOT)
+# This is for test sources.  It's absolute.  It ought to be
+# under src/ee but it's not.
+SET(VOLTDB_EE_TEST_DIR "${VOLTDB_ROOT}/tests/ee")
 # This is where test object files go, relative to the binary directory.
 SET(VOLTDB_EE_TEST_PROGRAM_DIR cpptests)
 
@@ -470,14 +470,15 @@ ExternalProject_Add(crypto
 # Go and build the S2GEO library.
 #
 ########################################################################
-SET (VOLTDB_S2GEO_SRC ${VOLTDB_THIRD_PARTY_CPP_DIR}/google-s2-geometry)
+SET (VOLTDB_S2GEO_SRC "${VOLTDB_THIRD_PARTY_CPP_DIR}/google-s2-geometry")
 SET (VOLTDB_S2GEO_OBJ ${VOLTDB_THIRD_PARTY_OBJ_DIR}/google-s2-geometry)
 SET (VOLTDB_S2GEO_CMAKE_CONFIG
   -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
-  -DVOLTDB_THIRD_PARTY_CPP_DIR=${CMAKE_SOURCE_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR}
+  -DVOLTDB_THIRD_PARTY_CPP_DIR=${VOLTDB_THIRD_PARTY_CPP_DIR}
   -DCMAKE_INSTALL_PREFIX=${VOLTDB_THIRD_PARTY_INSTALL_DIR}
   -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
 SET (VOLTDB_S2GEO_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR})
+
 ExternalProject_Add(s2geo
   DEPENDS crypto
   PREFIX ${VOLTDB_S2GEO_PREFIX}
@@ -491,163 +492,163 @@ ExternalProject_Add(s2geo
 #
 ########################################################################
 SET (VOLTDB_SRC
-  ${VOLTDB_EE_SRC_DIR}/catalog/catalog.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/catalogtype.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/cluster.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/column.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/columnref.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/connector.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/connectortableinfo.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/connectorproperty.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/constraint.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/constraintref.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/database.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/index.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/indexref.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/materializedviewhandlerinfo.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/materializedviewinfo.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/planfragment.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/statement.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/table.cpp
-  ${VOLTDB_EE_SRC_DIR}/catalog/tableref.cpp
-  ${VOLTDB_EE_SRC_DIR}/structures/ContiguousAllocator.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/FatalException.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/ThreadLocalPool.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/SegvException.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/SerializableEEException.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/SQLException.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/InterruptException.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/StringRef.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/tabletuple.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/TupleSchema.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/types.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/UndoLog.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/LargeTempTableBlockCache.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/NValue.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/RecoveryProtoMessage.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/RecoveryProtoMessageBuilder.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/executorcontext.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/serializeio.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/StreamPredicateList.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/Topend.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/TupleOutputStream.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/TupleOutputStreamProcessor.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/MiscUtil.cpp
-  ${VOLTDB_EE_SRC_DIR}/common/debuglog.cpp
-  ${VOLTDB_EE_SRC_DIR}/execution/FragmentManager.cpp
-  ${VOLTDB_EE_SRC_DIR}/execution/JNITopend.cpp
-  ${VOLTDB_EE_SRC_DIR}/execution/VoltDBEngine.cpp
-  ${VOLTDB_EE_SRC_DIR}/execution/ExecutorVector.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/OptimizedProjector.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/abstractexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/abstractjoinexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/aggregateexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/deleteexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/executorfactory.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/executorutil.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/indexcountexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/indexscanexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/insertexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/limitexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/materializedscanexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/materializeexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/mergereceiveexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/nestloopexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/nestloopindexexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/orderbyexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/windowfunctionexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/projectionexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/receiveexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/sendexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/seqscanexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/swaptablesexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/tablecountexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/tuplescanexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/unionexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/executors/updateexecutor.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/abstractexpression.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/expressionutil.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/functionexpression.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/geofunctions.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/operatorexpression.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/parametervalueexpression.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/scalarvalueexpression.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/subqueryexpression.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/tupleaddressexpression.cpp
-  ${VOLTDB_EE_SRC_DIR}/expressions/vectorexpression.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/abstractjoinnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/abstractoperationnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/abstractplannode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/abstractreceivenode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/abstractscannode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/aggregatenode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/deletenode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/indexscannode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/indexcountnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/tablecountnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/insertnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/limitnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/materializenode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/materializedscanplannode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/mergereceivenode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/nestloopindexnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/nestloopnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/orderbynode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/plannodefragment.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/plannodeutil.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/windowfunctionnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/projectionnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/receivenode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/SchemaColumn.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/sendnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/seqscannode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/swaptablesnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/tuplescannode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/unionnode.cpp
-  ${VOLTDB_EE_SRC_DIR}/plannodes/updatenode.cpp
-  ${VOLTDB_EE_SRC_DIR}/indexes/CoveringCellIndex.cpp
-  ${VOLTDB_EE_SRC_DIR}/indexes/IndexStats.cpp
-  ${VOLTDB_EE_SRC_DIR}/indexes/tableindex.cpp
-  ${VOLTDB_EE_SRC_DIR}/indexes/tableindexfactory.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/AbstractDRTupleStream.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/BinaryLogSink.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/BinaryLogSinkWrapper.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/ConstraintFailureException.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/constraintutil.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/CopyOnWriteContext.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/CopyOnWriteIterator.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/DRTupleStream.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/ElasticContext.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/ElasticIndex.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/ElasticIndexReadContext.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/ElasticScanner.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/ExportTupleStream.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/LargeTempTable.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/LargeTempTableBlock.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/MaterializedViewHandler.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/MaterializedViewTriggerForInsert.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/MaterializedViewTriggerForWrite.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/persistenttable.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/PersistentTableStats.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/RecoveryContext.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/streamedtable.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/StreamedTableStats.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/table.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/TableCatalogDelegate.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/tablefactory.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/TableStats.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/TableStreamer.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/TableStreamerContext.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/tableutil.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/tabletuplefilter.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/temptable.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/TempTableLimits.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/TupleBlock.cpp
-  ${VOLTDB_EE_SRC_DIR}/storage/TupleStreamBase.cpp
-  ${VOLTDB_EE_SRC_DIR}/stats/StatsAgent.cpp
-  ${VOLTDB_EE_SRC_DIR}/stats/StatsSource.cpp
-  ${VOLTDB_EE_SRC_DIR}/logging/JNILogProxy.cpp
-  ${VOLTDB_EE_SRC_DIR}/logging/LogManager.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/catalog.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/catalogtype.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/cluster.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/column.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/columnref.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/connector.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/connectortableinfo.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/connectorproperty.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/constraint.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/constraintref.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/database.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/index.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/indexref.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/materializedviewhandlerinfo.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/materializedviewinfo.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/planfragment.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/statement.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/table.cpp
+  ${CMAKE_SOURCE_DIR}/catalog/tableref.cpp
+  ${CMAKE_SOURCE_DIR}/structures/ContiguousAllocator.cpp
+  ${CMAKE_SOURCE_DIR}/common/FatalException.cpp
+  ${CMAKE_SOURCE_DIR}/common/ThreadLocalPool.cpp
+  ${CMAKE_SOURCE_DIR}/common/SegvException.cpp
+  ${CMAKE_SOURCE_DIR}/common/SerializableEEException.cpp
+  ${CMAKE_SOURCE_DIR}/common/SQLException.cpp
+  ${CMAKE_SOURCE_DIR}/common/InterruptException.cpp
+  ${CMAKE_SOURCE_DIR}/common/StringRef.cpp
+  ${CMAKE_SOURCE_DIR}/common/tabletuple.cpp
+  ${CMAKE_SOURCE_DIR}/common/TupleSchema.cpp
+  ${CMAKE_SOURCE_DIR}/common/types.cpp
+  ${CMAKE_SOURCE_DIR}/common/UndoLog.cpp
+  ${CMAKE_SOURCE_DIR}/common/LargeTempTableBlockCache.cpp
+  ${CMAKE_SOURCE_DIR}/common/NValue.cpp
+  ${CMAKE_SOURCE_DIR}/common/RecoveryProtoMessage.cpp
+  ${CMAKE_SOURCE_DIR}/common/RecoveryProtoMessageBuilder.cpp
+  ${CMAKE_SOURCE_DIR}/common/executorcontext.cpp
+  ${CMAKE_SOURCE_DIR}/common/serializeio.cpp
+  ${CMAKE_SOURCE_DIR}/common/StreamPredicateList.cpp
+  ${CMAKE_SOURCE_DIR}/common/Topend.cpp
+  ${CMAKE_SOURCE_DIR}/common/TupleOutputStream.cpp
+  ${CMAKE_SOURCE_DIR}/common/TupleOutputStreamProcessor.cpp
+  ${CMAKE_SOURCE_DIR}/common/MiscUtil.cpp
+  ${CMAKE_SOURCE_DIR}/common/debuglog.cpp
+  ${CMAKE_SOURCE_DIR}/execution/FragmentManager.cpp
+  ${CMAKE_SOURCE_DIR}/execution/JNITopend.cpp
+  ${CMAKE_SOURCE_DIR}/execution/VoltDBEngine.cpp
+  ${CMAKE_SOURCE_DIR}/execution/ExecutorVector.cpp
+  ${CMAKE_SOURCE_DIR}/executors/OptimizedProjector.cpp
+  ${CMAKE_SOURCE_DIR}/executors/abstractexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/abstractjoinexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/aggregateexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/deleteexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/executorfactory.cpp
+  ${CMAKE_SOURCE_DIR}/executors/executorutil.cpp
+  ${CMAKE_SOURCE_DIR}/executors/indexcountexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/indexscanexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/insertexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/limitexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/materializedscanexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/materializeexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/mergereceiveexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/nestloopexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/nestloopindexexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/orderbyexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/windowfunctionexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/projectionexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/receiveexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/sendexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/seqscanexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/swaptablesexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/tablecountexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/tuplescanexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/unionexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/executors/updateexecutor.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/abstractexpression.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/expressionutil.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/functionexpression.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/geofunctions.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/operatorexpression.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/parametervalueexpression.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/scalarvalueexpression.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/subqueryexpression.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/tupleaddressexpression.cpp
+  ${CMAKE_SOURCE_DIR}/expressions/vectorexpression.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/abstractjoinnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/abstractoperationnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/abstractplannode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/abstractreceivenode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/abstractscannode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/aggregatenode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/deletenode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/indexscannode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/indexcountnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/tablecountnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/insertnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/limitnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/materializenode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/materializedscanplannode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/mergereceivenode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/nestloopindexnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/nestloopnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/orderbynode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/plannodefragment.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/plannodeutil.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/windowfunctionnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/projectionnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/receivenode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/SchemaColumn.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/sendnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/seqscannode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/swaptablesnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/tuplescannode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/unionnode.cpp
+  ${CMAKE_SOURCE_DIR}/plannodes/updatenode.cpp
+  ${CMAKE_SOURCE_DIR}/indexes/CoveringCellIndex.cpp
+  ${CMAKE_SOURCE_DIR}/indexes/IndexStats.cpp
+  ${CMAKE_SOURCE_DIR}/indexes/tableindex.cpp
+  ${CMAKE_SOURCE_DIR}/indexes/tableindexfactory.cpp
+  ${CMAKE_SOURCE_DIR}/storage/AbstractDRTupleStream.cpp
+  ${CMAKE_SOURCE_DIR}/storage/BinaryLogSink.cpp
+  ${CMAKE_SOURCE_DIR}/storage/BinaryLogSinkWrapper.cpp
+  ${CMAKE_SOURCE_DIR}/storage/ConstraintFailureException.cpp
+  ${CMAKE_SOURCE_DIR}/storage/constraintutil.cpp
+  ${CMAKE_SOURCE_DIR}/storage/CopyOnWriteContext.cpp
+  ${CMAKE_SOURCE_DIR}/storage/CopyOnWriteIterator.cpp
+  ${CMAKE_SOURCE_DIR}/storage/DRTupleStream.cpp
+  ${CMAKE_SOURCE_DIR}/storage/ElasticContext.cpp
+  ${CMAKE_SOURCE_DIR}/storage/ElasticIndex.cpp
+  ${CMAKE_SOURCE_DIR}/storage/ElasticIndexReadContext.cpp
+  ${CMAKE_SOURCE_DIR}/storage/ElasticScanner.cpp
+  ${CMAKE_SOURCE_DIR}/storage/ExportTupleStream.cpp
+  ${CMAKE_SOURCE_DIR}/storage/LargeTempTable.cpp
+  ${CMAKE_SOURCE_DIR}/storage/LargeTempTableBlock.cpp
+  ${CMAKE_SOURCE_DIR}/storage/MaterializedViewHandler.cpp
+  ${CMAKE_SOURCE_DIR}/storage/MaterializedViewTriggerForInsert.cpp
+  ${CMAKE_SOURCE_DIR}/storage/MaterializedViewTriggerForWrite.cpp
+  ${CMAKE_SOURCE_DIR}/storage/persistenttable.cpp
+  ${CMAKE_SOURCE_DIR}/storage/PersistentTableStats.cpp
+  ${CMAKE_SOURCE_DIR}/storage/RecoveryContext.cpp
+  ${CMAKE_SOURCE_DIR}/storage/streamedtable.cpp
+  ${CMAKE_SOURCE_DIR}/storage/StreamedTableStats.cpp
+  ${CMAKE_SOURCE_DIR}/storage/table.cpp
+  ${CMAKE_SOURCE_DIR}/storage/TableCatalogDelegate.cpp
+  ${CMAKE_SOURCE_DIR}/storage/tablefactory.cpp
+  ${CMAKE_SOURCE_DIR}/storage/TableStats.cpp
+  ${CMAKE_SOURCE_DIR}/storage/TableStreamer.cpp
+  ${CMAKE_SOURCE_DIR}/storage/TableStreamerContext.cpp
+  ${CMAKE_SOURCE_DIR}/storage/tableutil.cpp
+  ${CMAKE_SOURCE_DIR}/storage/tabletuplefilter.cpp
+  ${CMAKE_SOURCE_DIR}/storage/temptable.cpp
+  ${CMAKE_SOURCE_DIR}/storage/TempTableLimits.cpp
+  ${CMAKE_SOURCE_DIR}/storage/TupleBlock.cpp
+  ${CMAKE_SOURCE_DIR}/storage/TupleStreamBase.cpp
+  ${CMAKE_SOURCE_DIR}/stats/StatsAgent.cpp
+  ${CMAKE_SOURCE_DIR}/stats/StatsSource.cpp
+  ${CMAKE_SOURCE_DIR}/logging/JNILogProxy.cpp
+  ${CMAKE_SOURCE_DIR}/logging/LogManager.cpp
 )
 
 SET (VOLTDB_THIRD_PARTY_SRC
@@ -659,10 +660,10 @@ SET (VOLTDB_THIRD_PARTY_SRC
 )
 
 SET (VOLTDB_JNI_SRC
-  ${VOLTDB_EE_SRC_DIR}/voltdbjni.cpp
+  ${CMAKE_SOURCE_DIR}/voltdbjni.cpp
   )
 SET (VOLTDB_IPC_SRC
-  ${VOLTDB_EE_SRC_DIR}/voltdbipc.cpp
+  ${CMAKE_SOURCE_DIR}/voltdbipc.cpp
 )
 ADD_LIBRARY(voltdbobjs OBJECT ${VOLTDB_SRC})
 ADD_LIBRARY(voltdbjniobjs OBJECT ${VOLTDB_JNI_SRC})
@@ -678,21 +679,21 @@ TARGET_INCLUDE_DIRECTORIES(voltdbobjs
   ${VOLTDB_THIRD_PARTY_CPP_DIR})
 TARGET_INCLUDE_DIRECTORIES(voltdbobjs
   PUBLIC
-  ${VOLTDB_EE_SRC_DIR}
+  ${CMAKE_SOURCE_DIR}
   ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
 TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
   SYSTEM PUBLIC
   ${VOLTDB_THIRD_PARTY_CPP_DIR})
 TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
   PUBLIC
-  ${VOLTDB_EE_SRC_DIR}
+  ${CMAKE_SOURCE_DIR}
   ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
 TARGET_INCLUDE_DIRECTORIES(voltdbjniobjs
   SYSTEM PUBLIC
   ${VOLTDB_THIRD_PARTY_CPP_DIR})
 TARGET_INCLUDE_DIRECTORIES(voltdbjniobjs
   PUBLIC
-  ${VOLTDB_EE_SRC_DIR}
+  ${CMAKE_SOURCE_DIR}
   ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
 TARGET_INCLUDE_DIRECTORIES(third_party_objs
   SYSTEM PUBLIC
@@ -850,7 +851,7 @@ TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
   SYSTEM PUBLIC
   ${VOLTDB_THIRD_PARTY_CPP_DIR}
   PUBLIC
-  ${VOLTDB_EE_SRC_DIR}
+  ${CMAKE_SOURCE_DIR}
   ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
 
 #
@@ -877,69 +878,18 @@ FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
 ENDFOREACH()
 
 SET (VOLTDB_TEST_WORKING_DIR ${VOLTDB_TEST_DIR}/test_working_dir)
-FUNCTION(VALGRIND_FILE_NAME TARGET_DIR TARGET_NAME OUTPUT_VAR)
-  SET(${OUTPUT_VAR} valgrind_ee_${TARGET_DIR}_${TARGET_NAME}.xml PARENT_SCOPE)
-ENDFUNCTION()
 
-function(JOIN VALUES GLUE OUTPUT)
-  string (REPLACE ";" "${GLUE}" _TMP_STR "${VALUES}")
-  set (${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
-endfunction()
+INCLUDE(VoltDB.cmake)
 
-FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD WILL_FAIL OUTPUT_VAR)
-  SET(SUPPRESSIONS ${CMAKE_SOURCE_DIR}/${VOLTDB_EE_TEST_DIR}/test_utils/vdbsuppressions.supp)
-  IF ( WILL_FAIL )
-    SET(FAIL_ARG --expect-fail=true)
-  ELSE()
-    SET(FAIL_ARG --expect-fail=false)
-  ENDIF()
-  IF ( IS_VALGRIND_BUILD )
-    VALGRIND_FILE_NAME(${TARGET_DIR} ${TARGET_NAME} VGFN)
-    SET(CMD_LIST
-      ${CMAKE_SOURCE_DIR}/tools/runvalgrindtest.py
-      ${FAIL_ARG}
-      "/usr/bin/env"
-      "valgrind"
-      "--leak-check=full"
-      "--show-reachable=yes"
-      "--error-exitcode=1"
-      "--suppressions=${SUPPRESSIONS}"
-      "--xml=yes"
-      "--xml-file=${VGFN}"
-      ${TEST_EXE_CMD})
-    SET(${OUTPUT_VAR}
-      ${CMD_LIST}
-      PARENT_SCOPE)
-  ELSE()
-    SET(${OUTPUT_VAR} ${TEST_EXE_CMD} PARENT_SCOPE)
-  ENDIF()
-ENDFUNCTION()
-
-#
-# Calculate if this is a python test.  If there is a python script
-# in the source folder called TEST_DIR/TEST_NAME.py, then we
-# wrap the test command with that script by putting the command
-# in the script's argument list.
-#
-FUNCTION(PYTHON_COMMAND TEST_DIR TEST_NAME TEST_EXE_CMD OUTPUT_VAR)
-  FILE(GLOB PYTHON_SCRIPTS ${CMAKE_SOURCE_DIR}/${VOLTDB_TEST_SRC}/${TEST_DIR}/${TEST_NAME}.py)
-  LIST(LENGTH PYTHON_SCRIPTS IS_PYTHON)
-  IF (${IS_PYTHON} GREATER 0)
-    LIST(GET PYTHON_SCRIPTS 0 PYTHON_SCRIPT)
-    LIST(INSERT TEST_EXE_CMD 0 ${PYTHON_SCRIPT})
-  ENDIF()
-  SET(${OUTPUT_VAR} ${TEST_EXE_CMD} PARENT_SCOPE)
-ENDFUNCTION()
-
-ADD_CUSTOM_TARGET(build-tests
+ADD_CUSTOM_TARGET(build-all-tests
   COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_TEST_WORKING_DIR})
 FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
-  ADD_CUSTOM_TARGET(make_${TEST_DIR}
+  ADD_CUSTOM_TARGET(make-${TEST_DIR}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_EE_TEST_PROGRAM_DIR}/${TEST_DIR})
   FOREACH (TEST_NAME ${VOLTDB_TEST_DIR_${TEST_DIR}})
     SET(CTEST_TEST_NAME ${TEST_NAME})
     #
-    # Define the test executable, and set the build-tests
+    # Define the test executable, and set the build-all-tests
     # depends on the test.  Remember the necessary include
     # directories and link libraries.
     #
@@ -955,13 +905,13 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
       EXCLUDE_FROM_ALL TRUE)
     ADD_DEPENDENCIES(${CTEST_TEST_NAME}
       pcre2 crypto s2geo
-      make_${TEST_DIR})
-    ADD_DEPENDENCIES(build-tests ${CTEST_TEST_NAME})
+      make-${TEST_DIR})
+    ADD_DEPENDENCIES(build-all-tests ${CTEST_TEST_NAME})
     TARGET_INCLUDE_DIRECTORIES(${CTEST_TEST_NAME}
       SYSTEM PUBLIC
       ${VOLTDB_THIRD_PARTY_CPP_DIR}
       PUBLIC
-      ${VOLTDB_EE_SRC_DIR}
+      ${CMAKE_SOURCE_DIR}
       ${VOLTDB_THIRD_PARTY_INCLUDE_DIR}
       ${VOLTDB_TEST_SRC})
     TARGET_LINK_LIBRARIES(${CTEST_TEST_NAME}
@@ -1005,6 +955,6 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
 ENDFOREACH()
 
 ADD_CUSTOM_TARGET(run-all-tests
-  DEPENDS build-tests
+  DEPENDS build-all-tests
   COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ctest -j 4
   )

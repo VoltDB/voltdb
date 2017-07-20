@@ -102,7 +102,7 @@
 <property name='cmake.generator'             value='Unix Makefiles' />
 <property name='cmake.build.source'          value='${base.dir}/src/ee' />
 <property name='cmake.test.source'           value='${base.dir}/tests/ee' />
-<property name='cmake.build.obj'             value='${base.dir}' />
+<property name='cmake.build.obj'             value='${build.dir}' />
 <property name='cmake.build.tool'            value='${cmake.build.source}/tools/build_cmake.py' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
@@ -1400,129 +1400,122 @@ NATIVE EE STUFF
 
 <target name="eecheck" depends="ee"
     description="Run testcases for C++ JNI library.">
-    <exec dir='.' executable='python' failonerror='true'>
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
-        <arg line="${cmake.build.tool}
-                   --generator='${cmake.generator}'
-                   --source-directory='${cmake.build.source}'
-                   --object-directory='${cmake.build.obj}'
-                   --test-directory='${cmake.test.source}'
-                   --build-type=${build}
-                   --run-all-tests" />
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--source-directory='${cmake.build.source}'" />
+        <arg line="--object-directory='${cmake.build.obj}'" />
+        <arg line="--test-directory='${cmake.test.source}'" />
+        <arg line="--build-type='${build}'" />
+        <arg line="--run-all-tests" />
     </exec>
 </target>
 
 <target name="eebuild" depends="voltdbipc"
     description="Build but do not run test cases for C++ JNI library.">
-    <exec dir='.' executable='python' failonerror='true'>
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
-        <arg line="${cmake.build.tool}
-                   --generator='${cmake.generator}'
-                   --source-directory='${cmake.build.source}'
-                   --object-directory='${cmake.build.obj}'
-                   --test-directory='${cmake.test.source}'
-                   --build-type=${build}
-                   --build-tests" />
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--source-directory='${cmake.build.source}'" />
+        <arg line="--object-directory='${cmake.build.obj}'" />
+        <arg line="--test-directory='${cmake.test.source}'" />
+        <arg line="--build-type='${build}'" />
+        <arg line="--build-tests" />
     </exec>
 </target>
 
 <target name='voltdbipc' depends="ee"
     description="Build the IPC client.">
-    <exec dir='.' executable='python' failonerror='true'>
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
-        <arg line="${cmake.build.tool}
-                   --generator='${cmake.generator}'
-                   --source-directory='${cmake.build.source}'
-                   --object-directory='${cmake.build.obj}'
-                   --test-directory='${cmake.test.source}'
-                   --build-type=${build}
-                   --install-ipc" />
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--source-directory='${cmake.build.source}'" />
+        <arg line="--object-directory='${cmake.build.obj}'" />
+        <arg line="--test-directory='${cmake.test.source}'" />
+        <arg line="--build-type='${build}'" />
+        <arg line="--install-ipc" />
     </exec>
 </target>
 
 <target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <env key="EESKIPBUILDMAKEFILE" value="true" />
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
-        <arg line="${cmake.build.tool}
-                   --generator='${cmake.generator}'
-                   --source-directory='${cmake.build.source}'
-                   --object-directory='${cmake.build.obj}'
-                   --test-directory='${cmake.test.source}'
-                   --build-type=${build}
-                   --install" />
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--source-directory='${cmake.build.source}'" />
+        <arg line="--object-directory='${cmake.build.obj}'" />
+        <arg line="--test-directory='${cmake.test.source}'" />
+        <arg line="--build-type='${build}'" />
+        <arg line="--install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
 
 <target name='recompile_ee_nodepends'
     description="Build C++ JNI library and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
-        <arg line="${cmake.build.tool}
-                   --generator='${cmake.generator}'
-                   --source-directory='${cmake.build.source}'
-                   --object-directory='${cmake.build.obj}'
-                   --test-directory='${cmake.test.source}'
-                   --build-type=${build}
-                   --install" />
+         <arg line="--generator='${cmake.generator}'" />
+         <arg line="--source-directory='${cmake.build.source}'" />
+         <arg line="--object-directory='${cmake.build.obj}'" />
+         <arg line="--test-directory='${cmake.test.source}'" />
+         <arg line="--build-type='${build}'" />
+         <arg line="--install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
 
 <target name='ee_profile' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
-        <arg line="${cmake.build.tool}
-                   --generator='${cmake.generator}'
-                   --source-directory='${cmake.build.source}'
-                   --object-directory='${cmake.build.obj}'
-                   --test-directory='${cmake.test.source}'
-                   --build-type=${build}
-                   --profile
-                   --install" />
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--source-directory=${cmake.build.source}" />
+        <arg line="--object-directory=${cmake.build.obj}" />
+        <arg line="--test-directory=${cmake.test.source}" />
+        <arg line="--build-type=${build}" />
+        <arg line="--profile" />
+        <arg line="--install" />
     </exec>
 </target>
 
 <target name='ee_coverage' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
-    <exec dir='.' executable='python' failonerror='true'>
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
-        <arg line="${cmake.build.tool}
-                   --generator='${cmake.generator}'
-                   --source-directory='${cmake.build.source}'
-                   --test-directory='${cmake.test.source}'
-                   --object-directory='${cmake.build.obj}'
-                   --build-type='${build}'
-                   --coverage
-                   --install" />
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--source-directory=${cmake.build.source}" />
+        <arg line="--test-directory=${cmake.test.source}" />
+        <arg line="--object-directory=${cmake.build.obj}" />
+        <arg line="--build-type=${build}" />
+        <arg line="--coverage" />
+        <arg line="--install" />
     </exec>
 </target>
 

@@ -84,14 +84,13 @@ def makeParser():
                         This is required.
                         ''')
     parser.add_argument('--object-directory',
-                        dest='objrootdir',
+                        dest='objdir',
                         required=True,
                         metavar='OBJECT_DIR',
                         help='''
-                        Root of the object directory.  This is typically S/obj,
-                        where S is the source directory for all of VoltDB.  Note that
-                        the build type is not specified with this parameter.
-                        This is required.
+                        Root of the object directory.  This is typically S/obj/BT,
+                        where S is the source directory for all of VoltDB and BT
+                        is the build type.  This is required.
                         ''')
     parser.add_argument('--max-processors',
                         dest='max_processors',
@@ -340,7 +339,6 @@ def validateConfig(config):
     # The config needs some variables
     # which are not defined but implied by
     # the command line parameters.
-    config.objdir=os.path.join(config.objrootdir, config.buildtype)
     config.installipc=False
 
     # Some of the build and run parameters are incompatible.
@@ -441,6 +439,7 @@ def main():
     # that are asked for.  This will also run all
     # the tests that are asked for.
     #
+    doBuild(config)
     print("Build success.")
 
 if __name__ == '__main__':
