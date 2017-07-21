@@ -1031,38 +1031,38 @@ public class SQLParser extends SQLPatternFactory
 
     // TODO: replace calls to this redundant function with call to SQLLexer.splitStatements
 //    public static List<String> parseQuery(String query)
-    public static SplitStmtResults parseQuery(String query)
-    {
-        if (query == null) {
-            return null;
-        }
-
-        //* enable to debug */ System.err.println("Parsing command queue:\n" + query);
-        /*
-         * Here begins the struggle between honoring comment starters and
-         * honoring single quotes and honoring semicolons as statement separators.
-         *
-         * For example, whole-line comments are eliminated early -- assumed
-         * never to be part of text literals, even though a text literal could
-         * have been started on a prior line and could optionally be ended
-         * with a quote on the current line and optionally followed by a
-         * statement-ending semicolon all within the supposed comment line.
-         */
-        query = AnyWholeLineComments.matcher(query).replaceAll("");
-          // Strip out inline comments
-          // At this point, all the quoted strings have been pulled out of the
-          // code mostly because they may contain semicolons.
-          // They will not be restored until after the split.
-          // So any user's quoted string containing ';' will be safe here.
-          // OTOH, this next line MAY eliminate blocks of code after any
-          // end-on-line comment that contains an unbalanced quote until
-          // the following quote. ENG-7594
-          // The reason for eliminating the comments here and now is to make sure that
-          // comment text containing a semicolon does not cause an erroneous statement
-          // split mid-comment.
-        query = EndOfLineComment.matcher(query).replaceAll("");
-//        ArrayList<String> queries = (ArrayList<String>) SQLLexer.splitStatements(query);
-        return SQLLexer.splitStatements(query);
+//    public static SplitStmtResults parseQuery(String query)
+//    {
+//        if (query == null) {
+//            return null;
+//        }
+//
+//        //* enable to debug */ System.err.println("Parsing command queue:\n" + query);
+//        /*
+//         * Here begins the struggle between honoring comment starters and
+//         * honoring single quotes and honoring semicolons as statement separators.
+//         *
+//         * For example, whole-line comments are eliminated early -- assumed
+//         * never to be part of text literals, even though a text literal could
+//         * have been started on a prior line and could optionally be ended
+//         * with a quote on the current line and optionally followed by a
+//         * statement-ending semicolon all within the supposed comment line.
+//         */
+//        query = AnyWholeLineComments.matcher(query).replaceAll("");
+//          // Strip out inline comments
+//          // At this point, all the quoted strings have been pulled out of the
+//          // code mostly because they may contain semicolons.
+//          // They will not be restored until after the split.
+//          // So any user's quoted string containing ';' will be safe here.
+//          // OTOH, this next line MAY eliminate blocks of code after any
+//          // end-on-line comment that contains an unbalanced quote until
+//          // the following quote. ENG-7594
+//          // The reason for eliminating the comments here and now is to make sure that
+//          // comment text containing a semicolon does not cause an erroneous statement
+//          // split mid-comment.
+//        query = EndOfLineComment.matcher(query).replaceAll("");
+////        ArrayList<String> queries = (ArrayList<String>) SQLLexer.splitStatements(query);
+//        return SQLLexer.splitStatements(query);
 //        ArrayList<String> queries = (ArrayList<String>) SQLLexer.splitStatements(query).completelyParsedStmts;
 
 //        /*
@@ -1149,7 +1149,7 @@ public class SQLParser extends SQLPatternFactory
 //            queries.add(fragment);
 //        }
 //        return queries;
-    }
+//    }
 
     // Process the quirky syntax for "exec" arguments -- a procedure name and
     // parameter values (optionally SINGLE-quoted) separated by arbitrary

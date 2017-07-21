@@ -44,6 +44,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import org.junit.Test;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.FileInfo;
 
@@ -458,7 +459,7 @@ public class TestSqlCmdInterface
     }
 
     private void assertThis(String qryStr, int numOfQry, int testID) {
-        List<String> parsed = SQLParser.parseQuery(qryStr).completelyParsedStmts;
+        List<String> parsed = SQLLexer.splitStatements(qryStr).completelyParsedStmts;
         String msg = "Test ID: " + testID + ". ";
         assertNotNull(msg + "SQLCommand.parseQuery returned a NULL obj!!", parsed);
         assertEquals(msg, numOfQry, parsed.size());
@@ -471,7 +472,7 @@ public class TestSqlCmdInterface
     }
 
     private void assertThis(String qryStr, String cleanQryStr, int numOfQry, int testID, int blockCommentCount) {
-        List<String> parsed = SQLParser.parseQuery(qryStr).completelyParsedStmts;
+        List<String> parsed = SQLLexer.splitStatements(qryStr).completelyParsedStmts;
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + numOfQry + "\n";
         err1 += "Actual # of queries: " + (parsed.size() - blockCommentCount) + "\n";
