@@ -834,7 +834,7 @@ public class SQLCommand
         for (String statement: parsedStatements) {
             executeStatement(statement, callback, lineNum);
         }
-        return parsedOutput.incompleteStmt;
+        return parsedOutput.incompleteMuliStmtProc;
     }
 
     private static void executeStatement(String statement, DDLParserCallback callback, int lineNum)

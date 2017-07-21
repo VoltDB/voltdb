@@ -26,10 +26,10 @@ import java.util.ArrayList;
  */
 public class SplitStmtResults {
     public List<String> completelyParsedStmts;
-    public String incompleteStmt;
+    public String incompleteMuliStmtProc;
 
     public SplitStmtResults() {
         completelyParsedStmts = new ArrayList<String>();
-        incompleteStmt = null;
+        incompleteMuliStmtProc = null;
     }
 }

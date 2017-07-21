@@ -80,7 +80,7 @@ public class TestSplitSQLStatements {
         String sql = "begin en";
         SplitStmtResults parsedOut = SQLLexer.splitStatements(sql);
         assertEquals(0, parsedOut.completelyParsedStmts.size());
-        assertEquals(sql, parsedOut.incompleteStmt);
+        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
         checkSplitter("CREATE PROCEDURE foo as SELECT * from t;", "CREATE PROCEDURE foo as SELECT * from t");
 
@@ -114,13 +114,13 @@ public class TestSplitSQLStatements {
         sql = "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;";
         parsedOut = SQLLexer.splitStatements(sql);
         assertEquals(0, parsedOut.completelyParsedStmts.size());
-        assertEquals(sql, parsedOut.incompleteStmt);
+        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
         // enf is not end of statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
         sql = "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;";
         parsedOut = SQLLexer.splitStatements(sql);
         assertEquals(0, parsedOut.completelyParsedStmts.size());
-        assertEquals(sql, parsedOut.incompleteStmt);
+        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
         checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end",
                 "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end");

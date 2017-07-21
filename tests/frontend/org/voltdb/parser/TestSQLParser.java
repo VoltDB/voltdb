@@ -456,18 +456,18 @@ public class TestSQLParser extends TestCase {
         SplitStmtResults parsedOut = SQLParser.parseQuery(sql);
         queriesOut = parsedOut.completelyParsedStmts;
         assertEquals(0, queriesOut.size());
-        assertEquals(sql, parsedOut.incompleteStmt);
+        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
-        // multiple mutli stmt procs
+//        // multiple mutli stmt procs
 //        sql = "CREATE PROCEDURE foo AS begin SELECT * from t; "
 //                + "SELECT * from t; end;";
-//        queriesOut = SQLParser.parseQuery(sql + sql);
+//        queriesOut = SQLParser.parseQuery(sql + sql).completelyParsedStmts;
 //        assertEquals(2, queriesOut.size());
 //        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(0));
 //        assertEquals(sql.substring(0, sql.length() - 1), queriesOut.get(1));
-
+//
 //        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t;";
-//        queriesOut = SQLParser.parseQuery(sql);
+//        queriesOut = SQLParser.parseQuery(sql).completelyParsedStmts;
 //        assertEquals(1, queriesOut.size());
 //        assertEquals(sql, queriesOut.get(0));
 
@@ -646,7 +646,7 @@ public class TestSQLParser extends TestCase {
         SplitStmtResults parsedOut = SQLParser.parseQuery(sql);
         queriesOut = parsedOut.completelyParsedStmts;
         assertEquals(0, queriesOut.size());
-        assertEquals(sql, parsedOut.incompleteStmt);
+        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
     }
 
     private static final Pattern RequiredWhitespace = Pattern.compile("\\s+");
