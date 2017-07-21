@@ -399,21 +399,33 @@
 
         function getBarHeightAndSpacing(dataSet, chart){
             var dataCount = dataSet.length;
-            if(dataCount < 3){
-                barHeight = 300;
-                chart.groupSpacing(.5);
+            if(dataCount == 1){
+                barHeight = 260;
+                chart.groupSpacing(.6);
+            }
+            else if(dataCount == 2){
+                barHeight = 305;
+                chart.groupSpacing(0.5);
             }
             else if(dataCount < 5){
-                barHeight = 400;
-                chart.groupSpacing(0.4);
+                barHeight = (dataCount * 111) + 56;
+                chart.groupSpacing(0.5);
             }
-             else if(dataCount < 7){
-                barHeight = 400;
+            else if(dataCount < 8){
+                barHeight = (dataCount * 75) + 25;
+                chart.groupSpacing(0.3);
+            }
+            else if(dataCount < 14){
+                barHeight = (dataCount * 72) + 24;
+                chart.groupSpacing(0.3);
+            }
+            else if(dataCount < 25){
+                barHeight = (dataCount * 70) + 24;
                 chart.groupSpacing(0.3);
             }
             else{
-                barHeight = 60 * dataCount;
-                chart.groupSpacing(0.2);
+                barHeight = (dataCount * 66) + 22;
+                chart.groupSpacing(0.3);
             }
         }
 
