@@ -46,7 +46,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.CommandLog;
 import org.voltdb.ProcedureRunner;
-import org.voltdb.QueueDepthTracker;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDBInterface;

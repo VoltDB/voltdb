@@ -30,7 +30,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.LoadedProcedureSet;
-import org.voltdb.QueueDepthTracker;
 import org.voltdb.StarvationTracker;
 
 /**

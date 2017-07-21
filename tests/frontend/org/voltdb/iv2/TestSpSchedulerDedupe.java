@@ -50,7 +50,6 @@ import org.voltdb.CommandLog;
 import org.voltdb.Consistency;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
-import org.voltdb.QueueDepthTracker;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StoredProcedureInvocation;

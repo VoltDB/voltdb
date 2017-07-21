@@ -30,7 +30,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 import org.junit.Test;
-import org.voltdb.QueueDepthTracker;
 import org.voltdb.StarvationTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
