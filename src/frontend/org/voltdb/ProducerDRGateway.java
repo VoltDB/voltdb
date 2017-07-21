@@ -194,4 +194,6 @@ public interface ProducerDRGateway {
     public void pauseAllReadersAsync();
 
     public void dropLocal();
+
+    public void elasticChangeUpdatesPartitionCount(int newPartitionCnt);
 }

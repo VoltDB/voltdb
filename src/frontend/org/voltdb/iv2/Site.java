@@ -1720,6 +1720,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long spHandle, long uniqueId) {
+//        Enable this code and fix up generateDREvent in DRTuplestream once the DR ReplicatedTable Stream has been removed
+//        if (m_partitionId >= oldPartitionCnt) {
+//            generateDREvent(
+//                    EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
+//        }
+//        else {
+            ByteBuffer paramBuffer = ByteBuffer.allocate(8);
+            paramBuffer.putInt(oldPartitionCnt);
+            paramBuffer.putInt(newPartitionCnt);
+            generateDREvent(
+                    EventType.DR_ELASTIC_CHANGE, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
+//        }
+    }
+
     public void setDRStreamEnd(long spHandle, long uniqueId) {
         generateDREvent(
                 EventType.DR_STREAM_END, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);

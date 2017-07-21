@@ -29,8 +29,10 @@ import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
+import org.voltdb.ProducerDRGateway;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TupleStreamStateInfo;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -180,6 +182,27 @@ public class ExecuteTask extends VoltSystemProcedure {
                     e.printStackTrace();
                     result.addRow("FAILURE");
                 }
+                break;
+            }
+            case ELASTIC_CHANGE:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                int oldPartitionCnt = buffer.getInt();
+                int newPartitionCnt = buffer.getInt();
+                ProducerDRGateway producer = VoltDB.instance().getNodeDRGateway();
+                if (context.isLowestSiteId()) {
+                    // update the total partition count reported in query response by DRProducer.
+                    // Do this even if the Producer is disabled or there are no conversations.
+                    producer.elasticChangeUpdatesPartitionCount(newPartitionCnt);
+                }
+                if (producer.isActive()) {
+                    // Only generate the event if we are generating binary log buffers
+                    long uniqueId = m_runner.getUniqueId();
+                    long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                    context.getSiteProcedureConnection().generateElasticChangeEvents(oldPartitionCnt,
+                            newPartitionCnt, spHandle, uniqueId);
+                }
+                result.addRow(STATUS_OK);
                 break;
             }
             default:
