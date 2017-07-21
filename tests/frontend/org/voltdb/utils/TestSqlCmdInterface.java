@@ -458,6 +458,17 @@ public class TestSqlCmdInterface
         assertThis(raw, expected, 1, ID);
     }
 
+    @Test
+    public void testParseCreateMultiStmtProcedure()
+    {
+        ID = 33;
+        String create = "create procedure foo as begin select * from blat; "
+                + "select * from foo; end;";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as begin insert into blat values (?, ?); end;";
+        assertThis(create, create, 1, ID);
+    }
+
     private void assertThis(String qryStr, int numOfQry, int testID) {
         List<String> parsed = SQLLexer.splitStatements(qryStr).completelyParsedStmts;
         String msg = "Test ID: " + testID + ". ";
