@@ -284,21 +284,17 @@ def delete_proc(pfile):
             pass
 
     if len(procset) :
-        filename =  'batchsql.ddl'
-        childin = open(filename, 'w+')
-        childin.write('file -inlinebatch EOB'+ '\n' + '\n')
+        sb = ''
+        sb += 'file -inlinebatch EOB'+ '\n' + '\n'
         for procname in procset:
-            sqlcmdopt = 'DROP PROCEDURE ' + procname + ' IF EXISTS;'
-            childin.write(sqlcmdopt+ '\n')
-        childin.write('\n'+ 'EOB' )
-        childin.close()
+            sb += 'DROP PROCEDURE ' + procname + ' IF EXISTS;' + '\n'
+        sb += '\n' + 'EOB'
 
-        childin = open(filename, 'r')
         proc = subprocess.Popen(['../../bin/sqlcmd'],
-                        stdin=childin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        proc.wait()
+                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        (stdoutprocdata, stderrdata) = proc.communicate()
+        (stdoutprocdata, stderrdata) = proc.communicate(input = sb)
+        proc.wait()
         print 'stdoutprocdata is : \n' + stdoutprocdata + '\n' #debug
 
 
@@ -317,22 +313,17 @@ def delete_table_and_view(pfile):
             pass
 
     if len(tableset) :
-        filename =  'batchsql.ddl'
-        childin = open(filename, 'w+')
-        childin.write('file -inlinebatch EOB'+ '\n' + '\n')
+        sb = ''
+        sb += 'file -inlinebatch EOB'+ '\n' + '\n'
         for tablename in tableset:
-            sqlcmdopt = 'DROP TABLE ' + tablename + ' IF EXISTS CASCADE;'
-            childin.write(sqlcmdopt+ '\n')
-        childin.write('\n'+ 'EOB' )
-        childin.close()
-
-        childin = open(filename, 'r')
+            sb += 'DROP TABLE ' + tablename + ' IF EXISTS CASCADE;' + '\n'
+        sb += '\n' + 'EOB'
 
         proc = subprocess.Popen(['../../bin/sqlcmd'],
-                        stdin=childin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        proc.wait()
+                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        (stdouttabledata, stderrdata) = proc.communicate()
+        (stdouttabledata, stderrdata) = proc.communicate(input = sb)
+        proc.wait()
         print 'stdouttabledata is : \n' + stdouttabledata + '\n' #debug
 
 
