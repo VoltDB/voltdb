@@ -411,6 +411,34 @@ public class TestSqlCommandParserInteractive extends TestCase {
         assertEquals(1, result.get().size());
         assertEquals("create procedure pr as begin\nselect * from t;\ninsert into t values (1);\nend",
                 result.get().get(0));
+
+        String sql = "create procedure thisproc as "
+        + "begin \n"
+        + "select * from r where f = 'begin' or f = 'END';"
+        + "select a, "
+        + "case when a > 100.00 then 'Expensive' else 'Cheap' end "
+        + "from t;"
+        + "end";
+
+        result = cmd.openQuery();
+        cmd.submitText("create procedure thisproc as begin \n");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("select * from r where f = 'begin' or f = 'END';");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("select a, case when a > 100.00 then 'Expensive' else 'Cheap' end ");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("from t;");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("end;\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(sql, result.get().get(0));
+
     }
 
     public void testSubQuery() throws Exception
