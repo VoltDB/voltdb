@@ -61,6 +61,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.DDLParserCallback;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.FileInfo;
 import org.voltdb.parser.SQLParser.FileOption;
@@ -827,9 +828,7 @@ public class SQLCommand
     //
     private static String executeStatements(String statements, DDLParserCallback callback, int lineNum)
     {
-        // TODO: send back incomplete statements?
-        SplitStmtResults parsedOutput = SQLParser.parseQuery(statements);
-//        List<String> parsedStatements = SQLParser.parseQuery(statements);
+        SplitStmtResults parsedOutput = SQLLexer.splitStatements(statements);
         List<String> parsedStatements = parsedOutput.completelyParsedStmts;
         for (String statement: parsedStatements) {
             executeStatement(statement, callback, lineNum);
@@ -1343,7 +1342,7 @@ public class SQLCommand
         try {
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
             getInteractiveQueries(reader);
-            return SQLParser.parseQuery(m_testFrontEndResult).completelyParsedStmts;
+            return SQLLexer.splitStatements(m_testFrontEndResult).completelyParsedStmts;
         } catch (Exception ioe) {}
         return null;
     }
@@ -1410,7 +1409,7 @@ public class SQLCommand
                 kerberos = "VoltDBClient";
             }
             else if (arg.startsWith("--query=")) {
-                List<String> argQueries = SQLParser.parseQuery(arg.substring(8)).completelyParsedStmts;
+                List<String> argQueries = SQLLexer.splitStatements(arg.substring(8)).completelyParsedStmts;
                 if (!argQueries.isEmpty()) {
                     if (queries == null) {
                         queries = argQueries;
