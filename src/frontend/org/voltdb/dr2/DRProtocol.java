@@ -19,7 +19,7 @@ package org.voltdb.dr2;
 
 public interface DRProtocol {
     // Also update DRTupleStream.h if version changes
-    public static final int PROTOCOL_VERSION = 7;
+    public static final int PROTOCOL_VERSION = 8;
     public static final int COMPATIBLE_PROTOCOL_VERSION = 7;
 
     // constant versions that don't change across releases

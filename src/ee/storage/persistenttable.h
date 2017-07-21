@@ -66,7 +66,7 @@
 #include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
-#include "storage/CopyOnWriteIterator.h"
+#include "storage/DRTupleStream.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -656,7 +656,13 @@ private:
     TBPtr allocateNextBlock();
 
     AbstractDRTupleStream* getDRTupleStream(ExecutorContext* ec) {
-        return isReplicatedTable() ? ec->drReplicatedStream() : ec->drStream();
+        if (isReplicatedTable()) {
+            if (ec->drStream()->drProtocolVersion() > DRTupleStream::COMPATIBLE_PROTOCOL_VERSION) {
+                return (ec->m_partitionId == 0) ? ec->drStream() : NULL;
+            }
+            return ec->drReplicatedStream();
+        }
+        return ec->drStream();
     }
 
     void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);

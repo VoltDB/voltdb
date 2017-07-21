@@ -40,10 +40,10 @@ public:
     // Also update DRProducerProtocol.java if version changes
     // whenever PROTOCOL_VERSION changes, check if DRBufferParser needs to be updated,
     // check if unit tests that use MockPartitionQueue and getTestDRBuffer() need to be updated
-    static const uint8_t PROTOCOL_VERSION = 7;
+    static const uint8_t PROTOCOL_VERSION = 8;
     static const uint8_t COMPATIBLE_PROTOCOL_VERSION = 7;
 
-    DRTupleStream(int partitionId, int defaultBufferSize);
+    DRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion=PROTOCOL_VERSION);
 
     virtual ~DRTupleStream() {}
 
@@ -93,7 +93,8 @@ public:
     virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
                                  int64_t uniqueId, ByteArray catalogCommands);
 
-    static int32_t getTestDRBuffer(int32_t partitionId,
+    static int32_t getTestDRBuffer(uint8_t drProtocolVersion,
+                                   int32_t partitionId,
                                    std::vector<int32_t> partitionKeyValueList,
                                    std::vector<int32_t> flagList,
                                    long startSequenceNumber,

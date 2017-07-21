@@ -60,9 +60,9 @@ const int CLUSTER_ID_REPLICA = 2;
 const int BUFFER_SIZE = 4096;
 const int LARGE_BUFFER_SIZE = 32768;
 
-static bool s_mulitPartitionFlag = false;
+static bool s_multiPartitionFlag = false;
 static int64_t addPartitionId(int64_t value) {
-    return s_mulitPartitionFlag ? ((value << 14) | 16383) : ((value << 14) | 42);
+    return s_multiPartitionFlag ? ((value << 14) | 16383) : ((value << 14) | 0);
 }
 
 class MockExportTupleStream : public ExportTupleStream {
@@ -116,7 +116,7 @@ class MockVoltDBEngine : public VoltDBEngine {
 public:
     MockVoltDBEngine(int clusterId, Topend* topend, Pool* pool,
                      DRTupleStream* drStream, DRTupleStream* drReplicatedStream)
-      : m_context(new ExecutorContext(1, 1, NULL, topend, pool, this,
+      : m_context(new ExecutorContext(0, 0, NULL, topend, pool, this,
                                       "localhost", 2, drStream, drReplicatedStream, clusterId))
     {
 
@@ -175,9 +175,9 @@ private:
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
-      : m_drStream(42, 64*1024),
+      : m_drStream(0, 64*1024),
         m_drReplicatedStream(16383, 64*1024),
-        m_drStreamReplica(42, 64*1024),
+        m_drStreamReplica(0, 64*1024),
         m_drReplicatedStreamReplica(16383, 64*1024),
         m_undoToken(0),
         m_spHandleReplica(0),
@@ -711,6 +711,54 @@ public:
         ASSERT_FALSE(tuple.isNullTuple());
     }
 
+    void replicatedTableWritesCommon() {
+        // write to only the replicated table
+        beginTxn(m_engine, 109, 99, 98, 70);
+        TableTuple first_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
+        endTxn(m_engine, true);
+
+        flushAndApply(99);
+
+        EXPECT_EQ(0, m_tableReplica->activeTupleCount());
+        EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());
+        TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(first_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+
+        // write to both the partitioned and replicated table
+        beginTxn(m_engine, 110, 100, 99, 71);
+        first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+        TableTuple second_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342));
+        endTxn(m_engine, true);
+
+        flushAndApply(100);
+
+        EXPECT_EQ(1, m_tableReplica->activeTupleCount());
+        EXPECT_EQ(2, m_replicatedTableReplica->activeTupleCount());
+        tuple = m_tableReplica->lookupTupleForDR(first_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+        tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+
+        // write to the partitioned and replicated table and roll it back
+        beginTxn(m_engine, 111, 101, 100, 72);
+        first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 11, 34534, "3453.4545", "another", "blah blah blah blah blah blah", 2344));
+        second_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+        endTxn(m_engine, false);
+
+        ASSERT_FALSE(flush(101));
+
+        // one more write to the replicated table for good measure
+        beginTxn(m_engine, 112, 102, 101, 73);
+        second_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+        endTxn(m_engine, true);
+
+        flushAndApply(102);
+        EXPECT_EQ(1, m_tableReplica->activeTupleCount());
+        EXPECT_EQ(3, m_replicatedTableReplica->activeTupleCount());
+        tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+    }
+
 protected:
     DRTupleStream m_drStream;
     DRTupleStream m_drReplicatedStream;
@@ -929,57 +977,25 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     EXPECT_EQ(1, committed.seqNum);
 }
 
-TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
-    // write to only the replicated table
-    beginTxn(m_engine, 109, 99, 98, 70);
-    TableTuple first_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
-    endTxn(m_engine, true);
-
-    flushAndApply(99);
-
-    EXPECT_EQ(0, m_tableReplica->activeTupleCount());
-    EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());
-    TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(first_tuple);
-    ASSERT_FALSE(tuple.isNullTuple());
-
-    // write to both the partitioned and replicated table
-    beginTxn(m_engine, 110, 100, 99, 71);
-    first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
-    TableTuple second_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342));
-    endTxn(m_engine, true);
-
-    flushAndApply(100);
-
-    EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    EXPECT_EQ(2, m_replicatedTableReplica->activeTupleCount());
-    tuple = m_tableReplica->lookupTupleForDR(first_tuple);
-    ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
-    ASSERT_FALSE(tuple.isNullTuple());
-
-    // write to the partitioned and replicated table and roll it back
-    beginTxn(m_engine, 111, 101, 100, 72);
-    first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 11, 34534, "3453.4545", "another", "blah blah blah blah blah blah", 2344));
-    second_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
-    endTxn(m_engine, false);
-
-    ASSERT_FALSE(flush(101));
-
-    // one more write to the replicated table for good measure
-    beginTxn(m_engine, 112, 102, 101, 73);
-    second_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
-    endTxn(m_engine, true);
-
-    flushAndApply(102);
-    EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    EXPECT_EQ(3, m_replicatedTableReplica->activeTupleCount());
-    tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
-    ASSERT_FALSE(tuple.isNullTuple());
+TEST_F(DRBinaryLogTest, ReplicatedTableWritesWithReplicatedStream) {
+    // Use the compatible protocol version so that dr replicated stream will be picked up and used
+    m_drStream.setDrProtocolVersion(DRTupleStream::COMPATIBLE_PROTOCOL_VERSION);
+    m_drReplicatedStream.setDrProtocolVersion(DRTupleStream::COMPATIBLE_PROTOCOL_VERSION);
+    replicatedTableWritesCommon();
 
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(1, committed.seqNum);
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(3, committed.seqNum);
+}
+
+TEST_F(DRBinaryLogTest, ReplicatedTableWritesNoReplicatedStream) {
+    replicatedTableWritesCommon();
+
+    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
+    EXPECT_EQ(2, committed.seqNum);
+    committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
+    EXPECT_EQ(-1, committed.seqNum);
 }
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {
@@ -2075,7 +2091,7 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     ASSERT_FALSE(flush(98));
     ASSERT_EQ(0, m_topend.blocks.size());
 
-    s_mulitPartitionFlag = true;
+    s_multiPartitionFlag = true;
 
     beginTxn(m_engine, 99, 99, 98, 70);
     endTxn(m_engine, true);
@@ -2121,7 +2137,7 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     ASSERT_EQ(INT64_MAX, m_undoToken);
     m_undoToken = prevUndoToken;
 
-    s_mulitPartitionFlag = false;
+    s_multiPartitionFlag = false;
 }
 
 int main() {
