@@ -488,15 +488,17 @@ public class SQLLexer extends SQLPatternFactory
         }
         // Get the last statement, if any.
         // we are still processing a multi statement procedure if we are still in begin...end
-        if (!inBegin && iStart < buf.length) {
-            String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-            if (!statement.isEmpty()) {
-                statements.add(statement);
+        if (iStart < buf.length) {
+            if (!inBegin) {
+                String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
+                if (!statement.isEmpty()) {
+                    statements.add(statement);
+                }
+            } else {
+                // we only check for incomplete multi statement procedures right now
+                // add a mandatory space..
+                results.incompleteStmt = String.copyValueOf(buf, iStart, iCur - iStart);
             }
-        } else {
-            // we only check for incomplete multi statement procedures right now
-            // add a mandatory space..
-            results.incompleteStmt = String.copyValueOf(buf, iStart, iCur - iStart);
         }
 
         results.completelyParsedStmts = statements;
