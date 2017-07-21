@@ -404,16 +404,16 @@ def doConfigure(config):
     # If we have not already configured, we want to reconfigure.
     # We always want to do this.
     #
-    if not os.path.exists('CMakeCache.txt'):
-        configCmd = configureCommandString(config)
-        if not runCommand(configCmd, config):
-            print("Cmake command \"%s\" failed." % configCmd)
-            sys.exit(100)
+    configCmd = configureCommandString(config)
+    if not runCommand(configCmd, config):
+        print("Cmake command \"%s\" failed." % configCmd)
+        sys.exit(100)
 
 def doBuild(config):
     buildCmd = buildCommandString(config)
     if buildCmd:
-        if not runCommand(buildCmd, config):
+        rc = runCommand(buildCmd, config)
+        if rc:
             print("Build command \"%s\" failed." % buildCmd)
             sys.exit(100)
 

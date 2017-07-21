@@ -68,24 +68,16 @@
 #       can use the usual -jN and -k options, of course.
 #       The tests will all go into cpptests/TEST_DIR/TEST_NAME.
 #
-#       To build one test run "make build-test-ALPHA" where
-#       ALPHA is the name of the test.
-#
-#       To build all the tests in one directory run
-#       "make build-testdir-ALPHA" where ALPHA is the name
-#       of the directory.
+#       To build one test or all test in one test directory,
+#       run "make build-ALPHA" where ALPHA is the name of
+#       the test or the test directory.
 #   2.) Running Tests
 #       To run all the tests run "make run-all-tests."
 #
-#       To make one test executable, say
-#           cpptests/plannodes/PlanNodeFragmentTest,
-#       run "make run-test-PlanNodeFragmentTest".  All needed
-#       directories will be made, and dependences will be made
-#       as well.
-#
-#       To run all the tests in one test directory run
-#       "make run-testdir-ALPHA" where ALPHA is the name of
-#       the test directory.
+#       To make one test executable or all tests in a test
+#       directory, run "make run-ALPHA", where ALPHA is the
+#       name of the test or test directory.  All directories will
+#       be made, and dependences will be made.
 #   4.) To delete any test binaries, just delete them.  Delete
 #       cpptests to delete all test binaries.  The test system
 #       will recreate any directories which need to be made.
@@ -127,6 +119,19 @@ IF ( (CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND ( (CMAKE_VERSION VERSION_GREATER 
     # it, but we need to use the old behavior on the mac.
     CMAKE_POLICY(SET CMP0042 OLD)
 ENDIF()
+
+IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
+    # Surely there is some way to discover this.
+    SET (VOLTDB_CORE_COUNT 4)
+ELSE()
+    EXECUTE_PROCESS(COMMAND bash -c "grep '^processor' /proc/cpuinfo | wc -l"
+                    OUTPUT_VARIABLE VOLTDB_CORE_COUNT)
+    STRING(STRIP "${VOLTDB_CORE_COUNT}" VOLTDB_CORE_COUNT)
+    IF ( "${VOLTDB_CORE_COUNT}" STREQUAL "" )
+        MESSAGE(FATAL_ERROR "Cannot calculate the core count.")
+    ENDIF()
+ENDIF()
+
 ########################################################################
 #
 # This CMakeLists.txt file describes the VoltDB build system.
@@ -145,7 +150,7 @@ ENDIF()
 #                           generally obj/debug, obj/release or obj/memcheck.
 #                           It will have -profile or -coverage at the
 #                           end if those options are enabled.
-#       ${VOLTDB_THIRD_PARTY_INSTALL_DIR}
+#       ${CMAKE_BINARY_DIR}/3pty_install
 #                           All third party artifacts on which which
 #                           voltdb depends go here, in lib or include.
 #                           There are some other subfolders created
@@ -224,23 +229,9 @@ ENDIF()
 EXECUTE_PROCESS(COMMAND bash -c "${CMAKE_SOURCE_DIR}/tools/findvdbroot.sh"
                 OUTPUT_VARIABLE VOLTDB_ROOT)
 STRING(STRIP ${VOLTDB_ROOT} VOLTDB_ROOT)
-# This is for test sources.  It's absolute.  It ought to be
-# under src/ee but it's not.
-SET(VOLTDB_EE_TEST_DIR "${VOLTDB_ROOT}/tests/ee")
-# This is where test object files go, relative to the binary directory.
-SET(VOLTDB_EE_TEST_PROGRAM_DIR cpptests)
 
-# This is for third party sources, relative to the source directory.
-# These are mostly for system include directories.
-SET (VOLTDB_THIRD_PARTY_CPP_DIR ${VOLTDB_ROOT}/third_party/cpp)
-# This is where we install third party artifacts.
-SET (VOLTDB_THIRD_PARTY_INSTALL_DIR ${CMAKE_BINARY_DIR}/3pty-install)
-SET (VOLTDB_THIRD_PARTY_INCLUDE_DIR ${VOLTDB_THIRD_PARTY_INSTALL_DIR}/include)
-# This where we build most third party artifacts.  OpenSSL is different.
-SET (VOLTDB_THIRD_PARTY_OBJ_DIR ${CMAKE_BINARY_DIR}/3pty-obj)
 # We keep pcre2 in a tarball, since we don't actually make
 # any changes to it.  This keeps the git repository epsilon smaller.
-SET (VOLTDB_TARBALLS ${VOLTDB_THIRD_PARTY_CPP_DIR}/tarballs)
 
 # Fetch the version number.
 EXECUTE_PROCESS(COMMAND cat ${CMAKE_SOURCE_DIR}/../../version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
@@ -425,10 +416,10 @@ ENDIF()
 # do this at build time.
 #
 ########################################################################
-SET (VOLTDB_PCRE2_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR}/pcre2)
+SET (VOLTDB_PCRE2_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/pcre2)
 SET (VOLTDB_PCRE2_VERSION 10.10)
 SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
-SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_PCRE2_NAME}.tgz)
+SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_ROOT}/third_party/cpp/tarballs/${VOLTDB_PCRE2_NAME}.tgz)
 SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_PREFIX}/src/${VOLTDB_PCRE2_NAME})
 SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
 
@@ -437,7 +428,7 @@ ExternalProject_Add(pcre2
   URL ${VOLTDB_PCRE2_TARBALL}
   SOURCE_DIR ${VOLTDB_PCRE2_SRC}
   BINARY_DIR ${VOLTDB_PCRE2_OBJ}
-  CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${VOLTDB_THIRD_PARTY_INSTALL_DIR}
+  CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${CMAKE_BINARY_DIR}/3pty-install
   BUILD_COMMAND make
   INSTALL_COMMAND make install)
 
@@ -450,8 +441,8 @@ ExternalProject_Add(pcre2
 ########################################################################
 SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
 SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
-SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tgz)
-SET (VOLTDB_OPENSSL_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR}/openssl)
+SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_ROOT}/third_party/cpp/tarballs/${VOLTDB_OPENSSL_NAME}.tgz)
+SET (VOLTDB_OPENSSL_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/openssl)
 # Binary and source are the same for openssl.  There
 # are not obvious ways to do out-of-tree builds.
 SET (VOLTDB_OPENSSL_SRC ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
@@ -461,7 +452,7 @@ ExternalProject_Add(crypto
   URL ${VOLTDB_OPENSSL_TARBALL}
   SOURCE_DIR ${VOLTDB_OPENSSL_SRC}
   BINARY_DIR ${VOLTDB_OPENSSL_OBJ}
-  CONFIGURE_COMMAND ./Configure --prefix=${VOLTDB_THIRD_PARTY_INSTALL_DIR} ${VOLTDB_OPENSSL_TOKEN}
+  CONFIGURE_COMMAND ./Configure --prefix=${CMAKE_BINARY_DIR}/3pty-install ${VOLTDB_OPENSSL_TOKEN}
   BUILD_COMMAND make
   INSTALL_COMMAND make install)
 
@@ -470,14 +461,14 @@ ExternalProject_Add(crypto
 # Go and build the S2GEO library.
 #
 ########################################################################
-SET (VOLTDB_S2GEO_SRC "${VOLTDB_THIRD_PARTY_CPP_DIR}/google-s2-geometry")
-SET (VOLTDB_S2GEO_OBJ ${VOLTDB_THIRD_PARTY_OBJ_DIR}/google-s2-geometry)
+SET (VOLTDB_S2GEO_SRC "${VOLTDB_ROOT}/third_party/cpp/google-s2-geometry")
+SET (VOLTDB_S2GEO_OBJ ${CMAKE_BINARY_DIR}/3pty-obj/google-s2-geometry)
 SET (VOLTDB_S2GEO_CMAKE_CONFIG
   -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
-  -DVOLTDB_THIRD_PARTY_CPP_DIR=${VOLTDB_THIRD_PARTY_CPP_DIR}
-  -DCMAKE_INSTALL_PREFIX=${VOLTDB_THIRD_PARTY_INSTALL_DIR}
+  -DVOLTDB_THIRD_PARTY_CPP_DIR=${VOLTDB_ROOT}/third_party/cpp
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/3pty-install
   -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
-SET (VOLTDB_S2GEO_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR})
+SET (VOLTDB_S2GEO_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj)
 
 ExternalProject_Add(s2geo
   DEPENDS crypto
@@ -652,11 +643,11 @@ SET (VOLTDB_SRC
 )
 
 SET (VOLTDB_THIRD_PARTY_SRC
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/jsoncpp/jsoncpp.cpp
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/crc/crc32c.cc
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/crc/crc32ctables.cc
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/murmur3/MurmurHash3.cpp
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/sha1/sha1.cpp
+  ${VOLTDB_ROOT}/third_party/cpp/jsoncpp/jsoncpp.cpp
+  ${VOLTDB_ROOT}/third_party/cpp/crc/crc32c.cc
+  ${VOLTDB_ROOT}/third_party/cpp/crc/crc32ctables.cc
+  ${VOLTDB_ROOT}/third_party/cpp/murmur3/MurmurHash3.cpp
+  ${VOLTDB_ROOT}/third_party/cpp/sha1/sha1.cpp
 )
 
 SET (VOLTDB_JNI_SRC
@@ -676,28 +667,28 @@ ADD_DEPENDENCIES(voltdbjniobjs s2geo crypto pcre2)
 
 TARGET_INCLUDE_DIRECTORIES(voltdbobjs
   SYSTEM PUBLIC
-  ${VOLTDB_THIRD_PARTY_CPP_DIR})
+  ${VOLTDB_ROOT}/third_party/cpp)
 TARGET_INCLUDE_DIRECTORIES(voltdbobjs
   PUBLIC
   ${CMAKE_SOURCE_DIR}
-  ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
+  ${CMAKE_BINARY_DIR}/3pty-install/include)
 TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
   SYSTEM PUBLIC
-  ${VOLTDB_THIRD_PARTY_CPP_DIR})
+  ${VOLTDB_ROOT}/third_party/cpp)
 TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
   PUBLIC
   ${CMAKE_SOURCE_DIR}
-  ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
+  ${CMAKE_BINARY_DIR}/3pty-install/include)
 TARGET_INCLUDE_DIRECTORIES(voltdbjniobjs
   SYSTEM PUBLIC
-  ${VOLTDB_THIRD_PARTY_CPP_DIR})
+  ${VOLTDB_ROOT}/third_party/cpp)
 TARGET_INCLUDE_DIRECTORIES(voltdbjniobjs
   PUBLIC
   ${CMAKE_SOURCE_DIR}
-  ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
+  ${CMAKE_BINARY_DIR}/3pty-install/include)
 TARGET_INCLUDE_DIRECTORIES(third_party_objs
   SYSTEM PUBLIC
-  ${VOLTDB_THIRD_PARTY_CPP_DIR})
+  ${VOLTDB_ROOT}/third_party/cpp)
 
 ########################################################################
 #
@@ -713,7 +704,7 @@ ADD_LIBRARY(${VOLTDB_LIBNAME}
   )
 
 TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
-  -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
+  -L${CMAKE_BINARY_DIR}/3pty-install/lib
   -lpcre2-8 -ls2geo -lcrypto
   ${VOLTDB_LINK_FLAGS})
 
@@ -731,7 +722,7 @@ ADD_EXECUTABLE(${VOLTDB_IPCRUN_NAME}
 
 TARGET_LINK_LIBRARIES(${VOLTDB_IPCRUN_NAME}
   ${VOLTDB_LINK_FLAGS}
-  -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
+  -L${CMAKE_BINARY_DIR}/3pty-install/lib
   -lpcre2-8 -ls2geo -lcrypto
   -ldl)
 
@@ -767,7 +758,6 @@ ADD_CUSTOM_TARGET(build
 ENABLE_TESTING()
 SET (VOLTDB_TEST_SRC ${VOLTDB_ROOT}/tests/ee)
 SET (VOLTDB_TEST_DIR ${CMAKE_BINARY_DIR}/tests)
-SET (VOLTDB_TEST_OBJ ${VOLTDB_TEST_DIR}/obj)
 #
 # This is a bit adhoc.
 #
@@ -783,7 +773,7 @@ SET (VOLTDB_PASSING_VALGRIND_TESTS no_losses)
 # unique.  We test for this later on.
 # 
 SET (VOLTDB_TEST_PROGRAMS
-  harness_test/harness_test
+  harness_test/harness_tester
   catalog/catalog_test
   logging/logging_test
   memleaktests/definite_losses
@@ -845,14 +835,14 @@ SET (VOLTDB_TEST_PROGRAMS
 
 ADD_LIBRARY(voltdb_test_harness
   OBJECT
-  ${VOLTDB_TEST_SRC}/harness)
+  ${VOLTDB_ROOT}/tests/ee/harness)
 
 TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
   SYSTEM PUBLIC
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}
+  ${VOLTDB_ROOT}/third_party/cpp
   PUBLIC
   ${CMAKE_SOURCE_DIR}
-  ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
+  ${CMAKE_BINARY_DIR}/3pty-install/include)
 
 #
 # Calculate the list of directories and the list of
@@ -877,52 +867,70 @@ FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
   LIST(APPEND VOLTDB_TEST_ALLTESTS ${TEST})
 ENDFOREACH()
 
-SET (VOLTDB_TEST_WORKING_DIR ${VOLTDB_TEST_DIR}/test_working_dir)
-
 INCLUDE(VoltDB.cmake)
 
-ADD_CUSTOM_TARGET(build-all-tests
-  COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_TEST_WORKING_DIR})
+########################################################################
+#
+# Create run-all-tests and build-all-tests.  We will make
+# build-all-tests depend on building each individual test.
+# So there's no command necessary.  However, we need to make
+# the test directory first.
+#
+########################################################################
+ADD_CUSTOM_TARGET(build-all-tests)
+ADD_CUSTOM_TARGET(run-all-tests
+  COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAIL=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT})
+ADD_DEPENDENCIES(run-all-tests build-all-tests)
 FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
-  ADD_CUSTOM_TARGET(make-${TEST_DIR}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_EE_TEST_PROGRAM_DIR}/${TEST_DIR})
+  # We assign each test the label of its test directory.
+  # So running all tests is just running all tests with
+  # the given label.
+  ADD_CUSTOM_TARGET(run-${TEST_DIR}
+    COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAIL=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -L ${TEST_DIR})
+  ADD_CUSTOM_TARGET(build-${TEST_DIR})
+  ADD_CUSTOM_COMMAND(TARGET build-${TEST_DIR}
+    PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory cpptests/${TEST_DIR}
+    )
+  ADD_DEPENDENCIES(build-all-tests build-${TEST_DIR})
   FOREACH (TEST_NAME ${VOLTDB_TEST_DIR_${TEST_DIR}})
-    SET(CTEST_TEST_NAME ${TEST_NAME})
     #
     # Define the test executable, and set the build-all-tests
     # depends on the test.  Remember the necessary include
     # directories and link libraries.
     #
-    SET(TEST_OUTPUT_NAME ${VOLTDB_EE_TEST_PROGRAM_DIR}/${TEST_DIR}/${TEST_NAME})
-    ADD_EXECUTABLE(${CTEST_TEST_NAME}
+    ADD_EXECUTABLE(${TEST_NAME}
       $<TARGET_OBJECTS:voltdb_test_harness>
       $<TARGET_OBJECTS:voltdbobjs>
       $<TARGET_OBJECTS:third_party_objs>
-      ${VOLTDB_TEST_SRC}/${TEST_DIR}/${TEST_NAME}.cpp)
-    SET_TARGET_PROPERTIES(${CTEST_TEST_NAME}
+      ${VOLTDB_ROOT}/tests/ee/${TEST_DIR}/${TEST_NAME}.cpp)
+    ADD_CUSTOM_COMMAND(TARGET ${TEST_NAME}
+      PRE_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory cpptests/${TEST_DIR}
+      )
+    ADD_DEPENDENCIES(build-${TEST_DIR} ${TEST_NAME})
+    SET_TARGET_PROPERTIES(${TEST_NAME}
       PROPERTIES
-      OUTPUT_NAME ${TEST_OUTPUT_NAME}
+      OUTPUT_NAME cpptests/${TEST_DIR}/${TEST_NAME}
       EXCLUDE_FROM_ALL TRUE)
-    ADD_DEPENDENCIES(${CTEST_TEST_NAME}
-      pcre2 crypto s2geo
-      make-${TEST_DIR})
-    ADD_DEPENDENCIES(build-all-tests ${CTEST_TEST_NAME})
-    TARGET_INCLUDE_DIRECTORIES(${CTEST_TEST_NAME}
+    ADD_DEPENDENCIES(${TEST_NAME}
+      pcre2 crypto s2geo ${VOLTDB_LIBNAME})
+    TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
       SYSTEM PUBLIC
-      ${VOLTDB_THIRD_PARTY_CPP_DIR}
+      ${VOLTDB_ROOT}/third_party/cpp
       PUBLIC
       ${CMAKE_SOURCE_DIR}
-      ${VOLTDB_THIRD_PARTY_INCLUDE_DIR}
-      ${VOLTDB_TEST_SRC})
-    TARGET_LINK_LIBRARIES(${CTEST_TEST_NAME}
+      ${CMAKE_BINARY_DIR}/3pty-install/include
+      ${VOLTDB_ROOT}/tests/ee)
+    TARGET_LINK_LIBRARIES(${TEST_NAME}
       ${VOLTDB_LINK_FLAGS}
-      -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
+      -L${CMAKE_BINARY_DIR}/3pty-install/lib
       -lpcre2-8 -ls2geo -lcrypto
       -ldl)
     #
     # Calculate the actual test command.
     #
-    SET(TARGET_EXE_CMD ${CMAKE_BINARY_DIR}/${TEST_OUTPUT_NAME})
+    SET(TARGET_EXE_CMD cpptests/${TEST_DIR}/${TEST_NAME})
     #
     # We expect all the memleak tests to fail, except for
     # the test no_losses.  It's possible, but not obvious,
@@ -940,21 +948,29 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     ELSE()
     ENDIF()
     # If we are running a valgrind test, then calculate the
-    # valgrind command.
-    VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} ${WILL_FAIL} VALGRIND_EXE_CMD)
-    PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD)
-    ADD_TEST(NAME ${CTEST_TEST_NAME}
-      WORKING_DIRECTORY ${VOLTDB_TEST_WORKING_DIR}
+    # valgrind command.  The output variable, VALGRIND_EXE_CMD,
+    # may be the same as TARGET_EXE or else it may be a call
+    # to valgrind.
+    VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} ${WILL_FAIL} VALGRIND_EXE_CMD IS_VALGRIND_TEST)
+    # Some tests need to run python.  This needs to be
+    # second because we want to run valgrind on the actual
+    # test executable, TARGET_EXE_CMD, and not on python.
+    PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD OUTPUT_IS_PYTHON_TEST)
+    # So, "make ${TEST_NAME}"" builds the test and
+    # "make run-${TEST_NAME}" runs the single test.
+    ADD_TEST(NAME ${TEST_NAME}
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_working_dir
       COMMAND ${CTEST_EXE_CMD})
-    SET_TESTS_PROPERTIES(${CTEST_TEST_NAME}
+    ADD_CUSTOM_TARGET(run-${TEST_NAME}
+      DEPENDS ${CTEST_EXE_CMD}
+      COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAIL=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -R ${TEST_NAME}
+      )
+    # Some tests are expected to fail.  Also, tag the
+    # test with it label.
+    SET_TESTS_PROPERTIES(${TEST_NAME}
       PROPERTIES
-      DEPENDS Configure-${CTEST_TEST_NAME}
       WILL_FAIL ${WILL_FAIL}
       LABELS ${TEST_DIR})
   ENDFOREACH()
 ENDFOREACH()
 
-ADD_CUSTOM_TARGET(run-all-tests
-  DEPENDS build-all-tests
-  COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ctest -j 4
-  )

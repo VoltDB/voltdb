@@ -1398,6 +1398,23 @@ NATIVE EE STUFF
     />
 </target>
 
+<target name="eeconfig" depends="ee"
+    description="Configure the build area but do not do any building.  This is mostly interesting for testing.">
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <env key="TEST_DIR" value="${build.testobjects.dir}" />
+        <env key="EETESTSUITE" value="${eetestsuite}"/>
+        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--source-directory='${cmake.build.source}'" />
+        <arg line="--object-directory='${cmake.build.obj}'" />
+        <arg line="--test-directory='${cmake.test.source}'" />
+        <arg line="--build-type='${build}'" />
+    </exec>
+</target>
+
 <target name="eecheck" depends="ee"
     description="Run testcases for C++ JNI library.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
