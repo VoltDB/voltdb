@@ -188,7 +188,10 @@ private:
 
     // State only for persistent table iterators
     struct PersistentState {
-        PersistentState() {}
+        PersistentState()
+        : m_blockIterator()
+        {
+        }
 
         PersistentState(TBMapI it)
         : m_blockIterator(it)
@@ -230,7 +233,9 @@ private:
 
     union TypeSpecificState {
 
-        TypeSpecificState() {}
+        TypeSpecificState() {
+            ::memset(this, 0, sizeof(*this));
+        }
 
         TypeSpecificState(TBMapI it) : m_pers(it) {}
         TypeSpecificState(std::vector<TBPtr>::iterator it, bool deleteAsGo)
@@ -324,6 +329,7 @@ inline TableIterator::TableIterator(const TableIterator &that)
     , m_dataPtr(that.m_dataPtr)
     , m_location(that.m_location)
     , m_iteratorType(that.m_iteratorType)
+    , m_state()
 {
     switch (m_iteratorType) {
     case TEMP:
