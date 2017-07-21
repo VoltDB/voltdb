@@ -167,16 +167,6 @@ public class MatchChecks {
         return data.asScalarLong();
     }
 
-    public static long streamImportChecker(int tablenum, Client client) {
-        // check row count in import table (kafkaimporttable<tablenum>)
-        ClientResponse response = doAdHoc(client, "select count(*) from KafkaImportTable" + tablenum);
-        VoltTable[] countQueryResult = response.getResults();
-        VoltTable data = countQueryResult[0];
-        if (data.asScalarLong() == VoltType.NULL_BIGINT)
-            return 0;
-        return data.asScalarLong();
-    }
-
     public static boolean checkPounderResults(long expected_rows, Client client) {
         // make sure import table has expected number of rows, and without gaps
         // we check the row count, then use min & max to infer the range is complete

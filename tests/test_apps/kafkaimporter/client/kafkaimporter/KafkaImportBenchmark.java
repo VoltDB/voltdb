@@ -265,18 +265,13 @@ public class KafkaImportBenchmark {
             public void run() {
                 long count = 0;
 
-                // if (!config.useexport) {
-                //     count = MatchChecks.getImportTableRowCount(config.alltypes?5:1, client); // imported count
-                // } else {
-                //    if (config.loadertest || config.streams > 1) {
-                    if (! config.alltypes) {
-                        for (int i=1; i <= config.streams; i++) {
-                            count += MatchChecks.getImportTableRowCount(i, client); // imported count
-                            log.info("kakfaimporttable" + i + ": import row count: " + count);
-                        }
-                   }
-                   log.info("Import table: " + count + " rows from " + config.streams + " tables.");
-                // }
+                if (! config.alltypes) {
+                    for (int i=1; i <= config.streams; i++) {
+                        count += MatchChecks.getImportTableRowCount(i, client); // imported count
+                        log.info("kakfaimporttable" + i + ": import row count: " + count);
+                    }
+                }
+                log.info("Import table: " + count + " rows from " + config.streams + " tables.");
                 importProgress.add((int) count);
 
                 if (config.alltypes) {
@@ -487,7 +482,6 @@ public class KafkaImportBenchmark {
 
         long[] importStatValues = MatchChecks.getImportValues(client);
         long mirrorStreamCounts = 0;
-        //if (!(config.streamtest || config.loadertest)) mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
         if (config.useexport) mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
         long importRows = MatchChecks.getImportTableRowCount(config.alltypes?5:1, client);
         long importRowCount = 0;
@@ -499,10 +493,8 @@ public class KafkaImportBenchmark {
                 ((--trial > 0) && ((importStatValues[OUTSTANDING_REQUESTS] > 0) || (importRows < config.expected_rows)))) {
             Thread.sleep(PAUSE_WAIT * 1000);
             importStatValues = MatchChecks.getImportValues(client);
-            //if (!(config.streamtest || config.loadertest)) mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
             if (config.useexport) mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
             importRows = MatchChecks.getImportTableRowCount(config.alltypes?1:5, client);
-            // importRowCount = MatchChecks.getImportRowCount(client);
         }
 
         // some counts that might help debugging....
