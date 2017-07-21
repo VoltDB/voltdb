@@ -271,7 +271,6 @@ public class StandaloneExportManager
 
     /**
      * Read the catalog to setup manager and loader(s)
-     * @param siteTracker
      */
     private StandaloneExportManager(
             int myHostId, String loaderClass, String exportConnectorClassName, List<PropertyType> exportConfiguration)
@@ -347,7 +346,8 @@ public class StandaloneExportManager
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
             if (generation.initializeGenerationFromDisk(null, m_messenger)) {
-                m_generations.put( generation.m_timestamp, generation);
+                // TODO remove m_generations
+                m_generations.put(0L, generation);
             } else {
                 String list[] = generationDirectory.list();
                 if (list != null && list.length == 0) {

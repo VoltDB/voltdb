@@ -77,7 +77,7 @@ public class StandaloneExportGeneration implements Generation {
                 System.exit(1);
             }
             int numSourcesDrained = m_drainedSources.incrementAndGet();
-            exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
+            exportLog.info("Drained source with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {
                 m_onAllSourcesDrained.run();
             }
@@ -85,28 +85,6 @@ public class StandaloneExportGeneration implements Generation {
     };
 
     private volatile boolean shutdown = false;
-
-    /**
-     * Constructor to create a new generation of export data
-     * @param exportOverflowDirectory
-     * @throws IOException
-     */
-    public StandaloneExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
-        m_timestamp = txnId;
-        m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
-        if (!isRejoin) {
-            if (!m_directory.mkdirs()) {
-                throw new IOException("Could not create " + m_directory);
-            }
-        } else {
-            if (!m_directory.canWrite()) {
-                if (!m_directory.mkdirs()) {
-                    throw new IOException("Could not create " + m_directory);
-                }
-            }
-        }
-        exportLog.info("Creating new export generation " + m_timestamp);
-    }
 
     /**
      * Constructor to create a generation based on one that has been persisted to disk
@@ -204,9 +182,8 @@ public class StandaloneExportGeneration implements Generation {
             File adFile,
             Set<Integer> partitions) throws IOException {
         m_numSources++;
-        ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile, false);
+        ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile);
         partitions.add(source.getPartitionId());
-        m_timestamp = source.getGeneration();
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());
@@ -227,22 +204,9 @@ public class StandaloneExportGeneration implements Generation {
         }
     }
 
-    /*
-     * An unfortunate test only method for supplying a mock source
-     */
-    public void addDataSource(ExportDataSource source) {
-        Map<String, ExportDataSource> dataSourcesForPartition =
-            m_dataSourcesByPartition.get(source.getPartitionId());
-        if (dataSourcesForPartition == null) {
-            dataSourcesForPartition = new HashMap<String, ExportDataSource>();
-            m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
-        }
-        dataSourcesForPartition.put(source.getSignature(), source);
-    }
-
     @Override
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
-        //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
+        //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
         //        }
@@ -252,7 +216,7 @@ public class StandaloneExportGeneration implements Generation {
 
         if (sources == null) {
             exportLog.error("Could not find export data sources for partition "
-                    + partitionId + " generation " + m_timestamp + " the export data is being discarded");
+                    + partitionId + " the export data is being discarded");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
@@ -262,8 +226,7 @@ public class StandaloneExportGeneration implements Generation {
         ExportDataSource source = sources.get(signature);
         if (source == null) {
             exportLog.error("Could not find export data source for partition " + partitionId +
-                    " signature " + signature + " generation " +
-                    m_timestamp + " the export data is being discarded");
+                    " signature " + signature + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }

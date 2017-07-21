@@ -79,7 +79,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private String m_partitionColumnName = "";
     private final String m_signature;
     private final byte [] m_signatureBytes;
-    private final long m_generation;
     private final int m_partitionId;
     private final ExportFormat m_format;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
@@ -134,7 +133,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             {
         checkNotNull( onDrain, "onDrain runnable is null");
         m_format = ExportFormat.SEVENDOTX;
-        m_generation = generation;
         m_onDrain = new Runnable() {
             @Override
             public void run() {
@@ -230,7 +228,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ExportDataSource(final Runnable onDrain, File adFile, boolean isContinueingGeneration) throws IOException {
+    public ExportDataSource(final Runnable onDrain, File adFile) throws IOException {
         /*
          * Certainly no more data coming if this is coming off of disk
          */
@@ -263,7 +261,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 hsid = -1;
             }
             m_database = jsObj.getString("database");
-            m_generation = 0; // TODO stop writing this out in JSON jsObj.getLong("generation");
             m_partitionId = jsObj.getInt("partitionId");
             m_signature = jsObj.getString("signature");
             m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
@@ -363,8 +360,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
-        stringer.keySymbolValuePair("adVersion", 0);
-        stringer.keySymbolValuePair("generation", m_generation);
+        stringer.keySymbolValuePair("adVersion", 1);
         stringer.keySymbolValuePair("partitionId", getPartitionId());
         stringer.keySymbolValuePair("signature", m_signature);
         stringer.keySymbolValuePair("tableName", getTableName());
@@ -571,10 +567,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public long getGeneration() {
-        return m_generation;
-    }
-
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
         RunnableWithES runnable = new RunnableWithES("truncateExportToTxnId") {
             @Override
@@ -584,7 +576,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //If this happens the truncate for this generation wont happen means more dupes will be exported.
                     if (m_mastershipAccepted.get()) {
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition skipping truncation." + getPartitionId());
+                            exportLog.debug("Export table " + getTableName() + " mastership already accepted for partition skipping truncation." + getPartitionId());
                         }
                         return;
                     }
@@ -762,8 +754,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = null;
 
                 if (m_drainTraceForDebug != null) {
+                    // TODO this should be impossible
                     //Making this an ERROR. Looks like this is happening when ackImpl initiates drains and pollImpl is submitted to execute.
-                    exportLog.error("Rolling generation " + m_generation + " before it is fully drained. " +
+                    exportLog.error("Rolling generation before it is fully drained. " +
                                             "Drain was called from " + Throwables.getStackTraceAsString(m_drainTraceForDebug));
                 }
             }
@@ -846,7 +839,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_replicaRunning = acceptMastership();
                 //If we didnt accept mastership we will depend on next ack to accept.
                 if (m_replicaRunning) {
-                    exportLog.info("Export generation " + getGeneration() + " accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
+                    exportLog.info("Export accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
                 }
             }
             return;
@@ -913,20 +906,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public synchronized boolean acceptMastership() {
         if (m_onMastership == null) {
-            exportLog.info("Mastership Runnable not yet set " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId());
+            exportLog.info("Mastership Runnable not yet set for table " + getTableName() + " partition " + getPartitionId());
             return false;
         }
         if (m_mastershipAccepted.get()) {
-            exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
+            exportLog.info("Export table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
             return true;
         }
-        exportLog.info("Accepting mastership for export generation " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId());
+        exportLog.info("Accepting mastership for export table " + getTableName() + " partition " + getPartitionId());
         RunnableWithES runnable = new RunnableWithES("acceptMastership") {
             @Override
             public void run() {
                 try {
                     if (!getLocalExecutorService().isShutdown() || !m_closed) {
-                        exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " accepting mastership for partition " + getPartitionId());
+                        exportLog.info("Export table " + getTableName() + " accepting mastership for partition " + getPartitionId());
                         if (m_onMastership != null) {
                             if (m_mastershipAccepted.compareAndSet(false, true)) {
                                 m_onMastership.run();
@@ -973,8 +966,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                         StringBuilder builder = new StringBuilder();
                         builder.append("Export task queue is filled up to: " + m_queuedActions.size());
-                        builder.append(". Not queueing anymore events beyond 50 for generation " + m_generation);
-                        builder.append(" and table " + m_tableName + ". The queue contains the following tasks:\n");
+                        builder.append(". Not queueing any more events beyond 50 for table ");
+                        builder.append(m_tableName + ". The queue contains the following tasks:\n");
                         for (RunnableWithES queuedR : m_queuedActions) {
                             builder.append(queuedR.getTaskName() + "\t");
                          }
@@ -1014,17 +1007,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         synchronized(m_executorLock) {
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Activating ExportDataSource gen " + m_generation
-                                    + " table " + m_tableName + " partition " + m_partitionId + "FirstAction: " + (m_firstAction != null ? "true" : "false"));
+                exportLog.debug("Activating ExportDataSource table " + m_tableName + " partition " + m_partitionId + "FirstAction: " + (m_firstAction != null ? "true" : "false"));
             }
             if (m_executor==null) {
                 ListeningExecutorService es = CoreUtils.getListeningExecutorService(
-                            "ExportDataSource gen " + m_generation
-                            + " table " + m_tableName + " partition " + m_partitionId, 1);
+                            "ExportDataSource table " + m_tableName + " partition " + m_partitionId, 1);
                 //If we have a truncate task do that first.
                 if (m_firstAction != null) {
-                    exportLog.info("Submitting truncate task for ExportDataSource gen " + m_generation
-                            + " table " + m_tableName + " partition " + m_partitionId);
+                    exportLog.info("Submitting truncate task for ExportDataSource table " + m_tableName + " partition " + m_partitionId);
                     es.submit(m_firstAction);
                 }
                 if (m_queuedActions.size()>0) {

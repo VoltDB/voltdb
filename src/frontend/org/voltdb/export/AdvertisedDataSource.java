@@ -32,6 +32,7 @@ public class AdvertisedDataSource
      * representation for decimals so that the format would be more efficient and
      * shareable with other features
      */
+    // TODO: does export sans generation need a different ExportFormat?
     public enum ExportFormat {
         ORIGINAL, FOURDOTFOUR, SEVENDOTX;
     }

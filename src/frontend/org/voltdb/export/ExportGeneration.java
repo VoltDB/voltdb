@@ -591,7 +591,7 @@ public class ExportGeneration implements Generation {
              * This is fine. If the table is dropped it won't have an entry in the generation created
              * after the table was dropped.
              */
-            //            exportLog.error("Could not find export data sources for generation " + m_timestamp + " partition "
+            //            exportLog.error("Could not find export data sources for partition "
             //                    + partitionId);
             return 0;
         }
@@ -602,7 +602,7 @@ public class ExportGeneration implements Generation {
              * This is fine. If the table is dropped it won't have an entry in the generation created
              * after the table was dropped.
              */
-            //exportLog.error("Could not find export data source for generation " + m_timestamp + " partition " + partitionId +
+            //exportLog.error("Could not find export data source for partition " + partitionId +
             //        " signature " + signature);
             return 0;
         }
@@ -613,9 +613,8 @@ public class ExportGeneration implements Generation {
      * Create a datasource based on an ad file
      */
     private void addDataSource(File adFile, Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, true);
+        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile);
         partitions.add(source.getPartitionId());
-        assert source.getGeneration() == 0; // TODO this can be removed
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());
@@ -675,7 +674,7 @@ public class ExportGeneration implements Generation {
     }
 
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
-        //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
+        //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
         //        }
