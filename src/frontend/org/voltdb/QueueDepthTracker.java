@@ -17,12 +17,12 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.Iterator;
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.iv2.SiteTasker;
 
@@ -34,9 +34,11 @@ import org.voltdb.iv2.SiteTasker;
  */
 public class QueueDepthTracker extends SiteStatsSource {
 
+    private static VoltLogger s_logger = new VoltLogger("HOST");
+
     private final AtomicInteger m_depth;
     private long m_lastWaitTime;
-    private Deque<QueueStatus> m_historicalData;
+    private ArrayBlockingQueue<QueueStatus> m_historicalData;
     private LinkedTransferQueue<SiteTasker> m_tasks;
     private long m_maxWaitTimeWindowSize = 5_000_000_000L; // window size set to 5 seconds
     private long m_maxWaitLastLogTime;
@@ -61,7 +63,7 @@ public class QueueDepthTracker extends SiteStatsSource {
 
     public QueueDepthTracker(long siteId, LinkedTransferQueue<SiteTasker> tasks) {
         super(siteId, false);
-        m_historicalData = new ConcurrentLinkedDeque<>();
+        m_historicalData = new ArrayBlockingQueue<>(10);
         m_depth = new AtomicInteger(tasks.size());
         m_lastWaitTime = 0;
         m_maxWaitLastLogTime = System.nanoTime();
@@ -87,20 +89,23 @@ public class QueueDepthTracker extends SiteStatsSource {
             m_recentTotalWaitTime += m_lastWaitTime;
             m_recentPollCount++;
         } else {
-            m_historicalData.addLast(new QueueStatus(currentTime,
+            // remove out of date historical data
+            while (!m_historicalData.isEmpty() &&
+                    m_historicalData.peek().timestamp <
+                    currentTime - m_maxWaitTimeWindowSize) {
+                m_historicalData.poll();
+            }
+            if (!m_historicalData.offer(new QueueStatus(currentTime,
                     m_recentMaxWaitTime,
                     m_recentTotalWaitTime,
-                    m_recentPollCount));
+                    m_recentPollCount))) {
+                //This should never happen...
+                s_logger.warn("Could not insert queue stats data. Current data size: " + m_historicalData.size());
+            }
             m_recentMaxWaitTime = m_lastWaitTime;
             m_recentTotalWaitTime = m_lastWaitTime;
             m_recentPollCount = 1;
             m_maxWaitLastLogTime = currentTime;
-            // remove out of date historical data
-            while (!m_historicalData.isEmpty() &&
-                    m_historicalData.peekFirst().timestamp <
-                    currentTime - m_maxWaitTimeWindowSize) {
-                m_historicalData.pollFirst();
-            }
         }
     }
 
