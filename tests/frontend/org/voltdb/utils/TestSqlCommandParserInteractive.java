@@ -419,7 +419,6 @@ public class TestSqlCommandParserInteractive extends TestCase {
         + "case when a > 100.00 then 'Expensive' else 'Cheap' end "
         + "from t;"
         + "end";
-
         result = cmd.openQuery();
         cmd.submitText("create procedure thisproc as begin \n");
         Thread.sleep(100);
@@ -439,6 +438,39 @@ public class TestSqlCommandParserInteractive extends TestCase {
         assertEquals(1, result.get().size());
         assertEquals(sql, result.get().get(0));
 
+        // case/end with no whitespace before and after it
+        sql = "create procedure thisproc as begin "
+                + "SELECT a, "
+                + "10+case when id < 0 then (id+0)end+100 from aaa;"
+                + "end";
+        result = cmd.openQuery();
+        cmd.submitText("create procedure thisproc as begin ");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("SELECT a, 10+case when id < 0 then (id+0)end+100 from aaa;");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("end;\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(sql, result.get().get(0));
+
+        sql = "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then asc else desc end; "
+                + "end";
+        result = cmd.openQuery();
+        cmd.submitText("create procedure mumble as begin ");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("select * from t order by case when t.a < 1 then asc else desc end; ");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("end;\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(sql, result.get().get(0));
     }
 
     public void testSubQuery() throws Exception
