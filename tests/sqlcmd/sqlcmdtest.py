@@ -275,11 +275,10 @@ def delete_proc(pfile):
         # column[2] gives the procedure name. using set to discard duplicates among partition.
         try:
             if columns[2] != ' ' :
-                print "columns[2] is : " + columns[2] #debug
                 procname = columns[2].replace('\"','')
                 if any( procname.endswith(defaultprocedure) for defaultprocedure in defaultstoredprocedures) :
                     continue
-                print "procname is " + procname  #debug
+                print "user procedure : " + procname  #debug
                 procset.add(procname)
         except IndexError:
             pass
