@@ -853,8 +853,9 @@ SET (VOLTDB_TEST_DIR_LIST "")
 SET (VOLTDB_TEST_ALLTESTS "")
 
 FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
-  STRING(REGEX REPLACE .*/ "" TEST ${TEST_NAME})
-  STRING(REGEX REPLACE /.* "" DIR ${TEST_NAME})
+  STRING(REGEX REPLACE .*/\([^/]*\) "\\1" TEST ${TEST_NAME})
+  STRING(REGEX REPLACE /[^/]* "" DIR ${TEST_NAME})
+  # MESSAGE("Parse from ${TEST_NAME} is ${DIR} and ${TEST}")
   LIST(FIND VOLTDB_TEST_ALLTESTS ${TEST} FIND_IDX)
   IF (NOT ${FIND_IDX} LESS 0)
     MESSAGE(FATAL_ERROR "Duplicate test name ${TEST_NAME}")
@@ -879,14 +880,14 @@ INCLUDE(VoltDB.cmake)
 ########################################################################
 ADD_CUSTOM_TARGET(build-all-tests)
 ADD_CUSTOM_TARGET(run-all-tests
-  COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAIL=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT})
+  COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT})
 ADD_DEPENDENCIES(run-all-tests build-all-tests)
 FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
   # We assign each test the label of its test directory.
   # So running all tests is just running all tests with
   # the given label.
   ADD_CUSTOM_TARGET(run-${TEST_DIR}
-    COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAIL=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -L ${TEST_DIR})
+    COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -L ${TEST_DIR})
   ADD_CUSTOM_TARGET(build-${TEST_DIR})
   ADD_CUSTOM_COMMAND(TARGET build-${TEST_DIR}
     PRE_BUILD
@@ -907,6 +908,7 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     ADD_CUSTOM_COMMAND(TARGET ${TEST_NAME}
       PRE_BUILD
       COMMAND ${CMAKE_COMMAND} -E make_directory cpptests/${TEST_DIR}
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/tests/test_working_dir
       )
     ADD_DEPENDENCIES(build-${TEST_DIR} ${TEST_NAME})
     SET_TARGET_PROPERTIES(${TEST_NAME}
@@ -930,7 +932,7 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     #
     # Calculate the actual test command.
     #
-    SET(TARGET_EXE_CMD cpptests/${TEST_DIR}/${TEST_NAME})
+    SET(TARGET_EXE_CMD ${CMAKE_BINARY_DIR}/cpptests/${TEST_DIR}/${TEST_NAME})
     #
     # We expect all the memleak tests to fail, except for
     # the test no_losses.  It's possible, but not obvious,
@@ -958,13 +960,13 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD OUTPUT_IS_PYTHON_TEST)
     # So, "make ${TEST_NAME}"" builds the test and
     # "make run-${TEST_NAME}" runs the single test.
+    # MESSAGE("Test run-${TEST_NAME} has command ${CTEST_EXE_CMD}.")
     ADD_TEST(NAME ${TEST_NAME}
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_working_dir
       COMMAND ${CTEST_EXE_CMD})
+    ADD_DEPENDENCIES(run-${TEST_DIR} ${TEST_NAME})
     ADD_CUSTOM_TARGET(run-${TEST_NAME}
-      DEPENDS ${CTEST_EXE_CMD}
-      COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAIL=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -R ${TEST_NAME}
-      )
+      COMMAND /usr/bin/env /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -R ${TEST_NAME})
     # Some tests are expected to fail.  Also, tag the
     # test with it label.
     SET_TESTS_PROPERTIES(${TEST_NAME}

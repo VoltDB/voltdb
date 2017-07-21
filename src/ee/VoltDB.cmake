@@ -8,7 +8,7 @@ FUNCTION(JOIN VALUES GLUE OUTPUT)
 ENDFUNCTION()
 
 FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD WILL_FAIL OUTPUT_VAR OUTPUT_IS_VALGRIND_TEST)
-  SET(SUPPRESSIONS ${CMAKE_SOURCE_DIR}/${VOLTDB_EE_TEST_DIR}/test_utils/vdbsuppressions.supp)
+  SET(SUPPRESSIONS ${VOLTDB_ROOT}/tests/ee/test_utils/vdbsuppressions.supp)
   IF ( WILL_FAIL )
     SET(FAIL_ARG --expect-fail=true)
   ELSE()
@@ -23,6 +23,9 @@ FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD WILL_FAIL OUTPUT_V
       "valgrind"
       "--leak-check=full"
       "--show-reachable=yes"
+      "--show-leak-kinds=all"
+      "--errors-for-leak-kinds=all"
+      "--track-origins=yes"
       "--error-exitcode=1"
       "--suppressions=${SUPPRESSIONS}"
       "--xml=yes"
@@ -47,7 +50,7 @@ FUNCTION(PYTHON_COMMAND TEST_DIR TEST_NAME TEST_EXE_CMD OUTPUT_VAR OUTPUT_IS_PYT
   LIST(LENGTH PYTHON_SCRIPTS IS_PYTHON)
   IF (${IS_PYTHON} GREATER 0)
     LIST(GET PYTHON_SCRIPTS 0 PYTHON_SCRIPT)
-    LIST(INSERT TEST_EXE_CMD 0 ${PYTHON_SCRIPT})
+    LIST(INSERT TEST_EXE_CMD 0 "${PYTHON_SCRIPT}")
     SET(${OUTPUT_IS_PYTHON_TEST} 1 PARENT_SCOPE)
     # MESSAGE("Python Command for ${TEST_NAME} is ${TEST_EXE_CMD}")
   ELSE()

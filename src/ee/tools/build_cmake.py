@@ -275,8 +275,12 @@ def configureCommandString(config):
         coverage = "ON"
     if config.profile:
         profile = 'ON'
-    return 'cmake -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s %s' \
-             % (config.buildtype, config.generator, coverage, profile, config.srcdir)
+    if config.buildtype == 'debug' or config.buildtype == 'memcheck':
+        cmakeBuildType="Debug"
+    else:
+        cmakeBuildType="Release"
+    return 'cmake -DCMAKE_BUILD_TYPE=%s -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s %s' \
+             % (cmakeBuildType, config.buildtype, config.generator, coverage, profile, config.srcdir)
 
 ########################################################################
 #
@@ -412,8 +416,7 @@ def doConfigure(config):
 def doBuild(config):
     buildCmd = buildCommandString(config)
     if buildCmd:
-        rc = runCommand(buildCmd, config)
-        if rc:
+        if not runCommand(buildCmd, config):
             print("Build command \"%s\" failed." % buildCmd)
             sys.exit(100)
 
