@@ -80,7 +80,7 @@ public class TestSpSchedulerDedupe extends TestCase
     private static SiteTaskerQueue getSiteTaskerQueue() {
         SiteTaskerQueue queue = new SiteTaskerQueue(0);
         queue.setStarvationTracker(new StarvationTracker(0));
-        queue.setQueueDepthTracker(new QueueDepthTracker(0));
+        queue.setupQueueDepthTracker(0);
         return queue;
     }
 
