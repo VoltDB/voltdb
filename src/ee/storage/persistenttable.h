@@ -247,9 +247,9 @@ public:
     }
 
     TableIterator iteratorDeletingAsWeGo() {
-        m_iter.reset(m_data.begin());
-        m_iter.setTempTableDeleteAsGo(false);
-        return m_iter;
+        // we don't delete persistent tuples "as we go",
+        // so just return a normal iterator.
+        return iterator();
     }
 
 

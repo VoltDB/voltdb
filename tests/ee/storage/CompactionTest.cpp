@@ -111,6 +111,14 @@ public:
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
 
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+
         m_primaryKeyIndexColumns.push_back(0);
 
         m_undoToken = 0;
