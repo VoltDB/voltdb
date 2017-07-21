@@ -34,11 +34,11 @@ import org.voltdb.iv2.SiteTasker;
  */
 public class QueueDepthTracker extends SiteStatsSource {
 
-    private static VoltLogger s_logger = new VoltLogger("HOST");
+    private static final VoltLogger s_logger = new VoltLogger("HOST");
 
     private final AtomicInteger m_depth;
     private long m_lastWaitTime;
-    private ArrayBlockingQueue<QueueStatus> m_historicalData;
+    private final ArrayBlockingQueue<QueueStatus> m_historicalData;
     private LinkedTransferQueue<SiteTasker> m_tasks;
     private long m_maxWaitTimeWindowSize = 5_000_000_000L; // window size set to 5 seconds
     private long m_maxWaitLastLogTime;
