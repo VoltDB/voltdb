@@ -146,8 +146,7 @@ public interface VoltDBInterface
      * @param newCatalogBytes The catalog bytes.
      * @param catalogBytesHash  The SHA-1 hash of the catalog bytes
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
-     * @param currentTxnId
-     * @param currentTxnTimestamp
+     * @param genId stream table catalog generation id
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentBytes  The deployment file bytes
      * @param deploymentHash The SHA-1 hash of the deployment file
@@ -157,14 +156,12 @@ public interface VoltDBInterface
             byte[] newCatalogBytes,
             byte[] catalogBytesHash,
             int expectedCatalogVersion,
-            long currentTxnId,
-            long currentTxnTimestamp,
+            long genId,
             byte[] deploymentBytes,
             byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration,
-            long ccrTime);
+            boolean requiresNewExportGeneration);
 
     /**
      * Given the information, write the new catalog jar file only

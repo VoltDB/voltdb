@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -47,6 +48,8 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -63,6 +66,8 @@ import org.voltdb.utils.InMemoryJarfile;
 public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     protected static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    private static final AtomicLong m_generationId = new AtomicLong(0);
 
     /**
      *
@@ -427,6 +432,16 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return null;
     }
 
+    /**
+     * Get a unique id for the next generation for export.
+     * @return next generation id (a unique long value)
+     */
+    public static long getNextGenerationId() {
+        return UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(),
+                                                      m_generationId.incrementAndGet(),
+                                                      MpInitiator.MP_INIT_PID);
+    }
+
     protected CompletableFuture<ClientResponse> updateApplication(String invocationName,
                                                                   final byte[] operationBytes,
                                                                   final String operationString,
@@ -511,6 +526,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                              ccr.catalogHash,
                              ccr.catalogBytes,
                              ccr.expectedCatalogVersion,
+                             getNextGenerationId(),
                              ccr.deploymentString,
                              ccr.tablesThatMustBeEmpty,
                              ccr.reasonsForEmptyTables,
@@ -518,8 +534,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                              ccr.deploymentHash,
                              ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                              ccr.hasSchemaChange ?  1 : 0,
-                             ccr.requiresNewExportGeneration ? 1 : 0,
-                             ccr.m_ccrTime);
+                             ccr.requiresNewExportGeneration ? 1 : 0);
     }
 
 }

@@ -21,8 +21,6 @@ import org.voltdb.client.ProcedureInvocationType;
 
 public class CatalogChangeResult {
 
-    public static final long CATALOG_CHANGE_NOREPLAY = -1L;
-
     public String errorMsg = null;
     public byte[] catalogHash;
     public byte[] catalogBytes;
@@ -45,6 +43,4 @@ public class CatalogChangeResult {
     public int expectedCatalogVersion = -1;
     // This is set to true if schema change involves stream or connector changes or a view on stream is created or dropped.
     public boolean requiresNewExportGeneration;
-    //Catalog change replay time is computed on replay to get a generation in future of reset of the generations loaded for export.
-    public long m_ccrTime = CATALOG_CHANGE_NOREPLAY;
 }

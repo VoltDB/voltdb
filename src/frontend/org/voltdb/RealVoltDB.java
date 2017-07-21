@@ -3391,14 +3391,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             byte[] newCatalogBytes,
             byte[] catalogBytesHash,
             int expectedCatalogVersion,
-            long currentTxnId,
             long currentTxnUniqueId,
             byte[] deploymentBytes,
             byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
-            boolean requiresNewExportGeneration,
-            long ccrTime)
+            boolean requiresNewExportGeneration)
     {
         try {
             synchronized(m_catalogUpdateLock) {
@@ -3425,7 +3423,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             true,
                             deploymentBytes,
                             m_messenger,
-                            hasSchemaChange, ccrTime);
+                            hasSchemaChange);
 
                 // log the stuff that's changed in this new catalog update
                 SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
