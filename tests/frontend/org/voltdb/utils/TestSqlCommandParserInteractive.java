@@ -392,6 +392,27 @@ public class TestSqlCommandParserInteractive extends TestCase {
         assertEquals(create, result.get().get(0));
     }
 
+    public void testCreateMultiStmtProcedure() throws Exception
+    {
+        CommandStuff cmd = new CommandStuff();
+        Future<List<String>> result = cmd.openQuery();
+        cmd.submitText("create procedure pr as begin\n");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("select * from t;\n");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("insert into t values (1);\n");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("end;\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals("create procedure pr as begin\nselect * from t;\ninsert into t values (1);\nend",
+                result.get().get(0));
+    }
+
     public void testSubQuery() throws Exception
     {
         CommandStuff cmd = new CommandStuff();
