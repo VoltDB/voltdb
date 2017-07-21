@@ -129,8 +129,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         assert(validatedHomogeonousSQL.size() == 0);
 
         List<String> sqlStatements = SQLLexer.splitStatements(sql).completelyParsedStmts;
-//        SplitStmtResults parsedResults = SQLLexer.splitStatements(sql);
-//        List<String> sqlStatements = parsedResults.getParsedStmts();
 
         // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
         Boolean hasDDL = null;

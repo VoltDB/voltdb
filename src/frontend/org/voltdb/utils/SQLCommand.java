@@ -790,7 +790,7 @@ public class SQLCommand
             statement.append(line).append("\n");
 
             // Check if the current statement ends here and now.
-            // if it is a multi statement procedure, continue to execute till END
+            // if it is an incomplete multi statement procedure, it is returned back
             if (SQLParser.isSemiColonTerminated(line)) {
                 if (batch == null) {
                     String statementString = statement.toString();
