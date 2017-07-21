@@ -92,7 +92,7 @@ public class TestSqlCmdInterface
         String raw = "   select * from Dummy where id  =    1;;;;    " +
                       "   select * from          dummy2;        ";
         ID = 3;
-        String expected = raw.replaceAll("\\s*;+\\s*", ";");
+        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
         assertThis(raw, expected, 2, ID);
     }
 
@@ -111,7 +111,7 @@ public class TestSqlCmdInterface
         String raw = "     INSERT INTO      Dummy " +
                       "            vALUES (value1, NULL, null, '', ...);";
         ID = 6;
-        String expected = raw.replaceAll("\\s*;+\\s*", ";");
+        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
         assertThis(raw, expected, 1, ID);
     }
 
@@ -133,7 +133,7 @@ public class TestSqlCmdInterface
     public void testParseQuery8() {
         String raw = "SELECT * FROM table --UNION SELECT * FROM table2;";
         ID = 8;
-        String expected = "SELECT * FROM table ;";
+        String expected = "SELECT * FROM table;";
         assertThis(raw, expected, 1, ID);
     }
 
@@ -145,7 +145,7 @@ public class TestSqlCmdInterface
     public void testParseQuery9() {
         String raw = "SELECT * FROM table --UNION --SELECT * FROM table2;";
         ID = 9;
-        String expected = "SELECT * FROM table ;";
+        String expected = "SELECT * FROM table;";
         assertThis(raw, expected, 1, ID);
     }
 
@@ -156,7 +156,7 @@ public class TestSqlCmdInterface
     public void testParseQuery10() {
         String raw = "SELECT * FROM table -- SELECT * FROM table2;";
         ID = 10;
-        String expected = "SELECT * FROM table ;";
+        String expected = "SELECT * FROM table;";
         assertThis(raw, expected, 1, ID);
 
     }
@@ -168,7 +168,7 @@ public class TestSqlCmdInterface
     public void testParseQuery11() {
         String raw = "  create tAble xxx   (col1_name type(), col2_name type());";
         ID = 11;
-        String expected = raw.replaceAll("\\s*;+\\s*", ";");
+        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
         assertThis(raw, expected, 1, ID);
     }
 
@@ -179,7 +179,7 @@ public class TestSqlCmdInterface
     public void testParseQuery13() {
         String raw = " select * From dummy;   create tAble xxx  (col1_name type(), col2_name type()) ;  ";
         ID = 2;
-        String expected = raw.replaceAll("\\s*;+\\s*", ";");
+        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
         assertThis(raw, expected, 2, ID);
     }
 
@@ -191,7 +191,7 @@ public class TestSqlCmdInterface
         ID = 14;
         String expected = raw;
         // sqlcmd always replace semicolons with ONE space
-        expected = expected.replaceAll("\\s*;+\\s*", ";");
+        expected = expected.replaceAll("\\s*;+\\s*", ";").trim();
         assertThis(raw, expected, 2, ID);
     }
 
@@ -243,7 +243,7 @@ public class TestSqlCmdInterface
     public void testParseQuery19() {
         ID = 19;
         String raw = " insert into tablename (col1, col2) values ('   1st 2nd 3rd  ', '   ');";
-        String expected = raw.replaceAll("\\s*;+\\s*", ";");
+        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
         assertThis(raw, expected, 1, ID);
     }
 
@@ -253,7 +253,7 @@ public class TestSqlCmdInterface
         ID = 20;
         String raw = " insert into votes (phone-number, state, CONTESTANT_NUMBER) " +
                 "values (978-475-      0001, 'MA', null);";
-        String expected = raw.replaceAll("\\s*;+\\s*", ";");
+        String expected = raw.replaceAll("\\s*;+\\s*", ";").trim();
         assertThis(raw, expected, 1, ID);
     }
 
@@ -337,10 +337,10 @@ public class TestSqlCmdInterface
                 + "from -- comment no semicolon\n"
                 + "table -- comment with semicolon;";
 
-        String expected = " select \n"
+        String expected = "select \n"
                 + "* \n"
                 + "from \n"
-                + "table ;";
+                + "table;";
         assertThis(raw, expected, 1, ID);
     }
 
