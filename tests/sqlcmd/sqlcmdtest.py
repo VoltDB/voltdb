@@ -267,7 +267,7 @@ def compare_cleaned_to_baseline(parent, baseparent, path, inpath, do_refresh, re
 
 def delete_proc(pfile):
     # drop any procedures left in between any tests
-    systemgeneratedprocedures = {".insert",".update",".select",".delete",".upsert"}
+    defaultstoredprocedures = {".insert",".update",".select",".delete",".upsert"}
     procset = set()
 
     for line in pfile.splitlines():
@@ -277,8 +277,9 @@ def delete_proc(pfile):
             if columns[2] != ' ' :
                 print "columns[2] is : " + columns[2] #debug
                 procname = columns[2].replace('\"','')
-                if any( systemprocedure in procname for systemprocedure in systemgeneratedprocedures) :
+                if any( procname.endswith(defaultprocedure) for defaultprocedure in defaultstoredprocedures) :
                     continue
+                print "procname is " + procname  #debug
                 procset.add(procname)
         except IndexError:
             pass
