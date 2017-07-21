@@ -96,8 +96,10 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                     });
                 }
             }
-            // Connection lost response is ignored because this data loader has auto-reconnect feature
-            else if (status != ClientResponse.CONNECTION_LOST){
+            else if (status == ClientResponse.CONNECTION_LOST) {
+                // TODO
+            }
+            else {
                 m_failedCount.incrementAndGet();
                 m_errHandler.handleError(m_csvLine, response, response.getStatusString());
             }
@@ -172,9 +174,6 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                 }
                 // Row inserted successfully, so move on
                 break;
-            } catch (NoConnectionsException ex) {
-                // Connection failed. Retry every one second
-                Thread.sleep(1000);
             } catch (IOException ex) {
                 // Connection failed. Retry every one second
                 Thread.sleep(1000);

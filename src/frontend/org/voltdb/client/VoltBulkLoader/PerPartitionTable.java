@@ -32,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -240,7 +239,7 @@ public class PerPartitionTable {
                 }
             };
 
-            loadTableWithRetry(callback, tmpTable);
+            loadTable(callback, tmpTable);
         }
     }
 
@@ -279,28 +278,6 @@ public class PerPartitionTable {
     }
 
     private void loadTable(ProcedureCallback callback, VoltTable toSend) throws Exception {
-        if (toSend.getRowCount() <= 0) {
-            return;
-        }
-
-        try {
-            if (m_isMP) {
-                m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
-            } else {
-                Object rpartitionParam = VoltType.valueToBytes(toSend.fetchRow(0).get(
-                        m_partitionedColumnIndex, m_partitionColumnType));
-                m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
-            }
-        } catch (IOException e) {
-            final ClientResponse r = new ClientResponseImpl(
-                    ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                    "Connection to database was lost");
-            callback.clientCallback(r);
-        }
-        toSend.clearRowData();
-    }
-
-    private void loadTableWithRetry(ProcedureCallback callback, VoltTable toSend) throws Exception {
         if (toSend.getRowCount() <= 0) {
             return;
         }
