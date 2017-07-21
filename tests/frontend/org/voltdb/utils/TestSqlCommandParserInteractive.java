@@ -440,15 +440,15 @@ public class TestSqlCommandParserInteractive extends TestCase {
 
         // double quoted identifiers with embedded semicolons
         // are yet not handled correctly---this test will fail
-        //
-        // result = cmd.openQuery();
-        // insert = "insert into hats (\"fo;o\", bar) " +
-        //     "( ( ( (((( (select goat, chicken from hats))))))))";
-        // cmd.submitText(insert + ";\n");
-        // cmd.waitOnResult();
-        // System.out.println("RESULT: " + result.get());
-        // assertEquals(1, result.get().size());
-        // assertEquals(insert, result.get().get(0));
+        // works from ENG-12846 multi stmt sp - changed parser
+         result = cmd.openQuery();
+         insert = "insert into hats (\"fo;o\", bar) " +
+             "( ( ( (((( (select goat, chicken from hats))))))))";
+         cmd.submitText(insert + ";\n");
+         cmd.waitOnResult();
+         System.out.println("RESULT: " + result.get());
+         assertEquals(1, result.get().size());
+         assertEquals(insert, result.get().get(0));
     }
 
     /**
