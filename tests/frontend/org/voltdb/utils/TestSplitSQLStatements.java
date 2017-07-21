@@ -62,12 +62,12 @@ public class TestSplitSQLStatements {
         checkSplitter(" a\"b ; c \\\" 'd;ef' \" ; ", "a\"b ; c \\\" 'd;ef' \"");
         checkSplitter(" a'b ; c \\' \"d;ef\" ' ; ", "a'b ; c \\' \"d;ef\" '");
         checkSplitter("a;;b;;c;;", "a", "b", "c");
-        checkSplitter("abc --;def\n;ghi", "abc --;def", "ghi");
+        checkSplitter("abc --;def\n;ghi", "abc", "ghi");
         checkSplitter("abc /*\";def\n;*/ghi", "abc /*\";def\n;*/ghi");
         checkSplitter("a\r\nb;c\r\nd;", "a\r\nb", "c\r\nd");
-        checkSplitter("--one\n--two\nreal", "--one", "--two", "real");
-        checkSplitter("  --one\n  --two\nreal", "--one", "--two", "real");
-        checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "--def", "/*ghi\njkl;*/");
+        checkSplitter("--one\n--two\nreal", "real");
+        checkSplitter("  --one\n  --two\nreal", "real");
+        checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "/*ghi\njkl;*/");
     }
 
     @Test
@@ -247,7 +247,13 @@ public class TestSplitSQLStatements {
                   + "select * from r where f = 'foo';"
                   + "select * from r where f = 'begin' or f = 'END';"
                   + "end;";
-        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+        String expected = "create procedure thisproc as "
+        + "begin \n"
+        + "select * from t;"
+        + "select * from r where f = 'foo';"
+        + "select * from r where f = 'begin' or f = 'END';"
+        + "end";
+        checkSplitter(sql, expected);
 
         sql = "create procedure thisproc as "
                 + "begin \n"

@@ -350,9 +350,9 @@ public class SQLLexer extends SQLPatternFactory
         // strip out comments
         String sqlNoComments = SQLParser.AnyWholeLineComments.matcher(sql).replaceAll("");
         sqlNoComments = SQLParser.EndOfLineComment.matcher(sqlNoComments).replaceAll("");
-        // TODO: use sqlNoComments instead of sql
+
         // Use a character array for efficient character-at-a-time scanning.
-        char[] buf = sql.toCharArray();
+        char[] buf = sqlNoComments.toCharArray();
         // Set to null outside of quoted segments or the quote character inside them.
         Character cQuote = null;
         // Set to null outside of comments or to the string that ends the comment.
@@ -368,9 +368,6 @@ public class SQLLexer extends SQLPatternFactory
         boolean inBegin = false;
         // To indicate if inside CASE .. WHEN
         int inCase = 0;
-        // TODO: remove the bufStr and use sqlNoComments
-        // needed for string region matching
-        String bufStr = new String(buf);
         int iCur = 0;
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
@@ -431,10 +428,10 @@ public class SQLLexer extends SQLPatternFactory
                 }
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
-                if( matchToken(bufStr, iCur, "case") ) {
+                if( matchToken(sqlNoComments, iCur, "case") ) {
                     inCase++;
                     iCur += 4;
-                } else if ( matchToken(bufStr, iCur, "begin") ) {
+                } else if ( matchToken(sqlNoComments, iCur, "begin") ) {
                     inBegin = true;
                     iCur += 5;
                 } else if ( !inBegin && buf[iCur] == ';') {
@@ -451,7 +448,7 @@ public class SQLLexer extends SQLPatternFactory
                     // Start of quoted string.
                     cQuote = buf[iCur];
                     iCur++;
-                } else if ( matchToken(bufStr, iCur, "end") ) {
+                } else if ( matchToken(sqlNoComments, iCur, "end") ) {
                     if (inCase > 0) {
                         inCase--;
                     } else {
