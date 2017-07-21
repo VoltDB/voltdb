@@ -684,6 +684,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long spHandle, long uniqueId) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
     public void setDRStreamEnd(long spHandle, long uniqueId) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
