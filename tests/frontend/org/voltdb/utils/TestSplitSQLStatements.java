@@ -74,12 +74,17 @@ public class TestSplitSQLStatements {
     public void testProcSQLSplit() {
         checkSplitter("begi", "begi");
         checkSplitter("begin end", "begin end");
-        checkSplitter("begin en", "begin en");
-        checkSplitter("begin enf", "begin enf");
+
+        // the next test will not return completely parsed statements
+        // because begin has not end yet, they are incomplete
+        String sql = "begin en";
+        SplitStmtResults parsedOut = SQLLexer.splitStatements(sql);
+        assertEquals(0, parsedOut.completelyParsedStmts.size());
+        assertEquals(sql, parsedOut.incompleteStmt);
 
         checkSplitter("CREATE PROCEDURE foo as SELECT * from t;", "CREATE PROCEDURE foo as SELECT * from t");
 
-        String sql = "CREATE PROCEDURE foo AS "
+        sql = "CREATE PROCEDURE foo AS "
                 + "BEGIN "
                 + "SELECT * from t; "
                 + "SELECT * from t; "
@@ -106,12 +111,16 @@ public class TestSplitSQLStatements {
           "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; END abc", "def");
 
         // there is no END statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
-        checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;",
-                "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;");
+        sql = "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;";
+        parsedOut = SQLLexer.splitStatements(sql);
+        assertEquals(0, parsedOut.completelyParsedStmts.size());
+        assertEquals(sql, parsedOut.incompleteStmt);
 
         // enf is not end of statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
-        checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;",
-                "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;");
+        sql = "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;";
+        parsedOut = SQLLexer.splitStatements(sql);
+        assertEquals(0, parsedOut.completelyParsedStmts.size());
+        assertEquals(sql, parsedOut.incompleteStmt);
 
         checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end",
                 "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end");
