@@ -1013,6 +1013,9 @@ public abstract class ProcedureCompiler {
             partitionClauseData = processPartitionSubClause(compiler, db, procedure, partitionClauses[1], info);
             procedure.setPartitionparameter2(partitionClauseData.partitionParamIndex);
             procedure.setPartitioncolumn2(partitionClauseData.partitionColumn);
+            procedure.setPartitiontable2(partitionClauseData.partitionTable);
         }
+
+        // TODO: set the isSinglePartition to be false here ?
     }
 }
