@@ -706,10 +706,15 @@
             ChartLatencyDetailAnalysis.height(barHeight);
             $("#divVisualizeLatencyDetail").css("height", barHeight-10);
             dataLatencyDetailAnalysis[0]["values"] = dataLatency;
+
             d3.select("#visualizeLatencyDetail")
                 .datum(dataLatencyDetailAnalysis)
                 .transition().duration(500)
                 .call(ChartLatencyDetailAnalysis);
+
+                   $("#visualizeLatencyDetail").find('.nvd3').removeAttr("x");
+            $("#visualizeLatencyDetail").find('.nvd3').attr("x",344);
+            $("#visualizeLatencyDetail").find('.nvd3').attr("y",172);
         }
 
         this.RefreshFrequencyDetailGraph = function(freqDetails){
@@ -722,6 +727,8 @@
                 .datum(dataFrequencyDetailAnalysis)
                 .transition().duration(500)
                 .call(ChartFrequencyDetailAnalysis);
+            $("#visualizeFrequencyDetails").find('.nvd3').attr("x",344);
+            $("#visualizeFrequencyDetails").find('.nvd3').attr("y",172);
         }
 
         this.RefreshCombinedDetailGraph = function(dataCombined){
@@ -734,6 +741,8 @@
                 .datum(dataCombinedDetailAnalysis)
                 .transition().duration(500)
                 .call(ChartCombinedDetailAnalysis);
+            $("#visualizeCombinedDetails").find('.nvd3').attr("x",344);
+            $("#visualizeCombinedDetails").find('.nvd3').attr("y",172);
         }
 
         nv.addGraph({
