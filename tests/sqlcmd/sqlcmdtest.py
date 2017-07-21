@@ -269,11 +269,13 @@ def delete_proc(pfile):
     # drop any procedures left in between any tests
     systemgeneratedprocedures = {".insert",".update",".select",".delete",".upsert"}
     procset = set()
-    for line in pfile:
+
+    for line in pfile.splitlines():
         columns = line.split(',')
         # column[2] gives the procedure name. using set to discard duplicates among partition.
         try:
             if columns[2] != ' ' :
+                print "columns[2] is : " + columns[2] #debug
                 procname = columns[2].replace('\"','')
                 if any( systemprocedure in procname for systemprocedure in systemgeneratedprocedures) :
                     continue
@@ -292,18 +294,19 @@ def delete_proc(pfile):
         childin.close()
 
         childin = open(filename, 'r')
-        childout = open((filename + '.out'), 'w+')
-        childerr = open((filename + '.err'), 'w+')
+        proc = subprocess.Popen(['../../bin/sqlcmd'],
+                        stdin=childin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc.wait()
 
-        subprocess.call(['../../bin/sqlcmd'],
-                        stdin=childin, stdout=childout, stderr=childerr)
+        (stdoutprocdata, stderrdata) = proc.communicate()
+        print 'stdoutprocdata is : \n' + stdoutprocdata + '\n' #debug
 
 
 
 def delete_table_and_view(pfile):
     # drop table (unique) and all its views left in between any tests
     tableset = set()
-    for line in pfile:
+    for line in pfile.splitlines():
         columns = line.split(',')
         # column[5] gives the table and views. using set to discard duplicates among partition.
         try:
@@ -324,47 +327,45 @@ def delete_table_and_view(pfile):
         childin.close()
 
         childin = open(filename, 'r')
-        childout = open((filename + '.out'), 'w+')
-        childerr = open((filename + '.err'), 'w+')
 
-        subprocess.call(['../../bin/sqlcmd'],
-                        stdin=childin, stdout=childout, stderr=childerr)
+        proc = subprocess.Popen(['../../bin/sqlcmd'],
+                        stdin=childin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc.wait()
+
+        (stdouttabledata, stderrdata) = proc.communicate()
+        print 'stdouttabledata is : \n' + stdouttabledata + '\n' #debug
+
 
 def test_drop_table_proc_view():
     for files in os.listdir("test_droptableproc"):
         if files.endswith(".in"):
-            print 'running test.. ' + (os.path.join("./test_droptableproc", files))
+            print 'running test.. ' + (os.path.join("./test_droptableproc", files)) # debug
             childin = open(os.path.join("./test_droptableproc", files),'r')
-            childout = open( os.path.join("./test_droptableproc", files + '.out'), 'w+')
-            childerr = open(os.path.join("./test_droptableproc", files + '.err'), 'w+')
-            subprocess.call(['../../bin/sqlcmd'],
-                        stdin=childin, stdout=childout, stderr=childerr)
 
-            childout.flush()
-            childerr.flush()
+            proc = subprocess.Popen(['../../bin/sqlcmd'],
+                        stdin=childin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc.wait()
 
-            childout = open(os.path.join("./test_droptableproc", files + '.proc' + '.out'), 'w+')
-            childerr = open(os.path.join("./test_droptableproc", files + '.proc' +'.err'), 'w+')
+            (stdoutdata, stderrdata) = proc.communicate()
 
-            subprocess.call(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
-                stdout=childout, stderr=childerr)
+            proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc.wait()
 
-            pfile = file(os.path.join("./test_droptableproc", files + '.proc' + '.out'), 'r')
+            (stdoutproceduredata, stdoutprocedurerr) = proc.communicate()
 
-            delete_proc(pfile)
+            print "stdoutproceduredata .. \n" + stdoutproceduredata + '\n' #debug
+            delete_proc(stdoutproceduredata)
 
-            childout.flush()
-            childerr.flush()
+            proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-            childout = open(os.path.join("./test_droptableproc", files + '.table' + '.out'), 'w+')
-            childerr = open(os.path.join("./test_droptableproc", files + '.table' +'.err'), 'w+')
+            proc.wait()
+            (stdouttabledata, stdouttableerr) = proc.communicate()
 
-            subprocess.call(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
-                    stdout=childout, stderr=childerr)
+            print "stdouttabledata .. \n" + stdouttabledata + '\n' #debug
 
-            pfile = file(os.path.join("./test_droptableproc", files + '.table' + '.out'), 'r')
-
-            delete_table_and_view(pfile)
+            delete_table_and_view(stdouttabledata)
 
 
 
@@ -442,43 +443,25 @@ def do_main():
                         stdin=childin, stdout=childout, stderr=childerr)
 
                 # Verify a clean database by dropping any procedure,views and table after each test to prevent cross-contamination.
-                childout.flush()
-                childerr.flush()
+                proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                childout = open(os.path.join(parent, prefix + '.out' + '.procedure'), 'w+')
-                childerr = open(os.path.join(parent, prefix + '.err' + '.procedure'), 'w+')
+                proc.wait()
+                (stdoutprocdata, stdoutprocerr) = proc.communicate()
 
-                subprocess.call(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
-                    stdout=childout, stderr=childerr)
+                print "stdoutprocdata .. \n" + stdoutprocdata + '\n' #debug
 
-                pfile = file(os.path.join(parent, prefix + '.out' + '.procedure'), 'r')
+                delete_proc(stdoutprocdata)
 
-                delete_proc(pfile)
+                proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                #clean up
-                os.remove(os.path.join(parent, prefix + '.out' + '.procedure'))
-                os.remove(os.path.join(parent, prefix + '.err' + '.procedure'))
+                proc.wait()
+                (stdouttabledata, stdouttableerr) = proc.communicate()
 
+                print "stdouttabledata .. \n" + stdouttabledata + '\n' #debug
 
-                childout.flush()
-                childerr.flush()
-                pfile.flush()
-
-                childout = open(os.path.join(parent, prefix + '.out' + '.table'), 'w+')
-                childerr = open(os.path.join(parent, prefix + '.err' + '.table'), 'w+')
-
-                subprocess.call(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
-                    stdout=childout, stderr=childerr)
-
-                pfile = file(os.path.join(parent, prefix + '.out' + '.table'), 'r')
-
-
-                delete_table_and_view(pfile)
-
-                # clean up
-                os.remove(os.path.join(parent, prefix + '.out' + '.table'))
-                os.remove(os.path.join(parent, prefix + '.err' + '.table'))
-
+                delete_table_and_view(stdouttabledata)
 
                 # fuzz the sqlcmd output for reliable comparison
                 clean_output(parent, prefix + '.out')
