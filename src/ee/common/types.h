@@ -513,6 +513,7 @@ enum DREventType {
     DR_STREAM_START = 3,
     SWAP_TABLE = 4,
     DR_STREAM_END = 5,
+    DR_ELASTIC_CHANGE = 6,
 };
 
 
