@@ -156,8 +156,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_tasks.setStarvationTracker(tracker);
     }
 
-    public void setQueueDepthTracker(QueueDepthTracker tracker) {
-        m_tasks.setQueueDepthTracker(tracker);
+    public QueueDepthTracker setupQueueDepthTracker(long siteId) {
+        return m_tasks.setupQueueDepthTracker(siteId);
     }
 
     public void setLock(Object o) {

@@ -95,8 +95,8 @@ public class SiteTaskerQueue
         m_starvationTracker = tracker;
     }
 
-    public void setQueueDepthTracker(QueueDepthTracker tracker) {
-        m_queueDepthTracker = tracker;
-        m_queueDepthTracker.beginQueueDepth(m_tasks.size(), m_tasks);
+    public QueueDepthTracker setupQueueDepthTracker(long siteId) {
+        m_queueDepthTracker = new QueueDepthTracker(siteId, m_tasks);
+        return m_queueDepthTracker;
     }
 }
