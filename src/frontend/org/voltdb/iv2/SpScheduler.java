@@ -502,6 +502,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -540,6 +541,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getUniqueId(),
                             msg.isReadOnly(),
                             msg.isSinglePartition(),
+                            null,
                             msg.getStoredProcedureInvocation(),
                             msg.getClientInterfaceHandle(),
                             msg.getConnectionId(),
@@ -971,6 +973,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalFragmentOffer(FragmentTaskMessage msg)
     {
+        // useful to debug/verify a two-part procedure is being run where it's supposed to be run
+        /*if (msg.getProcedureName() != null) {
+            if (msg.getProcedureName().contains("DoubleVote")) {
+                System.out.printf("Partition %d got message: %s\n", this.m_partitionId, msg.getProcedureName());
+                System.out.flush();
+            }
+        }*/
+
         final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
