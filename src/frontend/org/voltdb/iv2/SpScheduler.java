@@ -963,6 +963,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             m_mailbox.getHSId(), msg);
                 replmsg.setToReplica(true);
                 m_mailbox.send(m_sendToHSIds,replmsg);
+                if (tmLog.isDebugEnabled()) {
+                    List<Long> hsids = new ArrayList<Long>(Arrays.hashCode(m_sendToHSIds));
+                    tmLog.debug("[handleFragmentTaskMessage] " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " sends to " +
+                            CoreUtils.hsIdCollectionToString(hsids) + "\n" + replmsg);
+                }
                 DuplicateCounter counter;
                 /*
                  * Non-determinism should be impossible to happen with MP fragments.
@@ -988,13 +993,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         } else {
             logRepair(msg);
             newSpHandle = msg.getSpHandle();
-            try {
-                setMaxSeenTxnId(newSpHandle);
-            } catch (IllegalArgumentException e){
-                tmLog.error("INVALID SEQUENCE[handleFragmentTaskMessage] site:" +
-                        CoreUtils.hsIdToString(m_mailbox.getHSId()) + " is leader:" + m_isLeader + "\n" + msg);
-                throw e;
-            }
+            setMaxSeenTxnId(newSpHandle);
         }
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
         doLocalFragmentOffer(msg);
@@ -1185,6 +1184,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
                 FragmentResponseMessage resp = (FragmentResponseMessage)counter.getLastResponse();
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("[handleFragmentResponseMessage]: remove DC:" + message);
+                }
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
                 resp.setExecutorSiteId(m_mailbox.getHSId());
@@ -1702,8 +1704,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     public boolean txnDoneBeforeCheckPoint() {
-
-        //return right away to avoid performance penalty
         if (m_spiCheckPoint < 0) {
             return false;
         }
@@ -1714,6 +1714,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 StringBuilder builder = new StringBuilder();
                 for (DuplicateCounterKey dc : keys) {
                     builder.append(TxnEgo.txnIdToString(dc.m_txnId) + "(" + dc.m_spHandle + "),");
+                    DuplicateCounter counter = m_duplicateCounters.get(dc);
+                    builder.append(counter.m_openMessage + "\n");
                 }
                 tmLog.debug("Duplicate counters on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " have keys smaller than the sphandle:" + m_spiCheckPoint + "\n" + builder.toString());
             }

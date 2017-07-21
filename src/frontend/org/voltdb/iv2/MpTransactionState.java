@@ -356,6 +356,9 @@ public class MpTransactionState extends TransactionState
                                     CoreUtils.hsIdCollectionToString(e.getValue()));
                         }
                     }
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug("[FragmentResponseMessage.pollForResponses] send dump message to " + CoreUtils.hsIdCollectionToString(m_useHSIds));
+                    }
                     m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
                 }
             }
