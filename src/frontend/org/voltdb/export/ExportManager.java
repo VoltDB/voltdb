@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
@@ -200,6 +199,7 @@ public class ExportManager
      * @param catalogContext
      * @throws ExportManager.SetupException
      */
+    // FIXME - this synchronizes on the ExportManager class, but everyone else synchronizes on the instance.
     public static synchronized void initialize(
             int myHostId,
             CatalogContext catalogContext,
@@ -215,10 +215,10 @@ public class ExportManager
         }
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
-        m_self = em;
         if (hasEnabledConnectors(connectors)) {
             em.createInitialExportProcessor(catalogContext, connectors, true, partitions, isRejoin);
         }
+        m_self = em;
     }
 
     static boolean hasEnabledConnectors(CatalogMap<Connector> connectors) {
@@ -357,7 +357,7 @@ public class ExportManager
             if (startup) {
                 initializePersistedGenerations(
                         exportOverflowDirectory,
-                        catalogContext, connectors);
+                        catalogContext);
             }
 
             /*
@@ -368,7 +368,6 @@ public class ExportManager
             if (startup) {
                 if (generation == null){
                     final ExportGeneration currentGeneration = new ExportGeneration(
-                            catalogContext.m_ccrTime,
                             exportOverflowDirectory, isRejoin);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
                     generation = currentGeneration;
@@ -411,47 +410,39 @@ public class ExportManager
     }
 
     private void initializePersistedGenerations(
-            File exportOverflowDirectory, CatalogContext catalogContext,
-            CatalogMap<Connector> connectors) throws IOException {
-        TreeSet<File> generationDirectories = new TreeSet<File>();
+            File exportOverflowDirectory, CatalogContext catalogContext) throws IOException {
+
         File files[] = exportOverflowDirectory.listFiles();
         if (files == null) {
             //Clean export overflow no generations seen.
             return;
         }
-        if (files.length > 1) {
-            // TODO this is not approved UX
-            VoltDB.crashLocalVoltDB("BSDBG: there's more than one generation in export_overflow");
-        }
+
         for (File f : files) {
             if (f.isDirectory()) {
-                if (!f.canRead() || !f.canWrite() || !f.canExecute()) {
-                    throw new RuntimeException("Can't one of read/write/execute directory " + f);
-                }
-                generationDirectories.add(f);
+                // TODO this is not approved UX
+                VoltDB.crashLocalVoltDB("BSDBG: there's more than one generation in export_overflow");
             }
         }
 
         //Only give the processor to the oldest generation
-        for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_ccrTime);
-            generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
+        ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
+        generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
-            if (generation.initializeGenerationFromDisk(connectors, m_messenger)) {
-                assert (m_generation.get() == null);
-                m_generation.set(generation);
-            } else {
-                String list[] = generationDirectory.list();
-                if (list != null && list.length == 0) {
-                    try {
-                        VoltFile.recursivelyDelete(generationDirectory);
-                    } catch (IOException ioe) {
-                    }
-                } else {
-                    exportLog.error("Invalid export generation in overflow directory " + generationDirectory
-                            + " this will need to be manually cleaned up. number of files left: "
-                            + (list != null ? list.length : 0));
+        if (generation.initializeGenerationFromDisk(m_messenger)) {
+            assert (m_generation.get() == null);
+            m_generation.set(generation);
+        } else {
+            String list[] = exportOverflowDirectory.list();
+            if (list != null && list.length == 0) {
+                try {
+                    VoltFile.recursivelyDelete(exportOverflowDirectory);
+                } catch (IOException ioe) {
                 }
+            } else {
+                exportLog.error("Invalid export generation in overflow directory " + exportOverflowDirectory
+                        + " this will need to be manually cleaned up. number of files left: "
+                        + (list != null ? list.length : 0));
             }
         }
     }
@@ -536,11 +527,11 @@ public class ExportManager
             exportLog.info("Skipped rolling generations as generation not created in EE.");
             return;
         }
-        File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
         ExportGeneration generation = m_generation.get();
         if (generation == null) {
             try {
-                generation = new ExportGeneration(genid, exportOverflowDirectory, false);
+                File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
+                generation = new ExportGeneration(exportOverflowDirectory, false);
                 generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
                 m_generation.set(generation);
             } catch (IOException e1) {
@@ -634,14 +625,12 @@ public class ExportManager
      * for this generation.
      */
     public static void pushExportBuffer(
-            long exportGeneration,
             int partitionId,
             String signature,
             long uso,
             long bufferPtr,
             ByteBuffer buffer,
-            boolean sync,
-            boolean endOfStream) {
+            boolean sync) {
         //For validating that the memory is released
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
@@ -657,7 +646,7 @@ public class ExportManager
                 return;
                 */
             }
-            generation.pushExportBuffer(partitionId, signature, uso, buffer, sync, endOfStream);
+            generation.pushExportBuffer(partitionId, signature, uso, buffer, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);

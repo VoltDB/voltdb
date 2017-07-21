@@ -48,7 +48,7 @@ public:
         assert(m_uso == 0);
         StreamBlock *sb = new StreamBlock(new char[1], 0, 0, count);
         ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                                m_generation, m_partitionId, m_signature, sb, false, false);
+                                m_partitionId, m_signature, sb, false);
         delete sb;
         m_uso = count;
         //Extend the buffer chain to replace any existing stream blocks with a new one
@@ -68,7 +68,7 @@ public:
                 ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature);
     }
 
-    void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
+    void pushExportBuffer(StreamBlock *block, bool sync);
 
     /** write a tuple to the stream */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,

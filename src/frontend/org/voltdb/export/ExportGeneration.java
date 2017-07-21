@@ -74,7 +74,6 @@ public class ExportGeneration implements Generation {
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    public Long m_timestamp;
     public final File m_directory;
 
     private String m_leadersZKPath;
@@ -106,7 +105,7 @@ public class ExportGeneration implements Generation {
                 return;
             }
             int numSourcesDrained = m_drainedSources.incrementAndGet();
-            exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
+            exportLog.info("Drained source in export with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {
                 if (m_partitionLeaderZKName.isEmpty()) {
                     m_onAllSourcesDrained.run();
@@ -165,34 +164,27 @@ public class ExportGeneration implements Generation {
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
-        m_timestamp = txnId;
-        m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
+    public ExportGeneration(File exportOverflowDirectory, boolean isRejoin) throws IOException {
+        m_directory = exportOverflowDirectory;
         if (!m_directory.canWrite()) {
             if (!m_directory.mkdirs()) {
                 throw new IOException("Could not create " + m_directory + " Rejoin: " + isRejoin);
             }
         }
 
-        exportLog.info("Creating new export generation " + m_timestamp + " Rejoin: " + isRejoin);
+        exportLog.info("Creating new export generation. Rejoin: " + isRejoin);
     }
 
     /**
      * Constructor to create a generation based on one that has been persisted to disk
      * @param generationDirectory
-     * @param catalogGen Generation from catalog.
      * @throws IOException
      */
-    public ExportGeneration(File generationDirectory, long catalogGen) throws IOException {
+    public ExportGeneration(File generationDirectory) throws IOException {
         m_directory = generationDirectory;
-        try {
-            m_timestamp = Long.parseLong(generationDirectory.getName());
-        } catch (NumberFormatException ex) {
-            throw new IOException("Invalid Generation directory, directory name must be a number.");
-        }
     }
 
-    boolean initializeGenerationFromDisk(final CatalogMap<Connector> connectors, HostMessenger messenger) {
+    boolean initializeGenerationFromDisk(HostMessenger messenger) {
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -243,7 +235,7 @@ public class ExportGeneration implements Generation {
                     /*
                      * The path where leaders will register for this generation
                      */
-                    m_leadersZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "leaders";
+                    m_leadersZKPath = VoltZK.exportGenerations + "/" + "leaders";
 
                     /*
                      * Create a directory for each partition
@@ -407,7 +399,13 @@ public class ExportGeneration implements Generation {
     }
 
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
-        m_mailboxesZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "mailboxes";
+
+        if (m_mbox != null) {
+            // FIXME - need to clean up previous mailboxes and NOT return. Changes to partitions affects mailboxes.
+        //    return;
+        }
+
+        m_mailboxesZKPath = VoltZK.exportGenerations + "/" + "mailboxes";
 
         m_mbox = new LocalMailbox(messenger) {
             @Override
@@ -617,9 +615,7 @@ public class ExportGeneration implements Generation {
     private void addDataSource(File adFile, Set<Integer> partitions) throws IOException {
         ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, true);
         partitions.add(source.getPartitionId());
-        if (source.getGeneration() != this.m_timestamp) {
-            throw new IOException("Failed to load generation from disk invalid data source generation found.");
-        }
+        assert source.getGeneration() == 0; // TODO this can be removed
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());
@@ -660,7 +656,7 @@ public class ExportGeneration implements Generation {
                             table.getTypeName(),
                             partition,
                             table.getSignature(),
-                            m_timestamp,
+                            0, // TODO remove generation from EDS
                             table.getColumns(),
                             partColumn,
                             m_directory.getPath());
@@ -668,6 +664,7 @@ public class ExportGeneration implements Generation {
                             " signature " + table.getSignature() + " partition id " + partition);
                     dataSourcesForPartition.put(table.getSignature(), exportDataSource);
                 }
+                // FIXME - this looks like it may belong inside the above if() block
                 m_numSources++;
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB(
@@ -677,7 +674,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
         //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
@@ -688,7 +685,7 @@ public class ExportGeneration implements Generation {
 
         if (sources == null) {
             exportLog.error("Could not find export data sources for partition "
-                    + partitionId + " generation " + m_timestamp + " the export data is being discarded, endOfStream: " + endOfStream);
+                    + partitionId + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
@@ -698,15 +695,14 @@ public class ExportGeneration implements Generation {
         ExportDataSource source = sources.get(signature);
         if (source == null) {
             exportLog.error("Could not find export data source for partition " + partitionId +
-                    " signature " + signature + " generation " +
-                    m_timestamp + " the export data is being discarded, endOfStream: " + endOfStream);
+                    " signature " + signature + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
             return;
         }
 
-        source.pushExportBuffer(uso, buffer, sync, endOfStream);
+        source.pushExportBuffer(uso, buffer, sync);
     }
 
     private void cleanup(final HostMessenger messenger) {
@@ -850,7 +846,7 @@ public class ExportGeneration implements Generation {
 
     @Override
     public String toString() {
-        return "Export Generation - " + m_timestamp.toString();
+        return "Export Generation";
     }
 
     public void setGenerationDrainRunnable(Runnable onGenerationDrained) {

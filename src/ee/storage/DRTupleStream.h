@@ -153,7 +153,7 @@ public:
         return 0;
     }
 
-    void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {}
+    void pushExportBuffer(StreamBlock *block, bool sync) {}
 
     void rollbackTo(size_t mark, size_t drRowCost) {}
 

@@ -263,7 +263,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 hsid = -1;
             }
             m_database = jsObj.getString("database");
-            m_generation = jsObj.getLong("generation");
+            m_generation = 0; // TODO stop writing this out in JSON jsObj.getLong("generation");
             m_partitionId = jsObj.getInt("partitionId");
             m_signature = jsObj.getString("signature");
             m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
@@ -525,17 +525,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushExportBuffer(
             final long uso,
             final ByteBuffer buffer,
-            final boolean sync,
-            final boolean endOfStream) {
+            final boolean sync) {
         try {
             m_bufferPushPermits.acquire();
         } catch (InterruptedException e) {
             Throwables.propagate(e);
-        }
-        if (endOfStream) {
-            // TODO: remove endOfStream altogether
-            VoltDB.crashLocalVoltDB("BSDBG: end of stream encountered in ExportDataSource.pushExportBuffer");
-            return;
         }
         ListeningExecutorService es = getExecutorService();
         if (es == null) {

@@ -241,7 +241,7 @@ public class StandaloneExportGeneration implements Generation {
     }
 
     @Override
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
         //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
@@ -270,7 +270,7 @@ public class StandaloneExportGeneration implements Generation {
             return;
         }
 
-        source.pushExportBuffer(uso, buffer, sync, endOfStream);
+        source.pushExportBuffer(uso, buffer, sync);
     }
 
     public void closeAndDelete() throws IOException {

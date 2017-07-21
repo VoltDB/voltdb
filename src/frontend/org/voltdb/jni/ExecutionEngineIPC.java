@@ -359,6 +359,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     // end of generation flag - 1 byte
                     // export buffer length - 4 bytes
                     // export buffer - export buffer length bytes
+
+                    // NOTE: exportGeneration is the catalog version. It's not used by control code, but rides along with the data.
                     long exportGeneration = getBytes(8).getLong();
                     int partitionId = getBytes(4).getInt();
                     int signatureLength = getBytes(4).getInt();
@@ -367,18 +369,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     String signature = new String(signatureBytes, "UTF-8");
                     long uso = getBytes(8).getLong();
                     boolean sync = getBytes(1).get() == 1 ? true : false;
-                    // TODO: remove isEndOfGeneration and the generation ID since both are unused
+                    // TODO: remove isEndOfGeneration. Need to understand where this is being inserted
                     boolean isEndOfGeneration = getBytes(1).get() == 1 ? true : false;
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
-                            exportGeneration,
                             partitionId,
                             signature,
                             uso,
                             0,
                             length == 0 ? null : getBytes(length),
-                            sync,
-                            isEndOfGeneration);
+                            sync);
                 }
                 else if (status == kErrorCode_getQueuedExportBytes) {
                     ByteBuffer header = ByteBuffer.allocate(8);

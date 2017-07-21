@@ -187,7 +187,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // write the row size in to the row header rowlength does not include
     // the 4 byte row header but does include the null array.
     hdr.writeInt((int32_t)(io.position()) + (int32_t)streamHeaderSz - 4);
-    hdr.writeLong(m_generation);                                // generation
+    hdr.writeLong(m_generation);                                // version of the catalog
     hdr.writeInt(METADATA_COL_CNT + partitionColumn);           // partition index
     hdr.writeInt(METADATA_COL_CNT + tuple.sizeInValues());      // column count
 
@@ -234,12 +234,10 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + dataSz;                   // non-null tuple data
 }
 
-void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
+void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync) {
     ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                    m_generation,
                     m_partitionId,
                     m_signature,
                     block,
-                    sync,
-                    endOfStream);
+                    sync);
 }
