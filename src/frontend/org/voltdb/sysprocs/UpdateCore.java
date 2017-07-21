@@ -321,9 +321,10 @@ public class UpdateCore extends VoltSystemProcedure {
                 }
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
+                long uniqueId = m_runner.getUniqueId(); // unique id used to generate DR event
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
                 context.updateCatalog(commands, catalogContext,
-                        requiresSnapshotIsolation, genId, spHandle,
+                        requiresSnapshotIsolation, uniqueId, spHandle,
                         requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
 
                 if (log.isDebugEnabled()) {

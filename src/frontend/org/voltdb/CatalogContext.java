@@ -74,7 +74,7 @@ public class CatalogContext {
     private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
     public final UUID deploymentHashForConfig;
-    public long m_genId; // export generation id
+    public final long m_genId; // export generation id
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
     // Default procs are loaded on the fly
     // The DPM knows which default procs COULD EXIST

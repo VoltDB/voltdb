@@ -3391,7 +3391,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             byte[] newCatalogBytes,
             byte[] catalogBytesHash,
             int expectedCatalogVersion,
-            long currentTxnUniqueId,
+            long genId,
             byte[] deploymentBytes,
             byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
@@ -3416,7 +3416,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // 0. A new catalog! Update the global context and the context tracker
                 m_catalogContext =
                     m_catalogContext.update(
-                            currentTxnUniqueId,
+                            genId,
                             newCatalogBytes,
                             catalogBytesHash,
                             diffCommands,
