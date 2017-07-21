@@ -21,13 +21,13 @@
 #      must be preceded and followed by a space (otherwise the || concatenation
 #      operator would be impossible without some sort of escape symbol, which
 #      I did not want to get into).
-#   4. Adding an integer before a | symbol makes the preceding option more
-#      likely; the "n|" still needs to be preceded and followed by a space.
+#   4. Adding a (positive) integer before a | symbol makes the preceding option
+#      more likely; the "n|" still needs to be preceded and followed by a space.
 #      For example, in this definition:
-#          {definition} :== foo 2| bar
+#          definition :== foo 2| bar
 #      the "foo" option is twice as likely as the "bar" option. You may use
 #      more than one such integer; for example, in this definition:
-#          {definition} :== foo 3| bar 2| null
+#          definition :== foo 3| bar 2| null
 #      the "foo" option will be chosen half (3/6) the time, the "bar" option
 #      will be chosen a third (2/6) of the time, and the "null" option will
 #      be chosen only 1 time in 6. Note that the last option always has an
@@ -39,9 +39,13 @@
 #      add more brackets, e.g., [[foo]] has only a 25% chance of being included.
 #   6. You cannot include | inside brackets, so [foo | bar] will not work
 #      properly, though the reverse, e.g. [foo] | [bar] is fine; to achieve
-#      the same effect as [foo | bar] use [foo-or-bar], with:
-#          {foo-or-bar} :== foo | bar
+#      the same effect as [foo | bar] use [{foo-or-bar}], with:
+#          foo-or-bar :== foo | bar
 #      See "all-or-distinct" for one example of this.
+#   7. It is possible (despite what I said in #3 above) to escape an open ("[")
+#      or close ("]") bracket symbol, by preceding it with a backslash, i.e.,
+#      "\[" or "\]"; these escaped versions will be interpreted as literal
+#      bracket symbols ("[" or "]"), rather than as containing optional text.
 #
 ################################################################################
 
@@ -54,18 +58,22 @@ legit-table-name        ::= R0 | P0 | R1 | P1 | R2 | P2 | R3 | P3 | R4 | P4 | \
 legit-view-name         ::= VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | VR5 | VP5
 table-name              ::= {legit-table-name} 199| NONEXISTENT_TABLE
 view-name               ::= {legit-view-name}  199| NONEXISTENT_VIEW
+table-or-view-name      ::= {table-name} 3| {view-name}
 
 # TODO: also pre-define some Stored Procedures
 
 # Column names used in the pre-defined DDL, of every possible data type ...
-int-column-name         ::= ID | TINY | SMALL | INT | BIG
+int-non-id-column-name  ::= TINY | SMALL | INT | BIG
+int-column-name         ::= {int-non-id-column-name} 4| ID
 byte-column-name        ::= TINY
 
 # The "5" before the "|" makes the "int-column-name" option 5 times as likely
 # as the other options, making each numeric column name equally likely
-numeric-column-name     ::= {int-column-name} 5| NUM | DEC
+numeric-column-name     ::= {int-column-name}        5| NUM | DEC
+numeric-non-id-col-name ::= {int-non-id-column-name} 4| NUM | DEC
 
 string-column-name      ::= VCHAR_INLINE | VCHAR_INLINE_MAX | VCHAR | VCHAR_JSON
+json-column-name        ::= VCHAR_JSON
 timestamp-column-name   ::= TIME
 varbinary-column-name   ::= VARBIN
 point-column-name       ::= POINT
@@ -88,6 +96,7 @@ column-list             ::= {column-name} [, {column-list}]
 # one it is one that was actually defined
 table-alias             ::= T1 3| T2 2| T3
 column-alias            ::= C1 3| C2 2| C3
+table-alias-or-name     ::= {table-alias} 3| {table-or-view-name}
 
 ################################################################################
 # Any (non-DDL) SQL statement:
@@ -119,7 +128,7 @@ ordered-values-list     ::= {integer-non-null-value}, {byte-value}, {integer-val
                             {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value}
 random-order-value-list ::= {random-type-value} [, {random-order-value-list}]
 random-type-value       ::= {integer-value}  4| {numeric-value} 2| {string-value} 4| {timestamp-value} | \
-                            {varbinary-value} | {point-value}    | {polygon-value}
+                            {varbinary-value} | {point-value}    | {polygon-value} | {scalar-sub-query}
 simple-insert-values    ::= IN{in-or-up-sert-values}
 simple-insert-select    ::= IN{in-or-up-sert-select}
 
@@ -131,44 +140,126 @@ in-or-up-sert-select    ::= {insert-select-multiple} 8| {insert-select-all}    2
                             {insert-select-id-varbin} | {insert-select-id-point} | {insert-select-id-poly}
 
 # We leave the IN off of INSERT here, so these can also be used for UPSERT
-insert-values-id-num    ::= SERT INTO {table-name} (ID, {numeric-column-name})   VALUES ({integer-non-null-value}, {numeric-value})
-insert-values-id-str    ::= SERT INTO {table-name} (ID, {string-column-name})    VALUES ({integer-non-null-value}, {string-value})
-insert-values-id-time   ::= SERT INTO {table-name} (ID, {timestamp-column-name}) VALUES ({integer-non-null-value}, {timestamp-value})
-insert-values-id-varbin ::= SERT INTO {table-name} (ID, {varbinary-column-name}) VALUES ({integer-non-null-value}, {varbinary-value})
-insert-values-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})     VALUES ({integer-non-null-value}, {point-value})
-insert-values-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})   VALUES ({integer-non-null-value}, {polygon-value})
+insert-values-id-num    ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}) VALUES ({integer-non-null-value},  {numeric-value-or-subq})  | \
+                            SERT INTO {table-name} ({numeric-non-id-col-name}, ID) VALUES ({numeric-value-or-subq},   {integer-non-null-value}) | \
+                            SERT INTO {table-name} (ID, {int-non-id-column-name})  VALUES ({integer-non-null-value},  {integer-value-or-subq})  | \
+                            SERT INTO {table-name} ({int-non-id-column-name}, ID)  VALUES ({integer-value-or-subq},   {integer-non-null-value})
+insert-values-id-str    ::= SERT INTO {table-name} (ID, {string-column-name})      VALUES ({integer-non-null-value},  {string-value-or-subq}) | \
+                            SERT INTO {table-name} ({string-column-name}, ID)      VALUES ({string-value-or-subq},    {integer-non-null-value})
+insert-values-id-time   ::= SERT INTO {table-name} (ID, {timestamp-column-name})   VALUES ({integer-non-null-value},  {timestamp-value-or-subq}) | \
+                            SERT INTO {table-name} ({timestamp-column-name}, ID)   VALUES ({timestamp-value-or-subq}, {integer-non-null-value})
+insert-values-id-varbin ::= SERT INTO {table-name} (ID, {varbinary-column-name})   VALUES ({integer-non-null-value},  {varbinary-value-or-subq}) | \
+                            SERT INTO {table-name} ({varbinary-column-name}, ID)   VALUES ({varbinary-value-or-subq}, {integer-non-null-value})
+insert-values-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})       VALUES ({integer-non-null-value},  {point-value-or-subq}) | \
+                            SERT INTO {table-name} ({point-column-name}, ID)       VALUES ({point-value-or-subq},     {integer-non-null-value})
+insert-values-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})     VALUES ({integer-non-null-value},  {polygon-value-or-subq}) | \
+                            SERT INTO {table-name} ({polygon-column-name}, ID)     VALUES ({polygon-value-or-subq},   {integer-non-null-value})
 
-insert-values-multiple  ::= SERT INTO {table-name} ( ID, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
-                            {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) VALUES ( {integer-non-null-value}, \
-                            {numeric-value}, {string-value}, {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value} )
+numeric-value-or-subq   ::= {numeric-value}   9| {numeric-scalar-sub-q}
+integer-value-or-subq   ::= {integer-value}   9| {integer-scalar-sub-q}
+byte-value-or-subq      ::= {byte-value}      9| {integer-scalar-sub-q}
+string-value-or-subq    ::= {string-value}    9| {string-scalar-sub-q}
+json-value-or-subq      ::= {json-value}      9| {string-scalar-sub-q}
+timestamp-value-or-subq ::= {timestamp-value} 9| {timestamp-scalar-sub-q}
+# TODO: add sub-queries for other data types
+varbinary-value-or-subq ::= {varbinary-value}
+point-value-or-subq     ::= {point-value}
+polygon-value-or-subq   ::= {polygon-value}
+
+insert-values-multiple  ::= SERT INTO {table-name} ( ID, {numeric-non-id-col-name}, {string-column-name}, {timestamp-column-name}, \
+                            {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) VALUES ( {insert-values-mult-val} )
 insert-values-all       ::= SERT INTO {table-name} ( \
-                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, VCHAR_JSON, TIME, VARBIN,  \
-                            POINT, POLYGON) VALUES ( {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value},  \
-                            {integer-value}, {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value},  \
-                            {json-value}, {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value} )
+                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, VCHAR_JSON, TIME, VARBIN, \
+                            POINT, POLYGON) VALUES ( {insert-values-all-val} )
 insert-values-backward  ::= SERT INTO {table-name} ( \
                             POLYGON, POINT, VARBIN, TIME, VCHAR_JSON, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, DEC, NUM, BIG, INT, \
-                            SMALL, TINY, ID ) VALUES ( {polygon-value}, {point-value}, {varbinary-value}, {timestamp-value}, \
-                            {json-value}, {string-value}, {string-value}, {string-value}, {numeric-value}, {numeric-value}, \
-                            {integer-value}, {integer-value}, {integer-value}, {byte-value}, {integer-non-null-value} )
+                            SMALL, TINY, ID ) VALUES ( {insert-values-back-val} )
 
-insert-select-id-num    ::= SERT INTO {table-name} (ID, {numeric-column-name})   SELECT {int-column-name}, {numeric-column-name}   FROM {table-reference}
-insert-select-id-str    ::= SERT INTO {table-name} (ID, {string-column-name})    SELECT {int-column-name}, {string-column-name}    FROM {table-reference}
-insert-select-id-time   ::= SERT INTO {table-name} (ID, {timestamp-column-name}) SELECT {int-column-name}, {timestamp-column-name} FROM {table-reference}
-insert-select-id-varbin ::= SERT INTO {table-name} (ID, {varbinary-column-name}) SELECT {int-column-name}, {varbinary-column-name} FROM {table-reference}
-insert-select-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})     SELECT {int-column-name}, {point-column-name}     FROM {table-reference}
-insert-select-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})   SELECT {int-column-name}, {polygon-column-name}   FROM {table-reference}
+insert-values-mult-val  ::= {insert-values-mult-val1} 4| {insert-values-mult-val2}
+insert-values-mult-val1 ::= {integer-non-null-value}, {numeric-value}, {string-value}, {timestamp-value}, \
+                            {varbinary-value}, {point-value}, {polygon-value}
+insert-values-mult-val2 ::= {integer-non-null-value}, {numeric-value-or-subq}, {string-value-or-subq}, {timestamp-value-or-subq}, \
+                            {varbinary-value-or-subq}, {point-value-or-subq}, {polygon-value-or-subq}
 
-insert-select-multiple  ::= SERT INTO {table-name} ( ID, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
-                            {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) SELECT {int-column-name}, \
-                            {numeric-column-name}, {string-column-name}, {timestamp-column-name}, {varbinary-column-name}, \
-                            {point-column-name}, {polygon-column-name} FROM {table-reference}
-insert-select-all       ::= SERT INTO {table-name} ( \
-                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN, POINT, POLYGON ) SELECT \
-                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN, POINT, POLYGON FROM {table-reference}
-insert-select-backward  ::= SERT INTO {table-name} ( \
-                            POLYGON, POINT, VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID ) SELECT \
-                            POLYGON, POINT, VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID FROM {table-reference}
+insert-values-all-val   ::= {insert-values-all-val1} 4| {insert-values-all-val2}
+insert-values-all-val1  ::= {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, \
+                            {integer-value}, {numeric-value}, {numeric-value}, {string-value}, \
+                            {string-value}, {string-value}, {json-value}, {timestamp-value}, \
+                            {varbinary-value}, {point-value}, {polygon-value}
+insert-values-all-val2  ::= {integer-non-null-value}, {byte-value-or-subq}, {integer-value-or-subq}, {integer-value-or-subq}, \
+                            {integer-value-or-subq}, {numeric-value-or-subq}, {numeric-value-or-subq}, {string-value-or-subq}, \
+                            {string-value-or-subq}, {string-value-or-subq}, {json-value-or-subq}, {timestamp-value-or-subq}, \
+                            {varbinary-value-or-subq}, {point-value-or-subq}, {polygon-value-or-subq}
+
+insert-values-back-val  ::= {insert-values-back-val1} 4| {insert-values-back-val2}
+insert-values-back-val1 ::= {polygon-value}, {point-value}, {varbinary-value}, {timestamp-value}, \
+                            {json-value}, {string-value}, {string-value}, {string-value}, \
+                            {numeric-value}, {numeric-value}, {integer-value}, {integer-value}, \
+                            {integer-value}, {byte-value}, {integer-non-null-value}
+insert-values-back-val2 ::= {polygon-value-or-subq}, {point-value-or-subq}, {varbinary-value-or-subq}, {timestamp-value-or-subq}, \
+                            {json-value-or-subq}, {string-value-or-subq}, {string-value-or-subq}, {string-value-or-subq}, \
+                            {numeric-value-or-subq}, {numeric-value-or-subq}, {integer-value-or-subq}, {integer-value-or-subq}, \
+                            {integer-value-or-subq}, {byte-value-or-subq}, {integer-non-null-value}
+
+insert-select-id-num    ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}) SELECT {int-column-name}, {numeric-col-or-subq}   FROM {table-reference} | \
+                            SERT INTO {table-name} ({numeric-non-id-col-name}, ID) SELECT {numeric-col-or-subq}, {int-column-name}   FROM {table-reference} | \
+                            SERT INTO {table-name} (ID, {int-non-id-column-name})  SELECT {int-column-name}, {integer-col-or-subq}   FROM {table-reference} | \
+                            SERT INTO {table-name} ({int-non-id-column-name}, ID)  SELECT {integer-col-or-subq}, {int-column-name}   FROM {table-reference}
+insert-select-id-str    ::= SERT INTO {table-name} (ID, {string-column-name})      SELECT {int-column-name}, {string-col-or-subq}    FROM {table-reference} | \
+                            SERT INTO {table-name} ({string-column-name}, ID)      SELECT {string-col-or-subq}, {int-column-name}    FROM {table-reference}
+insert-select-id-time   ::= SERT INTO {table-name} (ID, {timestamp-column-name})   SELECT {int-column-name}, {timestamp-col-or-subq} FROM {table-reference} | \
+                            SERT INTO {table-name} ({timestamp-column-name}, ID)   SELECT {timestamp-col-or-subq}, {int-column-name} FROM {table-reference}
+insert-select-id-varbin ::= SERT INTO {table-name} (ID, {varbinary-column-name})   SELECT {int-column-name}, {varbinary-col-or-subq} FROM {table-reference} | \
+                            SERT INTO {table-name} ({varbinary-column-name}, ID)   SELECT {varbinary-col-or-subq}, {int-column-name} FROM {table-reference}
+insert-select-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})       SELECT {int-column-name}, {point-col-or-subq}     FROM {table-reference} | \
+                            SERT INTO {table-name} ({point-column-name}, ID)       SELECT {point-col-or-subq}, {int-column-name}     FROM {table-reference}
+insert-select-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})     SELECT {int-column-name}, {polygon-col-or-subq}   FROM {table-reference} | \
+                            SERT INTO {table-name} ({polygon-column-name}, ID)     SELECT {polygon-col-or-subq}, {int-column-name}   FROM {table-reference}
+
+numeric-col-or-subq     ::= {numeric-column-name}   9| {numeric-scalar-sub-q}
+integer-col-or-subq     ::= {int-column-name}       9| {integer-scalar-sub-q}
+byte-col-or-subq        ::= {byte-column-name}      9| {integer-scalar-sub-q}
+string-col-or-subq      ::= {string-column-name}    9| {string-scalar-sub-q}
+json-col-or-subq        ::= {json-column-name}      9| {string-scalar-sub-q}
+timestamp-col-or-subq   ::= {timestamp-column-name} 9| {timestamp-scalar-sub-q}
+# TODO: add sub-queries for other data types
+varbinary-col-or-subq   ::= {varbinary-column-name}
+point-col-or-subq       ::= {point-column-name}
+polygon-col-or-subq     ::= {polygon-column-name}
+
+insert-select-multiple  ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}, {string-column-name}, {timestamp-column-name}, \
+                            {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) SELECT {insert-select-mult-val} \
+                            FROM {table-reference}
+insert-select-all       ::= SERT INTO {table-name} (ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, \
+                            VCHAR_JSON, TIME, VARBIN, POINT, POLYGON) SELECT {insert-select-all-val} FROM {table-reference}
+insert-select-backward  ::= SERT INTO {table-name} (POLYGON, POINT, VARBIN, TIME, VCHAR_JSON, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, \
+                            DEC, NUM, BIG, INT, SMALL, TINY, ID) SELECT {insert-select-back-val} FROM {table-reference}
+
+insert-select-mult-val  ::= {insert-select-mult-val1} 4| {insert-select-mult-val2}
+insert-select-mult-val1 ::= {int-column-name}, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
+                            {varbinary-column-name}, {point-column-name}, {polygon-column-name}
+insert-select-mult-val2 ::= {int-column-name}, {numeric-col-or-subq}, {string-col-or-subq}, {timestamp-col-or-subq}, \
+                            {varbinary-col-or-subq}, {point-col-or-subq}, {polygon-col-or-subq}
+
+insert-select-all-val   ::= {insert-select-all-val1} 4| {insert-select-all-val2}
+insert-select-all-val1  ::= {int-column-name}, {byte-column-name}, {int-column-name}, {int-column-name}, \
+                            {int-column-name}, {numeric-column-name}, {numeric-column-name}, {string-column-name}, \
+                            {string-column-name}, {string-column-name}, {json-column-name}, {timestamp-column-name}, \
+                            {varbinary-column-name}, {point-column-name}, {polygon-column-name}
+insert-select-all-val2  ::= {int-column-name}, {byte-col-or-subq}, {integer-col-or-subq}, {integer-col-or-subq}, \
+                            {integer-col-or-subq}, {numeric-col-or-subq}, {numeric-col-or-subq}, {string-col-or-subq}, \
+                            {string-col-or-subq}, {string-col-or-subq}, {json-col-or-subq}, {timestamp-col-or-subq}, \
+                            {varbinary-col-or-subq}, {point-col-or-subq}, {polygon-col-or-subq}
+
+insert-select-back-val  ::= {insert-select-back-val1} 4| {insert-select-back-val2}
+insert-select-back-val1 ::= {polygon-column-name}, {point-column-name}, {varbinary-column-name}, {timestamp-column-name}, \
+                            {json-column-name}, {string-column-name}, {string-column-name}, {string-column-name}, \
+                            {numeric-column-name}, {numeric-column-name}, {int-column-name}, {int-column-name}, \
+                            {int-column-name}, {byte-column-name}, {int-column-name}
+insert-select-back-val2 ::= {polygon-col-or-subq}, {point-col-or-subq}, {varbinary-col-or-subq}, {timestamp-col-or-subq}, \
+                            {json-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, {string-col-or-subq}, \
+                            {numeric-col-or-subq}, {numeric-col-or-subq}, {integer-col-or-subq}, {integer-col-or-subq}, \
+                            {integer-col-or-subq}, {byte-col-or-subq}, {int-column-name}
 
 ################################################################################
 # Grammar rules for an UPSERT statement (almost identical to INSERT):
@@ -190,16 +281,50 @@ simple-upsert-select    ::= UP{in-or-up-sert-select}
 ################################################################################
 # Grammar rules for an UPDATE statement:
 ################################################################################
-update-statement        ::= UPDATE {table-name} SET {column-updates} [{where-clause}]
+update-statement        ::= UPDATE {table-name} [[AS ]{table-alias}] SET {column-updates} [{where-clause}] 4| \
+                            {corltd-update-statement}
 
 column-updates          ::= {column-update} [, {column-updates}]
-column-update           ::= {column-name}           = {value-expression}     | \
-                            {numeric-column-name}   = {numeric-expression}  7| \
+column-update           ::= {valid-column-update} 99| \
+                            {column-name}           = {value-expression}
+valid-column-update     ::= {numeric-column-name}   = {numeric-expression}  7| \
                             {string-column-name}    = {string-expression}   4| \
                             {timestamp-column-name} = {timestamp-expression} | \
                             {varbinary-column-name} = {varbinary-expression} | \
                             {point-column-name}     = {point-expression}     | \
                             {polygon-column-name}   = {polygon-expression}
+
+# UPDATE statements making use of a correlated column, often in a sub-query,
+# in either the SET or the WHERE clause, or both
+corltd-update-statement ::= UPDATE {table-name} [AS ]T0     SET {column-updates} WHERE {correlated-t0-bool-expr}  | \
+                            UPDATE {table-name-or-alias-t1} SET {column-updates} WHERE {correlated-t1-bool-expr}  | \
+                            UPDATE {table-name} [AS ]T0     SET {corltd-t0-column-updates} [{where-clause}] | \
+                            UPDATE {table-name-or-alias-t1} SET {corltd-t1-column-updates} [{where-clause}] | \
+                            UPDATE {table-name} [AS ]T0     SET {corltd-t0-column-updates} WHERE {correlated-t0-bool-expr} | \
+                            UPDATE {table-name-or-alias-t1} SET {corltd-t1-column-updates} WHERE {correlated-t1-bool-expr}
+
+table-name-or-alias-t1  ::= {table-name:t1} 3| {table-name} [AS ]{table-alias:t1}
+view-name-or-alias-t1   ::= {view-name:t1}  3| {view-name}  [AS ]{table-alias:t1}
+
+corltd-t0-column-updates::= {corltd-t0-column-update} [, {corltd-t0-column-updates}]
+corltd-t0-column-update ::= {column-update} 5| \
+                            {numeric-column-name}   = {corltd-t0-numeric-expr}  7| \
+                            {string-column-name}    = {corltd-t0-string-expr}   4| \
+                            {timestamp-column-name} = {corltd-t0-timestamp-expr}
+# TODO: add other data types
+#                            {varbinary-column-name} = {corltd-t0-varbinary-expr} | \
+#                            {point-column-name}     = {corltd-t0-point-expr}     | \
+#                            {polygon-column-name}   = {corltd-t0-polygon-expr}
+
+corltd-t1-column-updates::= {corltd-t1-column-update} [, {corltd-t1-column-updates}]
+corltd-t1-column-update ::= {column-update} 5| \
+                            {numeric-column-name}   = {corltd-t1-numeric-expr}  7| \
+                            {string-column-name}    = {corltd-t1-string-expr}   4| \
+                            {timestamp-column-name} = {corltd-t1-timestamp-expr}
+# TODO: add other data types
+#                            {varbinary-column-name} = {corltd-t1-varbinary-expr} | \
+#                            {point-column-name}     = {corltd-t1-point-expr}     | \
+#                            {polygon-column-name}   = {corltd-t1-polygon-expr}
 
 ################################################################################
 # Grammar rules for a DELETE (or TRUNCATE) statement:
@@ -208,9 +333,10 @@ column-update           ::= {column-name}           = {value-expression}     | \
 # likely than the "truncate-statement" option, since we don't want to truncate
 # (delete all data from) a table too often
 #
-delete-statement        ::= {basic-delete-statement} 9| {truncate-statement}
+delete-statement        ::= {basic-delete-statement} 19| {truncate-statement}
 
-basic-delete-statement  ::= DELETE FROM {table-name} [{where-clause}] [{sort-clause}]
+basic-delete-statement  ::= DELETE FROM {table-name} [{where-clause}] [{sort-clause}] 4| \
+                            DELETE FROM {table-name:t1} WHERE {correlated-t1-bool-expr}
 
 truncate-statement      ::= TRUNCATE TABLE {table-name}
 
@@ -222,50 +348,62 @@ set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
 
 # Putting the "top-clause" and "all-or-distinct" in more than one set of
 # brackets makes them less likely
-basic-select-statement  ::= SELECT {top-all-or-distinct} {select-list} FROM {from-clause}
+basic-select-statement  ::= SELECT {top-all-or-distinct} {select-list} {from-clause}
 top-all-or-distinct     ::= [[[{top-clause}]]] [[{all-or-distinct}]]
-from-clause             ::= {table-references} [[{join-clause}]] [[{where-clause}]] [[{group-clause}]] [{sort-clause}]
-from-clause-no-limit    ::= {table-references} [[{join-clause}]] [[{where-clause}]] [[{group-clause}]] [{order-by-clause}]
+from-clause             ::= FROM {table-references} [[{where-clause}]] [[{group-clause}]] [{sort-clause}] 38| \
+                            {from-clause-with-t0} | {from-clause-with-t1}
+from-clause-no-limit    ::= FROM {table-references} [[{where-clause}]] {group-order-no-limit} 38| \
+                            {from-clause-with-t0} | {from-clause-with-t1}
+group-order-no-limit    ::= [[{group-clause}]] [{order-by-clause}]
 
 all-or-distinct         ::= ALL | DISTINCT
-select-list             ::= {select-list-item} [[, {select-list}]]
+select-list             ::= {select-list-item}[[, {select-list}]]
 select-list-item        ::= {star} 5| {column-expression} [[AS] {column-alias}] 14| {window-function-expr} [[AS] {column-alias}]
-column-expression       ::= {column-name} 2| {selection-expression}
-column-reference        ::= {column-name} 2| {column-alias}
+
+column-expression       ::= {column-name-ref} 3| {selection-expression}
+column-reference        ::= {column-name-ref} 4| {column-alias}
 column-ref-or-expr      ::= {column-reference} | {column-expression}
+# The use of ":tr1", ":tr2", etc., is mainly useful in the case of a JOIN,
+# so that the column names are unambiguous
+column-name-ref         ::= {column-name} 78| \
+                            {table-alias-or-name:tr1}.{column-name} 16| \
+                            {table-alias-or-name:tr2}.{column-name} 16| \
+                            {table-alias-or-name:tr3}.{column-name}  4| \
+                            {table-alias-or-name:tr4}.{column-name}  2| \
+                            {table-alias-or-name:tr5}.{column-name}
 
 # Putting the ", {table-references}" in more than one set of brackets makes it less likely
-table-references        ::= {table-reference} [[, {table-references}]]
+table-references        ::= {table-reference} [[[, {table-references}]]] 4| {join-clause}
 
 # The "3" before the first "|" makes the "table-name..." option, and the "2"
 # before the "view-name..." option, makes them more likely than the "sub-query..."
 # option, making simple, valid statements more likely
-table-reference         ::= {table-name} [[AS] {table-alias}] 3| {view-name} [[AS] {table-alias}] 2| {sub-query} [AS] {table-alias}
+table-reference         ::= {table-name}[[ AS] {table-alias}] 5| \
+                            {view-name}[ [ AS] {table-alias}] 2| \
+                            {sub-query}  [ AS] {table-alias}   | \
+                            {table-name-or-alias-t1} | \
+                            {view-name-or-alias-t1}
 
 # Defining these separately so that they can optionally be overridden, for use
 # with SQLCoverage, to avoid syntax (TOP) not supported by PostgreSQL, and
 # issues with Geospatial types (point & polygon), where using * can be a problem
-top-clause              ::= TOP {non-negative-int-value}
-top-one                 ::= TOP 1
 star                    ::= *
-# PostgreSQL-compatible versions of the above: avoids problems involving SELECT * with Geospatial types;
-# and involving TOP, which PostgreSQL does not support
-pg-star                 ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, VCHAR_JSON, TIME, VARBIN, AsText(POINT), AsText(POLYGON)
+top-clause              ::= TOP {non-negative-int-value}
+top-one                 ::= TOP 1   98| TOP 0   | TOP {byte-non-null-value}
+limit-one               ::= LIMIT 1 98| LIMIT 0 | LIMIT {byte-non-null-value}
+
+# PostgreSQL-compatible versions of the above: avoids problems involving SELECT *
+# with Geospatial types; and involving TOP, which PostgreSQL does not support
+pg-star                 ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR_INLINE, VCHAR_INLINE_MAX, \
+                            VCHAR, VCHAR_JSON, TIME, VARBIN, AsText(POINT), AsText(POLYGON)
 pg-top-clause           ::=
 pg-top-one              ::=
 
 where-clause            ::= WHERE {boolean-expression}
-boolean-expression      ::=   [NOT ] {boolean-type-expr}   [[{and-or} {boolean-expression}]] 3| \
-                            ([[NOT ]]{boolean-expression}) [[{and-or} {boolean-expression}]]
+boolean-expression      ::=   [NOT ] {boolean-type-expr}   [[{and-or} {boolean-expression}]] 8| \
+                            ([[NOT ]]{boolean-expression}) [[{and-or} {boolean-expression}]] 2| \
+                            {correlated-bool-expr}
 and-or                  ::= AND | OR
-
-# TODO: allow for multi-joins (on more than 2 tables)
-join-clause             ::= [{join-type}] JOIN {table-reference} [{join-condition}]
-join-type               ::= INNER | {left-or-right} [OUTER]
-left-or-right           ::= LEFT | RIGHT | FULL
-join-condition          ::= ON {join-expression} | USING ({column-reference})
-# TODO: probably should be more specific (e.g. equi-join)
-join-expression         ::= {boolean-expression}
 
 group-clause            ::= GROUP BY {group-by-list} [HAVING {boolean-expression}]
 order-by-clause         ::= ORDER BY {order-by-list}
@@ -281,7 +419,7 @@ pg-sort-clause          ::= {order-by-clause}, ID [LIMIT {non-negative-int-value
 # using different data types (varbinary, point, polygon)
 value-expression        ::= {numeric-expression} 7| {string-expression} 4| {timestamp-expression}
 selection-expression    ::= {value-expression} 9| COUNT(*)
-boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {sub-query} | \
+boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {sub-query} IS [NOT ]NULL | \
                             {boolean-numeric-expr} 7| {boolean-string-expr} 4| {boolean-timestamp-expr} | \
                             EXISTS {sub-query}
 boolean-numeric-expr    ::= {numeric-expression}   {comparison-operator} {numeric-expression}   4| \
@@ -290,7 +428,38 @@ boolean-string-expr     ::= {string-expression}    {comparison-operator} {string
                             {string-column-name}    IN {string-sub-query}
 boolean-timestamp-expr  ::= {timestamp-expression} {comparison-operator} {timestamp-expression} 4| \
                             {timestamp-column-name} IN {timestamp-sub-query}
-comparison-operator     ::= = | <> | != | < | > | <= | >=
+comparison-operator     ::= = 3| <> | != | < | > | <= | >= | IS NOT DISTINCT FROM
+
+################################################################################
+# Joins, of various types, including multi-joins of up to 5 tables
+#
+join-clause             ::= {table-reference:tr1} [{join-type}] JOIN {table-reference:tr2} {join-condition1} \
+                                               [[ [{join-type}] JOIN {table-reference:tr3} {join-condition2} \
+                                                [ [{join-type}] JOIN {table-reference:tr4} {join-condition3} \
+                                                [ [{join-type}] JOIN {table-reference:tr5} {join-condition4} ]] ]]
+join-type               ::= INNER | {left-or-right} [OUTER]
+left-or-right           ::= LEFT | RIGHT | FULL
+
+join-condition1         ::= USING ({column-reference:c1}) 4| \
+                            ON {:tr1}.{column-ref-or-expr:c1} = {:tr2}.{:c1} | \
+                            ON {:tr2}.{column-ref-or-expr:c1} = {:tr1}.{:c1} | \
+                            ON {:tr1}.{column-ref-or-expr} {comparison-operator} {:tr2}.{column-ref-or-expr} | \
+                            ON {:tr2}.{column-ref-or-expr} {comparison-operator} {:tr1}.{column-ref-or-expr}
+join-condition2         ::= USING ({column-reference:c1}) 4| \
+                            ON {:tr2}.{column-ref-or-expr:c2} = {:tr3}.{:c2} | \
+                            ON {:tr3}.{column-ref-or-expr:c2} = {:tr1}.{:c2} | \
+                            ON {:tr3}.{column-ref-or-expr} {comparison-operator} {:tr1}.{column-ref-or-expr} | \
+                            ON {:tr2}.{column-ref-or-expr} {comparison-operator} {:tr3}.{column-ref-or-expr}
+join-condition3         ::= USING ({column-reference:c1}) 4| \
+                            ON {:tr3}.{column-ref-or-expr:c3} = {:tr4}.{:c3} | \
+                            ON {:tr4}.{column-ref-or-expr:c3} = {:tr1}.{:c3} | \
+                            ON {:tr2}.{column-ref-or-expr} {comparison-operator} {:tr4}.{column-ref-or-expr} | \
+                            ON {:tr4}.{column-ref-or-expr} {comparison-operator} {:tr3}.{column-ref-or-expr}
+join-condition4         ::= USING ({column-reference:c1}) 4| \
+                            ON {:tr1}.{column-ref-or-expr:c4} = {:tr5}.{:c4} | \
+                            ON {:tr5}.{column-ref-or-expr:c4} = {:tr4}.{:c4} | \
+                            ON {:tr2}.{column-ref-or-expr} {comparison-operator} {:tr5}.{column-ref-or-expr} | \
+                            ON {:tr5}.{column-ref-or-expr} {comparison-operator} {:tr3}.{column-ref-or-expr}
 
 ################################################################################
 # Sub-queries, scalar and otherwise, of various types
@@ -299,20 +468,124 @@ sub-query               ::= ({select-statement}) 3| {scalar-sub-query}
 scalar-sub-query        ::= {numeric-scalar-sub-q} 7| {string-scalar-sub-q} 4| \
                             {timestamp-scalar-sub-q}
 
-numeric-sub-query       ::= (SELECT {top-all-or-distinct}   {numeric-expression} FROM {from-clause})
-string-sub-query        ::= (SELECT {top-all-or-distinct}    {string-expression} FROM {from-clause})
-timestamp-sub-query     ::= (SELECT {top-all-or-distinct} {timestamp-expression} FROM {from-clause})
-numeric-scalar-sub-q    ::= (SELECT  {aggregate-function}({numeric-expression})  FROM {from-clause}) 3| \
-                            (SELECT {num-result-aggr-func}({column-expression})  FROM {from-clause}) 3| \
-                            (SELECT COUNT(*)                                     FROM {from-clause})  | \
-                            (SELECT {top-one}   {numeric-expression} FROM {from-clause-no-limit})     | \
-                            (SELECT             {numeric-expression} FROM {from-clause-no-limit} LIMIT 1)
-string-scalar-sub-q     ::= (SELECT {min-or-max-aggr-func}({string-expression})  FROM {from-clause}) 6| \
-                            (SELECT {top-one}    {string-expression} FROM {from-clause-no-limit})     | \
-                            (SELECT              {string-expression} FROM {from-clause-no-limit} LIMIT 1)
-timestamp-scalar-sub-q  ::= (SELECT {min-or-max-aggr-func}({timestamp-expression}) FROM {from-clause}) 6| \
-                            (SELECT {top-one} {timestamp-expression} FROM {from-clause-no-limit})       | \
-                            (SELECT           {timestamp-expression} FROM {from-clause-no-limit} LIMIT 1)
+numeric-sub-query       ::= (SELECT {top-all-or-distinct}   {numeric-expression} {from-clause})
+string-sub-query        ::= (SELECT {top-all-or-distinct}    {string-expression} {from-clause})
+timestamp-sub-query     ::= (SELECT {top-all-or-distinct} {timestamp-expression} {from-clause})
+numeric-scalar-sub-q    ::= (SELECT  {aggregate-function}({numeric-expression})  {from-clause}) 3| \
+                            (SELECT {num-result-aggr-func}({column-expression})  {from-clause}) 3| \
+                            (SELECT COUNT(*)                                     {from-clause})  | \
+                            (SELECT {top-one}   {numeric-expression} {from-clause-no-limit})     | \
+                            (SELECT             {numeric-expression} {from-clause-no-limit} {limit-one})
+integer-scalar-sub-q    ::= (SELECT  {aggregate-function}({int-expression})      {from-clause}) 3| \
+                            (SELECT {num-result-aggr-func}({column-expression})  {from-clause}) 3| \
+                            (SELECT COUNT(*)                                     {from-clause})  | \
+                            (SELECT {top-one}   {int-expression}     {from-clause-no-limit})     | \
+                            (SELECT             {int-expression}     {from-clause-no-limit} {limit-one})
+string-scalar-sub-q     ::= (SELECT {non-num-aggregate-func}({string-expression})  {from-clause}) 6| \
+                            (SELECT {top-one}    {string-expression} {from-clause-no-limit})       | \
+                            (SELECT              {string-expression} {from-clause-no-limit} {limit-one})
+timestamp-scalar-sub-q  ::= (SELECT {non-num-aggregate-func}({timestamp-expression}) {from-clause}) 6| \
+                            (SELECT {top-one} {timestamp-expression} {from-clause-no-limit})         | \
+                            (SELECT           {timestamp-expression} {from-clause-no-limit} {limit-one})
+
+################################################################################
+# Used to create correlated expressions and sub-queries, referring to a "T0"
+# table (or view) alias; that is, a boolean expression or sub-query that
+# compares the values from its own table (or view) with those of "T0" which
+# was defined in the outer query
+#
+
+# TODO: add other data types
+correlated-t0-bool-expr ::= {corltd-t0-bool-simp-expr}  | {corltd-t0-bool-subq-expr}
+correlated-t0-bool-expr2::= {corltd-t0-bool-simp-expr} 9| {corltd-t0-bool-subq-expr}
+corltd-t0-bool-simp-expr::= {numeric-expression}   {comparison-operator} T0.{numeric-column-name}  7| \
+                            {string-expression}    {comparison-operator} T0.{string-column-name}   4| \
+                            {timestamp-expression} {comparison-operator} T0.{timestamp-column-name} | \
+                            T0.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
+                            T0.{string-column-name}    {comparison-operator} {string-expression}   4| \
+                            T0.{timestamp-column-name} {comparison-operator} {timestamp-expression}
+corltd-t0-bool-subq-expr::= {numeric-expression}   {comparison-operator} ({numeric-corltd-t0-subq})   7| \
+                            {string-expression}    {comparison-operator} ({string-corltd-t0-subq})    4| \
+                            {timestamp-expression} {comparison-operator} ({timestamp-corltd-t0-subq})  | \
+                            ({numeric-corltd-t0-subq})   {comparison-operator} {numeric-expression}   7| \
+                            ({string-corltd-t0-subq})    {comparison-operator} {string-expression}    4| \
+                            ({timestamp-corltd-t0-subq}) {comparison-operator} {timestamp-expression}
+
+numeric-corltd-t0-subq  ::= SELECT  {aggregate-function}({numeric-expression}) {from-clause-corltd-t0} 3| \
+                            SELECT {num-result-aggr-func}({column-expression}) {from-clause-corltd-t0} 3| \
+                            SELECT COUNT(*)                                    {from-clause-corltd-t0}  | \
+                            SELECT {top-one}             {numeric-expression}  {from-clause-corltd-t0}  | \
+                            SELECT                       {numeric-expression}  {from-clause-corltd-t0} {limit-one}
+string-corltd-t0-subq   ::= SELECT {non-num-aggregate-func}({string-expression}) {from-clause-corltd-t0} 6| \
+                            SELECT {top-one}                {string-expression}  {from-clause-corltd-t0}  | \
+                            SELECT                          {string-expression}  {from-clause-corltd-t0} {limit-one}
+timestamp-corltd-t0-subq::= SELECT {non-num-aggregate-func}({timestamp-expression}) {from-clause-corltd-t0} 6| \
+                            SELECT {top-one}                {timestamp-expression}  {from-clause-corltd-t0}  | \
+                            SELECT                          {timestamp-expression}  {from-clause-corltd-t0} {limit-one}
+from-clause-corltd-t0   ::= FROM {table-or-view-name}    WHERE {correlated-t0-bool-expr2} [{group-order-no-limit}]
+from-clause-with-t0     ::= FROM {table-or-view-name} T0 WHERE {corltd-t0-bool-subq-expr} [{group-order-no-limit}]
+
+# Same idea as above, but without using a "T0" alias; instead, the same actual
+# table name (referred to here as {:t1}) is used again
+correlated-t1-bool-expr ::= {corltd-t1-bool-simp-expr}  | {corltd-t1-bool-subq-expr}
+correlated-t1-bool-expr2::= {corltd-t1-bool-simp-expr} 9| {corltd-t1-bool-subq-expr}
+corltd-t1-bool-simp-expr::= {numeric-expression}   {comparison-operator} {:t1}.{numeric-column-name}  7| \
+                            {string-expression}    {comparison-operator} {:t1}.{string-column-name}   4| \
+                            {timestamp-expression} {comparison-operator} {:t1}.{timestamp-column-name} | \
+                            {:t1}.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
+                            {:t1}.{string-column-name}    {comparison-operator} {string-expression}   4| \
+                            {:t1}.{timestamp-column-name} {comparison-operator} {timestamp-expression}
+corltd-t1-bool-subq-expr::= {numeric-expression}   {comparison-operator} ({numeric-corltd-t1-subq})    7| \
+                            {string-expression}    {comparison-operator} ({string-corltd-t1-subq})     4| \
+                            {timestamp-expression} {comparison-operator} ({timestamp-corltd-t1-subq})   | \
+                            ({numeric-corltd-t1-subq})   {comparison-operator} {numeric-expression}    7| \
+                            ({string-corltd-t1-subq})    {comparison-operator} {string-expression}     4| \
+                            ({timestamp-corltd-t1-subq}) {comparison-operator} {timestamp-expression}
+
+numeric-corltd-t1-subq  ::= SELECT  {aggregate-function}({numeric-expression}) {from-clause-corltd-t1} 3| \
+                            SELECT {num-result-aggr-func}({column-expression}) {from-clause-corltd-t1} 3| \
+                            SELECT COUNT(*)                                    {from-clause-corltd-t1}  | \
+                            SELECT {top-one}             {numeric-expression}  {from-clause-corltd-t1}  | \
+                            SELECT                       {numeric-expression}  {from-clause-corltd-t1} {limit-one}
+string-corltd-t1-subq   ::= SELECT {non-num-aggregate-func}({string-expression}) {from-clause-corltd-t1} 6| \
+                            SELECT {top-one}                {string-expression}  {from-clause-corltd-t1}  | \
+                            SELECT                          {string-expression}  {from-clause-corltd-t1} {limit-one}
+timestamp-corltd-t1-subq::= SELECT {non-num-aggregate-func}({timestamp-expression}) {from-clause-corltd-t1} 6| \
+                            SELECT {top-one}                {timestamp-expression}  {from-clause-corltd-t1}  | \
+                            SELECT                          {timestamp-expression}  {from-clause-corltd-t1} {limit-one}
+from-clause-corltd-t1   ::= FROM {table-or-view-name}    WHERE {correlated-t1-bool-expr2} [{group-order-no-limit}]
+from-clause-with-t1     ::= FROM {table-or-view-name:t1} WHERE {corltd-t1-bool-subq-expr} [{group-order-no-limit}]
+
+# Similar ideas to the above, but returning values of a certain specified type,
+# rather than a boolean value
+corltd-t0-numeric-expr  ::= ({numeric-corltd-t0-subq})   3| T0.{numeric-column-name}
+corltd-t0-string-expr   ::= ({string-corltd-t0-subq})    3| T0.{string-column-name}
+corltd-t0-timestamp-expr::= ({timestamp-corltd-t0-subq}) 3| T0.{timestamp-column-name}
+
+corltd-t1-numeric-expr  ::= ({numeric-corltd-t1-subq})   3| {:t1}.{numeric-column-name}
+corltd-t1-string-expr   ::= ({string-corltd-t1-subq})    3| {:t1}.{string-column-name}
+corltd-t1-timestamp-expr::= ({timestamp-corltd-t1-subq}) 3| {:t1}.{timestamp-column-name}
+
+# Similar idea to the above, but in a generic SELECT statement, where a table
+# alias of T0 or {table-name:t1} may or may not have been used
+correlated-bool-expr    ::= {numeric-expression}   {comparison-operator} {table-alias-or-name}.{numeric-column-name}  7| \
+                            {string-expression}    {comparison-operator} {table-alias-or-name}.{string-column-name}   4| \
+                            {timestamp-expression} {comparison-operator} {table-alias-or-name}.{timestamp-column-name} | \
+                            {table-alias-or-name}.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
+                            {table-alias-or-name}.{string-column-name}    {comparison-operator} {string-expression}   4| \
+                            {table-alias-or-name}.{timestamp-column-name} {comparison-operator} {timestamp-expression} | \
+                            {numeric-expression}   {comparison-operator} {table-name:t1}.{numeric-column-name} 14| \
+                            {string-expression}    {comparison-operator} {table-name:t1}.{string-column-name}   8| \
+                            {timestamp-expression} {comparison-operator} {table-name:t1}.{timestamp-column-name} | \
+                            {table-name:t1}.{numeric-column-name}   {comparison-operator} {numeric-expression} 14| \
+                            {table-name:t1}.{string-column-name}    {comparison-operator} {string-expression}   8| \
+                            {table-name:t1}.{timestamp-column-name} {comparison-operator} {timestamp-expression} | \
+                            {numeric-expression}   {comparison-operator} T0.{numeric-column-name}  7| \
+                            {string-expression}    {comparison-operator} T0.{string-column-name}   4| \
+                            {timestamp-expression} {comparison-operator} T0.{timestamp-column-name} | \
+                            T0.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
+                            T0.{string-column-name}    {comparison-operator} {string-expression}   4| \
+                            T0.{timestamp-column-name} {comparison-operator} {timestamp-expression}
 
 ################################################################################
 # Window functions - a.k.a. analytic functions
@@ -322,7 +595,7 @@ window-function         ::= {window-agg-func-expr} 4| COUNT(*) | RANK() | DENSE_
 
 # SUM can only take numeric argument; others can take any type;
 # (AVG not actually supported here, but it should not crash)
-window-agg-func-expr    ::= {non-num-aggregate-func}({column-expression}) 3| \
+window-agg-func-expr    ::= {non-num-arg-aggr-func}({column-expression}) 3| \
                             {num-only-aggregate-func}({numeric-expression})
 
 # This is somewhat redundant, but since some window functions (RANK, DENSE_RANK)
@@ -345,9 +618,9 @@ window-order-by-item    ::= {column-expression} 2| {int-expression} | {timestamp
 # TODO: More use of these in GROUP BY queries
 num-only-aggregate-func ::= SUM | AVG
 num-result-aggr-func    ::= COUNT 3| APPROX_COUNT_DISTINCT
-min-or-max-aggr-func    ::= MIN | MAX
-non-num-aggregate-func  ::= {min-or-max-aggr-func} 2| {num-result-aggr-func}
-aggregate-function      ::= {non-num-aggregate-func} 2| {num-only-aggregate-func}
+non-num-aggregate-func  ::= MIN | MAX
+non-num-arg-aggr-func   ::= {non-num-aggregate-func} 2| {num-result-aggr-func}
+aggregate-function      ::= {non-num-arg-aggr-func}  2| {num-only-aggregate-func}
 
 ################################################################################
 # Numeric constant values, functions, operators and expressions
@@ -368,11 +641,11 @@ byte-value              ::= {byte-non-null-value}    3| NULL
 integer-value           ::= {integer-non-null-value} 3| NULL
 numeric-value           ::= {numeric-non-null-value} 3| NULL
 
-int-expression          ::= {integer-value}  2|     {int-column-name}  5|     {int-function-expr}  2| \
-                            {aggregate-function}({int-expression})
-byte-expression         ::= {byte-value}      |    {byte-column-name}  3|    {byte-function-expr}
-numeric-expression      ::= {numeric-value} 20| {numeric-column-name} 30| {numeric-function-expr} 20| {int-expression} 20| \
-                            {aggregate-function}({numeric-expression}) 9| {numeric-scalar-sub-q}
+byte-expression         ::= {byte-value}    | {byte-column-name}  2| {byte-function-expr}
+int-expression          ::= {integer-value} |  {int-column-name}  2|  {int-function-expr}
+numeric-expression      ::= {simple-numeric-expr} 49| {numeric-scalar-sub-q}
+simple-numeric-expr     ::= {numeric-value} | [[[[{table-alias-or-name}.]]]]{numeric-column-name} 9| \
+                            {numeric-function-expr} | {int-expression}
 
 int-function-expr       ::= {int-expression} {math-operator} {int-expression} | \
                             {int-function-2args}({int-expression}, {int-expression}) | \
@@ -405,8 +678,9 @@ string-value            ::= {string-non-null-value} 3| NULL
 # TODO: make this into actual JSON strings:
 json-value              ::= {string-value}
 
-string-expression       ::= {string-value} 20| {string-column-name} 50| {string-function-expr} 20| \
-                            {non-num-aggregate-func}({string-expression}) 9| {string-scalar-sub-q}
+string-expression       ::= {simple-string-expr} 49| {string-scalar-sub-q}
+simple-string-expr      ::= {string-value} | [[[[{table-alias-or-name}.]]]]{string-column-name} 6| \
+                            {string-function-expr}
 string-function-expr    ::= {string-expression} {string-operator} {string-expression} 2| \
                             {string-valued-int-expr}  4| {string-val-str-int-expr}  5| \
                             {string-val-num-int-expr} 2| {string-special-func-expr} 3| \
@@ -481,8 +755,9 @@ timestamp-non-null-value::= '{year}-{month}-{day} {hour}:{minute-or-second}:{min
 # likely as the NULL option, making NULL values less likely
 timestamp-value         ::= {timestamp-non-null-value} 3| NULL
 
-timestamp-expression    ::= {timestamp-value} 20| {timestamp-column-name} 50| {timestamp-function-expr} 20| \
-                            {non-num-aggregate-func}({timestamp-expression}) 9| {timestamp-scalar-sub-q}
+timestamp-expression    ::= {simple-timestamp-expr} 49| {timestamp-scalar-sub-q}
+simple-timestamp-expr   ::= {timestamp-value} | [[[[{table-alias-or-name}.]]]]{timestamp-column-name} 6| \
+                            {timestamp-function-expr}
 timestamp-function-expr ::= {timestamp-func-0args} 2| \
                             FROM_UNIXTIME({int-expression}) | \
                             TO_TIMESTAMP({short-time-unit}, {int-expression}) | \
