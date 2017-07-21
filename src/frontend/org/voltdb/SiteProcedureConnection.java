@@ -235,4 +235,6 @@ public interface SiteProcedureConnection {
     public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId);
 
     public void setDRStreamEnd(long spHandle, long uniqueId);
+
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long spHandle, long uniqueId);
 }

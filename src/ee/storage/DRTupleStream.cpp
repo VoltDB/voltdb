@@ -636,6 +636,35 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
         extendBufferChain(0);
         break;
     }
+    case DR_ELASTIC_CHANGE: {
+        // REMOVE this hack and uncomment generateElasticChangeEvents code
+        // after the Replicated DR Stream is removed
+        ReferenceSerializeInputBE input(payloads.data(), 8);
+        int oldPartitionCnt = input.readInt();
+        if (m_partitionId >= oldPartitionCnt && m_partitionId != 16383) {
+            // Hack change the event to a StreamStart
+            ByteArray emptyBuff = ByteArray(payloads.data(), 0);
+            writeEventData(DR_STREAM_START, emptyBuff);
+        }
+        else {
+            writeEventData(type, payloads);
+        }
+        m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
+        if (UniqueId::isMpUniqueId(uniqueId)) {
+            m_lastCommittedMpUniqueId = uniqueId;
+            m_currBlock->recordCompletedMpTxnForDR(uniqueId);
+        } else {
+            m_lastCommittedSpUniqueId = uniqueId;
+            m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+        }
+
+        m_committedUso = m_uso;
+        openTransactionCommon(spHandle, uniqueId);
+        commitTransactionCommon();
+
+        extendBufferChain(0);
+        break;
+    }
     case SWAP_TABLE : {
         // For DR events that get generated between a BEGIN_TXN and END_TXN,
         // always call endTransaction() and then extendBufferChain() on dr
