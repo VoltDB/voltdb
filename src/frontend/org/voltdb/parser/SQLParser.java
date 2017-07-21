@@ -174,43 +174,6 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_CREATE_PROCEDURE_FROM_SQL");
 
     /*
-     * CREATE PROCEDURE <NAME> [ <MODIFIER_CLAUSE> ... ] AS BEGIN <SQL_STATEMENTS>
-     *
-     * This is used to only identify the beginning of a multi statement procedure
-     * CREATE PROCEDURE with single SELECT or DML statement pattern
-     * NB supports only unquoted table and column names
-     *
-     * Capture groups:
-     *  (1) Procedure name
-     *  (2) ALLOW/PARTITION clauses full text - needs further parsing
-     *  (3) SELECT or DML statement
-     */
-    private static final Pattern PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL_BEGIN =
-        SPF.statementLeader(
-            SPF.token("create"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
-            unparsedProcedureModifierClauses(),
-            SPF.token("as"), SPF.token("begin")
-        ).compile("PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL");
-
-    /*
-     * CREATE PROCEDURE <NAME> [ <MODIFIER_CLAUSE> ... ] AS BEGIN <SQL_STATEMENTS> END
-     *
-     * CREATE PROCEDURE with single SELECT or DML statement pattern
-     * NB supports only unquoted table and column names
-     *
-     * Capture groups:
-     *  (1) Procedure name
-     *  (2) ALLOW/PARTITION clauses full text - needs further parsing
-     *  (3) SELECT or DML statement
-     */
-    private static final Pattern PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL =
-        SPF.statement(
-            SPF.token("create"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
-            unparsedProcedureModifierClauses(),
-            SPF.token("as"), SPF.token("begin"), SPF.anythingOrNothing(), SPF.token("end")
-        ).compile("PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL");
-
-    /*
      * CREATE FUNCTION <NAME> FROM METHOD <CLASS NAME>.<METHOD NAME>
      *
      * CREATE FUNCTION with the designated method from the given class.
@@ -453,7 +416,6 @@ public class SQLParser extends SQLPatternFactory
     private static final Pattern OneWhitespace = Pattern.compile("\\s");
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleQuotedString = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern MultiStmtProc = Pattern.compile("BEGIN[^']*END", Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
     private static final Pattern SingleQuotedStringContainingParameterSeparators =
             Pattern.compile(
             "'" +
@@ -769,34 +731,6 @@ public class SQLParser extends SQLPatternFactory
     {
         return PAT_CREATE_PROCEDURE_FROM_SQL.matcher(statement);
     }
-
-    /**
-     * Match statement against pattern for create procedure as SQL
-     * with allow/partition clauses with multiple statements with begin only
-     * this is used to identify the start of a multi statement procedure
-     * @param statement  statement to match against
-     * @return           pattern matcher object
-     */
-    public static Matcher matchCreateMultiStmtProcedureBeginAsSQL(String statement)
-    {
-        return PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL_BEGIN.matcher(statement);
-    }
-
-    /**
-     * Match statement against pattern for create procedure as SQL
-     * with allow/partition clauses with multiple statements
-     * @param statement  statement to match against
-     * @return           pattern matcher object
-     */
-    public static Matcher matchCreateMultiStmtProcedureAsSQL(String statement)
-    {
-        return PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL.matcher(statement);
-    }
-
-//    public static boolean isCreateMultiStmtProcedureAsSQLComplete(String statement)
-//    {
-//        return false;
-//    }
 
     /**
      * Match statement against pattern for create procedure as script
