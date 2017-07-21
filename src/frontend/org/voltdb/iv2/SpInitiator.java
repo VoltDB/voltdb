@@ -214,7 +214,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                     if (balanceSPI) {
                         String hsidStr = VoltZK.suffixHSIdsWithBalanceSPIRequest(m_initiatorMailbox.getHSId());
-                        iv2masters.put(m_partitionId,hsidStr);
+                       // iv2masters.put(m_partitionId,hsidStr);
                         if (tmLog.isDebugEnabled()) {
                             tmLog.debug("Site " + CoreUtils.hsIdToString(m_initiatorMailbox.getHSId()) +
                                     " becomes new leader from SPI balance request.");

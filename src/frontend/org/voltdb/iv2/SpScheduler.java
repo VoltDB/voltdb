@@ -235,15 +235,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
     {
         if (tmLog.isDebugEnabled()) {
-            tmLog.debug("[updateReplicas] replicas: " + Arrays.toString(replicas.toArray()) + " on " + CoreUtils.hsIdToString(m_mailbox.getHSId()));
-            if (partitionMasters != null) {
-                if (partitionMasters.keySet() != null) {
-                    tmLog.debug("[updateReplicas] partition master keys: " + Arrays.toString(partitionMasters.keySet().toArray()));
-                }
-                if (partitionMasters.values() != null) {
-                    tmLog.debug("[updateReplicas] partition master values: " + Arrays.toString(partitionMasters.values().toArray()));
-                }
-            }
+            tmLog.debug("[SpScheduler.updateReplicas] replicas to " + CoreUtils.hsIdCollectionToString(replicas) +
+                    " on " + CoreUtils.hsIdToString(m_mailbox.getHSId())
+             + " from " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
         }
 
         // First - correct the official replica set.
@@ -284,6 +278,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 if (resp instanceof FragmentResponseMessage) {
                     FragmentResponseMessage fresp = (FragmentResponseMessage)resp;
                     fresp.setExecutorSiteId(m_mailbox.getHSId());
+                }
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("[SpScheduler.updateReplicas] sends done response on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + "\n" +counter);
                 }
                 m_mailbox.send(counter.m_destinationId, resp);
             }
@@ -912,6 +909,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         FragmentTaskMessage msg = message;
         long newSpHandle;
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("[SpSchdeudler.handleFragmentMessage] on " + CoreUtils.hsIdToString(m_mailbox.getHSId())
+            + " leader:" + m_isLeader + "\n" + message);
+        }
         //The site has been marked as non-leader. The follow-up batches or fragments are processed here
         if (!message.toReplica() && (m_isLeader || (!m_isLeader && message.shouldHandleByOriginalLeader()))) {
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
@@ -964,8 +965,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 replmsg.setToReplica(true);
                 m_mailbox.send(m_sendToHSIds,replmsg);
                 if (tmLog.isDebugEnabled()) {
-                    List<Long> hsids = new ArrayList<Long>(Arrays.hashCode(m_sendToHSIds));
-                    tmLog.debug("[handleFragmentTaskMessage] " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " sends to " +
+                    List<Long> hsids = Arrays.stream(m_sendToHSIds).boxed().collect(Collectors.toList());
+                    tmLog.debug("[handleFragmentTaskMessage] " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " leader: " + m_isLeader + " sends to " +
                             CoreUtils.hsIdCollectionToString(hsids) + "\n" + replmsg);
                 }
                 DuplicateCounter counter;
@@ -987,6 +988,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getTxnId(),
                             m_replicaHSIds,
                             message);
+                }
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("[SpSchdeudler.handleFragmentmessage add to DC] on " + CoreUtils.hsIdToString(m_mailbox.getHSId())
+                    + " leader:" + m_isLeader + "\n" + TxnEgo.txnIdToString(message.getTxnId()));
                 }
                 safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), newSpHandle), counter);
             }
