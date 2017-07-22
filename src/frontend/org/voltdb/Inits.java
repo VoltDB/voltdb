@@ -60,7 +60,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndIds;
+import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -311,7 +311,7 @@ public class Inits {
                     byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
 
                     //Export needs a cluster global unique id for the initial catalog version
-                    long catalogUniqueId =
+                    long exportInitialGenerationUniqueId =
                             UniqueIdGenerator.makeIdFromComponents(
                                     System.currentTimeMillis(),
                                     0,
@@ -324,8 +324,7 @@ public class Inits {
                     // publish the catalog bytes to ZK
                     CatalogUtil.updateCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
-                            0,
-                            catalogUniqueId,
+                            exportInitialGenerationUniqueId,
                             catalogBytes,
                             null,
                             deploymentBytes);
@@ -350,7 +349,7 @@ public class Inits {
 
         @Override
         public void run() {
-            CatalogAndIds catalogStuff = null;
+            CatalogAndDeployment catalogStuff = null;
             do {
                 try {
                     catalogStuff = CatalogUtil.getCatalogFromZK(m_rvdb.getHostMessenger().getZK());
@@ -415,14 +414,14 @@ public class Inits {
 
             try {
                 m_rvdb.m_catalogContext = new CatalogContext(
-                        catalogStuff.uniqueId,
+                        catalogStuff.genId,
                         catalog,
                         new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_nodeSettings),
                         catalogJarBytes,
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
-                        catalogStuff.version,
+                        0, // start up catalog version
                         m_rvdb.m_messenger);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);

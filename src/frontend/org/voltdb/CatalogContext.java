@@ -503,9 +503,10 @@ public class CatalogContext {
     }
 
     public String getCatalogLogString() {
-        return String.format("Catalog: catalog hash %s, deployment hash %s",
+        return String.format("Catalog: catalog hash %s, deployment hash %s, version %d",
                                 Encoder.hexEncode(catalogHash).substring(0, 10),
-                                Encoder.hexEncode(deploymentHash).substring(0, 10));
+                                Encoder.hexEncode(deploymentHash).substring(0, 10),
+                                catalogVersion);
     }
 
     public InMemoryJarfile getCatalogJar() {

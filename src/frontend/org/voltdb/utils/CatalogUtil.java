@@ -103,7 +103,6 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -2114,9 +2113,8 @@ public abstract class CatalogUtil {
         return hash;
     }
 
-    private static ByteBuffer makeCatalogVersionAndBytes(
-                int catalogVersion,
-                long uniqueId,
+    private static ByteBuffer makeCatalogAndDeploymentBytes(
+                long genId,
                 byte[] catalogBytes,
                 byte[] catalogHash,
                 byte[] deploymentBytes)
@@ -2127,8 +2125,7 @@ public abstract class CatalogUtil {
                     catalogBytes.length +
                     4 +  // deployment bytes length
                     deploymentBytes.length +
-                    4 +  // catalog version
-                    8 +  // unique ID
+                    8 +  // generation ID
                     20 + // catalog SHA-1 hash
                     20   // deployment SHA-1 hash
                     );
@@ -2143,8 +2140,7 @@ public abstract class CatalogUtil {
             }
         }
 
-        versionAndBytes.putInt(catalogVersion);
-        versionAndBytes.putLong(uniqueId);
+        versionAndBytes.putLong(genId);
         versionAndBytes.put(catalogHash);
         versionAndBytes.put(makeDeploymentHash(deploymentBytes));
         versionAndBytes.putInt(catalogBytes.length);
@@ -2160,16 +2156,14 @@ public abstract class CatalogUtil {
      *  distribution.
      */
     public static void writeCatalogToZK(ZooKeeper zk,
-                int catalogVersion,
-                long txnId,
-                long uniqueId,
-                byte[] catalogBytes,
-                byte[] catalogHash,
-                byte[] deploymentBytes)
+                                        long genId,
+                                        byte[] catalogBytes,
+                                        byte[] catalogHash,
+                                        byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                uniqueId, catalogBytes, catalogHash, deploymentBytes);
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(genId,
+                catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
@@ -2179,36 +2173,32 @@ public abstract class CatalogUtil {
      * called writeCatalogToZK earlier in order to create the ZK node.
      */
     public static void updateCatalogToZK(ZooKeeper zk,
-            int catalogVersion,
-            long uniqueId,
-            byte[] catalogBytes,
-            byte[] catalogHash,
-            byte[] deploymentBytes)
+                                        long genId,
+                                        byte[] catalogBytes,
+                                        byte[] catalogHash,
+                                        byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion, uniqueId,
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(genId,
                 catalogBytes, catalogHash, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
-    public static class CatalogAndIds {
-        public final long uniqueId;
-        public final int version;
+    public static class CatalogAndDeployment {
+        public final long genId;
         private final byte[] catalogHash;
         private final byte[] deploymentHash;
         public final byte[] catalogBytes;
         public final byte[] deploymentBytes;
 
-        private CatalogAndIds(
-                long uniqueId,
-                int catalogVersion,
+        private CatalogAndDeployment(
+                long genId,
                 byte[] catalogHash,
                 byte[] deploymentHash,
                 byte[] catalogBytes,
                 byte[] deploymentBytes)
         {
-            this.uniqueId = uniqueId;
-            this.version = catalogVersion;
+            this.genId = genId;
             this.catalogHash = catalogHash;
             this.deploymentHash = deploymentHash;
             this.catalogBytes = catalogBytes;
@@ -2239,32 +2229,30 @@ public abstract class CatalogUtil {
      * NOTE: In general, people who want the catalog and/or deployment should
      * be getting it from the current CatalogContext, available from
      * VoltDB.instance().  This is primarily for startup and for use by
-     * @UpdateApplicationCatalog.  If you think this is where you need to
-     * be getting catalog or deployment from, consider carefully if that's
-     * really what you want to do. --izzy 12/8/2014
+     * @UpdateCore.
      */
-    public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes =
+    public static CatalogAndDeployment getCatalogFromZK(ZooKeeper zk)
+            throws KeeperException, InterruptedException {
+        ByteBuffer catalogDeploymentBytes =
                 ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
-        int version = versionAndBytes.getInt();
-        long catalogUniqueId = versionAndBytes.getLong();
+        long genId = catalogDeploymentBytes.getLong();
         byte[] catalogHash = new byte[20]; // sha-1 hash size
-        versionAndBytes.get(catalogHash);
+        catalogDeploymentBytes.get(catalogHash);
         byte[] deploymentHash = new byte[20]; // sha-1 hash size
-        versionAndBytes.get(deploymentHash);
-        int catalogLength = versionAndBytes.getInt();
+        catalogDeploymentBytes.get(deploymentHash);
+        int catalogLength = catalogDeploymentBytes.getInt();
         byte[] catalogBytes = new byte[catalogLength];
-        versionAndBytes.get(catalogBytes);
-        int deploymentLength = versionAndBytes.getInt();
+        catalogDeploymentBytes.get(catalogBytes);
+        int deploymentLength = catalogDeploymentBytes.getInt();
         byte[] deploymentBytes = new byte[deploymentLength];
-        versionAndBytes.get(deploymentBytes);
-        versionAndBytes = null;
-        return new CatalogAndIds(catalogUniqueId, version, catalogHash,
-                deploymentHash, catalogBytes, deploymentBytes);
+        catalogDeploymentBytes.get(deploymentBytes);
+        catalogDeploymentBytes = null;
+
+        return new CatalogAndDeployment(genId, catalogHash, deploymentHash, catalogBytes, deploymentBytes);
     }
 
     /**
-     * Given plan graphs and a SQL stmt, compute a bi-directonal usage map between
+     * Given plan graphs and a SQL statement, compute a bidirectional usage map between
      * schema (indexes, table & views) and SQL/Procedures.
      * Use "annotation" objects to store this extra information in the catalog
      * during compilation and catalog report generation.

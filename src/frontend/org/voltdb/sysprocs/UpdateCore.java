@@ -47,7 +47,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndIds;
+import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -287,7 +287,7 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
             long genId = (Long) params.toArray()[6];
 
-            CatalogAndIds catalogStuff = null;
+            CatalogAndDeployment catalogStuff = null;
             try {
                 catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
             } catch (Exception e) {
@@ -478,7 +478,6 @@ public class UpdateCore extends VoltSystemProcedure {
             // then update data at the local site.
             CatalogUtil.updateCatalogToZK(
                     zk,
-                    expectedCatalogVersion + 1,
                     genId,
                     catalogBytes,
                     catalogHash,
