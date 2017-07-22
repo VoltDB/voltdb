@@ -104,6 +104,7 @@
 <property name='cmake.test.source'           value='${base.dir}/tests/ee' />
 <property name='cmake.build.obj'             value='${build.dir}' />
 <property name='cmake.build.tool'            value='${cmake.build.source}/tools/build_cmake.py' />
+<property name='cmake.build.verbose'         value='no' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -1412,6 +1413,7 @@ NATIVE EE STUFF
         <arg line="--object-directory='${cmake.build.obj}'" />
         <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+        <arg line="--verbose-build='${cmake.build.verbose}'" />
     </exec>
 </target>
 
@@ -1429,6 +1431,7 @@ NATIVE EE STUFF
         <arg line="--object-directory='${cmake.build.obj}'" />
         <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+        <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--run-all-tests" />
     </exec>
 </target>
@@ -1447,6 +1450,7 @@ NATIVE EE STUFF
         <arg line="--object-directory='${cmake.build.obj}'" />
         <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+        <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--build-tests" />
     </exec>
 </target>
@@ -1463,6 +1467,7 @@ NATIVE EE STUFF
         <arg line="--object-directory='${cmake.build.obj}'" />
         <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+        <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--install-ipc" />
     </exec>
 </target>
@@ -1480,6 +1485,7 @@ NATIVE EE STUFF
         <arg line="--object-directory='${cmake.build.obj}'" />
         <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+        <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
@@ -1497,6 +1503,7 @@ NATIVE EE STUFF
          <arg line="--object-directory='${cmake.build.obj}'" />
          <arg line="--test-directory='${cmake.test.source}'" />
          <arg line="--build-type='${build}'" />
+         <arg line="--verbose-build='${cmake.build.verbose}'" />
          <arg line="--install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
@@ -1514,6 +1521,7 @@ NATIVE EE STUFF
         <arg line="--object-directory=${cmake.build.obj}" />
         <arg line="--test-directory=${cmake.test.source}" />
         <arg line="--build-type=${build}" />
+        <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--profile" />
         <arg line="--install" />
     </exec>
@@ -1531,6 +1539,7 @@ NATIVE EE STUFF
         <arg line="--test-directory=${cmake.test.source}" />
         <arg line="--object-directory=${cmake.build.obj}" />
         <arg line="--build-type=${build}" />
+        <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--coverage" />
         <arg line="--install" />
     </exec>

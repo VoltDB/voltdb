@@ -64,6 +64,12 @@ def makeParser():
                         If this option is included then all test output will be shown, even if
                         the tests pass.
                         ''')
+    parser.add_argument('--verbose-build',
+                        dest='verbose_build',
+                        default='no',
+                        help='''
+                        Use verbose builds when building.
+                        ''')
     #
     # Build parameters.
     #
@@ -256,10 +262,17 @@ def getNumberProcessors(config):
 ########################################################################
 def makeBuilderCall(config):
     np = getNumberProcessors(config)
+    verbose = (config.verbose_build == 'yes')
     if config.generator.endswith('Unix Makefiles'):
-        return "make -j%d " % np
+        return "make -j%d %s" % (
+            np,
+            "VERBOSE=1" if verbose else ""
+        )
     elif config.generator.endswith('Ninja'):
-        return "ninja -j %d " % np
+        return "ninja -j %d " % (
+            np,
+            "-v" if verbose else ""
+        )
     else:
         print('Unknown generator \'%s\'' % config.generator)
 
