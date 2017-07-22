@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import static org.voltdb.compiler.CatalogChangeResult.CATALOG_CHANGE_NOREPLAY;
-
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -61,7 +59,6 @@ public class CatalogContext {
         }
     }
 
-
     // THE CATALOG!
     public final Catalog catalog;
 
@@ -77,8 +74,7 @@ public class CatalogContext {
     private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
     public final UUID deploymentHashForConfig;
-    public final long m_transactionId;
-    public long m_uniqueId;
+    public final long m_genId; // export generation id
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
     // Default procs are loaded on the fly
     // The DPM knows which default procs COULD EXIST
@@ -100,15 +96,11 @@ public class CatalogContext {
 
     // database settings. contains both cluster and path settings
     private final DbSettings m_dbSettings;
-
-    //This is same as unique id except when the UAC is building new catalog ccr stands for catalog change replay time.
-    public final long m_ccrTime;
     /**
      * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
      * When @param hasSchemaChange is true, @param defaultProcManager and @param plannerTool will be created as new.
      * Otherwise, it will try to use the ones passed in to save CPU cycles for performance reason.
-     * @param transactionId
-     * @param uniqueId
+     * @param genId
      * @param catalog
      * @param settings
      * @param catalogBytes
@@ -119,11 +111,9 @@ public class CatalogContext {
      * @param hasSchemaChange
      * @param defaultProcManager
      * @param plannerTool
-     * @param ccrTime - Catalog Change Replay Time
      */
     public CatalogContext(
-            long transactionId,
-            long uniqueId,
+            long genId,
             Catalog catalog,
             DbSettings settings,
             byte[] catalogBytes,
@@ -133,12 +123,9 @@ public class CatalogContext {
             HostMessenger messenger,
             boolean hasSchemaChange,
             DefaultProcedureManager defaultProcManager,
-            PlannerTool plannerTool, long ccrTime)
+            PlannerTool plannerTool)
     {
-        m_transactionId = transactionId;
-        m_uniqueId = uniqueId;
-        //This is only set to something other than m_uniqueId when we are replaying a UAC.
-        m_ccrTime = ((ccrTime == CATALOG_CHANGE_NOREPLAY) ? uniqueId : ccrTime);
+        m_genId = genId;
         // check the heck out of the given params in this immutable class
         if (catalog == null) {
             throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
@@ -217,8 +204,7 @@ public class CatalogContext {
 
     /**
      * Constructor of @CatalogConext used when creating brand-new instances.
-     * @param transactionId
-     * @param uniqueId
+     * @param genId
      * @param catalog
      * @param settings
      * @param catalogBytes
@@ -228,8 +214,7 @@ public class CatalogContext {
      * @param messenger
      */
     public CatalogContext(
-            long transactionId,
-            long uniqueId,
+            long genId,
             Catalog catalog,
             DbSettings settings,
             byte[] catalogBytes,
@@ -238,8 +223,8 @@ public class CatalogContext {
             int version,
             HostMessenger messenger)
     {
-        this(transactionId, uniqueId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
-                version, messenger, true, null, null, uniqueId);
+        this(genId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
+                version, messenger, true, null, null);
     }
 
     public Cluster getCluster() {
@@ -255,16 +240,14 @@ public class CatalogContext {
     }
 
     public CatalogContext update(
-            long txnId,
-            long uniqueId,
+            long genId,
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             String diffCommands,
             boolean incrementVersion,
             byte[] deploymentBytes,
             HostMessenger messenger,
-            boolean hasSchemaChange,
-            long ccrTime)
+            boolean hasSchemaChange)
     {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
@@ -287,8 +270,7 @@ public class CatalogContext {
         }
         CatalogContext retval =
             new CatalogContext(
-                    txnId,
-                    uniqueId,
+                    genId,
                     newCatalog,
                     this.m_dbSettings,
                     bytes,
@@ -298,8 +280,7 @@ public class CatalogContext {
                     messenger,
                     hasSchemaChange,
                     m_defaultProcs,
-                    m_ptool,
-                    ccrTime);
+                    m_ptool);
         return retval;
     }
 
@@ -522,10 +503,10 @@ public class CatalogContext {
     }
 
     public String getCatalogLogString() {
-        return String.format("Catalog: TXN ID %d, catalog hash %s, deployment hash %s\n",
-                                m_transactionId,
+        return String.format("Catalog: catalog hash %s, deployment hash %s, version %d",
                                 Encoder.hexEncode(catalogHash).substring(0, 10),
-                                Encoder.hexEncode(deploymentHash).substring(0, 10));
+                                Encoder.hexEncode(deploymentHash).substring(0, 10),
+                                catalogVersion);
     }
 
     public InMemoryJarfile getCatalogJar() {

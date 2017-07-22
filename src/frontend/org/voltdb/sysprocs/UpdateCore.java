@@ -28,11 +28,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
-import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.ReplicationRole;
@@ -50,7 +47,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndIds;
+import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -288,9 +285,9 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[3]) != 0;
             boolean hasSchemaChange = ((Byte) params.toArray()[4]) != 0;
             boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
-            long ccrTime = (Long) params.toArray()[6];
+            long genId = (Long) params.toArray()[6];
 
-            CatalogAndIds catalogStuff = null;
+            CatalogAndDeployment catalogStuff = null;
             try {
                 catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
             } catch (Exception e) {
@@ -303,20 +300,18 @@ public class UpdateCore extends VoltSystemProcedure {
             if (context.getCatalogVersion() == expectedCatalogVersion) {
 
                 // update the global catalog if we get there first
-                @SuppressWarnings("deprecation")
-                Pair<CatalogContext, CatalogSpecificPlanner> p =
+                CatalogContext catalogContext =
                 VoltDB.instance().catalogUpdate(
                         commands,
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
                         expectedCatalogVersion,
-                        DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
-                        getUniqueId(),
+                        genId,
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash(),
                         requireCatalogDiffCmdsApplyToEE,
                         hasSchemaChange,
-                        requiresNewExportGeneration, ccrTime);
+                        requiresNewExportGeneration);
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
@@ -326,9 +321,9 @@ public class UpdateCore extends VoltSystemProcedure {
                 }
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
-                long uniqueId = m_runner.getUniqueId();
+                long uniqueId = m_runner.getUniqueId(); // unique id used to generate DR event
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
-                context.updateCatalog(commands, p.getFirst(), p.getSecond(),
+                context.updateCatalog(commands, catalogContext,
                         requiresSnapshotIsolation, uniqueId, spHandle,
                         requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
 
@@ -404,7 +399,8 @@ public class UpdateCore extends VoltSystemProcedure {
             byte requiresSnapshotIsolation,
             byte requireCatalogDiffCmdsApplyToEE,
             byte hasSchemaChange,
-            byte requiresNewExportGeneration, long ccrTime)
+            byte requiresNewExportGeneration,
+            long genId)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -419,7 +415,8 @@ public class UpdateCore extends VoltSystemProcedure {
                 requiresSnapshotIsolation,
                 requireCatalogDiffCmdsApplyToEE,
                 hasSchemaChange,
-                requiresNewExportGeneration, ccrTime);
+                requiresNewExportGeneration,
+                genId);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
@@ -437,18 +434,14 @@ public class UpdateCore extends VoltSystemProcedure {
     /**
      * Parameters to run are provided internally and do not map to the
      * user's input.
-     * @param ctx
-     * @param catalogDiffCommands
-     * @param catalogURL
-     * @param expectedCatalogVersion
      * @return Standard STATUS table.
      */
-    @SuppressWarnings("deprecation")
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String catalogDiffCommands,
                            byte[] catalogHash,
                            byte[] catalogBytes,
                            int expectedCatalogVersion,
+                           long genId,
                            String deploymentString,
                            String[] tablesThatMustBeEmpty,
                            String[] reasonsForEmptyTables,
@@ -456,8 +449,7 @@ public class UpdateCore extends VoltSystemProcedure {
                            byte[] deploymentHash,
                            byte requireCatalogDiffCmdsApplyToEE,
                            byte hasSchemaChange,
-                           byte requiresNewExportGeneration,
-                           long ccrTime)
+                           byte requiresNewExportGeneration)
                                    throws Exception
     {
         assert(tablesThatMustBeEmpty != null);
@@ -486,9 +478,7 @@ public class UpdateCore extends VoltSystemProcedure {
             // then update data at the local site.
             CatalogUtil.updateCatalogToZK(
                     zk,
-                    expectedCatalogVersion + 1,
-                    DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
-                    getUniqueId(),
+                    genId,
                     catalogBytes,
                     catalogHash,
                     deploymentBytes);
@@ -500,7 +490,7 @@ public class UpdateCore extends VoltSystemProcedure {
                     requireCatalogDiffCmdsApplyToEE,
                     hasSchemaChange,
                     requiresNewExportGeneration,
-                    ccrTime);
+                    genId);
         } finally {
             // remove the uac blocker when exits
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);

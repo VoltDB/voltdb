@@ -62,6 +62,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
+import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
@@ -123,7 +124,6 @@ public class ProcedureRunner {
     protected final SiteProcedureConnection m_site;
     protected ExecutionEngine m_ee;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
-    protected CatalogSpecificPlanner m_csp;
 
     // per procedure state and catalog info
     //
@@ -158,9 +158,8 @@ public class ProcedureRunner {
 
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
-                    Procedure catProc,
-                    CatalogSpecificPlanner csp) {
-        this(procedure, site, null, catProc, csp);
+                    Procedure catProc) {
+        this(procedure, site, null, catProc);
         // assert this constructor for non-system procedures
         assert(procedure instanceof VoltSystemProcedure == false);
     }
@@ -168,8 +167,7 @@ public class ProcedureRunner {
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
                     SystemProcedureExecutionContext sysprocContext,
-                    Procedure catProc,
-                    CatalogSpecificPlanner csp) {
+                    Procedure catProc) {
         if (catProc.getHasjava() == false) {
             m_procedureName = catProc.getTypeName().intern();
         } else {
@@ -191,7 +189,6 @@ public class ProcedureRunner {
         }
         m_site = site;
         m_systemProcedureContext = sysprocContext;
-        m_csp = csp;
 
         m_procedure.init(this);
 
@@ -245,7 +242,7 @@ public class ProcedureRunner {
         return null;
     }
 
-    public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
+    public void reInitSysProc(CatalogContext catalogContext) {
         assert(m_procedure != null);
         if (! m_isSysProc) {
             return;
@@ -254,8 +251,6 @@ public class ProcedureRunner {
                 catalogContext.cluster,
                 catalogContext.getClusterSettings(),
                 catalogContext.getNodeSettings());
-
-        m_csp = csp;
     }
 
     public ProcedureStatsCollector getStatsCollector() {
@@ -667,7 +662,8 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition);
+            AdHocPlannedStmtBatch batch = AdHocNTBase.plan(VoltDB.instance().getCatalogContext().m_ptool,
+                    sql, args, m_isSinglePartition);
 
             if (m_isReadOnly && !batch.isReadOnly()) {
                 throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");
