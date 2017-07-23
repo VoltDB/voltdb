@@ -480,10 +480,12 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
         // Log something useful about catalog upgrades when they occur.
         if (ccr.upgradedFromVersion != null) {
-            compilerLog.info(String.format("catalog was automatically upgraded from version %s.", ccr.upgradedFromVersion));
+            compilerLog.info(String.format("catalog was automatically upgraded from version %s.",
+                    ccr.upgradedFromVersion));
         }
         if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, invocationName +" with no catalog changes was skipped.");
+            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, invocationName +
+                    " with no catalog changes was skipped.");
         }
         if (isRestoring() && !isPromotion && "UpdateApplicationCatalog".equals(invocationName)) {
             // This means no more @UAC calls when using DDL mode.
@@ -497,7 +499,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
         } catch (KeeperException | InterruptedException e) {
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
-            VoltDB.crashLocalVoltDB("Error reading ZK node " + VoltZK.elasticJoinActiveBlocker + ": " + e.getMessage(),
+            VoltDB.crashLocalVoltDB("Error reading ZK node " + VoltZK.elasticJoinActiveBlocker + ": "
+                                    + e.getMessage(),
                                     true, e);
         }
 
@@ -520,13 +523,23 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
+        long genId = getNextGenerationId();
+
+        if (ccr.tablesThatMustBeEmpty.length != 0) {
+            // only copy the current catalog when @UpdateCore could fail
+            CatalogUtil.copyCurrentCatalogToPreviousZK(zk, genId, ccr.catalogBytes,
+                    ccr.catalogHash, ccr.deploymentString);
+        }
+        CatalogUtil.updateCatalogToZK(zk, genId, ccr.catalogBytes, ccr.catalogHash,
+                ccr.deploymentString);
+
         // update the catalog jar
         return callProcedure("@UpdateCore",
                              ccr.encodedDiffCommands,
                              ccr.catalogHash,
                              ccr.catalogBytes,
                              ccr.expectedCatalogVersion,
-                             getNextGenerationId(),
+                             genId,
                              ccr.deploymentString,
                              ccr.tablesThatMustBeEmpty,
                              ccr.reasonsForEmptyTables,

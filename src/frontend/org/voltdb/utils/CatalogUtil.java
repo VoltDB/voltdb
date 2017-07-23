@@ -24,6 +24,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -2129,13 +2130,12 @@ public abstract class CatalogUtil {
     {
         ByteBuffer versionAndBytes =
             ByteBuffer.allocate(
+                    8 +  // generation Id
+                    20 + // catalog SHA-1 hash
                     4 +  // catalog bytes length
                     catalogBytes.length +
                     4 +  // deployment bytes length
-                    deploymentBytes.length +
-                    8 +  // generation ID
-                    20 + // catalog SHA-1 hash
-                    20   // deployment SHA-1 hash
+                    deploymentBytes.length
                     );
 
         if (catalogHash == null) {
@@ -2150,7 +2150,6 @@ public abstract class CatalogUtil {
 
         versionAndBytes.putLong(genId);
         versionAndBytes.put(catalogHash);
-        versionAndBytes.put(makeDeploymentHash(deploymentBytes));
         versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
         versionAndBytes.putInt(deploymentBytes.length);
@@ -2174,6 +2173,10 @@ public abstract class CatalogUtil {
                 catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        // create the previous catalog bytes zk node
+        zk.create(VoltZK.catalogbytesPrevious,
+                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
     /**
@@ -2192,23 +2195,36 @@ public abstract class CatalogUtil {
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
+    public static void updateCatalogToZK(ZooKeeper zk,
+                                        long genId,
+                                        byte[] catalogBytes,
+                                        byte[] catalogHash,
+                                        String deploymentString)
+    {
+        try {
+            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
+            CatalogUtil.updateCatalogToZK(zk, genId, catalogBytes, catalogHash, deploymentBytes);
+        } catch (UnsupportedEncodingException e) {
+            VoltDB.crashLocalVoltDB("invalid encoding deployment file: " + deploymentString, true, e);
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("error updating catalog bytes to zookeeper", true, e);
+        }
+    }
+
     public static class CatalogAndDeployment {
         public final long genId;
         private final byte[] catalogHash;
-        private final byte[] deploymentHash;
         public final byte[] catalogBytes;
         public final byte[] deploymentBytes;
 
         private CatalogAndDeployment(
                 long genId,
                 byte[] catalogHash,
-                byte[] deploymentHash,
                 byte[] catalogBytes,
                 byte[] deploymentBytes)
         {
             this.genId = genId;
             this.catalogHash = catalogHash;
-            this.deploymentHash = deploymentHash;
             this.catalogBytes = catalogBytes;
             this.deploymentBytes = deploymentBytes;
         }
@@ -2218,17 +2234,10 @@ public abstract class CatalogUtil {
             return catalogHash.clone();
         }
 
-        public byte[] getDeploymentHash()
-        {
-            return deploymentHash.clone();
-        }
-
         @Override
         public String toString()
         {
-            return String.format("Catalog: catalog hash %s, deployment hash %s\n",
-                    Encoder.hexEncode(catalogHash).substring(0, 10),
-                    Encoder.hexEncode(deploymentHash).substring(0, 10));
+            return "Catalog: catalog hash " + Encoder.hexEncode(catalogHash).substring(0, 10);
         }
     }
 
@@ -2246,8 +2255,6 @@ public abstract class CatalogUtil {
         long genId = catalogDeploymentBytes.getLong();
         byte[] catalogHash = new byte[20]; // sha-1 hash size
         catalogDeploymentBytes.get(catalogHash);
-        byte[] deploymentHash = new byte[20]; // sha-1 hash size
-        catalogDeploymentBytes.get(deploymentHash);
         int catalogLength = catalogDeploymentBytes.getInt();
         byte[] catalogBytes = new byte[catalogLength];
         catalogDeploymentBytes.get(catalogBytes);
@@ -2256,7 +2263,35 @@ public abstract class CatalogUtil {
         catalogDeploymentBytes.get(deploymentBytes);
         catalogDeploymentBytes = null;
 
-        return new CatalogAndDeployment(genId, catalogHash, deploymentHash, catalogBytes, deploymentBytes);
+        return new CatalogAndDeployment(genId, catalogHash, catalogBytes, deploymentBytes);
+    }
+
+    public static void copyCurrentCatalogToPreviousZK(ZooKeeper zk, long genId,
+            byte[] catalogBytes, byte[] catalogHash, String deployment) {
+        try {
+            // read the current catalog bytes
+            byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
+            // write to the previous catalog bytes place holder
+            zk.setData(VoltZK.catalogbytesPrevious, data, -1);
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("error read catalog bytes from zookeeper", true, e);
+        }
+    }
+
+    /**
+     * Copy the previous catalog bytes from ZK to the current catalog ZK node
+     */
+    public static void copyPreviousCatalogToCurrentZK(ZooKeeper zk)
+    {
+        try {
+            // read the current catalog bytes
+            byte[] data = zk.getData(VoltZK.catalogbytesPrevious, false, null);
+            assert(data != null);
+            // write to the previous catalog bytes place holder
+            zk.setData(VoltZK.catalogbytes, data, -1);
+        } catch (KeeperException | InterruptedException e) {
+            VoltDB.crashLocalVoltDB("error read catalog bytes from zookeeper", true, e);
+        }
     }
 
     /**
