@@ -290,7 +290,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         // Test for T22
         assertTrue(findTableInSystemCatalogResults("T22"));
-        assertEquals(8, indexedColumnCount("T22"));
+        assertEquals(10, indexedColumnCount("T22"));
 
         // Test for T23
         assertTrue(findTableInSystemCatalogResults("T23"));

@@ -143,7 +143,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
@@ -464,7 +463,7 @@ public abstract class CatalogUtil {
      * @param <T> The type of item to sort.
      * @param items The set of catalog items.
      * @param sortFieldName The name of the field to sort on.
-     * @param An output list of catalog items, sorted on the specified field.
+     * @param result An output list of catalog items, sorted on the specified field.
      */
     public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
         result.addAll(getSortedCatalogItems(items, sortFieldName    ));
@@ -977,6 +976,11 @@ public abstract class CatalogUtil {
         if (query == null) {
             query = new SystemSettingsType.Query();
             ss.setQuery(query);
+        }
+        SystemSettingsType.Procedure procedure = ss.getProcedure();
+        if (procedure == null) {
+            procedure = new SystemSettingsType.Procedure();
+            ss.setProcedure(procedure);
         }
         SystemSettingsType.Snapshot snap = ss.getSnapshot();
         if (snap == null) {
@@ -1503,11 +1507,19 @@ public abstract class CatalogUtil {
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
-                    hostLog.info("Export configuration enabled and provided for export target " +
-                                 targetName +
-                                 " in deployment file however no export " +
-                                 "tables are assigned to the this target. " +
-                                 "Export target " + targetName + " will be disabled.");
+                    if (DR_CONFLICTS_TABLE_EXPORT_GROUP.equals(targetName)) {
+                        throw new RuntimeException("Export configuration enabled and provided for export target " +
+                                targetName +
+                                " in deployment file however no export " +
+                                "tables are assigned to the this target. " +
+                                "DR Conflicts cannot be handled.");
+                    } else {
+                        hostLog.info("Export configuration enabled and provided for export target " +
+                                targetName +
+                                " in deployment file however no export " +
+                                "tables are assigned to the this target. " +
+                                "Export target " + targetName + " will be disabled.");
+                    }
                 }
                 continue;
             }

@@ -76,6 +76,7 @@ bool SendExecutor::p_execute(const NValueArray &params) {
 
     Table* inputTable = m_abstractNode->getInputTable();
     assert(inputTable);
+    VOLT_DEBUG("send input:\n%s\n", inputTable->debug().c_str());
     //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
     m_engine->send(inputTable);

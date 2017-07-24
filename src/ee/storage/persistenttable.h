@@ -608,7 +608,6 @@ private:
                                     TableTuple const& sourceTupleWithNewValues,
                                     std::vector<TableIndex*> const& indexesToUpdate);
 
-    bool checkNulls(TableTuple& tuple) const;
 
     void notifyBlockWasCompactedAway(TBPtr block);
 
