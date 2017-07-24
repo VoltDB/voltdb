@@ -2389,7 +2389,8 @@ var loadPage = function (serverName, portid) {
 
     $("#showAnalysisDetails").popup({
         open: function (event, ui, ele)  {
-            var procedureName = $("#hidProcedureName").html().split(' ')[1];
+
+            var procedureName = $("#hidProcedureName").html();
             $("#procedureName").html(procedureName);
              //filter specific procedure calls from list of datas
             var procDetails = {};
@@ -2400,30 +2401,20 @@ var loadPage = function (serverName, portid) {
             var count = 0;
             var isMultiple= false;
             var i =0;
-            var containLongName = false;
-
             if(VoltDbAnalysis.latencyDetailValue.length == 0){
                  $("#spanAnalysisLegend").hide();
                  $("#execTimeLegend").hide();
             }
             getTooltipValues(procedureName);
-
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                 var newStatement = '';
                 var latValue;
 //                $("#generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
 
                 if(item.PROCEDURE == procedureName ){
-                    containLongName = checkObjForLongStatementName(VoltDbAnalysis.latencyDetailValue, procedureName);
-
-                    if(containLongName){
-                        newStatement = (i + 1) + ") " + item.STATEMENT;
-                    }
-                    else{
-                        newStatement = item.STATEMENT;
-                    }
-                    var comp1 = newStatement.indexOf(') ') !== -1 ? newStatement.split(') ')[1]: newStatement;
-                    var comp2 = statement.indexOf(') ') !== -1 ? statement.split(') ')[1]: statement;
+                    newStatement = item.STATEMENT;
+                    var comp1 = newStatement;
+                    var comp2 = statement;
                     if (comp1 == comp2){
                         avg += item.value;
                         isMultiple = true;
@@ -2439,21 +2430,12 @@ var loadPage = function (serverName, portid) {
                             if (VoltDbAnalysis.latencyDetailValue[j]['STATEMENT'] == item.STATEMENT) count += 1;
                                 j += 1;
                         }
-
-                        if(containLongName)
-                            procDetails[newStatement.split(') ')[1]] = avg/count;
-                        else
-                            procDetails[newStatement] = avg/count;
+                        procDetails[newStatement] = avg/count;
                     }
                     else{
-                        if(containLongName)
-                            procDetails[newStatement.split(') ')[1]] = avg;
-                        else
-                            procDetails[newStatement] = avg;
+                        procDetails[newStatement] = avg;
                     }
-
                     statement = newStatement;
-
                 }
             });
             if($.isEmptyObject(procDetails)){
@@ -2465,15 +2447,8 @@ var loadPage = function (serverName, portid) {
                 $("#execTimeLegend").show();
             }
 
-            var k=0;
             for (var key in procDetails){
-                if(containLongName){
-                    finalDetails.push({"label": (k+1) + ") " + key,"value": procDetails[key]})
-                }
-                else{
-                    finalDetails.push({"label": key,"value": procDetails[key]})
-                }
-                k++;
+                finalDetails.push({"label": key, "value": procDetails[key]})
             }
             MonitorGraphUI.RefreshLatencyDetailGraph(finalDetails);
         }
@@ -2494,15 +2469,12 @@ var loadPage = function (serverName, portid) {
         open: function (event, ui, ele)  {
             var statement = '';
             var totalInvocations=0;
-            var procedureName = $("#hidProcedureName").html().split(' ')[1];
+            var procedureName = $("#hidProcedureName").html();
             $(".procedureName").html(procedureName);
              //filter specific procedure calls from list of datas
             var finalDetails = [];
             var freqDetails = {};
             var i =0;
-            var containLongName = false;
-
-
             if(VoltDbAnalysis.latencyDetailValue.length == 0){
                 $("#spanFreqLegend").hide();
                 $("#freqLegend").hide();
@@ -2517,18 +2489,9 @@ var loadPage = function (serverName, portid) {
 
 //                $(".generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
                 if(item.PROCEDURE == procedureName ){
-
-                    containLongName = checkObjForLongStatementName(VoltDbAnalysis.latencyDetailValue, procedureName);
-
-                    if(containLongName){
-                        newStatement = (i + 1) + ") " + item.STATEMENT;
-                    }
-                    else{
-                        newStatement = item.STATEMENT;
-                    }
-
-                    var comp1 = newStatement.indexOf(') ') !== -1 ? newStatement.split(') ')[1]: newStatement;
-                    var comp2 = statement.indexOf(') ') !== -1 ? statement.split(') ')[1]: statement;
+                    newStatement = item.STATEMENT;
+                    var comp1 = newStatement;
+                    var comp2 = statement;
                     if (comp1 == comp2){
                         totalInvocations += item.INVOCATION;
                     }
@@ -2553,15 +2516,8 @@ var loadPage = function (serverName, portid) {
                 $("#freqLegend").show();
             }
 
-            var k=0;
             for (var key in freqDetails){
-                if(containLongName){
-                    finalDetails.push({"label": (k+1) + ") " + key,"value": freqDetails[key]})
-                }
-                else{
-                    finalDetails.push({"label": key,"value": freqDetails[key]})
-                }
-                k++;
+                finalDetails.push({"label": key,"value": freqDetails[key]})
             }
             MonitorGraphUI.RefreshFrequencyDetailGraph(finalDetails);
         }
