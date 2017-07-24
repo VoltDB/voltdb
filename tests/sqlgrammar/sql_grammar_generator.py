@@ -32,11 +32,12 @@ from subprocess import Popen, PIPE, STDOUT
 from time import time
 from traceback import print_exc
 
-__SYMBOL_DEFN  = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.*)")
-__SYMBOL_REF   = re.compile(r"{(?P<symbolname>[\w-]+)}")
-__OPTIONAL     = re.compile(r"(?<!\\)\[(?P<optionaltext>[^\[\]]*[^\[\]\\]?)\]")
-__WEIGHTED_XOR = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
-__XOR          = ' | '
+__SYMBOL_DEFN      = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.*)")
+__SYMBOL_REF       = re.compile(r"{(?P<symbolname>[\w-]+)}")
+__SYMBOL_REF_REUSE = re.compile(r"{(?P<symbolname>[\w-]*):(?P<reusename>[\w-]+)}")
+__OPTIONAL         = re.compile(r"(?<!\\)\[(?P<optionaltext>[^\[\]]*[^\[\]\\]?)\]")
+__WEIGHTED_XOR     = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
+__XOR              = ' | '
 
 
 def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.'):
@@ -67,6 +68,12 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
             continue
         symbol_name = grammar_defn.group('symbolname').strip()
         definition  = grammar_defn.group('definition').strip()
+
+        # Check for use of '::=' within the definition, which is an error
+        if '::=' in definition:
+            print "\n\nFATAL ERROR: Definition of '" + str(symbol_name) + "' in grammar " + \
+                  "dictionary contains illegal characters '::=':\n    " + str(definition)
+            exit(21)
 
         weights = []
         for wxor in __WEIGHTED_XOR.finditer(definition):
@@ -103,46 +110,82 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
     return grammar
 
 
-def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth=5, optional_percent=50):
+def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth=5,
+                          optional_percent=50, final_statement=True):
     """Randomly generates one SQL statement of the specified type, using the
        specified maximum depth (meaning that recursive definitions are limited
        to that depth) and optional percent (meaning that option clauses, in
        brackets, have that percentage chance of being used).
     """
-    global symbol_depth
+    global symbol_depth, symbol_order, options, debug
 
     sql = '{' + sql_statement_type + '}'
-#     print 'DEBUG: sql:', sql
 
     max_count = 10000
     count = 0
-    symbol_count = 0
-    symbol_depth = {}
-    symbol = __SYMBOL_REF.search(sql)
+    if final_statement:
+        symbol_order = []
+        symbol_depth = {}
+    symbol_reuse = {}
+    symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
     while symbol and count < max_count:
         count += 1
         bracketed_name = symbol.group(0)
         symbol_name = symbol.group('symbolname')
+        try:
+            reuse_name = symbol.group('reusename')
+        except IndexError as ex:
+            reuse_name = None
         definition  = grammar.get(symbol_name)
-        #print 'DEBUG: bracketed_name:', str(bracketed_name)
-        #print 'DEBUG: symbol_name :', str(symbol_name)
-        #print 'DEBUG: definition:', str(definition)
+        if debug > 5:
+            print 'DEBUG: sql           :', str(sql)
+            print 'DEBUG: symbol_reuse  :', str(symbol_reuse)
+            print 'DEBUG: bracketed_name:', str(bracketed_name)
+            print 'DEBUG: symbol_name   :', str(symbol_name)
+            print 'DEBUG: reuse_name    :', str(reuse_name)
+            print 'DEBUG: definition    :', str(definition)
+
+        # For debugging purposes, we may wish to track symbol use
+        if options.echo_grammar and symbol_name:
+            symbol_order.append((symbol_name, sql))
+
+        # Handle the case where the same symbol could be used twice (or more)
+        # in the same SQL statement, e.g., {table-name:t1} can be reused to
+        # refer to the same table name more than once; the shorter {:t1} may
+        # also be used, after the first occurrence
+        if reuse_name:
+            if symbol_reuse.get(reuse_name):
+                # This reuse_name has been used before, so replace all
+                # occurrences of it with the same value used before
+                reuse_value = symbol_reuse[reuse_name]
+            else:
+                # This reuse_name has not been used before, so choose a value
+                # that will be used to replace it, throughout this SQL statement
+                reuse_value = get_one_sql_statement(grammar, symbol_name, max_depth,
+                                                    optional_percent, False)
+                symbol_reuse[reuse_name] = reuse_value
+
+            sql = sql.replace(bracketed_name, reuse_value)
+            symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
+            continue
+
         if definition is None:
-            print "ERROR: Could not find definition of '" + str(symbol_name) + "' in grammar dictionary!!!"
-            break
+            print "\n\nFATAL ERROR: Could not find definition of '" + str(symbol_name) + "' in grammar dictionary!!!"
+            exit(22)
+
         # Check how deep into a recursive definition we're going
         if symbol_depth.get(symbol_name):
-            symbol_depth[symbol_name][0] += 1
+            symbol_depth[symbol_name] += 1
         else:
-            symbol_depth[symbol_name] = [1, symbol_count]
-            symbol_count += 1
+            symbol_depth[symbol_name] = 1
+
         if isinstance(definition, list):
             random_index = randrange(0, len(definition))
             #print 'DEBUG: len(definition):', str(len(definition))
             #print 'DEBUG: random_index:', str(random_index)
             # Avoid going too deep into a recursive definition, if possible:
             # if there are alternatives, pick one
-            if (symbol_depth[symbol_name][0] > max_depth and bracketed_name in definition[random_index] and
+            if (symbol_depth[symbol_name] > max_depth and bracketed_name in definition[random_index] and
                     any(bracketed_name not in definition[i] for i in range(len(definition)) ) ):
                 while bracketed_name in definition[random_index]:
                     random_index = randrange(0, len(definition))
@@ -158,6 +201,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                     definition = key
                     break
         #print 'DEBUG: definition:', definition
+
         # Check for any optional text [in brackets], and decide whether to include it or not
         optional = __OPTIONAL.search(definition)
         while optional:
@@ -172,10 +216,11 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                 definition = definition.replace(bracketed_optionaltext, '', 1)
             #print 'DEBUG: definition:', definition
             optional = __OPTIONAL.search(definition)
+
         sql = sql.replace(bracketed_name, definition, 1)
         #print 'DEBUG: sql:', sql
 
-        symbol = __SYMBOL_REF.search(sql)
+        symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
 
     if count >= max_count:
         print "Gave up after", count, "iterations: possible infinite loop in grammar dictionary!!!"
@@ -189,8 +234,15 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
         if debug > 4:
             print "DEBUG: sql:", sql.strip(), "\n"
             print "DEBUG: symbol_depth:\n", symbol_depth, "\n\n"
+            if symbol_order:
+                print "DEBUG: symbol_order:\n", symbol_order, "\n\n"
 
-    return sql.strip().replace('\[', '[').replace('\]', ']') + ';'
+    if final_statement:
+        sql = sql.strip().replace('\[', '[').replace('\]', ']') + ';'
+        if debug > 5:
+            print "DEBUG: final sql     :", sql.strip(), "\n"
+
+    return sql
 
 
 def print_file_tail(from_file, to_file, number_of_lines=50):
@@ -264,6 +316,7 @@ def print_summary(error_message=''):
         # Check for a special case: TRUNCATE statements were all valid,
         # none invalid, as sometimes happens
         if count_sql_statements.get('TRUNCA') and \
+                count_sql_statements.get('TRUNCA').get('valid') and \
                 count_sql_statements.get('TRUNCA').get('invalid') is None:
             count_sql_statements['TRUNCA']['invalid'] = 0
 
@@ -345,7 +398,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     STDOUT).
     """
     global sql_output_file, sqlcmd_output_file, echo_output_file, sqlcmd_proc, \
-        last_n_sql_statements, options, echo_substrings, symbol_depth, debug
+        last_n_sql_statements, options, echo_substrings, symbol_depth, symbol_order, debug
 
     # Print the specified SQL statement to the specified output file
     print >> sql_output_file, sql
@@ -428,9 +481,10 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     sqlcmd_proc.communicate('exit')
                     exit(99)
         if sql_contains_echo_substring and options.echo_grammar:
-            print >> echo_output_file, '\nGrammar symbols used (in order), and how many times:'
-            for order, count, symbol in sorted([(v[1],v[0],k) for k,v in symbol_depth.items()]):
-                print >> echo_output_file, symbol, ':', count
+            print >> echo_output_file, '\nGrammar symbols used (in order), and how many times, and resulting SQL:'
+            for (symbol, partial_sql) in symbol_order:
+                print >> echo_output_file, "{0:1d}: {1:24s}: {2:s}".format(symbol_depth.get(symbol, 0), symbol, partial_sql)
+            print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
 
     else:
         increment_sql_statement_type(sql[0:num_chars_in_sql_type])
@@ -545,7 +599,7 @@ if __name__ == "__main__":
                          + "the list of grammar symbols, and how many times each one was used, for each of the "
                          + "SQL statements that is echoed [default: False]")
     parser.add_option("-D", "--debug", dest="debug", default=0,
-                      help="print debug info: 0 for none, increasing values (1-6) for more [default: 0]")
+                      help="print debug info: 0 for none, increasing values (1-7) for more [default: 0]")
     (options, args) = parser.parse_args()
 
     # If 'minutes' is specified, change the default for 'number'
@@ -602,11 +656,12 @@ if __name__ == "__main__":
     # Define the grammar to be used to generate SQL statements, based upon
     # the input grammar file(s)
     grammar = {}
-    symbol_depth = {}
     for grammar_file in options.grammar_files.split(','):
         grammar = get_grammar(grammar, grammar_file, options.path)
+    symbol_depth = {}
+    symbol_order = []
 
-    if debug > 5:
+    if debug > 6:
         print 'DEBUG: grammar:'
         for key in grammar.keys():
             print '   ', key + ':', grammar[key]

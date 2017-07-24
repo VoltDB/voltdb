@@ -36,7 +36,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.planner.ActivePlanRepository;
-
 import com.google_voltpatches.common.base.Charsets;
 
 /**

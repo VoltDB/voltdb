@@ -503,7 +503,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
                 VoltZK.elasticJoinActiveBlocker,
                 null,
                 ZooDefs.Ids.OPEN_ACL_UNSAFE,
-                CreateMode.EPHEMERAL_SEQUENTIAL );
+                CreateMode.EPHEMERAL);
+
         try {
             /*
              * Update the catalog and expect failure
