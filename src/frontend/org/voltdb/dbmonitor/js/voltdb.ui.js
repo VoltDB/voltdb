@@ -2456,7 +2456,6 @@ var loadPage = function (serverName, portid) {
 
                 }
             });
-            debugger;
             if($.isEmptyObject(procDetails)){
                 $("#spanAnalysisLegend").hide();
                 $("#execTimeLegend").hide();

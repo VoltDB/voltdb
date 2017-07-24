@@ -28,15 +28,6 @@ function loadAnalysisPage(){
         return totalValue;
     }
 
-    function checkObjForLongProcedureName(profileData){
-        for(var j = 0; j < profileData.length; j++){
-            if(profileData[j].PROCEDURE.length > 28){
-                return true;
-            }
-        }
-        return false;
-    }
-
     function checkObjForLongStatementName(profileData){
         for(var j = 0; j < profileData.length; j++){
             if(profileData[j].STATEMENT.length > 14){
@@ -90,9 +81,6 @@ function loadAnalysisPage(){
                 }
                 $("#analysisLoader").hide();
                 VoltDbAnalysis.proceduresCount = profileData["PROCEDURE_PROFILE"].length;
-                //order the procedure by  their (avg_exec_time * #of invocation) value
-                profileData["PROCEDURE_PROFILE"].sort(function(a,b) {return ((b.AVG * b.INVOCATIONS) > (a.AVG * a.INVOCATIONS)) ? 1 : (((a.AVG * a.INVOCATIONS) > (b.AVG * b.INVOCATIONS)) ? -1 : 0);} );
-                var containLongName = checkObjForLongProcedureName(profileData["PROCEDURE_PROFILE"])
                 var dataLatencyProcedures = [];
                 var dataLatencySysProcedures = [];
                 var dataFrequencySysProcedures = [];
@@ -106,7 +94,6 @@ function loadAnalysisPage(){
                 var totalProcessingTime = VoltDbUI.getFromLocalStorage("totalProcessingTime");
                 var averageExecutionTime = VoltDbUI.getFromLocalStorage("averageExecutionTime");
                 var showHideSysProcedures = VoltDbUI.getFromLocalStorage("showHideSysProcedures");
-
                 for(var i = 0; i < profileData["PROCEDURE_PROFILE"].length; i++){
                     if(i == 0)
                         timestamp = profileData["PROCEDURE_PROFILE"][i].TIMESTAMP;
@@ -124,9 +111,6 @@ function loadAnalysisPage(){
                         }
                     });
 
-                    if(containLongName)
-                        procedureName =(i + 1) + ") " + procedureName;
-
                     if(type == "Multi Partitioned")
                         isMPPresent = true;
                     else
@@ -138,16 +122,16 @@ function loadAnalysisPage(){
                     if(calculatedProcessingTime > totalProcessingTime && totalProcessingTime != "") {
                         $("#analysisRemarks").show();
                         $("#procedureWarningSection").show();
-                        warningString = "<p>" + procedureName.split(" ")[1] + " has total processing time greater than "+ totalProcessingTime +"ms.</p>";
-                        warningToolTip = procedureName.split(" ")[1] + " <br> has total processing time greater <br> than "+ totalProcessingTime +"ms.";
+                        warningString = "<p>" + procedureName + " has total processing time greater than "+ totalProcessingTime +"ms.</p>";
+                        warningToolTip = procedureName + " <br> has total processing time greater <br> than "+ totalProcessingTime +"ms.";
                     }
 
                     if(averageExecutionTime != undefined && averageExecutionTime != ""){
                         if(avgExecTime > averageExecutionTime){
                             $("#analysisRemarks").show();
                             $("#procedureWarningSection").show();
-                            warningString = warningString + "<p>" + procedureName.split(" ")[1] + " has average execution time greater than "+ averageExecutionTime +"ms.</p>"
-                            warningToolTip = warningToolTip + "<br/>"+ procedureName.split(" ")[1] + " <br/>has average execution time greater<br/> than "+ averageExecutionTime +"ms.";
+                            warningString = warningString + "<p>" + procedureName + " has average execution time greater than "+ averageExecutionTime +"ms.</p>"
+                            warningToolTip = warningToolTip + "<br/>"+ procedureName + " <br/>has average execution time greater<br/> than "+ averageExecutionTime +"ms.";
                         }
                     }
 
@@ -163,13 +147,13 @@ function loadAnalysisPage(){
                             WARNING: warningToolTip
                         }
                     if(procedureName.indexOf("org.voltdb.sysprocs") > -1){
-                        dataLatencySysProcedures.push({"label": procedureName , "value": avgExecTime});
-                        dataFrequencySysProcedures.push({"label": procedureName, "value": invocation});
-                        dataTotalProcessingSysProcedures.push({"label": procedureName, "value": calculatedProcessingTime});
+                        dataLatencySysProcedures.push({"label": procedureName , "value": avgExecTime, "index": i});
+                        dataFrequencySysProcedures.push({"label": procedureName, "value": invocation, "index": i});
+                        dataTotalProcessingSysProcedures.push({"label": procedureName, "value": calculatedProcessingTime, "index": i});
                     } else {
-                        dataLatencyProcedures.push({"label": procedureName , "value": avgExecTime});
-                        dataFrequencyProcedures.push({"label": procedureName, "value": invocation});
-                        dataTotalProcessingProcedures.push({"label": procedureName, "value": calculatedProcessingTime});
+                        dataLatencyProcedures.push({"label": procedureName , "value": avgExecTime, "index": i});
+                        dataFrequencyProcedures.push({"label": procedureName, "value": invocation, "index": i});
+                        dataTotalProcessingProcedures.push({"label": procedureName, "value": calculatedProcessingTime, "index": i});
                     }
                 }
                 var formatDate = VoltDbAnalysis.formatDateTime(timestamp);
@@ -180,7 +164,13 @@ function loadAnalysisPage(){
                     dataLatencyProcedures = $.merge(dataLatencyProcedures, dataLatencySysProcedures);
                     dataFrequencyProcedures = $.merge(dataFrequencyProcedures, dataFrequencySysProcedures);
                     dataTotalProcessingProcedures = $.merge(dataTotalProcessingProcedures, dataTotalProcessingSysProcedures);
+
                 }
+                ////order the procedure by  their (avg_exec_time * invocation) value
+                dataLatencyProcedures.sort(function(a,b) {return ((a.index) > (b.index)) ? 1 : (((b.index) > (a.index)) ? -1 : 0);});
+                dataFrequencyProcedures.sort(function(a,b) {return ((a.index) > (b.index)) ? 1 : (((b.index) > (a.index)) ? -1 : 0);});
+                dataTotalProcessingProcedures.sort(function(a,b) {return ((a.index) > (b.index)) ? 1 : (((b.index) > (a.index)) ? -1 : 0);});
+
                 MonitorGraphUI.RefreshAnalysisLatencyGraph(dataLatencyProcedures);
                 MonitorGraphUI.RefreshAnalysisFrequencyGraph(dataFrequencyProcedures);
                 MonitorGraphUI.RefreshAnalysisCombinedGraph(dataTotalProcessingProcedures);
