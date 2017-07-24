@@ -109,6 +109,7 @@ message ConnectResponse {
 message QueryResponse {
     optional bool includeMesh = 1 [default = false];
     repeated ClusterInfo clusterInfo = 2;
+    optional bool elasticallyModified = 3 [default = false];
 }
 
 message ClusterInfo {
