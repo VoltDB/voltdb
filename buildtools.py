@@ -847,7 +847,7 @@ def runTests(CTX):
             tests += [(os.path.join(OUTPUT_PREFIX, 'generated', 'bin'),
                        dirname,
                        testname)]
-    noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
+    noValgrindTests = [ "harness_test", "serializeio_test" ]
     for bindirname, dirname, test in tests:
         # We expect valgrind failures in all tests in memleaktests
         # except for the test named no_losses.
