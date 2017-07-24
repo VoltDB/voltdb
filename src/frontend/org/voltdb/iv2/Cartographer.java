@@ -629,8 +629,8 @@ public class Cartographer extends StatsSource
                 }
                 //Get Hosts for replicas
                 final List<Integer> replicaHost = new ArrayList<>();
+                final List<Integer> replicaOnStoppingHost = new ArrayList<>();
                 boolean hostHasReplicas = false;
-                boolean stoppingHostHasReplicas = false;
                 for (String replica : replicas) {
                     final String split[] = replica.split("/");
                     final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
@@ -639,7 +639,7 @@ public class Cartographer extends StatsSource
                         hostHasReplicas = true;
                     }
                     if (nodesBeingStopped.contains(hostId)) {
-                        stoppingHostHasReplicas = true;
+                        replicaOnStoppingHost.add(hostId);
                     }
                     replicaHost.add(hostId);
                 }
@@ -647,7 +647,7 @@ public class Cartographer extends StatsSource
                 if (hostHasReplicas && replicaHost.size() <= 1) {
                     return "Cluster doesn't have enough replicas";
                 }
-                if (hostHasReplicas && stoppingHostHasReplicas && replicaHost.size() <= nodesBeingStopped.size() + 1) {
+                if (hostHasReplicas && !replicaOnStoppingHost.isEmpty() && replicaHost.size() <= replicaOnStoppingHost.size() + 1) {
                     return "Cluster doesn't have enough replicas. There are concurrent stop node requests, retry the command later";
                 }
             } catch (InterruptedException | KeeperException | NumberFormatException e) {
