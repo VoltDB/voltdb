@@ -29,8 +29,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Random;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -44,6 +42,8 @@ import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UDF_TEST;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UserDefinedTestException;
+
+import junit.framework.Test;
 
 /**
  * Tests of SQL statements that use User-Defined Functions (UDF's).

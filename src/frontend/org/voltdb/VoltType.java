@@ -690,13 +690,19 @@ public enum VoltType {
                 return type;
             }
         }
+
         if (str.equalsIgnoreCase("DOUBLE")) {
             return FLOAT;
         }
+
         if (str.equalsIgnoreCase("CHARACTER") ||
                 str.equalsIgnoreCase("CHAR") ||
                 str.equalsIgnoreCase("VARCHAR")) {
             return STRING;
+        }
+
+        if (str.equalsIgnoreCase("BINARY")) {
+            return VoltType.VARBINARY;
         }
 
         throw new RuntimeException("Can't find type: " + str);
