@@ -293,10 +293,18 @@ def delete_proc(pfile):
         proc = subprocess.Popen(['../../bin/sqlcmd'],
                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        (stdoutprocdata, stderrdata) = proc.communicate(input = sb)
-        proc.wait()
-        print 'stdoutprocdata is : \n' + stdoutprocdata + '\n' #debug
+        proc.communicate(sb)
+        rc = proc.wait()
+        #(stdoutprocdata, stderrdata) = proc.communicate()
 
+        print 'RC is : '
+        print  rc #debug
+        if(rc != 0) :
+            # debug
+            (stdoutprocdata, stderrdata) = proc.communicate()
+            print "sqlcmdtest error \n"
+            print "Detail output : " +  stdoutprocdata
+            print "Detail error : " +  stderrdata
 
 
 def delete_table_and_view(pfile):
@@ -316,15 +324,27 @@ def delete_table_and_view(pfile):
         sb = ''
         sb += 'file -inlinebatch EOB'+ '\n' + '\n'
         for tablename in tableset:
+            print "user table/view : " + tablename  #debug
             sb += 'DROP TABLE ' + tablename + ' IF EXISTS CASCADE;' + '\n'
         sb += '\n' + 'EOB'
 
         proc = subprocess.Popen(['../../bin/sqlcmd'],
                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        (stdouttabledata, stderrdata) = proc.communicate(input = sb)
-        proc.wait()
-        print 'stdouttabledata is : \n' + stdouttabledata + '\n' #debug
+        proc.communicate(sb)
+        rc = proc.wait()
+        #(stdouttabledata, stderrdata) = proc.communicate()
+
+        print 'RC is : '
+        print  rc #debug
+        if(rc != 0) :
+            # debug
+            (stdouttabledata, stderrdata) = proc.communicate()
+            print "sqlcmdtest error \n"
+            print "Detail output : " +  stdouttabledata
+            print "Detail error : " +  stderrdata
+
+
 
 
 def test_drop_table_proc_view():
@@ -394,7 +414,7 @@ def do_main():
     launch_and_wait_on_voltdb(reportout)
 
     # start testing of drop table,proc and views
-    test_drop_table_proc_view()
+    #test_drop_table_proc_view()
 
     # Except in refresh mode, any diffs change the scripts exit code to fail ant/jenkins
     haddiffs = False
@@ -437,20 +457,34 @@ def do_main():
                 proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                proc.wait()
+                rc = proc.wait()
                 (stdoutprocdata, stdoutprocerr) = proc.communicate()
 
-                print "stdoutprocdata .. \n" + stdoutprocdata + '\n' #debug
+                print 'RC is : '
+                print  rc #debug
+                if (rc != 0) :
+                    # debug
+                    print "sqlcmdtest error \n"
+                    print "Detail output : " +  stdoutprocdata
+                    print "Detail error : " +  stdoutprocerr
 
                 delete_proc(stdoutprocdata)
 
                 proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                proc.wait()
+                rc = proc.wait()
                 (stdouttabledata, stdouttableerr) = proc.communicate()
 
-                print "stdouttabledata .. \n" + stdouttabledata + '\n' #debug
+                print 'RC is : '
+                print  rc #debug
+                if (rc != 0) :
+                    # debug
+                    print "sqlcmdtest error \n"
+                    print "Detail output : " +  stdouttabledata
+                    print "Detail error : " +  stdouttableerr
+
+                #print "stdouttabledata .. \n" + stdouttabledata + '\n' #debug
 
                 delete_table_and_view(stdouttabledata)
 
