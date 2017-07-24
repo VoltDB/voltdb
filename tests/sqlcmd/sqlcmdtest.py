@@ -295,10 +295,7 @@ def delete_proc(pfile):
 
         proc.communicate(sb)
         rc = proc.wait()
-        #(stdoutprocdata, stderrdata) = proc.communicate()
 
-        print 'RC is : '
-        print  rc #debug
         if(rc != 0) :
             # debug
             (stdoutprocdata, stderrdata) = proc.communicate()
@@ -333,51 +330,13 @@ def delete_table_and_view(pfile):
 
         proc.communicate(sb)
         rc = proc.wait()
-        #(stdouttabledata, stderrdata) = proc.communicate()
 
-        print 'RC is : '
-        print  rc #debug
         if(rc != 0) :
             # debug
             (stdouttabledata, stderrdata) = proc.communicate()
             print "sqlcmdtest error \n"
             print "Detail output : " +  stdouttabledata
             print "Detail error : " +  stderrdata
-
-
-
-
-def test_drop_table_proc_view():
-    for files in os.listdir("test_droptableproc"):
-        if files.endswith(".in"):
-            print 'running test.. ' + (os.path.join("./test_droptableproc", files)) # debug
-            childin = open(os.path.join("./test_droptableproc", files),'r')
-
-            proc = subprocess.Popen(['../../bin/sqlcmd'],
-                        stdin=childin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            proc.wait()
-
-            (stdoutdata, stderrdata) = proc.communicate()
-
-            proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            proc.wait()
-
-            (stdoutproceduredata, stdoutprocedurerr) = proc.communicate()
-
-            print "stdoutproceduredata .. \n" + stdoutproceduredata + '\n' #debug
-            delete_proc(stdoutproceduredata)
-
-            proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-            proc.wait()
-            (stdouttabledata, stdouttableerr) = proc.communicate()
-
-            print "stdouttabledata .. \n" + stdouttabledata + '\n' #debug
-
-            delete_table_and_view(stdouttabledata)
-
 
 
 def do_main():
@@ -460,8 +419,7 @@ def do_main():
                 rc = proc.wait()
                 (stdoutprocdata, stdoutprocerr) = proc.communicate()
 
-                print 'RC is : '
-                print  rc #debug
+
                 if (rc != 0) :
                     # debug
                     print "sqlcmdtest error \n"
@@ -476,15 +434,12 @@ def do_main():
                 rc = proc.wait()
                 (stdouttabledata, stdouttableerr) = proc.communicate()
 
-                print 'RC is : '
-                print  rc #debug
+
                 if (rc != 0) :
                     # debug
                     print "sqlcmdtest error \n"
                     print "Detail output : " +  stdouttabledata
                     print "Detail error : " +  stdouttableerr
-
-                #print "stdouttabledata .. \n" + stdouttabledata + '\n' #debug
 
                 delete_table_and_view(stdouttabledata)
 
