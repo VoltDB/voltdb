@@ -47,6 +47,7 @@ function QueryUI(queryTab) {
             MatchOneQuotedString = /'[^']*'/m,
             MatchDoubleQuotes = /\"/g,
             EscapedDoubleQuoteLiteral = '\\"',
+            MatchBeginCreateMultiStmtProcedure = /\bcreate\s+procedure\s+\w+\s+as\s+begin\b/gm
             QuotedStringNonceLiteral = "#COMMAND_PARSER_REPLACED_STRING#",
             // Generate fixed-length 5-digit nonce values from 100000 - 999999.
             // That's 900000 strings per statement batch -- that should be enough.
@@ -111,6 +112,8 @@ function QueryUI(queryTab) {
             // interesting statement syntax. This is required for statement splitting at 
             // semicolon boundaries -- semicolons might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
+
+            console.log(src.match(MatchBeginCreateMultiStmtProcedure));
 
             splitStmts = src.split(';');
 
