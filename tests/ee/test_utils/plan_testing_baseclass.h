@@ -181,6 +181,8 @@ public:
             //
             // When we delete the VoltDBEngine
             // it will cleanup all the tables for us.
+            // The m_pool will delete all of its memory
+            // as well.  So we should be good here.
             //
         }
 
@@ -265,8 +267,7 @@ public:
                                 << std::endl;
                             throw std::logic_error(oss.str());
                         }
-                        strstr = std::string(strings[val]);
-                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strstr.c_str());
+                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strings[val], &m_pool);
                         tuple.setNValue(col, nval);
                     } else {
                         voltdb::NValue nval = voltdb::ValueFactory::getIntegerValue(val);
@@ -276,7 +277,7 @@ public:
                     // If we have no values, generate them randomly.
                     if (types[col] == voltdb::VALUE_TYPE_VARCHAR) {
                         strstr = getRandomString(1, typesizes[col]);
-                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strstr.c_str());
+                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strstr.c_str(), &m_pool);
                         tuple.setNValue(col, nval);
                     } else {
                         val = getRandomInt(0, typesizes[col]);
@@ -544,6 +545,7 @@ protected:
     static const size_t  m_smallBufferSize = 4 * 1024;
     // The size of the result buffer.
     static const size_t m_resultBufferSize = 1024 * 1024 * 2;
+    voltdb::Pool        m_pool;
 };
 
 #endif /* TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_ */
