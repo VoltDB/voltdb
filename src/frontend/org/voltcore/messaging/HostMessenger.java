@@ -741,7 +741,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fhost = null;
         try {
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
-                    listeningAddress, new PicoNetwork(socket));
+                    listeningAddress, new PicoNetwork(socket, false));
             putForeignHost(hostId, fhost);
             fhost.enableRead(VERBOTEN_THREADS);
         } catch (java.io.IOException e) {
@@ -863,7 +863,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                  * Now add the host to the mailbox system
                  */
                 fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
-                        listeningAddress, new PicoNetwork(socket));
+                        listeningAddress, new PicoNetwork(socket, false));
                 putForeignHost(hostId, fhost);
                 fhost.enableRead(VERBOTEN_THREADS);
 
@@ -997,7 +997,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             ForeignHost fhost = null;
             try {
                 fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout,
-                        listeningAddresses[ii], new PicoNetwork(sockets[ii]));
+                        listeningAddresses[ii], new PicoNetwork(sockets[ii], false));
                 putForeignHost(hosts[ii], fhost);
             } catch (java.io.IOException e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("Failed to instantiate foreign host", true, e);
@@ -1076,7 +1076,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         prepSocketChannel(socket);
         // Auxiliary connection never time out
         ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
-                listeningAddress, new PicoNetwork(socket));
+                listeningAddress, new PicoNetwork(socket, true));
         putForeignHost(hostId, fhost);
         fhost.enableRead(VERBOTEN_THREADS);
 }
@@ -1711,7 +1711,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         SocketChannel socket = m_joiner.requestForConnection(fh.m_listeningAddress);
                         // Auxiliary connection never time out
                         ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
-                                fh.m_listeningAddress, new PicoNetwork(socket));
+                                fh.m_listeningAddress, new PicoNetwork(socket, true));
                         putForeignHost(hostId, fhost);
                         fhost.enableRead(VERBOTEN_THREADS);
                     } catch (IOException | JSONException e) {
