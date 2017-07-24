@@ -171,10 +171,12 @@ public class SpPromoteAlgo implements RepairAlgo
         }
 
         ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
-        if (rrs.m_expectedResponses < 0 && tmLog.isDebugEnabled()) {
-            tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
-            + " repair log entries from "
-            + CoreUtils.hsIdToString(response.m_sourceHSId));
+        if (rrs.m_expectedResponses < 0 ) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
+                + " repair log entries from "
+                + CoreUtils.hsIdToString(response.m_sourceHSId));
+            }
         }
         // Long.MAX_VALUE has rejoin semantics
         if (response.getHandle() != Long.MAX_VALUE) {
@@ -183,8 +185,8 @@ public class SpPromoteAlgo implements RepairAlgo
 
         if (response.getPayload() != null) {
             m_repairLogUnion.add(response);
-            if (tmLog.isTraceEnabled()) {
-                tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
                         ", message: " + response.getPayload());
             }
         }
@@ -195,6 +197,8 @@ public class SpPromoteAlgo implements RepairAlgo
                         + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
             if (areRepairLogsComplete()) {
+
+                //no repair needed for BalanceSPI
                 if (m_isBalanceSPI) {
                     m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
                 } else {

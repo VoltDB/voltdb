@@ -93,7 +93,10 @@ public class Cartographer extends StatsSource
     // local client interface so we can keep the CIs implementation
     private void sendLeaderChangeNotify(long hsId, int partitionId, boolean balanceSPI)
     {
-        if (balanceSPI) return;
+        //do not notify the leader change because of BalanceSPI to avoid intentional transaction drop
+        if (balanceSPI) {
+            return;
+        }
         hostLog.info("[Cartographer] Sending leader change notification with new leader:" +
                 CoreUtils.hsIdToString(hsId) + " for partition:" + partitionId);
 
@@ -394,10 +397,16 @@ public class Cartographer extends StatsSource
         return retval;
     }
 
+    /**
+     * return host site id with a given host id and a partition id
+     * @param hostId  The host id
+     * @param partition  The partition id
+     * @return  a site id or null if there is no such a site
+     */
     public Long getHSIDForPartitionHost(int hostId, int partition) {
         List<Long> hsids = getReplicasForPartition(partition);
-        for (Long hsid: hsids) {
-           if (hostId ==CoreUtils.getHostIdFromHSId(hsid)){
+        for (Long hsid : hsids) {
+           if (hostId == CoreUtils.getHostIdFromHSId(hsid)){
                return hsid;
            }
         }
@@ -720,8 +729,15 @@ public class Cartographer extends StatsSource
         }
     }
 
-    //find a partition and its target host to host its leader
-    //(best effort)
+    /**
+     * find a partition and its target host for SPI migration
+     * SPI is migrated from the host with most partition leaders to a host which has the partition replica and
+     * the least number of partition. if the host with @localHostId is not the host which has the most partition
+     * leaders, return null. Eventually the host with most partition leaders will get a chance to initiate SPI balance.
+     * @param hostCount  The number of hosts in the cluster
+     * @param localHostId  the host id
+     * @return  a pair of partition id and destination host id
+     */
     public Pair<Integer, Integer> getPartitionForBalanceSPI(int hostCount, int localHostId) {
 
         Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();

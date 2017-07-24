@@ -308,7 +308,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[MpInitiatorMailbox.repairReplicasWithInternal] send to " + CoreUtils.hsIdCollectionToString(needsRepair) + " msg:" + repairWork);
+                tmLog.debug("[MpInitiatorMailbox.repairReplicasWithInternal] send to " + CoreUtils.hsIdCollectionToString(needsRepair) + " with message:\n" + repairWork);
             }
             send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), repairWork);
         }

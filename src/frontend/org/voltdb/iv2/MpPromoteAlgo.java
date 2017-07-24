@@ -154,10 +154,11 @@ public class MpPromoteAlgo implements RepairAlgo
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
         m_replicaRepairStructs.put(m_mailbox.getHSId(), new ReplicaRepairStruct());
-
-        tmLog.info(m_whoami + "found " + m_survivors.size()
-                 + " surviving leaders to repair. "
-                 + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors) + "requested id:" + m_requestId);
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(m_whoami + "found " + m_survivors.size()
+            + " surviving leaders to repair. "
+            + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors) + " requested id:" + m_requestId);
+        }
         VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_survivors), logRequest);
         m_mailbox.send(m_mailbox.getHSId(), logRequest);
@@ -170,9 +171,11 @@ public class MpPromoteAlgo implements RepairAlgo
         if (message instanceof Iv2RepairLogResponseMessage) {
             Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
             if (response.getRequestId() != m_requestId) {
-                tmLog.debug(m_whoami + "rejecting stale repair response."
-                          + " Current request id is: " + m_requestId
-                          + " Received response for request id: " + response.getRequestId());
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(m_whoami + "rejecting stale repair response."
+                            + " Current request id is: " + m_requestId
+                            + " Received response for request id: " + response.getRequestId());
+                }
                 return;
             }
 
@@ -192,29 +195,35 @@ public class MpPromoteAlgo implements RepairAlgo
 
             // Step 3: offer to the union
             addToRepairLog(response);
-            if (tmLog.isTraceEnabled()) {
-                tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
                         ", message: " + response.getPayload());
             }
 
             // Step 4: update the corresponding replica repair struct.
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
             if (rrs.m_expectedResponses < 0) {
-                tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
-                          + " repair log entries from "
-                          + CoreUtils.hsIdToString(response.m_sourceHSId));
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
+                    + " repair log entries from "
+                    + CoreUtils.hsIdToString(response.m_sourceHSId));
+                }
             }
 
             if (rrs.update(response)) {
-                tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
-                          + " responses for " + rrs.m_expectedResponses
-                          + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
+                            + " responses for " + rrs.m_expectedResponses
+                            + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
+                }
 
                 if (areRepairLogsComplete()) {
 
                     TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
                             m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), true);
 
+                    //no real transaction repair when triggered with BalanceSPI. Theoretically it should not be here.
+                    //Balance SPI should not trigger MP promotion.
                     if (m_isBalanceSPI) {
                         m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
                     } else {

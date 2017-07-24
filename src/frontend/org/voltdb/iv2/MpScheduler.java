@@ -459,9 +459,6 @@ public class MpScheduler extends Scheduler
             ctm.setTruncationHandle(m_repairLogTruncationHandle);
             // dump it in the repair log
             // hacky castage
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[MpScheduler.handleInitiateResponseMessage]" + ctm);
-            }
             ((MpInitiatorMailbox)m_mailbox).deliverToRepairLog(ctm);
         }
     }

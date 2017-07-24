@@ -279,9 +279,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     FragmentResponseMessage fresp = (FragmentResponseMessage)resp;
                     fresp.setExecutorSiteId(m_mailbox.getHSId());
                 }
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("[SpScheduler.updateReplicas] sends done response on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + "\n" +counter);
-                }
                 m_mailbox.send(counter.m_destinationId, resp);
             }
             else {
@@ -775,7 +772,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 traceLog.add(() -> VoltTrace.endAsync("initsp", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getClientInterfaceHandle())));
             }
 
-            if (m_defaultConsistencyReadLevel == ReadLevel.FAST || !m_isLeader) {
+            if (m_defaultConsistencyReadLevel == ReadLevel.FAST) {
                 // the initiatorHSId is the ClientInterface mailbox.
                 m_mailbox.send(message.getInitiatorHSId(), message);
                 return;
@@ -989,10 +986,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             m_replicaHSIds,
                             message);
                 }
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("[SpSchdeudler.handleFragmentmessage add to DC] on " + CoreUtils.hsIdToString(m_mailbox.getHSId())
-                    + " leader:" + m_isLeader + "\n" + TxnEgo.txnIdToString(message.getTxnId()));
-                }
                 safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), newSpHandle), counter);
             }
         } else {
@@ -1189,9 +1182,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
                 FragmentResponseMessage resp = (FragmentResponseMessage)counter.getLastResponse();
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("[handleFragmentResponseMessage]: remove DC:" + message);
-                }
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
                 resp.setExecutorSiteId(m_mailbox.getHSId());
@@ -1240,7 +1230,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //    action: advance TxnEgo, send it to all original replicas (before spi migration)
         // 2) The site is the new leader but the message is intended for replica
         //    action: no TxnEgo advance
-        if ((m_isLeader && message.isToLeader())|| message.isToLeader()) {
+        if ((m_isLeader && message.isToLeader()) || message.isToLeader()) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly

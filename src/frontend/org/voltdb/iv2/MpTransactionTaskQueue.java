@@ -131,7 +131,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 }
                 next.doRestart(masters, partitionMasters);
 
-                // Write transactions will be rerouted and restarted if the master change is triggered via @BalanceSPI
                 // Let readonly txn go as restart.
                 if (!balanceSPI || readonly) {
                     MpTransactionState txn = (MpTransactionState)next.getTransactionState();

@@ -68,8 +68,7 @@ public class MpProcedureTask extends ProcedureTask
         m_isRestart = isRestart;
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);
-        List<Long> copy = new ArrayList<Long>(pInitiators);
-        m_restartMasters.set(copy);
+        m_restartMasters.set(new ArrayList<Long>());
         m_restartMastersMap.set(new HashMap<Integer, Long>());
     }
 
@@ -103,10 +102,6 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        if ( hostLog.isDebugEnabled()) {
-            hostLog.debug("STARTING: " + this + "\nLeaders:" + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
-        }
-
         final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
         if (traceLog != null) {
@@ -170,8 +165,7 @@ public class MpProcedureTask extends ProcedureTask
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             restart.setToLeader(true);
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " +
-                        " updated masters: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
+                hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
             }
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
@@ -198,7 +192,7 @@ public class MpProcedureTask extends ProcedureTask
                 restartTransaction();
             }
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("[MpProcedureTask]MISROUTED-RESTART: " + this);
+                hostLog.debug("[MpProcedureTask] MISROUTED-RESTART: " + this);
             }
         } else {
             if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {
@@ -211,12 +205,12 @@ public class MpProcedureTask extends ProcedureTask
                 m_initiator.deliver(response);
                 execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
                 if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("[MpProcedureTask]COMPLETE: " + this);
+                    hostLog.debug("[MpProcedureTask] COMPLETE: " + this);
                 }
             } else {
                 restartTransaction();
                 if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("[MpProcedureTask]RESTART: " + this);
+                    hostLog.debug("[MpProcedureTask] RESTART: " + this);
                 }
             }
         }
@@ -263,6 +257,8 @@ public class MpProcedureTask extends ProcedureTask
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
         complete.setToLeader(true);
+
+        //If there are misrouted fragments, send message to current masters.
         final List<Long> initiatorHSIds = new ArrayList<Long>();
         if (((MpTransactionState)m_txnState).isFragmentRestarted()) {
             initiatorHSIds.addAll(((MpTransactionState)m_txnState).getMasterHSIDs());

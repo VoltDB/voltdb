@@ -385,6 +385,11 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
+        //one more check to make sure all the hosts are up before any changes are made
+        if (!db.isClusterCompelte()) {
+            return;
+        }
+
         SpScheduler scheduler = (SpScheduler)m_scheduler;
         scheduler.checkPointBalanceSPI();
         scheduler.m_isLeader = false;
@@ -404,9 +409,6 @@ public class InitiatorMailbox implements Mailbox
             }
         }
 
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
-        }
         tmLog.info("Balance spi for partition " + pid + " to " + CoreUtils.hsIdToString(newLeaderHSId));
 
         //notify the new leader right away if the current leader has drained all transactions.

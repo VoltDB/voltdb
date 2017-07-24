@@ -2184,7 +2184,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             StoredProcedureInvocation spi = new StoredProcedureInvocation();
             spi.setProcName(procedureName);
 
-            tmLog.info(String.format("Migrating the mastership of partition %d to host %d (partition key %d)",
+            tmLog.info(String.format("Moving the leader of partition %d to host %d (partition key %d)",
                     partitionId, targetHostId, partitionKey));
 
             if (tmLog.isDebugEnabled()) {
@@ -2226,12 +2226,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                   }
               }
             } else {
-                //if the target host is down, ignore
-                Set<Integer> liveHosts = db.getHostMessenger().getLiveHostIds();
-                if (!liveHosts.contains(targetHostId)) {
-                    tmLog.error(String.format("The mastership for partition %d has not been successfully moved to host %d.",
-                            partitionId, targetHostId));
-                }
+                tmLog.warn(String.format("Fail to move the leader of partition %d to host %d. %s",
+                        partitionId, targetHostId, resp.getStatusString()));
             }
         } catch (IOException | InterruptedException e) {
             tmLog.error(String.format("Fail to process leader change for partition %d: %s", partitionId, e.getMessage()));

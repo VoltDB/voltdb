@@ -76,7 +76,11 @@ public class MpTransactionState extends TransactionState
     boolean m_haveDistributedInitTask = false;
     boolean m_isRestart = false;
     boolean m_fragmentRestarted = false;
-    final Map<Long, Long> m_masterSwapFromSpiBalance = Maps.newHashMap();
+
+    //Master change from BalanceSPI. The remote dependencies are built before SPI migration. After
+    //fragment restart, the FragmentResponseMessage will come from the new partition master. The map is used to remove
+    //the remote dependency which is built with the old partition master.
+    final Map<Long, Long> m_masterMapForFragmentRestart = Maps.newHashMap();
 
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
@@ -403,12 +407,12 @@ public class MpTransactionState extends TransactionState
         boolean needed = localRemotes.remove(hsid);
         if (!needed) {
             //m_remoteDeps may be built before SPI migration. The dependency should be then removed with new partition master
-            Long hsidBeforeSPIMigrration = m_masterSwapFromSpiBalance.get(hsid);
-            if (hsidBeforeSPIMigrration != null) {
-                needed = localRemotes.remove(hsidBeforeSPIMigrration);
+            Long newHsid = m_masterMapForFragmentRestart.get(hsid);
+            if (newHsid != null) {
+                needed = localRemotes.remove(newHsid);
                 if (tmLog.isDebugEnabled()){
                     tmLog.debug("[trackDependency]: remote dependency was built before spi migration. current leader:" + CoreUtils.hsIdToString(hsid)
-                    + " prior leader:" + CoreUtils.hsIdToString(hsidBeforeSPIMigrration));
+                    + " prior leader:" + CoreUtils.hsIdToString(newHsid));
                 }
             }
         }
@@ -463,18 +467,18 @@ public class MpTransactionState extends TransactionState
 
     /**
      * Restart this fragment after the fragment is mis-routed from SPI migration
+     * If the masters have been updated, the fragment will be routed to its new master. The fragment will be routed to the old master.
+     * until new master is updated.
      * @param message The mis-routed response message
-     * @param partitionMastersMap The current partition mastership MpScheduler sees. If the mastership has been
-     * updated, the fragment will be routed to its new master, otherwise, it will be still routed to the old master.
-     * Eventually the fragment will be routed to its new master.
+     * @param partitionMastersMap The current partition masters
      */
     public void restartFragment(FragmentResponseMessage message, List<Long> masters, Map<Integer, Long> partitionMastersMap) {
         final int partionId = message.getPartitionId();
         Long restartHsid = partitionMastersMap.get(partionId);
         Long hsid = message.getExecutorSiteId();
         if (!hsid.equals(restartHsid)) {
-            m_masterSwapFromSpiBalance.clear();
-            m_masterSwapFromSpiBalance.put(restartHsid, hsid);
+            m_masterMapForFragmentRestart.clear();
+            m_masterMapForFragmentRestart.put(restartHsid, hsid);
             //The very first fragment is to be rerouted to the new leader, then all the follow-up fragments are routed
             //to new leaders.
             updateMasters(masters, partitionMastersMap);

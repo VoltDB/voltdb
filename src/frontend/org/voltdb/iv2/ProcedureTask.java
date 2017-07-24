@@ -62,6 +62,7 @@ abstract public class ProcedureTask extends TransactionTask
             SiteProcedureConnection siteConnection)
     {
         final InitiateResponseMessage response = new InitiateResponseMessage(task);
+
         try {
             Object[] callerParams = null;
             /*

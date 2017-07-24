@@ -292,7 +292,6 @@ public class LeaderAppointer implements Promotable
         @Override
         public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
             Set<LeaderCallBackInfo> currentLeaders = new HashSet<LeaderCallBackInfo>(cache.values());
-            tmLog.debug("Updated leaders: " + currentLeaders);
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 try {
                     if (currentLeaders.size() == getInitialPartitionCount()) {
@@ -306,7 +305,7 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
                 }
             } else {
-                // update partition call backs after spi balance
+                // update partition call backs with correct current leaders after spi balance
                 for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
                     updatePartitionLeader(entry.getKey(), entry.getValue().m_HSID);
                 }
@@ -421,9 +420,6 @@ public class LeaderAppointer implements Promotable
         m_iv2appointees.start(true);
         m_iv2masters.start(true);
         ImmutableMap<Integer, Long> appointees = m_iv2appointees.pointInTimeCache();
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("appointees.toString(): " + appointees.toString());
-        }
         // Figure out what conditions we assumed leadership under.
         if (appointees.size() == 0)
         {
