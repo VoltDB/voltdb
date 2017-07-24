@@ -502,14 +502,17 @@ public class ExportManager
                     VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
                 }
                 generation.pausePolling(partitions);
+
+                ExportDataProcessor oldProcessor = m_processor.getAndSet(newProcessor);
+                oldProcessor.shutdown();
+
                 // override m_generation with itself to activate all the ExportDataSource
                 newProcessor.setExportGeneration(generation);
                 newProcessor.readyForData(false);
                 for ( Integer partitionId: m_masterOfPartitions) {
                     generation.acceptMastershipTask(partitionId);
                 }
-                ExportDataProcessor oldProcessor = m_processor.getAndSet(newProcessor);
-                oldProcessor.shutdown();
+
 
             }
         });
