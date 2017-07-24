@@ -208,7 +208,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     @Override
     public void close() throws InterruptedException, NoConnectionsException
     {
-        while (m_processedCount.get() + m_failedCount.get() != m_totalRowCount.get()) {
+        while (m_processedCount.get() != m_totalRowCount.get()) {
             m_client.drain();
             Thread.sleep(500);
         }
