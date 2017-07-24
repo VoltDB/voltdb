@@ -120,10 +120,8 @@ public class ImportManager implements ChannelChangeCallback {
         try {
             Map<String, ImportConfiguration> newProcessorConfig = em.loadNewConfigAndBundles(catalogContext);
             OperationMode startMode = VoltDB.instance().getStartMode();
-            if (startMode == OperationMode.RUNNING) {
+            if (startMode != OperationMode.PAUSED) {
                 em.startImporters(newProcessorConfig);
-            } else {
-                assert startMode == OperationMode.PAUSED : startMode;
             }
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating initial import processor", true, e);
@@ -305,13 +303,14 @@ public class ImportManager implements ChannelChangeCallback {
     public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
         try {
             Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
-            if (VoltDB.instance().getMode() == OperationMode.RUNNING &&
-                    (m_processorConfig == null || !m_processorConfig.equals(newProcessorConfig))) {
-                close();
-                startImporters(newProcessorConfig);
-                readyForDataInternal(catalogContext, messenger);
-            } else if (VoltDB.instance().getMode() != OperationMode.RUNNING){
-                importLog.info("Catalog update is not restarting importers because cluster state is " + VoltDB.instance().getMode());
+            if (m_processorConfig == null || !m_processorConfig.equals(newProcessorConfig)) {
+                if (VoltDB.instance().getMode() != OperationMode.PAUSED) {
+                    close();
+                    startImporters(newProcessorConfig);
+                    readyForDataInternal(catalogContext, messenger);
+                } else if (importLog.isDebugEnabled()) {
+                    importLog.debug("Catalog update is not restarting importers because cluster state is " + VoltDB.instance().getMode());
+                }
             }
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error updating importers with new DDL and/or deployment.", true, e);
