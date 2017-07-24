@@ -24,7 +24,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -2195,22 +2194,6 @@ public abstract class CatalogUtil {
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
-    public static void updateCatalogToZK(ZooKeeper zk,
-                                        long genId,
-                                        byte[] catalogBytes,
-                                        byte[] catalogHash,
-                                        String deploymentString)
-    {
-        try {
-            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
-            CatalogUtil.updateCatalogToZK(zk, genId, catalogBytes, catalogHash, deploymentBytes);
-        } catch (UnsupportedEncodingException e) {
-            VoltDB.crashLocalVoltDB("invalid encoding deployment file: " + deploymentString, true, e);
-        } catch (KeeperException | InterruptedException e) {
-            VoltDB.crashLocalVoltDB("error updating catalog bytes to zookeeper", true, e);
-        }
-    }
-
     public static class CatalogAndDeployment {
         public final long genId;
         private final byte[] catalogHash;
@@ -2264,34 +2247,6 @@ public abstract class CatalogUtil {
         catalogDeploymentBytes = null;
 
         return new CatalogAndDeployment(genId, catalogHash, catalogBytes, deploymentBytes);
-    }
-
-    public static void copyCurrentCatalogToPreviousZK(ZooKeeper zk, long genId,
-            byte[] catalogBytes, byte[] catalogHash, String deployment) {
-        try {
-            // read the current catalog bytes
-            byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
-            // write to the previous catalog bytes place holder
-            zk.setData(VoltZK.catalogbytesPrevious, data, -1);
-        } catch (KeeperException | InterruptedException e) {
-            VoltDB.crashLocalVoltDB("error read catalog bytes from zookeeper", true, e);
-        }
-    }
-
-    /**
-     * Copy the previous catalog bytes from ZK to the current catalog ZK node
-     */
-    public static void copyPreviousCatalogToCurrentZK(ZooKeeper zk)
-    {
-        try {
-            // read the current catalog bytes
-            byte[] data = zk.getData(VoltZK.catalogbytesPrevious, false, null);
-            assert(data != null);
-            // write to the previous catalog bytes place holder
-            zk.setData(VoltZK.catalogbytes, data, -1);
-        } catch (KeeperException | InterruptedException e) {
-            VoltDB.crashLocalVoltDB("error read catalog bytes from zookeeper", true, e);
-        }
     }
 
     /**

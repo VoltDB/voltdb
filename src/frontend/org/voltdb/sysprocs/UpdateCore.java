@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -471,8 +472,16 @@ public class UpdateCore extends VoltSystemProcedure {
             catch (VoltAbortException vae) {
                 log.info("Catalog verification failed: " + vae.getMessage());
                 // revert the catalog node on ZK
-                CatalogUtil.copyPreviousCatalogToCurrentZK(zk);
-
+                try {
+                    // read the current catalog bytes
+                    byte[] data = zk.getData(VoltZK.catalogbytesPrevious, false, null);
+                    assert(data != null);
+                    // write to the previous catalog bytes place holder
+                    zk.setData(VoltZK.catalogbytes, data, -1);
+                } catch (KeeperException | InterruptedException e) {
+                    log.error("error read/write catalog bytes on zookeeper: " + e.getMessage());
+                    throw e;
+                }
                 throw vae;
             }
 

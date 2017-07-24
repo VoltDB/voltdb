@@ -18,6 +18,7 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -523,15 +524,29 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
-        long genId = getNextGenerationId();
-
+        // only copy the current catalog when @UpdateCore could fail
         if (ccr.tablesThatMustBeEmpty.length != 0) {
-            // only copy the current catalog when @UpdateCore could fail
-            CatalogUtil.copyCurrentCatalogToPreviousZK(zk, genId, ccr.catalogBytes,
-                    ccr.catalogHash, ccr.deploymentString);
+            try {
+                // read the current catalog bytes
+                byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
+                // write to the previous catalog bytes place holder
+                zk.setData(VoltZK.catalogbytesPrevious, data, -1);
+            } catch (KeeperException | InterruptedException e) {
+                errMsg = "error copying catalog bytes or write catalog bytes on ZK";
+                return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+            }
         }
-        CatalogUtil.updateCatalogToZK(zk, genId, ccr.catalogBytes, ccr.catalogHash,
-                ccr.deploymentString);
+        long genId = getNextGenerationId();
+        try {
+            byte[] deploymentBytes = ccr.deploymentString.getBytes("UTF-8");
+            CatalogUtil.updateCatalogToZK(zk, genId, ccr.catalogBytes, ccr.catalogHash, deploymentBytes);
+        } catch (UnsupportedEncodingException e) {
+            errMsg = "error converting deployment string to bytes";
+            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+        } catch (KeeperException | InterruptedException e) {
+            errMsg = "error writing catalog bytes on ZK";
+            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+        }
 
         // update the catalog jar
         return callProcedure("@UpdateCore",
