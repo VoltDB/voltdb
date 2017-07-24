@@ -536,12 +536,20 @@ public class FunctionCustom extends FunctionSQL {
                 // End of VoltDB extension
                 break;
 
+            case FUNC_DEGREES :
+                name = Tokens.T_DEGREES;
+                parseList = singleParamList;
+                break;
+
+            case FUNC_RADIANS :
+                name = Tokens.T_RADIANS;
+                parseList = singleParamList;
+                break;
+
             case FUNC_ACOS :
             case FUNC_ASIN :
             case FUNC_ATAN :
             case FUNC_ATAN2 :
-            case FUNC_DEGREES :
-            case FUNC_RADIANS :
             case FUNC_ROUNDMAGIC :
             case FUNC_SIGN :
             case FUNC_SOUNDEX :
