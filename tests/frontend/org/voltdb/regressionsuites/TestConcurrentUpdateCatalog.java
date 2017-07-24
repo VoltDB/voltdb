@@ -233,8 +233,10 @@ public class TestConcurrentUpdateCatalog {
         cb2.waitForResponse();
 
         // Only one of them should succeed
-        assertTrue(ClientResponse.GRACEFUL_FAILURE == cb2.getResponse().getStatus()
-                || ClientResponse.GRACEFUL_FAILURE == cb1.getResponse().getStatus());
+
+        // as the NT-Procedure conversion, it's still like single-thread execution
+        assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
+                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
         assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
                 || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
     }
