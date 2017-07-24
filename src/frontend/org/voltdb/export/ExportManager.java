@@ -131,40 +131,6 @@ public class ExportManager
 
     private final ExecutorService m_dataProcessorHandler = CoreUtils.getSingleThreadExecutor("ImportProcessor");
 
-    /*
-     * Issue a permit when a generation is drained so that when we are truncating if a generation
-     * is completely truncated we can wait for the on generation drained task to finish.
-     *
-     * This eliminates a race with CL replay where it may do catalog updates and such while truncation
-     * is still running on generation drained.
-     */
-    private final Semaphore m_onGenerationDrainedForTruncation = new Semaphore(0);
-
-    public class GenerationDrainRunnable implements Runnable {
-
-        @Override
-        public void run() {
-            /*
-             * Do all the work to switch to a new generation in the thread for the processor
-             * of the old generation
-             */
-            // TODO: is there any benefit in queuing a runnable which only calls m_onGenerationDrainedForTruncation.release()?
-            //After all generations drained processors can not be null as above check should kick you out.
-            ExportDataProcessor proc = m_processor.get();
-            if (proc == null) {
-                VoltDB.crashLocalVoltDB("No export data processor found", true, null);
-            }
-            proc.queueWork(new Runnable() {
-                @Override
-                public void run() {
-                    m_onGenerationDrainedForTruncation.release();
-                }
-
-            });
-        }
-
-    }
-
     /**
      * Construct ExportManager using catalog.
      * @param myHostId
@@ -324,8 +290,7 @@ public class ExportManager
             }
         }
 
-        ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
-        generation.setGenerationDrainRunnable(new GenerationDrainRunnable());
+        ExportGeneration generation = new ExportGeneration(exportOverflowDirectory, false);
 
         if (generation.initializeGenerationFromDisk(m_messenger)) {
             assert (m_generation.get() == null);
@@ -406,7 +371,6 @@ public class ExportManager
             try {
                 File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
                 generation = new ExportGeneration(exportOverflowDirectory, isRejoin);
-                generation.setGenerationDrainRunnable(new GenerationDrainRunnable());
                 m_generation.set(generation);
             } catch (IOException e1) {
                 VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
@@ -626,12 +590,8 @@ public class ExportManager
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();
-        if (generation != null && generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
-            try {
-                m_onGenerationDrainedForTruncation.acquire();
-            } catch (InterruptedException e) {
-                VoltDB.crashLocalVoltDB("Interrupted truncating export data", true, e);
-            }
+        if (generation != null) {
+            generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
         }
     }
 

@@ -88,14 +88,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnLengths = new ArrayList<Integer>();
     private long m_firstUnpolledUso = 0;
     private final StreamBlockQueue m_committedBuffers;
-    private Runnable m_onDrain;
     private Runnable m_onMastership;
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
-    private final int m_nullArrayLength;
     private long m_lastReleaseOffset = 0;
     private long m_lastAckUSO = 0;
     //This is for testing only.
@@ -114,9 +112,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
     private RunnableWithES m_firstAction = null;
 
-    // Record the stacktrace of when this data source calls drain to help debug a race condition.
-    private volatile Exception m_drainTraceForDebug = null;
-
     /**
      * Create a new data source.
      * @param db
@@ -125,27 +120,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param catalogMap
      */
     public ExportDataSource(
-            final Runnable onDrain,
             String db, String tableName,
-            int partitionId, String signature, long generation,
+            int partitionId, String signature,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
             String overflowPath
             ) throws IOException
-            {
-        checkNotNull( onDrain, "onDrain runnable is null");
+    {
         m_format = ExportFormat.SEVENDOTX;
-        m_onDrain = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    onDrain.run();
-                } finally {
-                    m_onDrain = null;
-                    forwardAckToOtherReplicas(Long.MIN_VALUE);
-                }
-            }
-        };
         m_database = db;
         m_tableName = tableName;
         m_signature = signature;
@@ -220,32 +202,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             fos.getFD().sync();
         }
 
-        // compute the number of bytes necessary to hold one bit per
-        // schema column
-        m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
-
         // This is not being loaded from file, so activate immediately
         if (!m_dontActivateForTest) {
             activate();
         }
     }
 
-    public ExportDataSource(final Runnable onDrain, File adFile) throws IOException {
-        /*
-         * Certainly no more data coming if this is coming off of disk
-         */
-        m_onDrain = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    onDrain.run();
-                } finally {
-                    m_onDrain = null;
-                    forwardAckToOtherReplicas(Long.MIN_VALUE);
-                }
-            }
-        };
-
+    public ExportDataSource(File adFile) throws IOException {
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
         long hsid = -1;
@@ -301,10 +264,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
-
-        // compute the number of bytes necessary to hold one bit per
-        // schema column
-        m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
     }
 
     public void activate() {
@@ -767,13 +726,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     ackingContainer.discard();
                 }
                 m_pollFuture = null;
-
-                if (m_drainTraceForDebug != null) {
-                    // TODO this should be impossible
-                    //Making this an ERROR. Looks like this is happening when ackImpl initiates drains and pollImpl is submitted to execute.
-                    exportLog.error("Rolling generation before it is fully drained. " +
-                                            "Drain was called from " + Throwables.getStackTraceAsString(m_drainTraceForDebug));
-                }
             }
         } catch (Throwable t) {
             fut.setException(t);
@@ -881,9 +833,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
      private void ackImpl(long uso) {
 
-        if (uso == Long.MIN_VALUE && m_onDrain != null) {
-            m_drainTraceForDebug = new Exception("Acking USO " + uso);
-            m_onDrain.run();
+        if (uso == Long.MIN_VALUE) {
+            // drain
             return;
         }
 
