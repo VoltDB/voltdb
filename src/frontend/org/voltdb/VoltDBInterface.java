@@ -169,7 +169,7 @@ public interface VoltDBInterface
         return;
     }
 
-    default public String checkLoadingClasses(byte[] catalogBytes)
+    default public String checkLoadingClasses(byte[] catalogBytes, String diffCommands)
     {
         return null;
     }

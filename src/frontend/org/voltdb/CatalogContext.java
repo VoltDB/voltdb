@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
@@ -46,6 +47,8 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -83,10 +86,11 @@ public class CatalogContext {
     public final HostMessenger m_messenger;
 
     /*
-     * Planner associated with this catalog version.
-     * Not thread-safe, should only be accessed by AsyncCompilerAgent
+     * Planner associated with this catalog version, Not thread-safe
      */
     public final PlannerTool m_ptool;
+
+    public ConcurrentHashMap<Long, ImmutableMap<String, ProcedureRunner>> m_userProcsMap = new ConcurrentHashMap<>();
 
     // PRIVATE
     private final InMemoryJarfile m_jarfile;
@@ -239,6 +243,12 @@ public class CatalogContext {
         return m_dbSettings.getNodeSetting();
     }
 
+    public Catalog getNewCatalog(String diffCommands) {
+        Catalog newCatalog = catalog.deepCopy();
+        newCatalog.execute(diffCommands);
+        return newCatalog;
+    }
+
     public CatalogContext update(
             long genId,
             byte[] catalogBytes,
@@ -249,8 +259,8 @@ public class CatalogContext {
             HostMessenger messenger,
             boolean hasSchemaChange)
     {
-        Catalog newCatalog = catalog.deepCopy();
-        newCatalog.execute(diffCommands);
+        Catalog newCatalog = getNewCatalog(diffCommands);
+
         int incValue = incrementVersion ? 1 : 0;
         // If there's no new catalog bytes, preserve the old one rather than
         // bashing it
@@ -282,6 +292,11 @@ public class CatalogContext {
                     m_defaultProcs,
                     m_ptool);
         return retval;
+    }
+
+    public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedures() {
+        // TODO(xin)
+        return null;
     }
 
     /**
@@ -384,12 +399,13 @@ public class CatalogContext {
      * @return A java Class variable associated with the class.
      * @throws ClassNotFoundException if the class is not in the jar file.
      */
-    public Class<?> classForProcedure(String procedureClassName) throws ClassNotFoundException {
+    public Class<?> classForProcedure(String procedureClassName)
+            throws LinkageError, ExceptionInInitializerError, ClassNotFoundException {
         return classForProcedure(procedureClassName, m_jarfile.getLoader());
     }
 
     public static Class<?> classForProcedure(String procedureClassName, ClassLoader loader)
-            throws ClassNotFoundException {
+            throws LinkageError, ExceptionInInitializerError, ClassNotFoundException {
         // this is a safety mechanism to prevent catalog classes overriding VoltDB stuff
         if (procedureClassName.startsWith("org.voltdb.")) {
             return Class.forName(procedureClassName);

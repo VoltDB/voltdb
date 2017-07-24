@@ -59,6 +59,8 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -105,6 +107,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -3315,23 +3318,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         configInfoDir.mkdirs();
 
         InMemoryJarfile.writeToFile(catalogBytes,
-                                    new VoltFile(configInfoDir.getPath(), InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
+                                    new VoltFile(configInfoDir.getPath(),
+                                                 InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
     }
 
     // Verify the integrity of the newly updated catalog stored on the ZooKeeper
     @Override
-    public String checkLoadingClasses(byte[] catalogBytes) {
+    public String checkLoadingClasses(byte[] catalogBytes, String diffCommands) {
+        ImmutableMap.Builder<String, Class<?>> classesMap = ImmutableMap.<String, Class<?>>builder();
+        InMemoryJarfile newCatalogJar;
+        JarLoader jarLoader;
+        String errorMsg;
         try {
-            InMemoryJarfile testjar = new InMemoryJarfile(catalogBytes);
-            JarLoader testjarloader = testjar.getLoader();
-            for (String classname : testjarloader.getClassNames()) {
+            newCatalogJar = new InMemoryJarfile(catalogBytes);
+            jarLoader = newCatalogJar.getLoader();
+            for (String classname : jarLoader.getClassNames()) {
                 try {
-                    CatalogContext.classForProcedure(classname, testjarloader);
+                    Class<?> procCls = CatalogContext.classForProcedure(classname, jarLoader);
+                    classesMap.put(classname, procCls);
                 }
                 // LinkageError catches most of the various class loading errors we'd
                 // care about here.
                 catch (UnsupportedClassVersionError e) {
-                    String msg = "Cannot load classes compiled with a higher version of Java than currently" +
+                    errorMsg = "Cannot load classes compiled with a higher version of Java than currently" +
                                  " in use. Class " + classname + " was compiled with ";
 
                     Integer major = 0;
@@ -3343,27 +3352,69 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
 
                     if (VerifyCatalogAndWriteJar.SupportedJavaVersionMap.containsKey(major)) {
-                        msg = msg.concat(VerifyCatalogAndWriteJar.SupportedJavaVersionMap.get(major) + ", current runtime version is " +
+                        errorMsg = errorMsg.concat(VerifyCatalogAndWriteJar.SupportedJavaVersionMap.get(major) + ", current runtime version is " +
                                          System.getProperty("java.version") + ".");
                     } else {
-                        msg = msg.concat("an incompatable Java version.");
+                        errorMsg = errorMsg.concat("an incompatable Java version.");
                     }
-                    hostLog.error(msg);
-                    return msg;
+                    hostLog.error(errorMsg);
+                    return errorMsg;
                 }
                 catch (LinkageError | ClassNotFoundException e) {
                     String cause = e.getMessage();
                     if (cause == null && e.getCause() != null) {
                         cause = e.getCause().getMessage();
                     }
-                    String msg = "Error loading class \'" + classname + "\': " +
+                    errorMsg = "Error loading class \'" + classname + "\': " +
                         e.getClass().getCanonicalName() + " for " + cause;
-                    hostLog.warn(msg);
-                    return msg;
+                    hostLog.warn(errorMsg);
+                    return errorMsg;
                 }
             }
         } catch (Exception e) {
             return e.getMessage();
+        }
+
+        CatalogContext ctx = VoltDB.instance().getCatalogContext();
+        Catalog newCatalog = ctx.getNewCatalog(diffCommands);
+
+        Database db = newCatalog.getClusters().get("cluster").getDatabases().get("database");
+        CatalogMap<Procedure> catalogProcedures = db.getProcedures();
+
+        ExecutorService es = Executors.newSingleThreadScheduledExecutor();
+
+        SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
+        List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
+
+        Map<Long, Future<String>> resultFutureMap = new HashMap<>();
+        for (Long site : sites) {
+            Future<String> ft = es.submit(() -> {
+                try {
+                    ImmutableMap<String, ProcedureRunner> userProcs =
+                        LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
+                                                                    classesMap.build(), null);
+                    ctx.m_userProcsMap.put(site, userProcs);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    String msg = "error setting up user procedure runners using NT-procedure pattern: "
+                                + e.getMessage();
+                    hostLog.error(msg);
+                    return msg;
+                }
+                return null;
+            });
+            resultFutureMap.put(site, ft);
+        }
+
+        for (Future<String> ft : resultFutureMap.values()) {
+            try {
+                if ((errorMsg = ft.get()) == null)
+                    continue;
+            } catch (InterruptedException | ExecutionException e) {
+                return "Exception throw waiting for procedure runner creation result: " + e.getMessage();
+            }
+            hostLog.error(errorMsg);
+            return errorMsg;
         }
 
         return null;
@@ -3401,7 +3452,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 m_statusTracker.setNodeState(NodeState.UPDATING);
                 if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
-                    if (m_catalogContext.catalogVersion > expectedCatalogVersion);
+                    if (m_catalogContext.catalogVersion < expectedCatalogVersion) {
+                        throw new RuntimeException("Trying to update main catalog context with diff " +
+                                "commands generated for an out-of date catalog. Expected catalog version: " +
+                                expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
+                    };
+                    assert(m_catalogContext.catalogVersion == expectedCatalogVersion + 1);
                     return m_catalogContext;
                 }
 

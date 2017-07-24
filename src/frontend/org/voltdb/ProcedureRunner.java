@@ -127,6 +127,7 @@ public class ProcedureRunner {
 
     // per procedure state and catalog info
     //
+    protected ArrayList<String> m_stmtList;
     protected ProcedureStatsCollector m_statsCollector;
     protected SingleCallStatsToken m_perCallStats;
     protected final Procedure m_catProc;
@@ -195,17 +196,23 @@ public class ProcedureRunner {
         // Analyze and process the stored procedure, return a list of variable names of
         // the SQLStmts defined in the stored procedure.
         // The variable names are used in the granular statistics.
-        ArrayList<String> stmtList = reflect();
+        m_stmtList = reflect();
 
+        if (m_site != null) {
+            initStats(m_site);
+        }
+    }
+
+    public void initStats(SiteProcedureConnection site) {
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
         // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
         m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
                 site.getCorrespondingSiteId(),
                 new ProcedureStatsCollector(
-                        m_site.getCorrespondingSiteId(),
-                        m_site.getCorrespondingPartitionId(),
+                        site.getCorrespondingSiteId(),
+                        site.getCorrespondingPartitionId(),
                         m_catProc,
-                        stmtList,
+                        m_stmtList,
                         true)
                 );
 
