@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -308,7 +309,6 @@ public class UpdateCore extends VoltSystemProcedure {
                         expectedCatalogVersion,
                         genId,
                         catalogStuff.deploymentBytes,
-                        catalogStuff.getDeploymentHash(),
                         requireCatalogDiffCmdsApplyToEE,
                         hasSchemaChange,
                         requiresNewExportGeneration);
@@ -328,21 +328,23 @@ public class UpdateCore extends VoltSystemProcedure {
                         requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
 
                 if (log.isDebugEnabled()) {
+                    byte[] debugDeploymentHash = CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes);
                     log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
                             Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
-                            Encoder.hexEncode(catalogStuff.getDeploymentHash()).substring(0, 10),
+                            Encoder.hexEncode(debugDeploymentHash).substring(0, 10),
                             replayInfo));
                 }
             }
             // if seen before by this code, then check to see if this is a restart
             else if (context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
                     Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
-                    Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash())) {
+                    Arrays.equals(context.getDeploymentHash(),
+                            CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))) {
                 log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
                             Encoder.hexEncode(catalogStuff.getCatalogHash()),
-                            Encoder.hexEncode(catalogStuff.getDeploymentHash())));
+                            Encoder.hexEncode(CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))));
             }
             else {
                 VoltDB.crashLocalVoltDB("Invalid catalog update.  Expected version: " + expectedCatalogVersion +
@@ -469,19 +471,19 @@ public class UpdateCore extends VoltSystemProcedure {
             }
             catch (VoltAbortException vae) {
                 log.info("Catalog verification failed: " + vae.getMessage());
+                // revert the catalog node on ZK
+                try {
+                    // read the current catalog bytes
+                    byte[] data = zk.getData(VoltZK.catalogbytesPrevious, false, null);
+                    assert(data != null);
+                    // write to the previous catalog bytes place holder
+                    zk.setData(VoltZK.catalogbytes, data, -1);
+                } catch (KeeperException | InterruptedException e) {
+                    log.error("error read/write catalog bytes on zookeeper: " + e.getMessage());
+                    throw e;
+                }
                 throw vae;
             }
-
-            byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
-            // update the global version. only one site per node will accomplish this.
-            // others will see there is no work to do and gracefully continue.
-            // then update data at the local site.
-            CatalogUtil.updateCatalogToZK(
-                    zk,
-                    genId,
-                    catalogBytes,
-                    catalogHash,
-                    deploymentBytes);
 
             performCatalogUpdateWork(
                     catalogDiffCommands,

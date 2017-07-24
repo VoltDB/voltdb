@@ -2301,7 +2301,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (deploymentBytes != null && !m_config.m_deploymentDefault) {
                         byte[] deploymentHashHere =
                             CatalogUtil.makeDeploymentHash(deploymentBytes);
-                        if (!(Arrays.equals(deploymentHashHere, catalogStuff.getDeploymentHash())))
+                        byte[] deploymentHash =
+                            CatalogUtil.makeDeploymentHash(deploymentBytesTemp);
+                        if (!(Arrays.equals(deploymentHashHere, deploymentHash)))
                         {
                             hostLog.warn("The locally provided deployment configuration did not " +
                                     " match the configuration information found in the cluster.");
@@ -3389,7 +3391,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             int expectedCatalogVersion,
             long genId,
             byte[] deploymentBytes,
-            byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration)

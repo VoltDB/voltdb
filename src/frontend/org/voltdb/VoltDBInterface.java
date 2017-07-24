@@ -149,7 +149,6 @@ public interface VoltDBInterface
      * @param genId stream table catalog generation id
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentBytes  The deployment file bytes
-     * @param deploymentHash The SHA-1 hash of the deployment file
      */
     public CatalogContext catalogUpdate(
             String diffCommands,
@@ -158,7 +157,6 @@ public interface VoltDBInterface
             int expectedCatalogVersion,
             long genId,
             byte[] deploymentBytes,
-            byte[] deploymentHash,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration);
