@@ -425,8 +425,8 @@ def do_main():
                     print "sqlcmdtest error \n"
                     print "Detail output : " +  stdoutprocdata
                     print "Detail error : " +  stdoutprocerr
-
-                delete_proc(stdoutprocdata)
+                else :
+                    delete_proc(stdoutprocdata)
 
                 proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -440,8 +440,8 @@ def do_main():
                     print "sqlcmdtest error \n"
                     print "Detail output : " +  stdouttabledata
                     print "Detail error : " +  stdouttableerr
-
-                delete_table_and_view(stdouttabledata)
+                else :
+                    delete_table_and_view(stdouttabledata)
 
                 # fuzz the sqlcmd output for reliable comparison
                 clean_output(parent, prefix + '.out')
