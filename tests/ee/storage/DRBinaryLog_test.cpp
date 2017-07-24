@@ -187,6 +187,9 @@ public:
         m_drStream.setDefaultCapacity(BUFFER_SIZE);
         m_drStream.setSecondaryCapacity(LARGE_BUFFER_SIZE);
 
+        m_drStream.setLastCommittedSequenceNumber(0);
+        m_drReplicatedStream.setLastCommittedSequenceNumber(0);
+
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         m_drStreamReplica.m_enabled = false;
