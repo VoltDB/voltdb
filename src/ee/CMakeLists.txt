@@ -2,27 +2,38 @@
 #
 # A CMake build configuration for VoltDB.  The commands for the ant
 # targets in build.xml call src/ee/tools/build_cmake.py, which calls
-# cmake and make here, so you don't really know how to use this.
-# But for special cases this may be useful.
+# cmake and make here, so you don't really need to know how to use this.
+# But for special cases this may be useful.  Also, the phrase
+# "you don't really need to know how to use this" is code for
+# "understanding this is another burden we place on you", as we
+# all know with sadness.
 #
-# To use this standalone, in the root of the voltdb hierarchy, run
-#   1.) mkdir obj/${BUILD_TYPE}
+# To use this standalone, in the root of the voltdb hierarchy, run this
+# procedure. All files are relative to the VoltDB source tree root.  This
+# is the directory which contains src, test, voltdb and the VoltDB
+# LICENSE file.
+#   1.) mkdir -p obj/${BUILD_TYPE}
 #       where ${BUILD_TYPE} is memcheck, release or debug.
 #   2.) cd obj/${BUILD_TYPE}
 #   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE} ${SRC_DIR}
 #       where ${SRC_DIR} is the pathname of the voltdb
-#       source directory, where file is.  There are other
-#       arguments which could be added.  See build.xml.
+#       source directory, typically ../../voltdb/src/ee  There are other
+#       arguments which could be added.  See build.xml.  (The
+#       ../.. is there because we have changed directories to
+#       obj/${BUILD_TYPE}.  CMake looks at the build environment
+#       and creates makefiles aplenty.
 #   4.) make -j<N> -k install
 #       where, as usual, <N> is number telling make how much parallelism
 #       to use.  Values between 1 and 8 are typical.  Higher values
 #       may produce faster builds, or they may just gum things up.
-# If this succeeds, then the build artifacts will be placed in
-# obj/${BUILD}/nativelibs and obj/${BUILD}/prod
+#       If you use N=50 you will have to reboot your computer.  Really.
+#   5.) If this succeeds, then the build artifacts will be placed in
+#       obj/${BUILD}/nativelibs and obj/${BUILD}/prod.
+#   6.) To build the tests, see the section labelled Tests below.
 #
 # Note that there's the potential for making Eclipse projects here.
 # Also, there's the potential for substituting ninja for make, which
-# would improve EE build times.
+# would improve EE build times.  More experience is needed.
 #
 # The two artifacts are:
 #   1.) The jni library, which will be in
@@ -57,7 +68,8 @@
 #           preserve the file's timestamp and not force a
 #           recompilation.
 #           i.) Generated sources are in tests/ee/generated/src
-#               but tests/ee/generated is ignored by git.
+#               but tests/ee/generated is ignored by git through
+#               a gitignore file.
 #           ii.) Generated test binaries are placed in the same
 #               place that hand written tests are placed
 #       c.) Tests must all be unique by name.  We can't have
@@ -66,21 +78,35 @@
 #   1.) Building Tests
 #       To build all the tests run "make build-all-tests".  You
 #       can use the usual -jN and -k options, of course.
-#       The tests will all go into cpptests/TEST_DIR/TEST_NAME.
+#       The tests, generated and hand written, will all go into
+#       cpptests/TEST_DIR/TEST_NAME.
 #
 #       To build one test or all test in one test directory,
 #       run "make build-ALPHA" where ALPHA is the name of
-#       the test or the test directory.
+#       the test or the test directory.  Generated tests
+#       are treated just like hand written tests, except that
+#       their source is placed in tests/ee/generated/TEST_DIR,
+#       not tests/ee/TEST_DIR.  CMake takes care of all of this.
 #   2.) Running Tests
-#       To run all the tests run "make run-all-tests."
+#       To run all the tests run "make run-all-tests."  For
+#       memcheck builds this runs valgrind tests.  The full
+#       valgrind command is printed.
 #
-#       To make one test executable or all tests in a test
-#       directory, run "make run-ALPHA", where ALPHA is the
-#       name of the test or test directory.  All directories will
-#       be made, and dependences will be made.
+#       To make one test executable run "make TESTEXENAME.  To make
+#       all tests in a test directory, run "make run-ALPHA", where
+#       ALPHA is the name of the test directory.  All directories will
+#       be made, and dependences will be made.  Generated and
+#       hand-written tests are treated identically here.
+#
+#       To run one test executable run "make run-TESTEXENAME".  To
+#       run all tests in test directory ALPHA run "make run-ALPHA".
+#       Generated and hand-written tests are treated identically here.
+#       If any test executable is out of date it will be rebuilt.
 #   4.) To delete any test binaries, just delete them.  Delete
 #       cpptests to delete all test binaries.  The test system
 #       will recreate any directories which need to be made.
+#       Deleting tests/ee/generated has no effect, other than to
+#       force the recreation of the generated sources.
 #
 ########################################################################
 #
@@ -89,10 +115,12 @@
 ########################################################################
 #
 # Note that by default only GCC is supported on Linux, and only Clang is
-# supported on Darwin.  By redefining CMAKE_CXX_COMPILER one can
-# change this.  New C++ compilation flags can be added by defining
-# the cmake variable VOLTDB_CXXFLAGS.  New libraries can be added
-# to the link line for libvolt-*.so by defining VOLTDB_LDFLAGS.
+# supported on Darwin.  By redefining CMAKE_CXX_COMPILER, in the usual
+# CMake way, one can change this.  New C++ compilation flags can be
+# added by defining the cmake variable VOLTDB_CXXFLAGS.  New libraries can be added
+# to the link line for libvolt-*.so by defining VOLTDB_LINK_FLAGS
+# and VOLTDB_LDFLAGS.  For example,
+#    cmake -DVOLT_CXX_FLAGS="-fno-use-pirates" -DVOLT_LDFLAGS="-lninjutsu".
 #
 # This requires a gcc compiler version of at least 4.4.7, and a cmake
 # version of at least 2.8.12.  It's possible that older versions of
@@ -104,8 +132,9 @@
 # We also use Google's S2 geography library, pcre2 for regular
 # expression matching and openssl for arbitrary precision arithmetic.
 # These are all included in the source code of VoltDB.  But pcre3
-# is an autoconf/automake program.  So, you will need autoconf
-# and automake.
+# is an autoconf/automake program.  So, you will need the autoconf
+# and automake suites.  Trying to build without autotools gives obscure
+# error messages, so make sure autotools is installed.
 #
 ########################################################################
 
@@ -149,7 +178,8 @@ ENDIF()
 #      ${CMAKE_BINARY_DIR}  Root of the output tree.  This is
 #                           generally obj/debug, obj/release or obj/memcheck.
 #                           It will have -profile or -coverage at the
-#                           end if those options are enabled.
+#                           end if those options are enabled, and this is
+#                           called from the ant build process.
 #       ${CMAKE_BINARY_DIR}/3pty_install
 #                           All third party artifacts on which which
 #                           voltdb depends go here, in lib or include.
@@ -168,7 +198,7 @@ ENDIF()
 #       .so or .dylib suffix.  STATIC libraries are the usual .a
 #       archives, though we don't use these here.  OBJECT libraries,
 #       which we do use, are just sets of .o object files which
-#       CMake manages for us.
+#       CMake manages for us with a single name.
 #    d. Targets have properties, like compilation flags, link libraries
 #       and include directories.  These are associated with a target
 #       using ADD_COMPILE_OPTIONS, TARGET_LINK_LIBRARIES and
@@ -223,7 +253,12 @@ ELSE()
 ENDIF()
 ########################################################################
 #
-# Names of folders in the tree
+# It turns out that knowing the VOLTDB_ROOT is useful.  A typical
+# CMake project has all files below one single directory, CMAKE_SOURCE_DIR.
+# We set CMAKE_SOURCE_DIR to ${VOLTDB_ROOT}/src/ee, but there are test
+# sources in ${VOLTDB_ROOT}/tests/ee and third party sources in
+# ${VOLTDB_ROOT}/third_party.  So we need to know the names of folders
+# outside of the CMAKE_SOURCE_DIR.
 #
 ########################################################################
 EXECUTE_PROCESS(COMMAND bash -c "${CMAKE_SOURCE_DIR}/tools/findvdbroot.sh"
@@ -234,7 +269,7 @@ STRING(STRIP ${VOLTDB_ROOT} VOLTDB_ROOT)
 # any changes to it.  This keeps the git repository epsilon smaller.
 
 # Fetch the version number.
-EXECUTE_PROCESS(COMMAND cat ${CMAKE_SOURCE_DIR}/../../version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
+EXECUTE_PROCESS(COMMAND cat ${VOLTDB_ROOT}/version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
 STRING(STRIP ${VOLTDB_VERSION} VOLTDB_VERSION)
 
 # Set the log level.
@@ -767,71 +802,88 @@ SET (VOLTDB_TEST_DIR ${CMAKE_BINARY_DIR}/tests)
 #
 SET (VOLTDB_FAILING_VALGRIND_DIRS memleaktests)
 SET (VOLTDB_PASSING_VALGRIND_TESTS no_losses)
+########################################################################
 #
 # Here we have all the names of tests which are expected to pass.
-# They have the form directory/test_name.  The test names must all be globally
-# unique.  We test for this later on.
-# 
-SET (VOLTDB_TEST_PROGRAMS
-  harness_test/harness_tester
-  catalog/catalog_test
-  logging/logging_test
-  memleaktests/definite_losses
-  memleaktests/indirect_losses
-  memleaktests/still_reachable_losses
-  memleaktests/possible_losses
-  memleaktests/rw_deleted
-  memleaktests/no_losses
-  common/debuglog_test
-  common/elastic_hashinator_test
-  common/PerFragmentStatsTest
-  common/nvalue_test
-  common/pool_test
-  common/serializeio_test
-  common/tabletuple_test
-  common/ThreadLocalPoolTest
-  common/tupleschema_test
-  common/undolog_test
-  common/valuearray_test
-  common/uniqueid_test
-  execution/add_drop_table
-  execution/engine_test
-  execution/FragmentManagerTest
-  executors/OptimizedProjectorTest
-  executors/MergeReceiveExecutorTest
-  expressions/expression_test
-  expressions/function_test
-  indexes/index_key_test
-  indexes/index_scripted_test
-  indexes/index_test
-  indexes/CompactingHashIndexTest
-  indexes/CompactingTreeMultiIndexTest
-  indexes/CoveringCellIndexTest
-  storage/CompactionTest
-  storage/CopyOnWriteTest
-  storage/DRBinaryLog_test
-  storage/DRTupleStream_test
-  storage/ExportTupleStream_test
-  storage/PersistentTableMemStatsTest
-  storage/StreamedTable_test
-  storage/TempTableLimitsTest
-  storage/constraint_test
-  storage/filter_test
-  storage/persistent_table_log_test
-  storage/persistenttable_test
-  storage/serialize_test
-  storage/table_and_indexes_test
-  storage/table_test
-  storage/tabletuple_export_test
-  storage/tabletuplefilter_test
-  structures/CompactingMapTest
-  structures/CompactingMapIndexCountTest
-  structures/CompactingHashTest
-  structures/CompactingPoolTest
-  structures/CompactingMapBenchmark
-  plannodes/WindowFunctionPlanNodeTest
-  plannodes/PlanNodeFragmentTest
+# They have the form directory/test_name.  The test names must all be 
+# globally unique.  We test for this later on.
+#
+# FWIW, the elements of VOLTDB_MANUAL_TEST_PROGRAMS must have the form
+# ./TEST_DIR/TEST_NAME.  The initial "./" is important.  We could
+# make this more robust, but it would be work.
+#
+########################################################################
+SET (VOLTDB_MANUAL_TEST_PROGRAMS
+  ./harness_test/harness_tester
+  ./catalog/catalog_test
+  ./logging/logging_test
+  ./memleaktests/definite_losses
+  ./memleaktests/indirect_losses
+  ./memleaktests/still_reachable_losses
+  ./memleaktests/possible_losses
+  ./memleaktests/rw_deleted
+  ./memleaktests/no_losses
+  ./common/debuglog_test
+  ./common/elastic_hashinator_test
+  ./common/PerFragmentStatsTest
+  ./common/nvalue_test
+  ./common/pool_test
+  ./common/serializeio_test
+  ./common/tabletuple_test
+  ./common/ThreadLocalPoolTest
+  ./common/tupleschema_test
+  ./common/undolog_test
+  ./common/valuearray_test
+  ./common/uniqueid_test
+  ./execution/add_drop_table
+  ./execution/engine_test
+  ./execution/FragmentManagerTest
+  ./executors/OptimizedProjectorTest
+  ./executors/MergeReceiveExecutorTest
+  ./expressions/expression_test
+  ./expressions/function_test
+  ./indexes/index_key_test
+  ./indexes/index_scripted_test
+  ./indexes/index_test
+  ./indexes/CompactingHashIndexTest
+  ./indexes/CompactingTreeMultiIndexTest
+  ./indexes/CoveringCellIndexTest
+  ./storage/CompactionTest
+  ./storage/CopyOnWriteTest
+  ./storage/DRBinaryLog_test
+  ./storage/DRTupleStream_test
+  ./storage/ExportTupleStream_test
+  ./storage/PersistentTableMemStatsTest
+  ./storage/StreamedTable_test
+  ./storage/TempTableLimitsTest
+  ./storage/constraint_test
+  ./storage/filter_test
+  ./storage/persistent_table_log_test
+  ./storage/persistenttable_test
+  ./storage/serialize_test
+  ./storage/table_and_indexes_test
+  ./storage/table_test
+  ./storage/tabletuple_export_test
+  ./storage/tabletuplefilter_test
+  ./structures/CompactingMapTest
+  ./structures/CompactingMapIndexCountTest
+  ./structures/CompactingHashTest
+  ./structures/CompactingPoolTest
+  ./structures/CompactingMapBenchmark
+  ./plannodes/WindowFunctionPlanNodeTest
+  ./plannodes/PlanNodeFragmentTest
 )
+
+#
+# Generated test programs are created by calling a Java program
+# in the server.  For now this is just a test.
+SET(VOLTDB_GENERATED_TEST_PROGRAMS
+  generated/executors/TestWindowedMax
+)
+
+SET(VOLTDB_TEST_PROGRAMS "")
+LIST(APPEND VOLTDB_TEST_PROGRAMS ${VOLTDB_GENERATED_TEST_PROGRAMS})
+LIST(APPEND VOLTDB_TEST_PROGRAMS ${VOLTDB_MANUAL_TEST_PROGRAMS})
 
 ADD_LIBRARY(voltdb_test_harness
   OBJECT
@@ -851,11 +903,15 @@ TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
 #
 SET (VOLTDB_TEST_DIR_LIST "")
 SET (VOLTDB_TEST_ALLTESTS "")
+SET (VOLTDB_TEST_GENTESTS "")
+
+INCLUDE(VoltDB.cmake)
 
 FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
-  STRING(REGEX REPLACE .*/\([^/]*\) "\\1" TEST ${TEST_NAME})
-  STRING(REGEX REPLACE /[^/]* "" DIR ${TEST_NAME})
-  # MESSAGE("Parse from ${TEST_NAME} is ${DIR} and ${TEST}")
+  STRING(REGEX REPLACE ^.*/[^/]*/\([^/]*\)$ "\\1" TEST ${TEST_NAME})
+  STRING(REGEX REPLACE ^.*/\([^/]*\)/[^/]*$ "\\1" DIR ${TEST_NAME})
+  STRING(REGEX MATCH ^generated/[^/]*/[^/]*$ GENERATED ${TEST_NAME})
+  # MESSAGE("TEST_NAME ${TEST_NAME}: GENERATED ${GENERATED}, DIR ${DIR}, TEST ${TEST}")
   LIST(FIND VOLTDB_TEST_ALLTESTS ${TEST} FIND_IDX)
   IF (NOT ${FIND_IDX} LESS 0)
     MESSAGE(FATAL_ERROR "Duplicate test name ${TEST_NAME}")
@@ -865,11 +921,14 @@ FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
     LIST(APPEND VOLTDB_TEST_DIR_LIST ${DIR})
   ENDIF()
   LIST(APPEND VOLTDB_TEST_DIR_${DIR} ${TEST})
-  LIST(APPEND VOLTDB_TEST_ALLTESTS ${TEST})
+  STRING(LENGTH "${GENERATED}" IS_GENERATED)
+  # -- This is wrong. We want to add ${TEST} to
+  # -- VOLTDB_TEST_DIR_${TEST_DIR}.
+  LIST(APPEND VOLTDB_TEST_DIR_${DIR} ${TEST})
+  IF (${IS_GENERATED} LESS 1)
+    LIST(APPEND VOLTDB_TEST_GENTESTS ${TEST})
+  ENDIF()
 ENDFOREACH()
-
-INCLUDE(VoltDB.cmake)
-
 ########################################################################
 #
 # Create run-all-tests and build-all-tests.  We will make
@@ -895,6 +954,7 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     )
   ADD_DEPENDENCIES(build-all-tests build-${TEST_DIR})
   FOREACH (TEST_NAME ${VOLTDB_TEST_DIR_${TEST_DIR}})
+  # MESSAGE("TEST_DIR: ${TEST_DIR}, TEST_NAME: ${TEST_NAME}")
     #
     # Define the test executable, and set the build-all-tests
     # depends on the test.  Remember the necessary include
@@ -945,7 +1005,6 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     IF (${IS_VALGRIND_BUILD} AND (NOT (${VG_DIR_FAIL} LESS 0)))
       IF (${VG_TEST_PASS} LESS 0)
         SET (WILL_FAIL TRUE)
-      ELSE()
       ENDIF()
     ELSE()
     ENDIF()
@@ -975,4 +1034,3 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
       LABELS ${TEST_DIR})
   ENDFOREACH()
 ENDFOREACH()
-
