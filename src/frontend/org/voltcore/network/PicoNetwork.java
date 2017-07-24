@@ -127,6 +127,10 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         m_thread.start();
     }
 
+    public String toString() {
+        return m_toString;
+    }
+
     /**
      * Create a pico network thread
      * @param sc  SocketChannel

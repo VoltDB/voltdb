@@ -75,11 +75,13 @@ import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableCollection;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableMultimap;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -1332,6 +1334,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                            .put(hsId, fh)
                            .build();
         }
+    }
+
+    public String dumpBinding() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{ ");
+        Multimap<ForeignHost, Long> dest = ArrayListMultimap.create();
+        Multimaps.invertFrom(m_fhMapping.asMultimap(), dest);
+        int count = 0;
+        for (ForeignHost fh : dest.keySet()) {
+            if (count++ > 0) sb.append(", ");
+            sb.append(fh.m_network.toString()).append(":");
+            sb.append(CoreUtils.hsIdCollectionToString(dest.get(fh))).append("\n");
+        }
+        sb.append(" }");
+        return sb.toString();
     }
 
     private ForeignHost getPrimary(ImmutableCollection<ForeignHost> fhosts, int hostId) {
