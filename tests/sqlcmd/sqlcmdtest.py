@@ -372,8 +372,6 @@ def do_main():
     # VoltDB server and remember to leave it running on exit.
     launch_and_wait_on_voltdb(reportout)
 
-    # start testing of drop table,proc and views
-    #test_drop_table_proc_view()
 
     # Except in refresh mode, any diffs change the scripts exit code to fail ant/jenkins
     haddiffs = False
