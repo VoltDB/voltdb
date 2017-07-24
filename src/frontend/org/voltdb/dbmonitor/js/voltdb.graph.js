@@ -452,7 +452,7 @@
 
         function updateCombinedAnalysis(){
             ChartProcessingTimeAnalysis.update();
-             d3.selectAll("#chartProcessingTimeAnalysis .nv-bar").on('click',
+            d3.selectAll("#chartProcessingTimeAnalysis .nv-bar").on('click',
                 function(data){
                     $("#hidProcedureName").html(data.label);
                     $('#showAnalysisCombinedDetails').trigger("click");
@@ -524,6 +524,12 @@
                 });
                 d3.select('#visualiseLatencyAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
                 .each(function(d,i){ wordWrap(this, d, 110, -115, -6); });
+                d3.selectAll("#chartLatencyAnalysis .nv-bar").on('click',
+                    function(data){
+                        $("#hidProcedureName").html(data.label);
+                        $('#showAnalysisDetails').trigger("click");
+                    }
+                );
                 nv.utils.windowResize(updateLatencyAnalysis);
                 return ChartLatencyAnalysis;
             });
@@ -555,6 +561,12 @@
                 });
                 d3.select('#visualiseFrequencyAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
                 .each(function(d,i){ wordWrap(this, d, 110, -115, -6); });
+                d3.selectAll("#chartFrequencyAnalysis .nv-bar").on('click',
+                    function(data){
+                        $("#hidProcedureName").html(data.label);
+                        $('#showAnalysisFreqDetails').trigger("click");
+                    }
+                );
                 nv.utils.windowResize(updateFrequencyAnalysis);
                 return ChartFrequencyAnalysis;
             });
@@ -586,6 +598,12 @@
                 });
                 d3.select('#visualiseProcessingTimeAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
                 .each(function(d,i){ wordWrap(this, d, 110, -115, -6); });
+                d3.selectAll("#chartProcessingTimeAnalysis .nv-bar").on('click',
+                    function(data){
+                        $("#hidProcedureName").html(data.label);
+                        $('#showAnalysisCombinedDetails').trigger("click");
+                    }
+                );
                 nv.utils.windowResize(updateCombinedAnalysis);
                 return ChartProcessingTimeAnalysis;
             });
