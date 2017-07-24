@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.utils;
+package org.voltdb.importclient.kafka10;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -49,6 +49,11 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.utils.BulkLoaderErrorHandler;
+import org.voltdb.utils.CSVBulkDataLoader;
+import org.voltdb.utils.CSVDataLoader;
+import org.voltdb.utils.CSVTupleDataLoader;
+import org.voltdb.utils.RowWithMetaData;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
