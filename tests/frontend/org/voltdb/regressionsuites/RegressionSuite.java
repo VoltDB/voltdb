@@ -42,8 +42,6 @@ import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.CatalogContext;
@@ -69,8 +67,11 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.net.HostAndPort;
+
+import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -1080,6 +1081,14 @@ public class RegressionSuite extends TestCase {
             else if (expectedObj instanceof byte[]) {
                 byte[] expectedVarbinary = (byte[]) expectedObj;
                 byte[] actualVarbinary = actualRow.getVarbinary(i);
+                assertEquals(msg+"length of VARBINARY: ", expectedVarbinary.length, actualVarbinary.length);
+                for (int k = 0; k < expectedVarbinary.length; k++) {
+                    assertEquals(msg+"index "+k+" of VARBINARY value: ", expectedVarbinary[k], actualVarbinary[k]);
+                }
+            }
+            else if (expectedObj instanceof Byte[]) {
+                Byte[] expectedVarbinary = (Byte[]) expectedObj;
+                Byte[] actualVarbinary = SerializationHelper.boxUpByteArray(actualRow.getVarbinary(i));
                 assertEquals(msg+"length of VARBINARY: ", expectedVarbinary.length, actualVarbinary.length);
                 for (int k = 0; k < expectedVarbinary.length; k++) {
                     assertEquals(msg+"index "+k+" of VARBINARY value: ", expectedVarbinary[k], actualVarbinary[k]);

@@ -266,6 +266,14 @@ public class SerializationHelper {
         writeVarbinary(unboxedBytes, buf);
     }
 
+    public static Byte[] boxUpByteArray(byte[] bytes) {
+        Byte[] retval = new Byte[bytes.length];
+        for (int i = 0; i < bytes.length; i++) {
+            retval[i] = bytes[i];
+        }
+        return retval;
+    }
+
     public static void writeArray(byte[] values, ByteBuffer buf) throws IOException {
         buf.putInt(values.length);
         buf.put(values);

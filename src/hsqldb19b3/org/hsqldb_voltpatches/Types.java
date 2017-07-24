@@ -571,6 +571,7 @@ public class Types {
         javaTypeNumbers.put("long", Types.SQL_BIGINT);
         javaTypeNumbers.put("java.lang.Long", Types.SQL_BIGINT);
         javaTypeNumbers.put("[B", Types.SQL_BINARY);
+        javaTypeNumbers.put("[Ljava.lang.Byte;", Types.SQL_BINARY);
         javaTypeNumbers.put("java.lang.Object", Types.OTHER);
         javaTypeNumbers.put("java.lang.Void", Types.SQL_ALL_TYPES);
 

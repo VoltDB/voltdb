@@ -90,6 +90,7 @@ public class UserDefinedFunctionManager {
         final Object m_functionInstance;
         Method m_functionMethod;
         final VoltType[] m_paramTypes;
+        final boolean[] m_boxUpByteArray;
         final VoltType m_returnType;
         final int m_paramCount;
 
@@ -124,8 +125,10 @@ public class UserDefinedFunctionManager {
             Class<?>[] paramTypeClasses = m_functionMethod.getParameterTypes();
             m_paramCount = paramTypeClasses.length;
             m_paramTypes = new VoltType[m_paramCount];
+            m_boxUpByteArray = new boolean[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
                 m_paramTypes[i] = VoltType.typeFromClass(paramTypeClasses[i]);
+                m_boxUpByteArray[i] = paramTypeClasses[i] == Byte[].class;
             }
             m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
         }
@@ -268,6 +271,9 @@ public class UserDefinedFunctionManager {
             Object[] paramsIn = new Object[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
                 paramsIn[i] = getValueFromBuffer(udfBuffer, m_paramTypes[i]);
+                if (m_boxUpByteArray[i]) {
+                    paramsIn[i] = SerializationHelper.boxUpByteArray((byte[])paramsIn[i]);
+                }
             }
             try {
                 Object returnValue = m_functionMethod.invoke(m_functionInstance, paramsIn);
