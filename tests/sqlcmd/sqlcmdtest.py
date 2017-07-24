@@ -454,8 +454,6 @@ def do_main():
                         prefix + '.err', inpath,
                         options.refresh, reportout):
                     haddiffs = True;
-
-
     finally:
         kill_voltdb()
         print "Summary report written to file://" + os.path.abspath(options.report_file)
