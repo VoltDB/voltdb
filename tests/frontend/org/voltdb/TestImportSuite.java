@@ -66,6 +66,7 @@ public class TestImportSuite extends RegressionSuite {
 
     private Boolean m_socketHandlerInitialized = false;
     private Client m_client;
+    private Client m_adminClient;
     private List<DataPusher> m_dataPushers = new ArrayList<>();
     private CountDownLatch m_dataAwaiter = null;
 
@@ -79,6 +80,7 @@ public class TestImportSuite extends RegressionSuite {
         super.setUp();
 
         m_client = getClient();
+        m_adminClient = getAdminClient();
         while (!((ClientImpl) m_client).isHashinatorInitialized()) {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
@@ -102,7 +104,8 @@ public class TestImportSuite extends RegressionSuite {
     @Override
     public void tearDown() throws Exception {
         m_dataPushers.clear();
-        m_client.close();
+        releaseClient(m_client);
+        releaseClient(m_adminClient);
         super.tearDown();
     }
 
@@ -415,8 +418,8 @@ public class TestImportSuite extends RegressionSuite {
         // Run data pushers until they are explicitly stopped.
         asyncPushDataToImporters(0, 3);
 
-        updateDeploymentFile(true, true);
-        updateDeploymentFile(true, false);
+        updateDeploymentFile(true, true, false, false);
+        updateDeploymentFile(true, false, false, false);
 
         waitForData();
     }
@@ -429,14 +432,14 @@ public class TestImportSuite extends RegressionSuite {
         ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
         testConnector.tryPush(5);
 
-        updateDeploymentFile(false, false);
+        updateDeploymentFile(false, false, false, false);
         try {
             testConnector.tryPush(5);
             fail("Importer is still running even though it is no longer configured");
         } catch (IOException expected) {
         }
 
-        updateDeploymentFile(true, false);
+        updateDeploymentFile(true, false, false, false);
         testConnector.tryPush(5);
     }
 
@@ -457,6 +460,26 @@ public class TestImportSuite extends RegressionSuite {
         }
 
         applySchemaChange("CREATE TABLE IMPORTTABLE (PKEY bigint NOT NULL, A_INTEGER_VALUE bigint); PARTITION TABLE IMPORTTABLE ON COLUMN PKEY;");
+        testConnector.tryPush(5);
+    }
+
+    /** Verify that UAC does not start the importers while the cluster is paused.
+     */
+    public void testPausedUACWithImporter() throws Exception {
+        System.out.println("Catalog changes to a paused cluster must not restart the importers");
+
+        ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
+        testConnector.tryPush(5);
+
+        m_adminClient.callProcedure("@Pause");
+        updateDeploymentFile(true, false, true, true);
+        try {
+            testConnector.tryPush(5);
+            fail("Importer is running even though cluster is paused");
+        } catch (IOException expected) {
+        }
+
+        m_adminClient.callProcedure("@Resume");
         testConnector.tryPush(5);
     }
 
@@ -496,20 +519,27 @@ public class TestImportSuite extends RegressionSuite {
     /** Builds a CatalogContext for the import manager to use.
      * @param includeImporters Whether or not to include the importers associated with this test.
      * @param unrelatedChange Whether or not to make a change that has no impact on the importer.
+     * @param extraneousImporterChange Whether or not to make a change that impacts the importer config but not the importer behavior.
+     * @param useAdminClient Whether or not to make change in admin mode.
      * @return New deployment file
      * @throws Exception upon error or test failure
      */
-    private void updateDeploymentFile(boolean includeImporters, boolean unrelatedChange) throws Exception {
-        VoltProjectBuilder projectBuilder = generateVoltProject(includeImporters, unrelatedChange);
+    private void updateDeploymentFile(boolean includeImporters, boolean unrelatedChange, boolean extraneousImporterChange, boolean useAdminClient) throws Exception {
+        VoltProjectBuilder projectBuilder = generateVoltProject(includeImporters, unrelatedChange, extraneousImporterChange);
         File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly(null, 1, 1, 0, 0));
         System.out.println("Deployment file " + (includeImporters ? "with" : "without") + " importers, " +
-                (unrelatedChange ? "with" : "without") + " command logs written to " + deploymentFilePath.getCanonicalPath());
+                (unrelatedChange ? "with" : "without") + " custom heartbeat interval written to " + deploymentFilePath.getCanonicalPath());
         deploymentFilePath.deleteOnExit();
-        ClientResponse response = m_client.updateApplicationCatalog(null, deploymentFilePath);
+        ClientResponse response;
+        if (useAdminClient) {
+            response = m_adminClient.updateApplicationCatalog(null, deploymentFilePath);
+        } else {
+            response = m_client.updateApplicationCatalog(null, deploymentFilePath);
+        }
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 
-    private static VoltProjectBuilder generateVoltProject(boolean includeImporters, boolean unrelatedChange) throws Exception {
+    private static VoltProjectBuilder generateVoltProject(boolean includeImporters, boolean unrelatedChange, boolean extraneousImporterChange) throws Exception {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
@@ -519,6 +549,9 @@ public class TestImportSuite extends RegressionSuite {
                 "port", Integer.toString(SOCKET_IMPORTER_PORT),
                 "decode", "true",
                 "procedure", "importTable.insert");
+        if (extraneousImporterChange){
+            props.setProperty("unrelatedChangeForTest", Boolean.toString(true));
+        }
         project.addImport(includeImporters, "custom", "tsv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
@@ -527,6 +560,9 @@ public class TestImportSuite extends RegressionSuite {
                 "port", "6060",
                 "procedure", "log_events.insert",
                 "log-event-table", "log_events");
+        if (extraneousImporterChange){
+            props.setProperty("unrelatedChangeForTest", Boolean.toString(true));
+        }
         project.addImport(includeImporters, "custom", null, "log4jsocketimporter.jar", props);
 
         project.setHeartbeatTimeoutSeconds(5 + (unrelatedChange ? 1 : 0));
@@ -545,7 +581,7 @@ public class TestImportSuite extends RegressionSuite {
         final MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestImportSuite.class);
 
-        VoltProjectBuilder project = generateVoltProject(true, false);
+        VoltProjectBuilder project = generateVoltProject(true, false, false);
 
         /*
          * compile the catalog all tests start with
