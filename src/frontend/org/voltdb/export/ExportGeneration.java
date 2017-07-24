@@ -227,6 +227,7 @@ public class ExportGeneration implements Generation {
      * start consuming the export data.
      *
      */
+    @Override
     public void kickOffLeaderElection(final HostMessenger messenger) {
         m_childUpdatingThread.submit(new Runnable() {
             @Override
@@ -581,6 +582,7 @@ public class ExportGeneration implements Generation {
         };
     }
 
+    @Override
     public long getQueuedExportBytes(int partitionId, String signature) {
         //assert(m_dataSourcesByPartition.containsKey(partitionId));
         //assert(m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
@@ -673,6 +675,20 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    // pause polling on the all the data source for the given partitions
+    void pausePolling(List<Integer> partitions) {
+        for (Integer partition : partitions) {
+            Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
+            assert(dataSourcesForPartition != null);
+            for (ExportDataSource source: dataSourcesForPartition.values()) {
+                exportLog.debug("Pause polling for tableb:" + source.getTableName() + " partition:" + source.getPartitionId()
+                        + " signature:" + source.getSignature());
+                source.prepareForProcessorSwap();
+            }
+        }
+    }
+
+    @Override
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
         //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
@@ -743,6 +759,7 @@ public class ExportGeneration implements Generation {
     /*
      * Returns true if the generatino was completely truncated away
      */
+    @Override
     public boolean truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
         // create an easy partitionId:txnId lookup.
         HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
@@ -800,6 +817,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
     public void close(final HostMessenger messenger) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
@@ -824,6 +842,7 @@ public class ExportGeneration implements Generation {
      * mastership role for the given partition id
      * @param partitionId
      */
+    @Override
     public void acceptMastershipTask( int partitionId) {
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 

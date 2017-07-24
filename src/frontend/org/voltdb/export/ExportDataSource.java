@@ -73,6 +73,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Processors also log using this facility.
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final int LEGACY_AD_VERSION = 0;     // AD version for export format 4.4 and prior
+    private static final int SEVENX_AD_VERSION = 1;     // AD version for export format 7.x
 
     private final String m_database;
     private final String m_tableName;
@@ -251,7 +253,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             JSONObject jsObj = new JSONObject(new String(data, StandardCharsets.UTF_8));
 
             long version = jsObj.getLong("adVersion");
-            if (version != 0) {
+            if ((version != LEGACY_AD_VERSION) && (version != SEVENX_AD_VERSION)) {
                 throw new IOException("Unsupported ad file version " + version);
             }
             try {
@@ -518,6 +520,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
+    private volatile boolean m_poll = false;
+
+    public void polling(boolean value) {
+        m_poll = value;
+    }
+
+    //
+    void prepareForProcessorSwap() {
+        m_poll = false;                     // disable polling
+        m_mastershipAccepted.set(false);    // unassign mastership for this partition
+        // TODO: is setting poll future to null safe?
+        m_pollFuture = null;
+    }
+
     public void pushExportBuffer(
             final long uso,
             final ByteBuffer buffer,
@@ -550,8 +566,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!es.isShutdown()) {
-                            //Since we are part of active generation we poll too
-                            pushExportBufferImpl(uso, buffer, sync, true /* poll */);
+                            pushExportBufferImpl(uso, buffer, sync, m_poll /* poll */);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -942,6 +957,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
+        // force mastership logic to update runnable for the data source
+//        m_mastershipAccepted.set(false);
         if (m_replicaMastershipRequested) {
             acceptMastership();
         }

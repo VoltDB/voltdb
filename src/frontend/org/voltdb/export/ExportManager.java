@@ -512,7 +512,7 @@ public class ExportManager
         }
         else {
             // install new processor
-            swapWithNewProcessor(generation);
+            swapWithNewProcessor(generation, partitions);
         }
     }
 
@@ -525,7 +525,7 @@ public class ExportManager
     }
 
     // remove and install new processor
-    private void swapWithNewProcessor(ExportGeneration generation) {
+    private void swapWithNewProcessor(ExportGeneration generation, List<Integer> partitions) {
         java.util.concurrent.Future<?> task = m_dataProcessorHandler.submit(new Runnable() {
 
             @Override
@@ -538,16 +538,25 @@ public class ExportManager
                 catch (Exception crash) {
                     VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
                 }
+                generation.pausePolling(partitions);
                 // override m_generation with itself to activate all the ExportDataSource
                 newProcessor.setExportGeneration(generation);
                 newProcessor.readyForData(false);
+                for ( Integer partitionId: m_masterOfPartitions) {
+                    generation.acceptMastershipTask(partitionId);
+                }
                 ExportDataProcessor oldProcessor = m_processor.getAndSet(newProcessor);
                 oldProcessor.shutdown();
 
             }
         });
 
-//        task.get();
+//        try {
+//            task.get();
+//        }
+//        catch (Exception ignore) {
+//            exportLog.error("!!!!! " + ignore.getMessage() + " !!!!!");
+//        }
 
     }
 
