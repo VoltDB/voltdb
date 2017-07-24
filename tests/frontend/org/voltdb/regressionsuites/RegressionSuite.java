@@ -42,6 +42,8 @@ import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.CatalogContext;
@@ -69,8 +71,6 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.net.HostAndPort;
-
-import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -1026,8 +1026,8 @@ public class RegressionSuite extends TestCase {
             Object expectedObj = expectedRow[i];
             if (expectedObj == null) {
                 VoltType vt = actualRow.getColumnType(i);
-                actualRow.get(i,  vt);
-                assertTrue(msg, actualRow.wasNull());
+                Object actualValue = actualRow.get(i, vt);
+                assertTrue(msg+"expected null, but got: "+actualValue, actualRow.wasNull());
             }
             else if (expectedObj instanceof GeographyPointValue) {
                 assertApproximatelyEquals(msg, (GeographyPointValue) expectedObj, actualRow.getGeographyPointValue(i), epsilon);
@@ -1043,6 +1043,14 @@ public class RegressionSuite extends TestCase {
                 long val = ((Integer)expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
             }
+            else if (expectedObj instanceof Short) {
+                long val = ((Short)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
+            else if (expectedObj instanceof Byte) {
+                long val = ((Byte)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
             else if (expectedObj instanceof Double) {
                 double expectedValue = (Double)expectedObj;
                 double actualValue = actualRow.getDouble(i);
@@ -1052,7 +1060,7 @@ public class RegressionSuite extends TestCase {
                 if (actualRow.wasNull()) {
                     actualValue = Double.MIN_VALUE;
                 }
-                if (epsilon <= 0) {
+                if (epsilon <= 0 || !Double.isFinite(expectedValue)) {
                     String fullMsg = msg + String.format("Expected value %f != actual value %f", expectedValue, actualValue);
                     assertEquals(fullMsg, expectedValue, actualValue);
                 }
@@ -1066,8 +1074,16 @@ public class RegressionSuite extends TestCase {
                 BigDecimal exp = (BigDecimal)expectedObj;
                 BigDecimal got = actualRow.getDecimalAsBigDecimal(i);
                 // Either both are null or neither are null.
-                assertEquals(exp == null, got == null);
+                assertEquals(msg+"checking if DECIMAL is null: ", exp == null, got == null);
                 assertEquals(msg, exp.doubleValue(), got.doubleValue(), epsilon);
+            }
+            else if (expectedObj instanceof byte[]) {
+                byte[] expectedVarbinary = (byte[]) expectedObj;
+                byte[] actualVarbinary = actualRow.getVarbinary(i);
+                assertEquals(msg+"length of VARBINARY: ", expectedVarbinary.length, actualVarbinary.length);
+                for (int k = 0; k < expectedVarbinary.length; k++) {
+                    assertEquals(msg+"index "+k+" of VARBINARY value: ", expectedVarbinary[k], actualVarbinary[k]);
+                }
             }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;

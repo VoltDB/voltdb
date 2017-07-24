@@ -50,7 +50,7 @@ import junit.framework.Test;
  */
 public class TestUserDefinedFunctions extends RegressionSuite {
     static private Random random = new Random();
-    static private double EPSILON = 1.0E-15;  // Acceptable (relative) difference, for Double tests
+    static private double EPSILON = 1.0E-12;  // Acceptable difference, for FLOAT (Double) tests
     static private final BigDecimal MIN_DECIMAL_VALUE = new BigDecimal("-99999999999999999999999999.999999999999");
     static private final BigDecimal MAX_DECIMAL_VALUE = new BigDecimal( "99999999999999999999999999.999999999999");
     static private final String SIMPLE_POLYGON_WTK = "PolygonFromText( 'POLYGON((3 3, -3 3, -3 -3, 3 -3, 3 3),"
@@ -68,12 +68,21 @@ public class TestUserDefinedFunctions extends RegressionSuite {
     private void testFunction(String functionCall, Object expected, VoltType returnType,
             String[] columnNames, String[] columnValues, String tableName)
             throws IOException, ProcCallException {
+
+        // If table not specified, randomly decide which one to test
         if (tableName == null) {
             tableName = "R1";
             if (random.nextInt(100) < 50) {
                 tableName = "P1";
             }
         }
+
+        // Set the expected result of the SELECT query using the UDF
+        Object[][] expectedTable = new Object[1][2];
+        expectedTable[0][0] = 0;
+        expectedTable[0][1] = expected;
+
+        // INSERT one row into the table that we are using for testing
         String allColumnNames  = "ID";
         String allColumnValues = "0";
         if (columnNames != null && columnNames.length > 0) {
@@ -82,51 +91,26 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         if (columnValues != null && columnValues.length > 0) {
             allColumnValues = "0, " + String.join(",", columnValues);
         }
-
         Client client = getClient();
         ClientResponse cr = client.callProcedure("@AdHoc", "INSERT INTO "+tableName
                 + " ("+allColumnNames+") VALUES"
                 + " ("+allColumnValues+")");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
+        // Get the actual result of the SELECT query using the UDF
         cr = client.callProcedure("@AdHoc",
                 "SELECT ID, "+functionCall+" FROM "+tableName+" WHERE ID = 0");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable vt = cr.getResults()[0];
-        assertTrue(vt.advanceRow());
 
-        if (expected == null) {
-            vt.get(1, returnType);
-            assertTrue("Expected null result for "+functionCall, vt.wasNull());
-        // If expecting a VoltDB FLOAT (Java Double) value not equal to NaN or
-        // (positive or negative) infinity
-        } else if ( returnType == VoltType.FLOAT && expected instanceof Number &&
-                Double.isFinite(((Number)expected).doubleValue()) ) {
-            double expectedDouble = ((Number)expected).doubleValue();
-            double   actualDouble = vt.getDouble(1);
-            double difference = Math.abs(expectedDouble - actualDouble);
-            String relative = "";
-            if (expectedDouble != 0.0) {
-                difference = difference / expectedDouble;
-                relative = "relative ";
-            }
-            assertTrue("For "+functionCall+", actual FLOAT value ("+actualDouble+") differs from "
-                    + "expected ("+expectedDouble+") by a "+relative+"difference of "+difference
-                    +", which is more than EPSILON ("+EPSILON+")", difference <= EPSILON);
-        } else if (returnType == VoltType.DECIMAL && expected instanceof BigDecimal) {
-            BigDecimal   actualBD = vt.getDecimalAsBigDecimal(1);
-            BigDecimal expectedBD = ((BigDecimal) expected).setScale(actualBD.scale());
-            BigDecimal preExpectedBD = (BigDecimal) expected;
-            System.out.println("BigDecimal pre-exp., precision, scale: " + preExpectedBD + ", " + preExpectedBD.precision() + ", " + preExpectedBD.scale());
-            System.out.println("BigDecimal expected, precision, scale: " + expectedBD + ", " + expectedBD.precision() + ", " + expectedBD.scale());
-            System.out.println("BigDecimal   actual, precision, scale: " + actualBD + ", " + actualBD.precision() + ", " + actualBD.scale());
-            assertEquals("Unexpected ("+expected.getClass()+"; "+returnType+") result for "+functionCall,
-                    expectedBD, actualBD);
+        // Compare the expected to the actual result
+        if (VoltType.FLOAT.equals(returnType)) {
+            RegressionSuite.assertApproximateContentOfTable(expectedTable, vt, EPSILON);
         } else {
-            assertEquals("Unexpected ("+expected.getClass()+"; "+returnType+") result for "+functionCall,
-                    expected, vt.get(1, returnType));
+            RegressionSuite.assertContentOfTable(expectedTable, vt);
         }
 
+        // Clean-up
         cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE "+tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
