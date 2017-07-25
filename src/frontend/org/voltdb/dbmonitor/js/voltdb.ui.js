@@ -2454,16 +2454,16 @@ var loadPage = function (serverName, portid) {
         }
     });
 
-     function checkObjForLongStatementName(profileData, procedureName){
-        for(var j = 0; j < profileData.length; j++){
-            if(profileData[j].PROCEDURE == procedureName){
-                if(profileData[j].STATEMENT.length > 14){
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
+//     function checkObjForLongStatementName(profileData, procedureName){
+//        for(var j = 0; j < profileData.length; j++){
+//            if(profileData[j].PROCEDURE == procedureName){
+//                if(profileData[j].STATEMENT.length > 14){
+//                    return true;
+//                }
+//            }
+//        }
+//        return false;
+//    }
 
     $("#showAnalysisFreqDetails").popup({
         open: function (event, ui, ele)  {
@@ -2534,9 +2534,6 @@ var loadPage = function (serverName, portid) {
 //            var sumOfEachProcedure = 0;
             var statement = '';
             var finalDetails = [];
-            var i=0;
-            var containLongName = false;
-
 
             if(VoltDbAnalysis.latencyDetailValue.length == 0){
                  $("#spanCombinedLegend").hide();
@@ -2546,15 +2543,8 @@ var loadPage = function (serverName, portid) {
             getTooltipValues(procedureName);
 
             for (var key in VoltDbAnalysis.combinedDetail){
-
-                var newStatement = '';
                 var obj = VoltDbAnalysis.combinedDetail[key];
                 if(key == procedureName){
-                    containLongName = checkObjForLongStatementName(obj, procedureName);
-                    if(containLongName){
-                        newStatement = (i + 1) + ") " + VoltDbAnalysis.combinedDetail[key].STATEMENT;
-                    }
-
                     //Calculate sumOfEachProcedure
 //                    var sumOfEachProcedure = VoltDbUI.calculateCombinedDetailValue(obj);
                     obj.forEach(function(subItems){
@@ -2569,7 +2559,6 @@ var loadPage = function (serverName, portid) {
                             }
                         }
                         else{
-                            i++;
                             if(subItems.TYPE == "Single Partitioned"){
                                 combinedWeight = subItems.AVG * subItems.INVOCATIONS
                             }
@@ -2588,7 +2577,6 @@ var loadPage = function (serverName, portid) {
                             combinedWeight = (combinedWeight/count) * subItems.INVOCATIONS
                             combinedDetails[subItems.STATEMENT]= combinedWeight;
                         }
-//                        $(".generatedDate").html(VoltDbAnalysis.formatDateTime(subItems.TIMESTAMP));
                     })
 
                     if($.isEmptyObject(combinedDetails)){
@@ -2600,21 +2588,12 @@ var loadPage = function (serverName, portid) {
                         $("#totalProcTimeLegend").show();
                     }
 
-
-                    var k=0;
                     for (var key in combinedDetails){
-                        if(containLongName){
-                            finalDetails.push({"label": (k+1) + ") " + key,"value": combinedDetails[key]})
-                        }
-                        else{
-                            finalDetails.push({"label": key,"value": combinedDetails[key]})
-                        }
-                        k++;
+                        finalDetails.push({"label": key,"value": combinedDetails[key]})
                     }
 
                 }
             }
-
             MonitorGraphUI.RefreshCombinedDetailGraph(finalDetails);
         }
     });
