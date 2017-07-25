@@ -116,6 +116,9 @@ public class VoltDecimalHelper {
 
     private final static String m_defaultRoundingMode = "HALF_UP";
 
+    public static byte[] getNullIndecator() {
+        return NULL_INDICATOR;
+    }
     /*
      * This is the class of rounding configurations.  This is really
      * a pair, dressed up in glad rags.  Note that the only way to set

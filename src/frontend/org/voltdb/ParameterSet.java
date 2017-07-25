@@ -841,7 +841,7 @@ public class ParameterSet implements JSONString {
         }
     }
 
-    static long timestampToMicroseconds(Object obj) {
+    public static long timestampToMicroseconds(Object obj) {
         long micros = 0;
         // Adapt the Java standard classes' millisecond count to TIMESTAMP's microseconds.
         if (obj instanceof java.util.Date) {
