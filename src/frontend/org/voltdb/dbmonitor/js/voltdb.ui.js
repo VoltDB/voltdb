@@ -2492,13 +2492,19 @@ var loadPage = function (serverName, portid) {
                     newStatement = item.STATEMENT;
                     var comp1 = newStatement;
                     var comp2 = statement;
-                    if (comp1 == comp2){
-                        totalInvocations += item.INVOCATION;
-                    }
-                    else{
-                        i++;
+                     if(item.type == "Single Partitioned"){
+                        if (comp1 == comp2){
+
+                            totalInvocations += item.INVOCATION;
+                        }
+                        else{
+                            i++;
+                            totalInvocations = item.INVOCATION;
+                        }
+                     }
+                     else{
                         totalInvocations = item.INVOCATION;
-                    }
+                     }
 
                     freqDetails[item.STATEMENT] = totalInvocations;
 
@@ -2607,9 +2613,10 @@ var loadPage = function (serverName, portid) {
             var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
 
             if(item.PROCEDURE == procedureName ){
-                 if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
-                        VoltDbUI.executionDetails[item.STATEMENT]={};
-                    }
+                if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
+                    VoltDbUI.executionDetails[item.STATEMENT]={};
+                }
+
                 if (statement == item.STATEMENT){
                     if(item.MIN < smallest){
                         smallest = item.MIN;
@@ -2628,7 +2635,6 @@ var loadPage = function (serverName, portid) {
 
                     VoltDbUI.executionDetails[item.STATEMENT]["MIN"] = smallest;
                     VoltDbUI.executionDetails[item.STATEMENT]["MAX"] = largest;
-//                    VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = invocations;
                 }
                 else{
                     VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = item.INVOCATION;

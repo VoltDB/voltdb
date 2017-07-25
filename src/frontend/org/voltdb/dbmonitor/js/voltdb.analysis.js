@@ -187,11 +187,14 @@ function loadAnalysisPage(){
              //find procedure type
 
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
+                var procedureName = item.PROCEDURE;
                 var type = "Single Partitioned";
-                if(procedureName == item.PROCEDURE && item.PARTITION_ID == 16383){
-                    type = "Multi Partitioned"
-                    return false;
-                }
+                procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
+                    if(procedureName == item.PROCEDURE && item.PARTITION_ID == 16383){
+                        type = "Multi Partitioned"
+                        return false;
+                    }
+                });
 
                 if(VoltDbAnalysis.combinedDetail[item.PROCEDURE] == undefined){
                     VoltDbAnalysis.combinedDetail[item.PROCEDURE] = [];
