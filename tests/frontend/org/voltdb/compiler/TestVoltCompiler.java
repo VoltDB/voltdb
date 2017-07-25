@@ -782,6 +782,12 @@ public class TestVoltCompiler extends TestCase {
                   + "AS begin select * from books where cash = ?;"
                   + "select * from books; end");
 
+        // multi statement proc with CASE
+        tester.runtest("create procedure multifoo "
+                  + "AS BEGIN select * from books where cash = ?; "
+                  + "select title, CASE WHEN cash > 100 THEN 'expensive' ELSE 'cheap' END "
+                  + "from books; end");
+
         // Inspired by a problem with fullDDL.sql
         tester.runtest(
                 "create role admin;\n" +
