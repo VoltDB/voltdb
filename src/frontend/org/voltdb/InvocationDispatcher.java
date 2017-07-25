@@ -43,7 +43,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
@@ -285,6 +284,8 @@ public final class InvocationDispatcher {
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
 
+        String clientInfo = ccxn.getHostnameAndIPAndPort();  // Storing the client's ip information
+
         final String procName = task.getProcName();
         final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final StoredProcedureInvocation finalTask = task;
@@ -395,6 +396,7 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
             else if ("@StopNode".equals(procName)) {
+                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                 return dispatchStopNode(task);
             }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
@@ -455,22 +457,17 @@ public final class InvocationDispatcher {
 
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
-            if ((   "@Pause".equals(procName)
+            if (    "@Pause".equals(procName)
                  || "@Resume".equals(procName)
                  || "@PrepareShutdown".equals(procName))
-               && !handler.isAdmin())
             {
-                return unexpectedFailureResponse(
-                        procName + " is not available to this client",
-                        task.clientHandle);
-            }
-
-            // After we verify the shutdown command from an admin user, the detailed information
-            // should be printed out properly. The following message is printed at the node where
-            // the client is connected to.
-            if ("@PrepareShutdown".equals(procName)) {
-                String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a PrepareShutdown.";
-                CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
+                if (handler.isAdmin() == false) {
+                    return unexpectedFailureResponse(
+                            procName + " is not available to this client",
+                            task.clientHandle);
+                }
+                // Log the invocation with user name and ip information
+                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
             }
         }
         // If you're going to copy and paste something, CnP the pattern
@@ -671,26 +668,17 @@ public final class InvocationDispatcher {
                     "Invalid Host Id or Host Id not member of cluster: " + ihid,
                     task.clientHandle);
         }
-        if (!m_cartographer.isClusterSafeIfNodeDies(liveHids, ihid)) {
-            hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
-                    + " Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
-                    + " And all rejoin nodes should be completed."
-                    + " Use shutdown to stop the cluster.");
+        String reason = m_cartographer.stopNodeIfClusterIsSafe(liveHids, ihid);
+        if (reason != null) {
+            hostLog.info("It's unsafe to shutdown node " + ihid
+                    + ". Cannot stop the requested node. " + reason
+                    + ". Use shutdown to stop the cluster.");
             return gracefulFailureResponse(
-                    "Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
-                  + " And all rejoin nodes should be completed."
-                  + " Use shutdown to stop the cluster.", task.clientHandle);
+                    "It's unsafe to shutdown node " + ihid
+                  + ". Cannot stop the requested node. " + reason
+                  + ". Use shutdown to stop the cluster.", task.clientHandle);
         }
 
-
-        int hid = hostMessenger.getHostId();
-        if (hid == ihid) {
-            //Killing myself no pill needs to be sent
-            VoltDB.instance().halt();
-        } else {
-            //Send poison pill with target to kill
-            hostMessenger.sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
-        }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
