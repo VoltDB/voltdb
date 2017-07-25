@@ -864,8 +864,23 @@ public class DDLCompiler {
     private static int kStateReadingEndCodeBlockDelim = 10 ;      // dealing with ending code block delimiter ###
     private static int kStateReadingEndCodeBlockNextDelim = 11;   // dealing with ending code block delimiter ###
 
+    // To indicate if inside multi statement procedure
+    private static boolean inBegin = false;
+    // To indicate if inside CASE .. WHEN .. END
+    private static int inCase = 0;
 
     private static int readingState(char[] nchar, DDLStatement retval) {
+
+        if (!Character.isLetterOrDigit(nchar[0])) {
+            char prev = prevChar(retval.statement);
+            if ( prev == 'n' || prev == 'N' ) {
+                if( SQLLexer.matchToken(retval.statement, retval.statement.length()-5, "begin") )
+                    inBegin = true;
+            } else if ( prev == 'd' || prev == 'D' ) {
+                if( SQLLexer.matchToken(retval.statement, retval.statement.length()-3, "end") )
+                    inBegin = false;
+            }
+        }
         if (nchar[0] == '-') {
             // remember that a possible '--' is being examined
             return kStateReadingCommentDelim;
@@ -881,7 +896,9 @@ public class DDLCompiler {
         else if (nchar[0] == ';') {
             // end of the statement
             retval.statement += nchar[0];
-            return kStateCompleteStatement;
+            // statement completed only if outside of begin..end
+            if(!inBegin)
+                return kStateCompleteStatement;
         }
         else if (nchar[0] == '\'') {
             retval.statement += nchar[0];
@@ -898,6 +915,10 @@ public class DDLCompiler {
         }
 
         return kStateReading;
+    }
+
+    private static char prevChar(String str) {
+        return str.charAt(str.length() - 1);
     }
 
     private static int readingCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
