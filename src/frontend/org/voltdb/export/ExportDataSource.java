@@ -17,7 +17,6 @@
 
 package org.voltdb.export;
 
-import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -112,6 +111,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
     private RunnableWithES m_firstAction = null;
 
+    private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
     /**
      * Create a new data source.
      * @param db
@@ -634,12 +634,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return stashOrSubmitTask(runnable, false, false);
     }
 
+    public void setPendingContainer(BBContainer container) {
+        Preconditions.checkNotNull(m_pendingContainer.get() != null, "Pending container must be null.");
+        m_pendingContainer.set(container);
+    }
+
     public ListenableFuture<BBContainer> poll() {
         final SettableFuture<BBContainer> fut = SettableFuture.create();
         RunnableWithES runnable = new RunnableWithES("poll") {
             @Override
             public void run() {
                 try {
+                    //If we have anything pending set that before moving to next block.
+                    if (m_pendingContainer.get() != null) {
+                        fut.set(m_pendingContainer.getAndSet(null));
+                        return;
+                    }
                     /*
                      * The poll is blocking through the future, shouldn't
                      * call poll a second time until a response has been given
