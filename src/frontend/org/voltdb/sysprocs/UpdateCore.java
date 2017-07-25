@@ -288,14 +288,14 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
             long genId = (Long) params.toArray()[6];
 
+            boolean isForReplay = m_runner.getTxnState().isForReplay();
+
             CatalogAndDeployment catalogStuff = null;
             try {
                 catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
             }
-
-            String replayInfo = m_runner.getTxnState().isForReplay() ? " (FOR REPLAY)" : "";
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
@@ -309,6 +309,7 @@ public class UpdateCore extends VoltSystemProcedure {
                         expectedCatalogVersion,
                         genId,
                         catalogStuff.deploymentBytes,
+                        isForReplay,
                         requireCatalogDiffCmdsApplyToEE,
                         hasSchemaChange,
                         requiresNewExportGeneration);
@@ -325,9 +326,12 @@ public class UpdateCore extends VoltSystemProcedure {
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
                 context.updateCatalog(commands, catalogContext,
                         requiresSnapshotIsolation, uniqueId, spHandle,
+                        isForReplay,
                         requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
 
                 if (log.isDebugEnabled()) {
+                    String replayInfo = isForReplay ? " (FOR REPLAY)" : "";
+
                     byte[] debugDeploymentHash = CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes);
                     log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),

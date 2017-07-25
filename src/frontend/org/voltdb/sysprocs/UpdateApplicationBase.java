@@ -398,15 +398,13 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * Check the results map from every host and return error message if needed.
      * @return  A String describing the error messages. If all hosts return success, NULL is returned.
      */
-    protected String verifyAndWriteCatalogJar(byte[] catalogBytes, String encodedDiffCommands,
-            boolean skipPrepareProcRunners)
+    protected String verifyAndWriteCatalogJar(byte[] catalogBytes, String encodedDiffCommands)
     {
         String procedureName = "@VerifyCatalogAndWriteJar";
         String diffCommands = Encoder.decodeBase64AndDecompress(encodedDiffCommands);
 
         CompletableFuture<Map<Integer,ClientResponse>> cf =
-                callNTProcedureOnAllHosts(procedureName, catalogBytes, diffCommands,
-                        skipPrepareProcRunners ? 1: 0);
+                callNTProcedureOnAllHosts(procedureName, catalogBytes, diffCommands);
 
         Map<Integer, ClientResponse> resultMapByHost = null;
         String err;
@@ -523,8 +521,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
 
         // write the new catalog to a temporary jar file
-        errMsg = verifyAndWriteCatalogJar(ccr.catalogBytes, ccr.encodedDiffCommands,
-                ccr.requireCatalogDiffCmdsApplyToEE);
+        errMsg = verifyAndWriteCatalogJar(ccr.catalogBytes, ccr.encodedDiffCommands);
         if (errMsg != null) {
             hostLog.error("Catalog jar verification and/or jar writes faile. " + errMsg);
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);

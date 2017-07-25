@@ -394,11 +394,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 boolean requiresSnapshotIsolation,
                 long uniqueId, long spHandle,
+                boolean isReplay,
                 boolean requireCatalogDiffCmdsApplyToEE,
                 boolean requiresNewExportGeneration)
         {
             return Site.this.updateCatalog(diffCmds, context, requiresSnapshotIsolation,
-                    false, uniqueId, spHandle,
+                    false, uniqueId, spHandle, isReplay,
                     requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
         }
 
@@ -1503,6 +1504,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context,
             boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle,
+            boolean isReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration)
     {
@@ -1510,7 +1512,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
-        m_loadedProcedures.loadProcedures(m_context, requireCatalogDiffCmdsApplyToEE == false && !isMPI);
+        m_loadedProcedures.loadProcedures(m_context, isReplay);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs

@@ -82,34 +82,28 @@ public class LoadedProcedureSet {
      * @param catalogContext
      */
     public void loadProcedures(CatalogContext catalogContext) {
-        loadProcedures(catalogContext, false);
+        loadProcedures(catalogContext, true);
     }
 
     /**
      * Load procedures.
-     * If @param forUpdateOnly, it will try to reuse existing loaded procedures
-     * as many as possible, other than completely loading procedures from beginning.
-     * @param catalogContext
-     * @param forUpdateOnly
      */
-    public void loadProcedures(CatalogContext catalogContext, boolean forUpdateOnly)
+    public void loadProcedures(CatalogContext catalogContext, boolean isInitOrReplay)
     {
         m_defaultProcManager = catalogContext.m_defaultProcs;
         // default proc caches clear on catalog update
         m_defaultProcCache.clear();
         m_plannerTool = catalogContext.m_ptool;
 
-        if (forUpdateOnly) {
-            // When catalog updates, only user procedures needs to be reloaded.
+        if (m_sysProcs.size() == 0) {
+             // reload all system procedures from beginning
+            m_sysProcs = loadSystemProcedures(catalogContext, m_site);
+        } else {
             // System procedures can be left without changes.
             reInitSystemProcedureRunners(catalogContext);
+        }
 
-            m_userProcs = catalogContext.getPreparedUserProcedures(m_site);
-
-        } else {
-            // reload all system procedures from beginning
-            m_sysProcs = loadSystemProcedures(catalogContext, m_site);
-
+        if (isInitOrReplay) {
             // reload user procedures
             try {
                 m_userProcs = loadUserProcedureRunners(catalogContext.database.getProcedures(),
@@ -118,8 +112,10 @@ public class LoadedProcedureSet {
                                                        m_site);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error trying to load user procedures: " + e.getMessage());
-
             }
+        } else {
+            // When catalog updates, only user procedures needs to be reloaded.
+            m_userProcs = catalogContext.getPreparedUserProcedures(m_site);
         }
     }
 

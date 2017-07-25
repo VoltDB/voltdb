@@ -30,6 +30,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -296,12 +297,18 @@ public class CatalogContext {
     }
 
     public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedures(SiteProcedureConnection site) {
-        long siteId = site.getCorrespondingSiteId();
-        ImmutableMap<String, ProcedureRunner> userProcs = m_userProcsMap.get(siteId);
+        long hsId = site.getCorrespondingSiteId();
+        ImmutableMap<String, ProcedureRunner> userProcs = m_userProcsMap.get(hsId);
         // swap site and reinit stats
 
         if (userProcs == null) {
-            hostLog.error("look for site id : " + siteId + " in Map: " + m_userProcsMap.keySet());
+            // this may be the MPI site
+            hostLog.warn("look for MPI site: " + hsId + " in Map: " + m_userProcsMap.keySet());
+            long siteId = CoreUtils.getSiteIdFromHSId(hsId);
+            userProcs = m_userProcsMap.get(siteId);
+            if (userProcs == null) {
+                hostLog.error("look for site id : " + siteId + " in Map: " + m_userProcsMap.keySet());
+            }
         }
 
         for (ProcedureRunner runner: userProcs.values()) {

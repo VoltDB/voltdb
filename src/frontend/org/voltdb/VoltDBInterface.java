@@ -157,6 +157,7 @@ public interface VoltDBInterface
             int expectedCatalogVersion,
             long genId,
             byte[] deploymentBytes,
+            boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration);
@@ -169,8 +170,7 @@ public interface VoltDBInterface
         return;
     }
 
-    default public String checkLoadingClasses(byte[] catalogBytes, String diffCommands,
-            boolean skipPrepareProcRunners)
+    default public String verifyJarAndPrepareProcRunners(byte[] catalogBytes, String diffCommands)
     {
         return null;
     }

@@ -3324,7 +3324,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Verify the integrity of the newly updated catalog stored on the ZooKeeper
     @Override
-    public String checkLoadingClasses(byte[] catalogBytes, String diffCommands, boolean skipPrepareProcRunners) {
+    public String verifyJarAndPrepareProcRunners(byte[] catalogBytes, String diffCommands) {
         ImmutableMap.Builder<String, Class<?>> classesMap = ImmutableMap.<String, Class<?>>builder();
         InMemoryJarfile newCatalogJar;
         JarLoader jarLoader;
@@ -3375,12 +3375,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return e.getMessage();
         }
 
-        if (skipPrepareProcRunners) {
-            return null;
-        }
-
-        hostLog.error("Not skipping creating procedure runners ......");
-
         CatalogContext ctx = VoltDB.instance().getCatalogContext();
         Catalog newCatalog = ctx.getNewCatalog(diffCommands);
 
@@ -3390,7 +3384,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ExecutorService es = Executors.newSingleThreadScheduledExecutor();
 
         SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
-        List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
+        List<Long> immutableSites = siteTracker.getSitesForHost(m_messenger.getHostId());
+        ArrayList<Long> sites = new ArrayList<>(immutableSites);
+        sites.add((long) immutableSites.size());
 
         Map<Long, Future<String>> resultFutureMap = new HashMap<>();
         for (Long site : sites) {
@@ -3448,6 +3444,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             int expectedCatalogVersion,
             long genId,
             byte[] deploymentBytes,
+            boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration)
@@ -3545,7 +3542,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // this after flushing the stats -- this will re-register
                 // the MPI statistics.
                 if (m_MPI != null) {
-                    m_MPI.updateCatalog(diffCommands, m_catalogContext,
+                    m_MPI.updateCatalog(diffCommands, m_catalogContext, isForReplay,
                             requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
                 }
 
