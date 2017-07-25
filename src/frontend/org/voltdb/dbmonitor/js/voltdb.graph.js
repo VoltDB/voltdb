@@ -761,6 +761,8 @@
                 .datum(dataCombinedDetailAnalysis)
                 .transition().duration(500)
                 .call(ChartCombinedDetailAnalysis);
+            d3.select('#visualizeCombinedDetails > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
+            .each(function(d,i){wordWrap(this, d, 110, -115, -8);});
             $("#visualizeCombinedDetails").find('.nvd3').attr("x",344);
             $("#visualizeCombinedDetails").find('.nvd3').attr("y",172);
         }

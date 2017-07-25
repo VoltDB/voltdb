@@ -2525,7 +2525,7 @@ var loadPage = function (serverName, portid) {
 
     $("#showAnalysisCombinedDetails").popup({
         open: function (event, ui, ele)  {
-            var procedureName = $("#hidProcedureName").html().split(' ')[1];
+            var procedureName = $("#hidProcedureName").html();
             $(".procedureName").html(procedureName);
              //filter specific procedure calls from list of datas
             var count = 0;
@@ -2537,7 +2537,6 @@ var loadPage = function (serverName, portid) {
             var i=0;
             var containLongName = false;
 
-            debugger;
 
             if(VoltDbAnalysis.latencyDetailValue.length == 0){
                  $("#spanCombinedLegend").hide();
@@ -2545,8 +2544,6 @@ var loadPage = function (serverName, portid) {
             }
 
             getTooltipValues(procedureName);
-
-
 
             for (var key in VoltDbAnalysis.combinedDetail){
 
@@ -2570,8 +2567,6 @@ var loadPage = function (serverName, portid) {
                             else{ //For Multi partitioned
                                 combinedWeight += subItems.AVG
                             }
-
-
                         }
                         else{
                             i++;
