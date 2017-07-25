@@ -82,7 +82,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey> {
         private final long m_txnId;
         private final long m_spHandle;
-
         DuplicateCounterKey(long txnId, long spHandle) {
             m_txnId = txnId;
             m_spHandle = spHandle;
@@ -129,6 +128,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         @Override
         public String toString() {
             return "[txn:" + TxnEgo.txnIdToString(m_txnId) + "(" + m_txnId + "), spHandle:" + TxnEgo.txnIdToString(m_spHandle) + "(" + m_spHandle + ")]";
+        }
+
+        public boolean isSpTransaction() {
+            return (TxnEgo.getPartitionId(m_txnId) != MpInitiator.MP_INIT_PID);
         }
     };
 
@@ -772,7 +775,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 traceLog.add(() -> VoltTrace.endAsync("initsp", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getClientInterfaceHandle())));
             }
 
-            if (m_defaultConsistencyReadLevel == ReadLevel.FAST) {
+            if (m_defaultConsistencyReadLevel == ReadLevel.FAST || !m_isLeader) {
                 // the initiatorHSId is the ClientInterface mailbox.
                 m_mailbox.send(message.getInitiatorHSId(), message);
                 return;
@@ -1703,7 +1706,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             return false;
         }
         List<DuplicateCounterKey> keys = m_duplicateCounters.keySet().stream()
-                .filter(k->k.m_spHandle < m_spiCheckPoint).collect(Collectors.toList());
+                .filter(k->k.m_spHandle < m_spiCheckPoint && k.isSpTransaction()).collect(Collectors.toList());
         if (!keys.isEmpty()) {
             if (tmLog.isDebugEnabled()) {
                 StringBuilder builder = new StringBuilder();
