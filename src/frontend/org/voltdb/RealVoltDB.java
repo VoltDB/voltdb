@@ -3333,7 +3333,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             JarLoader testjarloader = testjar.getLoader();
             for (String classname : testjarloader.getClassNames()) {
                 try {
-                    CatalogContext.classForProcedure(classname, testjarloader);
+                    CatalogContext.classForProcedureOrUDF(classname, testjarloader);
                 }
                 // LinkageError catches most of the various class loading errors we'd
                 // care about here.
