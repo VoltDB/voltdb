@@ -70,6 +70,7 @@ public class CatalogContext {
         public final byte[] m_deploymentBytes;
         public final byte[] m_deploymentHash;
         public final UUID m_deploymentHashForConfig;
+        public Catalog m_catalog;
         public ConcurrentHashMap<Long, ImmutableMap<String, ProcedureRunner>> m_userProcsMap;
 
         public CatalogInfo(byte[] catalogBytes, byte[] catalogBytesHash, byte[] deploymentBytes) {
@@ -106,7 +107,7 @@ public class CatalogContext {
     }
 
     // THE CATALOG!
-    public final Catalog catalog;
+    public Catalog catalog;
 
     // PUBLIC IMMUTABLE CACHED INFORMATION
     public final Cluster cluster;
@@ -265,17 +266,22 @@ public class CatalogContext {
             HostMessenger messenger,
             boolean hasSchemaChange)
     {
-        Catalog newCatalog = getNewCatalog(diffCommands);
+        Catalog newCatalog = null;
         assert(catalogBytes != null);
 
         // using the prepared catalog information if prepared
-        CatalogInfo catalogInfo = m_preparedCatalogInfo;
+        CatalogInfo catalogInfo = null;
         if (isForReplay) {
             byte[] depbytes = deploymentBytes;
             if (depbytes == null) {
                 depbytes = m_catalogInfo.m_deploymentBytes;
             }
             catalogInfo = new CatalogInfo(catalogBytes, catalogBytesHash, depbytes);
+
+            newCatalog = getNewCatalog(diffCommands);
+        } else {
+            catalogInfo = m_preparedCatalogInfo;
+            newCatalog = catalogInfo.m_catalog;
         }
 
         CatalogContext retval =

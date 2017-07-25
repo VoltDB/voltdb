@@ -3390,6 +3390,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sites.add((long) immutableSites.size());
 
         ctx.m_preparedCatalogInfo = new CatalogContext.CatalogInfo(catalogBytes, catalogBytesHash, deploymentBytes);
+        ctx.m_preparedCatalogInfo.m_catalog = newCatalog;
         ctx.m_preparedCatalogInfo.m_userProcsMap = new ConcurrentHashMap<>();
 
         Map<Long, Future<String>> resultFutureMap = new HashMap<>();
