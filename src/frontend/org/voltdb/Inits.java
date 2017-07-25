@@ -414,14 +414,13 @@ public class Inits {
 
             try {
                 m_rvdb.m_catalogContext = new CatalogContext(
-                        catalogStuff.genId,
                         catalog,
                         new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_nodeSettings),
+                        0, // start up catalog version
+                        catalogStuff.genId,
                         catalogJarBytes,
                         catalogJarHash,
-                        // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
-                        0, // start up catalog version
                         m_rvdb.m_messenger);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);

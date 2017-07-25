@@ -398,13 +398,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * Check the results map from every host and return error message if needed.
      * @return  A String describing the error messages. If all hosts return success, NULL is returned.
      */
-    protected String verifyAndWriteCatalogJar(byte[] catalogBytes, String encodedDiffCommands)
+    protected String verifyAndWriteCatalogJar(CatalogChangeResult ccr, byte[] deploymentBytes)
     {
         String procedureName = "@VerifyCatalogAndWriteJar";
-        String diffCommands = Encoder.decodeBase64AndDecompress(encodedDiffCommands);
+        String diffCommands = Encoder.decodeBase64AndDecompress(ccr.encodedDiffCommands);
 
         CompletableFuture<Map<Integer,ClientResponse>> cf =
-                callNTProcedureOnAllHosts(procedureName, catalogBytes, diffCommands);
+                callNTProcedureOnAllHosts(procedureName, ccr.catalogBytes, diffCommands,
+                        ccr.catalogHash, deploymentBytes);
 
         Map<Integer, ClientResponse> resultMapByHost = null;
         String err;
@@ -520,8 +521,16 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
+        byte[] deploymentBytes = null;
+        try {
+            deploymentBytes = ccr.deploymentString.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            errMsg = "error converting deployment string to bytes";
+            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+        }
+
         // write the new catalog to a temporary jar file
-        errMsg = verifyAndWriteCatalogJar(ccr.catalogBytes, ccr.encodedDiffCommands);
+        errMsg = verifyAndWriteCatalogJar(ccr, deploymentBytes);
         if (errMsg != null) {
             hostLog.error("Catalog jar verification and/or jar writes faile. " + errMsg);
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
@@ -541,11 +550,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
         long genId = getNextGenerationId();
         try {
-            byte[] deploymentBytes = ccr.deploymentString.getBytes("UTF-8");
             CatalogUtil.updateCatalogToZK(zk, genId, ccr.catalogBytes, ccr.catalogHash, deploymentBytes);
-        } catch (UnsupportedEncodingException e) {
-            errMsg = "error converting deployment string to bytes";
-            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         } catch (KeeperException | InterruptedException e) {
             errMsg = "error writing catalog bytes on ZK";
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);

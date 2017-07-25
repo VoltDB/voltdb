@@ -355,7 +355,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public byte[] getDeploymentHash() {
-            return m_context.deploymentHash;
+            return m_context.getDeploymentHash();
         }
 
         @Override

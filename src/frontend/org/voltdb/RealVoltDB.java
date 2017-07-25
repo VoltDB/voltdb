@@ -58,6 +58,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -2477,15 +2478,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(result);
             }
 
-            m_catalogContext = new CatalogContext(
-                            0, //timestamp
-                            catalog,
-                            new DbSettings(m_clusterSettings, m_nodeSettings),
-                            new byte[] {},
-                            null,
-                            deploymentBytes,
-                            0,
-                            m_messenger);
+            m_catalogContext = new CatalogContext(catalog,
+                                                  new DbSettings(m_clusterSettings, m_nodeSettings),
+                                                  0, //timestamp
+                                                  0,
+                                                  new byte[] {},
+                                                  null,
+                                                  deploymentBytes,
+                                                  m_messenger);
 
             return ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled()));
         } catch (Exception e) {
@@ -3324,7 +3324,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Verify the integrity of the newly updated catalog stored on the ZooKeeper
     @Override
-    public String verifyJarAndPrepareProcRunners(byte[] catalogBytes, String diffCommands) {
+    public String verifyJarAndPrepareProcRunners(byte[] catalogBytes, String diffCommands,
+            byte[] catalogBytesHash, byte[] deploymentBytes) {
         ImmutableMap.Builder<String, Class<?>> classesMap = ImmutableMap.<String, Class<?>>builder();
         InMemoryJarfile newCatalogJar;
         JarLoader jarLoader;
@@ -3388,6 +3389,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ArrayList<Long> sites = new ArrayList<>(immutableSites);
         sites.add((long) immutableSites.size());
 
+        ctx.m_preparedCatalogInfo = new CatalogContext.CatalogInfo(catalogBytes, catalogBytesHash, deploymentBytes);
+        ctx.m_preparedCatalogInfo.m_userProcsMap = new ConcurrentHashMap<>();
+
         Map<Long, Future<String>> resultFutureMap = new HashMap<>();
         for (Long site : sites) {
             Future<String> ft = es.submit(() -> {
@@ -3395,7 +3399,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     ImmutableMap<String, ProcedureRunner> userProcs =
                         LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
                                                                     classesMap.build(), null);
-                    ctx.m_userProcsMap.put(site, userProcs);
+                    ctx.m_preparedCatalogInfo.m_userProcsMap.put(site, userProcs);
                 } catch (Exception e) {
                     e.printStackTrace();
                     String msg = "error setting up user procedure runners using NT-procedure pattern: "
@@ -3466,20 +3470,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // get old debugging info
                 SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
-                byte[] oldDeployHash = m_catalogContext.deploymentHash;
+                byte[] oldDeployHash = m_catalogContext.getCatalogHash();
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
                 // 0. A new catalog! Update the global context and the context tracker
-                m_catalogContext =
-                    m_catalogContext.update(
-                            genId,
-                            newCatalogBytes,
-                            catalogBytesHash,
-                            diffCommands,
-                            true,
-                            deploymentBytes,
-                            m_messenger,
-                            hasSchemaChange);
+                m_catalogContext = m_catalogContext.update(isForReplay,
+                                                           diffCommands,
+                                                           genId,
+                                                           newCatalogBytes,
+                                                           catalogBytesHash,
+                                                           deploymentBytes,
+                                                           m_messenger,
+                                                           hasSchemaChange);
 
                 // log the stuff that's changed in this new catalog update
                 SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
@@ -3581,7 +3583,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
 
                 // log system setting information if the deployment config has changed
-                if (!Arrays.equals(oldDeployHash, m_catalogContext.deploymentHash)) {
+                if (!Arrays.equals(oldDeployHash, m_catalogContext.getDeploymentHash())) {
                     logSystemSettingFromCatalogContext();
                 }
                 //Before starting resource monitor update any Snmp configuration changes.

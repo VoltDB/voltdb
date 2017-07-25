@@ -170,7 +170,8 @@ public interface VoltDBInterface
         return;
     }
 
-    default public String verifyJarAndPrepareProcRunners(byte[] catalogBytes, String diffCommands)
+    default public String verifyJarAndPrepareProcRunners(byte[] catalogBytes, String diffCommands,
+            byte[] catalogHash, byte[] deploymentBytes)
     {
         return null;
     }

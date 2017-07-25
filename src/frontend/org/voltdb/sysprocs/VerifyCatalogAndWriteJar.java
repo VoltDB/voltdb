@@ -47,11 +47,12 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
 
     VoltLogger log = new VoltLogger("HOST");
 
-    public CompletableFuture<ClientResponse> run(byte[] catalogBytes, String diffCommands)
+    public CompletableFuture<ClientResponse> run(byte[] catalogBytes, String diffCommands,
+            byte[] catalogHash, byte[] deploymentBytes)
     {
         // This should only be called once on each host
         String err = VoltDB.instance().verifyJarAndPrepareProcRunners(
-                catalogBytes, diffCommands);
+                catalogBytes, diffCommands, catalogHash, deploymentBytes);
         if (err != null) {
             return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, err);
         }
