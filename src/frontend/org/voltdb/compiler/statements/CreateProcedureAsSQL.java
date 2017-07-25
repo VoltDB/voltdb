@@ -37,10 +37,19 @@ public class CreateProcedureAsSQL extends CreateProcedure {
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
-        // Matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
-        Matcher statementMatcher = SQLParser.matchCreateProcedureAsSQL(ddlStatement.statement);
+
+        /* first check if it matches a multi statement procedure
+         * if not, then check if it is a single statement procedure
+         */
+        // Matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS BEGIN <select-or-dml-statement>
+        Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(ddlStatement.statement);
+
         if (! statementMatcher.matches()) {
-            return false;
+         // Matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
+            statementMatcher = SQLParser.matchCreateProcedureAsSQL(ddlStatement.statement);
+            if (! statementMatcher.matches()) {
+                return false;
+            }
         }
         String clazz = checkProcedureIdentifier(statementMatcher.group(1), ddlStatement.statement);
         String sqlStatement = statementMatcher.group(3) + ";";
