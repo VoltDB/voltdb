@@ -91,12 +91,16 @@ public class ImportManager implements ChannelChangeCallback {
         return ModuleManager.instance();
     }
 
-    private ImportManager(int myHostId, HostMessenger messenger, ImporterStatsCollector statsCollector, CatalogContext catalogContext) throws IOException {
+    private ImportManager(int myHostId,
+                          HostMessenger messenger,
+                          ImporterStatsCollector statsCollector,
+                          CatalogContext catalogContext,
+                          OperationMode mode) throws IOException {
         m_myHostId = myHostId;
         m_messenger = messenger;
         m_statsCollector = statsCollector;
         m_moduleManager = getModuleManager();
-        m_clusterMode = VoltDB.instance().getStartMode();
+        m_clusterMode = mode;
         m_catalogContext = catalogContext;
     }
 
@@ -117,7 +121,8 @@ public class ImportManager implements ChannelChangeCallback {
      */
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
         ImporterStatsCollector statsCollector = new ImporterStatsCollector(myHostId);
-        ImportManager em = new ImportManager(myHostId, messenger, statsCollector, catalogContext);
+        OperationMode startMode = VoltDB.instance().getMode();
+        ImportManager em = new ImportManager(myHostId, messenger, statsCollector, catalogContext, startMode);
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 StatsSelector.IMPORTER,
                 myHostId,
