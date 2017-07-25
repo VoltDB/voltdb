@@ -143,18 +143,19 @@ public interface VoltDBInterface
      * in case anything still links to it.
      *
      * @param diffCommands The commands to update the current catalog to the new one.
-     * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
-     * @param genId stream table catalog generation id
      * @param newCatalogBytes The catalog bytes.
      * @param catalogBytesHash  The SHA-1 hash of the catalog bytes
+     * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
+     * @param genId stream table catalog generation id
+     * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentBytes  The deployment file bytes
      */
     public CatalogContext catalogUpdate(
             String diffCommands,
-            int expectedCatalogVersion,
-            long genId,
             byte[] newCatalogBytes,
             byte[] catalogBytesHash,
+            int expectedCatalogVersion,
+            long genId,
             byte[] deploymentBytes,
             boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,

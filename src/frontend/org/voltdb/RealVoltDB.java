@@ -3442,16 +3442,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public CatalogContext catalogUpdate(String diffCommands,
-                                        int expectedCatalogVersion,
-                                        long genId,
-                                        byte[] newCatalogBytes,
-                                        byte[] catalogBytesHash,
-                                        byte[] deploymentBytes,
-                                        boolean isForReplay,
-                                        boolean requireCatalogDiffCmdsApplyToEE,
-                                        boolean hasSchemaChange,
-                                        boolean requiresNewExportGeneration)
+    public CatalogContext catalogUpdate(
+            String diffCommands,
+            byte[] newCatalogBytes,
+            byte[] catalogBytesHash,
+            int expectedCatalogVersion,
+            long genId,
+            byte[] deploymentBytes,
+            boolean isForReplay,
+            boolean requireCatalogDiffCmdsApplyToEE,
+            boolean hasSchemaChange,
+            boolean requiresNewExportGeneration)
     {
         try {
             synchronized(m_catalogUpdateLock) {
