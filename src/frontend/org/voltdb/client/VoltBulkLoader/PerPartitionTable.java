@@ -137,7 +137,6 @@ public class PerPartitionTable {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-            //one insert at a time callback
             if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
                 m_es.execute(new Runnable() {
 
@@ -260,7 +259,7 @@ public class PerPartitionTable {
                 assert false: "Type conversion exception" + ex.getMessage();
                 continue;
             }
-
+            //one insert at a time callback
             ProcedureCallback callback = new ReinsertCallback(row);
             loadTable(callback, tmpTable);
         }
