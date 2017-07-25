@@ -346,7 +346,7 @@ public class TestImportSuite extends RegressionSuite {
         pushDataToImporters(1000, 3);
         verifyData(m_client, 3000);
 
-        applySchemaChange(m_client, "create table nudge(id integer);");
+        applySchemaChange("create table nudge(id integer);");
 
         pushDataToImporters(1000, 4);
         // log4j will lose some events because of reconnection delay
@@ -362,10 +362,10 @@ public class TestImportSuite extends RegressionSuite {
         // Run data pushers until they are explicitly stopped.
         asyncPushDataToImporters(0, 3);
 
-        applySchemaChange(m_client, "CREATE TABLE nudge(id integer);");
-        applySchemaChange(m_client, "CREATE PROCEDURE NudgeThatDB AS INSERT INTO nudge VALUES (?);");
-        applySchemaChange(m_client, "DROP PROCEDURE NudgeThatDB;");
-        applySchemaChange(m_client, "DROP TABLE nudge;");
+        applySchemaChange("CREATE TABLE nudge(id integer);");
+        applySchemaChange("CREATE PROCEDURE NudgeThatDB AS INSERT INTO nudge VALUES (?);");
+        applySchemaChange("DROP PROCEDURE NudgeThatDB;");
+        applySchemaChange("DROP TABLE nudge;");
 
         waitForData();
     }
@@ -413,14 +413,14 @@ public class TestImportSuite extends RegressionSuite {
         testConnector.tryPush(5);
 
         // importer uses CRUD procedure associated with this table.
-        applySchemaChange(m_client, "DROP TABLE importTable;");
+        applySchemaChange("DROP TABLE importTable;");
         try {
             testConnector.tryPush(5);
             fail("Importer is still running even though its procedure is disabled");
         } catch (IOException expected) {
         }
 
-        applySchemaChange(m_client, "CREATE TABLE IMPORTTABLE (PKEY bigint NOT NULL, A_INTEGER_VALUE bigint); PARTITION TABLE IMPORTTABLE ON COLUMN PKEY;");
+        applySchemaChange("CREATE TABLE IMPORTTABLE (PKEY bigint NOT NULL, A_INTEGER_VALUE bigint); PARTITION TABLE IMPORTTABLE ON COLUMN PKEY;");
         testConnector.tryPush(5);
     }
 
@@ -433,7 +433,6 @@ public class TestImportSuite extends RegressionSuite {
         testConnector.tryPush(5);
 
         m_adminClient.callProcedure("@Pause");
-        applySchemaChange(m_adminClient, "CREATE TABLE ENSURE_SCHEMA_SURVIVAL (STUFF bigint NOT NULL);");
         updateDeploymentFile(m_adminClient, true, false, true);
         try {
             testConnector.tryPush(5);
@@ -443,7 +442,6 @@ public class TestImportSuite extends RegressionSuite {
 
         m_adminClient.callProcedure("@Resume");
         testConnector.tryPush(5);
-        applySchemaChange(m_client, "DROP TABLE ENSURE_SCHEMA_SURVIVAL;");
     }
 
     /**
@@ -474,8 +472,8 @@ public class TestImportSuite extends RegressionSuite {
         super(name);
     }
 
-    private static void applySchemaChange(Client clientToUse, String adhocddl) throws Exception {
-        ClientResponse response = clientToUse.callProcedure("@AdHoc", adhocddl);
+    private void applySchemaChange(String adhocddl) throws Exception {
+        ClientResponse response = m_client.callProcedure("@AdHoc", adhocddl);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 

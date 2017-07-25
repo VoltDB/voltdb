@@ -59,17 +59,13 @@ public class ImportManager implements ChannelChangeCallback {
 
     /** Obtain the global ImportManager via its instance() method */
     private static ImportManager m_self;
+    private final HostMessenger m_messenger;
 
     private final int m_myHostId;
     private ChannelDistributer m_distributer;
     private volatile boolean m_serverStarted;
     private final ImporterStatsCollector m_statsCollector;
     private final ModuleManager m_moduleManager;
-
-    // State we get from VoltDB via our callbacks
-    private OperationMode m_clusterMode;
-    private CatalogContext m_catalogContext;
-    private HostMessenger m_messenger;
 
     // Maintains the record of the importer bundles that have been loaded into the memory based on importer config.
     // These loaded loaded bundles remains in memory. ready for use and don't get loaded/unloaded
@@ -91,17 +87,11 @@ public class ImportManager implements ChannelChangeCallback {
         return ModuleManager.instance();
     }
 
-    private ImportManager(int myHostId,
-                          HostMessenger messenger,
-                          ImporterStatsCollector statsCollector,
-                          CatalogContext catalogContext,
-                          OperationMode mode) throws IOException {
+    private ImportManager(int myHostId, HostMessenger messenger, ImporterStatsCollector statsCollector) throws IOException {
         m_myHostId = myHostId;
         m_messenger = messenger;
         m_statsCollector = statsCollector;
         m_moduleManager = getModuleManager();
-        m_clusterMode = mode;
-        m_catalogContext = catalogContext;
     }
 
     private void initializeChannelDistributer() throws BundleException {
@@ -122,15 +112,14 @@ public class ImportManager implements ChannelChangeCallback {
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
         ImporterStatsCollector statsCollector = new ImporterStatsCollector(myHostId);
         OperationMode startMode = VoltDB.instance().getMode();
-        ImportManager em = new ImportManager(myHostId, messenger, statsCollector, catalogContext, startMode);
+        ImportManager em = new ImportManager(myHostId, messenger, statsCollector);
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 StatsSelector.IMPORTER,
                 myHostId,
                 statsCollector);
-
         try {
-            Map<String, ImportConfiguration> newProcessorConfig = em.loadNewConfigAndBundles();
-            if (em.m_clusterMode != OperationMode.PAUSED) {
+            Map<String, ImportConfiguration> newProcessorConfig = em.loadNewConfigAndBundles(catalogContext);
+            if (startMode != OperationMode.PAUSED) {
                 em.startImporters(newProcessorConfig);
             }
         } catch (final Exception e) {
@@ -159,12 +148,13 @@ public class ImportManager implements ChannelChangeCallback {
     /**
      * Parses importer configs and loads the formatters and bundles needed into memory.
      * This is used to generate a new configuration either to load or to compare with existing.
+     * @param catalogContext new catalog context
      * @return new importer configuration
      */
-    private synchronized Map<String, ImportConfiguration> loadNewConfigAndBundles() {
+    private synchronized Map<String, ImportConfiguration> loadNewConfigAndBundles(CatalogContext catalogContext) {
         Map<String, ImportConfiguration> newProcessorConfig;
 
-        ImportType importElement = m_catalogContext.getDeployment().getImport();
+        ImportType importElement = catalogContext.getDeployment().getImport();
         if (importElement == null || importElement.getConfiguration().isEmpty()) {
             newProcessorConfig = new HashMap<>();
         } else {
@@ -183,9 +173,9 @@ public class ImportManager implements ChannelChangeCallback {
             String procedure = properties.getProperty(ImportDataProcessor.IMPORT_PROCEDURE);
             assert procedure != null;
             //TODO: If processors is a list dont start till all procedures exists.
-            Procedure catProc = m_catalogContext.procedures.get(procedure);
+            Procedure catProc = catalogContext.procedures.get(procedure);
             if (catProc == null) {
-                catProc = m_catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
+                catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procedure);
             }
             if (catProc == null) {
                 importLog.info("Importer " + configName + " Procedure " + procedure +
@@ -300,28 +290,27 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     private synchronized void resume() {
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
         try {
-            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles();
+            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
             startImporters(newProcessorConfig);
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
         }
-        readyForDataInternal();
+        readyForDataInternal(catalogContext, VoltDB.instance().getHostMessenger());
     }
 
     public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
-        m_catalogContext = catalogContext;
-        assert m_messenger.equals(messenger);
-        m_messenger = messenger;
         try {
-            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles();
+            Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
             if (m_processorConfig == null || !m_processorConfig.equals(newProcessorConfig)) {
-                if (m_clusterMode != OperationMode.PAUSED) {
+                OperationMode clusterMode = VoltDB.instance().getMode();
+                if (clusterMode != OperationMode.PAUSED) {
                     close();
                     startImporters(newProcessorConfig);
-                    readyForDataInternal();
+                    readyForDataInternal(catalogContext, messenger);
                 } else if (importLog.isDebugEnabled()) {
-                    importLog.debug("Catalog update is not restarting importers because cluster state is " + m_clusterMode);
+                    importLog.debug("Catalog update is not restarting importers because cluster state is " + clusterMode);
                 }
             }
         } catch (final Exception e) {
@@ -330,17 +319,13 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
-        assert m_catalogContext.equals(catalogContext);
-        assert m_messenger.equals(messenger);
-        m_catalogContext = catalogContext;
-        m_messenger = messenger;
         m_serverStarted = true; // Note that server is ready, so that we know whether to process catalog updates
-        if (m_clusterMode != OperationMode.PAUSED) {
-            readyForDataInternal();
+        if (VoltDB.instance().getMode() != OperationMode.PAUSED) {
+            readyForDataInternal(catalogContext, messenger);
         }
     }
 
-    private synchronized void readyForDataInternal() {
+    private synchronized void readyForDataInternal(CatalogContext catalogContext, HostMessenger messenger) {
         if (!m_serverStarted) {
             if (importLog.isDebugEnabled()) {
                 importLog.debug("Server not started. Not sending readyForData to ImportProcessor");
@@ -353,7 +338,7 @@ public class ImportManager implements ChannelChangeCallback {
             return;
         }
         //Tell import processors and in turn ImportHandlers that we are ready to take in data.
-        m_processor.get().readyForData(m_catalogContext, m_messenger);
+        m_processor.get().readyForData(catalogContext, messenger);
     }
 
     @Override
@@ -363,8 +348,7 @@ public class ImportManager implements ChannelChangeCallback {
 
     @Override
     public synchronized void onClusterStateChange(VersionedOperationMode mode) {
-        m_clusterMode = mode.getMode();
-        switch (m_clusterMode) {
+        switch (mode.getMode()) {
             case PAUSED:
                 importLog.info("Cluster is paused shutting down all importers.");
                 close();
