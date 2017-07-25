@@ -136,12 +136,26 @@ GROUP BY
 -------------- PROCEDURES -------------------------------------------------------
 
 CREATE PROCEDURE PARTITION ON TABLE cards COLUMN card_id PARAMETER 0 FROM CLASS metrocard.CardSwipe;
-CREATE PROCEDURE FROM CLASS metrocard.GetBusiestStationInLastMinute;
-CREATE PROCEDURE FROM CLASS metrocard.GetSwipesPerSecond;
-
 
 CREATE PROCEDURE ReplenishCard PARTITION ON TABLE cards COLUMN card_id PARAMETER 1 AS
 UPDATE cards SET balance = balance + ?
 WHERE card_id = ? AND card_type = 0;
+
+CREATE PROCEDURE GetBusiestStationInLastMinute AS
+SELECT s.name, SUM(v.activities) as swipes, SUM(v.entries) as entries
+FROM secondly_entries_by_station v
+INNER JOIN stations s ON s.station_id = v.station_id
+WHERE
+  v.second >= DATEADD(SECOND, -60, NOW)
+GROUP BY s.name
+ORDER BY swipes DESC;
+
+CREATE PROCEDURE GetSwipesPerSecond AS
+SELECT second, activities, entries
+FROM secondly_stats
+WHERE
+  second >= DATEADD(SECOND, -1 * ?, NOW) AND
+  second < TRUNCATE(SECOND, NOW)
+ORDER BY second;
 
 END_OF_BATCH
