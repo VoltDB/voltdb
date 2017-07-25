@@ -48,7 +48,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -279,23 +278,19 @@ public class UpdateCore extends VoltSystemProcedure {
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
-            String catalogDiffCommands = (String)params.toArray()[0];
+            String catalogDiffCommands = (String)params.getParam(0);
             String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
-            int expectedCatalogVersion = (Integer)params.toArray()[1];
-            boolean requiresSnapshotIsolation = ((Byte) params.toArray()[2]) != 0;
-            boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[3]) != 0;
-            boolean hasSchemaChange = ((Byte) params.toArray()[4]) != 0;
-            boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
-            long genId = (Long) params.toArray()[6];
+            int expectedCatalogVersion = (Integer)params.getParam(1);
+            long genId = (Long) params.getParam(2);
+            byte[] catalogBytes = (byte[]) params.getParam(3);
+            byte[] catalogHash = (byte[]) params.getParam(4);
+            byte[] deploymentBytes = (byte[]) params.getParam(5);
+            boolean requiresSnapshotIsolation = ((Byte) params.getParam(6)) != 0;
+            boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.getParam(7)) != 0;
+            boolean hasSchemaChange = ((Byte) params.getParam(8)) != 0;
+            boolean requiresNewExportGeneration = ((Byte) params.getParam(9)) != 0;
 
             boolean isForReplay = m_runner.getTxnState().isForReplay();
-
-            CatalogAndDeployment catalogStuff = null;
-            try {
-                catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
-            }
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
@@ -304,11 +299,11 @@ public class UpdateCore extends VoltSystemProcedure {
                 CatalogContext catalogContext =
                 VoltDB.instance().catalogUpdate(
                         commands,
-                        catalogStuff.catalogBytes,
-                        catalogStuff.getCatalogHash(),
                         expectedCatalogVersion,
                         genId,
-                        catalogStuff.deploymentBytes,
+                        catalogBytes,
+                        catalogHash,
+                        deploymentBytes,
                         isForReplay,
                         requireCatalogDiffCmdsApplyToEE,
                         hasSchemaChange,
@@ -332,23 +327,23 @@ public class UpdateCore extends VoltSystemProcedure {
                 if (log.isDebugEnabled()) {
                     String replayInfo = isForReplay ? " (FOR REPLAY)" : "";
 
-                    byte[] debugDeploymentHash = CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes);
+                    byte[] debugDeploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
                     log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                            Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
+                            Encoder.hexEncode(catalogHash).substring(0, 10),
                             Encoder.hexEncode(debugDeploymentHash).substring(0, 10),
                             replayInfo));
                 }
             }
             // if seen before by this code, then check to see if this is a restart
             else if (context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
-                    Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
+                    Arrays.equals(context.getCatalogHash(), catalogHash) &&
                     Arrays.equals(context.getDeploymentHash(),
-                            CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))) {
+                            CatalogUtil.makeDeploymentHash(deploymentBytes))) {
                 log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                            Encoder.hexEncode(catalogStuff.getCatalogHash()),
-                            Encoder.hexEncode(CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))));
+                            Encoder.hexEncode(catalogHash),
+                            Encoder.hexEncode(CatalogUtil.makeDeploymentHash(deploymentBytes))));
             }
             else {
                 VoltDB.crashLocalVoltDB("Invalid catalog update.  Expected version: " + expectedCatalogVersion +
@@ -402,11 +397,14 @@ public class UpdateCore extends VoltSystemProcedure {
     private final VoltTable[] performCatalogUpdateWork(
             String catalogDiffCommands,
             int expectedCatalogVersion,
+            long genId,
+            byte[] catalogBytes,
+            byte[] catalogHash,
+            byte[] deploymentBytes,
             byte requiresSnapshotIsolation,
             byte requireCatalogDiffCmdsApplyToEE,
             byte hasSchemaChange,
-            byte requiresNewExportGeneration,
-            long genId)
+            byte requiresNewExportGeneration)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -418,11 +416,15 @@ public class UpdateCore extends VoltSystemProcedure {
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(
                 catalogDiffCommands,
                 expectedCatalogVersion,
+                genId,
+                catalogBytes,
+                catalogHash,
+                deploymentBytes,
                 requiresSnapshotIsolation,
                 requireCatalogDiffCmdsApplyToEE,
                 hasSchemaChange,
-                requiresNewExportGeneration,
-                genId);
+                requiresNewExportGeneration
+                );
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogAggregate;
@@ -492,11 +494,15 @@ public class UpdateCore extends VoltSystemProcedure {
             performCatalogUpdateWork(
                     catalogDiffCommands,
                     expectedCatalogVersion,
+                    genId,
+                    catalogBytes,
+                    catalogHash,
+                    deploymentBytes,
                     requiresSnapshotIsolation,
                     requireCatalogDiffCmdsApplyToEE,
                     hasSchemaChange,
-                    requiresNewExportGeneration,
-                    genId);
+                    requiresNewExportGeneration
+                    );
         } finally {
             // remove the uac blocker when exits
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
