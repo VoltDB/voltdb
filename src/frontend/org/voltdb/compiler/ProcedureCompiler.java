@@ -759,12 +759,8 @@ public abstract class ProcedureCompiler {
         }
 
         // if there are multiple statements,
-        // the string of statements will begin and end with single quotes
-        // but all the statements are stored in m_singleStmt as a single string
+        // all the statements are stored in m_singleStmt as a single string
         String stmtsStr = procedureDescriptor.m_singleStmt;
-        if( stmtsStr.charAt(0) == '\'' && stmtsStr.charAt(stmtsStr.length()-2) == '\'' )  {
-            stmtsStr = stmtsStr.substring(1, stmtsStr.length()-2);
-        }
 
         // get the short name of the class (no package if a user procedure)
         // use the Table.<builtin> name (allowing the period) if builtin.
