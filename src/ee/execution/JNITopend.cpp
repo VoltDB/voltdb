@@ -99,28 +99,6 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_throwableClass = m_jniEnv->FindClass("java/lang/Throwable");
-    if (m_throwableClass == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_throwableClass != NULL);
-        throw std::exception();
-    }
-
-    m_throwableClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_throwableClass));
-    if (m_throwableClass == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_throwableClass != NULL);
-        throw std::exception();
-    }
-
-    m_getMessageFromThrowableMID = m_jniEnv->GetMethodID(
-            m_throwableClass, "getMessage", "()Ljava/lang/String;");
-    if (m_getMessageFromThrowableMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_getMessageFromThrowableMID != 0);
-        throw std::exception();
-    }
-
     m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
     if (m_nextDependencyMID == NULL) {
         m_jniEnv->ExceptionDescribe();
@@ -451,7 +429,6 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_exportManagerClass);
     m_jniEnv->DeleteGlobalRef(m_partitionDRGatewayClass);
     m_jniEnv->DeleteGlobalRef(m_encoderClass);
-    m_jniEnv->DeleteGlobalRef(m_throwableClass);
 }
 
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
