@@ -294,9 +294,16 @@ public class CatalogContext {
         return retval;
     }
 
-    public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedures() {
-        // TODO(xin)
-        return null;
+    public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedures(SiteProcedureConnection site) {
+        long siteId = site.getCorrespondingSiteId();
+        ImmutableMap<String, ProcedureRunner> userProcs = m_userProcsMap.get(siteId);
+        // swap site and reinit stats
+
+        for (ProcedureRunner runner: userProcs.values()) {
+            runner.initSiteAndStats(site);
+        }
+
+        return userProcs;
     }
 
     /**

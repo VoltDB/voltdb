@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.StatementStats.SingleCallStatsToken;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
@@ -121,7 +120,7 @@ public class ProcedureRunner {
 
     // hooks into other parts of voltdb
     //
-    protected final SiteProcedureConnection m_site;
+    protected SiteProcedureConnection m_site;
     protected ExecutionEngine m_ee;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
 
@@ -181,9 +180,11 @@ public class ProcedureRunner {
         m_isReadOnly = catProc.getReadonly();
         m_isSinglePartition = m_catProc.getSinglepartition();
         if (m_isSinglePartition) {
-            ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
-            m_partitionColumn = ppi.index;
-            m_partitionColumnType = ppi.type;
+            // FIXME(xin):
+            // why use (ProcedurePartitionInfo) ?
+//            ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
+            m_partitionColumn = m_catProc.getPartitionparameter();
+            m_partitionColumnType = VoltType.get((byte) m_catProc.getPartitioncolumn().getType());
         } else {
             m_partitionColumn = 0;
             m_partitionColumnType = null;
@@ -198,12 +199,13 @@ public class ProcedureRunner {
         // The variable names are used in the granular statistics.
         m_stmtList = reflect();
 
-        if (m_site != null) {
-            initStats(m_site);
+        if (site != null) {
+            initSiteAndStats(m_site);
         }
     }
 
-    public void initStats(SiteProcedureConnection site) {
+    public void initSiteAndStats(SiteProcedureConnection site) {
+        m_site = site;
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
         // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
         m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(

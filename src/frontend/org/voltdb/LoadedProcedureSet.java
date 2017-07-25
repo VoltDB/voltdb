@@ -104,7 +104,7 @@ public class LoadedProcedureSet {
             // System procedures can be left without changes.
             reInitSystemProcedureRunners(catalogContext);
 
-            m_userProcs = catalogContext.getPreparedUserProcedures();
+            m_userProcs = catalogContext.getPreparedUserProcedures(m_site);
 
         } else {
             // reload all system procedures from beginning
