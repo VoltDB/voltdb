@@ -266,18 +266,7 @@ public class CatalogContext {
             boolean hasSchemaChange)
     {
         Catalog newCatalog = getNewCatalog(diffCommands);
-
-        // If there's no new catalog bytes, preserve the old one rather than
-        // bashing it
-        byte[] bytes = catalogBytes;
-        if (bytes == null) {
-            try {
-                bytes = this.getCatalogJarBytes();
-            } catch (IOException e) {
-                // Failure is not an option
-                hostLog.fatal(e.getMessage());
-            }
-        }
+        assert(catalogBytes != null);
 
         // using the prepared catalog information if prepared
         CatalogInfo catalogInfo = m_preparedCatalogInfo;
