@@ -146,11 +146,10 @@ public class PerPartitionTable {
                         try {
                             reinsertFailed(Arrays.asList(m_reinsertRow));
                         } catch (Exception e) {
-                            // TODO: handle exception
+                            loaderLog.error("Failed to re-insert failed batch", e);
                         }
                     }
                 });
-
                 return;
             }
             else if (response.getStatus() != ClientResponse.SUCCESS) {
