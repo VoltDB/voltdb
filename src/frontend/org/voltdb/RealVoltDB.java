@@ -338,7 +338,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
-    private static final String SECONDARY_PICONETWORK_THREADS = "secondaryPicoNetworkThreads";
 
     /** Last transaction ID at which the logging config updated.
      * Also, use the intrinsic lock to safeguard access from multiple
@@ -1428,6 +1427,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
             }
 
+            Set<Integer> partitionGroup = m_cartographer.getHostIdsWithinPartitionGroup(m_messenger.getHostId());
+            if (partitionGroup.size() > 1) {
+                StringBuilder strBuilder = new StringBuilder();
+                partitionGroup.forEach((h) -> {
+                    strBuilder.append(h).append(" ");
+                });
+                hostLog.warn("Host " + strBuilder.toString() + "belongs to the same partition group.");
+            }
+            m_messenger.setPartitionGroup(partitionGroup);
+
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
             try {
@@ -2007,57 +2016,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void createSecondaryConnections(boolean isRejoin) {
-        int partitionGroupCount = m_clusterSettings.get().hostcount() / (m_configuredReplicationFactor + 1);
-        int localHostId = m_messenger.getHostId();
-        Set<Integer> peers = Sets.newHashSet();
+        int hostCount = m_clusterSettings.get().hostcount();
+        int partitionGroupCount = hostCount / (m_configuredReplicationFactor + 1);
         if (m_configuredReplicationFactor > 0 && partitionGroupCount > 1) {
-            Set<Integer> hostIdsWithinGroup = m_cartographer.getHostIdsWithinPartitionGroup(localHostId);
-            if (isRejoin) {
-                peers.addAll(hostIdsWithinGroup);
-                // exclude local host id
-                peers.remove(m_messenger.getHostId());
-            } else {
-                for (Integer host : hostIdsWithinGroup) {
-                    // This node sends connection request to all its peers, once the connection
-                    // is established, both nodes will create a foreign host (contains a PicoNetwork thread).
-                    // That said, here we only connect to the nodes that have higher host id to avoid double
-                    // the network thread we expected.
-                    if (host > localHostId) {
-                        peers.add(host);
-                    }
-                }
-            }
-
-            // it is possible if some nodes are inactive
-            if (peers.isEmpty()) return;
-
-            /**
-             *  Basic goal is each host should has the same number of connections compare to the number
-             *  without partition group layout.
-             *
-             * (targetConnectionsWithinPG - existingConnectionsWithinPG) is the the total number of secondary
-             * connections we try to create, I want the secondary connections to have an even distribution
-             * across all nodes within the partition group, and round up the result because this is
-             * integer division, there is a trick to do this:  (a + (b - 1)) / b
-             * so it becomes (targetConnectionsWithinPG - existingConnectionsWithinPG) + (existingConnectionsWithinPG - 1)
-             * which equals to (targetConnectionsWithinPG - 1).
-             *
-             * All the numbers are per node basis, PG is short for Partition Group
-             */
-            int connectionsWithoutPG = m_clusterSettings.get().hostcount() - 1;
-            int existingConnectionsWithinPG = hostIdsWithinGroup.size() - 1;
-            int targetConnectionsWithinPG = Math.min( connectionsWithoutPG, CoreUtils.availableProcessors() / 4);
-
-            int secondaryConnections = (targetConnectionsWithinPG - 1) / existingConnectionsWithinPG;
-            Integer configNumberOfConnections = Integer.getInteger(SECONDARY_PICONETWORK_THREADS);
-            if (configNumberOfConnections != null) {
-                secondaryConnections = configNumberOfConnections;
-                hostLog.info("Overridden secondary PicoNetwork network thread count:" + configNumberOfConnections);
-            } else {
-                hostLog.info("This node has " + secondaryConnections + " secondary PicoNetwork thread" + ((secondaryConnections > 1) ? "s" :""));
-            }
-
-            m_messenger.createAuxiliaryConnections(peers, secondaryConnections);
+            m_messenger.createAuxiliaryConnections(hostCount, isRejoin);
         }
     }
 
