@@ -85,10 +85,6 @@ public class CreateFunctionFromMethod extends StatementProcessor {
             return false;
         }
 
-        // Before we complete the user-defined function feature, executing UDF-related DDLs will
-        // generate compiler warnings.
-        m_compiler.addWarn("User-defined functions are not implemented yet.");
-
         String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
         String className = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
         String methodName = checkIdentifierStart(statementMatcher.group(3), ddlStatement.statement);
