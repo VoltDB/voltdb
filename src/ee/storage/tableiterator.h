@@ -92,10 +92,10 @@ public:
     void setTempTableDeleteAsGo(bool flag) {
         switch (m_iteratorType) {
         case TEMP:
-            m_state.m_temp.m_tempTableDeleteAsGo = flag;
+            m_state.m_tempTableDeleteAsGo = flag;
             break;
         case LARGE_TEMP:
-            m_state.m_largeTemp.m_tempTableDeleteAsGo = flag;
+            m_state.m_tempTableDeleteAsGo = flag;
             break;
         default:
             assert(false);
@@ -150,12 +150,12 @@ protected:
 
     TBMapI getBlockIterator() const {
         assert (m_iteratorType == PERSISTENT);
-        return m_state.m_pers.m_blockIterator;
+        return m_state.m_persBlockIterator;
     }
 
     void setBlockIterator(const TBMapI& it) {
         assert (m_iteratorType == PERSISTENT);
-        m_state.m_pers.m_blockIterator = it;
+        m_state.m_persBlockIterator = it;
     }
 
     uint32_t getBlockOffset() const {
@@ -188,64 +188,66 @@ private:
 
     // State only for persistent table iterators
     struct PersistentState {
-        PersistentState()
-        : m_blockIterator()
-        {
-        }
 
-        PersistentState(TBMapI it)
-        : m_blockIterator(it)
-        {
-        }
-
-        TBMapI m_blockIterator;
     };
 
     // State only for temp table iterators
     struct TempState {
 
-        std::vector<TBPtr>::iterator m_tempBlockIterator;
-        bool m_tempTableDeleteAsGo;
+
     };
 
     // State for large temp table iterators only
     struct LargeTempState {
 
-        std::vector<int64_t>::iterator m_tempBlockIterator;
-        bool m_tempTableDeleteAsGo;
+
     };
 
-    union TypeSpecificState {
+    struct TypeSpecificState {
 
-        TypeSpecificState() {
-            ::memset(this, 0, sizeof(*this));
+        TypeSpecificState()
+        : m_persBlockIterator()
+        , m_tempBlockIterator()
+        , m_largeTempBlockIterator()
+            , m_tempTableDeleteAsGo(false)
+        {
         }
 
         TypeSpecificState(TBMapI it)
+        : m_persBlockIterator(it)
+        , m_tempBlockIterator()
+        , m_largeTempBlockIterator()
+        , m_tempTableDeleteAsGo(false)
         {
-            m_pers.m_blockIterator = it;
         }
 
 
         TypeSpecificState(std::vector<TBPtr>::iterator it, bool deleteAsGo)
+        : m_persBlockIterator()
+        , m_tempBlockIterator(it)
+        , m_largeTempBlockIterator()
+        , m_tempTableDeleteAsGo(deleteAsGo)
         {
-            m_temp.m_tempBlockIterator = it;
-            m_temp.m_tempTableDeleteAsGo = deleteAsGo;
         }
 
         TypeSpecificState(std::vector<int64_t>::iterator it, bool deleteAsGo)
+        : m_persBlockIterator()
+        , m_tempBlockIterator()
+        , m_largeTempBlockIterator(it)
+        , m_tempTableDeleteAsGo(deleteAsGo)
         {
-            m_largeTemp.m_tempBlockIterator = it;
-            m_largeTemp.m_tempTableDeleteAsGo = deleteAsGo;
         }
 
         ~TypeSpecificState()
         {
         }
 
-        PersistentState m_pers;
-        TempState m_temp;
-        LargeTempState m_largeTemp;
+        TBMapI m_persBlockIterator;
+        std::vector<TBPtr>::iterator m_tempBlockIterator;
+        std::vector<int64_t>::iterator m_largeTempBlockIterator;
+
+        // valid for large and normal temp tables
+        bool m_tempTableDeleteAsGo;
     };
 
     // State that is common to all kinds of iterators
@@ -322,20 +324,8 @@ inline TableIterator::TableIterator(const TableIterator &that)
     , m_dataPtr(that.m_dataPtr)
     , m_location(that.m_location)
     , m_iteratorType(that.m_iteratorType)
-    , m_state()
+    , m_state(that.m_state)
 {
-    switch (m_iteratorType) {
-    case TEMP:
-        m_state.m_temp = that.m_state.m_temp;
-        break;
-    case PERSISTENT:
-        m_state.m_pers = that.m_state.m_pers;
-        break;
-    case LARGE_TEMP:
-    default:
-        assert (m_iteratorType == LARGE_TEMP);
-        m_state.m_largeTemp = that.m_state.m_largeTemp;
-    }
 }
 
 inline TableIterator& TableIterator::operator=(const TableIterator& that) {
@@ -351,18 +341,7 @@ inline TableIterator& TableIterator::operator=(const TableIterator& that) {
         m_dataPtr = that.m_dataPtr;
         m_location = that.m_location;
         m_iteratorType = that.m_iteratorType;
-        switch (m_iteratorType) {
-        case TEMP:
-            m_state.m_temp = that.m_state.m_temp;
-            break;
-        case LARGE_TEMP:
-            m_state.m_largeTemp = that.m_state.m_largeTemp;
-            break;
-        case PERSISTENT:
-        default:
-            assert (m_iteratorType == PERSISTENT);
-            m_state.m_pers = that.m_state.m_pers;
-        }
+        m_state = that.m_state;
     }
 
     return *this;
@@ -378,8 +357,8 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
     m_currentBlock = NULL;
-    m_state.m_temp.m_tempBlockIterator = start;
-    m_state.m_temp.m_tempTableDeleteAsGo = false;
+    m_state.m_tempBlockIterator = start;
+    m_state.m_tempTableDeleteAsGo = false;
 }
 
 inline void TableIterator::reset(std::vector<int64_t>::iterator start) {
@@ -392,8 +371,8 @@ inline void TableIterator::reset(std::vector<int64_t>::iterator start) {
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
     m_currentBlock = NULL;
-    m_state.m_largeTemp.m_tempBlockIterator = start;
-    m_state.m_temp.m_tempTableDeleteAsGo = false;
+    m_state.m_largeTempBlockIterator = start;
+    m_state.m_tempTableDeleteAsGo = false;
 }
 
 inline void TableIterator::reset(TBMapI start) {
@@ -406,7 +385,7 @@ inline void TableIterator::reset(TBMapI start) {
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
     m_currentBlock = NULL;
-    m_state.m_pers.m_blockIterator = start;
+    m_state.m_persBlockIterator = start;
 }
 
 inline bool TableIterator::hasNext() {
@@ -436,10 +415,10 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
 //            if (m_blockIterator == m_table->m_data.end()) {
 //                throwFatalException("Could not find the expected number of tuples during a table scan");
 //            }
-            m_dataPtr = m_state.m_pers.m_blockIterator.key();
-            m_currentBlock = m_state.m_pers.m_blockIterator.data();
+            m_dataPtr = m_state.m_persBlockIterator.key();
+            m_currentBlock = m_state.m_persBlockIterator.data();
             m_blockOffset = 0;
-            m_state.m_pers.m_blockIterator++;
+            m_state.m_persBlockIterator++;
         } else {
             m_dataPtr += m_tupleLength;
         }
@@ -474,14 +453,14 @@ inline bool TableIterator::tempNext(TableTuple &out) {
             m_blockOffset >= m_currentBlock->unusedTupleBoundary())
         {
             // delete the last block of tuples in this temp table when they will never be used
-            if (m_state.m_temp.m_tempTableDeleteAsGo) {
-                m_table->freeLastScanedBlock(m_state.m_temp.m_tempBlockIterator);
+            if (m_state.m_tempTableDeleteAsGo) {
+                m_table->freeLastScanedBlock(m_state.m_tempBlockIterator);
             }
 
-            m_currentBlock = *(m_state.m_temp.m_tempBlockIterator);
+            m_currentBlock = *(m_state.m_tempBlockIterator);
             m_dataPtr = m_currentBlock->address();
             m_blockOffset = 0;
-            ++m_state.m_temp.m_tempBlockIterator;
+            ++m_state.m_tempBlockIterator;
         } else {
             m_dataPtr += m_tupleLength;
         }
@@ -512,7 +491,7 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
             m_blockOffset >= m_currentBlock->unusedTupleBoundary()) {
 
             LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
-            auto& blockIdIterator = m_state.m_largeTemp.m_tempBlockIterator;
+            auto& blockIdIterator = m_state.m_largeTempBlockIterator;
 
             if (m_currentBlock != NULL) {
                 lttCache->unpinBlock(*blockIdIterator);
