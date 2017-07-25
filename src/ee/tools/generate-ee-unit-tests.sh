@@ -12,7 +12,29 @@
 BUILD=release
 VERBOSE=
 ECHO=+x
-VOLTDBROOT="$(/bin/pwd)"
+
+#
+# Look in various places to find the root of the
+# build hierarchy.
+#
+isVoltDBRoot() {
+	local DIR="$1"
+    if [ ! -f "$DIR/build.xml" ]; then
+        return 1
+    fi
+    if grep '<project' "$DIR/build.xml" | grep -q 'name="VoltDB"'; then
+        return 0
+    fi
+    return 1;
+}
+if isVoltDBRoot "."; then
+	VOLTDBROOT="$(/bin/pwd)"
+elif isVoltDBRoot "../.."; then
+	VOLTDBROOT="$(cd ../..; /bin/pwd)"
+else
+    echo "$0: Can't find the voltdb root"
+    exit 100
+fi
 while [ -n "$1" ]; do
     case "$1" in
         --debug)
@@ -86,8 +108,8 @@ if [ -z "$TEST_CLASSES" ] ; then
     exit 100
 fi
 
-GENERATED_DIR="$VOLTDBROOT/tests/ee/generated"
+GENERATED_DIR="$VOLTDBROOT/tests/ee/ee_auto_generated_unit_tests"
 OBJDIR="$VOLTDBROOT/obj/${BUILD}"
 for CLASS in $TEST_CLASSES; do
-    (set $ECHO; java $VERBOSE -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDBROOT}/lib/\*:${VOLTDBROOT}/third_party/java/jars/\* -Dlog4j.configuration=file:${VOLTDBROOT}/tests/log4j-allconsole.xml $CLASS ${NAMES_ONLY} --generated-dir "$GENERATED_DIR")
+    (set $ECHO; java $VERBOSE -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDBROOT}/lib/\*:${VOLTDBROOT}/third_party/java/jars/\* -Dlog4j.configuration=file:${VOLTDBROOT}/tests/log4j-allconsole.xml $CLASS ${NAMES_ONLY} --voltdb-root="${VOLTDB_ROOT}")
 done

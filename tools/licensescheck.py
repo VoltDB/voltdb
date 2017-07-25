@@ -25,7 +25,8 @@ prunelist = ('hsqldb19b3',
              'jaxb',
              'pmsg',
              'customer-workloads',
-             'metrics_pb2.py')
+             'metrics_pb2.py',
+             'ee_auto_generated_unit_tests' )
 
 def licenseStartsHere(content, approvedLicenses):
     for license in approvedLicenses:

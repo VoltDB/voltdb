@@ -333,11 +333,10 @@ def buildCommandString(config):
 def runCommand(commandStr, config):
     if config.debug:
         print(commandStr)
-        return True
+        return (True, 0)
     else:
         retcode = subprocess.call(commandStr, shell = True)
-        return (retcode == 0)
-
+        return (retcode == 0, retcode)
 
 def morethanoneof(a, b, c):
     if a:
@@ -421,15 +420,19 @@ def doConfigure(config):
     # We always want to do this.
     #
     configCmd = configureCommandString(config)
-    if not runCommand(configCmd, config):
-        print("Cmake command \"%s\" failed." % configCmd)
+    (retval, success) = runCommand(configCmd, config);
+    if success:
+        print("Cmake command \"%s\" failed, return status %d."
+              % (configCmd, retval))
         sys.exit(100)
 
 def doBuild(config):
     buildCmd = buildCommandString(config)
     if buildCmd:
-        if not runCommand(buildCmd, config):
-            print("Build command \"%s\" failed." % buildCmd)
+        (success, retval) = runCommand(buildCmd, config)
+        if not success:
+            print("Build command \"%s\" failed, return status %d."
+                  % (buildCmd, retval))
             sys.exit(100)
 
 def main():
