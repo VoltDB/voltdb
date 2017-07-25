@@ -178,7 +178,6 @@ public class CatalogContext {
         this.deploymentHashForConfig = CatalogUtil.makeDeploymentHashForConfig(deploymentBytes);
         m_memoizedDeployment = null;
 
-
         // If there is no schema change, default procedures will not be changed.
         // Also, the planner tool can be almost reused except updating the catalog hash string.
         // When there is schema change, we just reload every default procedure and create new planner tool
@@ -291,6 +290,8 @@ public class CatalogContext {
                     hasSchemaChange,
                     m_defaultProcs,
                     m_ptool);
+        // keep the reference of the user procedure runner map
+        retval.m_userProcsMap = m_userProcsMap;
         return retval;
     }
 
@@ -298,6 +299,10 @@ public class CatalogContext {
         long siteId = site.getCorrespondingSiteId();
         ImmutableMap<String, ProcedureRunner> userProcs = m_userProcsMap.get(siteId);
         // swap site and reinit stats
+
+        if (userProcs == null) {
+            hostLog.error("look for site id : " + siteId + " in Map: " + m_userProcsMap.keySet());
+        }
 
         for (ProcedureRunner runner: userProcs.values()) {
             runner.initSiteAndStats(site);

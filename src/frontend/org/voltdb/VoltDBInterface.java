@@ -169,7 +169,8 @@ public interface VoltDBInterface
         return;
     }
 
-    default public String checkLoadingClasses(byte[] catalogBytes, String diffCommands)
+    default public String checkLoadingClasses(byte[] catalogBytes, String diffCommands,
+            boolean skipPrepareProcRunners)
     {
         return null;
     }

@@ -3324,7 +3324,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Verify the integrity of the newly updated catalog stored on the ZooKeeper
     @Override
-    public String checkLoadingClasses(byte[] catalogBytes, String diffCommands) {
+    public String checkLoadingClasses(byte[] catalogBytes, String diffCommands, boolean skipPrepareProcRunners) {
         ImmutableMap.Builder<String, Class<?>> classesMap = ImmutableMap.<String, Class<?>>builder();
         InMemoryJarfile newCatalogJar;
         JarLoader jarLoader;
@@ -3374,6 +3374,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (Exception e) {
             return e.getMessage();
         }
+
+        if (skipPrepareProcRunners) {
+            return null;
+        }
+
+        hostLog.error("Not skipping creating procedure runners ......");
 
         CatalogContext ctx = VoltDB.instance().getCatalogContext();
         Catalog newCatalog = ctx.getNewCatalog(diffCommands);

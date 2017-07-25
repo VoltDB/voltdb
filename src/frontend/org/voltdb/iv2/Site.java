@@ -1510,7 +1510,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
-        m_loadedProcedures.loadProcedures(m_context, false);
+        m_loadedProcedures.loadProcedures(m_context, requireCatalogDiffCmdsApplyToEE == false && !isMPI);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs
