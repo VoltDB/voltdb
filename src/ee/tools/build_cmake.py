@@ -70,33 +70,28 @@ def makeParser():
                         help='''
                         Use verbose builds when building.
                         ''')
+    parser.add_argument('--log-level',
+                        default='500',
+                        help='''
+                        Set the log level.  The default is 500.
+                        ''')
     #
     # Build parameters.
     #
     parser.add_argument('--source-directory',
                         dest='srcdir',
                         metavar='SOURCE_DIR',
-                        required=True,
                         help='''
                         Root of VoltDB EE source tree.
-                        This is required.
-                        ''')
-    parser.add_argument('--test-directory',
-                        dest='testdir',
-                        required=True,
-                        metavar='TESTDIR',
-                        help='''
-                        Root of the VoltDB test source tree.
-                        This is required.
                         ''')
     parser.add_argument('--object-directory',
                         dest='objdir',
-                        required=True,
+                        default=None,
                         metavar='OBJECT_DIR',
                         help='''
                         Root of the object directory.  This is typically S/obj/BT,
                         where S is the source directory for all of VoltDB and BT
-                        is the build type.  This is required.
+                        is the build type.<
                         ''')
     parser.add_argument('--max-processors',
                         dest='max_processors',
@@ -292,8 +287,8 @@ def configureCommandString(config):
         cmakeBuildType="Debug"
     else:
         cmakeBuildType="Release"
-    return 'cmake -DCMAKE_BUILD_TYPE=%s -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s %s' \
-             % (cmakeBuildType, config.buildtype, config.generator, coverage, profile, config.srcdir)
+    return 'cmake -DCMAKE_BUILD_TYPE=%s -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s -DVOLT_LOG_LEVEL=%s %s' \
+             % (cmakeBuildType, config.buildtype, config.generator, coverage, profile, config.log_level, config.srcdir)
 
 ########################################################################
 #
@@ -358,6 +353,10 @@ def validateConfig(config):
     # the command line parameters.
     config.installipc=False
 
+    if not config.objdir:
+        config.objdir = os.path.join('obj', config.buildtype)
+    if not config.srcdir:
+        config.srcdir = os.path.join(os.getcwd(), 'src', 'ee')
     # Some of the build and run parameters are incompatible.
     if morethanoneof(config.runalltests, config.runonetest, config.runonetestdir):
         print("--run-all-tests, --run-one-testdir and --run-one-test are incompatible.")
@@ -373,7 +372,7 @@ def validateConfig(config):
         config.buildalltests = config.runalltests
         config.buildonetest = config.runonetest
         config.buildonetestdir = config.runonetestdir
-    # If we ahve specified building one or more tests
+    # If we have specified building one or more tests
     # then we need to build the shared library and install
     # it.
     if config.buildalltests or config.buildonetest or config.buildonetestdir:

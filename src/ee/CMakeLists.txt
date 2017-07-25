@@ -3,10 +3,7 @@
 # A CMake build configuration for VoltDB.  The commands for the ant
 # targets in build.xml call src/ee/tools/build_cmake.py, which calls
 # cmake and make here, so you don't really need to know how to use this.
-# But for special cases this may be useful.  Also, the phrase
-# "you don't really need to know how to use this" is code for
-# "understanding this is another burden we place on you", as we
-# all know with sadness.
+# But for special cases this may be useful.
 #
 # To use this standalone, in the root of the voltdb hierarchy, run this
 # procedure. All files are relative to the VoltDB source tree root.  This
@@ -149,18 +146,16 @@ IF ( (CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND ( (CMAKE_VERSION VERSION_GREATER 
     CMAKE_POLICY(SET CMP0042 OLD)
 ENDIF()
 
-IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
-    # Surely there is some way to discover this.
-    SET (VOLTDB_CORE_COUNT 4)
-ELSE()
-    EXECUTE_PROCESS(COMMAND bash -c "grep '^processor' /proc/cpuinfo | wc -l"
-                    OUTPUT_VARIABLE VOLTDB_CORE_COUNT)
-    STRING(STRIP "${VOLTDB_CORE_COUNT}" VOLTDB_CORE_COUNT)
-    IF ( "${VOLTDB_CORE_COUNT}" STREQUAL "" )
-        MESSAGE(FATAL_ERROR "Cannot calculate the core count.")
-    ENDIF()
-ENDIF()
+########################################################################
+#
+# Some functions to make things look simpler.
+#
+########################################################################
+INCLUDE(VoltDB.cmake)
 
+
+COMPUTE_CORE_COUNT(VOLTDB_CORE_COUNT)
+# MESSAGE("VOLTDB_CORE_COUNT IS ${VOLTDB_CORE_COUNT}")
 ########################################################################
 #
 # This CMakeLists.txt file describes the VoltDB build system.
@@ -230,6 +225,7 @@ ENDIF ()
 #
 ########################################################################
 STRING(TOUPPER "${VOLTDB_BUILD_TYPE}" VOLTDB_BUILD_TYPE)
+STRING(TOLOWER "${VOLTDB_BUILD_TYPE}" VOLTDB_BUILD_TYPE_LOWER)
 IF ((${VOLTDB_BUILD_TYPE} STREQUAL "MEMCHECK") OR (${VOLTDB_BUILD_TYPE} STREQUAL "MEMCHECK_NOFREELIST"))
   SET (IS_VALGRIND_BUILD TRUE)
 ELSE()
@@ -261,9 +257,8 @@ ENDIF()
 # outside of the CMAKE_SOURCE_DIR.
 #
 ########################################################################
-EXECUTE_PROCESS(COMMAND bash -c "${CMAKE_SOURCE_DIR}/tools/findvdbroot.sh"
-                OUTPUT_VARIABLE VOLTDB_ROOT)
-STRING(STRIP ${VOLTDB_ROOT} VOLTDB_ROOT)
+FIND_VOLTDB_ROOT(VOLTDB_ROOT)
+# MESSAGE("VOLTDB_ROOT IS ${VOLTDB_ROOT}")
 
 # We keep pcre2 in a tarball, since we don't actually make
 # any changes to it.  This keeps the git repository epsilon smaller.
@@ -518,163 +513,163 @@ ExternalProject_Add(s2geo
 #
 ########################################################################
 SET (VOLTDB_SRC
-  ${CMAKE_SOURCE_DIR}/catalog/catalog.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/catalogtype.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/cluster.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/column.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/columnref.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/connector.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/connectortableinfo.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/connectorproperty.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/constraint.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/constraintref.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/database.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/index.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/indexref.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/materializedviewhandlerinfo.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/materializedviewinfo.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/planfragment.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/statement.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/table.cpp
-  ${CMAKE_SOURCE_DIR}/catalog/tableref.cpp
-  ${CMAKE_SOURCE_DIR}/structures/ContiguousAllocator.cpp
-  ${CMAKE_SOURCE_DIR}/common/FatalException.cpp
-  ${CMAKE_SOURCE_DIR}/common/ThreadLocalPool.cpp
-  ${CMAKE_SOURCE_DIR}/common/SegvException.cpp
-  ${CMAKE_SOURCE_DIR}/common/SerializableEEException.cpp
-  ${CMAKE_SOURCE_DIR}/common/SQLException.cpp
-  ${CMAKE_SOURCE_DIR}/common/InterruptException.cpp
-  ${CMAKE_SOURCE_DIR}/common/StringRef.cpp
-  ${CMAKE_SOURCE_DIR}/common/tabletuple.cpp
-  ${CMAKE_SOURCE_DIR}/common/TupleSchema.cpp
-  ${CMAKE_SOURCE_DIR}/common/types.cpp
-  ${CMAKE_SOURCE_DIR}/common/UndoLog.cpp
-  ${CMAKE_SOURCE_DIR}/common/LargeTempTableBlockCache.cpp
-  ${CMAKE_SOURCE_DIR}/common/NValue.cpp
-  ${CMAKE_SOURCE_DIR}/common/RecoveryProtoMessage.cpp
-  ${CMAKE_SOURCE_DIR}/common/RecoveryProtoMessageBuilder.cpp
-  ${CMAKE_SOURCE_DIR}/common/executorcontext.cpp
-  ${CMAKE_SOURCE_DIR}/common/serializeio.cpp
-  ${CMAKE_SOURCE_DIR}/common/StreamPredicateList.cpp
-  ${CMAKE_SOURCE_DIR}/common/Topend.cpp
-  ${CMAKE_SOURCE_DIR}/common/TupleOutputStream.cpp
-  ${CMAKE_SOURCE_DIR}/common/TupleOutputStreamProcessor.cpp
-  ${CMAKE_SOURCE_DIR}/common/MiscUtil.cpp
-  ${CMAKE_SOURCE_DIR}/common/debuglog.cpp
-  ${CMAKE_SOURCE_DIR}/execution/FragmentManager.cpp
-  ${CMAKE_SOURCE_DIR}/execution/JNITopend.cpp
-  ${CMAKE_SOURCE_DIR}/execution/VoltDBEngine.cpp
-  ${CMAKE_SOURCE_DIR}/execution/ExecutorVector.cpp
-  ${CMAKE_SOURCE_DIR}/executors/OptimizedProjector.cpp
-  ${CMAKE_SOURCE_DIR}/executors/abstractexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/abstractjoinexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/aggregateexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/deleteexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/executorfactory.cpp
-  ${CMAKE_SOURCE_DIR}/executors/executorutil.cpp
-  ${CMAKE_SOURCE_DIR}/executors/indexcountexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/indexscanexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/insertexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/limitexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/materializedscanexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/materializeexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/mergereceiveexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/nestloopexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/nestloopindexexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/orderbyexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/windowfunctionexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/projectionexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/receiveexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/sendexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/seqscanexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/swaptablesexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/tablecountexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/tuplescanexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/unionexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/executors/updateexecutor.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/abstractexpression.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/expressionutil.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/functionexpression.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/geofunctions.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/operatorexpression.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/parametervalueexpression.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/scalarvalueexpression.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/subqueryexpression.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/tupleaddressexpression.cpp
-  ${CMAKE_SOURCE_DIR}/expressions/vectorexpression.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/abstractjoinnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/abstractoperationnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/abstractplannode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/abstractreceivenode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/abstractscannode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/aggregatenode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/deletenode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/indexscannode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/indexcountnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/tablecountnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/insertnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/limitnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/materializenode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/materializedscanplannode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/mergereceivenode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/nestloopindexnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/nestloopnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/orderbynode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/plannodefragment.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/plannodeutil.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/windowfunctionnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/projectionnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/receivenode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/SchemaColumn.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/sendnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/seqscannode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/swaptablesnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/tuplescannode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/unionnode.cpp
-  ${CMAKE_SOURCE_DIR}/plannodes/updatenode.cpp
-  ${CMAKE_SOURCE_DIR}/indexes/CoveringCellIndex.cpp
-  ${CMAKE_SOURCE_DIR}/indexes/IndexStats.cpp
-  ${CMAKE_SOURCE_DIR}/indexes/tableindex.cpp
-  ${CMAKE_SOURCE_DIR}/indexes/tableindexfactory.cpp
-  ${CMAKE_SOURCE_DIR}/storage/AbstractDRTupleStream.cpp
-  ${CMAKE_SOURCE_DIR}/storage/BinaryLogSink.cpp
-  ${CMAKE_SOURCE_DIR}/storage/BinaryLogSinkWrapper.cpp
-  ${CMAKE_SOURCE_DIR}/storage/ConstraintFailureException.cpp
-  ${CMAKE_SOURCE_DIR}/storage/constraintutil.cpp
-  ${CMAKE_SOURCE_DIR}/storage/CopyOnWriteContext.cpp
-  ${CMAKE_SOURCE_DIR}/storage/CopyOnWriteIterator.cpp
-  ${CMAKE_SOURCE_DIR}/storage/DRTupleStream.cpp
-  ${CMAKE_SOURCE_DIR}/storage/ElasticContext.cpp
-  ${CMAKE_SOURCE_DIR}/storage/ElasticIndex.cpp
-  ${CMAKE_SOURCE_DIR}/storage/ElasticIndexReadContext.cpp
-  ${CMAKE_SOURCE_DIR}/storage/ElasticScanner.cpp
-  ${CMAKE_SOURCE_DIR}/storage/ExportTupleStream.cpp
-  ${CMAKE_SOURCE_DIR}/storage/LargeTempTable.cpp
-  ${CMAKE_SOURCE_DIR}/storage/LargeTempTableBlock.cpp
-  ${CMAKE_SOURCE_DIR}/storage/MaterializedViewHandler.cpp
-  ${CMAKE_SOURCE_DIR}/storage/MaterializedViewTriggerForInsert.cpp
-  ${CMAKE_SOURCE_DIR}/storage/MaterializedViewTriggerForWrite.cpp
-  ${CMAKE_SOURCE_DIR}/storage/persistenttable.cpp
-  ${CMAKE_SOURCE_DIR}/storage/PersistentTableStats.cpp
-  ${CMAKE_SOURCE_DIR}/storage/RecoveryContext.cpp
-  ${CMAKE_SOURCE_DIR}/storage/streamedtable.cpp
-  ${CMAKE_SOURCE_DIR}/storage/StreamedTableStats.cpp
-  ${CMAKE_SOURCE_DIR}/storage/table.cpp
-  ${CMAKE_SOURCE_DIR}/storage/TableCatalogDelegate.cpp
-  ${CMAKE_SOURCE_DIR}/storage/tablefactory.cpp
-  ${CMAKE_SOURCE_DIR}/storage/TableStats.cpp
-  ${CMAKE_SOURCE_DIR}/storage/TableStreamer.cpp
-  ${CMAKE_SOURCE_DIR}/storage/TableStreamerContext.cpp
-  ${CMAKE_SOURCE_DIR}/storage/tableutil.cpp
-  ${CMAKE_SOURCE_DIR}/storage/tabletuplefilter.cpp
-  ${CMAKE_SOURCE_DIR}/storage/temptable.cpp
-  ${CMAKE_SOURCE_DIR}/storage/TempTableLimits.cpp
-  ${CMAKE_SOURCE_DIR}/storage/TupleBlock.cpp
-  ${CMAKE_SOURCE_DIR}/storage/TupleStreamBase.cpp
-  ${CMAKE_SOURCE_DIR}/stats/StatsAgent.cpp
-  ${CMAKE_SOURCE_DIR}/stats/StatsSource.cpp
-  ${CMAKE_SOURCE_DIR}/logging/JNILogProxy.cpp
-  ${CMAKE_SOURCE_DIR}/logging/LogManager.cpp
+  catalog/catalog.cpp
+  catalog/catalogtype.cpp
+  catalog/cluster.cpp
+  catalog/column.cpp
+  catalog/columnref.cpp
+  catalog/connector.cpp
+  catalog/connectortableinfo.cpp
+  catalog/connectorproperty.cpp
+  catalog/constraint.cpp
+  catalog/constraintref.cpp
+  catalog/database.cpp
+  catalog/index.cpp
+  catalog/indexref.cpp
+  catalog/materializedviewhandlerinfo.cpp
+  catalog/materializedviewinfo.cpp
+  catalog/planfragment.cpp
+  catalog/statement.cpp
+  catalog/table.cpp
+  catalog/tableref.cpp
+  structures/ContiguousAllocator.cpp
+  common/FatalException.cpp
+  common/ThreadLocalPool.cpp
+  common/SegvException.cpp
+  common/SerializableEEException.cpp
+  common/SQLException.cpp
+  common/InterruptException.cpp
+  common/StringRef.cpp
+  common/tabletuple.cpp
+  common/TupleSchema.cpp
+  common/types.cpp
+  common/UndoLog.cpp
+  common/LargeTempTableBlockCache.cpp
+  common/NValue.cpp
+  common/RecoveryProtoMessage.cpp
+  common/RecoveryProtoMessageBuilder.cpp
+  common/executorcontext.cpp
+  common/serializeio.cpp
+  common/StreamPredicateList.cpp
+  common/Topend.cpp
+  common/TupleOutputStream.cpp
+  common/TupleOutputStreamProcessor.cpp
+  common/MiscUtil.cpp
+  common/debuglog.cpp
+  execution/FragmentManager.cpp
+  execution/JNITopend.cpp
+  execution/VoltDBEngine.cpp
+  execution/ExecutorVector.cpp
+  executors/OptimizedProjector.cpp
+  executors/abstractexecutor.cpp
+  executors/abstractjoinexecutor.cpp
+  executors/aggregateexecutor.cpp
+  executors/deleteexecutor.cpp
+  executors/executorfactory.cpp
+  executors/executorutil.cpp
+  executors/indexcountexecutor.cpp
+  executors/indexscanexecutor.cpp
+  executors/insertexecutor.cpp
+  executors/limitexecutor.cpp
+  executors/materializedscanexecutor.cpp
+  executors/materializeexecutor.cpp
+  executors/mergereceiveexecutor.cpp
+  executors/nestloopexecutor.cpp
+  executors/nestloopindexexecutor.cpp
+  executors/orderbyexecutor.cpp
+  executors/windowfunctionexecutor.cpp
+  executors/projectionexecutor.cpp
+  executors/receiveexecutor.cpp
+  executors/sendexecutor.cpp
+  executors/seqscanexecutor.cpp
+  executors/swaptablesexecutor.cpp
+  executors/tablecountexecutor.cpp
+  executors/tuplescanexecutor.cpp
+  executors/unionexecutor.cpp
+  executors/updateexecutor.cpp
+  expressions/abstractexpression.cpp
+  expressions/expressionutil.cpp
+  expressions/functionexpression.cpp
+  expressions/geofunctions.cpp
+  expressions/operatorexpression.cpp
+  expressions/parametervalueexpression.cpp
+  expressions/scalarvalueexpression.cpp
+  expressions/subqueryexpression.cpp
+  expressions/tupleaddressexpression.cpp
+  expressions/vectorexpression.cpp
+  plannodes/abstractjoinnode.cpp
+  plannodes/abstractoperationnode.cpp
+  plannodes/abstractplannode.cpp
+  plannodes/abstractreceivenode.cpp
+  plannodes/abstractscannode.cpp
+  plannodes/aggregatenode.cpp
+  plannodes/deletenode.cpp
+  plannodes/indexscannode.cpp
+  plannodes/indexcountnode.cpp
+  plannodes/tablecountnode.cpp
+  plannodes/insertnode.cpp
+  plannodes/limitnode.cpp
+  plannodes/materializenode.cpp
+  plannodes/materializedscanplannode.cpp
+  plannodes/mergereceivenode.cpp
+  plannodes/nestloopindexnode.cpp
+  plannodes/nestloopnode.cpp
+  plannodes/orderbynode.cpp
+  plannodes/plannodefragment.cpp
+  plannodes/plannodeutil.cpp
+  plannodes/windowfunctionnode.cpp
+  plannodes/projectionnode.cpp
+  plannodes/receivenode.cpp
+  plannodes/SchemaColumn.cpp
+  plannodes/sendnode.cpp
+  plannodes/seqscannode.cpp
+  plannodes/swaptablesnode.cpp
+  plannodes/tuplescannode.cpp
+  plannodes/unionnode.cpp
+  plannodes/updatenode.cpp
+  indexes/CoveringCellIndex.cpp
+  indexes/IndexStats.cpp
+  indexes/tableindex.cpp
+  indexes/tableindexfactory.cpp
+  storage/AbstractDRTupleStream.cpp
+  storage/BinaryLogSink.cpp
+  storage/BinaryLogSinkWrapper.cpp
+  storage/ConstraintFailureException.cpp
+  storage/constraintutil.cpp
+  storage/CopyOnWriteContext.cpp
+  storage/CopyOnWriteIterator.cpp
+  storage/DRTupleStream.cpp
+  storage/ElasticContext.cpp
+  storage/ElasticIndex.cpp
+  storage/ElasticIndexReadContext.cpp
+  storage/ElasticScanner.cpp
+  storage/ExportTupleStream.cpp
+  storage/LargeTempTable.cpp
+  storage/LargeTempTableBlock.cpp
+  storage/MaterializedViewHandler.cpp
+  storage/MaterializedViewTriggerForInsert.cpp
+  storage/MaterializedViewTriggerForWrite.cpp
+  storage/persistenttable.cpp
+  storage/PersistentTableStats.cpp
+  storage/RecoveryContext.cpp
+  storage/streamedtable.cpp
+  storage/StreamedTableStats.cpp
+  storage/table.cpp
+  storage/TableCatalogDelegate.cpp
+  storage/tablefactory.cpp
+  storage/TableStats.cpp
+  storage/TableStreamer.cpp
+  storage/TableStreamerContext.cpp
+  storage/tableutil.cpp
+  storage/tabletuplefilter.cpp
+  storage/temptable.cpp
+  storage/TempTableLimits.cpp
+  storage/TupleBlock.cpp
+  storage/TupleStreamBase.cpp
+  stats/StatsAgent.cpp
+  stats/StatsSource.cpp
+  logging/JNILogProxy.cpp
+  logging/LogManager.cpp
 )
 
 SET (VOLTDB_THIRD_PARTY_SRC
@@ -686,10 +681,10 @@ SET (VOLTDB_THIRD_PARTY_SRC
 )
 
 SET (VOLTDB_JNI_SRC
-  ${CMAKE_SOURCE_DIR}/voltdbjni.cpp
+  voltdbjni.cpp
   )
 SET (VOLTDB_IPC_SRC
-  ${CMAKE_SOURCE_DIR}/voltdbipc.cpp
+  voltdbipc.cpp
 )
 ADD_LIBRARY(voltdbobjs OBJECT ${VOLTDB_SRC})
 ADD_LIBRARY(voltdbjniobjs OBJECT ${VOLTDB_JNI_SRC})
@@ -804,83 +799,96 @@ SET (VOLTDB_FAILING_VALGRIND_DIRS memleaktests)
 SET (VOLTDB_PASSING_VALGRIND_TESTS no_losses)
 ########################################################################
 #
-# Here we have all the names of tests which are expected to pass.
+# Here we have all the names of tests which are not auto-generated.
 # They have the form directory/test_name.  The test names must all be 
 # globally unique.  We test for this later on.
 #
-# FWIW, the elements of VOLTDB_MANUAL_TEST_PROGRAMS must have the form
-# ./TEST_DIR/TEST_NAME.  The initial "./" is important.  We could
-# make this more robust, but it would be work.
-#
 ########################################################################
 SET (VOLTDB_MANUAL_TEST_PROGRAMS
-  ./harness_test/harness_tester
-  ./catalog/catalog_test
-  ./logging/logging_test
-  ./memleaktests/definite_losses
-  ./memleaktests/indirect_losses
-  ./memleaktests/still_reachable_losses
-  ./memleaktests/possible_losses
-  ./memleaktests/rw_deleted
-  ./memleaktests/no_losses
-  ./common/debuglog_test
-  ./common/elastic_hashinator_test
-  ./common/PerFragmentStatsTest
-  ./common/nvalue_test
-  ./common/pool_test
-  ./common/serializeio_test
-  ./common/tabletuple_test
-  ./common/ThreadLocalPoolTest
-  ./common/tupleschema_test
-  ./common/undolog_test
-  ./common/valuearray_test
-  ./common/uniqueid_test
-  ./execution/add_drop_table
-  ./execution/engine_test
-  ./execution/FragmentManagerTest
-  ./executors/OptimizedProjectorTest
-  ./executors/MergeReceiveExecutorTest
-  ./expressions/expression_test
-  ./expressions/function_test
-  ./indexes/index_key_test
-  ./indexes/index_scripted_test
-  ./indexes/index_test
-  ./indexes/CompactingHashIndexTest
-  ./indexes/CompactingTreeMultiIndexTest
-  ./indexes/CoveringCellIndexTest
-  ./storage/CompactionTest
-  ./storage/CopyOnWriteTest
-  ./storage/DRBinaryLog_test
-  ./storage/DRTupleStream_test
-  ./storage/ExportTupleStream_test
-  ./storage/PersistentTableMemStatsTest
-  ./storage/StreamedTable_test
-  ./storage/TempTableLimitsTest
-  ./storage/constraint_test
-  ./storage/filter_test
-  ./storage/persistent_table_log_test
-  ./storage/persistenttable_test
-  ./storage/serialize_test
-  ./storage/table_and_indexes_test
-  ./storage/table_test
-  ./storage/tabletuple_export_test
-  ./storage/tabletuplefilter_test
-  ./structures/CompactingMapTest
-  ./structures/CompactingMapIndexCountTest
-  ./structures/CompactingHashTest
-  ./structures/CompactingPoolTest
-  ./structures/CompactingMapBenchmark
-  ./plannodes/WindowFunctionPlanNodeTest
-  ./plannodes/PlanNodeFragmentTest
+  harness_test/harness_tester
+  catalog/catalog_test
+  logging/logging_test
+  memleaktests/definite_losses
+  memleaktests/indirect_losses
+  memleaktests/still_reachable_losses
+  memleaktests/possible_losses
+  memleaktests/rw_deleted
+  memleaktests/no_losses
+  common/debuglog_test
+  common/elastic_hashinator_test
+  common/PerFragmentStatsTest
+  common/nvalue_test
+  common/pool_test
+  common/serializeio_test
+  common/tabletuple_test
+  common/ThreadLocalPoolTest
+  common/tupleschema_test
+  common/undolog_test
+  common/valuearray_test
+  common/uniqueid_test
+  execution/add_drop_table
+  execution/engine_test
+  execution/FragmentManagerTest
+  executors/OptimizedProjectorTest
+  executors/MergeReceiveExecutorTest
+  expressions/expression_test
+  expressions/function_test
+  indexes/index_key_test
+  indexes/index_scripted_test
+  indexes/index_test
+  indexes/CompactingHashIndexTest
+  indexes/CompactingTreeMultiIndexTest
+  indexes/CoveringCellIndexTest
+  storage/CompactionTest
+  storage/CopyOnWriteTest
+  storage/DRBinaryLog_test
+  storage/DRTupleStream_test
+  storage/ExportTupleStream_test
+  storage/PersistentTableMemStatsTest
+  storage/StreamedTable_test
+  storage/TempTableLimitsTest
+  storage/constraint_test
+  storage/filter_test
+  storage/persistent_table_log_test
+  storage/persistenttable_test
+  storage/serialize_test
+  storage/table_and_indexes_test
+  storage/table_test
+  storage/tabletuple_export_test
+  storage/tabletuplefilter_test
+  structures/CompactingMapTest
+  structures/CompactingMapIndexCountTest
+  structures/CompactingHashTest
+  structures/CompactingPoolTest
+  structures/CompactingMapBenchmark
+  plannodes/WindowFunctionPlanNodeTest
+  plannodes/PlanNodeFragmentTest
 )
 
 #
-# Generated test programs are created by calling a Java program
-# in the server.  For now this is just a test.
-SET(VOLTDB_GENERATED_TEST_PROGRAMS
-  generated/executors/TestWindowedMax
+# Auto-generated test programs are created by calling a Java program
+# in the server.
+#
+# First, name all the classes we want to use.
+#
+SET(VOLTDB_GENERATED_TEST_GENERATORS
+  org.voltdb.planner.eegentests.GenerateEETests
 )
 
+SET(VOLTDB_TEST_CLASS_LIST "--build=${VOLTDB_BUILD_TYPE_LOWER}")
+FOREACH (CLASS ${VOLTDB_GENERATED_TEST_GENERATORS})
+  LIST(APPEND VOLTDB_TEST_CLASS_LIST --test-class=${CLASS})
+ENDFOREACH()
+EXECUTE_PROCESS(
+    COMMAND ${VOLTDB_ROOT}/src/ee/tools/generate-ee-unit-tests.sh --voltdbroot=${VOLTDB_ROOT} ${VOLTDB_TEST_CLASS_LIST}
+    OUTPUT_VARIABLE VOLTDB_GENERATED_TEST_PROGRAMS
+  )
+# MESSAGE( "VOLTDB_GENERATED_TEST_PROGRAMS is ${VOLTDB_GENERATED_TEST_PROGRAMS}" )
+
+#
+# The list of all test programs is the union of
+# the manual tests and the generated tests.
+#
 SET(VOLTDB_TEST_PROGRAMS "")
 LIST(APPEND VOLTDB_TEST_PROGRAMS ${VOLTDB_GENERATED_TEST_PROGRAMS})
 LIST(APPEND VOLTDB_TEST_PROGRAMS ${VOLTDB_MANUAL_TEST_PROGRAMS})
@@ -901,33 +909,45 @@ TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
 # tests in each directory.  The test names must be be
 # unique, even ignoring directories.
 #
-SET (VOLTDB_TEST_DIR_LIST "")
-SET (VOLTDB_TEST_ALLTESTS "")
-SET (VOLTDB_TEST_GENTESTS "")
-
-INCLUDE(VoltDB.cmake)
+SET ( VOLTDB_TEST_DIR_LIST "")
+SET ( VOLTDB_TEST_ALLTESTS "")
 
 FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
-  STRING(REGEX REPLACE ^.*/[^/]*/\([^/]*\)$ "\\1" TEST ${TEST_NAME})
-  STRING(REGEX REPLACE ^.*/\([^/]*\)/[^/]*$ "\\1" DIR ${TEST_NAME})
-  STRING(REGEX MATCH ^generated/[^/]*/[^/]*$ GENERATED ${TEST_NAME})
+  # Split the name into path components.
+  STRING(REGEX MATCHALL [^/]+ TEST_NAME_LIST ${TEST_NAME})
+  # MESSAGE("TEST_NAME_LIST is ${TEST_NAME_LIST}")
+  LIST(LENGTH TEST_NAME_LIST TEST_NAME_LIST_LENGTH)
+  # MESSAGE("TEST_NAME_LIST_LENGTH is ${TEST_NAME_LIST_LENGTH}")
+  # A test name will look like dir/test or else
+  # generated/dir/test.  Indexing into a CMake list
+  # with negative numbers get elements from the end.
+  # So, the test is always at -1, the dir is always
+  # at -2 and, if the generated exists, it is always
+  # at -3.
+  LIST(GET TEST_NAME_LIST -1 TEST)
+  LIST(GET TEST_NAME_LIST -2  DIR)
+  IF( TEST_NAME_LIST_LENGTH GREATER 2 )
+    LIST(GET TEST_NAME_LIST -3 GENERATED)
+  ELSE()
+    SET(GENERATED ".")
+  ENDIF()
   # MESSAGE("TEST_NAME ${TEST_NAME}: GENERATED ${GENERATED}, DIR ${DIR}, TEST ${TEST}")
+  # Find if this test has been seen before.
+  # If so it will be on the ALLTESTS list.
   LIST(FIND VOLTDB_TEST_ALLTESTS ${TEST} FIND_IDX)
   IF (NOT ${FIND_IDX} LESS 0)
     MESSAGE(FATAL_ERROR "Duplicate test name ${TEST_NAME}")
   ENDIF()
+  LIST(APPEND VOLTDB_TEST_ALLTESTS ${TEST})
+  # Find if this test directory has been
+  # seen before.  If not, then append the
+  # name to the test_dir_list.
   LIST(FIND VOLTDB_TEST_DIR_LIST ${DIR} FIND_IDX)
   IF (${FIND_IDX} LESS 0)
     LIST(APPEND VOLTDB_TEST_DIR_LIST ${DIR})
   ENDIF()
-  LIST(APPEND VOLTDB_TEST_DIR_${DIR} ${TEST})
-  STRING(LENGTH "${GENERATED}" IS_GENERATED)
-  # -- This is wrong. We want to add ${TEST} to
-  # -- VOLTDB_TEST_DIR_${TEST_DIR}.
-  LIST(APPEND VOLTDB_TEST_DIR_${DIR} ${TEST})
-  IF (${IS_GENERATED} LESS 1)
-    LIST(APPEND VOLTDB_TEST_GENTESTS ${TEST})
-  ENDIF()
+  SET(VOLTDB_TESTDIR_${TEST} ${DIR})
+  SET(VOLTDB_TESTGEN_${TEST} ${GENERATED})
 ENDFOREACH()
 ########################################################################
 #
@@ -941,6 +961,14 @@ ADD_CUSTOM_TARGET(build-all-tests)
 ADD_CUSTOM_TARGET(run-all-tests
   COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT})
 ADD_DEPENDENCIES(run-all-tests build-all-tests)
+
+########################################################################
+#
+# For each test directory, create a target.  We will
+# make this target depend on the test executable later
+# on.
+#
+########################################################################
 FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
   # We assign each test the label of its test directory.
   # So running all tests is just running all tests with
@@ -953,84 +981,95 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     COMMAND ${CMAKE_COMMAND} -E make_directory cpptests/${TEST_DIR}
     )
   ADD_DEPENDENCIES(build-all-tests build-${TEST_DIR})
-  FOREACH (TEST_NAME ${VOLTDB_TEST_DIR_${TEST_DIR}})
-  # MESSAGE("TEST_DIR: ${TEST_DIR}, TEST_NAME: ${TEST_NAME}")
-    #
-    # Define the test executable, and set the build-all-tests
-    # depends on the test.  Remember the necessary include
-    # directories and link libraries.
-    #
-    ADD_EXECUTABLE(${TEST_NAME}
+ENDFOREACH()
+
+########################################################################
+#
+# For each test, on the VOLTDB_TEST_ALLTESTS list, generate
+# targets, commands and dependences.
+#
+########################################################################
+FOREACH (TEST_NAME ${VOLTDB_TEST_ALLTESTS})
+  SET(TEST_DIR ${VOLTDB_TESTDIR_${TEST_NAME}})
+  SET(TEST_GEN ${VOLTDB_TESTGEN_${TEST_NAME}})
+  # MESSAGE("TEST_DIR: ${TEST_DIR}, TEST_NAME: ${TEST_NAME}, TEST_GEN: ${TEST_GEN}")
+  #
+  # Define the test executable, and set the build-all-tests
+  # depends on the test.  Remember the necessary include
+  # directories and link libraries.
+  #
+  ADD_EXECUTABLE(${TEST_NAME}
       $<TARGET_OBJECTS:voltdb_test_harness>
       $<TARGET_OBJECTS:voltdbobjs>
       $<TARGET_OBJECTS:third_party_objs>
-      ${VOLTDB_ROOT}/tests/ee/${TEST_DIR}/${TEST_NAME}.cpp)
-    ADD_CUSTOM_COMMAND(TARGET ${TEST_NAME}
-      PRE_BUILD
-      COMMAND ${CMAKE_COMMAND} -E make_directory cpptests/${TEST_DIR}
-      COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/tests/test_working_dir
-      )
-    ADD_DEPENDENCIES(build-${TEST_DIR} ${TEST_NAME})
-    SET_TARGET_PROPERTIES(${TEST_NAME}
-      PROPERTIES
-      OUTPUT_NAME cpptests/${TEST_DIR}/${TEST_NAME}
-      EXCLUDE_FROM_ALL TRUE)
-    ADD_DEPENDENCIES(${TEST_NAME}
-      pcre2 crypto s2geo ${VOLTDB_LIBNAME})
-    TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
-      SYSTEM PUBLIC
-      ${VOLTDB_ROOT}/third_party/cpp
-      PUBLIC
-      ${CMAKE_SOURCE_DIR}
-      ${CMAKE_BINARY_DIR}/3pty-install/include
-      ${VOLTDB_ROOT}/tests/ee)
-    TARGET_LINK_LIBRARIES(${TEST_NAME}
-      ${VOLTDB_LINK_FLAGS}
-      -L${CMAKE_BINARY_DIR}/3pty-install/lib
-      -lpcre2-8 -ls2geo -lcrypto
-      -ldl)
-    #
-    # Calculate the actual test command.
-    #
-    SET(TARGET_EXE_CMD ${CMAKE_BINARY_DIR}/cpptests/${TEST_DIR}/${TEST_NAME})
-    #
-    # We expect all the memleak tests to fail, except for
-    # the test no_losses.  It's possible, but not obvious,
-    # how to do this with a regular expression property
-    # on the test, but this seems more straightforward.
-    #
-    SET(WILL_FAIL FALSE)
-    LIST(FIND VOLTDB_FAILING_VALGRIND_DIRS ${TEST_DIR} VG_DIR_FAIL)
-    LIST(FIND VOLTDB_PASSING_VALGRIND_TESTS ${TEST_NAME} VG_TEST_PASS)
-    IF (${IS_VALGRIND_BUILD} AND (NOT (${VG_DIR_FAIL} LESS 0)))
-      IF (${VG_TEST_PASS} LESS 0)
-        SET (WILL_FAIL TRUE)
-      ENDIF()
-    ELSE()
+      ${VOLTDB_ROOT}/tests/ee/${TEST_GEN}/${TEST_DIR}/${TEST_NAME}.cpp)
+  ADD_CUSTOM_COMMAND(TARGET ${TEST_NAME}
+    PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory cpptests/${TEST_DIR}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/tests/test_working_dir
+    )
+  #
+  # Calculate the actual test command.
+  #
+  SET(TARGET_EXE_CMD ${CMAKE_BINARY_DIR}/cpptests/${TEST_DIR}/${TEST_NAME})
+  ADD_CUSTOM_TARGET(build-${TEST_NAME}
+    DEPENDS ${TEST_NAME})
+  ADD_DEPENDENCIES(build-${TEST_DIR} ${TEST_NAME})
+  SET_TARGET_PROPERTIES(${TEST_NAME}
+    PROPERTIES
+    OUTPUT_NAME ${TARGET_EXE_CMD}
+    EXCLUDE_FROM_ALL TRUE)
+  ADD_DEPENDENCIES(${TEST_NAME}
+    pcre2 crypto s2geo ${VOLTDB_LIBNAME})
+  TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
+    SYSTEM PUBLIC
+    ${VOLTDB_ROOT}/third_party/cpp
+    PUBLIC
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}/3pty-install/include
+    ${VOLTDB_ROOT}/tests/ee)
+  TARGET_LINK_LIBRARIES(${TEST_NAME}
+    ${VOLTDB_LINK_FLAGS}
+    -L${CMAKE_BINARY_DIR}/3pty-install/lib
+    -lpcre2-8 -ls2geo -lcrypto
+    -ldl)
+  #
+  # We expect all the memleak tests to fail, except for
+  # the test no_losses.  It's possible, but not obvious,
+  # how to do this with a regular expression property
+  # on the test, but this seems more straightforward.
+  #
+  SET(WILL_FAIL FALSE)
+  LIST(FIND VOLTDB_FAILING_VALGRIND_DIRS ${TEST_DIR} VG_DIR_FAIL)
+  LIST(FIND VOLTDB_PASSING_VALGRIND_TESTS ${TEST_NAME} VG_TEST_PASS)
+  IF (${IS_VALGRIND_BUILD} AND (NOT (${VG_DIR_FAIL} LESS 0)))
+    IF (${VG_TEST_PASS} LESS 0)
+      SET (WILL_FAIL TRUE)
     ENDIF()
-    # If we are running a valgrind test, then calculate the
-    # valgrind command.  The output variable, VALGRIND_EXE_CMD,
-    # may be the same as TARGET_EXE or else it may be a call
-    # to valgrind.
-    VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} ${WILL_FAIL} VALGRIND_EXE_CMD IS_VALGRIND_TEST)
-    # Some tests need to run python.  This needs to be
-    # second because we want to run valgrind on the actual
-    # test executable, TARGET_EXE_CMD, and not on python.
-    PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD OUTPUT_IS_PYTHON_TEST)
-    # So, "make ${TEST_NAME}"" builds the test and
-    # "make run-${TEST_NAME}" runs the single test.
-    # MESSAGE("Test run-${TEST_NAME} has command ${CTEST_EXE_CMD}.")
-    ADD_TEST(NAME ${TEST_NAME}
-      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_working_dir
-      COMMAND ${CTEST_EXE_CMD})
-    ADD_DEPENDENCIES(run-${TEST_DIR} ${TEST_NAME})
-    ADD_CUSTOM_TARGET(run-${TEST_NAME}
-      COMMAND /usr/bin/env /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -R ${TEST_NAME})
-    # Some tests are expected to fail.  Also, tag the
-    # test with it label.
-    SET_TESTS_PROPERTIES(${TEST_NAME}
-      PROPERTIES
-      WILL_FAIL ${WILL_FAIL}
-      LABELS ${TEST_DIR})
-  ENDFOREACH()
+  ENDIF()
+  # If we are running a valgrind test, then calculate the
+  # valgrind command.  The output variable, VALGRIND_EXE_CMD,
+  # may be the same as TARGET_EXE or else it may be a call
+  # to valgrind.
+  VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} ${WILL_FAIL} VALGRIND_EXE_CMD IS_VALGRIND_TEST)
+  # Some tests need to run python.  This needs to be
+  # second because we want to run valgrind on the actual
+  # test executable, TARGET_EXE_CMD, and not on python.
+  PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD OUTPUT_IS_PYTHON_TEST)
+  # So, "make ${TEST_NAME}"" builds the test and
+  # "make run-${TEST_NAME}" runs the single test.
+  # MESSAGE("Test run-${TEST_NAME} has command ${CTEST_EXE_CMD}.")
+  ADD_TEST(NAME ${TEST_NAME}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_working_dir
+    COMMAND ${CTEST_EXE_CMD})
+  ADD_DEPENDENCIES(run-${TEST_DIR} ${TEST_NAME})
+  ADD_CUSTOM_TARGET(run-${TEST_NAME}
+    DEPENDS ${TEST_NAME}
+    COMMAND /usr/bin/env /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -R ${TEST_NAME})
+  # Some tests are expected to fail.  Also, tag the
+  # test with its label.
+  SET_TESTS_PROPERTIES(${TEST_NAME}
+    PROPERTIES
+    WILL_FAIL ${WILL_FAIL}
+    LABELS ${TEST_DIR})
 ENDFOREACH()

@@ -88,6 +88,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -519,8 +521,6 @@ public class EEPlanGenerator extends PlannerTestCase {
          * @param testConfig
          */
         public void addTest(TestConfig testConfig) {
-            System.err.printf("Adding test %d: %s\n", m_testConfigs.size(), testConfig.m_testName);
-            System.err.flush();
             m_testConfigs.add(testConfig);
         }
 
@@ -863,7 +863,7 @@ public class EEPlanGenerator extends PlannerTestCase {
      * @throws Exception
      */
     protected void generateTests(String testFolder, String testClassName, DBConfig db) throws Exception {
-        System.out.printf("%s/%s\n", testFolder, testClassName);
+        System.out.printf("generated/%s/%s;", testFolder, testClassName);
         if (m_namesOnly) {
             return;
         }
@@ -910,17 +910,33 @@ public class EEPlanGenerator extends PlannerTestCase {
         }
     }
 
+    private String readFile(File path) throws IOException {
+        return(new String(Files.readAllBytes(Paths.get(path.getAbsolutePath()))));
+    }
+
+    /*
+     * Only write the file if it is different from the
+     * existing contents.  This saves building sometimes.
+     */
     private void writeFile(File path, String contents) throws Exception {
         PrintWriter out = null;
+        String oldContents = null;
         try {
-            out = new PrintWriter(path);
-            out.print(contents);
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (Exception ex) {
-                    ;
+            oldContents = readFile(path);
+        } catch (IOException ex) {
+            oldContents = "";
+        }
+        if (!oldContents.equals(contents)) {
+            try {
+                out = new PrintWriter(path);
+                out.print(contents);
+            } finally {
+                if (out != null) {
+                    try {
+                        out.close();
+                    } catch (Exception ex) {
+                        ;
+                    }
                 }
             }
         }

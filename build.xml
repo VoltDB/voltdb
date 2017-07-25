@@ -1399,20 +1399,15 @@ NATIVE EE STUFF
     />
 </target>
 
-<target name="eeconfig" depends="ee"
+<target name='eeconfig' depends='catalog, jnicompile, buildinfo'
     description="Configure the build area but do not do any building.  This is mostly interesting for testing.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="EETESTSUITE" value="${eetestsuite}"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
         <arg line="--generator='${cmake.generator}'" />
-        <arg line="--source-directory='${cmake.build.source}'" />
-        <arg line="--object-directory='${cmake.build.obj}'" />
-        <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--verbose-build='${cmake.build.verbose}'" />
     </exec>
 </target>
@@ -1420,17 +1415,12 @@ NATIVE EE STUFF
 <target name="eecheck" depends="ee"
     description="Run testcases for C++ JNI library.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="EETESTSUITE" value="${eetestsuite}"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
         <arg line="--generator='${cmake.generator}'" />
-        <arg line="--source-directory='${cmake.build.source}'" />
-        <arg line="--object-directory='${cmake.build.obj}'" />
-        <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--run-all-tests" />
     </exec>
@@ -1439,17 +1429,12 @@ NATIVE EE STUFF
 <target name="eebuild" depends="voltdbipc"
     description="Build but do not run test cases for C++ JNI library.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="EETESTSUITE" value="${eetestsuite}"/>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
         <arg line="--generator='${cmake.generator}'" />
-        <arg line="--source-directory='${cmake.build.source}'" />
-        <arg line="--object-directory='${cmake.build.obj}'" />
-        <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--build-tests" />
     </exec>
@@ -1458,15 +1443,12 @@ NATIVE EE STUFF
 <target name='voltdbipc' depends="ee"
     description="Build the IPC client.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
         <arg line="--generator='${cmake.generator}'" />
-        <arg line="--source-directory='${cmake.build.source}'" />
-        <arg line="--object-directory='${cmake.build.obj}'" />
-        <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--install-ipc" />
     </exec>
@@ -1475,16 +1457,12 @@ NATIVE EE STUFF
 <target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <env key="EESKIPBUILDMAKEFILE" value="true" />
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
         <arg line="--generator='${cmake.generator}'" />
-        <arg line="--source-directory='${cmake.build.source}'" />
-        <arg line="--object-directory='${cmake.build.obj}'" />
-        <arg line="--test-directory='${cmake.test.source}'" />
         <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--install" />
     </exec>
@@ -1494,15 +1472,12 @@ NATIVE EE STUFF
 <target name='recompile_ee_nodepends'
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
          <arg line="--generator='${cmake.generator}'" />
-         <arg line="--source-directory='${cmake.build.source}'" />
-         <arg line="--object-directory='${cmake.build.obj}'" />
-         <arg line="--test-directory='${cmake.test.source}'" />
          <arg line="--build-type='${build}'" />
+         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
          <arg line="--verbose-build='${cmake.build.verbose}'" />
          <arg line="--install" />
     </exec>
@@ -1512,15 +1487,12 @@ NATIVE EE STUFF
 <target name='ee_profile' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
          -->
         <arg line="--generator='${cmake.generator}'" />
-        <arg line="--source-directory=${cmake.build.source}" />
-        <arg line="--object-directory=${cmake.build.obj}" />
-        <arg line="--test-directory=${cmake.test.source}" />
         <arg line="--build-type=${build}" />
+        <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--profile" />
         <arg line="--install" />
@@ -1535,10 +1507,8 @@ NATIVE EE STUFF
              See the comment in that file for complete details.
          -->
         <arg line="--generator='${cmake.generator}'" />
-        <arg line="--source-directory=${cmake.build.source}" />
-        <arg line="--test-directory=${cmake.test.source}" />
-        <arg line="--object-directory=${cmake.build.obj}" />
         <arg line="--build-type=${build}" />
+        <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--coverage" />
         <arg line="--install" />
