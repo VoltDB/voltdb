@@ -865,6 +865,11 @@ public class TestVoltCompiler extends TestCase {
                 .getDatabases().get("database").getTables();
     }
 
+    private CatalogMap<Procedure> proceduresFromVoltCompiler(VoltCompiler c) {
+        return c.m_catalog.getClusters().get("cluster")
+                .getDatabases().get("database").getProcedures();
+    }
+
     private Table assertTableT(VoltCompiler c) {
         CatalogMap<Table> tables = tablesFromVoltCompiler(c);
         assertEquals(1, tables.size());
@@ -1032,6 +1037,19 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(c.hasErrors());
         CatalogMap<Table> tables = tablesFromVoltCompiler(c);
         assertEquals(2, tables.size());
+    }
+
+    public void testDDLCompilerMultiStmtProc() throws IOException {
+        String schema =
+            "create table t(a integer); create procedure multipr as begin\n" +
+            "select * from t; end;";
+        VoltCompiler c = compileSchemaForDDLTest(schema, true);
+        assertFalse(c.hasErrors());
+        CatalogMap<Table> tables = tablesFromVoltCompiler(c);
+        assertEquals(1, tables.size());
+        CatalogMap<Procedure> procs = proceduresFromVoltCompiler(c);
+        assertEquals(1, procs.size());
+        assertNotNull(procs.get("multipr"));
     }
 
     private void checkDDLCompilerDefaultStringLiteral(String literal)
@@ -2832,6 +2850,15 @@ public class TestVoltCompiler extends TestCase {
                 "drop procedure p1 if exists;\n"
                 );
         proc = db.getProcedures().get("p1");
+        assertNull(proc);
+
+        // check if exists
+        db = goodDDLAgainstSimpleSchema(
+                "create procedure mp1 as begin select * from books; end;\n" +
+                "drop procedure mp1 if exists;\n" +
+                "drop procedure mp1 if exists;\n"
+                );
+        proc = db.getProcedures().get("mp1");
         assertNull(proc);
     }
 
