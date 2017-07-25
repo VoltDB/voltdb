@@ -565,4 +565,12 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                              ccr.requiresNewExportGeneration ? 1 : 0);
     }
 
+    protected void logCatalogUpdateInvocation(String procName) {
+        if (getProcedureRunner().isUserAuthEnabled()) {
+            String warnMsg = "A user from " + getProcedureRunner().getConnectionIPAndPort() +
+                             " issued a " + procName + " to update the catalog.";
+            hostLog.info(warnMsg);
+        }
+    }
+
 }
