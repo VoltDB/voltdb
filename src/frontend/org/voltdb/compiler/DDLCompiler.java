@@ -873,12 +873,22 @@ public class DDLCompiler {
 
         if (!Character.isLetterOrDigit(nchar[0])) {
             char prev = prevChar(retval.statement);
-            if ( prev == 'n' || prev == 'N' ) {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length()-5, "begin") )
+            if (prev == 'n' || prev == 'N') {
+                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") )
                     inBegin = true;
-            } else if ( prev == 'd' || prev == 'D' ) {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length()-3, "end") )
-                    inBegin = false;
+            } else if (prev == 'd' || prev == 'D') {
+                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 3, "end") ) {
+                    if (inCase > 0) {
+                        inCase--;
+                    } else {
+                        // we can terminate BEGIN ... END for multi stmt proc
+                        // after all CASE ... END stmts are completed
+                        inBegin = false;
+                    }
+                }
+            } else if (prev == 'e' || prev == 'E') {
+                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 4, "case") )
+                    inCase++;
             }
         }
         if (nchar[0] == '-') {
