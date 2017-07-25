@@ -755,6 +755,33 @@ public class TestVoltCompiler extends TestCase {
                   + "allow r1 "
                   + "AS select * from books where cash = ?");
 
+        // multi statement proc
+        tester.runtest("create procedure multifoo "
+                  + "AS begin select * from books where cash = ?; "
+                  + "select * from books; end");
+
+        // multi statement proc with partition
+        tester.runtest("create procedure multifoo "
+                + "PARTITION on table books COLUMN cash PARAMETER 0 "
+                + "AS begin select * from books where cash = ?; "
+                + "select * from books; end");
+
+        // multi statement proc with ALLOW before PARTITION clause
+        tester.runtest("create role r1;\n"
+                  + "create procedure multifoo "
+                  + "allow r1 "
+                  + "PARTITION on table books COLUMN cash PARAMETER 0 "
+                  + "AS begin select * from books where cash = ?; "
+                  + "select * from books; end");
+
+        // multi statement proc with ALLOW after PARTITION clause
+        tester.runtest("create role r1;\n"
+                  + "create procedure multifoo "
+                  + "PARTITION on table books COLUMN cash PARAMETER 0 "
+                  + "allow r1 "
+                  + "AS begin select * from books where cash = ?;"
+                  + "select * from books; end");
+
         // Inspired by a problem with fullDDL.sql
         tester.runtest(
                 "create role admin;\n" +
@@ -1040,6 +1067,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testDDLCompilerMultiStmtProc() throws IOException {
+        // multi statement proc with one statement
         String schema =
             "create table t(a integer); create procedure multipr as begin\n" +
             "select * from t; end;";
@@ -1050,6 +1078,20 @@ public class TestVoltCompiler extends TestCase {
         CatalogMap<Procedure> procs = proceduresFromVoltCompiler(c);
         assertEquals(1, procs.size());
         assertNotNull(procs.get("multipr"));
+
+        // multi statement proc with multiple statements
+        schema =
+            "create table t(a integer);\n"
+            + "create procedure multipr1 as begin\n"
+            + "select * from t;\n"
+            + "insert into t values(1); end;";
+        c = compileSchemaForDDLTest(schema, true);
+        assertFalse(c.hasErrors());
+        tables = tablesFromVoltCompiler(c);
+        assertEquals(1, tables.size());
+        procs = proceduresFromVoltCompiler(c);
+        assertEquals(1, procs.size());
+        assertNotNull(procs.get("multipr1"));
     }
 
     private void checkDDLCompilerDefaultStringLiteral(String literal)
