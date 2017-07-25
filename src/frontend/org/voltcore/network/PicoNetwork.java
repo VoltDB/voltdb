@@ -393,7 +393,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             retval.put(
                     m_ih.connectionId(),
                     Pair.of(
-                            getHostnameOrIP()+"_p",
+                            m_toString + "_p",
                             new long[]{
                                     read,
                                     messagesRead,
