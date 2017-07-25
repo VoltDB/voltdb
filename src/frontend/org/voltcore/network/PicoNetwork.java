@@ -393,7 +393,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             retval.put(
                     m_ih.connectionId(),
                     Pair.of(
-                            getHostnameOrIP(),
+                            getHostnameOrIP()+"_p",
                             new long[]{
                                     read,
                                     messagesRead,
@@ -402,7 +402,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             retval.put(
                     -1L,
                     Pair.of(
-                            "GLOBAL",
+                            "GLOBAL_p",
                             new long[] {
                                     read,
                                     messagesRead,
