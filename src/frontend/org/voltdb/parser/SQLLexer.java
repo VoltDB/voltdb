@@ -301,7 +301,7 @@ public class SQLLexer extends SQLPatternFactory
      * eg: emptycase, caseofbeer, suitcaseofbeer,
      * (id+0)end+100, suit2case3ofbeer, 100+case
      */
-    private static boolean matchToken(String buffer, int position, String token) {
+    public static boolean matchToken(String buffer, int position, String token) {
 
         final int tokLength = token.length();
         final int bufLength = buffer.length();
@@ -366,7 +366,7 @@ public class SQLLexer extends SQLPatternFactory
         // To indicate if inside multi statement procedure
         boolean inBegin = false;
         boolean checkForNextBegin = false;
-        // To indicate if inside CASE .. WHEN
+        // To indicate if inside CASE .. WHEN .. END
         int inCase = 0;
         int iCur = 0;
         while (iCur < buf.length) {
