@@ -494,7 +494,7 @@ public class KafkaImportBenchmark {
             Thread.sleep(PAUSE_WAIT * 1000);
             importStatValues = MatchChecks.getImportValues(client);
             if (config.useexport) mirrorStreamCounts = MatchChecks.getMirrorTableRowCount(config.alltypes, config.streams, client);
-            importRows = MatchChecks.getImportTableRowCount(config.alltypes?1:5, client);
+            importRows = MatchChecks.getImportTableRowCount(config.alltypes?5:1, client);
         }
 
         // some counts that might help debugging....
