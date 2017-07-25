@@ -191,6 +191,40 @@ public class TestExplainCommandSuite extends RegressionSuite {
         }
     }
 
+    public void testExplainMultiStmtProc() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        // Test if the error checking is working properly.
+        verifyProcFails(client, "Procedure MultiSP not in catalog", "@ExplainProc", "MultiSP");
+
+        String[] sql = new String[]{
+                "insert into t1 values (1, 1, 'ab');",
+                "select * from t1;"};
+        client.callProcedure("@AdHoc", "CREATE PROCEDURE MultiSP AS BEGIN "
+                + sql[0] + sql[1] + " end;");
+        vt = client.callProcedure("@ExplainProc", "MultiSP" ).getResults()[0];
+        System.out.println(vt);
+        assertEquals(2, vt.getRowCount());
+
+        // -1- insert into t1
+        // -2- select * from t1
+        for (int i = 0; i < 2; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String plan = vt.getString(1);
+            assertEquals(sql[i], task);
+            assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
+            assertTrue(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
+            if (i == 0) {
+                assertTrue(plan.contains("INSERT into \"T1\""));
+                assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
+            } else if (i == 1) {
+                assertTrue(plan.contains("SEQUENTIAL SCAN of \"T1\""));
+            }
+        }
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
