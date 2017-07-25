@@ -2820,6 +2820,59 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
+    public void testInvalidMultipleStatementCreateProcedureDDL() throws Exception {
+        ArrayList<Feedback> fbs;
+        String expectedError;
+
+        fbs = checkInvalidDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS BEGIN SELECT * FROM PKEY_INTEGER;\n" +
+                "BANBALOO pkey FROM PKEY_INTEGER;" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY; END;"
+                );
+        expectedError = "Failed to plan for statement (sql1) \"BANBALOO pkey FROM PKEY_INTEGER;\"";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS BEGIN SELECT * FROM PKEY_INTEGER; SELEC pkey FROM PKEY_INTEGER;" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 0; END;"
+                );
+        expectedError = "Failed to plan for statement (sql1) \"SELEC pkey FROM PKEY_INTEGER;\"";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE PKEY = ?; END;" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 2;"
+                );
+        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER; SELECT * FROM PKEY_INTEGER END;" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE 7Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE PKEY = ?; END;" +
+                "PARTITION PROCEDURE 7Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Unknown indentifier in DDL: \""+
+                "CREATE PROCEDURE 7Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE PKEY = ?; END" +
+                "\" contains invalid identifier \"7Foo\"";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+    }
+
     public void testDropProcedure() throws Exception {
         if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) {
             return;
