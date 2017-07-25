@@ -205,7 +205,6 @@ public class TestExplainCommandSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "CREATE PROCEDURE MultiSP AS BEGIN "
                 + sql[0] + sql[1] + " end;");
         vt = client.callProcedure("@ExplainProc", "MultiSP" ).getResults()[0];
-        System.out.println(vt);
         assertEquals(2, vt.getRowCount());
 
         // -1- insert into t1
@@ -234,7 +233,6 @@ public class TestExplainCommandSuite extends RegressionSuite {
                 + "COLUMN PKEY PARAMETER 0 AS BEGIN "
                 + sql[0] + sql[1] + " end;");
         vt = client.callProcedure("@ExplainProc", "MultiSP1" ).getResults()[0];
-        System.out.println(vt);
         assertEquals(2, vt.getRowCount());
 
         // -1- insert into t1
