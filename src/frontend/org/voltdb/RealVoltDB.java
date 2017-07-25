@@ -408,7 +408,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     SnmpTrapSender m_snmp;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
-    private OperationMode m_startMode = null;
+    private volatile OperationMode m_startMode = null;
 
     volatile String m_localMetadata = "";
 

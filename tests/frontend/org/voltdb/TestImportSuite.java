@@ -43,6 +43,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.importer.SocketImporterConnector;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
@@ -107,46 +108,6 @@ public class TestImportSuite extends RegressionSuite {
         releaseClient(m_client);
         releaseClient(m_adminClient);
         super.tearDown();
-    }
-
-    /** Allows the test thread to check if the importer is alive by writing data to it. */
-    static class ImporterConnector {
-        private final String m_server;
-        private final int m_port;
-        private final char m_separator;
-        private int m_counter = 0;
-
-        public ImporterConnector(String server, int port, char separator) {
-            m_separator = separator;
-            m_server = server;
-            m_port = port;
-        }
-
-        /** Tries to write data to the importer, but may fail. */
-        public void tryPush(int maxAttempts) throws IOException {
-            int numConnectAttempts = 0;
-            do {
-                try {
-                    Socket pushSocket = new Socket(m_server, m_port);
-                    OutputStream socketStream = pushSocket.getOutputStream();
-                    System.out.printf("Connected to VoltDB socket importer at: %s.\n", m_server + ":" + m_port);
-                    String s = String.valueOf(m_counter) + m_separator + System.currentTimeMillis() + "\n";
-                    socketStream.write(s.getBytes());
-                    pushSocket.close();
-                    m_counter++;
-                    return;
-                } catch (IOException e) {
-                    numConnectAttempts++;
-                    if (numConnectAttempts >= maxAttempts) {
-                        throw e;
-                    }
-                    try {
-                        Thread.sleep((int) (Math.random() * 1000) + 500);
-                    } catch (InterruptedException ignore) {
-                    }
-                }
-            } while (true);
-        }
     }
 
     abstract class DataPusher extends Thread {
@@ -385,7 +346,7 @@ public class TestImportSuite extends RegressionSuite {
         pushDataToImporters(1000, 3);
         verifyData(m_client, 3000);
 
-        applySchemaChange("create table nudge(id integer);");
+        applySchemaChange(m_client, "create table nudge(id integer);");
 
         pushDataToImporters(1000, 4);
         // log4j will lose some events because of reconnection delay
@@ -401,10 +362,10 @@ public class TestImportSuite extends RegressionSuite {
         // Run data pushers until they are explicitly stopped.
         asyncPushDataToImporters(0, 3);
 
-        applySchemaChange("CREATE TABLE nudge(id integer);");
-        applySchemaChange("CREATE PROCEDURE NudgeThatDB AS INSERT INTO nudge VALUES (?);");
-        applySchemaChange("DROP PROCEDURE NudgeThatDB;");
-        applySchemaChange("DROP TABLE nudge;");
+        applySchemaChange(m_client, "CREATE TABLE nudge(id integer);");
+        applySchemaChange(m_client, "CREATE PROCEDURE NudgeThatDB AS INSERT INTO nudge VALUES (?);");
+        applySchemaChange(m_client, "DROP PROCEDURE NudgeThatDB;");
+        applySchemaChange(m_client, "DROP TABLE nudge;");
 
         waitForData();
     }
@@ -418,8 +379,8 @@ public class TestImportSuite extends RegressionSuite {
         // Run data pushers until they are explicitly stopped.
         asyncPushDataToImporters(0, 3);
 
-        updateDeploymentFile(true, true, false, false);
-        updateDeploymentFile(true, false, false, false);
+        updateDeploymentFile(m_client, true, true, false);
+        updateDeploymentFile(m_client, true, false, false);
 
         waitForData();
     }
@@ -429,17 +390,17 @@ public class TestImportSuite extends RegressionSuite {
     public void testImporterDeploymentChanges() throws Exception {
         System.out.println("Removing and re-adding importers should cause them to restart");
 
-        ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
+        SocketImporterConnector testConnector = new SocketImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
         testConnector.tryPush(5);
 
-        updateDeploymentFile(false, false, false, false);
+        updateDeploymentFile(m_client, false, false, false);
         try {
             testConnector.tryPush(5);
             fail("Importer is still running even though it is no longer configured");
         } catch (IOException expected) {
         }
 
-        updateDeploymentFile(true, false, false, false);
+        updateDeploymentFile(m_client, true, false, false);
         testConnector.tryPush(5);
     }
 
@@ -448,18 +409,18 @@ public class TestImportSuite extends RegressionSuite {
     public void testAddRemoveImporterProcedure() throws Exception {
         System.out.println("Removing and adding procedures that the importers rely on should result in a restart");
 
-        ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
+        SocketImporterConnector testConnector = new SocketImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
         testConnector.tryPush(5);
 
         // importer uses CRUD procedure associated with this table.
-        applySchemaChange("DROP TABLE importTable;");
+        applySchemaChange(m_client, "DROP TABLE importTable;");
         try {
             testConnector.tryPush(5);
             fail("Importer is still running even though its procedure is disabled");
         } catch (IOException expected) {
         }
 
-        applySchemaChange("CREATE TABLE IMPORTTABLE (PKEY bigint NOT NULL, A_INTEGER_VALUE bigint); PARTITION TABLE IMPORTTABLE ON COLUMN PKEY;");
+        applySchemaChange(m_client, "CREATE TABLE IMPORTTABLE (PKEY bigint NOT NULL, A_INTEGER_VALUE bigint); PARTITION TABLE IMPORTTABLE ON COLUMN PKEY;");
         testConnector.tryPush(5);
     }
 
@@ -468,11 +429,12 @@ public class TestImportSuite extends RegressionSuite {
     public void testPausedUACWithImporter() throws Exception {
         System.out.println("Catalog changes to a paused cluster must not restart the importers");
 
-        ImporterConnector testConnector = new ImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
+        SocketImporterConnector testConnector = new SocketImporterConnector(SERVER, SOCKET_IMPORTER_PORT, DELIMITER);
         testConnector.tryPush(5);
 
         m_adminClient.callProcedure("@Pause");
-        updateDeploymentFile(true, false, true, true);
+        applySchemaChange(m_adminClient, "CREATE TABLE ENSURE_SCHEMA_SURVIVAL (STUFF bigint NOT NULL);");
+        updateDeploymentFile(m_adminClient, true, false, true);
         try {
             testConnector.tryPush(5);
             fail("Importer is running even though cluster is paused");
@@ -481,6 +443,7 @@ public class TestImportSuite extends RegressionSuite {
 
         m_adminClient.callProcedure("@Resume");
         testConnector.tryPush(5);
+        applySchemaChange(m_client, "DROP TABLE ENSURE_SCHEMA_SURVIVAL;");
     }
 
     /**
@@ -511,31 +474,27 @@ public class TestImportSuite extends RegressionSuite {
         super(name);
     }
 
-    private void applySchemaChange(String adhocddl) throws Exception {
-        ClientResponse response = m_client.callProcedure("@AdHoc", adhocddl);
+    private static void applySchemaChange(Client clientToUse, String adhocddl) throws Exception {
+        ClientResponse response = clientToUse.callProcedure("@AdHoc", adhocddl);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 
     /** Builds a CatalogContext for the import manager to use.
+     *
+     * @param clientToUse
      * @param includeImporters Whether or not to include the importers associated with this test.
      * @param unrelatedChange Whether or not to make a change that has no impact on the importer.
      * @param extraneousImporterChange Whether or not to make a change that impacts the importer config but not the importer behavior.
-     * @param useAdminClient Whether or not to make change in admin mode.
      * @return New deployment file
      * @throws Exception upon error or test failure
      */
-    private void updateDeploymentFile(boolean includeImporters, boolean unrelatedChange, boolean extraneousImporterChange, boolean useAdminClient) throws Exception {
+    private static void updateDeploymentFile(Client clientToUse, boolean includeImporters, boolean unrelatedChange, boolean extraneousImporterChange) throws Exception {
         VoltProjectBuilder projectBuilder = generateVoltProject(includeImporters, unrelatedChange, extraneousImporterChange);
         File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly(null, 1, 1, 0, 0));
         System.out.println("Deployment file " + (includeImporters ? "with" : "without") + " importers, " +
                 (unrelatedChange ? "with" : "without") + " custom heartbeat interval written to " + deploymentFilePath.getCanonicalPath());
         deploymentFilePath.deleteOnExit();
-        ClientResponse response;
-        if (useAdminClient) {
-            response = m_adminClient.updateApplicationCatalog(null, deploymentFilePath);
-        } else {
-            response = m_client.updateApplicationCatalog(null, deploymentFilePath);
-        }
+        ClientResponse response = clientToUse.updateApplicationCatalog(null, deploymentFilePath);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 
