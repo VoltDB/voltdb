@@ -190,7 +190,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             } catch (SQLException& ex) {
                 std::string errorMsg = ex.message()
                                     + " '" + (targetTable->getColumnNames()).at(m_inputTargetMap[map_ctr].first) + "'";
-                throw SQLException(ex.getSqlState(), errorMsg);
+                throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
             }
 
         }

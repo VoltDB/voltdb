@@ -30,7 +30,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 import org.junit.Test;
-import org.voltdb.QueueDepthTracker;
 import org.voltdb.StarvationTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -43,9 +42,9 @@ public class TestTransactionTaskQueue extends TestCase
 {
 
     private static SiteTaskerQueue getSiteTaskerQueue() {
-        SiteTaskerQueue queue = new SiteTaskerQueue();
+        SiteTaskerQueue queue = new SiteTaskerQueue(0);
         queue.setStarvationTracker(new StarvationTracker(0));
-        queue.setQueueDepthTracker(new QueueDepthTracker(0));
+        queue.setupQueueDepthTracker(0);
         return queue;
     }
 

@@ -124,7 +124,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_args.procedure, kafkaBulkLoaderCallback, m_callbackExecutor, kafkaBulkLoaderCallback);
         }
         else {
-            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_args.table, m_args.batchsize, m_args.update, kafkaBulkLoaderCallback, kafkaBulkLoaderCallback);
+            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_args.table, m_args.batch, m_args.update, kafkaBulkLoaderCallback, kafkaBulkLoaderCallback);
         }
 
         m_loader.setFlushInterval(m_args.flush, m_args.flush);
@@ -319,7 +319,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         FormatterBuilder builder = createFormatterBuilder(properties);
 
         return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokerList, properties.topic, properties.groupid,
-                                                properties.procedure, properties.timeout, properties.buffersize, properties.commitPolicy, builder);
+                                                properties.procedure, properties.timeout, properties.buffersize, properties.commitpolicy, builder);
     }
 
     /*

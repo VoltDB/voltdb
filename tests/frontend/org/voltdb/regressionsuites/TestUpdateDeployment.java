@@ -269,14 +269,30 @@ public class TestUpdateDeployment extends RegressionSuite {
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtable.jar");
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtable.xml");
         // Asynchronously attempt consecutive catalog update and deployment update
-        client.updateApplicationCatalog(new CatTestCallback(ClientResponse.SUCCESS),
+        SyncCallback cb1 = new SyncCallback();
+        client.updateApplicationCatalog(cb1,
                 new File(newCatalogURL), null);
         // Then, update the users in the deployment
         SyncCallback cb2 = new SyncCallback();
         client.updateApplicationCatalog(cb2, null, new File(deploymentURL));
+        cb1.waitForResponse();
         cb2.waitForResponse();
-        assertEquals(ClientResponse.USER_ABORT, cb2.getResponse().getStatus());
-        assertTrue(cb2.getResponse().getStatusString().contains("Invalid catalog update"));
+
+        // System.err.println("cb1: " + Byte.toString(cb1.getResponse().getStatus()) + " " + cb1.getResponse().getStatusString());
+        // System.err.println("cb2: " + Byte.toString(cb2.getResponse().getStatus()) + " " + cb2.getResponse().getStatusString());
+
+        // One should succeed, the other one should fail
+        assertTrue(ClientResponse.GRACEFUL_FAILURE == cb2.getResponse().getStatus()
+                || ClientResponse.GRACEFUL_FAILURE == cb1.getResponse().getStatus());
+        assertTrue(ClientResponse.SUCCESS == cb2.getResponse().getStatus()
+                || ClientResponse.SUCCESS == cb1.getResponse().getStatus());
+
+        if (cb1.getResponse().getStatus() == ClientResponse.SUCCESS) {
+            assertTrue(cb2.getResponse().getStatusString().contains("Invalid catalog update"));
+        } else {
+            assertTrue(cb1.getResponse().getStatusString().contains("Invalid catalog update"));
+            return;
+        }
 
         // Verify the heartbeat timeout change didn't take
         Client client3 = getClient();

@@ -1211,7 +1211,7 @@ public class CoreUtils {
      * @param msg   Message to be printed out beautifully
      * @param level Logging level
      */
-    public static void PrintGoodLookingLog(VoltLogger vLogger, String msg, Level level)
+    public static void printAsciiArtLog(VoltLogger vLogger, String msg, Level level)
     {
         if (vLogger == null || msg == null || level == Level.OFF) { return; }
 
@@ -1257,6 +1257,15 @@ public class CoreUtils {
             default:
                 break;
         }
+    }
+
+    public static void logProcedureInvocation(VoltLogger log, String userName, String where, String procedure) {
+        String msg = "User " + userName + " from " + where +
+                " issued a " + procedure;
+        if ("@PrepareShutdown".equals(procedure))
+            printAsciiArtLog(log, msg, Level.INFO);
+        else
+            log.info(msg);
     }
 
     // Utility method to figure out if this is a test case.  Various junit targets in

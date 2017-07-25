@@ -28,9 +28,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.LoadedProcedureSet;
-import org.voltdb.QueueDepthTracker;
 import org.voltdb.StarvationTracker;
 
 /**
@@ -53,17 +51,17 @@ class MpRoSitePool {
 
         MpRoSiteContext(long siteId, BackendTarget backend,
                 CatalogContext context, int partitionId,
-                InitiatorMailbox initiatorMailbox, CatalogSpecificPlanner csp,
+                InitiatorMailbox initiatorMailbox,
                 ThreadFactory threadFactory)
         {
             m_catalogContext = context;
-            m_queue = new SiteTaskerQueue();
+            m_queue = new SiteTaskerQueue(partitionId);
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
-            m_queue.setQueueDepthTracker(new QueueDepthTracker(siteId));
+            m_queue.setupQueueDepthTracker(siteId);
             m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
             m_loadedProcedures = new LoadedProcedureSet(m_site);
-            m_loadedProcedures.loadProcedures(m_catalogContext, csp);
+            m_loadedProcedures.loadProcedures(m_catalogContext);
             m_site.setLoadedProcedures(m_loadedProcedures);
             m_siteThread = threadFactory.newThread(m_site);
             m_siteThread.start();
@@ -106,7 +104,6 @@ class MpRoSitePool {
     private final int m_partitionId;
     private final InitiatorMailbox m_initiatorMailbox;
     private CatalogContext m_catalogContext;
-    private CatalogSpecificPlanner m_csp;
     private ThreadFactory m_poolThreadFactory;
     private final int m_poolSize;
 
@@ -115,15 +112,13 @@ class MpRoSitePool {
             BackendTarget backend,
             CatalogContext context,
             int partitionId,
-            InitiatorMailbox initiatorMailbox,
-            CatalogSpecificPlanner csp)
+            InitiatorMailbox initiatorMailbox)
     {
         m_siteId = siteId;
         m_backend = backend;
         m_catalogContext = context;
         m_partitionId = partitionId;
         m_initiatorMailbox = initiatorMailbox;
-        m_csp = csp;
         m_poolThreadFactory =
             CoreUtils.getThreadFactory("RO MP Site - " + CoreUtils.hsIdToString(m_siteId),
                     CoreUtils.MEDIUM_STACK_SIZE);
@@ -142,7 +137,6 @@ class MpRoSitePool {
                         m_catalogContext,
                         m_partitionId,
                         m_initiatorMailbox,
-                        m_csp,
                         m_poolThreadFactory));
         }
 
@@ -151,10 +145,9 @@ class MpRoSitePool {
     /**
      * Update the catalog
      */
-    void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    void updateCatalog(String diffCmds, CatalogContext context)
     {
         m_catalogContext = context;
-        m_csp = csp;
         // Wipe out all the idle sites with stale catalogs.
         // Non-idle sites will get killed and replaced when they finish
         // whatever they started before the catalog update
@@ -172,10 +165,9 @@ class MpRoSitePool {
     /**
      * update cluster settings
      */
-    void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    void updateSettings(CatalogContext context)
     {
         m_catalogContext = context;
-        m_csp = csp;
     }
 
     /**
@@ -226,7 +218,6 @@ class MpRoSitePool {
                             m_catalogContext,
                             m_partitionId,
                             m_initiatorMailbox,
-                            m_csp,
                             m_poolThreadFactory));
             }
             site = m_idleSites.pop();

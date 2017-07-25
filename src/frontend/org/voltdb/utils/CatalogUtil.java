@@ -143,7 +143,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
@@ -464,7 +463,7 @@ public abstract class CatalogUtil {
      * @param <T> The type of item to sort.
      * @param items The set of catalog items.
      * @param sortFieldName The name of the field to sort on.
-     * @param An output list of catalog items, sorted on the specified field.
+     * @param result An output list of catalog items, sorted on the specified field.
      */
     public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
         result.addAll(getSortedCatalogItems(items, sortFieldName    ));
@@ -977,6 +976,11 @@ public abstract class CatalogUtil {
         if (query == null) {
             query = new SystemSettingsType.Query();
             ss.setQuery(query);
+        }
+        SystemSettingsType.Procedure procedure = ss.getProcedure();
+        if (procedure == null) {
+            procedure = new SystemSettingsType.Procedure();
+            ss.setProcedure(procedure);
         }
         SystemSettingsType.Snapshot snap = ss.getSnapshot();
         if (snap == null) {
@@ -1503,11 +1507,19 @@ public abstract class CatalogUtil {
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
-                    hostLog.info("Export configuration enabled and provided for export target " +
-                                 targetName +
-                                 " in deployment file however no export " +
-                                 "tables are assigned to the this target. " +
-                                 "Export target " + targetName + " will be disabled.");
+                    if (DR_CONFLICTS_TABLE_EXPORT_GROUP.equals(targetName)) {
+                        throw new RuntimeException("Export configuration enabled and provided for export target " +
+                                targetName +
+                                " in deployment file however no export " +
+                                "tables are assigned to the this target. " +
+                                "DR Conflicts cannot be handled.");
+                    } else {
+                        hostLog.info("Export configuration enabled and provided for export target " +
+                                targetName +
+                                " in deployment file however no export " +
+                                "tables are assigned to the this target. " +
+                                "Export target " + targetName + " will be disabled.");
+                    }
                 }
                 continue;
             }
@@ -2109,25 +2121,20 @@ public abstract class CatalogUtil {
         return hash;
     }
 
-    private static ByteBuffer makeCatalogVersionAndBytes(
-                int catalogVersion,
-                long txnId,
-                long uniqueId,
+    private static ByteBuffer makeCatalogAndDeploymentBytes(
+                long genId,
                 byte[] catalogBytes,
                 byte[] catalogHash,
                 byte[] deploymentBytes)
     {
         ByteBuffer versionAndBytes =
             ByteBuffer.allocate(
+                    8 +  // generation Id
+                    20 + // catalog SHA-1 hash
                     4 +  // catalog bytes length
                     catalogBytes.length +
                     4 +  // deployment bytes length
-                    deploymentBytes.length +
-                    4 +  // catalog version
-                    8 +  // txnID
-                    8 +  // unique ID
-                    20 + // catalog SHA-1 hash
-                    20   // deployment SHA-1 hash
+                    deploymentBytes.length
                     );
 
         if (catalogHash == null) {
@@ -2140,11 +2147,8 @@ public abstract class CatalogUtil {
             }
         }
 
-        versionAndBytes.putInt(catalogVersion);
-        versionAndBytes.putLong(txnId);
-        versionAndBytes.putLong(uniqueId);
+        versionAndBytes.putLong(genId);
         versionAndBytes.put(catalogHash);
-        versionAndBytes.put(makeDeploymentHash(deploymentBytes));
         versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
         versionAndBytes.putInt(deploymentBytes.length);
@@ -2158,17 +2162,19 @@ public abstract class CatalogUtil {
      *  distribution.
      */
     public static void writeCatalogToZK(ZooKeeper zk,
-                int catalogVersion,
-                long txnId,
-                long uniqueId,
-                byte[] catalogBytes,
-                byte[] catalogHash,
-                byte[] deploymentBytes)
+                                        long genId,
+                                        byte[] catalogBytes,
+                                        byte[] catalogHash,
+                                        byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogBytes, catalogHash, deploymentBytes);
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(genId,
+                catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
+                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        // create the previous catalog bytes zk node
+        zk.create(VoltZK.catalogbytesPrevious,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
@@ -2177,41 +2183,31 @@ public abstract class CatalogUtil {
      * called writeCatalogToZK earlier in order to create the ZK node.
      */
     public static void updateCatalogToZK(ZooKeeper zk,
-            int catalogVersion,
-            long txnId,
-            long uniqueId,
-            byte[] catalogBytes,
-            byte[] catalogHash,
-            byte[] deploymentBytes)
+                                        long genId,
+                                        byte[] catalogBytes,
+                                        byte[] catalogHash,
+                                        byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogBytes, catalogHash, deploymentBytes);
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(genId,
+                catalogBytes, catalogHash, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
-    public static class CatalogAndIds {
-        public final long txnId;
-        public final long uniqueId;
-        public final int version;
+    public static class CatalogAndDeployment {
+        public final long genId;
         private final byte[] catalogHash;
-        private final byte[] deploymentHash;
         public final byte[] catalogBytes;
         public final byte[] deploymentBytes;
 
-        private CatalogAndIds(long txnId,
-                long uniqueId,
-                int catalogVersion,
+        private CatalogAndDeployment(
+                long genId,
                 byte[] catalogHash,
-                byte[] deploymentHash,
                 byte[] catalogBytes,
                 byte[] deploymentBytes)
         {
-            this.txnId = txnId;
-            this.uniqueId = uniqueId;
-            this.version = catalogVersion;
+            this.genId = genId;
             this.catalogHash = catalogHash;
-            this.deploymentHash = deploymentHash;
             this.catalogBytes = catalogBytes;
             this.deploymentBytes = deploymentBytes;
         }
@@ -2221,18 +2217,10 @@ public abstract class CatalogUtil {
             return catalogHash.clone();
         }
 
-        public byte[] getDeploymentHash()
-        {
-            return deploymentHash.clone();
-        }
-
         @Override
         public String toString()
         {
-            return String.format("Catalog: TXN ID %d, catalog hash %s, deployment hash %s\n",
-                    txnId,
-                    Encoder.hexEncode(catalogHash).substring(0, 10),
-                    Encoder.hexEncode(deploymentHash).substring(0, 10));
+            return "Catalog: catalog hash " + Encoder.hexEncode(catalogHash).substring(0, 10);
         }
     }
 
@@ -2241,33 +2229,28 @@ public abstract class CatalogUtil {
      * NOTE: In general, people who want the catalog and/or deployment should
      * be getting it from the current CatalogContext, available from
      * VoltDB.instance().  This is primarily for startup and for use by
-     * @UpdateApplicationCatalog.  If you think this is where you need to
-     * be getting catalog or deployment from, consider carefully if that's
-     * really what you want to do. --izzy 12/8/2014
+     * @UpdateCore.
      */
-    public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes =
+    public static CatalogAndDeployment getCatalogFromZK(ZooKeeper zk)
+            throws KeeperException, InterruptedException {
+        ByteBuffer catalogDeploymentBytes =
                 ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
-        int version = versionAndBytes.getInt();
-        long catalogTxnId = versionAndBytes.getLong();
-        long catalogUniqueId = versionAndBytes.getLong();
+        long genId = catalogDeploymentBytes.getLong();
         byte[] catalogHash = new byte[20]; // sha-1 hash size
-        versionAndBytes.get(catalogHash);
-        byte[] deploymentHash = new byte[20]; // sha-1 hash size
-        versionAndBytes.get(deploymentHash);
-        int catalogLength = versionAndBytes.getInt();
+        catalogDeploymentBytes.get(catalogHash);
+        int catalogLength = catalogDeploymentBytes.getInt();
         byte[] catalogBytes = new byte[catalogLength];
-        versionAndBytes.get(catalogBytes);
-        int deploymentLength = versionAndBytes.getInt();
+        catalogDeploymentBytes.get(catalogBytes);
+        int deploymentLength = catalogDeploymentBytes.getInt();
         byte[] deploymentBytes = new byte[deploymentLength];
-        versionAndBytes.get(deploymentBytes);
-        versionAndBytes = null;
-        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash,
-                deploymentHash, catalogBytes, deploymentBytes);
+        catalogDeploymentBytes.get(deploymentBytes);
+        catalogDeploymentBytes = null;
+
+        return new CatalogAndDeployment(genId, catalogHash, catalogBytes, deploymentBytes);
     }
 
     /**
-     * Given plan graphs and a SQL stmt, compute a bi-directonal usage map between
+     * Given plan graphs and a SQL statement, compute a bidirectional usage map between
      * schema (indexes, table & views) and SQL/Procedures.
      * Use "annotation" objects to store this extra information in the catalog
      * during compilation and catalog report generation.

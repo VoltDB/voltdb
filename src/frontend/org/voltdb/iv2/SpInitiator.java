@@ -26,7 +26,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
@@ -76,7 +75,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             StartAction startAction)
     {
         super(VoltZK.iv2masters, messenger, partition,
-                new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
+                new SpScheduler(partition, new SiteTaskerQueue(partition), snapMonitor),
                 "SP", agent, startAction);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
@@ -87,7 +86,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
@@ -104,7 +102,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
-                csp, numberOfPartitions, startAction, agent, memStats, cl,
+                numberOfPartitions, startAction, agent, memStats, cl,
                 coreBindIds, hasMPDRGateway);
 
         m_tickProducer.start();

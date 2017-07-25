@@ -46,7 +46,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.CommandLog;
 import org.voltdb.ProcedureRunner;
-import org.voltdb.QueueDepthTracker;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDBInterface;
@@ -71,9 +70,9 @@ public class TestSpSchedulerSpHandle extends TestCase
 
 
     private static SiteTaskerQueue getSiteTaskerQueue() {
-        SiteTaskerQueue queue = new SiteTaskerQueue();
+        SiteTaskerQueue queue = new SiteTaskerQueue(0);
         queue.setStarvationTracker(new StarvationTracker(0));
-        queue.setQueueDepthTracker(new QueueDepthTracker(0));
+        queue.setupQueueDepthTracker(0);
         return queue;
     }
 
