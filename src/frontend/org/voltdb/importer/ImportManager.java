@@ -33,6 +33,7 @@ import com.google_voltpatches.common.base.Throwables;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
+import org.voltdb.OperationMode;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
@@ -73,6 +74,9 @@ public class ImportManager implements ChannelChangeCallback {
     // maintains mapping of active importer config to the bundle bundle path used for communicating import processor
     // about the jars to use
     private Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
+
+    // If this is set, importers can be restarted even if the catalog has not changed
+    private boolean m_importersDisabled = false;
 
     /**
      * Get the global instance of the ImportManager.
@@ -127,16 +131,14 @@ public class ImportManager implements ChannelChangeCallback {
     private synchronized void create(CatalogContext catalogContext) {
         try {
             Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
-            startImporters(newProcessorConfig);
+            restartImporters(newProcessorConfig);
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
         }
     }
 
-    private synchronized void startImporters(Map<String, ImportConfiguration> newProcessorConfig) throws BundleException {
-        // ENG-12902 - there are scenarios where m_processor.get() is NOT null.
-        // Since these are not fully understood, always call close() as this ensure the importer is in a valid state.
-        close();
+    private synchronized void restartImporters(Map<String, ImportConfiguration> newProcessorConfig) throws BundleException {
+        close(); // always restart - processor may be created but not used if cluster is paused
 
         m_processorConfig = newProcessorConfig;
         importLog.info("Currently loaded importer modules: " + m_loadedBundles.keySet() + ", types: " + m_importersByType.keySet());
@@ -304,9 +306,8 @@ public class ImportManager implements ChannelChangeCallback {
     public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
         try {
             Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
-            if (m_processorConfig == null || !m_processorConfig.equals(newProcessorConfig)) {
-                close();
-                startImporters(newProcessorConfig);
+            if (m_processorConfig == null || m_importersDisabled || !m_processorConfig.equals(newProcessorConfig)) {
+                restartImporters(newProcessorConfig);
                 readyForDataInternal(catalogContext, messenger);
             }
         } catch (final Exception e) {
@@ -331,8 +332,14 @@ public class ImportManager implements ChannelChangeCallback {
         if (m_processor.get() == null) {
             return;
         }
-        //Tell import processors and in turn ImportHandlers that we are ready to take in data.
-        m_processor.get().readyForData(catalogContext, messenger);
+
+        if (VoltDB.instance().getMode() != OperationMode.PAUSED) {
+            //Tell import processors and in turn ImportHandlers that we are ready to take in data.
+            m_processor.get().readyForData(catalogContext, messenger);
+            m_importersDisabled = false;
+        } else {
+            m_importersDisabled = true;
+        }
     }
 
     @Override
