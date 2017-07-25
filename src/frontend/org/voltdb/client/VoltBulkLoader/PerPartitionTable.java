@@ -19,6 +19,7 @@ package org.voltdb.client.VoltBulkLoader;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -127,6 +128,41 @@ public class PerPartitionTable {
         }
     }
 
+    class ReinsertCallback implements ProcedureCallback {
+        final VoltBulkLoaderRow m_reinsertRow;
+
+        ReinsertCallback(VoltBulkLoaderRow row) {
+            m_reinsertRow = row;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            //one insert at a time callback
+            if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
+                m_es.execute(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        try {
+                            reinsertFailed(Arrays.asList(m_reinsertRow));
+                        } catch (Exception e) {
+                            // TODO: handle exception
+                        }
+                    }
+                });
+
+                return;
+            }
+            else if (response.getStatus() != ClientResponse.SUCCESS) {
+                m_reinsertRow.m_loader.m_notificationCallBack.failureCallback(m_reinsertRow.m_rowHandle, m_reinsertRow.m_rowData, response);
+            }
+
+            m_reinsertRow.m_loader.m_loaderCompletedCnt.incrementAndGet();
+            m_reinsertRow.m_loader.m_outstandingRowCount.decrementAndGet();
+        }
+
+    }
+
     PerPartitionTable(ClientImpl clientImpl, String tableName, int partitionId, boolean isMP,
             VoltBulkLoader firstLoader, int minBatchTriggerSize, BulkLoaderSuccessCallback successCallback) {
         m_clientImpl = clientImpl;
@@ -226,19 +262,7 @@ public class PerPartitionTable {
                 continue;
             }
 
-            ProcedureCallback callback = new ProcedureCallback() {
-                @Override
-                public void clientCallback(ClientResponse response) throws Exception {
-                    //one insert at a time callback
-                    if (response.getStatus() != ClientResponse.SUCCESS) {
-                        row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
-                    }
-
-                    row.m_loader.m_loaderCompletedCnt.incrementAndGet();
-                    row.m_loader.m_outstandingRowCount.decrementAndGet();
-                }
-            };
-
+            ProcedureCallback callback = new ReinsertCallback(row);
             loadTable(callback, tmpTable);
         }
     }
