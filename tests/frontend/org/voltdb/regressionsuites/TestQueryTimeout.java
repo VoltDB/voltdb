@@ -37,9 +37,11 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 
 public class TestQueryTimeout extends RegressionSuite {
 
+    // These are dimensionless multipliers.
     private static final double TIMEOUT_INCREASE = 50.0;
     private static final double TIMEOUT_DECREASE = 1/500.0;
 
+    // These are all in milliseconds.
     private static final int TIMEOUT_NORMAL = 1000;
     private static final int TIMEOUT_LONG   = (int)(1000 * TIMEOUT_INCREASE);
     private static final int TIMEOUT_SHORT  = (int)(1000 * TIMEOUT_DECREASE);
@@ -96,7 +98,7 @@ public class TestQueryTimeout extends RegressionSuite {
         truncateData(client, "R1");
     }
 
-    public void notestReplicatedProcTimeout() throws IOException, ProcCallException, InterruptedException {
+    public void testReplicatedProcTimeout() throws IOException, ProcCallException, InterruptedException {
         // If the authentication information is
         // incorrect, shutdown will not succeed.
         // So, we need to set this in any case.
@@ -148,7 +150,7 @@ public class TestQueryTimeout extends RegressionSuite {
         }
     }
 
-    public void notestPartitionedProcTimeout() throws IOException, ProcCallException, InterruptedException {
+    public void testPartitionedProcTimeout() throws IOException, ProcCallException, InterruptedException {
         // If the authentication information is
         // incorrect, shutdown will not succeed.
         // So, we need to set this in any case.
@@ -273,7 +275,7 @@ public class TestQueryTimeout extends RegressionSuite {
                 client.callProcedureWithTimeout(TIMEOUT_LONG, procName, params);
                 fail(procName + PROMPTMSG);
             }
-            catch (Exception ex) {
+            catch (ProcCallException ex) {
                 assertTrue(ex.toString() + " did not contain " + ERRORMSG,
                            ex.getMessage().contains(ERRORMSG));
             }
@@ -292,7 +294,7 @@ public class TestQueryTimeout extends RegressionSuite {
             client.callProcedure(procName, params);
             fail(procName + PROMPTMSG);
         }
-        catch (Exception ex) {
+        catch (ProcCallException ex) {
             assertTrue(ex.toString() + " did not contain " + ERRORMSG,
                        ex.getMessage().contains(ERRORMSG));
         }
@@ -344,7 +346,6 @@ public class TestQueryTimeout extends RegressionSuite {
                     + " is supposed to succeed, but failed with message "
                     + ex.getMessage()
                     + "\n");
-            ex.printStackTrace();
         }
 
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
@@ -372,7 +373,7 @@ public class TestQueryTimeout extends RegressionSuite {
             // truncate the data
             truncateTables(client);
             // load more data
-            loadTables(client, 5000, 3000);
+            loadTables(client, 10000, 3000);
 
             if (isAdmin) {
                 checkTimeoutIncreasedProcSucceed(sync, client, "SPPartitionReadOnlyProc", 1);
@@ -437,8 +438,6 @@ public class TestQueryTimeout extends RegressionSuite {
         }
         Client client;
 
-        m_username = "adminUser";
-        m_password = "password";
         client = getClient();
         checkIndividualProcTimeout(client, true);
 
