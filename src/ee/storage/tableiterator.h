@@ -204,28 +204,12 @@ private:
     // State only for temp table iterators
     struct TempState {
 
-        TempState(std::vector<TBPtr>::iterator it, bool deleteAsGo)
-        : m_tempBlockIterator(it)
-        , m_tempTableDeleteAsGo(deleteAsGo)
-        {
-        }
-
-        TempState() {}
-
         std::vector<TBPtr>::iterator m_tempBlockIterator;
         bool m_tempTableDeleteAsGo;
     };
 
     // State for large temp table iterators only
     struct LargeTempState {
-
-        LargeTempState(std::vector<int64_t>::iterator it, bool deleteAsGo)
-        : m_tempBlockIterator(it)
-        , m_tempTableDeleteAsGo(deleteAsGo)
-        {
-        }
-
-        LargeTempState() {}
 
         std::vector<int64_t>::iterator m_tempBlockIterator;
         bool m_tempTableDeleteAsGo;
@@ -237,14 +221,23 @@ private:
             ::memset(this, 0, sizeof(*this));
         }
 
-        TypeSpecificState(TBMapI it) : m_pers(it) {}
+        TypeSpecificState(TBMapI it)
+        {
+            m_pers.m_blockIterator = it;
+        }
+
+
         TypeSpecificState(std::vector<TBPtr>::iterator it, bool deleteAsGo)
-        : m_temp(it, deleteAsGo)
-        {}
+        {
+            m_temp.m_tempBlockIterator = it;
+            m_temp.m_tempTableDeleteAsGo = deleteAsGo;
+        }
 
         TypeSpecificState(std::vector<int64_t>::iterator it, bool deleteAsGo)
-        : m_largeTemp(it, deleteAsGo)
-        {}
+        {
+            m_largeTemp.m_tempBlockIterator = it;
+            m_largeTemp.m_tempTableDeleteAsGo = deleteAsGo;
+        }
 
         ~TypeSpecificState()
         {
