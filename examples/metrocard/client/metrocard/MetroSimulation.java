@@ -25,10 +25,15 @@ package metrocard;
 
 import java.util.Calendar;
 import java.util.NavigableMap;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeMap;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.client.ClientStatusListenerExt;
@@ -56,6 +61,7 @@ public class MetroSimulation {
     Calendar cal = Calendar.getInstance();
     int cardCount = 0;
     int max_station_id = 0;
+    Properties producerConfig;
 
     /**
      * Prints headings
@@ -85,6 +91,12 @@ public class MetroSimulation {
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
+
+        @Option(desc = "Swipes are posted to this topic.")
+        String swipe = "card_swipes";
+
+        @Option(desc = "Swipes are posted to this topic.")
+        String trains = "train_activity";
 
         @Override
         public void validate() {
@@ -126,6 +138,8 @@ public class MetroSimulation {
         cal.set(Calendar.MINUTE, 0);
         cal.set(Calendar.SECOND, 0);
         cal.set(Calendar.MILLISECOND, 0);
+        producerConfig = new Properties();
+        producerConfig.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, config.broker);
 
         printHeading("Command Line Configuration");
         System.out.println(config.getConfigDumpString());
@@ -195,6 +209,96 @@ public class MetroSimulation {
         return(2);
     }
 
+    abstract class KafkaPublisher extends Thread {
+        private volatile int m_totalCount;
+        private volatile int m_currentCount = 0;
+        private volatile Exception m_error = null;
+        private final KafkaProducer m_producer;
+        private final String m_topic;
+        private Properties m_producerConfig;
+
+        public KafkaPublisher(String topic, Properties producerConfig, int count) {
+            m_topic = topic;
+            m_totalCount = count;
+            m_producerConfig = new Properties();
+            m_producerConfig.putAll(producerConfig);
+            m_producerConfig.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+            m_producerConfig.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+            m_producer = new KafkaProducer(m_producerConfig);
+        }
+
+        protected abstract void initialize();
+        protected void close() {
+            m_producer.close();
+        }
+        protected abstract ProducerRecord<String, String> getNextRecord();
+
+        @Override
+        public void run() {
+            initialize();
+            if (m_totalCount == 0) {
+                m_totalCount = Integer.MAX_VALUE; // keep running until explicitly stopped
+            }
+            try {
+                while (m_currentCount < m_totalCount) {
+                    ProducerRecord<String, String> record = getNextRecord();
+                    m_producer.send(record);
+                    m_currentCount++;
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                m_error = ex;
+            } finally {
+                close();
+            }
+        }
+
+        public void shutDown() throws Exception {
+            if (m_totalCount == Integer.MAX_VALUE) {
+                m_totalCount = 0; // this will stop the pusher's forever loop
+            }
+            if (m_error != null) {
+                throw m_error;
+            }
+        }
+    }
+
+    class TrainActivityPublisher extends KafkaPublisher {
+        MetroCardConfig m_config;
+        TrainActivityPublisher(String trainId, MetroCardConfig config, Properties producerConfig, int count) {
+            super(config.trains, producerConfig, count);
+            m_config = config;
+        }
+
+        @Override
+        protected void initialize() {
+        }
+
+        @Override
+        protected ProducerRecord<String, String> getNextRecord() {
+            return new ProducerRecord<String, String>(m_config.trains, "key", "value");
+        }
+
+    }
+
+    class SwipeActivityPublisher extends KafkaPublisher {
+
+        SwipeActivityPublisher(MetroCardConfig config, Properties producerConfig, int count) {
+            super(config.swipe, producerConfig, count);
+        }
+
+        @Override
+        protected void initialize() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        protected ProducerRecord<String, String> getNextRecord() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+    }
+
     public void iterate() throws Exception {
 
     }
@@ -217,9 +321,13 @@ public class MetroSimulation {
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+
+        TrainActivityPublisher redLine = new TrainActivityPublisher("1", config, producerConfig, 100);
+        redLine.start();
         while (benchmarkEndTime > System.currentTimeMillis()) {
-            iterate();
+            Thread.sleep(10000);
         }
+        redLine.close();
 
         // cancel periodic stats printing
         timer.cancel();
