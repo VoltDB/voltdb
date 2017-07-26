@@ -101,7 +101,7 @@ public class LoadedProcedureSet {
         if (isInitOrReplay) {
             // reload user procedures
             try {
-            	hostLog.info("Reloading all user procedures");
+                hostLog.info("Reloading all user procedures");
                 m_userProcs = loadUserProcedureRunners(catalogContext.database.getProcedures(),
                                                        catalogContext.getCatalogJar().getLoader(),
                                                        null,
@@ -110,7 +110,7 @@ public class LoadedProcedureSet {
                 VoltDB.crashLocalVoltDB("Error trying to load user procedures: " + e.getMessage());
             }
         } else {
-        	hostLog.info("Swapping prepared user procedures");
+            hostLog.info("Swapping prepared user procedures");
             // When catalog updates, only user procedures needs to be reloaded.
             m_userProcs = catalogContext.getPreparedUserProcedures(m_site);
         }
