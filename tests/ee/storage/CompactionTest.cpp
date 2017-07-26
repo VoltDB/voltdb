@@ -111,6 +111,14 @@ public:
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
 
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+        m_tableSchemaAllowNull.push_back(true);
+
         m_primaryKeyIndexColumns.push_back(0);
 
         m_undoToken = 0;
@@ -323,7 +331,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     m_table->doForcedCompaction();
 
     stx::btree_set<int32_t> pkeysFoundAfterDelete;
-    TableIterator& iter = m_table->iterator();
+    TableIterator iter = m_table->iterator();
     TableTuple tuple(m_table->schema());
     while (iter.next(tuple)) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
@@ -467,7 +475,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         m_table->doForcedCompaction();
 
         stx::btree_set<int32_t> pkeysFoundAfterDelete;
-        TableIterator& iter = m_table->iterator();
+        TableIterator iter = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iter.next(tuple)) {
             int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));

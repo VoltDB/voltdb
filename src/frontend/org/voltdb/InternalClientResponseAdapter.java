@@ -46,6 +46,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.iv2.MpInitiator;
 
 /**
  * A very simple adapter for import handler that deserializes bytes into client responses.
@@ -62,7 +63,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
         public String getProcedureName();
-        public int getPartitionId();
+        public int[] getPartitionIds();
+        public int getPrimaryPartitionId();
         public InternalConnectionContext getInternalContext();
     }
 
@@ -81,7 +83,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
         private final ProcedureCallback m_cb;
         private final InternalConnectionStatsCollector m_statsCollector;
-        private final int m_partition;
+        private final int[] m_partitions;
         private final InternalAdapterTaskAttributes m_kattrs;
         private final StoredProcedureInvocation m_task;
         private final Procedure m_proc;
@@ -92,7 +94,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 Procedure proc,
                 StoredProcedureInvocation task,
                 String procName,
-                int partition,
+                int[] partitions,
                 ProcedureCallback cb,
                 InternalConnectionStatsCollector statsCollector,
                 AuthSystem.AuthUser user,
@@ -103,7 +105,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             m_proc = proc;
             m_cb = cb;
             m_statsCollector = statsCollector;
-            m_partition = partition;
+            m_partitions = partitions;
             m_user = user;
             m_procName = procName;
         }
@@ -133,7 +135,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                         m_statsCollector,
                         m_task,
                         m_user,
-                        m_partition,
+                        m_partitions,
                         false,
                         null);
             }
@@ -145,8 +147,13 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         }
 
         @Override
-        public int getPartitionId() {
-            return m_partition;
+        public int[] getPartitionIds() {
+            return m_partitions;
+        }
+
+        @Override
+        public int getPrimaryPartitionId() {
+            return (m_partitions == null) || (m_partitions.length > 1) ? MpInitiator.MP_INIT_PID : m_partitions[0];
         }
 
         @Override
@@ -166,11 +173,14 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final InternalConnectionStatsCollector statsCollector,
             final StoredProcedureInvocation task,
             final AuthSystem.AuthUser user,
-            final int partition,
+            final int[] partitions,
             final boolean ntPriority,
             final Function<Integer, Boolean> backPressurePredicate) {
-        if (!m_partitionExecutor.containsKey(partition)) {
-            m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
+
+        int primaryPartition = ((partitions == null) || (partitions.length > 1)) ? MpInitiator.MP_INIT_PID : partitions[0];
+
+        if (!m_partitionExecutor.containsKey(primaryPartition)) {
+            m_partitionExecutor.putIfAbsent(primaryPartition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + primaryPartition));
         }
 
         if (backPressurePredicate != null) {
@@ -179,13 +189,13 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     if (m_permits.tryAcquire(BACK_PRESSURE_WAIT_TIME, MILLISECONDS)) {
                         break;
                     }
-                } while (backPressurePredicate.apply(partition));
+                } while (backPressurePredicate.apply(primaryPartition));
             } catch (InterruptedException e) {}
         }
 
         final InvocationDispatcher dispatcher = getClientInterface().getDispatcher();
 
-        ExecutorService executor = m_partitionExecutor.get(partition);
+        ExecutorService executor = m_partitionExecutor.get(primaryPartition);
         try {
             executor.submit(new Runnable() {
                 @Override
@@ -199,7 +209,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
                     final InternalCallback cb = new InternalCallback(
-                            kattrs, catProc, task, procName, partition, proccb, statsCollector, user, handle);
+                            kattrs, catProc, task, procName, partitions, proccb, statsCollector, user, handle);
 
                     m_callbacks.put(handle, cb);
 
@@ -285,11 +295,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         if (callback == null) {
             throw new IllegalStateException("Callback was null?");
         }
-        if (!m_partitionExecutor.containsKey(callback.getPartitionId())) {
+        if (!m_partitionExecutor.containsKey(callback.getPrimaryPartitionId())) {
             m_logger.error("Invalid partition response recieved for sending internal client response.");
             return;
         }
-        ExecutorService executor = m_partitionExecutor.get(callback.getPartitionId());
+        ExecutorService executor = m_partitionExecutor.get(callback.getPrimaryPartitionId());
         try {
             executor.submit(new Runnable() {
                 @Override

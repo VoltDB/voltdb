@@ -338,9 +338,9 @@ TEST_F(ExpressionTest, SimpleUnaryMinus) {
     // -5
     e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)5));
     e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, VALUE_TYPE_TINYINT, 1));
-    // dummy left expression to prevent segmentation fault
+    // dummy right expression to prevent segmentation fault
     // since unary minus is the only arithmetic operator with one operand
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)1));
+    e.push(NULL);
 
     boost::scoped_ptr<AbstractExpression> testexp1(convertToExpression(e));
     NValue r1 = testexp1->eval(&junk,NULL);
@@ -349,11 +349,11 @@ TEST_F(ExpressionTest, SimpleUnaryMinus) {
     // -(-3)
     e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)3));
     e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, VALUE_TYPE_TINYINT, 1));
-    // dummy left expression to prevent segmentation fault
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)1));
+    // dummy right expression to prevent segmentation fault
+    e.push(NULL);
     e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, VALUE_TYPE_TINYINT, 1));
-    // dummy left expression to prevent segmentation fault
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)1));
+    // dummy right expression to prevent segmentation fault
+    e.push(NULL);
 
     boost::scoped_ptr<AbstractExpression> testexp2(convertToExpression(e));
     NValue r2 = testexp2->eval(&junk,NULL);
@@ -394,8 +394,8 @@ TEST_F(ExpressionTest, SimpleMultiplication) {
     e.push(new AE(EXPRESSION_TYPE_OPERATOR_PLUS, VALUE_TYPE_TINYINT, 1));
     e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)4));
     e.push(new AE(EXPRESSION_TYPE_OPERATOR_UNARY_MINUS, VALUE_TYPE_TINYINT, 1));
-    // dummy left expression to prevent segmentation fault
-    e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)1));
+    // dummy right expression to prevent segmentation fault
+    e.push(NULL);
     e.push(new AE(EXPRESSION_TYPE_OPERATOR_MULTIPLY, VALUE_TYPE_TINYINT, 1));
     e.push(new CV(EXPRESSION_TYPE_VALUE_CONSTANT, VALUE_TYPE_TINYINT, 1, (int64_t)5));
 

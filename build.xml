@@ -514,7 +514,6 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 
-
 <!--
 ***************************************
 DISTRIBUTION
@@ -671,6 +670,20 @@ DISTRIBUTION
     <dist_tools_macro distlabel="" />
 
     <antcall target="copy_pro_bin"/>
+
+    <!-- copy meshmonitor -->
+    <mkdir dir="${dist.dir}/tools/meshmonitor" />
+    <ant antfile="${base.dir}/tools/meshmonitor/build.xml"
+	 target="dist" inheritAll="false"
+	 dir="${base.dir}/tools/meshmonitor">
+        <property name="volthome" value="${base.dir}"/>
+    </ant>
+    <copy todir="${dist.dir}/tools/meshmonitor">
+        <fileset dir="${base.dir}/tools/meshmonitor/dist" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+    </copy>
+
 
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
