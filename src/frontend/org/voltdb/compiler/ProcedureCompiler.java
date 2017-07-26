@@ -816,7 +816,8 @@ public abstract class ProcedureCompiler {
         for (String curStmt: stmts) {
 
             // add the statement to the catalog
-            Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME + String.valueOf(stmtNum++));
+            Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME + String.valueOf(stmtNum));
+            stmtNum++;
 
             // compile the statement
             // default to FASTER detmode because stmt procs can't feed read output into writes
