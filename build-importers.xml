@@ -1,5 +1,5 @@
 <!-- Simple build file to build socket stream importer -->
-<project name="socketstream"      basedir="." default="socketstream">
+<project name="importers"      basedir="." default="buildbundles">
 <property name='base.dir'         location='.' />
 <property name='bundles.dir'      location='./bundles' />
 <property name='build.dir'        location='obj/${build}' />
@@ -185,14 +185,68 @@
 	<path id="k10classpath">     	
         <pathelement location='${build.client.dir}' />
  	    <pathelement location='${build.prod.dir}' /> 
- 	    <fileset dir='${vendor.lib.dir}'>
-	 	    <include name='kafka-clients-0.10.2.1.jar'/>
+	<fileset dir='${vendor.lib.dir}'>
+		<include name='kafka-clients-0.10.2.1.jar'/>
+	 	    <include name='junit*.jar'/>
  	        <exclude name='ant.jar' />
  	        <exclude name='classes-java1.7.jar' />   
  	    </fileset>
  		<fileset refid="voltpro.classpath"/>
  	</path>
- 
+  
+    <target name="kafka10junit" depends="kafkastream10">  
+	    <javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
+            includes="org/voltdb/importer/kafka10/**/*.java"
+            encoding='UTF-8'
+            debug='true'
+            includeAntRuntime='false'>            
+			<classpath refid="k10classpath"/>
+        </javac>  
+		<run_junit classpathref='k10classpath'>
+			<tests>
+		      <fileset dir='${build.test.dir}'>
+		          <include name="org/voltdb/importer/kafka10/TestKafka10BasicConsumer.class"/> 	 	          
+		      </fileset>
+		    </tests>
+    	</run_junit>
+    </target>
+    
+	<macrodef name="run_junit">
+	  <attribute name="classpathref"/>
+	  <element name="tests"/>
+	  <sequential>
+		 <mkdir dir="${build.testoutput.dir}"/>
+		 <junit fork="yes" haltonfailure="${junit.haltonfailure}" failureproperty="junit.failures" printsummary="false" maxmemory="2048M" showoutput="${junit.showoutput}">
+			<classpath>
+			   <path refid="@{classpathref}"/>
+			   <path refid="project.classpath"/>
+			</classpath>
+			<batchtest todir="${build.testoutput.dir}">
+			   <tests/>
+			   <formatter type="plain" usefile="false" if="verbosereport"/>
+			   <formatter type="plain" usefile="true"/>
+			   <formatter type="xml" classname="org.voltdb.VoltJUnitFormatter" usefile="false" extension="none"/>
+			   <formatter type="xml"/>
+			</batchtest>
+			<assertions>
+			   <enable/>
+			</assertions>
+		 </junit>
+		 <junitreport todir="${build.testoutput.dir}">
+			<fileset dir="${build.testoutput.dir}">
+			   <include name="TEST-*.xml"/>
+			</fileset>
+			<report format="noframes" todir="${build.testoutput.dir}/report"/>
+			<report styledir="tools" format="noframes" todir="${build.testoutput.dir}"/>
+		 </junitreport>
+		 <concat>
+			<filelist dir="${build.testoutput.dir}" files="junit-noframes.html"/>
+		 </concat>
+		 <available file="${build.testoutput.dir}/JUNITHADFAILURES" property="junit.failures"/>
+		 <fail if="junit.failures" unless="use_jacoco" message="JUnit had failures"/>
+	  </sequential>
+	</macrodef>
+    
     <target name="kafkastream10">
  	    <javac  srcdir="src/frontend"
             destdir="${build.prod.dir}"
@@ -226,7 +280,8 @@
         </jar>
     </target>
 
-    <!-- regular build compile will compile the classes -->
+    <!-- Create the Bundle -->
+    
     <target name="osgibundle">
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}//${bundle.name}.jar" basedir="${build.prod.dir}">
