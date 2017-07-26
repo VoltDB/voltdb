@@ -27,6 +27,7 @@ import java.util.Date;
 import java.util.Random;
 import java.util.Timer;
 import java.util.concurrent.CountDownLatch;
+import java.io.FileWriter;
 import java.util.Arrays;
 import java.util.TimerTask;
 
@@ -316,7 +317,33 @@ class NPBenchmark {
         ProcCallback.printProcedureResults("Select");
 
         // Write stats to file if requested
-        client.writeSummaryCSV(stats, config.statsfile);
+        // client.writeSummaryCSV(stats, config.statsfile);
+
+        FileWriter fw = null;
+        if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+            fw = new FileWriter(config.statsfile);
+
+            fw.append(String.format("%d,%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d\n",
+                stats.getStartTimestamp(),
+                stats.getDuration(),
+                stats.getInvocationsCompleted(),
+                stats.getTxnThroughput(),
+                stats.getAverageLatency(),
+                stats.getAverageInternalLatency(),
+                stats.kPercentileLatencyAsDouble(0.95),
+                stats.kPercentileLatencyAsDouble(0.99),
+                stats.kPercentileLatencyAsDouble(0.9999),
+                stats.kPercentileLatencyAsDouble(0.99999),
+                stats.getInvocationErrors(),
+                stats.getInvocationAborts(),
+                stats.getInvocationTimeouts()));
+
+            fw.flush();
+            fw.close();
+        }
+
+        client.drain();
+        client.close();
     }
 
     public void initialize() throws Exception {
