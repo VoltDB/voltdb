@@ -202,16 +202,16 @@
             includeAntRuntime='false'>            
 			<classpath refid="k10classpath"/>
         </javac>  
-		<run_junit classpathref='k10classpath'>
+		<run_junit_tests classpathref='k10classpath'>
 			<tests>
 		      <fileset dir='${build.test.dir}'>
 		          <include name="org/voltdb/importer/kafka10/TestKafka10BasicConsumer.class"/> 	 	          
 		      </fileset>
 		    </tests>
-    	</run_junit>
+    	</run_junit_tests>
     </target>
     
-	<macrodef name="run_junit">
+	<macrodef name="run_junit_tests">
 	  <attribute name="classpathref"/>
 	  <element name="tests"/>
 	  <sequential>
@@ -316,4 +316,5 @@
         </jar>
     </target>
 
+	<target name="importer_junit_tests" depends="kafka10junit"/>
 </project>

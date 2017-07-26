@@ -171,8 +171,9 @@
     <exclude name="**/TestExportBaseSocketExport.class"/>
     <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" /> <!-- fails legacy -->
 
-	<!-- Exclude importer tests, they're in build-importer.xml -->
-	<exclude name="org/voltdb/importer/**/*.class"/>
+	<!-- Exclude Kafka importer tests, they're in build-importer.xml -->
+	<exclude name="org/voltdb/importer/kafka/*.class"/>
+	<exclude name="org/voltdb/importer/kafka10/*.class"/>
 	
 </patternset>
 
@@ -1642,6 +1643,7 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
+    <ant antfile="build-importers.xml" target="importers-junit" inheritAll="true" inheritRefs="true"/>
 </target>
 
 <target name="junit_sql"
@@ -1838,7 +1840,7 @@ TEST CASES
 </target>
 
 <target name="junit_importers">
-    <ant antfile="build-importers.xml" target="kafka10junit" inheritAll="true" inheritRefs="true">
+    <ant antfile="build-importers.xml" target="importer_junit_tests" inheritAll="true" inheritRefs="true">
     </ant>
 </target>
 

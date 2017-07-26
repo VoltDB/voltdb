@@ -48,7 +48,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
 public class Kafka10ConsumerRunner implements Runnable {
 
     private Consumer<byte[], byte[]> m_consumer;
-    private CSVParser m_csvParser;
+    private CSVParser m_csvParser = new CSVParser();
     private Formatter m_formatter;
     private AtomicBoolean m_closed = new AtomicBoolean(false);
     private Kafka10StreamImporterConfig m_config;
