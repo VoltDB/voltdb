@@ -162,8 +162,8 @@ public class SpPromoteAlgo implements RepairAlgo
         }
         Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
         if (response.getRequestId() != m_requestId) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(m_whoami + "rejecting stale repair response."
+            if (tmLog.isTraceEnabled()) {
+                tmLog.trace(m_whoami + "rejecting stale repair response."
                         + " Current request id is: " + m_requestId
                         + " Received response for request id: " + response.getRequestId());
             }

@@ -98,7 +98,7 @@ public class MpTransactionState extends TransactionState
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
         if (tmLog.isDebugEnabled()) {
-            tmLog.debug("[MpTransactionState] update masters from " +  CoreUtils.hsIdCollectionToString(m_useHSIds)
+            tmLog.debug("[MpTransactionState] TXN ID: " + TxnEgo.txnIdSeqToString(txnId) + " update masters from " +  CoreUtils.hsIdCollectionToString(m_useHSIds)
             + " to "+ CoreUtils.hsIdCollectionToString(masters));
         }
         m_useHSIds.clear();
@@ -240,13 +240,8 @@ public class MpTransactionState extends TransactionState
                         m_masterHSIds.keySet());
             }
             // Distribute fragments to remote destinations.
-            long[] non_local_hsids = new long[m_useHSIds.size()];
-            for (int i = 0; i < m_useHSIds.size(); i++) {
-                non_local_hsids[i] = m_useHSIds.get(i);
-            }
-            // send to all non-local sites
-            if (non_local_hsids.length > 0) {
-                m_mbox.send(non_local_hsids, m_remoteWork);
+            if (!m_useHSIds.isEmpty()) {
+                m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), m_remoteWork);
             }
         }
         // Do distributed fragments, if any
@@ -354,14 +349,11 @@ public class MpTransactionState extends TransactionState
                                 CoreUtils.hsIdToString(m_buddyHSId));
                     }
                     else {
-                        tmLog.warn("Waiting on remote dependencies: ");
+                        tmLog.warn("Waiting on remote dependencies for message:\n" + m_remoteWork + "\n");
                         for (Entry<Integer, Set<Long>> e : m_remoteDeps.entrySet()) {
                             tmLog.warn("Dep ID: " + e.getKey() + " waiting on: " +
                                     CoreUtils.hsIdCollectionToString(e.getValue()));
                         }
-                    }
-                    if (tmLog.isDebugEnabled()) {
-                        tmLog.debug("[FragmentResponseMessage.pollForResponses] send dump message to " + CoreUtils.hsIdCollectionToString(m_useHSIds));
                     }
                     m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
                 }

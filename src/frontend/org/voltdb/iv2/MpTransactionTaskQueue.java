@@ -150,11 +150,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                     }
                 }
             }
-            else {
-                // Don't think that EveryPartitionTasks need to do anything here, since they
-                // don't actually run java, they just exist for sequencing.  Any cleanup should be
-                // to the duplicate counter in MpScheduler for this transaction.
-            }
         }
         // Now, iterate through the backlog and update the partition masters
         // for all ProcedureTasks
@@ -163,6 +158,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             TransactionTask tt = iter.next();
             if (tt instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
+
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug("Repair updating task: " + next + " with masters: " + CoreUtils.hsIdCollectionToString(masters));
                 }

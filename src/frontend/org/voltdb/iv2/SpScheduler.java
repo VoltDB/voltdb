@@ -746,10 +746,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             replmsg.setToReplica(true);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[SpScheduler.handleFragmentTaskMessageRepair] sending repairing msg to " + CoreUtils.hsIdCollectionToString(needsRepair) +
-                        " from " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " " + replmsg);
-            }
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
@@ -909,10 +905,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         FragmentTaskMessage msg = message;
         long newSpHandle;
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("[SpSchdeudler.handleFragmentMessage] on " + CoreUtils.hsIdToString(m_mailbox.getHSId())
-            + " leader:" + m_isLeader + "\n" + message);
-        }
         //The site has been marked as non-leader. The follow-up batches or fragments are processed here
         if (!message.toReplica() && (m_isLeader || (!m_isLeader && message.shouldHandleByOriginalLeader()))) {
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
@@ -964,11 +956,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             m_mailbox.getHSId(), msg);
                 replmsg.setToReplica(true);
                 m_mailbox.send(m_sendToHSIds,replmsg);
-                if (tmLog.isDebugEnabled()) {
-                    List<Long> hsids = Arrays.stream(m_sendToHSIds).boxed().collect(Collectors.toList());
-                    tmLog.debug("[handleFragmentTaskMessage] " + CoreUtils.hsIdToString(m_mailbox.getHSId()) + " leader: " + m_isLeader + " sends to " +
-                            CoreUtils.hsIdCollectionToString(hsids) + "\n" + replmsg);
-                }
                 DuplicateCounter counter;
                 /*
                  * Non-determinism should be impossible to happen with MP fragments.
@@ -1220,7 +1207,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             traceLog.add(() -> VoltTrace.endAsync("recvfragment", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getTxnId()),
                                                   "status", message.getStatusCode()));
         }
-
         m_mailbox.send(message.getDestinationSiteId(), message);
     }
 
@@ -1239,20 +1225,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // correctly
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
-            logRepair(msg);
             msg.setToLeader(false);
             msg.setAckRequestedFromSender(true);
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
-        } else {
-            if(!m_isLeader) {
-                setMaxSeenTxnId(msg.getSpHandle());
-                if (txn != null) {
-                    logRepair(msg);
-                }
-            }
+        } else if(!m_isLeader) {
+            setMaxSeenTxnId(msg.getSpHandle());
         }
+        logRepair(msg);
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for
         // now, fix that later.
@@ -1556,10 +1537,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (existingDC == null) {
             m_duplicateCounters.put(dpKey, counter);
             return;
-        }
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(String.format("Duplicate counters:\nMessage 1: %s\nMessage 2: %s\n",
-                    existingDC.m_openMessage, counter.m_openMessage));
         }
         if (!skipCollisionFromBalanceSPI(existingDC, counter)) {
             existingDC.logWithCollidingDuplicateCounters(counter);
