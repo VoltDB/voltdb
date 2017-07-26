@@ -23,12 +23,14 @@
 
 package metrocard;
 
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.TreeMap;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -36,7 +38,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import org.voltdb.CLIConfig;
-import org.voltdb.client.ClientStatusListenerExt;
 
 
 public class MetroSimulation {
@@ -48,8 +49,6 @@ public class MetroSimulation {
 
     // validated command line configuration
     final MetroCardConfig config;
-    // Timer for periodic stats printing
-    Timer timer;
     // Benchmark start time
     long benchmarkStartTS;
 
@@ -82,15 +81,8 @@ public class MetroSimulation {
         @Option(desc = "Broker to connect to publish swipes and train activity.")
         String broker = "localhost:9092";
 
-
-        @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 300;
-
-        @Option(desc = "Interval for performance feedback, in seconds.")
-        long displayinterval = 5;
-
-        @Option(desc = "Filename to write raw summary statistics to.")
-        String statsfile = "";
+        @Option(desc = "Number of activities per train.")
+        long count = 50000;
 
         @Option(desc = "Swipes are posted to this topic.")
         String swipe = "card_swipes";
@@ -100,8 +92,7 @@ public class MetroSimulation {
 
         @Override
         public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (count < 0) exitWithMessageAndUsage("count must be > 0");
         }
     }
 
@@ -140,96 +131,57 @@ public class MetroSimulation {
         cal.set(Calendar.MILLISECOND, 0);
         producerConfig = new Properties();
         producerConfig.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, config.broker);
+        producerConfig.setProperty(ProducerConfig.ACKS_CONFIG, "1");
+        producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "metrocard");
 
         printHeading("Command Line Configuration");
         System.out.println(config.getConfigDumpString());
     }
 
-    /**
-     * Provides a callback to be notified on node failure.
-     * This example only logs the event.
-     */
-    class StatusListener extends ClientStatusListenerExt {
-        @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            // if the benchmark is still active
-            if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-            }
-        }
+    public static final Map<Integer,Integer> stationToNextTimeIn = new HashMap<>();
+    static {
+        stationToNextTimeIn.put(1, 2*60000);
+        stationToNextTimeIn.put(2, 2*60000);
+        stationToNextTimeIn.put(3, 3*60000);
+        stationToNextTimeIn.put(4, 4*60000);
+        stationToNextTimeIn.put(5, 2*60000);
+        stationToNextTimeIn.put(6, 2*60000);
+        stationToNextTimeIn.put(7, 1*60000);
+        stationToNextTimeIn.put(8, 2*60000);
+        stationToNextTimeIn.put(9, 2*60000);
+        stationToNextTimeIn.put(10,2*60000);
+        stationToNextTimeIn.put(11,2*60000);
+        stationToNextTimeIn.put(12,2*60000);
+        stationToNextTimeIn.put(13,2*60000);
+        stationToNextTimeIn.put(14,3*60000);
+        stationToNextTimeIn.put(15,2*60000);
+        stationToNextTimeIn.put(16,3*60000);
+        stationToNextTimeIn.put(17,3*60000);
     }
 
-    /**
-     * Create a Timer task to display performance data on the Vote procedure
-     * It calls printStatistics() every displayInterval seconds
-     */
-    public void schedulePeriodicStats() {
-        timer = new Timer();
-        TimerTask statsPrinting = new TimerTask() {
-            @Override
-            public void run() { printStatistics(); }
-        };
-        timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
-    }
-
-    /**
-     * Prints a one line update on performance that can be printed
-     * periodically during a benchmark.
-     */
-    public synchronized void printStatistics() {
-        //TODO: Print some kafka stats.
-    }
-
-    /**
-     * Prints the results of the voting simulation and statistics
-     * about performance.
-     *
-     * @throws Exception if anything unexpected happens.
-     */
-    public synchronized void printResults() throws Exception {
-        printHeading("Transaction Results");
-    }
-
-    public void initialize() throws Exception {
-
-    }
-
-    public int randomizeNotify() throws Exception {
-        // create a small number of text and email notification
-        // preferences, settable via random weighting below
-        float n = rand.nextFloat();
-        if (n > 0.01) {
-            return(0);
-        }
-        if (n > 0.005) {
-            return(1);
-        }
-        return(2);
-    }
 
     abstract class KafkaPublisher extends Thread {
-        private volatile int m_totalCount;
-        private volatile int m_currentCount = 0;
-        private volatile Exception m_error = null;
+        private volatile long m_totalCount;
+        private volatile long m_currentCount = 0;
         private final KafkaProducer m_producer;
-        private final String m_topic;
-        private Properties m_producerConfig;
+        private final Properties m_producerConfig;
 
-        public KafkaPublisher(String topic, Properties producerConfig, int count) {
-            m_topic = topic;
+        public KafkaPublisher(Properties producerConfig, long count) {
             m_totalCount = count;
             m_producerConfig = new Properties();
             m_producerConfig.putAll(producerConfig);
             m_producerConfig.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             m_producerConfig.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-            m_producer = new KafkaProducer(m_producerConfig);
+            m_producer = new KafkaProducer<>(m_producerConfig);
         }
 
         protected abstract void initialize();
         protected void close() {
-            m_producer.close();
+            try {
+                m_producer.close();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
         protected abstract ProducerRecord<String, String> getNextRecord();
 
@@ -247,36 +199,69 @@ public class MetroSimulation {
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
-                m_error = ex;
             } finally {
                 close();
             }
         }
-
-        public void shutDown() throws Exception {
-            if (m_totalCount == Integer.MAX_VALUE) {
-                m_totalCount = 0; // this will stop the pusher's forever loop
-            }
-            if (m_error != null) {
-                throw m_error;
-            }
-        }
     }
 
-    class TrainActivityPublisher extends KafkaPublisher {
+    static class TrainActivityPublisher extends KafkaPublisher {
         MetroCardConfig m_config;
-        TrainActivityPublisher(String trainId, MetroCardConfig config, Properties producerConfig, int count) {
-            super(config.trains, producerConfig, count);
+        public final String m_trainId;
+        public final long stopTime = 60000; //60 seconds randomize?
+        public final long lastStopWait = 120000;
+        public int curStation = 1;
+        public long startTime;
+        public int lastState = 0; // 0 for arrival, 1 for departure
+        public long arrivalTime;
+        public long departureTime;
+        public int direction = 1;
+        public static int tcnt = 0;
+        TrainActivityPublisher(String trainId, MetroCardConfig config, Properties producerConfig, long count) {
+            super(producerConfig, count);
+            m_trainId = trainId;
             m_config = config;
         }
 
         @Override
         protected void initialize() {
+            //Shift start time for each train by 2 min
+            startTime = System.currentTimeMillis() + (tcnt++ * 240*1000);
+            arrivalTime = startTime;
         }
 
         @Override
         protected ProducerRecord<String, String> getNextRecord() {
-            return new ProducerRecord<String, String>(m_config.trains, "key", "value");
+            StringBuilder sb = new StringBuilder();
+            long eventTime = startTime;
+            sb.append(m_trainId).append(",")
+                    .append(Integer.valueOf(curStation)).append(",")
+                    .append(Integer.valueOf(lastState)).append(",")
+                    .append(Long.valueOf(eventTime));
+            ProducerRecord<String, String> rec = new ProducerRecord<String, String>(m_config.trains, m_trainId, sb.toString());
+            curStation += direction*1;
+            long wtime = stopTime;
+            if (curStation > 17) {
+                curStation = 17;
+                wtime += lastStopWait;
+                direction = -1;
+            } else if (curStation < 1) {
+                curStation = 1;
+                direction = 1;
+                wtime += lastStopWait;
+            }
+            if (lastState == 0) { //Stopped
+                startTime = startTime + wtime;
+            } else { //Moving and arriving
+                startTime = startTime + stationToNextTimeIn.get(curStation) + wtime;
+            }
+            if (lastState == 0) {
+                lastState = 1;
+            } else {
+                lastState = 0;
+            }
+            System.out.println(sb.toString());
+            return rec;
         }
 
     }
@@ -284,7 +269,7 @@ public class MetroSimulation {
     class SwipeActivityPublisher extends KafkaPublisher {
 
         SwipeActivityPublisher(MetroCardConfig config, Properties producerConfig, int count) {
-            super(config.swipe, producerConfig, count);
+            super(producerConfig, count);
         }
 
         @Override
@@ -310,31 +295,18 @@ public class MetroSimulation {
      * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark() throws Exception {
-        printHeading("Setup & Initialization");
+        printHeading("Publishing Train Activities");
 
-
-        // print periodic statistics to the console
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
-
-        // Run the benchmark loop for the requested duration
-        // The throughput may be throttled depending on client configuration
-        System.out.println("\nRunning benchmark...");
-        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-
-        TrainActivityPublisher redLine = new TrainActivityPublisher("1", config, producerConfig, 100);
-        redLine.start();
-        while (benchmarkEndTime > System.currentTimeMillis()) {
-            Thread.sleep(10000);
+        String trains[] = { "1", "2", "3", "4" };
+        List<TrainActivityPublisher> trainPubs = new ArrayList<>();
+        for (int i = 0; i < trains.length; i++) {
+            TrainActivityPublisher redLine = new TrainActivityPublisher(trains[i], config, producerConfig, config.count);
+            redLine.start();
+            trainPubs.add(redLine);
         }
-        redLine.close();
-
-        // cancel periodic stats printing
-        timer.cancel();
-
-        // print the summary results
-        printResults();
-
+        for (TrainActivityPublisher redLine : trainPubs) {
+            redLine.join();
+        }
     }
 
     public static void main(String[] args) throws Exception {

@@ -86,8 +86,8 @@ PARTITION TABLE activity ON COLUMN card_id;
 CREATE TABLE train_activity(
   train_id              INTEGER        NOT NULL,
   station_id            INTEGER        NOT NULL,
-  arrival_time          TIMESTAMP,
-  dep_time              TIMESTAMP,
+  activity_type         TINYINT        NOT NULL, -- 0 for arrival, 1 for departure.
+  time                  TIMESTAMP
 );
 PARTITION TABLE train_activity ON COLUMN station_id;
 
