@@ -95,17 +95,13 @@ public class LoadedProcedureSet {
         m_defaultProcCache.clear();
         m_plannerTool = catalogContext.m_ptool;
 
-        if (m_sysProcs.size() == 0) {
-             // reload all system procedures from beginning
-            m_sysProcs = loadSystemProcedures(catalogContext, m_site);
-        } else {
-            // System procedures can be left without changes.
-            reInitSystemProcedureRunners(catalogContext);
-        }
+        // reload all system procedures from beginning
+        m_sysProcs = loadSystemProcedures(catalogContext, m_site);
 
         if (isInitOrReplay) {
             // reload user procedures
             try {
+            	hostLog.info("Reloading all user procedures");
                 m_userProcs = loadUserProcedureRunners(catalogContext.database.getProcedures(),
                                                        catalogContext.getCatalogJar().getLoader(),
                                                        null,
@@ -114,6 +110,7 @@ public class LoadedProcedureSet {
                 VoltDB.crashLocalVoltDB("Error trying to load user procedures: " + e.getMessage());
             }
         } else {
+        	hostLog.info("Swapping prepared user procedures");
             // When catalog updates, only user procedures needs to be reloaded.
             m_userProcs = catalogContext.getPreparedUserProcedures(m_site);
         }
@@ -245,14 +242,6 @@ public class LoadedProcedureSet {
             }
         }
         return builder.build();
-    }
-
-    public void reInitSystemProcedureRunners(CatalogContext catalogContext)
-    {
-        for (Entry<String, ProcedureRunner> entry: m_sysProcs.entrySet()) {
-            ProcedureRunner runner = entry.getValue();
-            runner.reInitSysProc(catalogContext);
-        }
     }
 
     public ProcedureRunner getProcByName(String procName)

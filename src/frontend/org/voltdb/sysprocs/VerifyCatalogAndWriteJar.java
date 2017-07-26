@@ -50,6 +50,8 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
     public CompletableFuture<ClientResponse> run(byte[] catalogBytes, String diffCommands,
             byte[] catalogHash, byte[] deploymentBytes)
     {
+        log.info("Precheck and prepare catalog update on non-blocking asynchronous threads");
+
         // This should only be called once on each host
         String err = VoltDB.instance().verifyJarAndPrepareProcRunners(
                 catalogBytes, diffCommands, catalogHash, deploymentBytes);

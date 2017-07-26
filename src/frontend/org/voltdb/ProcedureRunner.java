@@ -251,17 +251,6 @@ public class ProcedureRunner {
         return null;
     }
 
-    public void reInitSysProc(CatalogContext catalogContext) {
-        assert(m_procedure != null);
-        if (! m_isSysProc) {
-            return;
-        }
-        ((VoltSystemProcedure) m_procedure).initSysProc(m_site,
-                catalogContext.cluster,
-                catalogContext.getClusterSettings(),
-                catalogContext.getNodeSettings());
-    }
-
     public ProcedureStatsCollector getStatsCollector() {
         return m_statsCollector;
     }
