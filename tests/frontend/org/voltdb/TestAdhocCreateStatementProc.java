@@ -178,7 +178,7 @@ public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
 
             try {
                 m_client.callProcedure("@AdHoc",
-                        "create procedure MULTIFOO as begin select * from FOO where ID=?; end;");
+                        "create procedure MULTIFOO as begin select * from FOO where ID=?; select * from foo; end;");
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
