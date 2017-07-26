@@ -1157,10 +1157,11 @@ public class PlanAssembler {
         String contentDeterminismMessage = m_parsedSelect.getContentDeterminismMessage();
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismMessage);
 
-        // Apply the micro-optimization:
+        // Apply the select construction phase micro-optimizations:
         // LIMIT push down, Table count / Counting Index, Optimized Min/Max
-        MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
-
+        MicroOptimizationRunner.applyAll(plan,
+                                         m_parsedSelect,
+                                         MicroOptimizationRunner.Phases.DURING_PLAN_ASSEMBLY);
         return plan;
     }
 
@@ -1659,8 +1660,10 @@ public class PlanAssembler {
 
         // the root of the insert plan may be an InsertPlanNode, or
         // it may be a scan plan node.  We may do an inline InsertPlanNode
-        // as well.
-        InsertPlanNode insertNode = new InsertPlanNode();
+        // as well.  All inlining of insert nodes will be done later,
+        // in a microoptimzation.  We can't do it here, since we
+        // may need to remove uneeded projection nodes.
+        InsertPlanNode insertNode = new InsertPlanNode(m_parsedInsert.m_isUpsert);
         insertNode.setTargetTableName(targetTable.getTypeName());
         if (subquery != null) {
             insertNode.setSourceIsPartitioned(! subquery.getIsReplicated());
@@ -1670,7 +1673,6 @@ public class PlanAssembler {
         // where to put values produced by child into the row to be inserted.
         insertNode.setFieldMap(fieldMap);
 
-        AbstractPlanNode root = insertNode;
         if (matSchema != null) {
             MaterializePlanNode matNode =
                     new MaterializePlanNode(matSchema);
@@ -1679,27 +1681,12 @@ public class PlanAssembler {
             retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
         }
         else {
-            ScanPlanNodeWithInlineInsert planNode
-              = (retval.rootPlanGraph instanceof ScanPlanNodeWithInlineInsert)
-                    ? ((ScanPlanNodeWithInlineInsert)retval.rootPlanGraph)
-                    : null;
-            // If we have a sequential or index scan node without an inline aggregate
-            // node, and this is not an upsert, then we can inline the insert node.
-            // Inline upsert might be possible, but not now.
-            if (planNode != null
-                    && ( ! m_parsedInsert.m_isUpsert)
-                    && ( ! planNode.hasInlineAggregateNode())) {
-                planNode.addInlinePlanNode(insertNode);
-                root = planNode.getAbstractNode();
-            } else {
-                // Otherwise just make it out-of-line.
-                insertNode.addAndLinkChild(retval.rootPlanGraph);
-            }
+            insertNode.addAndLinkChild(retval.rootPlanGraph);
         }
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
-            retval.rootPlanGraph = root;
+            retval.rootPlanGraph = insertNode;
             return retval;
         }
 
@@ -1707,7 +1694,7 @@ public class PlanAssembler {
         // Add a compensating sum of modified tuple counts or a limit 1
         // AND a send on top of a union-like receive node.
         boolean isReplicated = targetTable.getIsreplicated();
-        retval.rootPlanGraph = addCoordinatorToDMLNode(root, isReplicated);
+        retval.rootPlanGraph = addCoordinatorToDMLNode(insertNode, isReplicated);
         return retval;
     }
 

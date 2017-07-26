@@ -156,27 +156,45 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         testCreateView(client,
                        "create view vv1 as select a, count(*), max(b + b) from alpha group by a",
                        UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv2 as select a, max(b + b), count(*) from alpha group by a",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv3 as select a, count(*), max(b + b), count(*) from alpha group by a",
+                       UNSAFE_OPS_STRING);
         // This should fail if alpha and beta are both populated, as
         // they are in the second test case.
         testCreateView(client,
-                       "create view vv2 as select alpha.a, count(*), max(beta.b + alpha.b) from alpha, beta group by alpha.a",
+                       "create view vv4 as select alpha.a, count(*), max(beta.b + alpha.b) from alpha, beta group by alpha.a",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv2 as select alpha.a, count(*) from alpha join beta on alpha.a / alpha.a < 1 group by alpha.a;",
+                       "create view vv4 as select alpha.a, count(*) from alpha join beta on alpha.a / alpha.a < 1 group by alpha.a;",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv2 as select alpha.a, count(*) from alpha, beta where alpha.a / alpha.a < 1 group by alpha.a;",
+                       "create view vv4 as select alpha.a, count(*) from alpha, beta where alpha.a / alpha.a < 1 group by alpha.a;",
                        UNSAFE_OPS_STRING);
         testCreateView(client,
-                       "create view vv2 as select alpha.a/beta.b, count(*) from alpha, beta group by alpha.a/beta.b;",
+                       "create view vv4 as select alpha.a/beta.b, count(*) from alpha, beta group by alpha.a/beta.b;",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv4 as select alpha.a/beta.b, sum(alpha.a/beta.b), count(*) from alpha, beta group by alpha.a/beta.b;",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv4 as select alpha.a/beta.b, count(*), sum(alpha.a/beta.b), count(*) from alpha, beta group by alpha.a/beta.b;",
                        UNSAFE_OPS_STRING);
         // This should succeed always, since the table empty is always
         // empty.
         testCreateView(client,
-                       "create view vv3 as select alpha.a, count(*), max(empty.b + empty.b) from alpha, empty group by alpha.a",
+                       "create view vv5 as select alpha.a, count(*), max(empty.b + empty.b) from alpha, empty group by alpha.a",
                        null);
         testCreateView(client,
-                       "create view vv4 as select a, count(*), max(b) from alpha group by a",
+                       "create view vv6 as select a, count(*), max(b) from alpha group by a",
+                       null);
+        testCreateView(client,
+                       "create view vv7 as select a, max(b), count(*) from alpha group by a",
+                       null);
+        testCreateView(client,
+                       "create view vv8 as select a, min(b), count(*), max(b), count(*) from alpha group by a",
                        null);
     }
 
@@ -296,6 +314,32 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
                         + "  ON t1.AID = t2.AID\n"
                         + "GROUP BY\n"
                         + "      t1.AID;\n"
+
+                        // count(*) anywhere in materialized views
+                        + "CREATE VIEW T_ENG_10945_1_VIEW\n"
+                        + "AS\n"
+                        + "   SELECT\n"
+                        + "        AID,\n"
+                        + "        MIN(AID),\n"
+                        + "        COUNT(*) AS IGNOREME,\n"
+                        + "        SUM(CAST(USD AS DECIMAL)) AS USD\n"
+                        + "FROM T_ENG_11497_1\n"
+                        + "GROUP BY\n"
+                        + "      AID;\n"
+
+                        // multiple count(*) anywhere in materialized views
+                        + "CREATE VIEW T_ENG_10945_2_VIEW\n"
+                        + "AS\n"
+                        + "   SELECT\n"
+                        + "        AID,\n"
+                        + "        MIN(AID),\n"
+                        + "        COUNT(*) AS IGNOREME,\n"
+                        + "        MAX(AID),\n"
+                        + "        COUNT(*) AS IGNOREME1,\n"
+                        + "        SUM(CAST(USD AS DECIMAL)) AS USD\n"
+                        + "FROM T_ENG_11497_1\n"
+                        + "GROUP BY\n"
+                        + "      AID;\n"
                         ;
 
         // Create some tables and some views
@@ -314,6 +358,12 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("@AdHoc", "drop view T_ENG_11497_2_VIEW;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop view T_ENG_10945_1_VIEW;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop view T_ENG_10945_2_VIEW;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("@AdHoc", "drop table T_ENG_11497_1;");

@@ -28,6 +28,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import java.security.SecureRandom;
 
 import java.io.IOException;
 
@@ -122,5 +123,15 @@ public enum TxnId2Utils {;
     static long getRowCount(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = doAdHoc(client, "select count(*) from " + tableName + ";");
         return cr.getResults()[0].asScalarLong();
+    }
+
+    static final String AB = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static SecureRandom rnd = new SecureRandom();
+
+    static String randomString( int len ){
+        StringBuilder sb = new StringBuilder( len );
+        for( int i = 0; i < len; i++ )
+            sb.append( AB.charAt( rnd.nextInt(AB.length()) ) );
+        return sb.toString();
     }
 }

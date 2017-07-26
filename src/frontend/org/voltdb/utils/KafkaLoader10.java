@@ -34,8 +34,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -45,12 +50,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /**
@@ -472,17 +471,21 @@ public class KafkaLoader10 {
      * @throws Exception
      */
     public static Client getClient(ClientConfig config, String[] servers) throws Exception {
+        config.setTopologyChangeAware(true);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
             try {
                 client.createConnection(server.trim());
-            } catch (Exception closeConnectionAndRethrow) {
-                m_log.error("Failed to connect to " + server.trim() + ". Provide valid list of server(s).");
-                try {
-                    client.close();
-                } catch (Exception ignore) {}
-                throw closeConnectionAndRethrow;
+            } catch (IOException e) {
+                // Only swallow exceptions caused by Java network or connection problem
+                // Unresolved hostname exceptions will be thrown
             }
+        }
+        if (client.getConnectedHostList().isEmpty()) {
+            try {
+                client.close();
+            } catch (Exception ignore) {}
+            throw new Exception("Unable to connect to any servers");
         }
         return client;
     }

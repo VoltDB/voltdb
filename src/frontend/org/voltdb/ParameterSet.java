@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -95,6 +96,12 @@ public class ParameterSet implements JSONString {
                     continue;
                 }
 
+                if (obj instanceof Byte[]) {
+                    final Byte[] b = (Byte[]) obj;
+                    size += 4 + b.length;
+                    continue;
+                }
+
                 VoltType type;
                 try {
                     type = VoltType.typeFromClass(cls.getComponentType());
@@ -108,16 +115,28 @@ public class ParameterSet implements JSONString {
                 size +=  1 + 2;// component type, array length
                 switch (type) {
                     case SMALLINT:
-                        size += 2 * ((short[])obj).length;
+                        if (obj instanceof Short[])
+                            size += 2 * ((Short[])obj).length;
+                        else
+                            size += 2 * ((short[])obj).length;
                         break;
                     case INTEGER:
-                        size += 4 * ((int[])obj).length;
+                        if (obj instanceof Integer[])
+                            size += 4 * ((Integer[])obj).length;
+                        else
+                            size += 4 * ((int[])obj).length;
                         break;
                     case BIGINT:
-                        size += 8 * ((long[])obj).length;
+                        if (obj instanceof Long[])
+                            size += 8 * ((Long[])obj).length;
+                        else
+                            size += 8 * ((long[])obj).length;
                         break;
                     case FLOAT:
-                        size += 8 * ((double[])obj).length;
+                        if (obj instanceof Double[])
+                            size += 8 * ((Double[])obj).length;
+                        else
+                            size += 8 * ((double[])obj).length;
                         break;
                     case STRING:
                         String strings[] = (String[]) obj;
@@ -144,10 +163,19 @@ public class ParameterSet implements JSONString {
                         }
                         break;
                     case VARBINARY:
-                        for (byte[] buf : (byte[][]) obj) {
-                            size += 4; // length prefix
-                            if (buf != null) {
-                                size += buf.length;
+                        if (obj instanceof Byte[][]) {
+                            for (Byte[] buf : (Byte[][]) obj) {
+                                size += 4; // length prefix
+                                if (buf != null) {
+                                    size += buf.length;
+                                }
+                            }
+                        } else {
+                            for (byte[] buf : (byte[][]) obj) {
+                                size += 4; // length prefix
+                                if (buf != null) {
+                                    size += buf.length;
+                                }
                             }
                         }
                         break;
@@ -665,8 +693,13 @@ public class ParameterSet implements JSONString {
                 // Since arrays of bytes could be varbinary or strings,
                 // and they are the only kind of array needed by the EE,
                 // special case them as the VARBINARY type.
-                if (obj instanceof byte[]) {
-                    final byte[] b = (byte[]) obj;
+                if (obj instanceof byte[] || obj instanceof Byte[]) {
+                    final byte[] b;
+                    if (obj instanceof Byte[]) {
+                        b = ArrayUtils.toPrimitive((Byte[])obj);
+                    } else {
+                        b = (byte[]) obj;
+                    }
                     // commented out this bit... presumably the EE will do this check upon recipt
                     /*if (b.length > VoltType.MAX_VALUE_LENGTH) {
                         throw new IOException("Value of byte[] larger than allowed max string or varbinary " + VoltType.MAX_VALUE_LENGTH_STR);
@@ -702,16 +735,28 @@ public class ParameterSet implements JSONString {
                 buf.put(type.getValue());
                 switch (type) {
                     case SMALLINT:
-                        SerializationHelper.writeArray((short[]) obj, buf);
+                        if (obj instanceof Short[])
+                            SerializationHelper.writeArray((short[]) ArrayUtils.toPrimitive((Short[])obj), buf);
+                        else
+                            SerializationHelper.writeArray((short[]) obj, buf);
                         break;
                     case INTEGER:
-                        SerializationHelper.writeArray((int[]) obj, buf);
+                        if (obj instanceof Integer[])
+                            SerializationHelper.writeArray((int[]) ArrayUtils.toPrimitive((Integer[])obj), buf);
+                        else
+                            SerializationHelper.writeArray((int[]) obj, buf);
                         break;
                     case BIGINT:
-                        SerializationHelper.writeArray((long[]) obj, buf);
+                        if (obj instanceof Long[])
+                            SerializationHelper.writeArray((long[]) ArrayUtils.toPrimitive((Long[])obj), buf);
+                        else
+                            SerializationHelper.writeArray((long[]) obj, buf);
                         break;
                     case FLOAT:
-                        SerializationHelper.writeArray((double[]) obj, buf);
+                        if (obj instanceof Double[])
+                            SerializationHelper.writeArray((double[]) ArrayUtils.toPrimitive((Double[])obj), buf);
+                        else
+                            SerializationHelper.writeArray((double[]) obj, buf);
                         break;
                     case STRING:
                         if (m_encodedStringArrays[i] == null) {
@@ -739,7 +784,16 @@ public class ParameterSet implements JSONString {
                         SerializationHelper.writeArray((VoltTable[]) obj, buf);
                         break;
                     case VARBINARY:
-                        SerializationHelper.writeArray((byte[][]) obj, buf);
+                        if (obj instanceof Byte[][]) {
+                            Byte[][] boxByteBuf = (Byte[][])obj;
+                            int byteLen = boxByteBuf.length;
+                            byte[][] byteBuf = new byte[byteLen][];
+                            for (int ii = 0; ii < byteLen; ii++) {
+                               byteBuf[ii] = ArrayUtils.toPrimitive(boxByteBuf[ii]);
+                            }
+                            SerializationHelper.writeArray(byteBuf, buf);
+                        } else
+                            SerializationHelper.writeArray((byte[][]) obj, buf);
                         break;
                     case GEOGRAPHY_POINT:
                         SerializationHelper.writeArray((GeographyPointValue[]) obj, buf);

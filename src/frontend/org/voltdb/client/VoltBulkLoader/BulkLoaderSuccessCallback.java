@@ -14,19 +14,20 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.voltdb.client.VoltBulkLoader;
 
-package org.voltdb.processtools;
-
-import org.voltdb.processtools.ProcessData.OutputLine;
+import org.voltdb.client.ClientResponse;
 
 /**
- * Implement this interface to handle output for a process.
+ * Interface for operations that need to be informed of a successful import operation, such as Kafka offset management.
+ * @author jcrump
  *
  */
-public interface OutputHandler {
+public interface BulkLoaderSuccessCallback {
+
     /**
-     * Called when a new line from standard output or error is available.
-     * @param line
+     * Callback for successful row import.  Callers are reponsible for managing their own exception reporting.
      */
-    public void update(OutputLine line);
+    public void success(Object rowHandle, ClientResponse response);
+
 }

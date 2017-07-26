@@ -332,6 +332,7 @@ protected:
                                        std::vector<std::string> const& columnNames,
                                        bool ownsTupleSchema,
                                        int32_t compactionThreshold = 95);
+    bool checkNulls(TableTuple& tuple) const;
 
 protected:
     // ------------------------------------------------------------------
@@ -341,6 +342,9 @@ protected:
     boost::scoped_array<char> m_tempTupleMemory;
 
     TupleSchema* m_schema;
+
+    // CONSTRAINTS
+    std::vector<bool> m_allowNulls;
 
     // schema as array of string names
     std::vector<std::string> m_columnNames;

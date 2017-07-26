@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
@@ -32,6 +33,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 
 import com.google_voltpatches.common.collect.Lists;
 
@@ -45,10 +47,13 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     private final String m_insertProcedure;
     private final VoltType[] m_columnTypes;
     private final BulkLoaderErrorHandler m_errHandler;
+    private final ExecutorService m_callbackExecutor;
 
     final AtomicLong m_processedCount = new AtomicLong(0);
     final AtomicLong m_failedCount = new AtomicLong(0);
     final int m_reportEveryNRows = 10000;
+
+    final BulkLoaderSuccessCallback m_successCallback;
 
     @Override
     public void setFlushInterval(int delay, int seconds) {
@@ -78,9 +83,20 @@ public class CSVTupleDataLoader implements CSVDataLoader {
 
         //one insert at a time callback
         @Override
-        public void clientCallback(ClientResponse response) throws Exception {
+        public void clientCallback(final ClientResponse response) throws Exception {
             byte status = response.getStatus();
-            if (status != ClientResponse.SUCCESS) {
+            if (status == ClientResponse.SUCCESS) {
+                if (m_callbackExecutor != null && m_successCallback != null) {
+                    // If the client is keeping track of offsets, notify it (but run on a service thread)
+                    m_callbackExecutor.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            m_successCallback.success(m_csvLine, response);
+                        }
+                    });
+                }
+            }
+            else {
                 m_failedCount.incrementAndGet();
                 m_errHandler.handleError(m_csvLine, response, response.getStatusString());
             }
@@ -95,9 +111,22 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler)
             throws IOException, ProcCallException
     {
+        this(client, procName, errHandler, null);
+    }
+
+    public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler, ExecutorService callbackExecutor)
+            throws IOException, ProcCallException {
+        this(client, procName, errHandler, callbackExecutor, null);
+    }
+
+    public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler, ExecutorService callbackExecutor, BulkLoaderSuccessCallback successCallback)
+            throws IOException, ProcCallException
+    {
         m_client = client;
         m_insertProcedure = procName;
         m_errHandler = errHandler;
+        m_callbackExecutor = callbackExecutor;
+        m_successCallback = successCallback;
 
         List<VoltType> typeList = Lists.newArrayList();
         VoltTable procInfo = client.callProcedure("@SystemCatalog", "PROCEDURECOLUMNS").getResults()[0];

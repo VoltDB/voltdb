@@ -1,0 +1,5 @@
+create table identicaltablet1 (
+  identicaltablecol1 integer not null primary key
+);
+create procedure identicaltableproc1 as select count(*) from identicaltablet1;	
+create view identicaltableview1 (identicaltablecol1) as select count(*) from identicaltablet1 where identicaltablecol1 < 100;

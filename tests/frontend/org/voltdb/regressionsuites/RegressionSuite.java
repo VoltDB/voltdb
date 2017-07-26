@@ -247,6 +247,10 @@ public class RegressionSuite extends TestCase {
         return getClientToHostId(hostId, 1000 * 60 * 10); // 10 minute default
     }
 
+    public Client getClientToSubsetHosts(int[] hostIds) throws IOException {
+        return getClientToSubsetHosts(hostIds, 1000 * 60 * 10); // 10 minute default
+    }
+
     public Client getFullyConnectedClient() throws IOException {
         return getFullyConnectedClient(1000 * 60 * 10); // 10 minute default
     }
@@ -365,6 +369,28 @@ public class RegressionSuite extends TestCase {
         return client;
     }
 
+    public Client getClientToSubsetHosts(int[] hostIds, long timeout) throws IOException {
+        List<String> listeners = new ArrayList<String>();
+        for (int hostId : hostIds) {
+            listeners.add(m_config.getListenerAddress(hostId));
+        }
+        ClientConfig config = new ClientConfigForTest(m_username, m_password);
+        config.setConnectionResponseTimeout(timeout);
+        config.setProcedureCallTimeout(timeout);
+        final Client client = ClientFactory.createClient(config);
+        for (String listener : listeners) {
+            try {
+                client.createConnection(listener);
+            }
+            // retry once
+            catch (ConnectException e) {
+                client.createConnection(listener);
+            }
+        }
+        m_clients.add(client);
+        return client;
+    }
+
     public Client getFullyConnectedClient(long timeout) throws IOException {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
@@ -430,7 +456,7 @@ public class RegressionSuite extends TestCase {
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
                     hNp.getHostText(), m_username, hashedPassword, port, null,
-                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine)[0];
+                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine, 0)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {

@@ -80,7 +80,8 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             new ColumnInfo("LASTQUEUEDTIMESTAMP", VoltType.TIMESTAMP),
             new ColumnInfo("LASTACKTIMESTAMP", VoltType.TIMESTAMP),
             new ColumnInfo("ISSYNCED", VoltType.STRING),
-            new ColumnInfo("MODE", VoltType.STRING)
+            new ColumnInfo("MODE", VoltType.STRING),
+            new ColumnInfo("QUEUE_GAP", VoltType.BIGINT),
         };
     }
 

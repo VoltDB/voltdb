@@ -184,8 +184,15 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         //
         TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
         for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
-            tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
+            try {
+                tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
                                 m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
+            } catch (SQLException& ex) {
+                std::string errorMsg = ex.message()
+                                    + " '" + (targetTable->getColumnNames()).at(m_inputTargetMap[map_ctr].first) + "'";
+                throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
+            }
+
         }
 
         // if there is a partition column for the target table

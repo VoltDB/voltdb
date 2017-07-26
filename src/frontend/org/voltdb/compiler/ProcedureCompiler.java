@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfo;
@@ -148,6 +147,17 @@ public abstract class ProcedureCompiler {
         return retval;
     }
 
+    public static Map<String, SQLStmt> getSQLStmtMap(VoltCompiler compiler, Class<?> procClass) throws VoltCompilerException {
+        VoltProcedure procInstance;
+        try {
+            procInstance = (VoltProcedure) procClass.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            throw new RuntimeException("Error instantiating procedure " + procClass.getName(), e);
+        }
+        Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, procInstance, true);
+        return stmtMap;
+    }
+
     /**
      * get the short name of the class (no package)
      * @param className fully qualified (or not) class name
@@ -163,53 +173,20 @@ public abstract class ProcedureCompiler {
         return shortName;
     }
 
-    static void compileJavaProcedure(VoltCompiler compiler,
-                                     HSQLInterface hsql,
-                                     DatabaseEstimates estimates,
-                                     Database db,
-                                     ProcedureDescriptor procedureDescriptor,
-                                     InMemoryJarfile jarOutput)
-                                             throws VoltCompiler.VoltCompilerException
-    {
-        final String className = procedureDescriptor.m_className;
-
-        // Load the class given the class name
-        Class<?> procClass = procedureDescriptor.m_class;
-
-        // get the short name of the class (no package)
+    public static ProcInfoData checkPartitioningInfo(VoltCompiler compiler, String ddlPartitionString,
+            String className, ProcedureAnnotation pa, Class<?> procClass) throws VoltCompilerException {
+        // check if partition info was set in ddl
+        ProcInfoData ddlInfo = null;
+        if (ddlPartitionString != null && ! ddlPartitionString.trim().isEmpty()) {
+            ddlInfo = new ProcInfoData();
+            ddlInfo.partitionInfo = ddlPartitionString;
+            ddlInfo.singlePartition = true;
+        }
         String shortName = deriveShortProcedureName(className);
-
-        // add an entry to the catalog
-        final Procedure procedure = db.getProcedures().add(shortName);
-        for (String groupName : procedureDescriptor.m_authGroups) {
-            final Group group = db.getGroups().get(groupName);
-            if (group == null) {
-                throw compiler.new VoltCompilerException("Procedure " + className + " allows access by a role " + groupName + " that does not exist");
-            }
-            final GroupRef groupRef = procedure.getAuthgroups().add(groupName);
-            groupRef.setGroup(group);
-        }
-        procedure.setClassname(className);
-        // sysprocs don't use the procedure compiler
-        procedure.setSystemproc(false);
-        procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
-        procedure.setHasjava(true);
-        ProcedureAnnotation pa = (ProcedureAnnotation) procedure.getAnnotation();
-        if (pa == null) {
-            pa = new ProcedureAnnotation();
-            procedure.setAnnotation(pa);
-        }
 
         // get the annotation
         // first try to get one that has been passed from the compiler
         ProcInfoData info = compiler.getProcInfoOverride(shortName);
-        // check if partition info was set in ddl
-        ProcInfoData ddlInfo = null;
-        if (procedureDescriptor.m_partitionString != null && ! procedureDescriptor.m_partitionString.trim().isEmpty()) {
-            ddlInfo = new ProcInfoData();
-            ddlInfo.partitionInfo = procedureDescriptor.m_partitionString;
-            ddlInfo.singlePartition = true;
-        }
         // then check for the usual one in the class itself
         // and create a ProcInfo.Data instance for it
         if (info == null) {
@@ -245,38 +222,11 @@ public abstract class ProcedureCompiler {
             }
         }
 
-        // if the procedure is non-transactional, then take this special path here
-        if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
-            compileNTProcedure(compiler, procClass, procedure, jarOutput);
-            return;
-        }
-        // if still here, that means the procedure is transactional
-        procedure.setTransactional(true);
+        return info;
+    }
 
-        // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
-        boolean procHasWriteStmts = false;
-        boolean procHasSeqScans = false;
-        // procWantsCommonPartitioning == true but commonPartitionExpression == null signifies a proc
-        // for which the planner was requested to attempt to find an SP plan, but that was not possible
-        // -- it had a replicated write or it had one or more partitioned reads that were not all
-        // filtered by the same partition key value -- so it was planned as an MP proc.
-        boolean procWantsCommonPartitioning = true;
-        AbstractExpression commonPartitionExpression = null;
-        String exampleSPstatement = null;
-        Object exampleSPvalue = null;
-
-        // iterate through the fields and get valid sql statements
-
-        VoltProcedure procInstance;
-        try {
-            procInstance = (VoltProcedure) procClass.newInstance();
-        } catch (InstantiationException e) {
-            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
-        }
-        Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, procInstance, true);
-
+    public static Map<String, Object> getFiledsMap(VoltCompiler compiler, Map<String, SQLStmt> stmtMap,
+            Class<?> procClass, String shortName) throws VoltCompilerException {
         ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
         builder.putAll(stmtMap);
 
@@ -321,6 +271,24 @@ public abstract class ProcedureCompiler {
         builder.put("@run",procMethod);
 
         Map<String, Object> fields = builder.build();
+        return fields;
+    }
+
+    public static void compileSQLStmtUpdatingProcedureInfomation(VoltCompiler compiler,
+            HSQLInterface hsql, DatabaseEstimates estimates, Database db,
+            Procedure procedure, boolean isSinglePartition, Map<String, Object> fields)
+                    throws VoltCompilerException {
+        // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
+        boolean procHasWriteStmts = false;
+        boolean procHasSeqScans = false;
+        // procWantsCommonPartitioning == true but commonPartitionExpression == null signifies a proc
+        // for which the planner was requested to attempt to find an SP plan, but that was not possible
+        // -- it had a replicated write or it had one or more partitioned reads that were not all
+        // filtered by the same partition key value -- so it was planned as an MP proc.
+        boolean procWantsCommonPartitioning = true;
+        AbstractExpression commonPartitionExpression = null;
+        String exampleSPstatement = null;
+        Object exampleSPvalue = null;
 
         // determine if proc is read or read-write by checking if the proc contains any write sql stmts
         boolean readWrite = false;
@@ -349,7 +317,7 @@ public abstract class ProcedureCompiler {
 
             // compile the statement
             StatementPartitioning partitioning =
-                info.singlePartition ? StatementPartitioning.forceSP() :
+                    isSinglePartition ? StatementPartitioning.forceSP() :
                                        StatementPartitioning.forceMP();
             boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
@@ -445,8 +413,12 @@ public abstract class ProcedureCompiler {
 
         procedure.setHasseqscans(procHasSeqScans);
 
+        String shortName = deriveShortProcedureName(procedure.getClassname());
         checkForDeterminismWarnings(compiler, shortName, procedure, procHasWriteStmts);
+    }
 
+    public static Class<?>[] setParameterTypes(VoltCompiler compiler, Procedure procedure, String shortName, Method procMethod)
+            throws VoltCompilerException {
         // set procedure parameter types
         CatalogMap<ProcParameter> params = procedure.getParameters();
         Class<?>[] paramTypes = procMethod.getParameterTypes();
@@ -464,21 +436,11 @@ public abstract class ProcedureCompiler {
             else
                 param.setIsarray(false);
 
-            // boxed types are not supported parameters at this time
-            if ((cls == Long.class) || (cls == Integer.class) || (cls == Short.class) ||
-                (cls == Byte.class) || (cls == Double.class) ||
-                (cls == Character.class) || (cls == Boolean.class))
-            {
-                String msg = "Procedure: " + shortName + " has a parameter with a boxed type: ";
-                msg += cls.getSimpleName();
-                msg += ". Replace this parameter with the corresponding primitive type and the procedure may compile.";
-                throw compiler.new VoltCompilerException(msg);
-            } else if ((cls == Float.class) || (cls == float.class)) {
+            if ((cls == Float.class) || (cls == float.class)) {
                 String msg = "Procedure: " + shortName + " has a parameter with type: ";
                 msg += cls.getSimpleName();
                 msg += ". Replace this parameter type with double and the procedure may compile.";
                 throw compiler.new VoltCompilerException(msg);
-
             }
 
             VoltType type;
@@ -501,47 +463,115 @@ public abstract class ProcedureCompiler {
 
             param.setType(type.getValue());
         }
+        return paramTypes;
+    }
 
-        // parse the procinfo
+    public static void addPartitioningInfo(VoltCompiler compiler, Procedure procedure,
+            Database db, Class<?>[] paramTypes, ProcInfoData info)
+                    throws VoltCompilerException {
+        // parse the procedureInfo
         procedure.setSinglepartition(info.singlePartition);
-        if (info.singlePartition) {
-            parsePartitionInfo(compiler, db, procedure, info.partitionInfo);
-            if (procedure.getPartitionparameter() >= paramTypes.length) {
-                String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
-                throw compiler.new VoltCompilerException(msg);
-            }
+        if (!info.singlePartition) return;
 
-            // check the type of partition parameter meets our high standards
-            Class<?> partitionType = paramTypes[procedure.getPartitionparameter()];
-            Class<?>[] validPartitionClzzes = {
-                    Long.class, Integer.class, Short.class, Byte.class,
-                    long.class, int.class, short.class, byte.class,
-                    String.class, byte[].class
-            };
-            boolean found = false;
-            for (Class<?> candidate : validPartitionClzzes) {
-                if (partitionType == candidate)
-                    found = true;
-            }
-            if (!found) {
-                String msg = "PartitionInfo parameter must be a String or Number for procedure: " + procedure.getClassname();
-                throw compiler.new VoltCompilerException(msg);
-            }
+        parsePartitionInfo(compiler, db, procedure, info.partitionInfo);
+        if (procedure.getPartitionparameter() >= paramTypes.length) {
+            String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
+            throw compiler.new VoltCompilerException(msg);
+        }
 
-            VoltType columnType = VoltType.get((byte)procedure.getPartitioncolumn().getType());
-            VoltType paramType = VoltType.typeFromClass(partitionType);
-            if ( ! columnType.canExactlyRepresentAnyValueOf(paramType)) {
-                String msg = "Type mismatch between partition column and partition parameter for procedure " +
+        // check the type of partition parameter meets our high standards
+        Class<?> partitionType = paramTypes[procedure.getPartitionparameter()];
+        Class<?>[] validPartitionClzzes = {
+                Long.class, Integer.class, Short.class, Byte.class,
+                long.class, int.class, short.class, byte.class,
+                String.class, byte[].class
+        };
+        boolean found = false;
+        for (Class<?> candidate : validPartitionClzzes) {
+            if (partitionType == candidate)
+                found = true;
+        }
+        if (!found) {
+            String msg = "PartitionInfo parameter must be a String or Number for procedure: " + procedure.getClassname();
+            throw compiler.new VoltCompilerException(msg);
+        }
+
+        VoltType columnType = VoltType.get((byte)procedure.getPartitioncolumn().getType());
+        VoltType paramType = VoltType.typeFromClass(partitionType);
+        if ( ! columnType.canExactlyRepresentAnyValueOf(paramType)) {
+            String msg = "Type mismatch between partition column and partition parameter for procedure " +
                     procedure.getClassname() + " may cause overflow or loss of precision.\nPartition column is type " + columnType +
                     " and partition parameter is type " + paramType;
-                throw compiler.new VoltCompilerException(msg);
-            } else if ( ! paramType.canExactlyRepresentAnyValueOf(columnType)) {
-                String msg = "Type mismatch between partition column and partition parameter for procedure " +
-                        procedure.getClassname() + " does not allow the full range of partition key values.\nPartition column is type " + columnType +
-                        " and partition parameter is type " + paramType;
-                compiler.addWarn(msg);
-            }
+            throw compiler.new VoltCompilerException(msg);
+        } else if ( ! paramType.canExactlyRepresentAnyValueOf(columnType)) {
+            String msg = "Type mismatch between partition column and partition parameter for procedure " +
+                    procedure.getClassname() + " does not allow the full range of partition key values.\nPartition column is type " + columnType +
+                    " and partition parameter is type " + paramType;
+            compiler.addWarn(msg);
         }
+    }
+
+    static void compileJavaProcedure(VoltCompiler compiler,
+                                     HSQLInterface hsql,
+                                     DatabaseEstimates estimates,
+                                     Database db,
+                                     ProcedureDescriptor procedureDescriptor,
+                                     InMemoryJarfile jarOutput)
+                                             throws VoltCompiler.VoltCompilerException
+    {
+        final String className = procedureDescriptor.m_className;
+
+        // Load the class given the class name
+        Class<?> procClass = procedureDescriptor.m_class;
+
+        // get the short name of the class (no package)
+        String shortName = deriveShortProcedureName(className);
+
+        // add an entry to the catalog
+        final Procedure procedure = db.getProcedures().add(shortName);
+        for (String groupName : procedureDescriptor.m_authGroups) {
+            final Group group = db.getGroups().get(groupName);
+            if (group == null) {
+                throw compiler.new VoltCompilerException("Procedure " + className + " allows access by a role " + groupName + " that does not exist");
+            }
+            final GroupRef groupRef = procedure.getAuthgroups().add(groupName);
+            groupRef.setGroup(group);
+        }
+        procedure.setClassname(className);
+        // sysprocs don't use the procedure compiler
+        procedure.setSystemproc(false);
+        procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
+        procedure.setHasjava(true);
+        ProcedureAnnotation pa = (ProcedureAnnotation) procedure.getAnnotation();
+        if (pa == null) {
+            pa = new ProcedureAnnotation();
+            procedure.setAnnotation(pa);
+        }
+
+        // check if partition info was set in ddl
+        ProcInfoData info = checkPartitioningInfo(compiler, procedureDescriptor.m_partitionString, className, pa, procClass);
+
+        // if the procedure is non-transactional, then take this special path here
+        if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
+            compileNTProcedure(compiler, procClass, procedure, jarOutput);
+            return;
+        }
+        // if still here, that means the procedure is transactional
+        procedure.setTransactional(true);
+
+        // iterate through the fields and get valid sql statements
+        Map<String, SQLStmt> stmtMap = getSQLStmtMap(compiler, procClass);
+        Map<String, Object> fields = getFiledsMap(compiler, stmtMap, procClass, shortName);
+        Method procMethod = (Method) fields.get("@run");
+        assert(procMethod != null);
+
+        compileSQLStmtUpdatingProcedureInfomation(compiler, hsql, estimates, db, procedure,
+                info.singlePartition, fields);
+
+        // set procedure parameter types
+        Class<?>[] paramTypes = setParameterTypes(compiler, procedure, shortName, procMethod);
+
+        addPartitioningInfo(compiler, procedure, db, paramTypes, info);
 
         // put the compiled code for this procedure into the jarfile
         // need to find the outermost ancestor class for the procedure in the event
@@ -555,7 +585,7 @@ public abstract class ProcedureCompiler {
         compiler.addClassToJar(jarOutput, ancestor);
     }
 
-    private static void compileNTProcedure(VoltCompiler compiler,
+    public static void compileNTProcedure(VoltCompiler compiler,
                                            Class<?> procClass,
                                            Procedure procedure,
                                            InMemoryJarfile jarOutput)
@@ -689,7 +719,7 @@ public abstract class ProcedureCompiler {
         }
     }
 
-    private static void checkForDeterminismWarnings(VoltCompiler compiler, String shortName, final Procedure procedure,
+    public static void checkForDeterminismWarnings(VoltCompiler compiler, String shortName, final Procedure procedure,
                                          boolean procHasWriteStmts) {
         for (Statement catalogStmt : procedure.getStatements()) {
             if (catalogStmt.getIscontentdeterministic() == false) {
@@ -858,7 +888,7 @@ public abstract class ProcedureCompiler {
     /**
      * Determine which parameter is the partition indicator
      */
-    static void parsePartitionInfo(VoltCompiler compiler, Database db,
+    public static void parsePartitionInfo(VoltCompiler compiler, Database db,
             Procedure procedure, String info) throws VoltCompilerException {
 
         assert(procedure.getSinglepartition() == true);
@@ -894,7 +924,7 @@ public abstract class ProcedureCompiler {
         // split the columninfo
         parts = columnInfo.split("\\.");
         if (parts.length != 2) {
-            String msg = "Possibly invalid PartitionInfo in attribute for procedure: " + procedure.getClassname();
+            String msg = "Possibly invalid PartitionInfo " + info + " in attribute for procedure: " + procedure.getClassname();
             throw compiler.new VoltCompilerException(msg);
         }
 

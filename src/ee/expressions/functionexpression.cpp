@@ -197,6 +197,13 @@ using namespace functionexpression;
 AbstractExpression*
 ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments) {
     if (IS_USER_DEFINED_ID(functionId)) {
+        // This part is temporary to avoid the memory leak.
+        // It will be removed after the UDF code is checked in.
+        size_t i = arguments->size();
+        while (i--) {
+            delete (*arguments)[i];
+        }
+        delete arguments;
         return new ConstantValueExpression(NValue::getNullValue(VALUE_TYPE_BIGINT));
     }
     AbstractExpression* ret = 0;
@@ -433,6 +440,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_INET6_ATON:
             ret = new UnaryFunctionExpression<FUNC_INET6_ATON>((*arguments)[0]);
+            break;
+        case FUNC_DEGREES:
+            ret = new UnaryFunctionExpression<FUNC_DEGREES>((*arguments)[0]);
+            break;
+        case FUNC_RADIANS:
+            ret = new UnaryFunctionExpression<FUNC_RADIANS>((*arguments)[0]);
             break;
         default:
             return NULL;

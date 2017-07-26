@@ -265,6 +265,79 @@ def compare_cleaned_to_baseline(parent, baseparent, path, inpath, do_refresh, re
             return True
     return False
 
+def delete_proc(pfile):
+    # drop any procedures left in between any tests
+    defaultstoredprocedures = {".insert",".update",".select",".delete",".upsert"}
+    procset = set()
+
+    for line in pfile.splitlines():
+        columns = line.split(',')
+        # column[2] gives the procedure name. using set to discard duplicates among partition.
+        try:
+            if columns[2] != ' ' :
+                procname = columns[2].replace('\"','')
+                if any( procname.endswith(defaultprocedure) for defaultprocedure in defaultstoredprocedures) :
+                    continue
+                print "user procedure : " + procname  #debug
+                procset.add(procname)
+        except IndexError:
+            pass
+
+    if len(procset) :
+        sb = ''
+        sb += 'file -inlinebatch EOB'+ '\n' + '\n'
+        for procname in procset:
+            sb += 'DROP PROCEDURE ' + procname + ' IF EXISTS;' + '\n'
+        sb += '\n' + 'EOB'
+
+        proc = subprocess.Popen(['../../bin/sqlcmd'],
+                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        proc.communicate(sb)
+        rc = proc.wait()
+
+        if(rc != 0) :
+            # debug
+            (stdoutprocdata, stderrdata) = proc.communicate()
+            print "sqlcmdtest error \n"
+            print "Detail output : " +  stdoutprocdata
+            print "Detail error : " +  stderrdata
+
+
+def delete_table_and_view(pfile):
+    # drop table (unique) and all its views left in between any tests
+    tableset = set()
+    for line in pfile.splitlines():
+        columns = line.split(',')
+        # column[5] gives the table and views. using set to discard duplicates among partition.
+        try:
+            if columns[5] != ' ' :
+                tablename = columns[5].replace('\"','')
+                tableset.add(tablename)
+        except IndexError:
+            pass
+
+    if len(tableset) :
+        sb = ''
+        sb += 'file -inlinebatch EOB'+ '\n' + '\n'
+        for tablename in tableset:
+            print "user table/view : " + tablename  #debug
+            sb += 'DROP TABLE ' + tablename + ' IF EXISTS CASCADE;' + '\n'
+        sb += '\n' + 'EOB'
+
+        proc = subprocess.Popen(['../../bin/sqlcmd'],
+                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        proc.communicate(sb)
+        rc = proc.wait()
+
+        if(rc != 0) :
+            # debug
+            (stdouttabledata, stderrdata) = proc.communicate()
+            print "sqlcmdtest error \n"
+            print "Detail output : " +  stdouttabledata
+            print "Detail error : " +  stderrdata
+
 
 def do_main():
     parser = OptionParser()
@@ -298,6 +371,7 @@ def do_main():
     # option or automatic-but-verbosely -- to detect and use an already running
     # VoltDB server and remember to leave it running on exit.
     launch_and_wait_on_voltdb(reportout)
+
 
     # Except in refresh mode, any diffs change the scripts exit code to fail ant/jenkins
     haddiffs = False
@@ -336,8 +410,36 @@ def do_main():
                     subprocess.call(['../../bin/sqlcmd'],
                         stdin=childin, stdout=childout, stderr=childerr)
 
-                # TODO launch a hard-coded script that verifies a clean database and healthy server
-                # ("show tables" or equivalent) after each test run to prevent cross-contamination.
+                # Verify a clean database by dropping any procedure,views and table after each test to prevent cross-contamination.
+                proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @SystemCatalog procedures', '--output-skip-metadata', '--output-format=csv'],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                rc = proc.wait()
+                (stdoutprocdata, stdoutprocerr) = proc.communicate()
+
+
+                if (rc != 0) :
+                    # debug
+                    print "sqlcmdtest error \n"
+                    print "Detail output : " +  stdoutprocdata
+                    print "Detail error : " +  stdoutprocerr
+                else :
+                    delete_proc(stdoutprocdata)
+
+                proc = subprocess.Popen(['../../bin/sqlcmd', '--query=exec @Statistics table 0', '--output-skip-metadata', '--output-format=csv'],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                rc = proc.wait()
+                (stdouttabledata, stdouttableerr) = proc.communicate()
+
+
+                if (rc != 0) :
+                    # debug
+                    print "sqlcmdtest error \n"
+                    print "Detail output : " +  stdouttabledata
+                    print "Detail error : " +  stdouttableerr
+                else :
+                    delete_table_and_view(stdouttabledata)
 
                 # fuzz the sqlcmd output for reliable comparison
                 clean_output(parent, prefix + '.out')

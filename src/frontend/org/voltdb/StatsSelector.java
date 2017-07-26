@@ -21,6 +21,7 @@ public enum StatsSelector {
     INDEX,            // invoked as @stat index
     PROCEDURE,        // invoked as @stat procedure
     STARVATION,
+    QUEUE,
     INITIATOR,        // invoked as @stat initiator
     LATENCY,          // invoked as @stat latency
     LATENCY_COMPRESSED,  // before V7.3 this was @Statistics LATENCY

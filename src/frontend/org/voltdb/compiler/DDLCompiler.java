@@ -37,7 +37,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 
-import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -56,7 +55,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
-import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
@@ -111,7 +109,6 @@ public class DDLCompiler {
     private final MaterializedViewProcessor m_mvProcessor;
 
     private String m_fullDDL = "";
-    private int m_currLineNo = 1;
 
     private final VoltDBStatementProcessor m_voltStatementProcessor;
 
@@ -175,7 +172,8 @@ public class DDLCompiler {
             this.lineNo = lineNo;
         }
         public String statement = "";
-        public int lineNo;
+        public int lineNo; // beginning of statement line number
+        public int endLineNo; // end of statement line number
     }
 
     public DDLCompiler(VoltCompiler compiler,
@@ -375,13 +373,13 @@ public class DDLCompiler {
      */
     void loadSchema(Reader reader, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompiler.VoltCompilerException {
-        m_currLineNo = 1;
+        int currLineNo = 1;
 
-        DDLStatement stmt = getNextStatement(reader, m_compiler);
+        DDLStatement stmt = getNextStatement(reader, m_compiler, currLineNo);
         while (stmt != null) {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             processVoltDBStatements(db, whichProcs, stmt);
-            stmt = getNextStatement(reader, m_compiler);
+            stmt = getNextStatement(reader, m_compiler, stmt.endLineNo);
         }
 
         try {
@@ -659,91 +657,10 @@ public class DDLCompiler {
         }
     }
 
-    private class CreateProcedurePartitionData {
+    public static class CreateProcedurePartitionData {
         String tableName = null;
         String columnName = null;
         String parameterNo = null;
-    }
-
-    /**
-     * Parse and validate the substring containing ALLOW and PARTITION
-     * clauses for CREATE PROCEDURE.
-     * @param clauses  the substring to parse
-     * @param descriptor  procedure descriptor populated with role names from ALLOW clause
-     * @return  parsed and validated partition data or null if there was no PARTITION clause
-     * @throws VoltCompilerException
-     */
-    private CreateProcedurePartitionData parseCreateProcedureClauses(
-            ProcedureDescriptor descriptor,
-            String clauses) throws VoltCompilerException {
-
-        // Nothing to do if there were no clauses.
-        // Null means there's no partition data to return.
-        // There's also no roles to add.
-        if (clauses == null || clauses.isEmpty()) {
-            return null;
-        }
-        CreateProcedurePartitionData data = null;
-
-        Matcher matcher = SQLParser.matchAnyCreateProcedureStatementClause(clauses);
-        int start = 0;
-        while (matcher.find(start)) {
-            start = matcher.end();
-
-            if (matcher.group(1) != null) {
-                // Add roles if it's an ALLOW clause. More that one ALLOW clause is okay.
-                for (String roleName : StringUtils.split(matcher.group(1), ',')) {
-                    // Don't put the same role in the list more than once.
-                   String roleNameFixed = roleName.trim().toLowerCase();
-                    if (!descriptor.m_authGroups.contains(roleNameFixed)) {
-                        descriptor.m_authGroups.add(roleNameFixed);
-                    }
-                }
-            }
-            else {
-                // Add partition info if it's a PARTITION clause. Only one is allowed.
-                if (data != null) {
-                    throw m_compiler.new VoltCompilerException(
-                        "Only one PARTITION clause is allowed for CREATE PROCEDURE.");
-                }
-                data = new CreateProcedurePartitionData();
-                data.tableName = matcher.group(2);
-                data.columnName = matcher.group(3);
-                data.parameterNo = matcher.group(4);
-            }
-        }
-
-        return data;
-    }
-
-    private void addProcedurePartitionInfo(
-            String procName,
-            CreateProcedurePartitionData data,
-            String statement) throws VoltCompilerException {
-
-        assert(procName != null);
-
-        // Will be null when there is no optional partition clause.
-        if (data == null) {
-            return;
-        }
-
-        assert(data.tableName != null);
-        assert(data.columnName != null);
-
-        // Check the identifiers.
-        checkIdentifierStart(procName, statement);
-        checkIdentifierStart(data.tableName, statement);
-        checkIdentifierStart(data.columnName, statement);
-
-        // if not specified default parameter index to 0
-        if (data.parameterNo == null) {
-            data.parameterNo = "0";
-        }
-
-        String partitionInfo = String.format("%s.%s: %s", data.tableName, data.columnName, data.parameterNo);
-
-        m_tracker.addProcedurePartitionInfoTo(procName, partitionInfo);
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
@@ -948,14 +865,14 @@ public class DDLCompiler {
     private static int kStateReadingEndCodeBlockNextDelim = 11;   // dealing with ending code block delimiter ###
 
 
-    private int readingState(char[] nchar, DDLStatement retval) {
+    private static int readingState(char[] nchar, DDLStatement retval) {
         if (nchar[0] == '-') {
             // remember that a possible '--' is being examined
             return kStateReadingCommentDelim;
         }
         else if (nchar[0] == '\n') {
             // normalize newlines to spaces
-            m_currLineNo += 1;
+            retval.endLineNo += 1;
             retval.statement += " ";
         }
         else if (nchar[0] == '\r') {
@@ -983,7 +900,7 @@ public class DDLCompiler {
         return kStateReading;
     }
 
-    private int readingCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
+    private static int readingCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReadingCodeBlockNextDelim;
@@ -992,7 +909,7 @@ public class DDLCompiler {
         }
     }
 
-    private int readingEndCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
+    private static int readingEndCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReadingEndCodeBlockNextDelim;
@@ -1001,7 +918,7 @@ public class DDLCompiler {
         }
     }
 
-    private int readingCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
+    private static int readingCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             retval.statement += nchar[0];
             return kStateReadingCodeBlock;
@@ -1009,7 +926,7 @@ public class DDLCompiler {
         return readingState(nchar, retval);
     }
 
-    private int readingEndCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
+    private static int readingEndCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
         retval.statement += nchar[0];
         if (SQLLexer.isBlockDelimiter(nchar[0])) {
             return kStateReading;
@@ -1017,7 +934,7 @@ public class DDLCompiler {
         return kStateReadingCodeBlock;
     }
 
-    private int readingCodeBlock(char [] nchar, DDLStatement retval) {
+    private static int readingCodeBlock(char [] nchar, DDLStatement retval) {
         // all characters in the literal are accumulated. keep track of
         // newlines for error messages.
         retval.statement += nchar[0];
@@ -1026,17 +943,17 @@ public class DDLCompiler {
         }
 
         if (nchar[0] == '\n') {
-            m_currLineNo += 1;
+            retval.endLineNo += 1;
         }
         return kStateReadingCodeBlock;
     }
 
-    private int readingStringLiteralState(char[] nchar, DDLStatement retval) {
+    private static int readingStringLiteralState(char[] nchar, DDLStatement retval) {
         // all characters in the literal are accumulated. keep track of
         // newlines for error messages.
         retval.statement += nchar[0];
         if (nchar[0] == '\n') {
-            m_currLineNo += 1;
+            retval.endLineNo += 1;
         }
 
         // if we see a SINGLE_QUOTE, change states to check for terminating literal
@@ -1049,7 +966,7 @@ public class DDLCompiler {
     }
 
 
-    private int readingStringLiteralSpecialChar(char[] nchar, DDLStatement retval) {
+    private static int readingStringLiteralSpecialChar(char[] nchar, DDLStatement retval) {
 
         // if this is an escaped quote, return kReadingStringLiteral.
         // otherwise, the string is complete. Parse nchar as a non-literal
@@ -1062,7 +979,7 @@ public class DDLCompiler {
         }
     }
 
-    private int readingCommentDelimState(char[] nchar, DDLStatement retval) {
+    private static int readingCommentDelimState(char[] nchar, DDLStatement retval) {
         if (nchar[0] == '-') {
             // confirmed that a comment is being read
             return kStateReadingComment;
@@ -1075,16 +992,16 @@ public class DDLCompiler {
         }
     }
 
-    private int readingCommentState(char[] nchar, DDLStatement retval) {
+    private static int readingCommentState(char[] nchar, DDLStatement retval) {
         if (nchar[0] == '\n') {
             // a comment is continued until a newline is found.
-            m_currLineNo += 1;
+            retval.endLineNo += 1;
             return kStateReading;
         }
         return kStateReadingComment;
     }
 
-    private DDLStatement getNextStatement(Reader reader, VoltCompiler compiler)
+    public static DDLStatement getNextStatement(Reader reader, VoltCompiler compiler, int currLineNo)
             throws VoltCompiler.VoltCompilerException {
 
         int state = kStateInvalid;
@@ -1092,7 +1009,6 @@ public class DDLCompiler {
         char[] nchar = new char[1];
         @SuppressWarnings("synthetic-access")
         DDLStatement retval = new DDLStatement();
-        retval.lineNo = m_currLineNo;
 
         try {
 
@@ -1105,7 +1021,7 @@ public class DDLCompiler {
 
                 // trim leading whitespace outside of a statement
                 if (nchar[0] == '\n') {
-                    m_currLineNo++;
+                    currLineNo++;
                 }
                 else if (nchar[0] == '\r') {
                 }
@@ -1123,7 +1039,7 @@ public class DDLCompiler {
                     }
                     if (nchar[0] != '-') {
                         String msg = "Invalid content before or between DDL statements.";
-                        throw compiler.new VoltCompilerException(msg, m_currLineNo);
+                        throw compiler.new VoltCompilerException(msg, currLineNo);
                     }
                     else {
                         do {
@@ -1134,7 +1050,7 @@ public class DDLCompiler {
                         } while (nchar[0] != '\n');
 
                         // process the newline and loop
-                        m_currLineNo++;
+                        currLineNo++;
                     }
                 }
 
@@ -1142,11 +1058,13 @@ public class DDLCompiler {
                 else {
                     retval.statement += nchar[0];
                     state = kStateReading;
-                    // Set the line number to the start of the real statement.
-                    retval.lineNo = m_currLineNo;
                     break;
                 }
             } while (true);
+
+            // Set the line number to the start of the real statement.
+            retval.lineNo = currLineNo;
+            retval.endLineNo = currLineNo;
 
             while (state != kStateCompleteStatement) {
                 if (reader.read(nchar) == -1) {

@@ -24,14 +24,21 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.collect.Sets.SetView;
 
 import junit.framework.Test;
 
@@ -39,8 +46,6 @@ public class TestStopNode2NK1PartitionDetectionOn extends RegressionSuite
 {
 
     static LocalCluster m_config;
-    private static final String TMPDIR = "/tmp";
-    private static final String TESTNONCE = "ppd_nonce";
 
     public TestStopNode2NK1PartitionDetectionOn(String name) {
         super(name);
@@ -73,24 +78,55 @@ public class TestStopNode2NK1PartitionDetectionOn extends RegressionSuite
 
     }
 
-    public void testStopNode() throws Exception {
-        Client client = getFullyConnectedClient();
+    public void waitForHostToBeGone(int hid) {
+        Set<Integer> hids = new HashSet<Integer>();
+        hids.add(hid);
+        waitForHostsToBeGone(hids);
+    }
 
-        boolean lostConnect = false;
-        try {
-            CountDownLatch cdl = new CountDownLatch(2);
-            //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 1), "@StopNode", 1);
-            //Stop a node that should stay up
-            client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 0), "@StopNode", 0);
-            VoltTable tab = client.callProcedure("@SystemInformation", "overview").getResults()[0];
-            cdl.await();
-        } catch (Exception pce) {
-            pce.printStackTrace();
-            lostConnect = pce.getMessage().contains("was lost before a response was received");
+    public void waitForHostsToBeGone(Set<Integer> hids) {
+        while (true) {
+            Client client = null;
+            VoltTable table = null;
+            try {
+                Thread.sleep(1000);
+                client = getFullyConnectedClient();
+                table = client.callProcedure("@SystemInformation", "overview").getResults()[0];
+                client.close();
+                client = null;
+            } catch (Exception ex) {
+                System.out.println("Failed to get SystemInformation overview: " + ex.getMessage());
+                continue;
+            }
+            Set<Integer> liveHids = new HashSet<Integer>();
+            while (table.advanceRow()) {
+                liveHids.add((int)table.getLong("HOST_ID"));
+            }
+            SetView<Integer> intersect = Sets.intersection(liveHids, hids);
+            if (!intersect.isEmpty()) {
+                intersect.forEach((hid) -> {
+                    if (hids.contains(hid)) System.out.println("Host " + hid + " Still there");
+                });
+            } else {
+                return;
+            }
         }
-        //We should never lose contact.
-        assertFalse(lostConnect);
+    }
+
+    public void testStopNode() throws Exception {
+        if (!MiscUtils.isPro()) {
+            return;
+        }
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost", m_config.port(1));
+
+        CountDownLatch cdl = new CountDownLatch(2);
+        //Stop a node that should be allowed
+        client.callProcedure(new StopCallBack(cdl, ClientResponse.SUCCESS, 0), "@StopNode", 0);
+        //Stop a node that should stay up
+        client.callProcedure(new StopCallBack(cdl, ClientResponse.GRACEFUL_FAILURE, 1), "@StopNode", 1);
+        cdl.await();
+        waitForHostToBeGone(0); // If something goes wrong, keep looping until timeout
     }
 
     @Override
@@ -106,8 +142,8 @@ public class TestStopNode2NK1PartitionDetectionOn extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         //Lets tolerate 3 node failures.
-        m_config = new LocalCluster("decimal-default.jar", 4, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        m_config.setHasLocalServer(true);
+        m_config = new LocalCluster("decimal-default.jar", 4, 2, MiscUtils.isPro() ? 1 : 0, BackendTarget.NATIVE_EE_JNI);
+        m_config.setHasLocalServer(false);
         project.setPartitionDetectionEnabled(true);
         success = m_config.compile(project);
         assertTrue(success);

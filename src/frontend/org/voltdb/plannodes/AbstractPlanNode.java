@@ -44,6 +44,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -467,6 +468,76 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * Find the true output schema.  This may be in some child
+     * node.  This seems to be the search order when constructing
+     * a plan node in the EE.
+     *
+     * There are several cases.
+     * 1.) If the child has an output schema, and if it is
+     *     not a copy of one of its children's schemas,
+     *     that's the one we want.  We know it's a copy
+     *     if m_hasSignificantOutputSchema is false.
+     * 2.) If the child has no significant output schema but it
+     *     has an inline projection node, then
+     *     a.) If it does <em>not</em> have an inline insert
+     *         node then the output schema of the child is
+     *         the output schema of the inline projection node.
+     *     b.) If the output schema has an inline insert node
+     *         then the output schema is the usual DML output
+     *         schema, which will be the schema of the inline
+     *         insert node.  I don't think we will ever see.
+     *         this case in this function.  This function is
+     *         only called from the microoptimizer to remove
+     *         projection nodes.  So we don't see a projection
+     *         node on top of a node with an inlined insert node.
+     *  3.) Otherwise, the output schema is the output schema
+     *      of the child's first child.  We should be able to
+     *      follow the first children until we get something
+     *      usable.
+     *
+     * Just for the record, if the child node has an inline
+     * insert and a projection node, the projection node's
+     * output schema is the schema of the tuples we will be
+     * inserting into the target table.  The output schema of
+     * the child node will be the output schema of the insert
+     * node, which will be the usual DML schema.  This has one
+     * long integer column counting the number of rows inserted.
+     *
+     * @param node
+     * @return The true output schema.  This will never return null.
+     */
+    public final NodeSchema getTrueOutputSchema() throws PlanningErrorException {
+        AbstractPlanNode child = this;
+        NodeSchema childSchema = getOutputSchema();
+        //
+        // Note: This code is translated from the C++ code in
+        //       AbstractExecutor::getOutputSchema.  It's considerably
+        //       different there, but I think this has the corner
+        //       cases covered correctly.
+        while (childSchema == null || ( ! child.m_hasSignificantOutputSchema) ) {
+            AbstractPlanNode childProj = child.getInlinePlanNode(PlanNodeType.PROJECTION);
+            if (childProj != null) {
+                AbstractPlanNode inlineInsertNode = childProj.getInlinePlanNode(PlanNodeType.INSERT);
+                if (inlineInsertNode != null) {
+                    child = inlineInsertNode;
+                } else {
+                    child = childProj;
+                }
+                childSchema = child.getOutputSchema();
+            } else if (child.getChildCount() > 0) {
+                child = child.getChild(0);
+            } else {
+                // We've gone to the end of the plan.  This is a
+                // failure in the EE.
+                assert(false);
+                throw new PlanningErrorException("AbstractPlanNode with no true output schema.");
+            }
+        }
+        assert(childSchema != null);
+        return childSchema;
+    }
+
+    /**
      * Add a child and link this node child's parent.
      * @param child The node to add.
      */
@@ -476,7 +547,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         child.m_parents.add(this);
     }
 
-    // called by PushDownLimit, re-link the child without changing the order
+    /**
+     * Used to re-link the child without changing the order.
+     *
+     * This is called by PushDownLimit and RemoveUnnecessaryProjectNodes.
+     * @param index
+     * @param child
+     */
     public void setAndLinkChild(int index, AbstractPlanNode child) {
         assert(child != null);
         m_children.set(index, child);
