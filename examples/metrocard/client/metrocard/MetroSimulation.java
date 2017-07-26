@@ -82,7 +82,7 @@ public class MetroSimulation {
         String broker = "localhost:9092";
 
         @Option(desc = "Number of activities per train.")
-        long count = 50000;
+        long count = 5000000;
 
         @Option(desc = "Swipes are posted to this topic.")
         String swipe = "card_swipes";
@@ -205,7 +205,8 @@ public class MetroSimulation {
         }
     }
 
-    static class TrainActivityPublisher extends KafkaPublisher {
+    public static int tcnt = 0;
+    class TrainActivityPublisher extends KafkaPublisher {
         MetroCardConfig m_config;
         public final String m_trainId;
         public final long stopTime = 60000; //60 seconds randomize?
@@ -216,7 +217,6 @@ public class MetroSimulation {
         public long arrivalTime;
         public long departureTime;
         public int direction = 1;
-        public static int tcnt = 0;
         TrainActivityPublisher(String trainId, MetroCardConfig config, Properties producerConfig, long count) {
             super(producerConfig, count);
             m_trainId = trainId;
