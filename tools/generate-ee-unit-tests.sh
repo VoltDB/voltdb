@@ -12,7 +12,6 @@
 BUILD=release
 VERBOSE=
 ECHO=+x
-
 #
 # Look in various places to find the root of the
 # build hierarchy.
@@ -28,9 +27,9 @@ isVoltDBRoot() {
     return 1;
 }
 if isVoltDBRoot "."; then
-	VOLTDBROOT="$(/bin/pwd)"
+	VOLTDB_ROOT="$(/bin/pwd)"
 elif isVoltDBRoot "../.."; then
-	VOLTDBROOT="$(cd ../..; /bin/pwd)"
+	VOLTDB_ROOT="$(cd ../..; /bin/pwd)"
 else
     echo "$0: Can't find the voltdb root"
     exit 100
@@ -66,16 +65,16 @@ while [ -n "$1" ]; do
             esac
             ;;
         --voltdbroot=*)
-            VOLTDBROOT="$(echo $1 | sed 's/--voltdbroot=//')"
+            VOLTDB_ROOT="$(echo $1 | sed 's/--voltdbroot=//')"
             shift
-            if [ ! -d "$VOLTDBROOT" ] ; then
-                echo "$0: Source directory \"$VOLTDBROOT\" does not exist."
+            if [ ! -d "$VOLTDB_ROOT" ] ; then
+                echo "$0: Source directory \"$VOLTDB_ROOT\" does not exist."
                 exit 100
             fi
-            if [ ! -d "$VOLTDBROOT/lib" ] \
-                || [ ! -d "$VOLTDBROOT/third_party/java/jars" ] \
-                || [ ! -f "$VOLTDBROOT/tests/log4j-allconsole.xml" ] ; then
-                  echo "$0: Source directory \"$VOLTDBROOT\" is implausible.  Is it right?"
+            if [ ! -d "$VOLTDB_ROOT/lib" ] \
+                || [ ! -d "$VOLTDB_ROOT/third_party/java/jars" ] \
+                || [ ! -f "$VOLTDB_ROOT/tests/log4j-allconsole.xml" ] ; then
+                  echo "$0: Source directory \"$VOLTDB_ROOT\" is implausible.  Is it right?"
                   exit 100
             fi
             ;;
@@ -108,8 +107,10 @@ if [ -z "$TEST_CLASSES" ] ; then
     exit 100
 fi
 
-GENERATED_DIR="$VOLTDBROOT/tests/ee/ee_auto_generated_unit_tests"
-OBJDIR="$VOLTDBROOT/obj/${BUILD}"
+GENERATED_DIR="$VOLTDB_ROOT/tests/ee/ee_auto_generated_unit_tests"
+OBJDIR="$VOLTDB_ROOT/obj/${BUILD}"
+echo "VOLTDB_ROOT=$VOLTDB_ROOT"
+echo "OBJDIR=${OBJDIR}"
 for CLASS in $TEST_CLASSES; do
-    (set $ECHO; java $VERBOSE -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDBROOT}/lib/\*:${VOLTDBROOT}/third_party/java/jars/\* -Dlog4j.configuration=file:${VOLTDBROOT}/tests/log4j-allconsole.xml $CLASS ${NAMES_ONLY} --voltdb-root="${VOLTDB_ROOT}")
+    (set $ECHO; java $VERBOSE -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDB_ROOT}/lib/\*:${VOLTDB_ROOT}/third_party/java/jars/\* -Dlog4j.configuration=file:${VOLTDB_ROOT}/tests/log4j-allconsole.xml $CLASS ${NAMES_ONLY} --voltdb-root="${VOLTDB_ROOT}")
 done

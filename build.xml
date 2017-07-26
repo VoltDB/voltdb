@@ -100,10 +100,8 @@
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
 <!-- Some definitions the EE build process needs. -->
 <property name='cmake.generator'             value='Unix Makefiles' />
-<property name='cmake.build.source'          value='${base.dir}/src/ee' />
-<property name='cmake.test.source'           value='${base.dir}/tests/ee' />
 <property name='cmake.build.obj'             value='${build.dir}' />
-<property name='cmake.build.tool'            value='${cmake.build.source}/tools/build_cmake.py' />
+<property name='cmake.build.tool'            value='${base.dir}/tools/build_cmake.py' />
 <property name='cmake.build.verbose'         value='no' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
@@ -1465,21 +1463,6 @@ NATIVE EE STUFF
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--verbose-build='${cmake.build.verbose}'" />
         <arg line="--install" />
-    </exec>
-    <antcall target="prep_libvoltdb"/>
-</target>
-
-<target name='recompile_ee_nodepends'
-    description="Build C++ JNI library and copy it to production folder.">
-    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <!-- The tool ${cmake.build.tool} does all the EE building.
-             See the comment in that file for complete details.
-         -->
-         <arg line="--generator='${cmake.generator}'" />
-         <arg line="--build-type='${build}'" />
-         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-         <arg line="--verbose-build='${cmake.build.verbose}'" />
-         <arg line="--install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>

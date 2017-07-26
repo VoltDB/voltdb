@@ -35,7 +35,9 @@ def licenseStartsHere(content, approvedLicenses):
     return 0
 
 def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
-    if f.endswith('.py'):
+    if f.endswith('.py') \
+       or f.endswith('.cmake') \
+       or f.endswith("CMakeLists.txt"):
         if not content.startswith("#"):
             if content.lstrip().startswith("#"):
                 print "ERROR: \"%s\" contains whitespace before initial comment." % f
@@ -288,7 +290,7 @@ def fixTrailingNewline(f, content):
 FIX_LICENSES_LEVEL = 2
 
 def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
-    for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py', '.groovy'):
+    for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py', '.groovy', '.cmake', 'CMakeLists.txt'):
         if f.endswith(suffix):
             break
     else:
@@ -305,7 +307,9 @@ def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
     if retval != 0:
         if fix > FIX_LICENSES_LEVEL:
             fixed += retval
-            if f.endswith('.py'):
+            if f.endswith('.py') \
+               or f.endswith('.cmake') \
+               or f == "CMakeLists.txt":
                 content = fixLicensePython(f, content, approvedLicensesPython)
             else:
                 content = fixLicenseJavaC(f, content, approvedLicensesJavaC)

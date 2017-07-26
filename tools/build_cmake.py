@@ -352,10 +352,14 @@ def validateConfig(config):
     # the command line parameters.
     config.installipc=False
 
+    # If we don't have an explicit objdir,
+    # then it's obj/${BUILDTYPE}.
     if not config.objdir:
         config.objdir = os.path.join('obj', config.buildtype)
+    # If we don't have an explicity srcdir
+    # then it's the current working directory.
     if not config.srcdir:
-        config.srcdir = os.path.join(os.getcwd(), 'src', 'ee')
+        config.srcdir = os.path.join(os.getcwd())
     # Some of the build and run parameters are incompatible.
     if morethanoneof(config.runalltests, config.runonetest, config.runonetestdir):
         print("--run-all-tests, --run-one-testdir and --run-one-test are incompatible.")
