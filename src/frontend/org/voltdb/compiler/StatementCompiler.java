@@ -407,7 +407,7 @@ public abstract class StatementCompiler {
         CatalogMap<Statement> statements = newCatProc.getStatements();
         assert(statements != null);
 
-        Statement stmt = statements.add(VoltDB.ANON_STMT_NAME);
+        Statement stmt = statements.add(VoltDB.ANON_STMT_NAME + "0");
         stmt.setSqltext(sqlText);
         stmt.setReadonly(catProc.getReadonly());
         stmt.setQuerytype(qtype.getValue());
