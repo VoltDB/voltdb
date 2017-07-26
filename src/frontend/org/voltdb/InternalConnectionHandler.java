@@ -29,6 +29,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -126,9 +127,9 @@ public class InternalConnectionHandler {
             task.setBatchTimeout(timeout);
         }
 
-        int partition = -1;
+        int[] partitions = null;
         try {
-            partition = InvocationDispatcher.getPartitionForProcedure(catProc, task);
+            partitions = InvocationDispatcher.getPartitionsForProcedure(catProc, task);
         } catch (Exception e) {
             String fmt = "Can not invoke procedure %s. Partition not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, procName);
@@ -136,11 +137,12 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        final InternalClientResponseAdapter adapter = m_adapters.get(partition);
+        boolean mp = (partitions[0] == MpInitiator.MP_INIT_PID) || (partitions.length > 1);
+        final InternalClientResponseAdapter adapter = mp ? m_adapters.get(MpInitiator.MP_INIT_PID) : m_adapters.get(partitions[0]);
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
                 DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, adapter.connectionId());
 
-        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, ntPriority, backPressurePredicate)) {
+        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partitions, ntPriority, backPressurePredicate)) {
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -173,9 +175,9 @@ public class InternalConnectionHandler {
             m_failedCount.incrementAndGet();
             return false;
         }
-        int partition = -1;
+        int[] partitions = null;
         try {
-            partition = InvocationDispatcher.getPartitionForProcedure(catProc, task);
+            partitions = InvocationDispatcher.getPartitionsForProcedure(catProc, task);
         } catch (Exception e) {
             String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, proc, caller);
@@ -183,12 +185,13 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        final InternalClientResponseAdapter adapter = m_adapters.get(partition);
+        boolean mp = (partitions[0] == MpInitiator.MP_INIT_PID) || (partitions.length > 1);
+        final InternalClientResponseAdapter adapter = mp ? m_adapters.get(MpInitiator.MP_INIT_PID) : m_adapters.get(partitions[0]);
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(caller,  adapter.connectionId());
 
         final AuthUser user = getCatalogContext().authSystem.getImporterUser();
 
-        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, false, backPressurePredicate)) {
+        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partitions, false, backPressurePredicate)) {
             m_failedCount.incrementAndGet();
             return false;
         }
