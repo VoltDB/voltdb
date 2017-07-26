@@ -356,7 +356,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private long m_lastHeartbeatTime = System.nanoTime();
     private void processMessage(VoltMessage message) throws Exception {
         if (!m_hsIds.contains(message.m_sourceHSId)) {
-        	String messageFormat = "Dropping message " + message + " because it is not from a known up site";
+            String messageFormat = "Dropping message " + message + " because it is not from a known up site";
             //logger.log("Dropping message " + message + " because it is not from a known up site",System.currentTimeMillis(), Level.INFO);
             RateLimitedLogger.tryLogForMessage(m_lastHeartbeatTime,
                                                10000,
