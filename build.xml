@@ -1643,7 +1643,7 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-    <ant antfile="build-importers.xml" target="importers-junit" inheritAll="true" inheritRefs="true"/>
+    <ant antfile="build-importers.xml" target="importer_junit_tests" inheritAll="true" inheritRefs="true"/>
 </target>
 
 <target name="junit_sql"
