@@ -127,10 +127,6 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         m_thread.start();
     }
 
-    public String toString() {
-        return m_toString;
-    }
-
     /**
      * Create a pico network thread
      * @param sc  SocketChannel
@@ -393,7 +389,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             retval.put(
                     m_ih.connectionId(),
                     Pair.of(
-                            m_toString + "_p",
+                            getHostnameOrIP(),
                             new long[]{
                                     read,
                                     messagesRead,
@@ -402,7 +398,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             retval.put(
                     -1L,
                     Pair.of(
-                            "GLOBAL_p",
+                            "GLOBAL",
                             new long[] {
                                     read,
                                     messagesRead,

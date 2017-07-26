@@ -392,7 +392,6 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
             }
             else if ("@Trace".equals(procName)) {
-                hostLog.warn(VoltDB.instance().getHostMessenger().dumpBinding());
                 return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
             else if ("@StopNode".equals(procName)) {
