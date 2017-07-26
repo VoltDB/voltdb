@@ -2196,11 +2196,11 @@ public abstract class CatalogUtil {
 
     public static class CatalogAndDeployment {
         public final long genId;
-        private final byte[] catalogHash;
+        public final byte[] catalogHash;
         public final byte[] catalogBytes;
         public final byte[] deploymentBytes;
 
-        private CatalogAndDeployment(
+        public CatalogAndDeployment(
                 long genId,
                 byte[] catalogHash,
                 byte[] catalogBytes,
@@ -2214,7 +2214,7 @@ public abstract class CatalogUtil {
 
         public byte[] getCatalogHash()
         {
-            return catalogHash.clone();
+            return catalogHash;
         }
 
         @Override

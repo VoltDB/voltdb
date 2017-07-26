@@ -66,6 +66,7 @@ public class CatalogContext {
     public static class CatalogInfo {
         public InMemoryJarfile m_jarfile;
         public final long m_catalogCRC;
+        public final byte[] m_catalogBytes;
         public final byte[] m_catalogHash;
         public final byte[] m_deploymentBytes;
         public final byte[] m_deploymentHash;
@@ -80,6 +81,7 @@ public class CatalogContext {
 
             if (catalogBytes != null) {
                 try {
+                    m_catalogBytes = catalogBytes;
                     m_jarfile = new InMemoryJarfile(catalogBytes);
                     m_catalogCRC = m_jarfile.getCRC();
                 }

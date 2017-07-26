@@ -291,10 +291,20 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean isForReplay = m_runner.getTxnState().isForReplay();
 
             CatalogAndDeployment catalogStuff = null;
-            try {
-                catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
+            if (isForReplay) {
+            	try {
+            		catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+            	} catch (Exception e) {
+            		VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
+            	}
+
+            } else {
+                CatalogContext ctx = VoltDB.instance().getCatalogContext();
+                catalogStuff = new CatalogAndDeployment(genId,
+                        ctx.m_preparedCatalogInfo.m_catalogHash,
+                        ctx.m_preparedCatalogInfo.m_catalogHash,
+                        ctx.m_preparedCatalogInfo.m_deploymentBytes);
+
             }
 
             // if this is a new catalog, do the work to update
@@ -302,17 +312,17 @@ public class UpdateCore extends VoltSystemProcedure {
 
                 // update the global catalog if we get there first
                 CatalogContext catalogContext =
-                VoltDB.instance().catalogUpdate(
-                        commands,
-                        catalogStuff.catalogBytes,
-                        catalogStuff.getCatalogHash(),
-                        expectedCatalogVersion,
-                        genId,
-                        catalogStuff.deploymentBytes,
-                        isForReplay,
-                        requireCatalogDiffCmdsApplyToEE,
-                        hasSchemaChange,
-                        requiresNewExportGeneration);
+                        VoltDB.instance().catalogUpdate(
+                                commands,
+                                catalogStuff.catalogBytes,
+                                catalogStuff.catalogHash,
+                                expectedCatalogVersion,
+                                genId,
+                                catalogStuff.deploymentBytes,
+                                isForReplay,
+                                requireCatalogDiffCmdsApplyToEE,
+                                hasSchemaChange,
+                                requiresNewExportGeneration);
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
