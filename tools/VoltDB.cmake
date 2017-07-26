@@ -199,19 +199,32 @@ FUNCTION(DEFINE_TEST TEST_NAME)
   # "make run-${TEST_NAME}" runs the single test.
   ADD_DEPENDENCIES(build-${TEST_DIR} build-${TEST_NAME})
   ADD_DEPENDENCIES(run-${TEST_DIR} build-${TEST_NAME})
-  MESSAGE("Defining target run-${TEST_NAME}")
+  # MESSAGE("Defining target run-${TEST_NAME}")
   ADD_CUSTOM_TARGET(run-${TEST_NAME}
     DEPENDS ${TEST_NAME}
     COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -R ${TEST_NAME})
   # Some tests are expected to fail.  Also, tag the
   # test with its label.
-  MESSAGE("Test ${TEST_NAME} has command ${CTEST_EXE_CMD}.")
+  # MESSAGE("Test ${TEST_NAME} has command ${CTEST_EXE_CMD}.")
   ADD_TEST(NAME ${TEST_NAME}
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_working_dir
     COMMAND ${CTEST_EXE_CMD})
   SET_TESTS_PROPERTIES(${TEST_NAME}
     PROPERTIES
     WILL_FAIL ${WILL_FAIL}
-    LABELS ${TEST_DIR})
+    LABELS ${TEST_DIR} )
+  IF (${TEST_GEN} STREQUAL ".")
+    SET_TESTS_PROPERTIES(${TEST_NAME}
+      PROPERTIES
+      LABELS "manual")
+    ADD_DEPENDENCIES(run-manual-tests run-${TEST_NAME})
+    ADD_DEPENDENCIES(build-manual-tests build-${TEST_NAME})
+  ELSE()
+    SET_TESTS_PROPERTIES(${TEST_NAME}
+      PROPERTIES
+      LABELS "generated")
+    ADD_DEPENDENCIES(run-generated-tests run-${TEST_NAME})
+    ADD_DEPENDENCIES(build-generated-tests build-${TEST_NAME})
+  ENDIF()
 ENDFUNCTION()
 

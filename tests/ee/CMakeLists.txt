@@ -142,14 +142,15 @@ SET(VOLTDB_GENERATED_TEST_GENERATORS
   org.voltdb.planner.eegentests.GenerateEETests
 )
 
-SET(VOLTDB_TEST_CLASS_LIST "--build=${VOLTDB_BUILD_TYPE_LOWER}")
+SET(VOLTDB_TEST_BUILD_TYPE "--build-type=${VOLTDB_BUILD_TYPE_LOWER}")
 FOREACH (CLASS ${VOLTDB_GENERATED_TEST_GENERATORS})
   LIST(APPEND VOLTDB_TEST_CLASS_LIST --test-class=${CLASS})
 ENDFOREACH()
 EXECUTE_PROCESS(
-    COMMAND ${VOLTDB_ROOT}tools/generate-ee-unit-tests.sh --voltdbroot=${VOLTDB_ROOT} ${VOLTDB_TEST_CLASS_LIST}
+    COMMAND ${CMAKE_SOURCE_DIR}/tools/generate-ee-unit-tests.sh --voltdbroot=${CMAKE_SOURCE_DIR} ${VOLTDB_TEST_BUILD_TYPE} ${VOLTDB_TEST_CLASS_LIST}
     OUTPUT_VARIABLE VOLTDB_GENERATED_TEST_PROGRAMS
   )
+STRING(STRIP "${VOLTDB_GENERATED_TEST_PROGRAMS}" VOLTDB_GENERATED_TEST_PROGRAMS)
 MESSAGE( "VOLTDB_GENERATED_TEST_PROGRAMS is ${VOLTDB_GENERATED_TEST_PROGRAMS}" )
 
 #
@@ -186,14 +187,14 @@ ENDFOREACH()
 
 ADD_LIBRARY(voltdb_test_harness
   OBJECT
-  ${VOLTDB_ROOT}/tests/ee/harness)
+  ${CMAKE_SOURCE_DIR}/tests/ee/harness)
 
 MESSAGE("VoltDB_Tests: PROJECT_NAME Is ${PROJECT_NAME}")
 MESSAGE("VoltDB_Tests: PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}")
 TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
   SYSTEM
   PUBLIC
-  ${VOLTDB_ROOT}/third_party/cpp)
+  ${CMAKE_SOURCE_DIR}/third_party/cpp)
 TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
   PUBLIC
   ${${PROJECT_NAME}_SOURCE_DIR}
@@ -219,7 +220,12 @@ ADD_CUSTOM_TARGET(build-all-tests)
 ADD_CUSTOM_TARGET(run-all-tests
   COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT})
 ADD_DEPENDENCIES(run-all-tests build-all-tests)
-
+ADD_CUSTOM_TARGET(build-generated-tests)
+ADD_CUSTOM_TARGET(run-generated-tests
+  COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -L generated -j ${VOLTDB_CORE_COUNT})
+ADD_CUSTOM_TARGET(build-manual-tests)
+ADD_CUSTOM_TARGET(run-manual-tests
+  COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -L manual -j ${VOLTDB_CORE_COUNT})
 ########################################################################
 #
 # For each test directory, create a target.  We will

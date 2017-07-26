@@ -12,28 +12,7 @@
 BUILD=release
 VERBOSE=
 ECHO=+x
-#
-# Look in various places to find the root of the
-# build hierarchy.
-#
-isVoltDBRoot() {
-	local DIR="$1"
-    if [ ! -f "$DIR/build.xml" ]; then
-        return 1
-    fi
-    if grep '<project' "$DIR/build.xml" | grep -q 'name="VoltDB"'; then
-        return 0
-    fi
-    return 1;
-}
-if isVoltDBRoot "."; then
-	VOLTDB_ROOT="$(/bin/pwd)"
-elif isVoltDBRoot "../.."; then
-	VOLTDB_ROOT="$(cd ../..; /bin/pwd)"
-else
-    echo "$0: Can't find the voltdb root"
-    exit 100
-fi
+
 while [ -n "$1" ]; do
     case "$1" in
         --debug)
@@ -44,22 +23,18 @@ while [ -n "$1" ]; do
             VERBOSE=-v
             shift
             ;;
-        --names-only)
-            NAMES_ONLY=--names-only
-            shift
-            ;;
         --test-class=*)
             TEST_CLASSES="$TEST_CLASSES $(echo $1 | sed 's/--test-class=//')"
             shift
             ;;
-        --build=*)
-            BUILD="$(echo $1 | sed 's/--build=//')"
+        --build-type=*)
+            BUILD_TYPE="$(echo $1 | sed 's/--build-type=//')"
             shift
-            case "$BUILD" in
+            case "$BUILD_TYPE" in
                 debug|release|memcheck)
                     ;;
                 *)
-                    echo "$0: Unknown argument to --build: \"$BUILD\""
+                    echo "$0: Unknown argument to --build: \"$BUILD_TYPE\""
                     exit 100
                     ;;
             esac
@@ -83,10 +58,6 @@ while [ -n "$1" ]; do
             echo 'Options:'
             echo ' --verbose                Run java -v'
             echo ' --voltdbroot DIR         The root of the voltdb tree is DIR.'
-            echo ' --build buildType        Set the build type.  The'
-            echo '                          possibilities are debug,'
-            echo '                          release and memcheck.'
-            echo ' --names-only             Only echo the test names'
             echo ' --test-class class-name  Run the given class name'
             echo '                          as a Java main program.  It'
             echo '                          will know which tests it'
@@ -107,10 +78,14 @@ if [ -z "$TEST_CLASSES" ] ; then
     exit 100
 fi
 
-GENERATED_DIR="$VOLTDB_ROOT/tests/ee/ee_auto_generated_unit_tests"
-OBJDIR="$VOLTDB_ROOT/obj/${BUILD}"
-echo "VOLTDB_ROOT=$VOLTDB_ROOT"
-echo "OBJDIR=${OBJDIR}"
+SRC_DIR="$VOLTDB_ROOT/tests/ee/"
+GENERATED_DIR='ee_auto_generated_unit_tests'
+OBJDIR="$VOLTDB_ROOT/obj/${BUILD_TYPE}"
 for CLASS in $TEST_CLASSES; do
-    (set $ECHO; java $VERBOSE -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDB_ROOT}/lib/\*:${VOLTDB_ROOT}/third_party/java/jars/\* -Dlog4j.configuration=file:${VOLTDB_ROOT}/tests/log4j-allconsole.xml $CLASS ${NAMES_ONLY} --voltdb-root="${VOLTDB_ROOT}")
+    (set $ECHO; java $VERBOSE \
+                     -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDB_ROOT}/lib/\*:${VOLTDB_ROOT}/third_party/java/jars/\* \
+                     -Dlog4j.configuration=file:${VOLTDB_ROOT}/tests/log4j-allconsole.xml $CLASS \
+                     --test-source-dir="$SRC_DIR" \
+                     --test-generated-dir="$GENERATED_DIR"
+    )
 done

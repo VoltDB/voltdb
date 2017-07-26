@@ -213,8 +213,7 @@ public class EEPlanGenerator extends PlannerTestCase {
     // Guess that we are started in the root.
     //
     private String m_VoltDBRootDirName = Paths.get(".").toAbsolutePath().normalize().toString();
-
-    private boolean m_namesOnly = false;
+    private String m_testGenDir = "ee_auto_generated_unit_tests";
 
     protected String getPlanString(String sqlStmt) throws JSONException {
         return getPlanString(sqlStmt, 0);
@@ -866,10 +865,7 @@ public class EEPlanGenerator extends PlannerTestCase {
      * @throws Exception
      */
     protected void generateTests(String testFolder, String testClassName, DBConfig db) throws Exception {
-        System.out.printf("ee_auto_generated_unit_tests/%s/%s;", testFolder, testClassName);
-        if (m_namesOnly) {
-            return;
-        }
+        System.out.printf("%s/%s/%s;", m_testGenDir, testFolder, testClassName);
         Map<String, String> params = new HashMap<>();
         params.put("SOURCE_PACKAGE_NAME",   db.getClassPackageName());
         params.put("SOURCE_CLASS_NAME",     db.getClassName());
@@ -948,10 +944,10 @@ public class EEPlanGenerator extends PlannerTestCase {
     protected void processArgs(String args[]) throws PlanningErrorException {
         for (int idx = 0; idx < args.length; idx += 1) {
             String arg = args[idx];
-            if (arg.startsWith("--voltdb-root=")) {
-                m_VoltDBRootDirName = arg.substring(0, "--voltdb-root=".length());
-            } else if ("--names-only".equals(arg)) {
-                m_namesOnly  = true;
+            if (arg.startsWith("--test-source-dir=")) {
+                m_VoltDBRootDirName = arg.substring("--test-source-dir=".length());
+            } else if (arg.startsWith("--generated-source-dir=")) {
+                m_testGenDir = arg.substring("--generated-source-dir".length());
             }
         }
     }
@@ -963,13 +959,11 @@ public class EEPlanGenerator extends PlannerTestCase {
             String value   = params.get(entry.getKey());
             template = template.replace(pattern, value);
         }
-        File outputDir = new File(String.format("%s/tests/ee/ee_auto_generated_unit_tests/%s", m_VoltDBRootDirName, testFolder));
-        System.out.printf("Writing to folder %s\n", outputDir);
+        File outputDir = new File(String.format("%s/%s/%s", m_VoltDBRootDirName, m_testGenDir, testFolder));
         if (! outputDir.exists() && !outputDir.mkdirs()) {
             throw new IOException("Cannot make test source folder \"" + outputDir + "\"");
         }
         File outputFile = new File(outputDir, testClassName + ".cpp");
-        System.out.printf("Writing file %s\n", outputFile);
         writeFile(outputFile, template);
     }
 

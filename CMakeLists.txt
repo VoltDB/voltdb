@@ -43,8 +43,8 @@
 #   1.) mkdir -p obj/${BUILD_TYPE}
 #       where ${BUILD_TYPE} is memcheck, release or debug.
 #   2.) cd obj/${BUILD_TYPE}
-#   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE} ${VOLTDB_ROOT}
-#       where ${VOLTDB_ROOT} is the pathname of the root of the voltdb
+#   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE} <VOLTDB_ROOT>
+#       where <VOLTDB_ROOT> is the pathname of the root of the voltdb
 #       source directory, typically where you found this file.
 #       There are other arguments which could be added.  See build.xml.
 #       CMake looks at the build environment and creates makefiles
@@ -172,8 +172,7 @@ ENDIF ()
 #   VOLTDB_TOP_BINARY_DIR
 #
 ########################################################################
-SET (VOLTDB_ROOT ${CMAKE_SOURCE_DIR})
-EXECUTE_PROCESS(COMMAND cat ${VOLTDB_ROOT}/version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
+EXECUTE_PROCESS(COMMAND cat ${CMAKE_SOURCE_DIR}/version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
 STRING(STRIP ${VOLTDB_VERSION} VOLTDB_VERSION)
 SET(VOLTDB_TOP_BINARY_DIR ${CMAKE_BINARY_DIR})
 SET (VOLT_LOG_LEVEL 500)
@@ -227,7 +226,7 @@ INCLUDE(tools/VoltDBCompilation.cmake)
 SET (VOLTDB_PCRE2_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/pcre2)
 SET (VOLTDB_PCRE2_VERSION 10.10)
 SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
-SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_ROOT}/third_party/cpp/tarballs/${VOLTDB_PCRE2_NAME}.tgz)
+SET (VOLTDB_PCRE2_TARBALL ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs/${VOLTDB_PCRE2_NAME}.tgz)
 SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_PREFIX}/src/${VOLTDB_PCRE2_NAME})
 SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
 
@@ -249,7 +248,7 @@ ExternalProject_Add(pcre2
 ########################################################################
 SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
 SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
-SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_ROOT}/third_party/cpp/tarballs/${VOLTDB_OPENSSL_NAME}.tgz)
+SET (VOLTDB_OPENSSL_TARBALL ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs/${VOLTDB_OPENSSL_NAME}.tgz)
 SET (VOLTDB_OPENSSL_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/openssl)
 # Binary and source are the same for openssl.  There
 # are not obvious ways to do out-of-tree builds.
@@ -269,11 +268,11 @@ ExternalProject_Add(crypto
 # Go and build the S2GEO library.
 #
 ########################################################################
-SET (VOLTDB_S2GEO_SRC "${VOLTDB_ROOT}/third_party/cpp/google-s2-geometry")
+SET (VOLTDB_S2GEO_SRC "${CMAKE_SOURCE_DIR}/third_party/cpp/google-s2-geometry")
 SET (VOLTDB_S2GEO_OBJ ${CMAKE_BINARY_DIR}/3pty-obj/google-s2-geometry)
 SET (VOLTDB_S2GEO_CMAKE_CONFIG
   -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
-  -DVOLTDB_THIRD_PARTY_CPP_DIR=${VOLTDB_ROOT}/third_party/cpp
+  -DVOLTDB_THIRD_PARTY_CPP_DIR=${CMAKE_SOURCE_DIR}/third_party/cpp
   -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/3pty-install
   -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
 SET (VOLTDB_S2GEO_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj)
