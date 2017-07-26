@@ -12,7 +12,7 @@ function loadAnalysisPage(){
 
     function refreshLegend(legendTitle){
         if(legendTitle == "Frequency"){
-            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Frequency(" : "Frequency");
+            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Number Of Invocation(" : "Number Of Invocation");
             VoltDbAnalysis.currentTab =  "Frequency";
         } else if(legendTitle == "Total Processing Time"){
             $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Total Processing Time(" : "Total Processing Time");
@@ -196,7 +196,8 @@ function loadAnalysisPage(){
                 dataFrequencyProcedures = $.merge(dataFrequencyProcedures, dataFrequencySysProcedures);
                 dataTotalProcessingProcedures = $.merge(dataTotalProcessingProcedures, dataTotalProcessingSysProcedures);
             }
-
+            if($.isEmptyObject(dataLatencyProcedures))
+                $("#visualiseLatencyAnalysis > text").css("margin")
             ////order the procedure by  their (avg_exec_time * invocation) value
             dataLatencyProcedures.sort(function(a,b) {return ((b.index) > (a.index)) ? 1 : (((a.index) > (b.index)) ? -1 : 0);});
             dataFrequencyProcedures.sort(function(a,b) {return ((b.index) > (a.index)) ? 1 : (((a.index) > (b.index)) ? -1 : 0);});
@@ -322,7 +323,7 @@ function loadAnalysisPage(){
                 saveInLocalStorage("averageExecutionTime", 500)
             }
             if(VoltDbUI.getFromLocalStorage("showHideSysProcedures") == undefined){
-                saveInLocalStorage("showHideSysProcedures", true)
+                saveInLocalStorage("showHideSysProcedures", false)
             }
         }
     });

@@ -399,7 +399,10 @@
 
         function getBarHeightAndSpacing(dataSet, chart){
             var dataCount = dataSet.length;
-            if(dataCount == 1){
+            if(dataCount == 0){
+                barHeight = 400;
+            }
+            else if(dataCount == 1){
                 barHeight = 260;
                 chart.groupSpacing(.6);
             }
