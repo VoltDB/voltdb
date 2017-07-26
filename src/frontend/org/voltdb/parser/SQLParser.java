@@ -843,7 +843,22 @@ public class SQLParser extends SQLPatternFactory
                             SPF.token("parameter"),
                             SPF.group(captureTokens, SPF.integer())
                         )
-                    )
+                    ),
+                    // parse a two-partition transaction clause
+                    SPF.optional(
+                        SPF.clause(
+                            SPF.token("and"), SPF.token("on"), SPF.token("table"),
+                            SPF.group(captureTokens, SPF.databaseObjectName()),
+                            SPF.token("column"),
+                            SPF.group(captureTokens, SPF.databaseObjectName()),
+                            SPF.optional(
+                                SPF.clause(
+                                    SPF.token("parameter"),
+                                    SPF.group(captureTokens, SPF.integer())
+                                )
+                            )
+                        )
+                     )
                 )
             );
     }

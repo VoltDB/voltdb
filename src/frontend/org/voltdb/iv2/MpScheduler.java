@@ -34,7 +34,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -97,14 +96,14 @@ public class MpScheduler extends Scheduler
         m_pendingTasks.setMpRoSitePool(sitePool);
     }
 
-    void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    void updateCatalog(String diffCmds, CatalogContext context)
     {
-        m_pendingTasks.updateCatalog(diffCmds, context, csp);
+        m_pendingTasks.updateCatalog(diffCmds, context);
     }
 
-    void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    void updateSettings(CatalogContext context)
     {
-        m_pendingTasks.updateSettings(context, csp);
+        m_pendingTasks.updateSettings(context);
     }
 
     @Override
@@ -256,6 +255,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     true, // isSinglePartition
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -283,6 +283,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -302,6 +303,19 @@ public class MpScheduler extends Scheduler
 
             // if cannot figure out the involved partitions, run it as an MP txn
         }
+
+        int[] nPartitionIds = message.getNParitionIds();
+        if (nPartitionIds != null) {
+            HashMap<Integer, Long> involvedPartitionMasters = new HashMap<>();
+            for (int partitionId : nPartitionIds) {
+                involvedPartitionMasters.put(partitionId, m_partitionMasters.get(partitionId));
+            }
+
+            task = instantiateNpProcedureTask(m_mailbox, procedureName,
+                    m_pendingTasks, mp, involvedPartitionMasters,
+                    m_buddyHSIds.get(m_nextBuddy), false);
+        }
+
 
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
@@ -369,6 +383,7 @@ public class MpScheduler extends Scheduler
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),

@@ -519,6 +519,20 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         m_selector.wakeup();
     }
 
+    public FutureTask<Void> enqueueAndDrain(final ByteBuffer buf) {
+        Callable<Void> task = new Callable<Void>() {
+            public Void call() throws Exception {
+                m_writeStream.enqueue(buf);
+                drainWriteStream();
+                return null;
+            }
+        };
+        FutureTask<Void> ft = new FutureTask<Void>(task);
+        m_tasks.offer(ft);
+        m_selector.wakeup();
+        return ft;
+    }
+
     boolean readyForRead() {
         return (m_key.readyOps() & SelectionKey.OP_READ) != 0 && (m_interestOps & SelectionKey.OP_READ) != 0;
     }

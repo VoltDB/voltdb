@@ -1,0 +1,11 @@
+
+create table identicalviewt2 (
+  identicalviewcol2 integer not null primary key
+);
+Command succeeded.
+
+create procedure identicalviewproc2 as select count(*) from identicalviewt2;
+Command succeeded.
+
+create view identicalviewview1 (identicalviewcol2) as select count(*) from identicalviewt2 where identicalviewcol2 < 100;
+Command succeeded.

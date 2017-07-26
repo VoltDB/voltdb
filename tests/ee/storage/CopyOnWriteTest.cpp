@@ -239,6 +239,10 @@ public:
                                              true, true, m_tableSchema);
         std::vector<voltdb::TableIndexScheme> indexes;
 
+        if (m_table != NULL) {
+            delete m_table;
+        }
+
         m_table = dynamic_cast<voltdb::PersistentTable*>(
                 voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema,
                                                          m_columnNames, signature, false, 0, false, false,
@@ -251,7 +255,7 @@ public:
 
         TableTuple tuple(m_table->schema());
         size_t i = 0;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         while (iterator.next(tuple)) {
             int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
             m_values.push_back(value);
@@ -404,7 +408,7 @@ public:
         }
 
         size_t numTuples = 0;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             if (tuple.isDirty()) {
@@ -427,7 +431,7 @@ public:
     }
 
     void getTableValueSet(T_ValueSet &set) {
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
@@ -657,7 +661,7 @@ public:
         // Check for dirty tuples.
         context("check dirty");
         int numTuples = 0;
-        voltdb::TableIterator &iterator = m_table->iterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             if (tuple.isDirty()) {
@@ -752,7 +756,7 @@ public:
 
     void checkIndex(const std::string &tag, ElasticIndex *index, StreamPredicateList &predicates, bool directKey) {
         ASSERT_NE(NULL, index);
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         T_ValueSet accepted;
         T_ValueSet rejected;
@@ -1152,7 +1156,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
 
-    voltdb::TableIterator& iterator = m_table->iterator();
+    voltdb::TableIterator iterator = m_table->iterator();
     TBMap blocks(getTableData());
     getBlocksPendingSnapshot().swap(getBlocksNotPendingSnapshot());
     getBlocksPendingSnapshotLoad().swap(getBlocksNotPendingSnapshotLoad());
@@ -1286,7 +1290,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                                                                  0, 0, 0, 0, false);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
@@ -1354,7 +1358,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                                                                  0, 0, 0, 0, false);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
@@ -1436,7 +1440,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         iterate();
 
         int totalInserted = 0;              // Total tuple counter.
-        boost::scoped_ptr<char> buffers[npartitions];   // Stream buffers.
+        boost::scoped_array<char> buffers[npartitions];   // Stream buffers.
         std::vector<std::string> strings(npartitions);  // Range strings.
         T_ValueSet expected[npartitions]; // Expected tuple values by partition.
         T_ValueSet actual[npartitions];   // Actual tuple values by partition.
@@ -1469,7 +1473,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         context("precalculate");
 
         // Map original tuples to expected partitions.
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TableIterator iterator = m_table->iterator();
         int partCol = m_table->partitionColumn();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
@@ -1996,3 +2000,4 @@ TEST_F(CopyOnWriteTest, ElasticIndexLowerUpperBounds) {
 int main() {
     return TestSuite::globalInstance()->runAll();
 }
+

@@ -93,7 +93,8 @@ class InsertExecutor : public AbstractExecutor
      * don't have any work to do.
      */
     bool p_execute_init(const TupleSchema *inputSchema,
-                        TempTable *newOutputTable);
+                        TempTable *newOutputTable,
+                        TableTuple &temp_tuple);
 
     /**
      * Insert a row into the target table and then count it.

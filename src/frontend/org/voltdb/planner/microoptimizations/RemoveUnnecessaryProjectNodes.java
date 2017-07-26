@@ -16,6 +16,7 @@
  */
 package org.voltdb.planner.microoptimizations;
 
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.types.PlanNodeType;
@@ -48,7 +49,7 @@ public class RemoveUnnecessaryProjectNodes extends MicroOptimization {
      * in its final state.
      */
     @Override
-    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan) {
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan, AbstractParsedStmt parsedStmt) {
         // When we pass in -1 here we are saying
         // we have not come to this node through
         // any parent.  That is to say, this is the root

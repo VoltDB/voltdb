@@ -176,7 +176,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Compile a batch of one or more SQL statements into a set of plans.
      * Parameters are valid iff there is exactly one DML/DQL statement.
      */
-    public static AdHocPlannedStatement compileAdHocSQL(CatalogContext context,
+    public static AdHocPlannedStatement compileAdHocSQL(PlannerTool plannerTool,
                                                         String sqlStatement,
                                                         boolean inferPartitioning,
                                                         Object userPartitionKey,
@@ -185,10 +185,9 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                         Object[] userParamSet)
                                                                 throws AdHocPlanningException
     {
-        assert(context != null);
+        assert(plannerTool != null);
         assert(sqlStatement != null);
-
-        final PlannerTool ptool = context.m_ptool;
+        final PlannerTool ptool = plannerTool;
 
         // Take advantage of the planner optimization for inferring single partition work
         // when the batch has one statement.
@@ -281,7 +280,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         for (final String sqlStatement : sqlStatements) {
             try {
-                AdHocPlannedStatement result = compileAdHocSQL(context,
+                AdHocPlannedStatement result = compileAdHocSQL(context.m_ptool,
                                                                sqlStatement,
                                                                inferSP,
                                                                userPartitionKey,
@@ -467,4 +466,51 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
         return callProcedure(procedureName, params);
     }
+
+    public static AdHocPlannedStmtBatch plan(PlannerTool ptool, String sql, Object[] userParams, boolean singlePartition)
+            throws AdHocPlanningException
+    {
+        List<String> sqlStatements = new ArrayList<>();
+        AdHocSQLMix mix = processAdHocSQLStmtTypes(sql, sqlStatements);
+
+        switch (mix) {
+        case EMPTY:
+            throw new AdHocPlanningException("No valid SQL found.");
+        case ALL_DDL:
+        case MIXED:
+            throw new AdHocPlanningException("DDL not supported in stored procedures.");
+        default:
+            break;
+        }
+
+        if (sqlStatements.size() != 1) {
+            throw new AdHocPlanningException("Only one statement is allowed in stored procedure, but received " + sqlStatements.size());
+        }
+
+        sql = sqlStatements.get(0);
+
+        // any object will signify SP
+        Object partitionKey = singlePartition ? "1" : null;
+
+        List<AdHocPlannedStatement> stmts = new ArrayList<>();
+        AdHocPlannedStatement result = null;
+
+        result = compileAdHocSQL(ptool,
+                                 sql,
+                                 false,
+                                 partitionKey,
+                                 ExplainMode.NONE,
+                                 false,
+                                 userParams);
+        stmts.add(result);
+
+
+        return new AdHocPlannedStmtBatch(userParams,
+                                         stmts,
+                                         -1,
+                                         null,
+                                         null,
+                                         userParams);
+    }
+
 }

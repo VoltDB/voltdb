@@ -22,7 +22,6 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 public abstract class MicroOptimization {
-    protected AbstractParsedStmt m_parsedStmt;
 
     /// Provide a commonly used approach to optimization via a potentially
     /// recursive call to recursivelyApply that is expected to edit or replace
@@ -35,17 +34,11 @@ public abstract class MicroOptimization {
     protected void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt)
     {
         try {
-            m_parsedStmt = parsedStmt;
             AbstractPlanNode planGraph = plan.rootPlanGraph;
-            planGraph = recursivelyApply(planGraph);
+            planGraph = recursivelyApply(planGraph, parsedStmt);
             plan.rootPlanGraph = planGraph;
         } catch (Exception ex) {
             ex.printStackTrace();
-        }
-        finally {
-            // Avoid leaking a long-term reference from static optimizations
-            // to a large parsed statement structure.
-            m_parsedStmt = null;
         }
     }
 
@@ -53,5 +46,5 @@ public abstract class MicroOptimization {
         return MicroOptimizationRunner.Phases.DURING_PLAN_ASSEMBLY;
     }
 
-    protected abstract AbstractPlanNode recursivelyApply(AbstractPlanNode plan);
+    protected abstract AbstractPlanNode recursivelyApply(AbstractPlanNode plan, AbstractParsedStmt parsedStmt);
 }

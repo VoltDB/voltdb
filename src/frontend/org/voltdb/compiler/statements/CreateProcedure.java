@@ -40,6 +40,9 @@ public abstract class CreateProcedure extends StatementProcessor {
         String tableName = null;
         String columnName = null;
         String parameterNo = null;
+        String tableName2 = null;
+        String columnName2 = null;
+        String parameterNo2 = null;
     }
 
     /**
@@ -87,6 +90,9 @@ public abstract class CreateProcedure extends StatementProcessor {
                 data.tableName = matcher.group(2);
                 data.columnName = matcher.group(3);
                 data.parameterNo = matcher.group(4);
+                data.tableName2 = matcher.group(5);
+                data.columnName2 = matcher.group(6);
+                data.parameterNo2 = matcher.group(7);
             }
         }
 
@@ -119,6 +125,25 @@ public abstract class CreateProcedure extends StatementProcessor {
         }
 
         String partitionInfo = String.format("%s.%s: %s", data.tableName, data.columnName, data.parameterNo);
+
+        // two partition procedure
+        if (data.tableName2 != null) {
+            assert(data.columnName2 != null);
+
+            checkIdentifierStart(data.tableName2, statement);
+            checkIdentifierStart(data.columnName2, statement);
+
+            if (data.parameterNo2 == null) {
+                if (data.parameterNo != "0") {
+                    String exceptionMsg = String.format("Two partition parameter must specify index for  " +
+                            "second partitioning parameter if the first partitioning parameter index is non-zero.");
+                            throw m_compiler.new VoltCompilerException(exceptionMsg);
+                }
+                data.parameterNo2 = "1";
+            }
+
+            partitionInfo += String.format(", %s.%s: %s", data.tableName2, data.columnName2, data.parameterNo2);
+        }
 
         m_tracker.addProcedurePartitionInfoTo(procName, partitionInfo);
     }

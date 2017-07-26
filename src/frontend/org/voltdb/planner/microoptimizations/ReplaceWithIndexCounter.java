@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -36,7 +37,7 @@ import org.voltdb.types.PlanNodeType;
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
     @Override
-    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan, AbstractParsedStmt parsedStmt)
     {
         assert(plan != null);
 
@@ -53,7 +54,7 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
         for (AbstractPlanNode child : children) {
             // TODO this will break when children feed multiple parents
-            AbstractPlanNode newChild = recursivelyApply(child);
+            AbstractPlanNode newChild = recursivelyApply(child, parsedStmt);
             // Do a graft into the (parent) plan only if a replacement for a child was found.
             if (newChild == child) {
                 continue;
