@@ -141,6 +141,9 @@
  	        <include name='scala*.jar'/>
  	        <include name='felix.jar'/>
  	    </fileset>
+		<fileset dir='${vendor.lib.dir}'>
+  		    <include name='junit*.jar'/>
+  		</fileset> 	    
  		<fileset refid="voltpro.classpath"/>
  	</path>
  	
@@ -180,15 +183,32 @@
         </jar>
     </target>
 
+	 <target name="kafka8junit" depends="kafkastream10">  
+	    <javac srcdir="${src.test.dir}" destdir='${build.test.dir}'
+            includes="org/voltdb/importer/kafka/**/*.java"
+            encoding='UTF-8'
+            debug='true'
+            includeAntRuntime='false'>            
+			<classpath refid="k8classpath"/>
+        </javac>  
+		<run_junit_tests classpathref='k8classpath'>
+			<tests>
+		      <fileset dir='${build.test.dir}'>
+		          <include name="org/voltdb/importer/kafka/TestKafkaLoaderArgumentParsing.class"/> 	 	          
+		      </fileset>
+		    </tests>
+    	</run_junit_tests>
+    </target>
+    
 	<!-- Kafka 10 -->
 	
 	<path id="k10classpath">     	
         <pathelement location='${build.client.dir}' />
  	    <pathelement location='${build.prod.dir}' /> 
-	<fileset dir='${vendor.lib.dir}'>
-		<include name='kafka-clients-0.10.2.1.jar'/>
-	 	    <include name='junit*.jar'/>
- 	        <exclude name='ant.jar' />
+		<fileset dir='${vendor.lib.dir}'>
+			<include name='kafka-clients-0.10.2.1.jar'/>
+  		    <include name='junit*.jar'/>
+			<exclude name='ant.jar' />
  	        <exclude name='classes-java1.7.jar' />   
  	    </fileset>
  		<fileset refid="voltpro.classpath"/>
@@ -219,7 +239,7 @@
 		 <junit fork="yes" haltonfailure="${junit.haltonfailure}" failureproperty="junit.failures" printsummary="false" maxmemory="2048M" showoutput="${junit.showoutput}">
 			<classpath>
 			   <path refid="@{classpathref}"/>
-			   <path refid="project.classpath"/>
+			   <path refid="project.classpath"/>			  
 			</classpath>
 			<batchtest todir="${build.testoutput.dir}">
 			   <tests/>
@@ -316,5 +336,5 @@
         </jar>
     </target>
 
-	<target name="importer_junit_tests" depends="kafka10junit"/>
+	<target name="importer_junit_tests" depends="kafka8junit, kafka10junit"/>
 </project>
