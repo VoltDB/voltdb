@@ -1175,7 +1175,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                                           m_messenger.getHostId(),
                                                                           hostGroups);
                     }
-                    partitionGroupPeers = m_cartographer.getHostIdsWithinPartitionGroup(m_messenger.getHostId());
+                    partitionGroupPeers = m_cartographer.findPartitionGroupPeers(partitions);
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
@@ -1185,7 +1185,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 } else {
                     m_configuredNumberOfPartitions = topo.getPartitionCount();
                     partitions = topo.getPartitionIdList(m_messenger.getHostId());
-                    partitionGroupPeers = topo.getPartitionGroupHostIds(m_messenger.getHostId());
+                    partitionGroupPeers = topo.getPartitionGroupPeers(m_messenger.getHostId());
                 }
                 m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
                 for (int ii = 0; ii < partitions.size(); ii++) {
