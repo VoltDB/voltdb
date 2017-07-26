@@ -1165,6 +1165,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 };
                 List<Integer> partitions = null;
+                Set<Integer> partitionGroupPeers = null;
                 if (m_rejoining) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     partitions = recoverPartitions(topo, hostGroups.get(m_messenger.getHostId()));
@@ -1174,6 +1175,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                                           m_messenger.getHostId(),
                                                                           hostGroups);
                     }
+                    partitionGroupPeers = m_cartographer.getHostIdsWithinPartitionGroup(m_messenger.getHostId());
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
@@ -1183,7 +1185,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 } else {
                     m_configuredNumberOfPartitions = topo.getPartitionCount();
                     partitions = topo.getPartitionIdList(m_messenger.getHostId());
+                    partitionGroupPeers = topo.getPartitionGroupHostIds(m_messenger.getHostId());
                 }
+                m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
                 for (int ii = 0; ii < partitions.size(); ii++) {
                     Integer partition = partitions.get(ii);
                     m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
@@ -1426,16 +1430,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
             }
-
-            Set<Integer> partitionGroup = m_cartographer.getHostIdsWithinPartitionGroup(m_messenger.getHostId());
-            if (partitionGroup.size() > 1) {
-                StringBuilder strBuilder = new StringBuilder();
-                partitionGroup.forEach((h) -> {
-                    strBuilder.append(h).append(" ");
-                });
-                hostLog.warn("Host " + strBuilder.toString() + "belongs to the same partition group.");
-            }
-            m_messenger.setPartitionGroup(partitionGroup);
 
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
@@ -2016,10 +2010,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void createSecondaryConnections(boolean isRejoin) {
-        int hostCount = m_clusterSettings.get().hostcount();
-        int partitionGroupCount = hostCount / (m_configuredReplicationFactor + 1);
+        int partitionGroupCount = m_clusterSettings.get().hostcount() / (m_configuredReplicationFactor + 1);
         if (m_configuredReplicationFactor > 0 && partitionGroupCount > 1) {
-            m_messenger.createAuxiliaryConnections(hostCount, isRejoin);
+            m_messenger.createAuxiliaryConnections(isRejoin);
         }
     }
 

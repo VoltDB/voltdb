@@ -1733,11 +1733,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    public void setPartitionGroup(Set<Integer> partitionGroup) {
-        Set<Integer> peersWithoutMe = partitionGroup;
-        peersWithoutMe.remove(m_localHostId);
-        m_peers = peersWithoutMe;
+    public void setPartitionGroupPeers(Set<Integer> partitionGroupPeers, int hostCount) {
+        if (partitionGroupPeers.size() > 1) {
+            StringBuilder strBuilder = new StringBuilder();
+            strBuilder.append("< ");
+            partitionGroupPeers.forEach((h) -> {
+                strBuilder.append(h).append(" ");
+            });
+            strBuilder.append(">");
+            m_hostLog.warn("Host " + strBuilder.toString() + "belongs to the same partition group.");
+        }
+        partitionGroupPeers.remove(m_localHostId);
+        m_peers = partitionGroupPeers;
         m_hostLog.warn("Set m_peers to " + dumpSet(m_peers));
+        m_secondaryConnections = computeSecondaryConnections(hostCount);
     }
 
     private String dumpSet(Set<Integer> dumpSet) {
@@ -1780,9 +1789,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     // Create connections to nodes within the same partition group
-    public void createAuxiliaryConnections(int hostCount, boolean isRejoin) {
-
-        m_secondaryConnections = computeSecondaryConnections(hostCount);
+    public void createAuxiliaryConnections(boolean isRejoin) {
         Set<Integer> hostsToConnect = Sets.newHashSet();
         if (isRejoin) {
             hostsToConnect.addAll(m_peers);
