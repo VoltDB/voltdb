@@ -53,11 +53,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -271,7 +273,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ScheduledFuture<?> resMonitorWork;
     private HealthMonitor m_healthMonitor;
 
-    private FailedLoginCounter[] m_flcArray = new FailedLoginCounter[128];
+    private FailedLoginCounter m_flc = new FailedLoginCounter();
+    //private FailedLoginCounter[] m_flcArray = new FailedLoginCounter[128];
+    private Queue<Object[]> m_failedLoginMessageQueue = new ConcurrentLinkedQueue<Object[]>();
 
     private NodeStateTracker m_statusTracker;
     // Should the execution sites be started in recovery mode
@@ -4581,11 +4585,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.error(sb.toString());
     }
 
-    public FailedLoginCounter[] getFLCArray() {
-        return m_flcArray;
+//    public FailedLoginCounter[] getFLCArray() {
+//        return m_flcArray;
+//    }
+//
+//    public void setMFLCArray(FailedLoginCounter[] m_flcArray) {
+//        this.m_flcArray = m_flcArray;
+//    }
+
+
+    public Queue<Object[]> getFailedLoginMessageQueue() {
+        return m_failedLoginMessageQueue;
     }
 
-    public void setMFLCArray(FailedLoginCounter[] m_flcArray) {
-        this.m_flcArray = m_flcArray;
+    public void setFailedLoginMessageQueue(Queue<Object[]> m_failedLoginMessageQueue) {
+        this.m_failedLoginMessageQueue = m_failedLoginMessageQueue;
     }
+
+	public FailedLoginCounter getFLC() {
+		return m_flc;
+	}
+
+	public void setFLC(FailedLoginCounter m_flc) {
+		this.m_flc = m_flc;
+	}
 }

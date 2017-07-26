@@ -25,7 +25,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -41,6 +40,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -707,45 +707,69 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 boolean authenticated = arq.authenticate(hashScheme, socket.socket().getRemoteSocketAddress().toString());
 
                 if (!authenticated) {
-                    FailedLoginCounter[] FLCArray = ((RealVoltDB)VoltDB.instance()).getFLCArray();
-                    int bucket = (int) (Thread.currentThread().getId() % 128);
-                    FailedLoginCounter counter = null;
-                    if (FLCArray[bucket] != null) {
-                        counter = FLCArray[bucket];
-                    } else {
-                        counter = new FailedLoginCounter();
-                    }
-                    long timestamp = System.currentTimeMillis();
-                    for (FailedLoginCounter ctr: FLCArray) {
-                        try {
-                            if (ctr != null) {
-                                ctr.checkCounter(timestamp);
+                    ScheduledExecutorService es = VoltDB.instance().getSES(true);
+                    if (es != null && !es.isShutdown()) {
+                        es.submit(new Runnable() {
+                            @Override
+                            public void run()
+                            {
+                                ((RealVoltDB)VoltDB.instance()).getFLC().logMessage(System.currentTimeMillis(), username);
+                                Exception faex = arq.getAuthenticationFailureException();
+                                if (faex != null) {
+                                    authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                                             "):", faex);
+                                } else {
+                                    authLog.warn("Failure to authenticate connection asynchronously(" + socket.socket().getRemoteSocketAddress() +
+                                                 "): user " + username + " failed authentication. " + ((RealVoltDB)VoltDB.instance()).getFLC().getCount(username) + " times in the last minute.");
+                                }
                             }
-                        } catch (ParseException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        }
+                        });
                     }
-                    counter.logMessage(timestamp, username);
-                    FLCArray[bucket] = counter;
-                    int count = 0;
-                    System.out.println("Before: count is " + count);
-                    count = loopArray(FLCArray, username);
-                    System.out.println("After: count is " + count);
+
+//                    Object[] failedLoginMessage = new Object[2];
+//                    failedLoginMessage[0] = new Long(System.currentTimeMillis());
+//                    failedLoginMessage[1] = username;
+//                    ((RealVoltDB)VoltDB.instance()).getFailedLoginMessageQueue().add(failedLoginMessage);
+
+//                    FailedLoginCounter[] FLCArray = ((RealVoltDB)VoltDB.instance()).getFLCArray();
+//                    int bucket = (int) (Thread.currentThread().getId() % 128);
+//                    FailedLoginCounter counter = null;
+//                    if (FLCArray[bucket] != null) {
+//                        counter = FLCArray[bucket];
+//                    } else {
+//                        counter = new FailedLoginCounter();
+//                    }
+//                    long timestamp = System.currentTimeMillis();
+//                    for (FailedLoginCounter ctr: FLCArray) {
+//                        try {
+//                            if (ctr != null) {
+//                                ctr.checkCounter(timestamp);
+//                            }
+//                        } catch (ParseException e) {
+//                            // TODO Auto-generated catch block
+//                            e.printStackTrace();
+//                        }
+//                    }
+//                    counter.logMessage(timestamp, username);
+//                    FLCArray[bucket] = counter;
+//                    int count = 0;
+//
+//                    count = loopArray(FLCArray, username);
+
                     Exception faex = arq.getAuthenticationFailureException();
+//                    if (faex != null) {
+//                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+//                                 "):", faex);
+//                    } else {
+//                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+//                                     "): user " + username + " failed authentication. " + ((RealVoltDB)VoltDB.instance()).getFLC().getCount(username) + " times in the last minute.");
+//                    }
 
                     boolean isItIo = false;
                     for (Throwable cause = faex; faex != null && !isItIo; cause = cause.getCause()) {
                         isItIo = cause instanceof IOException;
                     }
 
-                    if (faex != null) {
-                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                                 "):", faex);
-                    } else {
-                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                                     "): user " + username + " failed authentication. " + count + " times in the last minute.");
-                    }
                     //Send negative response
                     if (!isItIo) {
                         responseBuffer.put(AUTHENTICATION_FAILURE).flip();
