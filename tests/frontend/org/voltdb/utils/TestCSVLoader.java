@@ -1764,6 +1764,33 @@ public class TestCSVLoader {
         }
     }
 
+    // A bad decimal input should not make csvloader hang on forever
+    @Test(timeout=2000)
+    public void testBadDecimal() throws Exception {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--limitrows=100",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "1 ,1,1,11111111,first,2000000000000000000000000000000.000000000000,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+        };
+        int invalidLineCnt = 1;
+        int validLineCnt = 0;
+
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
     private void createCSVFile(String encoding) {
         String FILENAME = encoding+"_encoded_text.csv";
         BufferedWriter bw = null;

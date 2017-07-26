@@ -16,6 +16,7 @@
  */
 package org.voltdb.planner.microoptimizations;
 
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ScanPlanNodeWhichCanHaveInlineInsert;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
@@ -23,7 +24,7 @@ import org.voltdb.plannodes.InsertPlanNode;
 public class MakeInsertNodesInlineIfPossible extends MicroOptimization {
 
     @Override
-    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan) {
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan, AbstractParsedStmt parsedStmt) {
         return recursivelyApply(plan, -1);
     }
 

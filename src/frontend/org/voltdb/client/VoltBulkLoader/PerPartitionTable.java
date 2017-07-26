@@ -261,7 +261,7 @@ public class PerPartitionTable {
                     row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(),
                             currRow.m_rowData[i]);
                 }
-            } catch (VoltTypeException e) {
+            } catch (Exception e) {
                 loader.generateError(currRow.m_rowHandle, currRow.m_rowData, e.getMessage());
                 loader.m_outstandingRowCount.decrementAndGet();
                 it.remove();
