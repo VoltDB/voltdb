@@ -43,9 +43,9 @@ import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
-import static org.voltdb.compiler.CatalogChangeResult.CATALOG_CHANGE_NOREPLAY;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -58,7 +58,6 @@ public class CatalogContext {
             this.index = index;
         }
     }
-
 
     // THE CATALOG!
     public final Catalog catalog;
@@ -75,8 +74,7 @@ public class CatalogContext {
     private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
     public final UUID deploymentHashForConfig;
-    public final long m_transactionId;
-    public long m_uniqueId;
+    public final long m_genId; // export generation id
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
     // Default procs are loaded on the fly
     // The DPM knows which default procs COULD EXIST
@@ -98,15 +96,11 @@ public class CatalogContext {
 
     // database settings. contains both cluster and path settings
     private final DbSettings m_dbSettings;
-
-    //This is same as unique id except when the UAC is building new catalog ccr stands for catalog change replay time.
-    public final long m_ccrTime;
     /**
      * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
      * When @param hasSchemaChange is true, @param defaultProcManager and @param plannerTool will be created as new.
      * Otherwise, it will try to use the ones passed in to save CPU cycles for performance reason.
-     * @param transactionId
-     * @param uniqueId
+     * @param genId
      * @param catalog
      * @param settings
      * @param catalogBytes
@@ -117,11 +111,9 @@ public class CatalogContext {
      * @param hasSchemaChange
      * @param defaultProcManager
      * @param plannerTool
-     * @param ccrTime - Catalog Change Replay Time
      */
     public CatalogContext(
-            long transactionId,
-            long uniqueId,
+            long genId,
             Catalog catalog,
             DbSettings settings,
             byte[] catalogBytes,
@@ -131,12 +123,9 @@ public class CatalogContext {
             HostMessenger messenger,
             boolean hasSchemaChange,
             DefaultProcedureManager defaultProcManager,
-            PlannerTool plannerTool, long ccrTime)
+            PlannerTool plannerTool)
     {
-        m_transactionId = transactionId;
-        m_uniqueId = uniqueId;
-        //This is only set to something other than m_uniqueId when we are replaying a UAC.
-        m_ccrTime = ((ccrTime == CATALOG_CHANGE_NOREPLAY) ? uniqueId : ccrTime);
+        m_genId = genId;
         // check the heck out of the given params in this immutable class
         if (catalog == null) {
             throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
@@ -215,8 +204,7 @@ public class CatalogContext {
 
     /**
      * Constructor of @CatalogConext used when creating brand-new instances.
-     * @param transactionId
-     * @param uniqueId
+     * @param genId
      * @param catalog
      * @param settings
      * @param catalogBytes
@@ -226,8 +214,7 @@ public class CatalogContext {
      * @param messenger
      */
     public CatalogContext(
-            long transactionId,
-            long uniqueId,
+            long genId,
             Catalog catalog,
             DbSettings settings,
             byte[] catalogBytes,
@@ -236,8 +223,8 @@ public class CatalogContext {
             int version,
             HostMessenger messenger)
     {
-        this(transactionId, uniqueId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
-                version, messenger, true, null, null, uniqueId);
+        this(genId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
+                version, messenger, true, null, null);
     }
 
     public Cluster getCluster() {
@@ -253,16 +240,14 @@ public class CatalogContext {
     }
 
     public CatalogContext update(
-            long txnId,
-            long uniqueId,
+            long genId,
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             String diffCommands,
             boolean incrementVersion,
             byte[] deploymentBytes,
             HostMessenger messenger,
-            boolean hasSchemaChange,
-            long ccrTime)
+            boolean hasSchemaChange)
     {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
@@ -285,8 +270,7 @@ public class CatalogContext {
         }
         CatalogContext retval =
             new CatalogContext(
-                    txnId,
-                    uniqueId,
+                    genId,
                     newCatalog,
                     this.m_dbSettings,
                     bytes,
@@ -296,8 +280,7 @@ public class CatalogContext {
                     messenger,
                     hasSchemaChange,
                     m_defaultProcs,
-                    m_ptool,
-                    ccrTime);
+                    m_ptool);
         return retval;
     }
 
@@ -311,20 +294,53 @@ public class CatalogContext {
         return m_jarfile.get(key);
     }
 
+    public enum CatalogJarWriteMode {
+        START_OR_RESTART,
+        CATALOG_UPDATE,
+        RECOVER
+    }
+
     /**
-     * Write the original JAR file to the specified path/name
+     * Write, replace or update the catalog jar based on different cases. This function
+     * assumes any IOException should lead to fatal crash.
      * @param path
      * @param name
      * @throws IOException
      */
-    public Runnable writeCatalogJarToFile(String path, String name) throws IOException
+    public Runnable writeCatalogJarToFile(String path, String name, CatalogJarWriteMode mode) throws IOException
     {
-        File catalog_file = new VoltFile(path, name);
-        if (catalog_file.exists())
-        {
-            catalog_file.delete();
+        File catalogFile = new VoltFile(path, name);
+        File catalogTmpFile = new VoltFile(path, name + ".tmp");
+
+        if (mode == CatalogJarWriteMode.CATALOG_UPDATE) {
+            // This means a @UpdateCore case, the asynchronous writing of
+            // jar file has finished, rename the jar file
+            catalogFile.delete();
+            catalogTmpFile.renameTo(catalogFile);
+            return null;
         }
-        return m_jarfile.writeToFile(catalog_file);
+
+        if (mode == CatalogJarWriteMode.START_OR_RESTART) {
+            // This happens in the beginning of ,
+            // when the catalog jar does not yet exist. Though the contents
+            // written might be a default one and could be overwritten later
+            // by @UAC, @UpdateClasses, etc.
+            return m_jarfile.writeToFile(catalogFile);
+        }
+
+        if (mode == CatalogJarWriteMode.RECOVER) {
+            // we must overwrite the file (the file may have been changed)
+            catalogFile.delete();
+            if (catalogTmpFile.exists()) {
+                // If somehow the catalog temp jar is not cleaned up, then delete it
+                catalogTmpFile.delete();
+            }
+
+            return m_jarfile.writeToFile(catalogFile);
+        }
+
+        VoltDB.crashLocalVoltDB("Unsupported mode to write catalog jar", true, null);
+        return null;
     }
 
     /**
@@ -373,7 +389,7 @@ public class CatalogContext {
     }
 
     public static Class<?> classForProcedure(String procedureClassName, ClassLoader loader)
-        throws ClassNotFoundException {
+            throws ClassNotFoundException {
         // this is a safety mechanism to prevent catalog classes overriding VoltDB stuff
         if (procedureClassName.startsWith("org.voltdb.")) {
             return Class.forName(procedureClassName);
@@ -484,6 +500,13 @@ public class CatalogContext {
     public byte[] getCatalogHash()
     {
         return catalogHash;
+    }
+
+    public String getCatalogLogString() {
+        return String.format("Catalog: catalog hash %s, deployment hash %s, version %d",
+                                Encoder.hexEncode(catalogHash).substring(0, 10),
+                                Encoder.hexEncode(deploymentHash).substring(0, 10),
+                                catalogVersion);
     }
 
     public InMemoryJarfile getCatalogJar() {
