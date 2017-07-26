@@ -539,7 +539,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         long genId = getNextGenerationId();
         try {
             byte[] deploymentBytes = ccr.deploymentString.getBytes("UTF-8");
-            CatalogUtil.updateCatalogToZK(zk, genId, ccr.catalogBytes, ccr.catalogHash, deploymentBytes);
+            CatalogUtil.updateCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId,
+                    ccr.catalogBytes, ccr.catalogHash, deploymentBytes);
         } catch (UnsupportedEncodingException e) {
             errMsg = "error converting deployment string to bytes";
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);

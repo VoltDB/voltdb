@@ -2122,6 +2122,7 @@ public abstract class CatalogUtil {
     }
 
     private static ByteBuffer makeCatalogAndDeploymentBytes(
+                int version,
                 long genId,
                 byte[] catalogBytes,
                 byte[] catalogHash,
@@ -2129,6 +2130,7 @@ public abstract class CatalogUtil {
     {
         ByteBuffer versionAndBytes =
             ByteBuffer.allocate(
+                    4 +  // version number
                     8 +  // generation Id
                     20 + // catalog SHA-1 hash
                     4 +  // catalog bytes length
@@ -2147,6 +2149,7 @@ public abstract class CatalogUtil {
             }
         }
 
+        versionAndBytes.putInt(version);
         versionAndBytes.putLong(genId);
         versionAndBytes.put(catalogHash);
         versionAndBytes.putInt(catalogBytes.length);
@@ -2168,7 +2171,8 @@ public abstract class CatalogUtil {
                                         byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(genId,
+        // use default version 0 as start
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(0, genId,
                 catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -2183,29 +2187,33 @@ public abstract class CatalogUtil {
      * called writeCatalogToZK earlier in order to create the ZK node.
      */
     public static void updateCatalogToZK(ZooKeeper zk,
+                                        int version,
                                         long genId,
                                         byte[] catalogBytes,
                                         byte[] catalogHash,
                                         byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
-        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(genId,
+        ByteBuffer versionAndBytes = makeCatalogAndDeploymentBytes(version, genId,
                 catalogBytes, catalogHash, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
     public static class CatalogAndDeployment {
+        public final int version;
         public final long genId;
         private final byte[] catalogHash;
         public final byte[] catalogBytes;
         public final byte[] deploymentBytes;
 
         private CatalogAndDeployment(
+                int version,
                 long genId,
                 byte[] catalogHash,
                 byte[] catalogBytes,
                 byte[] deploymentBytes)
         {
+            this.version = version;
             this.genId = genId;
             this.catalogHash = catalogHash;
             this.catalogBytes = catalogBytes;
@@ -2220,7 +2228,10 @@ public abstract class CatalogUtil {
         @Override
         public String toString()
         {
-            return "Catalog: catalog hash " + Encoder.hexEncode(catalogHash).substring(0, 10);
+            return String.format("catalog version %d, catalog hash %s, deployment hash %s",
+                                version,
+                                Encoder.hexEncode(catalogHash).substring(0, 10),
+                                Encoder.hexEncode(deploymentBytes).substring(0, 10));
         }
     }
 
@@ -2235,6 +2246,7 @@ public abstract class CatalogUtil {
             throws KeeperException, InterruptedException {
         ByteBuffer catalogDeploymentBytes =
                 ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
+        int version = catalogDeploymentBytes.getInt();
         long genId = catalogDeploymentBytes.getLong();
         byte[] catalogHash = new byte[20]; // sha-1 hash size
         catalogDeploymentBytes.get(catalogHash);
@@ -2246,7 +2258,7 @@ public abstract class CatalogUtil {
         catalogDeploymentBytes.get(deploymentBytes);
         catalogDeploymentBytes = null;
 
-        return new CatalogAndDeployment(genId, catalogHash, catalogBytes, deploymentBytes);
+        return new CatalogAndDeployment(version, genId, catalogHash, catalogBytes, deploymentBytes);
     }
 
     /**
