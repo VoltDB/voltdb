@@ -1474,20 +1474,15 @@
         <div class="overlay-content setThresholdPopContent">
             <div>
                 <div class="settingMessage">
-                   Set the thresholds at which graphs highlight entries.
-                   Any entries above the following settings will be highlighted and explained in the area below the graph.
+                   Choose whether to include system procedures in the graphs and set the warning threshold.
+                   Any entries that exceed the threshold are highlighted in the graph and explained in the area below the graph.
                 </div>
             </div>
             <table id="tblAnalysisSettings" width="100%" cellpadding="0" cellspacing="0" class="alertThresholdTbl">
                 <tr>
-                    <td width="50%">Total Processing Time</td>
-                    <td width="30%" style="text-align:right"><input type="text" id="partitionThreshold"></td>
+                    <td width="50%">Average Execution Time</td>
+                    <td width="30%" style="text-align:right"><input type="text" value="" id="averageExecutionTime"></td>
                     <td width="20%">ms</td>
-                </tr>
-                <tr>
-                    <td>Average Execution Time</td>
-                    <td style="text-align:right"><input type="text" value="" id="averageExecutionTime"></td>
-                    <td>ms</td>
                 </tr>
             </table>
         </div>

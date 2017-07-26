@@ -81,7 +81,6 @@ function loadAnalysisPage(){
             var timestamp;
             var isMPPresent = false;
             var isPPresent = false;
-            var totalProcessingTime = VoltDbUI.getFromLocalStorage("totalProcessingTime");
             var averageExecutionTime = VoltDbUI.getFromLocalStorage("averageExecutionTime");
             var showHideSysProcedures = VoltDbUI.getFromLocalStorage("showHideSysProcedures");
             var procedureObj = {}
@@ -130,13 +129,6 @@ function loadAnalysisPage(){
                     } else {
                         isMPPresent = true;
                     }
-                }
-
-                if(calculatedProcessingTime > totalProcessingTime && totalProcessingTime != "") {
-                    $("#analysisRemarks").show();
-                    $("#procedureWarningSection").show();
-                    warningString = "<p>" + procedureName + " has total processing time greater than "+ totalProcessingTime +"ms.</p>";
-                    warningToolTip = procedureName + " <br> has total processing time greater <br> than "+ totalProcessingTime +"ms.";
                 }
 
                 if(averageExecutionTime != undefined && averageExecutionTime != ""){
@@ -299,9 +291,6 @@ function loadAnalysisPage(){
         }
 
         this.setDefaultAnalysisSettings = function(){
-            if(VoltDbUI.getFromLocalStorage("totalProcessingTime") == undefined){
-               saveInLocalStorage("totalProcessingTime", 3000)
-            }
             if(VoltDbUI.getFromLocalStorage("averageExecutionTime") == undefined){
                 saveInLocalStorage("averageExecutionTime", 500)
             }

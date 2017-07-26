@@ -2650,7 +2650,6 @@ var loadPage = function (serverName, portid) {
 
     $("#btnThreshold").popup({
         open: function (event, ui, ele) {
-            $("#partitionThreshold").val(VoltDbUI.getFromLocalStorage("totalProcessingTime"))
             $("#averageExecutionTime").val(VoltDbUI.getFromLocalStorage("averageExecutionTime"))
             $("#trShowHideSysProcedures").remove();
             $("#tblAnalysisSettings").append('<tr id="trShowHideSysProcedures">' +
@@ -2668,7 +2667,6 @@ var loadPage = function (serverName, portid) {
             var popup = $(this)[0];
             $("#btnSaveThreshold").unbind("click");
             $("#btnSaveThreshold").on("click", function () {
-                saveInLocalStorage("totalProcessingTime", $("#partitionThreshold").val())
                 saveInLocalStorage("averageExecutionTime", $("#averageExecutionTime").val())
                 saveInLocalStorage("showHideSysProcedures", $("#chkSystemProcedure").is(':checked'))
                 $("#btnAnalyzeNow").trigger("click");
