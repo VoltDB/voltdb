@@ -1289,11 +1289,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
         ForeignHost fhost = null;
         if (fhosts.size() == 1 || CoreUtils.getSiteIdFromHSId(hsId) < 0 ) {
-            // Always use primary connection to send to well-known mailbox
+            // Always use primary connection to send to well-known mailboxes
             fhost = getPrimary(fhosts, hostId);
         } else {
             /**
-             * Because the secondary connections are created rather late, just after cluster mesh network has
+             * Because the secondary connections are created late in the initialization, after cluster mesh network has
              * established, but before the whole cluster has been initialized. It's possible that some non-transactional
              * iv2 messages to be sent through foreign host when there is only one primary connection, So in
              * case of binding all sites to the primary connection, this check has been added to prevent it.
@@ -1762,7 +1762,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * so it becomes (targetConnectionsWithinPG - existingConnectionsWithinPG) + (existingConnectionsWithinPG - 1)
          * which equals to (targetConnectionsWithinPG - 1).
          *
-         * All the numbers are per node basis, PG is short for Partition Group
+         * All the numbers are on per node basis, PG is short for Partition Group
          */
         int connectionsWithoutPG = hostCount - 1;
         int existingConnectionsWithinPG = m_peers.size();
@@ -1772,9 +1772,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         Integer configNumberOfConnections = Integer.getInteger(SECONDARY_PICONETWORK_THREADS);
         if (configNumberOfConnections != null) {
             secondaryConnections = configNumberOfConnections;
-            m_hostLog.info("Overridden secondary PicoNetwork network thread count:" + configNumberOfConnections);
+            m_hostLog.warn("Overridden secondary PicoNetwork network thread count:" + configNumberOfConnections);
         } else {
-            m_hostLog.info("This node has " + secondaryConnections + " secondary PicoNetwork thread" + ((secondaryConnections > 1) ? "s" :""));
+            m_hostLog.warn("This node has " + secondaryConnections + " secondary PicoNetwork thread" + ((secondaryConnections > 1) ? "s" :""));
         }
         return secondaryConnections;
     }
