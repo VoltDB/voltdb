@@ -665,10 +665,12 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time" || d.series[0].key == "Total Processing Time" || d.series[0].key == "Processing Time Detail")
+                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time" || d.series[0].key == "Processing Time Detail")
                             unit = " ms"
                         else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail")
                             unit = ""
+                        else if(d.series[0].key == "Total Processing Time")
+                            unit =" s"
                         else
                             unit = " %"
                     }
@@ -766,7 +768,7 @@
                         .html("Total Processing Time")
 
                         trowEnter3.append("td")
-                            .html(VoltDbAnalysis.procedureValue[d.data.label].TOTAL_PROCESSING_TIME.toFixed(3) + " ms");
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].TOTAL_PROCESSING_TIME.toFixed(3) + " s");
                     }
 
                     if(d.series[0].key != "Execution Time"){
@@ -9153,10 +9155,7 @@
                         .attr('x', function (d, i) {
                             var charLength = d.key != "Frequency" ? d.value.toFixed(3).toString().length : d.value.toString().length;
                             var xLength = getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) + 16;
-                            if(d.key == "Total Processing Time")
-                                xLength += VoltDbAnalysis.proceduresCount > 1 ? (6.5 * charLength) : (6.5 * charLength);
-                            else
-                                xLength += (6.5 * charLength);
+                            xLength += (6.5 * charLength);
                             return xLength;
                         })
                 } else {

@@ -687,13 +687,13 @@
                 .call(ChartFrequencyAnalysis);
         }
 
-        this.RefreshAnalysisCombinedGraph = function(dataCombined){
+        this.RefreshAnalysisProcessingTimeGraph = function(dataProcessingTime){
             ChartProcessingTimeAnalysis.update;
-            getBarHeightAndSpacing(dataCombined, ChartProcessingTimeAnalysis);
+            getBarHeightAndSpacing(dataProcessingTime, ChartProcessingTimeAnalysis);
             ChartProcessingTimeAnalysis.height(barHeight);
             $("#chartProcessingTimeAnalysis").css("height", barHeight-10);
             ChartProcessingTimeAnalysis.margin({"left": 115,"right": 40});
-            dataProcessingTimeAnalysis[0]["values"] = dataCombined;
+            dataProcessingTimeAnalysis[0]["values"] = dataProcessingTime;
             d3.select("#visualiseProcessingTimeAnalysis")
                 .datum(dataProcessingTimeAnalysis)
                 .transition().duration(500)

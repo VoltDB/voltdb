@@ -26,23 +26,6 @@ function loadAnalysisPage(){
         VoltDbAnalysis.refreshChart();
     }
 
-    function calculateCombinedValue(profileData){
-        var totalValue = 0;
-        for(var j = 0; j < profileData.length; j++){
-            totalValue += (profileData[j].AVG/1000000) * profileData[j].INVOCATIONS;
-        }
-        return totalValue;
-    }
-
-    function checkObjForLongStatementName(profileData){
-        for(var j = 0; j < profileData.length; j++){
-            if(profileData[j].STATEMENT.length > 14){
-                return true;
-            }
-        }
-        return false;
-    }
-
     function formatAnalysisLegend(isMP, isP){
         if(isMP && isP){
             $("#legendAnalysisMP").hide();
@@ -133,7 +116,7 @@ function loadAnalysisPage(){
             var isMPPresent = false;
             $.each(procedureObj, function(key, value){
                 var avgExecTime = (value["AVG"] / value["COUNT"]) / 1000000;
-                var calculatedProcessingTime = (avgExecTime * value["INVOCATION"]);
+                var calculatedProcessingTime = (avgExecTime * value["INVOCATION"]/1000);
                 var procedureName = key;
                 var invocation = value["INVOCATION"];
                 var type = value["TYPE"];
@@ -205,7 +188,7 @@ function loadAnalysisPage(){
 
             MonitorGraphUI.RefreshAnalysisLatencyGraph(dataLatencyProcedures);
             MonitorGraphUI.RefreshAnalysisFrequencyGraph(dataFrequencyProcedures);
-            MonitorGraphUI.RefreshAnalysisCombinedGraph(dataTotalProcessingProcedures);
+            MonitorGraphUI.RefreshAnalysisProcessingTimeGraph(dataTotalProcessingProcedures);
         });
 
         voltDbRenderer.GetProcedureDetailInformation(function (procedureDetails){
