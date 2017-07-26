@@ -1088,7 +1088,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         fhost.enableRead(VERBOTEN_THREADS);
         boolean ready = true;
         for (int peer : m_peers) {
-            ready = ready && m_foreignHosts.get(peer).size() == m_secondaryConnections;
+            ready = ready && m_foreignHosts.get(peer).size() == (m_secondaryConnections + 1);
             m_hostLog.warn("NotifyOfConnection For hostId " + hostId + " ready=" + ready);
         }
         if (ready) {
@@ -1823,7 +1823,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
         boolean ready = true;
         for (int hostId : m_peers) {
-            ready = ready && m_foreignHosts.get(hostId).size() == m_secondaryConnections;
+            ready = ready && m_foreignHosts.get(hostId).size() == (m_secondaryConnections + 1);
             m_hostLog.warn("For hostId " + hostId + " ready=" + ready);
         }
         if (ready) {
