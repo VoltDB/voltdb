@@ -298,4 +298,5 @@ ADD_SUBDIRECTORY(src/ee ee)
 # Configure the tests.
 #
 ########################################################################
+ENABLE_TESTING()
 ADD_SUBDIRECTORY(tests/ee tests)

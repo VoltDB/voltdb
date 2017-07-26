@@ -16,7 +16,7 @@ FUNCTION(VALGRIND_FILE_NAME TARGET_DIR TARGET_NAME OUTPUT_VAR)
 ENDFUNCTION()
 
 FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD WILL_FAIL OUTPUT_VAR OUTPUT_IS_VALGRIND_TEST)
-  SET(SUPPRESSIONS ${VOLTDB_ROOT}/tests/ee/test_utils/vdbsuppressions.supp)
+  SET(SUPPRESSIONS ${${PROJECT_NAME}_SOURCE_DIR}/test_utils/vdbsuppressions.supp)
   IF ( WILL_FAIL )
     SET(FAIL_ARG --expect-fail=true)
   ELSE()
@@ -54,7 +54,7 @@ ENDFUNCTION()
 # in the script's argument list.
 #
 FUNCTION(PYTHON_COMMAND TEST_DIR TEST_NAME TEST_EXE_CMD OUTPUT_VAR OUTPUT_IS_PYTHON_TEST)
-  FILE(GLOB PYTHON_SCRIPTS ${VOLTDB_ROOT}/tests/ee/${TEST_DIR}/${TEST_NAME}.py)
+  FILE(GLOB PYTHON_SCRIPTS ${${PROJECT_NAME}_SOURCE_DIR}/${TEST_DIR}/${TEST_NAME}.py)
   LIST(LENGTH PYTHON_SCRIPTS IS_PYTHON)
   IF (${IS_PYTHON} GREATER 0)
     LIST(GET PYTHON_SCRIPTS 0 PYTHON_SCRIPT)
@@ -132,42 +132,46 @@ FUNCTION(DEFINE_TEST TEST_NAME)
   # depends on the test.  Remember the necessary include
   # directories and link libraries.
   #
+  # First, calculate the actual test command.  We
+  # don't need this to define the executable, but we do
+  # need it to define the output name of the executable.
+  #
   ADD_EXECUTABLE(${TEST_NAME}
       $<TARGET_OBJECTS:voltdb_test_harness>
       $<TARGET_OBJECTS:voltdbobjs>
       $<TARGET_OBJECTS:third_party_objs>
-      ${VOLTDB_ROOT}/tests/ee/${TEST_GEN}/${TEST_DIR}/${TEST_NAME}.cpp)
+      ${${PROJECT_NAME}_SOURCE_DIR}/${TEST_GEN}/${TEST_DIR}/${TEST_NAME}.cpp)
   ADD_CUSTOM_COMMAND(TARGET ${TEST_NAME}
     PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory cpptests/${TEST_DIR}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/cpptests/${TEST_DIR}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/tests/test_working_dir
     )
-  #
-  # Calculate the actual test command.
-  #
-  SET(TARGET_EXE_CMD ${CMAKE_BINARY_DIR}/cpptests/${TEST_DIR}/${TEST_NAME})
-  MESSAGE("Defining target build-${TEST_NAME}")
-  ADD_CUSTOM_TARGET(build-${TEST_NAME}
-    DEPENDS ${TEST_NAME})
-  ADD_DEPENDENCIES(build-${TEST_DIR} ${TEST_NAME})
+  SET(TARGET_EXE_DIR ${CMAKE_BINARY_DIR}/cpptests/${TEST_DIR})
+  SET(TARGET_EXE_CMD ${TARGET_EXE_DIR}/${TEST_NAME})
   SET_TARGET_PROPERTIES(${TEST_NAME}
     PROPERTIES
-    OUTPUT_NAME ${TARGET_EXE_CMD}
+    RUNTIME_OUTPUT_DIRECTORY ${TARGET_EXE_DIR}
     EXCLUDE_FROM_ALL TRUE)
-  ADD_DEPENDENCIES(${TEST_NAME}
-    pcre2 crypto s2geo ${VOLTDB_LIBNAME})
   TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
     SYSTEM PUBLIC
-    ${VOLTDB_ROOT}/third_party/cpp
+    ${CMAKE_SOURCE_DIR}/third_party/cpp)
+  TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
     PUBLIC
+    ${${PROJECT_NAME}_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}
-    ${CMAKE_BINARY_DIR}/3pty-install/include
-    ${VOLTDB_ROOT}/tests/ee)
+    ${CMAKE_SOURCE_DIR}/src/ee
+    ${CMAKE_BINARY_DIR}/3pty-install/include)
   TARGET_LINK_LIBRARIES(${TEST_NAME}
     ${VOLTDB_LINK_FLAGS}
     -L${CMAKE_BINARY_DIR}/3pty-install/lib
     -lpcre2-8 -ls2geo -lcrypto
     -ldl)
+  ADD_DEPENDENCIES(${TEST_NAME}
+    pcre2 crypto s2geo ${VOLTDB_LIBNAME})
+
+  # This allows us to run "make build-sometest" to build sometest.
+  ADD_CUSTOM_TARGET(build-${TEST_NAME}
+    DEPENDS ${TEST_NAME})
   #
   # We expect all the memleak tests to fail, except for
   # the test no_losses.  It's possible, but not obvious,
@@ -193,17 +197,18 @@ FUNCTION(DEFINE_TEST TEST_NAME)
   PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD OUTPUT_IS_PYTHON_TEST)
   # So, "make ${TEST_NAME}"" builds the test and
   # "make run-${TEST_NAME}" runs the single test.
-  MESSAGE("Test run-${TEST_NAME} has command ${CTEST_EXE_CMD}.")
-  ADD_TEST(NAME ${TEST_NAME}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_working_dir
-    COMMAND ${CTEST_EXE_CMD})
-  ADD_DEPENDENCIES(run-${TEST_DIR} ${TEST_NAME})
+  ADD_DEPENDENCIES(build-${TEST_DIR} build-${TEST_NAME})
+  ADD_DEPENDENCIES(run-${TEST_DIR} build-${TEST_NAME})
   MESSAGE("Defining target run-${TEST_NAME}")
   ADD_CUSTOM_TARGET(run-${TEST_NAME}
     DEPENDS ${TEST_NAME}
     COMMAND /usr/bin/env CTEST_OUTPUT_ON_FAILURE=true ${CMAKE_CTEST_COMMAND} -j ${VOLTDB_CORE_COUNT} -R ${TEST_NAME})
   # Some tests are expected to fail.  Also, tag the
   # test with its label.
+  MESSAGE("Test ${TEST_NAME} has command ${CTEST_EXE_CMD}.")
+  ADD_TEST(NAME ${TEST_NAME}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_working_dir
+    COMMAND ${CTEST_EXE_CMD})
   SET_TESTS_PROPERTIES(${TEST_NAME}
     PROPERTIES
     WILL_FAIL ${WILL_FAIL}

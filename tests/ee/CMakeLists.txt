@@ -188,11 +188,16 @@ ADD_LIBRARY(voltdb_test_harness
   OBJECT
   ${VOLTDB_ROOT}/tests/ee/harness)
 
+MESSAGE("VoltDB_Tests: PROJECT_NAME Is ${PROJECT_NAME}")
+MESSAGE("VoltDB_Tests: PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}")
 TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
-  SYSTEM PUBLIC
-  ${VOLTDB_ROOT}/third_party/cpp
+  SYSTEM
   PUBLIC
-  ${${PROJECT}_SOURCE_DIR}
+  ${VOLTDB_ROOT}/third_party/cpp)
+TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
+  PUBLIC
+  ${${PROJECT_NAME}_SOURCE_DIR}
+  ${CMAKE_SOURCE_DIR}/src/ee
   ${CMAKE_SOURCE_DIR}
   ${CMAKE_BINARY_DIR}/3pty-install/include)
 

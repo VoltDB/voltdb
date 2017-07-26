@@ -293,6 +293,8 @@ ADD_DEPENDENCIES(voltdbobjs s2geo crypto pcre2)
 ADD_DEPENDENCIES(voltdbipcobjs s2geo crypto pcre2)
 ADD_DEPENDENCIES(voltdbjniobjs s2geo crypto pcre2)
 
+MESSAGE("VoltDB_EE: PROJECT_NAME Is ${PROJECT_NAME}")
+MESSAGE("VoltDB_EE: PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}")
 TARGET_INCLUDE_DIRECTORIES(voltdbobjs
   SYSTEM PUBLIC
   ${CMAKE_SOURCE_DIR}/third_party/cpp)
