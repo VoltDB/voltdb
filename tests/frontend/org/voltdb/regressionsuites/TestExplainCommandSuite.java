@@ -195,15 +195,10 @@ public class TestExplainCommandSuite extends RegressionSuite {
         Client client = getClient();
         VoltTable vt = null;
 
-        // Test if the error checking is working properly.
-        verifyProcFails(client, "Procedure MultiSP not in catalog", "@ExplainProc", "MultiSP");
-
         // test for multi partition query
         String[] sql = new String[]{
                 "insert into t1 values (?, ?, ?);",
                 "select * from t1;"};
-        client.callProcedure("@AdHoc", "CREATE PROCEDURE MultiSP AS BEGIN "
-                + sql[0] + sql[1] + " end;");
         vt = client.callProcedure("@ExplainProc", "MultiSP" ).getResults()[0];
         assertEquals(2, vt.getRowCount());
 
@@ -225,18 +220,15 @@ public class TestExplainCommandSuite extends RegressionSuite {
         }
 
         // test for single partition query
-        client.callProcedure("@AdHoc", "DROP PROCEDURE MultiSP;");
-        client.callProcedure("@AdHoc", "PARTITION TABLE T1 ON COLUMN PKEY;");
-        client.callProcedure("@AdHoc",
-                "CREATE PROCEDURE MultiSP1 "
-                + "PARTITION ON TABLE T1 "
-                + "COLUMN PKEY PARAMETER 0 AS BEGIN "
-                + sql[0] + sql[1] + " end;");
-        vt = client.callProcedure("@ExplainProc", "MultiSP1" ).getResults()[0];
+        sql = new String[]{
+                "insert into t2 values (?, ?, ?);",
+                "select * from t2;"};
+        vt = client.callProcedure("@ExplainProc", "MultiSPSingle" ).getResults()[0];
         assertEquals(2, vt.getRowCount());
 
-        // -1- insert into t1
-        // -2- select * from t1
+        // -1- insert into t2
+        // -2- select * from t2
+        // t2 is partitioned on PKEY
         for (int i = 0; i < 2; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
@@ -244,10 +236,10 @@ public class TestExplainCommandSuite extends RegressionSuite {
             assertEquals(sql[i], task);
             // note that there is no send and receive data from all partitions unlike above query
             if (i == 0) {
-                assertTrue(plan.contains("INSERT into \"T1\""));
+                assertTrue(plan.contains("INSERT into \"T2\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
             } else if (i == 1) {
-                assertTrue(plan.contains("SEQUENTIAL SCAN of \"T1\""));
+                assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
             }
         }
     }
