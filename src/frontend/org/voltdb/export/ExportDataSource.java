@@ -485,12 +485,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_poll = value;
     }
 
-    //
+    // update internal state of export data source - poll, mastership and m_pollfuture, in preparation
+    // for delegating existing data sources to the new processor
     void prepareForProcessorSwap() {
         m_poll = false;                     // disable polling
         m_mastershipAccepted.set(false);    // unassign mastership for this partition
-        // TODO: is setting poll future to null safe?
-        m_pollFuture = null;
+
+        // For case where the previous export processor had only row of the first block to process
+        // and it completed processing it, poll future is not set to null still. Set it to null to
+        // prepare for the new processor polling
+        if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
+            m_pollFuture = null;
+        }
+
     }
 
     public void pushExportBuffer(
@@ -648,6 +655,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //If we have anything pending set that before moving to next block.
                     if (m_pendingContainer.get() != null) {
                         fut.set(m_pendingContainer.getAndSet(null));
+                        if (m_pollFuture != null) {
+                            exportLog.info("picked up work from pending container, set poll future to null");
+                            m_pollFuture = null;
+                        }
                         return;
                     }
                     /*
@@ -918,8 +929,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        // force mastership logic to update runnable for the data source
-//        m_mastershipAccepted.set(false);
         if (m_replicaMastershipRequested) {
             acceptMastership();
         }

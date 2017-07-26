@@ -128,7 +128,8 @@ public class ExportManager
 
     private int m_connCount = 0;
 
-    private final ExecutorService m_dataProcessorHandler = CoreUtils.getSingleThreadExecutor("ImportProcessor");
+    private final ExecutorService m_dataProcessorHandler = CoreUtils.getSingleThreadExecutor("Export-UAC-Handler");
+
 
     /**
      * Construct ExportManager using catalog.
@@ -382,7 +383,7 @@ public class ExportManager
     private void initialize(CatalogMap<Connector> connectors, List<Integer> partitions, boolean isRejoin) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
-            ExportDataProcessor newProcessor = getNewProcessor();
+            ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet();
             m_processor.set(newProcessor);
 
             initializePersistedGenerations();
@@ -445,7 +446,7 @@ public class ExportManager
 
             try {
                 exportLog.info("Creating connector " + m_loaderClass);
-                ExportDataProcessor newProcessor = getNewProcessor();
+                ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet();
                 m_processor.set(newProcessor);
 
                 newProcessor.setExportGeneration(generation);
@@ -479,7 +480,7 @@ public class ExportManager
         }
     }
 
-    private  ExportDataProcessor getNewProcessor() throws ClassNotFoundException, InstantiationException, IllegalAccessException {
+    private  ExportDataProcessor getNewProcessorWithProcessConfigSet() throws ClassNotFoundException, InstantiationException, IllegalAccessException {
         final Class<?> loaderClass = Class.forName(m_loaderClass);
         ExportDataProcessor newProcessor = (ExportDataProcessor)loaderClass.newInstance();
         newProcessor.addLogger(exportLog);
@@ -489,24 +490,22 @@ public class ExportManager
 
     // remove and install new processor
     private void swapWithNewProcessor(ExportGeneration generation, List<Integer> partitions) {
+        generation.pausePolling(partitions);
         java.util.concurrent.Future<?> task = m_dataProcessorHandler.submit(new Runnable() {
-
             @Override
             public void run() {
-
+                ExportDataProcessor oldProcessor = m_processor.get();
+                exportLog.info("Shutdown guestprocessor");
+                oldProcessor.shutdown();
+                exportLog.info("Processor shutdown completed, install new export processor");
                 ExportDataProcessor newProcessor = null;
                 try {
-                    newProcessor = getNewProcessor();
+                    newProcessor = getNewProcessorWithProcessConfigSet();
                 }
                 catch (Exception crash) {
                     VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
                 }
-                generation.pausePolling(partitions);
-
-                ExportDataProcessor oldProcessor = m_processor.getAndSet(newProcessor);
-                oldProcessor.shutdown();
-
-                // override m_generation with itself to activate all the ExportDataSource
+                m_processor.getAndSet(newProcessor);
                 newProcessor.setExportGeneration(generation);
                 newProcessor.readyForData(false);
                 for ( Integer partitionId: m_masterOfPartitions) {
