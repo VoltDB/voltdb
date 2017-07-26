@@ -383,7 +383,7 @@ public class ExportManager
     private void initialize(CatalogMap<Connector> connectors, List<Integer> partitions, boolean isRejoin) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
-            ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet();
+            ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
             m_processor.set(newProcessor);
 
             initializePersistedGenerations();
@@ -446,7 +446,7 @@ public class ExportManager
 
             try {
                 exportLog.info("Creating connector " + m_loaderClass);
-                ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet();
+                ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
 
                 newProcessor.setExportGeneration(generation);
@@ -475,21 +475,24 @@ public class ExportManager
             }
         }
         else {
-            // install new processor
-            swapWithNewProcessor(generation, partitions);
+            // install new export processors with export config from this time
+            swapWithNewProcessor(generation, partitions, m_processorConfig);
         }
     }
 
-    private  ExportDataProcessor getNewProcessorWithProcessConfigSet() throws ClassNotFoundException, InstantiationException, IllegalAccessException {
+    private  ExportDataProcessor getNewProcessorWithProcessConfigSet(Map<String, Pair<Properties, Set<String>>> config) throws ClassNotFoundException, InstantiationException, IllegalAccessException {
         final Class<?> loaderClass = Class.forName(m_loaderClass);
         ExportDataProcessor newProcessor = (ExportDataProcessor)loaderClass.newInstance();
         newProcessor.addLogger(exportLog);
-        newProcessor.setProcessorConfig(m_processorConfig);
+        newProcessor.setProcessorConfig(config);
         return newProcessor;
     }
 
     // remove and install new processor
-    private void swapWithNewProcessor(ExportGeneration generation, List<Integer> partitions) {
+    private void swapWithNewProcessor(
+            ExportGeneration generation,
+            List<Integer> partitions,
+            Map<String, Pair<Properties, Set<String>>> config) {
         generation.pausePolling(partitions);
         java.util.concurrent.Future<?> task = m_dataProcessorHandler.submit(new Runnable() {
             @Override
@@ -500,7 +503,7 @@ public class ExportManager
                 exportLog.info("Processor shutdown completed, install new export processor");
                 ExportDataProcessor newProcessor = null;
                 try {
-                    newProcessor = getNewProcessorWithProcessConfigSet();
+                    newProcessor = getNewProcessorWithProcessConfigSet(config);
                 }
                 catch (Exception crash) {
                     VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
@@ -511,17 +514,8 @@ public class ExportManager
                 for ( Integer partitionId: m_masterOfPartitions) {
                     generation.acceptMastershipTask(partitionId);
                 }
-
-
             }
         });
-
-//        try {
-//            task.get();
-//        }
-//        catch (Exception ignore) {
-//            exportLog.error("!!!!! " + ignore.getMessage() + " !!!!!");
-//        }
 
     }
 
