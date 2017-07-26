@@ -292,11 +292,11 @@ public class UpdateCore extends VoltSystemProcedure {
 
             CatalogAndDeployment catalogStuff = null;
             if (isForReplay) {
-            	try {
-            		catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-            	} catch (Exception e) {
-            		VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
-            	}
+                try {
+                    catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
+                }
 
             } else {
                 CatalogContext ctx = VoltDB.instance().getCatalogContext();
