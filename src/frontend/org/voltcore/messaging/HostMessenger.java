@@ -343,6 +343,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
+    private int m_secondaryConnections;
+    /* Peers within the same partition group */
+    private Set<Integer> m_peers;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
     private final AtomicInteger m_nextForeignHost = new AtomicInteger();
     private final AtomicBoolean m_paused = new AtomicBoolean(false);
@@ -351,6 +354,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * used when coordinating joining hosts
      */
     private final JoinAcceptor m_acceptor;
+
+    private static final String SECONDARY_PICONETWORK_THREADS = "secondaryPicoNetworkThreads";
 
     public Mailbox getMailbox(long hsId) {
         return m_siteMailboxes.get(hsId);
@@ -744,7 +749,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fhost = null;
         try {
             fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
-                    listeningAddress, new PicoNetwork(socket));
+                    listeningAddress, new PicoNetwork(socket, false));
             putForeignHost(hostId, fhost);
             fhost.enableRead(VERBOTEN_THREADS);
         } catch (java.io.IOException e) {
@@ -866,7 +871,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                  * Now add the host to the mailbox system
                  */
                 fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
-                        listeningAddress, new PicoNetwork(socket));
+                        listeningAddress, new PicoNetwork(socket, false));
                 putForeignHost(hostId, fhost);
                 fhost.enableRead(VERBOTEN_THREADS);
 
@@ -1000,7 +1005,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             ForeignHost fhost = null;
             try {
                 fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout,
-                        listeningAddresses[ii], new PicoNetwork(sockets[ii]));
+                        listeningAddresses[ii], new PicoNetwork(sockets[ii], false));
                 putForeignHost(hosts[ii], fhost);
             } catch (java.io.IOException e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("Failed to instantiate foreign host", true, e);
@@ -1079,9 +1084,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         prepSocketChannel(socket);
         // Auxiliary connection never time out
         ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
-                listeningAddress, new PicoNetwork(socket));
+                listeningAddress, new PicoNetwork(socket, true));
         putForeignHost(hostId, fhost);
         fhost.enableRead(VERBOTEN_THREADS);
+        boolean ready = true;
+        for (int peer : m_peers) {
+            ready = ready && m_foreignHosts.get(peer).size() == (m_secondaryConnections + 1);
+        }
+        if (ready) {
+            // Now it's time to use secondary pico network, see comments in presend() to know why we can't
+            // do this earlier.
+            m_hasAllSecondaryConnectionCreated = true;
+        }
 }
 
 
@@ -1274,13 +1288,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             return null;
         }
         ForeignHost fhost = null;
-        if (CoreUtils.getSiteIdFromHSId(hsId) < 0 ) {
-            // special mailbox, always use primary connection
+        if (fhosts.size() == 1 || CoreUtils.getSiteIdFromHSId(hsId) < 0 ) {
+            // Always use primary connection to send to well-known mailboxes
             fhost = getPrimary(fhosts, hostId);
         } else {
             /**
-             *  Because the secondary connections are created rather late, just after cluster mesh network has
-             *  established, but before the whole cluster has been initialized. It's possible that some non-transactional
+             * Because the secondary connections are created late in the initialization, after cluster mesh network has
+             * established, but before the whole cluster has been initialized. It's possible that some non-transactional
              * iv2 messages to be sent through foreign host when there is only one primary connection, So in
              * case of binding all sites to the primary connection, this check has been added to prevent it.
              */
@@ -1290,6 +1304,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 if (fhost == null) {
                     int index = Math.abs(m_nextForeignHost.getAndIncrement() % fhosts.size());
                     fhost = (ForeignHost) fhosts.toArray()[index];
+                    if (m_hostLog.isDebugEnabled()) {
+                        m_hostLog.debug("bind " + CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId) +
+                                " to " + fhost.hostnameAndIPAndPort());
+                    }
                     bindForeignHost(hsId, fhost);
                 }
             } else {
@@ -1732,10 +1750,72 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
+    public void setPartitionGroupPeers(Set<Integer> partitionGroupPeers, int hostCount) {
+        if (partitionGroupPeers.size() > 1) {
+            StringBuilder strBuilder = new StringBuilder();
+            strBuilder.append("< ");
+            partitionGroupPeers.forEach((h) -> {
+                strBuilder.append(h).append(" ");
+            });
+            strBuilder.append(">");
+            m_hostLog.info("Host " + strBuilder.toString() + " belongs to the same partition group.");
+        }
+        partitionGroupPeers.remove(m_localHostId);
+        m_peers = partitionGroupPeers;
+        m_secondaryConnections = computeSecondaryConnections(hostCount);
+    }
+
+    private int computeSecondaryConnections(int hostCount) {
+        /**
+         *  Basic goal is each host should has the same number of connections compare to the number
+         *  without partition group layout.
+         *
+         * (targetConnectionsWithinPG - existingConnectionsWithinPG) is the the total number of secondary
+         * connections we try to create, I want the secondary connections to have an even distribution
+         * across all nodes within the partition group, and round up the result because this is
+         * integer division, there is a trick to do this:  (a + (b - 1)) / b
+         * so it becomes (targetConnectionsWithinPG - existingConnectionsWithinPG) + (existingConnectionsWithinPG - 1)
+         * which equals to (targetConnectionsWithinPG - 1).
+         *
+         * All the numbers are on per node basis, PG is short for Partition Group
+         */
+        int connectionsWithoutPG = hostCount - 1;
+        int existingConnectionsWithinPG = m_peers.size();
+        int targetConnectionsWithinPG = Math.min( connectionsWithoutPG, CoreUtils.availableProcessors() / 4);
+
+        int secondaryConnections = (targetConnectionsWithinPG - 1) / existingConnectionsWithinPG;
+        Integer configNumberOfConnections = Integer.getInteger(SECONDARY_PICONETWORK_THREADS);
+        if (configNumberOfConnections != null) {
+            secondaryConnections = configNumberOfConnections;
+            m_hostLog.info("Overridden secondary PicoNetwork network thread count:" + configNumberOfConnections);
+        } else {
+            m_hostLog.info("This node has " + secondaryConnections + " secondary PicoNetwork thread" + ((secondaryConnections > 1) ? "s" :""));
+        }
+        return secondaryConnections;
+    }
+
     // Create connections to nodes within the same partition group
-    public void createAuxiliaryConnections(Set<Integer> peers, int secondaryConnections) {
-        for (int hostId : peers) {
-            for (int ii = 0; ii < secondaryConnections; ii++) {
+    public void createAuxiliaryConnections(boolean isRejoin) {
+        Set<Integer> hostsToConnect = Sets.newHashSet();
+        if (isRejoin) {
+            hostsToConnect.addAll(m_peers);
+        } else {
+            for (Integer host : m_peers) {
+                // This node sends connection request to all its peers, once the connection
+                // is established, both nodes will create a foreign host (contains a PicoNetwork thread).
+                // That said, here we only connect to the nodes that have higher host id to avoid double
+                // the network thread we expected.
+                if (host > m_localHostId) {
+                    hostsToConnect.add(host);
+                }
+            }
+        }
+
+        // it is possible if some nodes are inactive
+        if (hostsToConnect.isEmpty()) return;
+
+        for (int hostId : hostsToConnect) {
+            for (int ii = 0; ii < m_secondaryConnections; ii++) {
                 Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
                 if (it.hasNext()) {
                     ForeignHost fh = it.next();
@@ -1743,7 +1823,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         SocketChannel socket = m_joiner.requestForConnection(fh.m_listeningAddress);
                         // Auxiliary connection never time out
                         ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
-                                fh.m_listeningAddress, new PicoNetwork(socket));
+                                fh.m_listeningAddress, new PicoNetwork(socket, true));
                         putForeignHost(hostId, fhost);
                         fhost.enableRead(VERBOTEN_THREADS);
                     } catch (IOException | JSONException e) {
@@ -1754,7 +1834,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 }
             }
         }
-        m_hasAllSecondaryConnectionCreated = true;
+        boolean ready = true;
+        for (int hostId : m_peers) {
+            ready = ready && m_foreignHosts.get(hostId).size() == (m_secondaryConnections + 1);
+        }
+        if (ready) {
+            // Now it's time to use secondary pico network, see comments in presend() to know why we can't
+            // do this earlier.
+            m_hasAllSecondaryConnectionCreated = true;
+        }
     }
 
     public synchronized void addStopNodeNotice(int targetHostId) {

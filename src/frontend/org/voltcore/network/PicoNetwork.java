@@ -127,17 +127,25 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         m_thread.start();
     }
 
-    public PicoNetwork(SocketChannel sc) {
+    /**
+     * Create a pico network thread
+     * @param sc  SocketChannel
+     * @param isSecondary  Is this a secondary thread?
+     */
+    public PicoNetwork(SocketChannel sc, boolean isSecondary) {
         m_sc = sc;
         InetSocketAddress remoteAddress = (InetSocketAddress)sc.socket().getRemoteSocketAddress();
         m_remoteSocketAddress = remoteAddress;
         m_remoteSocketAddressString = remoteAddress.getAddress().getHostAddress();
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
-        m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
         String remoteHost = ReverseDNSCache.hostnameOrAddress(m_remoteSocketAddress.getAddress());
         if (!remoteHost.equals(m_remoteSocketAddress.getAddress().getHostAddress())) {
             m_remoteHostname = remoteHost;
             m_remoteHostAndAddressAndPort = remoteHost + m_remoteHostAndAddressAndPort;
+        }
+        if (isSecondary) {
+            m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort + "(s)";
+        } else {
             m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
         }
 
