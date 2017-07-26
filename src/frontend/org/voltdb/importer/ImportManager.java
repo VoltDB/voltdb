@@ -75,9 +75,6 @@ public class ImportManager implements ChannelChangeCallback {
     // about the jars to use
     private Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
 
-    // If this is set, importers can be restarted even if the catalog has not changed
-    private boolean m_importersDisabled = false;
-
     /**
      * Get the global instance of the ImportManager.
      * @return The global single instance of the ImportManager.
@@ -306,7 +303,7 @@ public class ImportManager implements ChannelChangeCallback {
     public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
         try {
             Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
-            if (m_processorConfig == null || m_importersDisabled || !m_processorConfig.equals(newProcessorConfig)) {
+            if (m_processorConfig == null || !m_processorConfig.equals(newProcessorConfig)) {
                 restartImporters(newProcessorConfig);
                 readyForDataInternal(catalogContext, messenger);
             }
@@ -336,9 +333,6 @@ public class ImportManager implements ChannelChangeCallback {
         if (VoltDB.instance().getMode() != OperationMode.PAUSED) {
             //Tell import processors and in turn ImportHandlers that we are ready to take in data.
             m_processor.get().readyForData(catalogContext, messenger);
-            m_importersDisabled = false;
-        } else {
-            m_importersDisabled = true;
         }
     }
 
