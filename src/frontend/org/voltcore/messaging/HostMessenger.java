@@ -1288,8 +1288,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             return null;
         }
         ForeignHost fhost = null;
-        if (CoreUtils.getSiteIdFromHSId(hsId) < 0 ) {
-            // special mailbox, always use primary connection
+        if (fhosts.size() == 1 || CoreUtils.getSiteIdFromHSId(hsId) < 0 ) {
+            // Always use primary connection to send to well-known mailbox
             fhost = getPrimary(fhosts, hostId);
         } else {
             /**
