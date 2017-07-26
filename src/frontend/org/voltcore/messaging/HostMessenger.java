@@ -1089,6 +1089,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         boolean ready = true;
         for (int peer : m_peers) {
             ready = ready && m_foreignHosts.get(peer).size() == m_secondaryConnections;
+            m_hostLog.warn("NotifyOfConnection For hostId " + hostId + " ready=" + ready);
         }
         if (ready) {
             // Now it's time to use secondary pico network, see comments in presend() to know why we can't
@@ -1303,6 +1304,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 if (fhost == null) {
                     int index = Math.abs(m_nextForeignHost.getAndIncrement() % fhosts.size());
                     fhost = (ForeignHost) fhosts.toArray()[index];
+                    m_hostLog.warn("bind " + CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId) + " to " + fhost);
                     bindForeignHost(hsId, fhost);
                 }
             } else {
@@ -1735,6 +1737,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         Set<Integer> peersWithoutMe = partitionGroup;
         peersWithoutMe.remove(m_localHostId);
         m_peers = peersWithoutMe;
+        m_hostLog.warn("Set m_peers to " + dumpSet(m_peers));
+    }
+
+    private String dumpSet(Set<Integer> dumpSet) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{ ");
+        for (Integer h : dumpSet) {
+            sb.append(h).append(" ");
+        }
+        sb.append(" }");
+        return sb.toString();
     }
 
     private int computeSecondaryConnections(int hostCount) {
@@ -1811,6 +1824,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         boolean ready = true;
         for (int hostId : m_peers) {
             ready = ready && m_foreignHosts.get(hostId).size() == m_secondaryConnections;
+            m_hostLog.warn("For hostId " + hostId + " ready=" + ready);
         }
         if (ready) {
             // Now it's time to use secondary pico network, see comments in presend() to know why we can't
