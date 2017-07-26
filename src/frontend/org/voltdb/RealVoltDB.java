@@ -414,7 +414,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     SnmpTrapSender m_snmp;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
-    private OperationMode m_startMode = null;
+    // TODO should this be volatile?
+    private OperationMode m_startMode = OperationMode.RUNNING;
 
     volatile String m_localMetadata = "";
 
@@ -1029,7 +1030,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
-
+            assert determination.paused || !m_config.m_isPaused;
+            m_config.m_isPaused = determination.paused;
             m_terminusNonce = determination.terminusNonce;
 
             // determine if this is a rejoining node
@@ -1080,6 +1082,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostGroups.put(k, v.m_group);
                 sitesPerHostMap.put(k, v.m_localSitesCount);
             });
+            hostLog.error("BSDBG: RVDB.init(): messenger is " + (m_messenger.isPaused() ? "" : "NOT ") + "paused and config is " + (m_config.m_isPaused ? "" : "NOT ") + "paused.");
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
             }

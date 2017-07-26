@@ -63,6 +63,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.OperationMode;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Function;
@@ -270,7 +271,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
      * </ul>
      * @param zk
      * @param hostId
-     * @param queue
      */
     public ChannelDistributer(ZooKeeper zk, String hostId) {
         Preconditions.checkArgument(
@@ -289,7 +289,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
         m_undispatched = new LinkedList<>();
 
         // Prime directory structure if needed
-        mkdirs(zk, VoltZK.operationMode, OperationMode.RUNNING.getBytes());
+        OperationMode startMode = VoltDB.instance().getStartMode();
+        LOG.error("BSDBG: ChannelDistributer: startMode is " + startMode);
+        assert startMode == OperationMode.RUNNING || startMode == OperationMode.PAUSED;
+        mkdirs(zk, VoltZK.operationMode, startMode.getBytes());
         mkdirs(zk, HOST_DN, EMPTY_ARRAY);
         mkdirs(zk, MASTER_DN, EMPTY_ARRAY);
 
@@ -1362,17 +1365,25 @@ public class ChannelDistributer implements ChannelChangeCallback {
             try {
                 internalProcessResults(rc, path, ctx, nodeData, stat);
                 if (Code.get(rc) != Code.OK) {
+                    LOG.error("BSDBG: GetOperationMode.processResult() not OK");
                     return;
                 }
-                OperationMode next = OperationMode.RUNNING;
-                if (nodeData != null && nodeData.length > 0) try {
-                    next = OperationMode.valueOf(nodeData);
-                } catch (IllegalArgumentException e) {
-                    fault = Optional.of(loggedDistributerException(
-                            e, "unable to decode content in operation node: \"%s\"",
-                            new String(nodeData, StandardCharsets.UTF_8)
-                            ));
-                    return;
+                OperationMode next = VoltDB.instance().getStartMode();
+                if (nodeData != null && nodeData.length > 0) {
+                    try {
+                        next = OperationMode.valueOf(nodeData);
+                        LOG.error("BSDBG: ChannelDistributer acquired operation mode from Zookeeper: " + next);
+                    } catch (IllegalArgumentException e) {
+                        fault = Optional.of(loggedDistributerException(
+                                e, "unable to decode content in operation node: \"%s\"",
+                                new String(nodeData, StandardCharsets.UTF_8)
+                        ));
+                        LOG.error("BSDBG: GetOperationMode.processResult() got exception");
+                        e.printStackTrace();
+                        return;
+                    }
+                } else {
+                    LOG.error("BSDBG: ChannelDistributer used VoltDB start mode: " + next);
                 }
                 opmode = Optional.of(new VersionedOperationMode(next, stat.getVersion()));
 
@@ -1380,12 +1391,15 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 OperationMode prev = m_mode.get(stamp);
                 if (stamp[0] > stat.getVersion()) {
                     opmode = Optional.of(new VersionedOperationMode(prev, stamp[0]));
+                    LOG.error("BSDBG: GetOperationMode.processResult() stamp[0] (" + stamp[0] + " > version from Zookeeper (" + stat.getVersion() + "); set opmode to " + opmode);
                     return;
                 }
                 if (!m_mode.compareAndSet(prev, next, stamp[0], stat.getVersion())) {
+                    LOG.error("BSDBG: GetOperationMode.processResult() compare and swap failure. Tried CAS(prev=" + prev + ", next=" + next + ", stamp[0]=" + stamp[0] + ", version=" + stat.getVersion());
                     return;
                 }
                 if (prev == next) {
+                    LOG.error("BSDBG: GetOperationMode.processResult() prev == next (" + next + ")");
                     return;
                 }
                 if (m_isLeader && !m_done.get() && next == OperationMode.RUNNING) {
@@ -1395,6 +1409,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                             );
                     m_es.submit(new AssignChannels());
                 }
+                LOG.error("BSDBG: GetOperationMode.processResult() posting event with opmode " + opmode.get());
                 m_eb.post(opmode.get());
 
             } finally {
