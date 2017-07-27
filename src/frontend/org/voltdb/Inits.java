@@ -324,6 +324,7 @@ public class Inits {
                     // publish the catalog bytes to ZK
                     CatalogUtil.updateCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
+                            0, // Initial version
                             exportInitialGenerationUniqueId,
                             catalogBytes,
                             null,
@@ -421,7 +422,7 @@ public class Inits {
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
-                        0, // start up catalog version
+                        catalogStuff.version, // catalog version from zk (rejoin node needs the latest version)
                         m_rvdb.m_messenger);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
