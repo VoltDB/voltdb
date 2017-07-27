@@ -665,11 +665,11 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time" || d.series[0].key == "Processing Time Detail")
+                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time")
                             unit = " ms"
                         else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail")
                             unit = ""
-                        else if(d.series[0].key == "Total Processing Time")
+                        else if(d.series[0].key == "Total Processing Time" || d.series[0].key == "Processing Time Detail")
                             unit =" s"
                         else
                             unit = " %"
@@ -9125,9 +9125,9 @@
                         })
                         .text(function (d, i) {
                             var unit = " ";
-                            if(d.key == "Execution Time")
+                            if(d.key == "Execution Time" || d.key == "Avg Execution Time")
                                 unit = "ms";
-                            else if (d.key == "Total Processing Time")
+                            else if (d.key == "Total Processing Time" || d.key == "Processing Time Detail")
                                 unit = "s";
                             var t = valueFormat(getY(d, i))
                                 , yerr = getYerr(d, i);
