@@ -3490,8 +3490,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     deploymentBytes = ctx.m_preparedCatalogInfo.m_deploymentBytes;
                 }
 
-                // get old debugging info
-                SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
                 byte[] oldDeployHash = m_catalogContext.getCatalogHash();
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
@@ -3505,16 +3503,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                            m_messenger,
                                                            hasSchemaChange);
 
-                // log the stuff that's changed in this new catalog update
-                SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
-                for (Entry<String, String> e : newDbgMap.entrySet()) {
-                    // skip log lines that are unchanged
-                    if (oldDbgMap.containsKey(e.getKey()) && oldDbgMap.get(e.getKey()).equals(e.getValue())) {
-                        continue;
-                    }
-                    hostLog.info(e.getValue());
-                }
-
                 //Construct the list of partitions and sites because it simply doesn't exist anymore
                 SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
                 List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
@@ -3524,7 +3512,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     Integer partition = siteTracker.getPartitionForSite(site);
                     partitions.add(partition);
                 }
-
 
                 // 1. update the export manager.
                 ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration, partitions);
@@ -3570,7 +3557,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
                 }
 
-                // Update catalog for import processor this should be just/stop start and updat partitions.
+                // Update catalog for import processor this should be just/stop start and update partitions.
                 ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
                 // 6. Perform updates required by the DR subsystem
