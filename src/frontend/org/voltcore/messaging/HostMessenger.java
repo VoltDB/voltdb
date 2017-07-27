@@ -93,9 +93,9 @@ import com.google_voltpatches.common.primitives.Longs;
  */
 public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMessenger {
 
-    private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
-    private static final VoltLogger m_hostLog = new VoltLogger("HOST");
-    private static final VoltLogger m_tmLog = new VoltLogger("TM");
+    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger tmLog = new VoltLogger("TM");
 
     //VERBOTEN_THREADS is a set of threads that are not allowed to use ZK client.
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
@@ -205,15 +205,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         private void initNetworkThreads() {
             try {
-                m_networkLog.info("Default network thread count: " + this.networkThreads);
+                networkLog.info("Default network thread count: " + this.networkThreads);
                 Integer networkThreadConfig = Integer.getInteger(NETWORK_THREADS);
                 if ( networkThreadConfig != null ) {
                     this.networkThreads = networkThreadConfig;
-                    m_networkLog.info("Overridden network thread count: " + this.networkThreads);
+                    networkLog.info("Overridden network thread count: " + this.networkThreads);
                 }
 
             } catch (Exception e) {
-                m_networkLog.error("Error setting network thread count", e);
+                networkLog.error("Error setting network thread count", e);
             }
         }
 
@@ -359,15 +359,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_siteMailboxes.get(hsId);
     }
 
-    /**
-     * @param network
-     * @param coordinatorIp
-     * @param expectedHosts
-     * @param catalogCRC
-     * @param hostLog
-     * @param membershipAcceptor
-     * @param m_hostWatcher
-     */
     public HostMessenger(Config config, HostWatcher hostWatcher) {
         m_config = config;
         m_hostWatcher = hostWatcher;
@@ -417,18 +408,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 thisHostId,
                 StringUtils.join(currentHosts, ','),
                 StringUtils.join(previousHosts, ','));
-        m_tmLog.info(logLine);
+        tmLog.info(logLine);
 
         // A strict, viable minority is always a partition.
         if ((currentHosts.size() * 2) < previousHosts.size()) {
             if (pdEnabled) {
-                m_tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
+                tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
                         + "Current cluster contains fewer than half of the previous servers. "
                         + "Shutting down to avoid multiple copies of the database running independently.");
                 return true; // partition detection triggered
             }
             else {
-                m_tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
+                tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
                         + "Current cluster contains fewer than half of the previous servers. "
                         + "Continuing because network partition detection is disabled, but there "
                         + "is significant danger that multiple copies of the database are running "
@@ -447,13 +438,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 // (say, if this was triggered by rejoin), will be greater than any surviving
                 // host ID, so don't worry about including it in this search.
                 if (currentHosts.contains(Collections.min(previousHosts))) {
-                    m_tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
+                    tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
                             + "Current cluster contains half of the previous servers, "
                             + "including the \"tie-breaker\" node. Continuing.");
                     return false; // partition detection not triggered
                 }
                 else {
-                    m_tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
+                    tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
                             + "Current cluster contains exactly half of the previous servers, but does "
                             + "not include the \"tie-breaker\" node. "
                             + "Shutting down to avoid multiple copies of the database running independently.");
@@ -462,7 +453,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
             else {
                 // 50/50 split. We don't care about tie-breakers for this error message
-                m_tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
+                tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
                         + "Current cluster contains exactly half of the previous servers. "
                         + "Continuing because network partition detection is disabled, "
                         + "but there is significant danger that multiple copies of the "
@@ -472,7 +463,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         // info message will be printed on every failure that isn't handled above (most cases)
-        m_tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
+        tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
                 + "Current cluster contains a majority of the prevous servers and is safe. Continuing.");
         return false; // partition detection not triggered
     }
@@ -522,7 +513,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     if (!m_shuttingDown) {
                         // info to avoid printing on the console more than once
                         // reportForeignHostFailed should print on the console once
-                        m_networkLog.info(String.format("Host %d failed (DisconnectFailedHostsCallback)", hostId));
+                        networkLog.info(String.format("Host %d failed (DisconnectFailedHostsCallback)", hostId));
                     }
                 }
                 m_acceptor.detract(failedHostIds);
@@ -582,7 +573,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_agreementSite.reportFault(initiatorSiteId);
         if (!m_shuttingDown) {
             // should be the single console message a user sees when another node fails
-            m_networkLog.warn(String.format("Host %d failed. Cluster remains operational.", hostId));
+            networkLog.warn(String.format("Host %d failed. Cluster remains operational.", hostId));
         }
     }
 
@@ -590,7 +581,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public synchronized void relayForeignHostFailed(FaultMessage fm) {
         m_agreementSite.reportFault(fm);
         if (!m_shuttingDown) {
-            m_networkLog.info("Someone else claims a host failed: " + fm);
+            networkLog.info("Someone else claims a host failed: " + fm);
         }
     }
 
@@ -679,7 +670,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             instance_id.put("coord",
                     ByteBuffer.wrap(m_config.coordinatorIp.getAddress().getAddress()).getInt());
             instance_id.put("timestamp", System.currentTimeMillis());
-            m_hostLog.debug("Cluster will have instance ID:\n" + instance_id.toString(4));
+            hostLog.debug("Cluster will have instance ID:\n" + instance_id.toString(4));
             byte[] payload = instance_id.toString(4).getBytes("UTF-8");
             m_zk.create(CoreZK.instance_id, payload, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
@@ -725,7 +716,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             catch (Exception e)
             {
                 String msg = "Unable to get instance ID info from " + CoreZK.instance_id;
-                m_hostLog.error(msg);
+                hostLog.error(msg);
                 throw new RuntimeException(msg, e);
             }
         }
@@ -741,7 +732,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             int hostId, SocketChannel socket,
             InetSocketAddress listeningAddress,
             JSONObject jo) {
-        m_networkLog.info(getHostId() + " notified of " + hostId);
+        networkLog.info(getHostId() + " notified of " + hostId);
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
@@ -856,7 +847,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 while (finishedJoining.hasRemaining() && System.currentTimeMillis() - start < 120000) {
                     int read = socket.read(finishedJoining);
                     if (read == -1) {
-                        m_networkLog.info("New connection was unable to establish mesh");
+                        networkLog.info("New connection was unable to establish mesh");
                         socket.close();
                         return;
                     } else if (read < 1) {
@@ -874,7 +865,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
                 m_acceptor.accrue(hostId, jo);
             } catch (Exception e) {
-                m_networkLog.error("Error joining new node", e);
+                networkLog.error("Error joining new node", e);
                 addFailedHost(hostId);
                 removeForeignHost(hostId);
                 m_acceptor.detract(hostId);
@@ -996,7 +987,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_network.start();//network must be running for register to work
 
         for (int ii = 0; ii < hosts.length; ii++) {
-            m_networkLog.info(yourHostId + " notified of host " + hosts[ii]);
+            networkLog.info(yourHostId + " notified of host " + hosts[ii]);
             agreementSites.add(CoreUtils.getHSIdFromHostAndSite(hosts[ii], AGREEMENT_SITE_ID));
             prepSocketChannel(sockets[ii]);
             ForeignHost fhost = null;
@@ -1077,7 +1068,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             SocketChannel socket,
             InetSocketAddress listeningAddress) throws Exception
     {
-        m_networkLog.info("Host " + getHostId() + " receives a new connection from host " + hostId);
+        networkLog.info("Host " + getHostId() + " receives a new connection from host " + hostId);
         prepSocketChannel(socket);
         // Auxiliary connection never time out
         ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
@@ -1087,6 +1078,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         boolean ready = true;
         for (int peer : m_peers) {
             ready = ready && m_foreignHosts.get(peer).size() == (m_secondaryConnections + 1);
+            if (!ready) return;
         }
         if (ready) {
             // Now it's time to use secondary pico network, see comments in presend() to know why we can't
@@ -1269,7 +1261,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 mbox.deliver(message);
                 return null;
             } else {
-                m_networkLog.info("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
+                networkLog.info("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
                 return null;
             }
         }
@@ -1278,7 +1270,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ImmutableCollection<ForeignHost> fhosts = m_foreignHosts.get(hostId);
         if (fhosts.isEmpty()) {
             if (!m_knownFailedHosts.containsKey(hostId)) {
-                m_networkLog.warn(
+                networkLog.warn(
                         "Attempted to send a message to foreign host with id " +
                         hostId + " but there is no such host.");
             }
@@ -1301,8 +1293,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 if (fhost == null) {
                     int index = Math.abs(m_nextForeignHost.getAndIncrement() % fhosts.size());
                     fhost = (ForeignHost) fhosts.toArray()[index];
-                    if (m_hostLog.isDebugEnabled()) {
-                        m_hostLog.debug("bind " + CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId) +
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("bind " + CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId) +
                                 " to " + fhost.hostnameAndIPAndPort());
                     }
                     bindForeignHost(hsId, fhost);
@@ -1315,7 +1307,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
         if (!fhost.isUp()) {
             if (!m_shuttingDown) {
-                m_networkLog.info("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
+                networkLog.info("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
             }
             return null;
         }
@@ -1361,7 +1353,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
         }
         if (fhost == null) { // unlikely
-            m_networkLog.warn("Attempted to deliver a message to host " +
+            networkLog.warn("Attempted to deliver a message to host " +
                         hostId + " but there is no primary connection to the host.");
         }
         return fhost;
@@ -1384,7 +1376,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
             @Override
             public void deliver(VoltMessage message) {
-                m_networkLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
+                networkLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
             }
 
             @Override
@@ -1678,7 +1670,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public void setDeadHostTimeout(int timeout) {
         Preconditions.checkArgument(timeout > 0, "Timeout value must be > 0, was %s", timeout);
-        m_hostLog.info("Dead host timeout set to " + timeout + " milliseconds");
+        hostLog.info("Dead host timeout set to " + timeout + " milliseconds");
         m_config.deadHostTimeout = timeout;
         for (ForeignHost fh : m_foreignHosts.values()) {
             fh.updateDeadHostTimeout(timeout);
@@ -1726,27 +1718,31 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 strBuilder.append(h).append(" ");
             });
             strBuilder.append(">");
-            m_hostLog.info("Host " + strBuilder.toString() + " belongs to the same partition group.");
+            hostLog.info("Host " + strBuilder.toString() + " belongs to the same partition group.");
         }
         partitionGroupPeers.remove(m_localHostId);
         m_peers = partitionGroupPeers;
         m_secondaryConnections = computeSecondaryConnections(hostCount);
     }
 
+    /**
+     *  Basic goal is each host should has the same number of connections compare to the number
+     *  without partition group layout.
+     */
     private int computeSecondaryConnections(int hostCount) {
-        /**
-         *  Basic goal is each host should has the same number of connections compare to the number
-         *  without partition group layout.
-         *
-         * (targetConnectionsWithinPG - existingConnectionsWithinPG) is the the total number of secondary
-         * connections we try to create, I want the secondary connections to have an even distribution
-         * across all nodes within the partition group, and round up the result because this is
-         * integer division, there is a trick to do this:  (a + (b - 1)) / b
-         * so it becomes (targetConnectionsWithinPG - existingConnectionsWithinPG) + (existingConnectionsWithinPG - 1)
-         * which equals to (targetConnectionsWithinPG - 1).
-         *
-         * All the numbers are on per node basis, PG is short for Partition Group
-         */
+
+        // (targetConnectionsWithinPG - existingConnectionsWithinPG) is the the total number of secondary
+        // connections we try to create, I want the secondary connections to have an even distribution
+        // across all nodes within the partition group, and round up the result because this is
+        // integer division, there is a trick to do this:  (a + (b - 1)) / b
+        // so it becomes:
+        //
+        // (targetConnectionsWithinPG - existingConnectionsWithinPG) + (existingConnectionsWithinPG - 1)
+        //
+        // which equals to (targetConnectionsWithinPG - 1).
+        //
+        // All the numbers are on per node basis, PG stands for Partition Group
+
         int connectionsWithoutPG = hostCount - 1;
         int existingConnectionsWithinPG = m_peers.size();
         int targetConnectionsWithinPG = Math.min( connectionsWithoutPG, CoreUtils.availableProcessors() / 4);
@@ -1755,9 +1751,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         Integer configNumberOfConnections = Integer.getInteger(SECONDARY_PICONETWORK_THREADS);
         if (configNumberOfConnections != null) {
             secondaryConnections = configNumberOfConnections;
-            m_hostLog.info("Overridden secondary PicoNetwork network thread count:" + configNumberOfConnections);
+            hostLog.info("Overridden secondary PicoNetwork network thread count:" + configNumberOfConnections);
         } else {
-            m_hostLog.info("This node has " + secondaryConnections + " secondary PicoNetwork thread" + ((secondaryConnections > 1) ? "s" :""));
+            hostLog.info("This node has " + secondaryConnections + " secondary PicoNetwork thread" + ((secondaryConnections > 1) ? "s" :""));
         }
         return secondaryConnections;
     }
@@ -1795,7 +1791,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         putForeignHost(hostId, fhost);
                         fhost.enableRead(VERBOTEN_THREADS);
                     } catch (IOException | JSONException e) {
-                        m_hostLog.error("Failed to connect to peer nodes.", e);
+                        hostLog.error("Failed to connect to peer nodes.", e);
                         throw new RuntimeException("Failed to establish socket connection with " +
                                 fh.m_listeningAddress.getAddress().getHostAddress(), e);
                     }
@@ -1805,6 +1801,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         boolean ready = true;
         for (int hostId : m_peers) {
             ready = ready && m_foreignHosts.get(hostId).size() == (m_secondaryConnections + 1);
+            if (!ready) return;
         }
         if (ready) {
             // Now it's time to use secondary pico network, see comments in presend() to know why we can't

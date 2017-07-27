@@ -114,7 +114,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     final InetSocketAddress m_remoteSocketAddress;
     final String m_remoteSocketAddressString;
     private volatile String m_remoteHostAndAddressAndPort;
-    private String m_toString;
+    private String m_threadName;
     private Set<Long> m_verbotenThreads;
 
     /**
@@ -144,12 +144,12 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             m_remoteHostAndAddressAndPort = remoteHost + m_remoteHostAndAddressAndPort;
         }
         if (isSecondary) {
-            m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort + "(s)";
+            m_threadName = super.toString() + ":" + m_remoteHostAndAddressAndPort + "(s)";
         } else {
-            m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
+            m_threadName = super.toString() + ":" + m_remoteHostAndAddressAndPort;
         }
 
-        m_thread = new Thread(this, "Pico Network - " + m_toString);
+        m_thread = new Thread(this, "Pico Network - " + m_threadName);
         m_thread.setDaemon(true);
         try {
             sc.configureBlocking(false);
@@ -206,7 +206,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         } catch (CancelledKeyException e) {
             networkLog.warn(
                     "Had a cancelled key exception for "
-                            + m_toString, e);
+                            + m_threadName, e);
         } catch (IOException e) {
             final String trimmed = e.getMessage() == null ? "" : e.getMessage().trim();
             if ((e instanceof IOException && (trimmed.equalsIgnoreCase("Connection reset by peer") || trimmed.equalsIgnoreCase("broken pipe"))) ||
@@ -339,7 +339,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                 }
             }
         } finally {
-            networkLog.debug("Closing channel " + m_toString);
+            networkLog.debug("Closing channel " + m_threadName);
             try {
                 m_sc.close();
             } catch (IOException e) {
