@@ -77,10 +77,12 @@ public class ServerSocketImporter extends AbstractImporter {
         for (ClientConnectionHandler client : m_clients) {
             client.stopClient();
         }
+        info(null, "Stopped");
     }
 
     private void startListening()
     {
+        info(null, "Running");
         try {
             while (shouldRun()) {
                 Socket clientSocket = m_config.getServerSocket().accept();
@@ -96,6 +98,7 @@ public class ServerSocketImporter extends AbstractImporter {
                 warn(e, "Unexpected error accepting client connections for " + getName() + " on port " + m_config.getPort());
             }
         }
+        info(null, "No longer running");
     }
 
     //This is ClientConnection handler to read and dispatch data to stored procedure.
