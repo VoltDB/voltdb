@@ -342,7 +342,6 @@ public class SQLLexer extends SQLPatternFactory
      * @param sql raw SQL text to split
      * @return list of individual SQL statements
      */
-//    public static List<String> splitStatements(final String sql) {
       public static SplitStmtResults splitStatements(final String sql) {
         List<String> statements = new ArrayList<>();
         SplitStmtResults results = new SplitStmtResults();
@@ -366,13 +365,14 @@ public class SQLLexer extends SQLPatternFactory
         boolean inStatement = false;
         // To indicate if inside multi statement procedure
         boolean inBegin = false;
+        boolean checkForNextBegin = false;
         // To indicate if inside CASE .. WHEN
         int inCase = 0;
         int iCur = 0;
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
             if (!inStatement) {
-                if (Character.isWhitespace(buf[iCur])) {
+                if (Character.isWhitespace(buf[iCur]) || Character.isSpaceChar(buf[iCur])) {
                     iCur++;
                     iStart = iCur;
                 }
@@ -428,13 +428,25 @@ public class SQLLexer extends SQLPatternFactory
                 }
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
+
+                // check if the next token is BEGIN if the previous one is AS
+                // if not, do not look for BEGIN
+                if (checkForNextBegin
+                        && !(Character.isWhitespace(buf[iCur]) || Character.isSpaceChar(buf[iCur])) ) {
+                    // 'BEGIN' should only be followed after 'AS'
+                    // otherwise it is a column or table name
+                    if ( matchToken(sqlNoComments, iCur, "begin") ) {
+                        inBegin = true;
+                        iCur += 5;
+                    }
+                    checkForNextBegin = false;
+                }
                 if( matchToken(sqlNoComments, iCur, "case") ) {
                     inCase++;
                     iCur += 4;
-                } else if ( iCur - 3 >= 0 && matchToken(sqlNoComments, iCur - 3, "as")
-                        && matchToken(sqlNoComments, iCur, "begin") ) {
-                    inBegin = true;
-                    iCur += 5;
+                } else if ( matchToken(sqlNoComments, iCur, "as") ) {
+                    checkForNextBegin = true;
+                    iCur += 2;
                 } else if ( !inBegin && buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
                     // if it is not in a BEGIN ... END

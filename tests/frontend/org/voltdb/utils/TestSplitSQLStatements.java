@@ -92,6 +92,14 @@ public class TestSplitSQLStatements {
                 + "END;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
 
+        // with white spaces between AS..BEGIN
+        sql = "CREATE PROCEDURE foo AS  \t"
+                + "BEGIN "
+                + "SELECT * from t; "
+                + "SELECT * from t; "
+                + "END;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
         sql = "CREATE PROCEDURE foo AS "
                 + "BEGIN "
                 + "SELECT * from t; "
@@ -240,6 +248,11 @@ public class TestSplitSQLStatements {
 
         // begin as table and column name
         sql = "create procedure p as "
+                + "select begin.begin from begin;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
+
+        // begin as table and column name with spaces after AS
+        sql = "create procedure p as      "
                 + "select begin.begin from begin;";
         checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
     }
