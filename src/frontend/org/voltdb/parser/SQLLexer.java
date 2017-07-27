@@ -431,7 +431,8 @@ public class SQLLexer extends SQLPatternFactory
                 if( matchToken(sqlNoComments, iCur, "case") ) {
                     inCase++;
                     iCur += 4;
-                } else if ( matchToken(sqlNoComments, iCur, "begin") ) {
+                } else if ( iCur - 3 >= 0 && matchToken(sqlNoComments, iCur - 3, "as")
+                        && matchToken(sqlNoComments, iCur, "begin") ) {
                     inBegin = true;
                     iCur += 5;
                 } else if ( !inBegin && buf[iCur] == ';') {

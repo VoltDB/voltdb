@@ -74,10 +74,11 @@ public class TestSplitSQLStatements {
     public void testProcSQLSplit() {
         checkSplitter("begi", "begi");
         checkSplitter("begin end", "begin end");
+        checkSplitter("as begin end", "as begin end");
 
         // the next test will not return completely parsed statements
         // because begin has not end yet, they are incomplete
-        String sql = "begin en";
+        String sql = "as begin en";
         SplitStmtResults parsedOut = SQLLexer.splitStatements(sql);
         assertEquals(0, parsedOut.completelyParsedStmts.size());
         assertEquals(sql, parsedOut.incompleteMuliStmtProc);
@@ -111,19 +112,19 @@ public class TestSplitSQLStatements {
           "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; END abc", "def");
 
         // there is no END statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
-        sql = "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;";
+        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t;";
         parsedOut = SQLLexer.splitStatements(sql);
         assertEquals(0, parsedOut.completelyParsedStmts.size());
         assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
         // enf is not end of statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
-        sql = "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;";
+        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; ENF;";
         parsedOut = SQLLexer.splitStatements(sql);
         assertEquals(0, parsedOut.completelyParsedStmts.size());
         assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
-        checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end",
-                "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end");
+        checkSplitter("CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; ENF; end",
+                "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; ENF; end");
 
         String sql1 = "abc";
         sql = "SELECT a, "
@@ -235,6 +236,11 @@ public class TestSplitSQLStatements {
                 + "select begin.begin from begin; "
                 + "select emptycase from R; "
                 + "end;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
+
+        // begin as table and column name
+        sql = "create procedure p as "
+                + "select begin.begin from begin;";
         checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
     }
 
