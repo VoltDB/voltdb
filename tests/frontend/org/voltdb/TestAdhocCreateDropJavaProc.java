@@ -192,7 +192,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             // Now load the procedure requiring the already-resident dependency
             InMemoryJarfile jarfile = new InMemoryJarfile();
             VoltCompiler comp = new VoltCompiler(false);
-            comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.NoMeaningClass.class);
+            comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.NoMeaningClass.class);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
 
             try {
