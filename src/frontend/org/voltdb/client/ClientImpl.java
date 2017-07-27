@@ -1029,6 +1029,10 @@ public final class ClientImpl implements Client {
         }
     }
 
+    public boolean isAutoReconnectEnabled() {
+        return (m_reconnectStatusListener != null);
+    }
+
     @Override
     public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)
             throws IOException, NoConnectionsException, ProcCallException {

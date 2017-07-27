@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -56,7 +57,8 @@ public class PerPartitionTable {
     //Queue for processing pending rows for this table
     LinkedBlockingQueue<VoltBulkLoaderRow> m_partitionRowQueue;
 
-    final ExecutorService m_es;
+    final ExecutorService m_insertExecutor;
+    final ExecutorService m_reinsertExecutor;
 
     //Zero based index of the partitioned column in the table
     final int m_partitionedColumnIndex;
@@ -78,6 +80,8 @@ public class PerPartitionTable {
     final byte m_upsert;
     // Callback for per-row success notification
     final BulkLoaderSuccessCallback m_successCallback;
+    //Whether to retry insertion when the connection is lost
+    final boolean m_autoReconnect;
 
     // Callback for batch submissions to the Client. A failed request submits the entire
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
@@ -95,7 +99,7 @@ public class PerPartitionTable {
         public void clientCallback(final ClientResponse response) throws InterruptedException {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 // Queue up all rows for individual processing by originating BulkLoader's FailureProcessor.
-                m_es.execute(new Runnable() {
+                m_insertExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
@@ -111,7 +115,7 @@ public class PerPartitionTable {
                 // necessary bookkeeping (like managing offsets, for example). Do this in the executor
                 // so as not to hold up the callback.
                 if (m_successCallback != null) {
-                    m_es.execute(new Runnable() {
+                    m_insertExecutor.execute(new Runnable() {
                         @Override
                         public void run() {
                             for (VoltBulkLoaderRow r : m_batchRowList) {
@@ -137,9 +141,8 @@ public class PerPartitionTable {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-            if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
-                m_es.execute(new Runnable() {
-
+            if (response.getStatus() == ClientResponse.CONNECTION_LOST && m_autoReconnect) {
+                m_reinsertExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
@@ -162,7 +165,8 @@ public class PerPartitionTable {
     }
 
     PerPartitionTable(ClientImpl clientImpl, String tableName, int partitionId, boolean isMP,
-            VoltBulkLoader firstLoader, int minBatchTriggerSize, BulkLoaderSuccessCallback successCallback) {
+            VoltBulkLoader firstLoader, int minBatchTriggerSize, BulkLoaderSuccessCallback successCallback,
+            boolean autoReconnect) {
         m_clientImpl = clientImpl;
         m_partitionId = partitionId;
         m_isMP = isMP;
@@ -177,8 +181,10 @@ public class PerPartitionTable {
         m_tableName = tableName;
         m_successCallback = successCallback;
         m_table = new VoltTable(m_columnInfo);
+        m_autoReconnect = autoReconnect;
 
-        m_es = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
+        m_insertExecutor = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
+        m_reinsertExecutor = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId + "-reinsert");
     }
 
     boolean updateMinBatchTriggerSize(int minBatchTriggerSize) {
@@ -199,7 +205,7 @@ public class PerPartitionTable {
     synchronized void insertRowInTable(final VoltBulkLoaderRow nextRow) throws InterruptedException {
         m_partitionRowQueue.put(nextRow);
         if (m_partitionRowQueue.size() == m_minBatchTriggerSize) {
-            m_es.execute(new Runnable() {
+            m_insertExecutor.execute(new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -220,7 +226,7 @@ public class PerPartitionTable {
      * are either inserted or failed definitively, call shutdown().
      */
     Future<?> flushAllTableQueues() throws InterruptedException {
-        return m_es.submit(new Callable<Boolean>() {
+        return m_insertExecutor.submit(new Callable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
                 loadTable(buildTable(), m_table);
@@ -235,8 +241,10 @@ public class PerPartitionTable {
         } catch (ExecutionException e) {
             throw (Exception) e.getCause();
         }
-        m_es.shutdown();
-        m_es.awaitTermination(365, TimeUnit.DAYS);
+        m_insertExecutor.shutdown();
+        m_reinsertExecutor.shutdown();
+        m_insertExecutor.awaitTermination(365, TimeUnit.DAYS);
+        m_reinsertExecutor.awaitTermination(365, TimeUnit.DAYS);
     }
 
     private void reinsertFailed(List<VoltBulkLoaderRow> rows) throws Exception {
@@ -300,26 +308,45 @@ public class PerPartitionTable {
     }
 
     private void loadTable(ProcedureCallback callback, VoltTable toSend) throws Exception {
+        long sleepTime = 1000;
         if (toSend.getRowCount() <= 0) {
             return;
         }
 
-        while (true) {
-            try {
-                if (m_isMP) {
-                    m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
-                } else {
-                    Object rpartitionParam = VoltType.valueToBytes(toSend.fetchRow(0).get(
-                            m_partitionedColumnIndex, m_partitionColumnType));
-                    m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
+        if (m_autoReconnect) {
+            while (true) {
+                try {
+                    load(callback, toSend);
+                    // Table loaded successfully. So move on
+                    break;
+                } catch (IOException e) {
+                    // Maximum retry interval is eight seconds
+                    sleepTime = Math.min(sleepTime * 2, 8000);
+                    Thread.sleep(1000);
                 }
-                // Table loaded successfully. So move on
-                break;
+            }
+        } else {
+            try {
+                load(callback, toSend);
             } catch (IOException e) {
-                // Connection failed. Retry every one second
-                Thread.sleep(1000);
+                final ClientResponse r = new ClientResponseImpl(
+                        ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                        "Connection to database was lost");
+                callback.clientCallback(r);
             }
         }
+
+
         toSend.clearRowData();
+    }
+
+    private void load(ProcedureCallback callback, VoltTable toSend) throws Exception {
+        if (m_isMP) {
+            m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
+        } else {
+            Object rpartitionParam = VoltType.valueToBytes(toSend.fetchRow(0).get(
+                    m_partitionedColumnIndex, m_partitionColumnType));
+            m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
+        }
     }
 }

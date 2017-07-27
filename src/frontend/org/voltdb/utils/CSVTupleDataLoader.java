@@ -184,6 +184,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     }
 
     private void insertWithRetry(RowWithMetaData metaData, Object[] values) throws InterruptedException {
+        long sleepTime = 1000;
         while (true) {
             try {
                 PartitionSingleExecuteProcedureCallback cbmt =
@@ -196,8 +197,9 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                 }
                 break;
             } catch (IOException ex) {
-                // Connection failed. Retry every one second
-                Thread.sleep(1000);
+                // Maximum retry interval is eight seconds
+                sleepTime = Math.min(sleepTime * 2, 8000);
+                Thread.sleep(sleepTime);
             } catch (Exception ex) {
                 // Exceptions not pertaining to connection problems are thrown out
                 m_errHandler.handleError(metaData, null, ex.toString());
