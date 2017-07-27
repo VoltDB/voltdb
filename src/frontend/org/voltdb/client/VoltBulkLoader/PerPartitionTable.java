@@ -308,12 +308,12 @@ public class PerPartitionTable {
     }
 
     private void loadTable(ProcedureCallback callback, VoltTable toSend) throws Exception {
-        long sleepTime = 1000;
         if (toSend.getRowCount() <= 0) {
             return;
         }
 
         if (m_autoReconnect) {
+            long sleepTime = 1000;
             while (true) {
                 try {
                     load(callback, toSend);
@@ -322,7 +322,7 @@ public class PerPartitionTable {
                 } catch (IOException e) {
                     // Maximum retry interval is eight seconds
                     sleepTime = Math.min(sleepTime * 2, 8000);
-                    Thread.sleep(1000);
+                    Thread.sleep(sleepTime);
                 }
             }
         } else {
@@ -335,8 +335,6 @@ public class PerPartitionTable {
                 callback.clientCallback(r);
             }
         }
-
-
         toSend.clearRowData();
     }
 
