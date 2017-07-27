@@ -102,9 +102,9 @@
 <property name='cmake.generator'             value='Unix Makefiles' />
 <property name='cmake.build.obj'             value='${build.dir}' />
 <property name='cmake.build.tool'            value='${base.dir}/tools/build_cmake.py' />
-<property name='cmake.verbose.build'         value='yes' />
-<property name='cmake.verbose.config'        value='yes' />
-<property name='cmake.build.maxcores'        value='1' />
+<property name='cmake.verbose.build'         value='no' />
+<property name='cmake.verbose.config'        value='no' />
+<property name='cmake.build.maxcores'        value='-1' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">

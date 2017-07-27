@@ -36,7 +36,7 @@
 # built separately from the Execution Engine.
 #
 ########################################################################
-CMAKE_MINIMUM_REQUIRED (VERSION 2.8.12 FATAL_ERROR)
+CMAKE_MINIMUM_REQUIRED (VERSION 2.8.11 FATAL_ERROR)
 PROJECT(VoltDB_EE)
 
 BANNER("Configuring the VoltDB Execution Engine Runtime."

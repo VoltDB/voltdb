@@ -33,7 +33,7 @@
 #
 ########################################################################
 
-CMAKE_MINIMUM_REQUIRED (VERSION 2.8.12 FATAL_ERROR)
+CMAKE_MINIMUM_REQUIRED (VERSION 2.8.11 FATAL_ERROR)
 PROJECT(VoltDB_Tests)
 IF ( (CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND ( (CMAKE_VERSION VERSION_GREATER 3.0.0) OR (CMAKE_VERSION VERSION_EQUAL 3.0.0) ) )
     # Newer versions of CMake than we use set this
