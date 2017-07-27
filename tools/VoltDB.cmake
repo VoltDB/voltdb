@@ -3,10 +3,12 @@
 # These are some functions we use when using CMake.
 #
 ########################################################################
-FUNCTION(BANNER MSG)
+FUNCTION(BANNER)
   MESSAGE("######################################################################")
   MESSAGE("#")
-  MESSAGE("# ${MSG}")
+  FOREACH(MSG ${ARGN})
+    MESSAGE("# ${MSG}")
+  ENDFOREACH()
   MESSAGE("#")
   MESSAGE("######################################################################")
 ENDFUNCTION()

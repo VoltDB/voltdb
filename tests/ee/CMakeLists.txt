@@ -43,7 +43,14 @@ IF ( (CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND ( (CMAKE_VERSION VERSION_GREATER 
     CMAKE_POLICY(SET CMP0042 OLD)
 ENDIF()
 
-BANNER("Configuring the VoltDB Execution Engine Unit Tests.")
+BANNER("Configuring the VoltDB Execution Engine Unit Tests."
+       "CMAKE_SOURCE_DIRECTORY: ${CMAKE_SOURCE_DIRECTORY}"
+       "CMAKE_BINARY_DIRECTORY: ${CMAKE_BINARY_DIRECTORY}"
+       "${PROJECT_NAME}: PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}"
+       "${PROJECT_NAME}: PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
+       "VOLTDB_BUILD_TYPE: ${VOLTDB_BUILD_TYPE}"
+   )
+
 ########################################################################
 #
 # Here we have all the names of tests which are not auto-generated

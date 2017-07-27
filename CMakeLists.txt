@@ -154,7 +154,6 @@ ENDIF()
 ########################################################################
 INCLUDE(tools/VoltDB.cmake)
 
-BANNER("Configuring the VoltDB Execution Engine.")
 ########################################################################
 #
 # Sanity check the configuration.
@@ -164,17 +163,24 @@ IF (NOT DEFINED VOLTDB_BUILD_TYPE)
   MESSAGE (FATAL_ERROR "VOLTDB_BUILD_TYPE is not defined.")
 ENDIF ()
 
+BANNER("Configuring the VoltDB Execution Engine."
+       "CMAKE_SOURCE_DIRECTORY: ${CMAKE_SOURCE_DIRECTORY}"
+       "CMAKE_BINARY_DIRECTORY: ${CMAKE_BINARY_DIRECTORY}"
+       "CMAKE_GENERATOR: ${CMAKE_GENERATOR}"
+       "${PROJECT_NAME}: PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}"
+       "${PROJECT_NAME}: PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
+       "VOLTDB_BUILD_TYPE: ${VOLTDB_BUILD_TYPE}"
+   )
+
 ########################################################################
 #
 # Set some variables useful to all the sub projects.
 #   VOLTDB_VERSION
 #   VOLT_LOG_LEVEL
-#   VOLTDB_TOP_BINARY_DIR
 #
 ########################################################################
 EXECUTE_PROCESS(COMMAND cat ${CMAKE_SOURCE_DIR}/version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
 STRING(STRIP ${VOLTDB_VERSION} VOLTDB_VERSION)
-SET(VOLTDB_TOP_BINARY_DIR ${CMAKE_BINARY_DIR})
 SET (VOLT_LOG_LEVEL 500)
 
 ########################################################################
@@ -216,6 +222,12 @@ COMPUTE_CORE_COUNT(VOLTDB_CORE_COUNT)
 ########################################################################
 INCLUDE(tools/VoltDBCompilation.cmake)
 
+
+########################################################################
+#
+# The external projects are used in testing and EE shared objects.
+# So we need to build them here and share them.
+#
 ########################################################################
 #
 # Go and build the pcre2 library.
@@ -230,6 +242,13 @@ SET (VOLTDB_PCRE2_TARBALL ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs/${VOLTDB_
 SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_PREFIX}/src/${VOLTDB_PCRE2_NAME})
 SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
 
+BANNER("Describing PCRE2"
+       "  PREFIX at ${VOLTDB_PCRE2_PREFIX}"
+       "  SOURCE at ${VOLTDB_PCRE2_SRC}"
+       "  BINARY at ${VOLTDB_PCRE2_OBJ}"
+       "  TARBALL at ${VOLTDB_PCRE2_TARBALL}"
+       "  CONFIGURE_COMMAND: ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${CMAKE_BINARY_DIR}/3pty-install"
+   )
 ExternalProject_Add(pcre2
   PREFIX ${VOLTDB_PCRE2_PREFIX}
   URL ${VOLTDB_PCRE2_TARBALL}
@@ -254,6 +273,14 @@ SET (VOLTDB_OPENSSL_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/openssl)
 # are not obvious ways to do out-of-tree builds.
 SET (VOLTDB_OPENSSL_SRC ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
 SET (VOLTDB_OPENSSL_OBJ ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
+
+BANNER("Describing CRYPTO"
+       "  PREFIX at ${VOLTDB_OPENSSL_PREFIX}"
+       "  SOURCE at ${VOLTDB_OPENSSL_SRC}"
+       "  BINARY at ${VOLTDB_OPENSSL_OBJ}"
+       "  TARBALL at ${VOLTDB_OPENSSL_TARBALL}"
+       "  CONFIGURE_COMMAND: ./Configure --prefix=${CMAKE_BINARY_DIR}/3pty-install ${VOLTDB_OPENSSL_TOKEN}"
+   )
 ExternalProject_Add(crypto
   PREFIX ${VOLTDB_OPENSSL_PREFIX}
   URL ${VOLTDB_OPENSSL_TARBALL}
@@ -277,6 +304,13 @@ SET (VOLTDB_S2GEO_CMAKE_CONFIG
   -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
 SET (VOLTDB_S2GEO_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj)
 
+BANNER("Describing S2GEO"
+       "  PREFIX at ${VOLTDB_S2GEO_PREFIX}"
+       "  SOURCE at ${VOLTDB_S2GEO_SRC}"
+       "  BINARY at ${VOLTDB_S2GEO_OBJ}"
+       "  CMAKE_ARGS: ${VOLTDB_S2GEO_CMAKE_CONFIG}"
+       "  CMAKE_GENERATOR: ${CMAKE_GENERATOR}"
+   )
 ExternalProject_Add(s2geo
   DEPENDS crypto
   PREFIX ${VOLTDB_S2GEO_PREFIX}
