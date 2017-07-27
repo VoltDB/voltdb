@@ -25,7 +25,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
@@ -125,7 +124,6 @@ public abstract class BaseInitiator implements Initiator
     protected void configureCommon(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
@@ -166,7 +164,7 @@ public abstract class BaseInitiator implements Initiator
                                        taskLog,
                                        hasMPDRGateway);
             LoadedProcedureSet procSet = new LoadedProcedureSet(m_executionSite);
-            procSet.loadProcedures(catalogContext, csp);
+            procSet.loadProcedures(catalogContext);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setProcedureSet(procSet);
             m_scheduler.setCommandLog(cl);

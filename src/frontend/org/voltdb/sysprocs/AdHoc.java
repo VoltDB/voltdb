@@ -27,20 +27,14 @@ import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.ClientInterface.ExplainMode;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.CatalogChangeResult;
-import org.voltdb.compiler.CatalogChangeResult.PrepareDiffFailureException;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.parser.SQLLexer;
 
 public class AdHoc extends AdHocNTBase {
 
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
-        final String invocationName = "@AdHoc";
-
         if (params.size() == 0) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "Adhoc system procedure requires at least the query parameter.");
@@ -114,8 +108,6 @@ public class AdHoc extends AdHocNTBase {
             }
         }
 
-        // We have adhoc DDL.  Is it okay to run it?
-
         // check for conflicting DDL create/drop table statements.
         // unhappy if the intersection is empty
         conflictTables.retainAll(createdTables);
@@ -131,10 +123,13 @@ public class AdHoc extends AdHocNTBase {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, sb.toString());
         }
 
-        // Is it forbidden by the replication role and configured schema change method?
-        // master and UAC method chosen:
+        if (!allowPausedModeWork(false, isAdminConnection())) {
+            return makeQuickResponse(
+                    ClientResponse.SERVER_UNAVAILABLE,
+                    "Server is paused and is available in read-only mode - please try again later.");
+        }
+
         boolean useAdhocDDL = VoltDB.instance().getCatalogContext().cluster.getUseddlschema();
-        // TODO fix this hack
         if (!useAdhocDDL) {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
@@ -142,53 +137,14 @@ public class AdHoc extends AdHocNTBase {
                     "to change application schema.  AdHoc DDL is forbidden.");
         }
 
-        // TODO figure out when internalmode matters
-        if (!allowPausedModeWork(false, isAdminConnection())) {
-            return makeQuickResponse(
-                    ClientResponse.SERVER_UNAVAILABLE,
-                    "Server is paused and is available in read-only mode - please try again later.");
-        }
+        logCatalogUpdateInvocation("@AdHoc");
 
-        CatalogChangeResult ccr = null;
-        try {
-            DrRoleType drRole = DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole());
-            ccr = prepareApplicationCatalogDiff(invocationName,
-                                                null,
-                                                null,
-                                                sqlStatements.toArray(new String[0]),
-                                                null,
-                                                false,
-                                                drRole,
-                                                true,
-                                                false,
-                                                getHostname(),
-                                                getUsername());
-        }
-        catch (PrepareDiffFailureException pe) {
-            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
-            return makeQuickResponse(pe.statusCode, pe.getMessage());
-        }
-
-        // case for @CatalogChangeResult
-        if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return makeQuickResponse(ClientResponseImpl.SUCCESS, "Catalog update with no changes was skipped.");
-        }
-
-        // initiate the transaction.
-        return callProcedure("@UpdateCore",
-                             ccr.encodedDiffCommands,
-                             ccr.catalogHash,
-                             ccr.catalogBytes,
-                             ccr.expectedCatalogVersion,
-                             ccr.deploymentString,
-                             ccr.tablesThatMustBeEmpty,
-                             ccr.reasonsForEmptyTables,
-                             ccr.requiresSnapshotIsolation ? 1 : 0,
-                             ccr.worksWithElastic ? 1 : 0,
-                             ccr.deploymentHash,
-                             ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                             ccr.hasSchemaChange ?  1 : 0,
-                             ccr.requiresNewExportGeneration ? 1 : 0,
-                             ccr.m_ccrTime);
+        return updateApplication("@AdHoc",
+                                null,
+                                null,
+                                sqlStatements.toArray(new String[0]),
+                                null,
+                                false,
+                                true);
     }
 }
