@@ -47,7 +47,8 @@ function QueryUI(queryTab) {
             MatchOneQuotedString = /'[^']*'/m,
             MatchDoubleQuotes = /\"/g,
             EscapedDoubleQuoteLiteral = '\\"',
-            MatchBeginCreateMultiStmtProcedure = /\bcreate\s+procedure\s+\w+\s+as\s+begin\b/gm
+            MatchBeginCreateMultiStmtProcedure = /as\s+begin\b/gm
+            MultiStmtProcNonceLiteral = "#COMMAND_PARSER_REPLACED_MULTISP#",
             QuotedStringNonceLiteral = "#COMMAND_PARSER_REPLACED_STRING#",
             // Generate fixed-length 5-digit nonce values from 100000 - 999999.
             // That's 900000 strings per statement batch -- that should be enough.
@@ -94,6 +95,41 @@ function QueryUI(queryTab) {
             return src;
         }
 
+        function matchToken(buffer, position, token) {
+            let tokLength = token.length;
+            let bufLength = buffer.length;
+            let firstLo = token.charAt(0).toLowerCase();
+            let firstHi = token.charAt(0).toUpperCase();
+            var letterNumber = /^[0-9a-zA-Z]/;
+
+            if (
+                (position == 0 || buffer.charAt(position-1).match(letterNumber) == null )
+                && (buffer.charAt(position) == firstLo || buffer.charAt(position) == firstHi)
+                && (position <= bufLength - tokLength)
+                // TODO: check what match returns when there are multiple occurrances and update matching code
+                && (buffer.match(token) != null && buffer.match(token).index == position)
+                && (position + tokLength == bufLength || buffer.charAt(position + tokLength).match(letterNumber) == null)
+                ) {
+                console.log("matched token : " + token );
+                return true;
+            }
+        }
+
+        function findEndOfMultiStmtProc(src, idx) {
+            let inCase = 0;
+            for (let i = idx; i < src.length; i++) {
+                if ( matchToken(src, i, "end") ) {
+                    if (inCase == 0) {
+                        console.log("found end of msp");
+                        return i;
+                    }
+                }
+            }
+        }
+
+        function replaceBetween(str, start, end, what) {
+            return str.toString().substring(0, start) + what + str.toString().substring(end);
+        }
 
         // break down a multi-statement string into a statement array.
         function parseUserInputMethod(src) {
@@ -113,8 +149,10 @@ function QueryUI(queryTab) {
             // semicolon boundaries -- semicolons might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
 
-            console.log(src.match(MatchBeginCreateMultiStmtProcedure));
-
+            matchArr = src.match(MatchBeginCreateMultiStmtProcedure);
+            console.log(matchArr);
+            var endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
+            src = replaceBetween(src, src.indexOf(matchArr[0]), endidx, MultiStmtProcNonceLiteral);
             splitStmts = src.split(';');
 
             statementBank = [];
