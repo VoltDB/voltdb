@@ -12,7 +12,7 @@ function loadAnalysisPage(){
 
     function refreshLegend(legendTitle){
         if(legendTitle == "Frequency"){
-            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Number Of Invocation(" : "Number Of Invocation");
+            $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Number Of Invocations(" : "Number Of Invocations");
             VoltDbAnalysis.currentTab =  "Frequency";
         } else if(legendTitle == "Total Processing Time"){
             $(".spnAnalysisLegend").html(VoltDbAnalysis.partitionStatus == "both" ?"Total Processing Time(" : "Total Processing Time");
