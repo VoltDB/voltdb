@@ -27,6 +27,17 @@ DROP FUNCTION addYearsToTimestamp IF EXISTS;
 DROP FUNCTION add2GeographyPoint  IF EXISTS;
 DROP FUNCTION addGeographyPointToGeography IF EXISTS;
 
+DROP FUNCTION add2TinyintWithoutNullCheck  IF EXISTS;
+DROP FUNCTION add2SmallintWithoutNullCheck IF EXISTS;
+DROP FUNCTION add2IntegerWithoutNullCheck  IF EXISTS;
+DROP FUNCTION add2BigintWithoutNullCheck   IF EXISTS;
+DROP FUNCTION add2FloatWithoutNullCheck    IF EXISTS;
+DROP FUNCTION add2TinyintBoxedWithoutNullCheck  IF EXISTS;
+DROP FUNCTION add2SmallintBoxedWithoutNullCheck IF EXISTS;
+DROP FUNCTION add2IntegerBoxedWithoutNullCheck  IF EXISTS;
+DROP FUNCTION add2BigintBoxedWithoutNullCheck   IF EXISTS;
+DROP FUNCTION add2FloatBoxedWithoutNullCheck    IF EXISTS;
+
 DROP FUNCTION piUdf        IF EXISTS;
 DROP FUNCTION piUdfBoxed   IF EXISTS;
 DROP FUNCTION absTinyint   IF EXISTS;
@@ -91,6 +102,22 @@ CREATE FUNCTION addYearsToTimestamp  FROM METHOD org.voltdb_testfuncs.UserDefine
 CREATE FUNCTION add2GeographyPoint FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
 CREATE FUNCTION addGeographyPointToGeography FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography;
 
+-- Create the 'add...WithoutNullCheck' test UDF's, which are just like (some of)
+-- the ones above (they throw all kinds of exceptions, and return various flavors
+-- of VoltDB 'null' values, when given certain special input values, generally
+-- from -100 to -120); but these functions do no null checking:
+CREATE FUNCTION add2TinyintWithoutNullCheck  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2TinyintWithoutNullCheck;
+CREATE FUNCTION add2SmallintWithoutNullCheck FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2SmallintWithoutNullCheck;
+CREATE FUNCTION add2IntegerWithoutNullCheck  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2IntegerWithoutNullCheck;
+CREATE FUNCTION add2BigintWithoutNullCheck   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2BigintWithoutNullCheck;
+CREATE FUNCTION add2FloatWithoutNullCheck    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2FloatWithoutNullCheck;
+CREATE FUNCTION add2TinyintBoxedWithoutNullCheck  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2TinyintBoxedWithoutNullCheck;
+CREATE FUNCTION add2SmallintBoxedWithoutNullCheck FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2SmallintBoxedWithoutNullCheck;
+CREATE FUNCTION add2IntegerBoxedWithoutNullCheck  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2IntegerBoxedWithoutNullCheck;
+CREATE FUNCTION add2BigintBoxedWithoutNullCheck   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2BigintBoxedWithoutNullCheck;
+CREATE FUNCTION add2FloatBoxedWithoutNullCheck    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2FloatBoxedWithoutNullCheck;
+
+
 -- Create simple test UDF's with 0 or 1 arguments (these, and the ones below,
 -- unlike the ones above, are 'compatible' with PostgreSQL, and do not go out
 -- of their way to throw exceptions or return VoltDB null values, so they could
@@ -108,10 +135,10 @@ CREATE FUNCTION absSmallintBoxed FROM METHOD org.voltdb_testfuncs.UserDefinedTes
 CREATE FUNCTION absIntegerBoxed  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absIntegerBoxed;
 CREATE FUNCTION absBigintBoxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absBigintBoxed;
 CREATE FUNCTION absFloatBoxed    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absFloatBoxed;
-CREATE FUNCTION absDecimal  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absDecimal;
-CREATE FUNCTION reverse     FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.reverse;
-CREATE FUNCTION numRings  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numRings;
-CREATE FUNCTION numPointsUdf   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numPointsUdf;
+CREATE FUNCTION absDecimal   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absDecimal;
+CREATE FUNCTION reverse      FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.reverse;
+CREATE FUNCTION numRings     FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numRings;
+CREATE FUNCTION numPointsUdf FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numPointsUdf;
 
 -- Create simple test UDF's with 2 arguments
 

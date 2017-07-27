@@ -247,7 +247,12 @@ public class UserDefinedTestFunctions {
         }
         byte[] result = new byte[value.length];
         for (int i=0; i < value.length; i++) {
-            result[i] = testExceptions(value[i]);
+            Byte test_i = testExceptions(value[i], true);
+            if (test_i == null) {
+                return null;
+            } else {
+                result[i] = test_i;
+            }
         }
         return result;
     }
@@ -263,7 +268,7 @@ public class UserDefinedTestFunctions {
         }
         Byte[] result = new Byte[value.length];
         for (int i=0; i < value.length; i++) {
-            Byte test_i = testExceptions(value[i]);
+            Byte test_i = testExceptions(value[i], true);
             if (test_i == null) {
                 return null;
             } else {
@@ -602,6 +607,92 @@ public class UserDefinedTestFunctions {
             return null;
         }
         return g2.add(p);
+    }
+
+
+    // Test UDF's (user-defined functions) that are similar to (some of) the
+    // above UDF's, but without null checking, so slightly odd things can happen,
+    // such as null plus one equals a number
+
+    /** Simple test UDF (user-defined function) that adds two TINYINT
+     *  (primitive, or unboxed, byte) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public byte add2TinyintWithoutNullCheck(byte i, byte j) {
+        return (byte) (testExceptions(i) + testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two TINYINT
+     *  (boxed Byte) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Byte add2TinyintBoxedWithoutNullCheck(Byte i, Byte j) {
+        return (byte) (testExceptions(i) + testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two SMALLINT
+     *  (primitive, or unboxed, short) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public short add2SmallintWithoutNullCheck(short i, short j) {
+        return (short) (testExceptions(i) + testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two SMALLINT
+     *  (boxed Short) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Short add2SmallintBoxedWithoutNullCheck(Short i, Short j) {
+        return (short) (testExceptions(i) + testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two INTEGER
+     *  (primitive, or unboxed, int) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public int add2IntegerWithoutNullCheck(int i, int j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two INTEGER
+     *  (boxed Integer) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Integer add2IntegerBoxedWithoutNullCheck(Integer i, Integer j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two BIGINT
+     *  (primitive, or unboxed, long) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public long add2BigintWithoutNullCheck(long i, long j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two BIGINT
+     *  (boxed Long) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Long add2BigintBoxedWithoutNullCheck(Long i, Long j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two FLOAT
+     *  (primitive, or unboxed, double) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public double add2FloatWithoutNullCheck(double i, double j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two FLOAT
+     *  (boxed Double) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Double add2FloatBoxedWithoutNullCheck(Double i, Double j) {
+        return testExceptions(i) + testExceptions(j);
     }
 
 

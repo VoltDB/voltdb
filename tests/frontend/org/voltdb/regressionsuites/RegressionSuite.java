@@ -1054,7 +1054,15 @@ public class RegressionSuite extends TestCase {
             if (expectedObj == null) {
                 VoltType vt = actualRow.getColumnType(i);
                 Object actualValue = actualRow.get(i, vt);
-                assertTrue(msg+"expected null, but got: "+actualValue, actualRow.wasNull());
+                String fullMsg = msg + "expected null, but got: "+actualValue;
+                if (actualValue instanceof byte[]) {
+                    fullMsg = msg+"expected null, but got VARBINARY with array of byte values: "
+                            + Arrays.toString((byte[])actualValue);
+                } else if (actualValue instanceof Byte[]) {
+                    fullMsg = msg+"expected null, but got VARBINARY with array of Byte values: "
+                            + Arrays.toString((Byte[])actualValue);
+                }
+                assertTrue(fullMsg, actualRow.wasNull());
             }
             else if (expectedObj instanceof GeographyPointValue) {
                 assertApproximatelyEquals(msg, (GeographyPointValue) expectedObj, actualRow.getGeographyPointValue(i), epsilon);
@@ -1079,14 +1087,11 @@ public class RegressionSuite extends TestCase {
                 assertEquals(msg, val, actualRow.getLong(i));
             }
             else if (expectedObj instanceof Double) {
-                double expectedValue = (Double)expectedObj;
+                Double expectedValue = (Double)expectedObj;
                 double actualValue = actualRow.getDouble(i);
-                // check if the row value was evaluated as null. Looking
-                // at return is not reliable way to do so;
-                // for null values, convert value into double min
-                if (actualRow.wasNull()) {
-                    actualValue = Double.MIN_VALUE;
-                }
+                // Either both are null or neither is null
+                assertEquals(msg+"expected "+expectedValue+" but got "+actualValue+": checking for null FLOAT: ",
+                        expectedValue == null, actualRow.wasNull());
                 if (epsilon <= 0 || !Double.isFinite(expectedValue)) {
                     String fullMsg = msg + String.format("Expected value %f != actual value %f", expectedValue, actualValue);
                     assertEquals(fullMsg, expectedValue, actualValue);
@@ -1100,8 +1105,9 @@ public class RegressionSuite extends TestCase {
             else if (expectedObj instanceof BigDecimal) {
                 BigDecimal exp = (BigDecimal)expectedObj;
                 BigDecimal got = actualRow.getDecimalAsBigDecimal(i);
-                // Either both are null or neither are null.
-                assertEquals(msg+"checking if DECIMAL is null: ", exp == null, got == null);
+                // Either both are null or neither is null
+                assertEquals(msg+"expected "+exp+" but got "+got+": checking for null DECIMAL: ",
+                        exp == null, got == null);
                 assertEquals(msg, exp.doubleValue(), got.doubleValue(), epsilon);
             }
             else if (expectedObj instanceof byte[]) {

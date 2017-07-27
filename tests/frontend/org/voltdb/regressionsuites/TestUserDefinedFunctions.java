@@ -29,6 +29,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Random;
 
+import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -43,14 +45,13 @@ import org.voltdb.types.TimestampType;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UDF_TEST;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UserDefinedTestException;
 
-import junit.framework.Test;
-
 /**
  * Tests of SQL statements that use User-Defined Functions (UDF's).
  */
 public class TestUserDefinedFunctions extends RegressionSuite {
     static private Random random = new Random();
-    static private double EPSILON = 1.0E-12;  // Acceptable difference, for FLOAT (Double) tests
+    static private final double EPSILON = 1.0E-12;  // Acceptable difference, for FLOAT (Double) tests
+    static private final double PI = 3.1415926535897932384;
     static private final BigDecimal MIN_DECIMAL_VALUE = new BigDecimal("-99999999999999999999999999.999999999999");
     static private final BigDecimal MAX_DECIMAL_VALUE = new BigDecimal( "99999999999999999999999999.999999999999");
     static private final String SIMPLE_POLYGON_WTK = "PolygonFromText( 'POLYGON((3 3, -3 3, -3 -3, 3 -3, 3 3),"
@@ -92,15 +93,15 @@ public class TestUserDefinedFunctions extends RegressionSuite {
             allColumnValues = "0, " + String.join(",", columnValues);
         }
         Client client = getClient();
-        ClientResponse cr = client.callProcedure("@AdHoc", "INSERT INTO "+tableName
-                + " ("+allColumnNames+") VALUES"
-                + " ("+allColumnValues+")");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        String insertStatement = "INSERT INTO "+tableName
+                + " ("+allColumnNames+") VALUES" + " ("+allColumnValues+")";
+        ClientResponse cr = client.callProcedure("@AdHoc", insertStatement);
+        assertEquals(insertStatement+" failed", ClientResponse.SUCCESS, cr.getStatus());
 
         // Get the actual result of the SELECT query using the UDF
-        cr = client.callProcedure("@AdHoc",
-                "SELECT ID, "+functionCall+" FROM "+tableName+" WHERE ID = 0");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        String selectStatement = "SELECT ID, "+functionCall+" FROM "+tableName+" WHERE ID = 0";
+        cr = client.callProcedure("@AdHoc", selectStatement);
+        assertEquals(selectStatement+" failed", ClientResponse.SUCCESS, cr.getStatus());
         VoltTable vt = cr.getResults()[0];
 
         // Compare the expected to the actual result
@@ -111,8 +112,9 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         }
 
         // Clean-up
-        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE "+tableName);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        String truncateStatement = "TRUNCATE TABLE "+tableName;
+        cr = client.callProcedure("@AdHoc", truncateStatement);
+        assertEquals(truncateStatement+" (clean-up) failed", ClientResponse.SUCCESS, cr.getStatus());
     }
 
     /** Tests the specified <i>functionCall</i>, and confirms that the
@@ -141,7 +143,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
     }
 
     /** Tests the specified <i>functionCall</i>, and confirms that an Exception
-     *  is thrown, of <i>expectedExceptionType</i>, with a cause (possibly null)
+     *  is thrown, of type ProcCallException.class, with a cause (possibly null)
      *  of <i>expectedExcepCauseType</i>.
      *  It does this by first INSERT-ing one row, and then SELECT-ing the
      *  <i>functionCall</i> value (as well as the ID) from that row, and then
@@ -152,8 +154,9 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  The table to INSERT into and SELECT from is chosen, randomly, as either
      *  R1 or P1. */
     private void testFunctionThrowsException(String functionCall, VoltType returnType,
-            Class<? extends Throwable> expectedExceptionType, Class<? extends Throwable> expectedExcepCauseType,
+            Class<? extends Throwable> expectedExcepCauseType,
             String[] columnNames, String[] columnValues) {
+        Class<? extends Throwable> expectedExceptionType = ProcCallException.class;
         try {
             testFunction(functionCall, null, returnType, columnNames, columnValues);
         } catch (Throwable ex) {
@@ -164,22 +167,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
                 actualExcepCauseType = exceptionCause.getClass();
             }
 
-            // TODO: temp debug:
-            if ((expectedExceptionType != null && !expectedExceptionType.equals(actualExceptionType)) ||
-                    (expectedExcepCauseType != null && !expectedExcepCauseType.equals(actualExcepCauseType)) ) {
-                System.out.println("In testFunctionThrowsException:");
-                System.out.println("  functionCall          : " + functionCall);
-                System.out.println("  expectedExceptionType : " + expectedExceptionType);
-                System.out.println("  actual  ExceptionType : " + actualExceptionType);
-                System.out.println("  expectedExcepCauseType: " + expectedExcepCauseType);
-                System.out.println("  actual  ExcepCauseType: " + actualExcepCauseType);
-                System.out.println("  exceptionCause        : " + exceptionCause);
-                System.out.println("  actual ExcType details: " + ex.toString());
-                System.out.println("  actual ExcType stackTrace:\n");
-                ex.printStackTrace(System.out);
-            }
-
-            assertEquals("Unexpected Exception type for "+functionCall, expectedExceptionType, actualExceptionType);
+            assertEquals("Unexpected Exception type for: "+functionCall, expectedExceptionType, actualExceptionType);
 
             // TODO: delete, once UDFs throwing exceptions with causes works (ENG-12863):
             if (exceptionCause == null) {
@@ -198,25 +186,6 @@ public class TestUserDefinedFunctions extends RegressionSuite {
      *  It does this by first INSERT-ing one row, and then SELECT-ing the
      *  <i>functionCall</i> value (as well as the ID) from that row, and then
      *  catching any Exception (or other Throwable) thrown.
-     *  Optionally, you can also specify <i>columnNames</i> and corresponding
-     *  <i>columnValues</i> (in addition to ID=0) to be specified in the
-     *  initial INSERT statement.
-     *  The table to INSERT into and SELECT from is chosen, randomly, as either
-     *  R1 or P1. */
-    private void testFunctionThrowsException(String functionCall, VoltType returnType,
-            Class<? extends Throwable> expectedExcepCauseType,
-            String[] columnNames, String[] columnValues) {
-        testFunctionThrowsException(functionCall, returnType,
-                ProcCallException.class, expectedExcepCauseType,
-                columnNames, columnValues);
-    }
-
-    /** Tests the specified <i>functionCall</i>, and confirms that an Exception
-     *  is thrown, of type ProcCallException.class, with a cause (possibly null)
-     *  of <i>expectedExcepCauseType</i>.
-     *  It does this by first INSERT-ing one row, and then SELECT-ing the
-     *  <i>functionCall</i> value (as well as the ID) from that row, and then
-     *  catching any Exception (or other Throwable) thrown.
      *  The table to INSERT into and SELECT from is chosen, randomly, as either
      *  R1 or P1. */
     private void testFunctionThrowsException(String functionCall, VoltType returnType,
@@ -227,7 +196,6 @@ public class TestUserDefinedFunctions extends RegressionSuite {
 
     // Test UDF's with zero arguments ...
 
-    final static double PI = 3.1415926535897932384;
     public void testPiFunction0args() throws IOException, ProcCallException {
         testFunction("piUdf()", PI, VoltType.FLOAT);
     }
@@ -320,14 +288,14 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         expectedResult[0] = (byte) 0xAB;
         expectedResult[1] = (byte) 0x00;
         expectedResult[2] = (byte) 0xCD;
-        testFunction("btrim(x'0001AB00CD0100',x'0001')", expectedResult, VoltType.VARBINARY);
+        testFunction("btrim(x'0001AB00CD0100', x'0001')", expectedResult, VoltType.VARBINARY);
     }
     public void testBtrimBoxedFunction() throws IOException, ProcCallException {
         Byte[] expectedResult = new Byte[3];
         expectedResult[0] = (byte) 0xAB;
         expectedResult[1] = (byte) 0x00;
         expectedResult[2] = (byte) 0xCD;
-        testFunction("btrimBoxed(x'0001AB00CD0100',x'0001')", expectedResult, VoltType.VARBINARY);
+        testFunction("btrimBoxed(x'0001AB00CD0100', x'0001')", expectedResult, VoltType.VARBINARY);
     }
 
     // Test more UDF's with two arguments; now the arguments are column names,
@@ -431,7 +399,246 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("addGeographyPointToGeography(POLYGON, POINT1)", expectedResult, VoltType.GEOGRAPHY, columnNames, columnValues);
     }
 
-    // Test concat UDF's with two, three or four arguments ...
+    // Test more UDF's with two arguments; these UDF calls have results that
+    // exceed their limits; in some cases, this means that they wrap around,
+    // to or beyond the NULL value for that (numeric) data type ...
+
+    public void testAdd2TinyintWrap1() throws IOException, ProcCallException {
+        testFunction("add2Tinyint(-127,-1)", null, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintWrap2() throws IOException, ProcCallException {
+        testFunction("add2Tinyint(-127,-2)", (byte)127, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintWrap3() throws IOException, ProcCallException {
+        testFunction("add2Tinyint(127,1)", null, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintWrap4() throws IOException, ProcCallException {
+        testFunction("add2Tinyint(127,2)", (byte)-127, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintBoxedWrap1() throws IOException, ProcCallException {
+        testFunction("add2TinyintBoxed(-127,-1)", null, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintBoxedWrap2() throws IOException, ProcCallException {
+        testFunction("add2TinyintBoxed(-127,-2)", (byte)127, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintBoxedWrap3() throws IOException, ProcCallException {
+        testFunction("add2TinyintBoxed(127,1)", null, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintBoxedWrap4() throws IOException, ProcCallException {
+        testFunction("add2TinyintBoxed(127,2)", (byte)-127, VoltType.TINYINT);
+    }
+
+    public void testAdd2SmallintWrap1() throws IOException, ProcCallException {
+        testFunction("add2Smallint(-32767,-1)", null, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintWrap2() throws IOException, ProcCallException {
+        testFunction("add2Smallint(-32767,-2)", (short)32767, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintWrap3() throws IOException, ProcCallException {
+        testFunction("add2Smallint(32767,1)", null, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintWrap4() throws IOException, ProcCallException {
+        testFunction("add2Smallint(32767,2)", (short)-32767, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintBoxedWrap1() throws IOException, ProcCallException {
+        testFunction("add2SmallintBoxed(-32767,-1)", null, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintBoxedWrap2() throws IOException, ProcCallException {
+        testFunction("add2SmallintBoxed(-32767,-2)", (short)32767, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintBoxedWrap3() throws IOException, ProcCallException {
+        testFunction("add2SmallintBoxed(32767,1)", null, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintBoxedWrap4() throws IOException, ProcCallException {
+        testFunction("add2SmallintBoxed(32767,2)", (short)-32767, VoltType.SMALLINT);
+    }
+
+    public void testAdd2IntegerWrap1() throws IOException, ProcCallException {
+        testFunction("add2Integer(-2147483647,-1)", null, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerWrap2() throws IOException, ProcCallException {
+        testFunction("add2Integer(-2147483647,-2)", 2147483647, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerWrap3() throws IOException, ProcCallException {
+        testFunction("add2Integer(2147483647,1)", null, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerWrap4() throws IOException, ProcCallException {
+        testFunction("add2Integer(2147483647,2)", -2147483647, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerBoxedWrap1() throws IOException, ProcCallException {
+        testFunction("add2IntegerBoxed(-2147483647,-1)", null, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerBoxedWrap2() throws IOException, ProcCallException {
+        testFunction("add2IntegerBoxed(-2147483647,-2)", 2147483647, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerBoxedWrap3() throws IOException, ProcCallException {
+        testFunction("add2IntegerBoxed(2147483647,1)", null, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerBoxedWrap4() throws IOException, ProcCallException {
+        testFunction("add2IntegerBoxed(2147483647,2)", -2147483647, VoltType.INTEGER);
+    }
+
+    public void testAdd2BigintWrap1() throws IOException, ProcCallException {
+        testFunction("add2Bigint(-9223372036854775807,-1)", null, VoltType.BIGINT);
+    }
+    public void testAdd2BigintWrap2() throws IOException, ProcCallException {
+        testFunction("add2Bigint(-9223372036854775807,-2)", 9223372036854775807L, VoltType.BIGINT);
+    }
+    public void testAdd2BigintWrap3() throws IOException, ProcCallException {
+        testFunction("add2Bigint(9223372036854775807,1)", null, VoltType.BIGINT);
+    }
+    public void testAdd2BigintWrap4() throws IOException, ProcCallException {
+        testFunction("add2Bigint(9223372036854775807,2)", -9223372036854775807L, VoltType.BIGINT);
+    }
+    public void testAdd2BigintBoxedWrap1() throws IOException, ProcCallException {
+        testFunction("add2BigintBoxed(-9223372036854775807,-1)", null, VoltType.BIGINT);
+    }
+    public void testAdd2BigintBoxedWrap2() throws IOException, ProcCallException {
+        testFunction("add2BigintBoxed(-9223372036854775807,-2)", 9223372036854775807L, VoltType.BIGINT);
+    }
+    public void testAdd2BigintBoxedWrap3() throws IOException, ProcCallException {
+        testFunction("add2BigintBoxed(9223372036854775807,1)", null, VoltType.BIGINT);
+    }
+    public void testAdd2BigintBoxedWrap4() throws IOException, ProcCallException {
+        testFunction("add2BigintBoxed(9223372036854775807,2)", -9223372036854775807L, VoltType.BIGINT);
+    }
+
+    public void testAdd2FloatWrap1() throws IOException, ProcCallException {
+        testFunction("add2Float(-1.6E+308, -0.1E+308)", null, VoltType.FLOAT);
+    }
+    public void testAdd2FloatWrap2() throws IOException, ProcCallException {
+        testFunction("add2Float(-1.6E+308, -0.2E+308)", null, VoltType.FLOAT);
+    }
+    public void testAdd2FloatWrap3() throws IOException, ProcCallException {
+        testFunction("add2Float(1.6E+308, 0.1E+308)", 1.7E308, VoltType.FLOAT);
+    }
+    public void testAdd2FloatWrap4() throws IOException, ProcCallException {
+        testFunction("add2Float(1.6E+308, 0.2E+308)", Double.POSITIVE_INFINITY, VoltType.FLOAT);
+    }
+    public void testAdd2FloatBoxedWrap1() throws IOException, ProcCallException {
+        testFunction("add2FloatBoxed(-1.6E+308, -0.1E+308)", null, VoltType.FLOAT);
+    }
+    public void testAdd2FloatBoxedWrap2() throws IOException, ProcCallException {
+        testFunction("add2FloatBoxed(-1.6E+308, -0.2E+308)", null, VoltType.FLOAT);
+    }
+    public void testAdd2FloatBoxedWrap3() throws IOException, ProcCallException {
+        testFunction("add2FloatBoxed(1.6E+308, 0.1E+308)", 1.7E308, VoltType.FLOAT);
+    }
+    public void testAdd2FloatBoxedWrap4() throws IOException, ProcCallException {
+        testFunction("add2FloatBoxed(1.6E+308, 0.2E+308)", Double.POSITIVE_INFINITY, VoltType.FLOAT);
+    }
+
+    // Unlike other numeric types, DECIMAL (BigDecimal) throws an Exception
+    // when it overflows (positively or negatively)
+    public void testAdd2DecimalWrap1() throws IOException, ProcCallException {
+        testFunctionThrowsException("add2Decimal(-99999999999999999999999999.999999999999, -0.000000000001)",
+                VoltType.DECIMAL, RuntimeException.class);
+    }
+    public void testAdd2DecimalWrap2() throws IOException, ProcCallException {
+        testFunctionThrowsException("add2Decimal(99999999999999999999999999.999999999999, 0.000000000001)",
+                VoltType.DECIMAL, RuntimeException.class);
+    }
+
+    public void testAdd2VarbinaryWrap0() throws IOException, ProcCallException {
+        byte[] expectedResult = new byte[3];
+        expectedResult[0] = (byte) 0xFF;
+        expectedResult[1] = (byte) 0xFF;
+        expectedResult[2] = (byte) 0xFF;
+        testFunction("add2Varbinary(x'888888', x'777777')", expectedResult, VoltType.VARBINARY);
+    }
+    public void testAdd2VarbinaryWrap1() throws IOException, ProcCallException {
+        byte[] expectedResult = new byte[1];
+        expectedResult[0] = (byte) 0x00;
+        testFunction("add2Varbinary(x'FF', x'01')", expectedResult, VoltType.VARBINARY);
+    }
+    public void testAdd2VarbinaryWrap2() throws IOException, ProcCallException {
+        byte[] expectedResult = new byte[3];
+        expectedResult[0] = (byte) 0xFF;
+        expectedResult[1] = (byte) 0x00;
+        expectedResult[2] = (byte) 0xFF;
+        testFunction("add2Varbinary(x'FFFFFF', x'0001')", expectedResult, VoltType.VARBINARY);
+    }
+
+    public void testAddYearsToTimestampWrap1() throws IOException, ProcCallException {
+        TimestampType expectedResult = new TimestampType(253402300801000000L);  // equals 10000-01-01 00:00:01.0
+        testFunction("addYearsToTimestamp('9999-01-01 00:00:01.0', 1)", expectedResult, VoltType.TIMESTAMP);
+    }
+    public void testddYearsToTimestampWrap2() throws IOException, ProcCallException {
+        TimestampType expectedResult = new TimestampType("1582-12-31 23:59:59.0");
+        testFunction("addYearsToTimestamp('1583-12-31 23:59:59.0', -1)", expectedResult, VoltType.TIMESTAMP);
+    }
+
+
+
+    // Test more UDF's with two arguments; these UDF's have no null checking, so odd
+    // things can happen, such as null plus one equals a number ...
+
+    public void testAdd2TinyintWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2TinyintWithoutNullCheck(null,1)", (byte)-127, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2TinyintWithoutNullCheck(null,-1)", (byte)127, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2TinyintBoxedWithoutNullCheck(null,1)", (byte)-127, VoltType.TINYINT);
+    }
+    public void testAdd2TinyintBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2TinyintBoxedWithoutNullCheck(null,-1)", (byte)127, VoltType.TINYINT);
+    }
+
+    public void testAdd2SmallintWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2SmallintWithoutNullCheck(null,1)", (short)-32767, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2SmallintWithoutNullCheck(null,-1)", (short)32767, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2SmallintBoxedWithoutNullCheck(null,1)", (short)-32767, VoltType.SMALLINT);
+    }
+    public void testAdd2SmallintBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2SmallintBoxedWithoutNullCheck(null,-1)", (short)32767, VoltType.SMALLINT);
+    }
+
+    public void testAdd2IntegerWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2IntegerWithoutNullCheck(null,1)", -2147483647, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2IntegerWithoutNullCheck(null,-1)", 2147483647, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2IntegerBoxedWithoutNullCheck(null,1)", -2147483647, VoltType.INTEGER);
+    }
+    public void testAdd2IntegerBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2IntegerBoxedWithoutNullCheck(null,-1)", 2147483647, VoltType.INTEGER);
+    }
+
+    public void testAdd2BigintWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2BigintWithoutNullCheck(null,1)", -9223372036854775807L, VoltType.BIGINT);
+    }
+    public void testAdd2BigintWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2BigintWithoutNullCheck(null,-1)", 9223372036854775807L, VoltType.BIGINT);
+    }
+    public void testAdd2BigintBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2BigintBoxedWithoutNullCheck(null,1)", -9223372036854775807L, VoltType.BIGINT);
+    }
+    public void testAdd2BigintBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2BigintBoxedWithoutNullCheck(null,-1)", 9223372036854775807L, VoltType.BIGINT);
+    }
+
+    public void testAdd2FloatWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2FloatWithoutNullCheck(null, 0.1E+308)", -1.6E+308, VoltType.FLOAT);
+    }
+    public void testAdd2FloatWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2FloatWithoutNullCheck(null, -0.1E+308)", null, VoltType.FLOAT);
+    }
+    public void testAdd2FloatBoxedWithoutNullCheck1() throws IOException, ProcCallException {
+        testFunction("add2FloatBoxedWithoutNullCheck(null, 0.1E+308)", -1.6E+308, VoltType.FLOAT);
+    }
+    public void testAdd2FloatBoxedWithoutNullCheck2() throws IOException, ProcCallException {
+        testFunction("add2FloatBoxedWithoutNullCheck(null, -0.1E+308)", null, VoltType.FLOAT);
+    }
+
+    // Test concatenation UDF's with two, three or four arguments ...
 
     public void testConcat2VarcharFunction() throws IOException, ProcCallException {
         testFunction("concat2Varchar('Foo','Bar')", "FooBar", VoltType.STRING);
@@ -482,11 +689,11 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         testFunction("add2Varchar('"+UDF_TEST.RETURN_JAVA_NULL+"', 'Foo')", null, VoltType.STRING);
     }
     public void testReturnVarbinaryNull() throws IOException, ProcCallException {
-        testFunction("add2Varbinary(x'" + String.format("%02X", (byte)UDF_TEST.RETURN_DATA_TYPE_NULL) + "', x'00')",
+        testFunction("add2Varbinary(x'" + String.format("%02X", UDF_TEST.RETURN_DATA_TYPE_NULL) + "', x'00')",
                     null, VoltType.VARBINARY);
     }
     public void testReturnVarbinaryBoxedNull() throws IOException, ProcCallException {
-        testFunction("add2VarbinaryBoxed(x'" + String.format("%02X", (byte)UDF_TEST.RETURN_DATA_TYPE_NULL) + "', x'00')",
+        testFunction("add2VarbinaryBoxed(x'" + String.format("%02X", UDF_TEST.RETURN_DATA_TYPE_NULL) + "', x'00')",
                     null, VoltType.VARBINARY);
     }
     public void testReturnTimestampNull() throws IOException, ProcCallException {
@@ -500,7 +707,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
     public void testReturnGeographyNull() throws IOException, ProcCallException {
         int nullCode = UDF_TEST.RETURN_DATA_TYPE_NULL;
         testFunction("addGeographyPointToGeography( PolygonFromText('POLYGON"
-                    + "((0 0, "+nullCode+" 0, 0 "+nullCode+", 0 0))'), "
+                    + "((0 0, "+nullCode+" 0, 0 -1, 0 0))'), "
                     + "PointFromText('POINT(0 0)') )", null, VoltType.GEOGRAPHY);
     }
 
@@ -634,7 +841,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
         LocalCluster config = new LocalCluster("tudf-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        //* enable for simplified config */ config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        //* enable for simplified config */ config = new LocalCluster("tudf-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // build the jarfile
         assertTrue(config.compile(project));
         // add this config to the set of tests to run
