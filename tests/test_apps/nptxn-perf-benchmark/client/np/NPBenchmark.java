@@ -341,9 +341,6 @@ class NPBenchmark {
             fw.flush();
             fw.close();
         }
-
-        client.drain();
-        client.close();
     }
 
     public void initialize() throws Exception {
