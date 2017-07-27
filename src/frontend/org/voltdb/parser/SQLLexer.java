@@ -458,15 +458,6 @@ public class SQLLexer extends SQLPatternFactory
                     }
                     iCur += 3;
                 } else if (iCur <= buf.length - 2) {
-                    // Comment (double-dash or C-style)?
-//                    if (buf[iCur] == '-' && buf[iCur+1] == '-') {
-//                        // One line double-dash comment start.
-//                        sCommentEnd = "\n"; // Works for *IX (\n) and Windows (\r\n).
-//                        if (iCur == iStart) {
-//                            statementIsComment = true;
-//                        }
-//                        iCur += 2;
-//                    } else
                     if (buf[iCur] == '/' && buf[iCur+1] == '*') {
                         // Multi-line C-style comment start.
                         sCommentEnd = "*/";
