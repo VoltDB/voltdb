@@ -449,7 +449,7 @@ public class ExportGeneration implements Generation {
             Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
             assert(dataSourcesForPartition != null);
             for (ExportDataSource source: dataSourcesForPartition.values()) {
-                exportLog.debug("Pause polling for tableb:" + source.getTableName() + " partition:" + source.getPartitionId()
+                exportLog.debug("Pause polling for table:" + source.getTableName() + " partition:" + source.getPartitionId()
                         + " signature:" + source.getSignature());
                 source.prepareForProcessorSwap();
             }

@@ -1446,7 +1446,7 @@ public class LocalCluster extends VoltServerConfig {
         return recoverOne( logtime, startTime, hostId, null, "", StartAction.REJOIN);
     }
 
-    // Re-start a (dead) process. HostId is the enumberation of the host
+    // Re-start a (dead) process. HostId is the enumeration of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
                                String rejoinHost, StartAction startAction) {

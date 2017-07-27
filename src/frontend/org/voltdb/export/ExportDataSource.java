@@ -105,8 +105,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
     private volatile boolean m_replicaMastershipRequested = false;
     private volatile ListeningExecutorService m_executor;
-
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
+    private volatile boolean m_performPoll = false;            // flag to pause/resume polling
+
     /**
      * Create a new data source.
      * @param db
@@ -115,8 +116,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param catalogMap
      */
     public ExportDataSource(
-            String db, String tableName,
-            int partitionId, String signature,
+            String db,
+            String tableName,
+            int partitionId,
+            String signature,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
             String overflowPath
@@ -310,7 +313,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
-        stringer.keySymbolValuePair("adVersion", 1);
+        stringer.keySymbolValuePair("adVersion", SEVENX_AD_VERSION);
         stringer.keySymbolValuePair("partitionId", getPartitionId());
         stringer.keySymbolValuePair("signature", m_signature);
         stringer.keySymbolValuePair("tableName", getTableName());
@@ -468,16 +471,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private volatile boolean m_poll = false;
 
     public void polling(boolean value) {
-        m_poll = value;
+        m_performPoll = value;
     }
 
     // update internal state of export data source - poll, mastership and m_pollfuture, in preparation
     // for delegating existing data sources to the new processor
     void prepareForProcessorSwap() {
-        m_poll = false;                     // disable polling
+        m_performPoll = false;              // disable polling
         m_mastershipAccepted.set(false);    // unassign mastership for this partition
 
         // For case where the previous export processor had only row of the first block to process
@@ -500,7 +502,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         ListeningExecutorService es = getExecutorService();
         if (es == null) {
-            //If we have not activated lets get the buffer in overflow and dont poll
+            //If we have not activated lets get the buffer in overflow and don't poll
             try {
                 pushExportBufferImpl(uso, buffer, sync, false);
             } catch (Throwable t) {
@@ -521,7 +523,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!es.isShutdown()) {
-                            pushExportBufferImpl(uso, buffer, sync, m_poll /* poll */);
+                            pushExportBufferImpl(uso, buffer, sync, m_performPoll);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -845,6 +847,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         if (uso == Long.MIN_VALUE) {
             // drain
+
+            // TODO: is returning from here desirable behavior? Earlier if on onDrain was completed,
+            // peer would have send an ack with USO set to Long.MIN_VALUE. With only generation,
+            // will this happen and if so, should the bytes be releaseExportBytes() be called on the uso?
             return;
         }
 
