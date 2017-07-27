@@ -415,8 +415,9 @@ public class ExportManager
         final Database db = cluster.getDatabases().get("database");
         final CatalogMap<Connector> connectors = db.getConnectors();
 
+        Map<String, Pair<Properties, Set<String>>> processorConfigBeforeUpdate = m_processorConfig;
         updateProcessorConfig(connectors);
-        if (m_processorConfig.isEmpty()) {
+        if (m_processorConfig.isEmpty() && processorConfigBeforeUpdate.isEmpty()) {
             return;
         }
 
@@ -494,12 +495,17 @@ public class ExportManager
             List<Integer> partitions,
             Map<String, Pair<Properties, Set<String>>> config) {
         generation.pausePolling(partitions);
-        java.util.concurrent.Future<?> task = m_dataProcessorHandler.submit(new Runnable() {
+        m_dataProcessorHandler.submit(new Runnable() {
             @Override
             public void run() {
                 ExportDataProcessor oldProcessor = m_processor.get();
                 exportLog.info("Shutdown guestprocessor");
                 oldProcessor.shutdown();
+                if (config.isEmpty()) {
+                    m_processor.getAndSet(null);
+                    exportLog.info("Processor shutdown completed");
+                    return;
+                }
                 exportLog.info("Processor shutdown completed, install new export processor");
                 ExportDataProcessor newProcessor = null;
                 try {
