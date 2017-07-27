@@ -63,7 +63,7 @@ public class ImportManager implements ChannelChangeCallback {
 
     private final int m_myHostId;
     private ChannelDistributer m_distributer;
-    private boolean m_serverStarted;
+    private volatile boolean m_serverStarted;
     private final ImporterStatsCollector m_statsCollector;
     private final ModuleManager m_moduleManager;
 
@@ -146,7 +146,6 @@ public class ImportManager implements ChannelChangeCallback {
             ImportDataProcessor newProcessor = new ImportProcessor(
                     m_myHostId, m_distributer, m_statsCollector, clusterTag);
             newProcessor.setProcessorConfig(newProcessorConfig, m_loadedBundles);
-            importLog.warn("BSDBG: creating import processor");
             m_processor.set(newProcessor);
         } else {
             m_processor.set(null);
@@ -290,7 +289,6 @@ public class ImportManager implements ChannelChangeCallback {
             return;
         }
         if (m_serverStarted) {
-            importLog.warn("BSDBG: Closing import processor");
             m_processor.get().shutdown();
         }
         //Unset until it gets started.
@@ -322,22 +320,19 @@ public class ImportManager implements ChannelChangeCallback {
 
     public synchronized void readyForDataInternal(CatalogContext catalogContext, HostMessenger messenger, OperationMode newOperationMode) {
         if (!m_serverStarted) {
-            //if (importLog.isDebugEnabled()) {
-                importLog.warn("BSDBG: Server not started. Not sending readyForData to ImportProcessor");
-            //}
+            if (importLog.isDebugEnabled()) {
+                importLog.debug("Server not started. Not sending readyForData to ImportProcessor");
+            }
             return;
         }
 
         //If we dont have any processors we dont have any import configured.
         if (m_processor.get() == null) {
-            importLog.warn("BSDBG: Not sending readyForData to ImportProcessor - import not enabled");
             return;
         }
 
-        importLog.warn("BSDBG: readyForData to ImportProcessor: cluster is " + newOperationMode);
         if (newOperationMode != OperationMode.PAUSED) {
             //Tell import processors and in turn ImportHandlers that we are ready to take in data.
-            importLog.warn("BSDBG: starting importers");
             m_processor.get().readyForData(catalogContext, messenger);
         }
     }
@@ -349,7 +344,6 @@ public class ImportManager implements ChannelChangeCallback {
 
     @Override
     public synchronized void onClusterStateChange(VersionedOperationMode mode) {
-        importLog.warn("BSDBG: onClusterStateChange mode is " + mode.getMode());
         switch (mode.getMode()) {
             case PAUSED:
                 importLog.info("Cluster is paused shutting down all importers.");
