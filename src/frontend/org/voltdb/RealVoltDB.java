@@ -4602,11 +4602,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         this.m_failedLoginMessageQueue = m_failedLoginMessageQueue;
     }
 
-	public FailedLoginCounter getFLC() {
-		return m_flc;
-	}
+    public FailedLoginCounter getFLC() {
+        return m_flc;
+    }
 
-	public void setFLC(FailedLoginCounter m_flc) {
-		this.m_flc = m_flc;
-	}
+    public void setFLC(FailedLoginCounter m_flc) {
+        this.m_flc = m_flc;
+    }
 }
