@@ -47,8 +47,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -290,23 +288,6 @@ public class UpdateCore extends VoltSystemProcedure {
 
             boolean isForReplay = m_runner.getTxnState().isForReplay();
 
-            CatalogAndDeployment catalogStuff = null;
-            if (isForReplay) {
-                try {
-                    catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
-                }
-
-            } else {
-                CatalogContext ctx = VoltDB.instance().getCatalogContext();
-                catalogStuff = new CatalogAndDeployment(genId,
-                        ctx.m_preparedCatalogInfo.m_catalogHash,
-                        ctx.m_preparedCatalogInfo.m_catalogHash,
-                        ctx.m_preparedCatalogInfo.m_deploymentBytes);
-
-            }
-
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
 
@@ -314,11 +295,8 @@ public class UpdateCore extends VoltSystemProcedure {
                 CatalogContext catalogContext =
                         VoltDB.instance().catalogUpdate(
                                 commands,
-                                catalogStuff.catalogBytes,
-                                catalogStuff.catalogHash,
                                 expectedCatalogVersion,
                                 genId,
-                                catalogStuff.deploymentBytes,
                                 isForReplay,
                                 requireCatalogDiffCmdsApplyToEE,
                                 hasSchemaChange,
@@ -338,27 +316,11 @@ public class UpdateCore extends VoltSystemProcedure {
                         requiresSnapshotIsolation, uniqueId, spHandle,
                         isForReplay,
                         requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
-
-                if (log.isDebugEnabled()) {
-                    String replayInfo = isForReplay ? " (FOR REPLAY)" : "";
-
-                    byte[] debugDeploymentHash = CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes);
-                    log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
-                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                            Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
-                            Encoder.hexEncode(debugDeploymentHash).substring(0, 10),
-                            replayInfo));
-                }
             }
             // if seen before by this code, then check to see if this is a restart
-            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
-                    Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
-                    Arrays.equals(context.getDeploymentHash(),
-                            CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))) {
-                log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
-                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                            Encoder.hexEncode(catalogStuff.getCatalogHash()),
-                            Encoder.hexEncode(CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))));
+            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1)) {
+                log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update.",
+                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId())));
             }
             else {
                 VoltDB.crashLocalVoltDB("Invalid catalog update.  Expected version: " + expectedCatalogVersion +

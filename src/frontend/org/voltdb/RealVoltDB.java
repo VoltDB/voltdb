@@ -3444,11 +3444,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public CatalogContext catalogUpdate(
             String diffCommands,
-            byte[] newCatalogBytes,
-            byte[] catalogBytesHash,
             int expectedCatalogVersion,
             long genId,
-            byte[] deploymentBytes,
             boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
@@ -3467,6 +3464,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     };
                     assert(m_catalogContext.catalogVersion == expectedCatalogVersion + 1);
                     return m_catalogContext;
+                }
+
+                byte[] newCatalogBytes = null;
+                byte[] catalogBytesHash = null;
+                byte[] deploymentBytes = null;
+                if (isForReplay) {
+                    try {
+                        CatalogAndDeployment catalogStuff =
+                                CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+                        newCatalogBytes = catalogStuff.catalogBytes;
+                        catalogBytesHash = catalogStuff.catalogHash;
+                        deploymentBytes = catalogStuff.deploymentBytes;
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
+                    }
+                } else {
+                    CatalogContext ctx = VoltDB.instance().getCatalogContext();
+                    if (ctx.m_preparedCatalogInfo != null) {
+                        hostLog.fatal("prepared catalog is null...");
+                    }
+                    assert(ctx.m_preparedCatalogInfo != null);
+                    newCatalogBytes = ctx.m_preparedCatalogInfo.m_catalogBytes;
+                    catalogBytesHash = ctx.m_preparedCatalogInfo.m_catalogHash;
+                    deploymentBytes = ctx.m_preparedCatalogInfo.m_deploymentBytes;
                 }
 
                 // get old debugging info
