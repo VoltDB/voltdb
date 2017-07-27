@@ -270,8 +270,8 @@ class NPBenchmark {
             public void run() { printStatistics(); }
         };
         timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
+                                  config.displayinterval * 6000,
+                                  config.displayinterval * 6000);
     }
 
     /**
