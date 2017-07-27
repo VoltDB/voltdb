@@ -102,7 +102,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private volatile boolean m_shouldContinue = true;
     private volatile boolean m_recovering = false;
     private static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
-    //RateLimitedLogger logger = new RateLimitedLogger(10000, m_recoveryLog, Level.INFO);
     private static final VoltLogger m_agreementLog = new VoltLogger("AGREEMENT");
     private long m_minTxnIdAfterRecovery = Long.MIN_VALUE;
     private final CountDownLatch m_shutdownComplete = new CountDownLatch(1);
@@ -357,7 +356,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private void processMessage(VoltMessage message) throws Exception {
         if (!m_hsIds.contains(message.m_sourceHSId)) {
             String messageFormat = "Dropping message " + message + " because it is not from a known up site";
-            //logger.log("Dropping message " + message + " because it is not from a known up site",System.currentTimeMillis(), Level.INFO);
             RateLimitedLogger.tryLogForMessage(m_lastHeartbeatTime,
                                                10000,
                                                TimeUnit.MILLISECONDS,
