@@ -108,9 +108,10 @@ function client() {
          --servers="$SERVERS" \
          --sprate=0.9 \
          --cardcount=500000 \
-         --mprate=0.02 \
+         --mprate=0.005 \
          --skew=0.0 \
-         --duration=30
+         --duration=30 \
+         --clients=3
 }
 
 ###################

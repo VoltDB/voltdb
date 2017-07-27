@@ -47,11 +47,12 @@ class NPBenchmark {
     // validated command line configuration
     final NPBenchmarkConfig config;
     // Reference to the database connection we will use
-    final Client client;
+    // Each client is backed by a single thread for execution
+    final Client[] clients;
 
     // Statistics manager objects from the client
-    final ClientStatsContext periodicStatsContext;
-    final ClientStatsContext fullStatsContext;
+    final ClientStatsContext[] periodicStatsContexts;
+    final ClientStatsContext[] fullStatsContexts;
 
     Timer timer;
     long benchmarkStartTS;
@@ -85,10 +86,13 @@ class NPBenchmark {
         int cardcount = 500000;
 
         @Option(desc = "Rate of MP txns")
-        double mprate = 0.05;
+        double mprate = 0.005;
 
         @Option(desc = "Data skew ratio")
         double skew = 0.2;
+
+        @Option(desc = "Number of threads to run clients")
+        int clients = 1;
 
         @Override
         public void validate() {
@@ -110,6 +114,10 @@ class NPBenchmark {
             if (duration <= 0) {
                 exitWithMessageAndUsage("Invalid duration...");
             }
+
+            if (clients <= 0) {
+                exitWithMessageAndUsage("Invalid client number...");
+            }
         }
     }
 
@@ -130,10 +138,15 @@ class NPBenchmark {
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
 
-        client = ClientFactory.createClient(clientConfig);
+        clients = new Client[config.clients];
+        periodicStatsContexts = new ClientStatsContext[config.clients];
+        fullStatsContexts = new ClientStatsContext[config.clients];
 
-        periodicStatsContext = client.createStatsContext();
-        fullStatsContext = client.createStatsContext();
+        for (int i = 0; i < config.clients; i++) {
+            clients[i] = ClientFactory.createClient(clientConfig);
+            periodicStatsContexts[i] = clients[i].createStatsContext();
+            fullStatsContexts[i] = clients[i].createStatsContext();
+        }
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
@@ -198,7 +211,7 @@ class NPBenchmark {
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
-    void connectToOneServerWithRetry(String server) {
+    void connectToOneServerWithRetry(Client client, String server, int index) {
         int sleep = 1000;
         while (true) {
             try {
@@ -206,12 +219,12 @@ class NPBenchmark {
                 break;
             }
             catch (Exception e) {
-                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
+                System.err.printf("Client %d connection failed - retrying in %d second(s).\n", index, sleep / 1000);
                 try { Thread.sleep(sleep); } catch (Exception interruted) {}
                 if (sleep < 8000) sleep += sleep;
             }
         }
-        System.out.printf("Connected to VoltDB node at: %s.\n", server);
+        System.out.printf("Client %d connected to VoltDB node at: %s.\n", index, server);
     }
 
     /**
@@ -226,18 +239,22 @@ class NPBenchmark {
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
-        final CountDownLatch connections = new CountDownLatch(serverArray.length);
+        final CountDownLatch connections = new CountDownLatch(serverArray.length * config.clients);
 
-        // use a new thread to connect to each server
-        for (final String server : serverArray) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(server);
-                    connections.countDown();
-                }
-            }).start();
+        for (int i = 0; i < config.clients; i++) {
+            final int index = i;
+            // use a new thread to connect to each server
+            for (final String server : serverArray) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        connectToOneServerWithRetry(clients[index], server, index);
+                        connections.countDown();
+                    }
+                }).start();
+            }
         }
+
         // block until all have connected
         connections.await();
     }
@@ -262,18 +279,40 @@ class NPBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
-        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+        long time = Math.round((periodicStatsContexts[0].fetch().getStats().getEndTimestamp() - benchmarkStartTS) / 1000.0);
+
+        long thruput = 0;
+        long invocErrs = 0, invocAbrts = 0, invocTimeOuts = 0;
+        double avgLatcy = 0.0, kpLatcy = 0.0;
+
+        long totalInvoc = 0;
+
+        for (int i = 0; i < config.clients; i++) {
+            ClientStats stats = periodicStatsContexts[i].fetchAndResetBaseline().getStats();
+
+            thruput += stats.getTxnThroughput();
+            invocErrs += stats.getInvocationErrors();
+            invocAbrts += stats.getInvocationAborts();
+            invocTimeOuts += stats.getInvocationTimeouts();
+
+            long temp = stats.getInvocationsCompleted() + stats.getInvocationAborts() + stats.getInvocationErrors() + stats.getInvocationTimeouts();
+            totalInvoc += temp;
+
+            avgLatcy += stats.getAverageLatency() * (double) temp;
+            kpLatcy += stats.kPercentileLatency(0.95) * (double) temp;
+        }
+        avgLatcy = avgLatcy / (double) totalInvoc;
+        kpLatcy = kpLatcy / (double) totalInvoc;
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
-        System.out.printf("Aborts/Failures %d/%d, ",
-                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Throughput %d/s, ", thruput);
+        System.out.printf("Aborts/Failures/Aborts %d/%d/%d, ",
+                invocAbrts, invocErrs, invocTimeOuts);
 
         // cast to stats.getAverageLatency from long to double
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n",
-                          (double)stats.getAverageLatency(),
-                          stats.kPercentileLatency(0.95));
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n",
+                          avgLatcy,
+                          kpLatcy);
 
     }
 
@@ -284,26 +323,52 @@ class NPBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public synchronized void printResults() throws Exception {
-        ClientStats stats = fullStatsContext.fetch().getStats();
+        long thruput = 0;
+        long invocErrs = 0, invocAbrts = 0, invocTimeOuts = 0;
+        double avgLatcy = 0.0, k95pLatcy = 0.0, k99pLatcy = 0.0, internalLatcy = 0.0;
+
+        long totalInvoc = 0;
+
+        for (int i = 0; i < config.clients; i++) {
+            ClientStats stats = fullStatsContexts[i].fetchAndResetBaseline().getStats();
+
+            thruput += stats.getTxnThroughput();
+            invocErrs += stats.getInvocationErrors();
+            invocAbrts += stats.getInvocationAborts();
+            invocTimeOuts += stats.getInvocationTimeouts();
+
+            long temp = stats.getInvocationsCompleted() + stats.getInvocationAborts() + stats.getInvocationErrors() + stats.getInvocationTimeouts();
+            totalInvoc += temp;
+
+            avgLatcy += stats.getAverageLatency() * (double) temp;
+            k95pLatcy += stats.kPercentileLatency(0.95) * (double) temp;
+            k99pLatcy += stats.kPercentileLatency(0.99) * (double) temp;
+            internalLatcy += stats.getAverageInternalLatency() * (double) temp;
+        }
+        avgLatcy = avgLatcy / (double) totalInvoc;
+        k95pLatcy = k95pLatcy / (double) totalInvoc;
+        k99pLatcy = k99pLatcy / (double) totalInvoc;
+        internalLatcy = internalLatcy / (double) totalInvoc;
+
 
         // Performance statistics
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Client Workload Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
+        System.out.printf("Average throughput:            %,9d txns/sec\n", thruput);
         // cast stats.getAverateLatency from long to double
-        System.out.printf("Average latency:               %,9.2f ms\n", (double)stats.getAverageLatency());
+        System.out.printf("Average latency:               %,9.2f ms\n", avgLatcy);
         //System.out.printf("Average latency:               %,9d ms\n", stats.getAverageLatency());
-        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
+        System.out.printf("95th percentile latency:       %,9.2f ms\n", k95pLatcy);
+        System.out.printf("99th percentile latency:       %,9.2f ms\n", k99pLatcy);
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
         // cast stats.getAverageInternalLatency from long to double
-        System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", (double)stats.getAverageInternalLatency());
+        System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", internalLatcy);
         //System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
 
         System.out.print("\n" + HORIZONTAL_RULE);
@@ -324,19 +389,19 @@ class NPBenchmark {
             fw = new FileWriter(config.statsfile);
 
             fw.append(String.format("%d,%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d\n",
-                stats.getStartTimestamp(),
-                stats.getDuration(),
-                stats.getInvocationsCompleted(),
-                stats.getTxnThroughput(),
-                stats.getAverageLatency(),
-                stats.getAverageInternalLatency(),
-                stats.kPercentileLatencyAsDouble(0.95),
-                stats.kPercentileLatencyAsDouble(0.99),
-                stats.kPercentileLatencyAsDouble(0.9999),
-                stats.kPercentileLatencyAsDouble(0.99999),
-                stats.getInvocationErrors(),
-                stats.getInvocationAborts(),
-                stats.getInvocationTimeouts()));
+                0,
+                config.duration,
+                totalInvoc,
+                thruput,
+                avgLatcy,
+                internalLatcy,
+                k95pLatcy,
+                k99pLatcy,
+                0.0,
+                0.0,
+                invocErrs,
+                invocAbrts,
+                invocTimeOuts));
 
             fw.flush();
             fw.close();
@@ -351,7 +416,7 @@ class NPBenchmark {
             Date now = new Date();
 
             // insert the card
-            client.callProcedure(new ProcCallback("CARD_ACCOUNT.insert"),
+            clients[0].callProcedure(new ProcCallback("CARD_ACCOUNT.insert"),
                                  "CARD_ACCOUNT.insert",
                                  pan,
                                  1, // ACTIVE
@@ -375,51 +440,53 @@ class NPBenchmark {
         double count = ((double) config.cardcount) * (1.0 - config.skew);
         int offset = (int) (((double) config.cardcount) / 2.0 - count / 2.0);
 
-        // SP transaction
-        if (rand.nextDouble() < config.sprate) {
-            String pan1 = generate16DString(rand.nextInt(config.cardcount));
-            String pan2 = generate16DString(rand.nextInt(config.cardcount));
-
-            client.callProcedure(new ProcCallback("Authorize"),
-                                 "Authorize",
-                                 pan1,
-                                 1,
-                                 "USD"
-                                 );
-            client.callProcedure(new ProcCallback("Redeem"),
-                                 "Redeem",
-                                 pan1,
-                                 1,
-                                 "USD",
-                                 1
-                                 );
-        } else {
-            for (int i = 0; i < 2; i++) {
-                // 2P transaction
+        for (int num = 0; num < config.clients; num++) {
+            // SP transaction
+            if (rand.nextDouble() < config.sprate) {
                 String pan1 = generate16DString(rand.nextInt(config.cardcount));
-                String pan2 = generate16DString(rand.nextInt((int) count) + offset);    // a smaller range of entities
+                String pan2 = generate16DString(rand.nextInt(config.cardcount));
 
-                client.callProcedure(new ProcCallback("Transfer",10000),
-                                        "Transfer",
-                                        pan1,
-                                        pan2,
-                                        rand.nextDouble() < 0.5 ? -1 : 1,   // random transfer direction
-                                        "USD"
-                                        );
+                clients[num].callProcedure(new ProcCallback("Authorize"),
+                                    "Authorize",
+                                    pan1,
+                                    1,
+                                    "USD"
+                                    );
+                clients[num].callProcedure(new ProcCallback("Redeem"),
+                                    "Redeem",
+                                    pan2,
+                                    1,
+                                    "USD",
+                                    1
+                                    );
+            } else {
+                for (int i = 0; i < 2; i++) {
+                    // 2P transaction
+                    String pan1 = generate16DString(rand.nextInt(config.cardcount));
+                    String pan2 = generate16DString(rand.nextInt((int) count) + offset);    // a smaller range of entities
 
-                if (rand.nextDouble() < config.mprate) {
-                    // MP transaction
-                    int id1 = rand.nextInt(config.cardcount);
-                    int id2 = id1 + 2000 < config.cardcount ?
-                            id1 + 2000 : config.cardcount - 1;
+                    clients[num].callProcedure(new ProcCallback("Transfer",10000),
+                                            "Transfer",
+                                            pan1,
+                                            pan2,
+                                            rand.nextDouble() < 0.5 ? -1 : 1,   // random transfer direction
+                                            "USD"
+                                            );
 
-                    pan1 = generate16DString(id1);
-                    pan2 = generate16DString(id2);
+                    if (rand.nextDouble() < config.mprate) {
+                        // MP transaction
+                        int id1 = rand.nextInt(config.cardcount);
+                        int id2 = id1 + 2000 < config.cardcount ?
+                                id1 + 2000 : config.cardcount - 1;
 
-                    client.callProcedure(new ProcCallback("Select"),
-                                        "Select",
-                                        pan1,
-                                        pan2);
+                        pan1 = generate16DString(id1);
+                        pan2 = generate16DString(id2);
+
+                        clients[num].callProcedure(new ProcCallback("Select"),
+                                            "Select",
+                                            pan1,
+                                            pan2);
+                    }
                 }
             }
         }
@@ -456,8 +523,10 @@ class NPBenchmark {
         }
 
         // reset the stats after warmup
-        fullStatsContext.fetchAndResetBaseline();
-        periodicStatsContext.fetchAndResetBaseline();
+        for (int i = 0; i < config.clients; i++) {
+            fullStatsContexts[i].fetchAndResetBaseline();
+            periodicStatsContexts[i].fetchAndResetBaseline();
+        }
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
@@ -475,13 +544,17 @@ class NPBenchmark {
         timer.cancel();
 
         // block until all outstanding txns return
-        client.drain();
+        for (int i = 0; i < config.clients; i++) {
+            clients[i].drain();
+        }
 
         // print the summary results
         printResults();
 
         // close down the client connections
-        client.close();
+        for (int i = 0; i < config.clients; i++) {
+            clients[i].close();
+        }
     }
 
     // Generate a string containing 16 digits from the given integer
