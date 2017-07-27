@@ -493,7 +493,7 @@ public abstract class ProcedureCompiler {
                     throws VoltCompilerException {
         // parse the procedureInfo
         procedure.setSinglepartition(info.singlePartition);
-        if (!info.singlePartition) return;
+        if (!info.singlePartition && info.partitionInfo.length() == 0) return;
 
         parsePartitionInfo(compiler, db, procedure, info.partitionInfo);
         if (procedure.getPartitionparameter() >= paramTypes.length) {
@@ -1014,8 +1014,9 @@ public abstract class ProcedureCompiler {
             procedure.setPartitionparameter2(partitionClauseData.partitionParamIndex);
             procedure.setPartitioncolumn2(partitionClauseData.partitionColumn);
             procedure.setPartitiontable2(partitionClauseData.partitionTable);
-        }
 
-        // TODO: set the isSinglePartition to be false here ?
+            // TODO: set the isSinglePartition to be false here ?
+            procedure.setSinglepartition(false);
+        }
     }
 }
