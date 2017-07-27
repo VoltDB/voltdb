@@ -89,6 +89,7 @@ if __name__ == '__main__':
     arg = sys.argv[1]
     expectfail=False
     expected_status = 0
+    run_valgrind = True
     if arg == '--expect-fail=true':
         expectfail=True
         sys.argv.pop(1)
@@ -97,16 +98,20 @@ if __name__ == '__main__':
         expectfail=False
         sys.argv.pop(1)
         expected_status = 0
+    elif arg == '--just-read-file':
+        run_valgrind = False
     for arg in sys.argv:
         if arg.startswith('--xml-file='):
             xmlfile=arg[11:]
             break
-    testReturnStatus = subprocess.call(sys.argv[1:], shell=False)
+    if run_valgrind:
+        testReturnStatus = subprocess.call(sys.argv[1:], shell=False)
+    else:
+        testReturnStatus = 0
     if xmlfile:
+        result = XMLFile(xmlfile, expectfail)
+        result.readErrors()
+        result.printErrors()
         if (testReturnStatus == expected_status):
             os.remove(xmlfile)
-        else:
-            result = XMLFile(xmlfile, expectfail)
-            result.readErrors()
-            result.printErrors()
     sys.exit(testReturnStatus)

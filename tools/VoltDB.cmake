@@ -82,7 +82,12 @@ FUNCTION(COMPUTE_CORE_COUNT OUTPUT_VARIABLE)
   ENDIF()
 ENDFUNCTION()
 
-FUNCTION (ADD_TEST_PROGRAM TEST_NAME EXPECT_FAILURE OUTPUT_VAR)
+#
+# Parse the TEST_NAME and decide what directory the
+# source and executable should be in, what the command
+# should be and how to run it if it's a valgrind build.
+#
+FUNCTION (ADD_TEST_PROGRAM TEST_NAME EXPECT_FAILURE RUN_VALGRIND OUTPUT_VAR OUTPUT_TEST_NAME)
   # Split the name into path components.
   STRING(REGEX MATCHALL [^/]+ TEST_NAME_LIST ${TEST_NAME})
   # MESSAGE("TEST_NAME_LIST is ${TEST_NAME_LIST}")
@@ -101,7 +106,7 @@ FUNCTION (ADD_TEST_PROGRAM TEST_NAME EXPECT_FAILURE OUTPUT_VAR)
   ELSE()
     SET(GENERATED ".")
   ENDIF()
-  MESSAGE("TEST_NAME ${TEST_NAME}: GENERATED ${GENERATED}, DIR ${DIR}, TEST ${TEST}")
+  # MESSAGE("TEST_NAME ${TEST_NAME}: GENERATED ${GENERATED}, DIR ${DIR}, TEST ${TEST}")
   # Find if this test has been seen before.
   # If so it will be on the ALLTESTS list.
   LIST(FIND VOLTDB_TEST_ALLTESTS ${TEST} FIND_IDX)
@@ -117,16 +122,18 @@ FUNCTION (ADD_TEST_PROGRAM TEST_NAME EXPECT_FAILURE OUTPUT_VAR)
   IF (${FIND_IDX} LESS 0)
     LIST(APPEND VOLTDB_TEST_DIR_LIST ${DIR})
   ENDIF()
-  SET(VOLTDB_TESTDIR_${TEST} ${DIR} PARENT_SCOPE)
-  SET(VOLTDB_TESTGEN_${TEST} ${GENERATED} PARENT_SCOPE)
-  SET(VOLTDB_TESTFAIL_${TEST} ${EXPECT_FAILURE} PARENT_SCOPE)
+  SET("VOLTDB_TESTDIR_${TEST}" ${DIR} PARENT_SCOPE)
+  SET("VOLTDB_TESTGEN_${TEST}" ${GENERATED} PARENT_SCOPE)
+  SET("VOLTDB_TESTFAIL_${TEST}" ${EXPECT_FAILURE} PARENT_SCOPE)
+  SET("VOLTDB_RUNVALGRIND_${TEST}" ${RUN_VALGRIND} PARENT_SCOPE)
   SET(VOLTDB_TEST_DIR_LIST ${VOLTDB_TEST_DIR_LIST} PARENT_SCOPE)
+  SET(${OUTPUT_TEST_NAME} ${TEST} PARENT_SCOPE)
 ENDFUNCTION()
 
 FUNCTION(DEFINE_TEST TEST_NAME)
   SET(TEST_DIR ${VOLTDB_TESTDIR_${TEST_NAME}})
   SET(TEST_GEN ${VOLTDB_TESTGEN_${TEST_NAME}})
-  MESSAGE("Defining test ${TEST_DIR}/${TEST_NAME} (from ${TEST_GEN})")
+  # MESSAGE("Defining test ${TEST_DIR}/${TEST_NAME} (from ${TEST_GEN})")
   #
   # Define the test executable, and set the build-all-tests
   # depends on the test.  Remember the necessary include
@@ -172,25 +179,16 @@ FUNCTION(DEFINE_TEST TEST_NAME)
   # This allows us to run "make build-sometest" to build sometest.
   ADD_CUSTOM_TARGET(build-${TEST_NAME}
     DEPENDS ${TEST_NAME})
-  #
-  # We expect all the memleak tests to fail, except for
-  # the test no_losses.  It's possible, but not obvious,
-  # how to do this with a regular expression property
-  # on the test, but this seems more straightforward.
-  #
-  SET(WILL_FAIL FALSE)
-  LIST(FIND VOLTDB_FAILING_VALGRIND_DIRS ${TEST_DIR} VG_DIR_FAIL)
-  LIST(FIND VOLTDB_PASSING_VALGRIND_TESTS ${TEST_NAME} VG_TEST_PASS)
-  IF (${IS_VALGRIND_BUILD} AND (NOT (${VG_DIR_FAIL} LESS 0)))
-    IF (${VG_TEST_PASS} LESS 0)
-      SET (WILL_FAIL TRUE)
-    ENDIF()
-  ENDIF()
+  SET(WILL_FAIL ${VOLTDB_TESTFAIL_${TEST_NAME}})
   # If we are running a valgrind test, then calculate the
   # valgrind command.  The output variable, VALGRIND_EXE_CMD,
   # may be the same as TARGET_EXE or else it may be a call
   # to valgrind.
-  VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} ${WILL_FAIL} VALGRIND_EXE_CMD IS_VALGRIND_TEST)
+  IF (${VOLTDB_RUNVALGRIND_${TEST_NAME}})
+    VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} ${WILL_FAIL} VALGRIND_EXE_CMD IS_VALGRIND_TEST)
+  ELSE()
+    SET(VALGRIND_EXE_CMD ${TARGET_EXE_CMD})
+  ENDIF()
   # Some tests need to run python.  This needs to be
   # second because we want to run valgrind on the actual
   # test executable, TARGET_EXE_CMD, and not on python.

@@ -58,7 +58,6 @@ BANNER("Configuring the VoltDB Execution Engine Unit Tests.")
 #
 ########################################################################
 SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
-  harness_test/harness_tester
   catalog/catalog_test
   logging/logging_test
   memleaktests/no_losses
@@ -67,7 +66,6 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   common/PerFragmentStatsTest
   common/nvalue_test
   common/pool_test
-  common/serializeio_test
   common/tabletuple_test
   common/ThreadLocalPoolTest
   common/tupleschema_test
@@ -131,6 +129,10 @@ SET(VOLTDB_MANUAL_VALGRIND_FAILING_TEST_PROGRAMS
 #
 SET (VOLTDB_MANUAL_FAILING_TEST_PROGRAMS
   )
+SET (VOLTDB_NOVALGRIND_TEST_PROGRAMS
+  common/serializeio_test
+  harness_test/harness_tester
+  )
 #
 # Auto-generated test programs are created by calling a Java program
 # in the server.  The java class we run is named here.  We may
@@ -151,7 +153,7 @@ EXECUTE_PROCESS(
     OUTPUT_VARIABLE VOLTDB_GENERATED_TEST_PROGRAMS
   )
 STRING(STRIP "${VOLTDB_GENERATED_TEST_PROGRAMS}" VOLTDB_GENERATED_TEST_PROGRAMS)
-MESSAGE( "VOLTDB_GENERATED_TEST_PROGRAMS is ${VOLTDB_GENERATED_TEST_PROGRAMS}" )
+# MESSAGE( "VOLTDB_GENERATED_TEST_PROGRAMS is ${VOLTDB_GENERATED_TEST_PROGRAMS}" )
 
 #
 # The list of all test programs is the union of
@@ -168,29 +170,40 @@ SET(VOLTDB_TEST_DIR_LIST "")
 # it's expected to fail.
 #
 FOREACH(PROG ${VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS})
-  # FALSE means we don't expect a failure.
-  ADD_TEST_PROGRAM(${PROG} FALSE VOLTDB_TEST_PROGRAMS)
+  # FALSE TRUE means we don't expect a failure, run valgrind.
+  ADD_TEST_PROGRAM(${PROG} FALSE TRUE VOLTDB_TEST_PROGRAMS TEST)
 ENDFOREACH()
+FOREACH(PROG ${VOLTDB_GENERATED_TEST_PROGRAMS})
+  # FALSE TRUE means we don't expect a failure and run valgrind.
+  # The difference between this and the last one is that these
+  # are generated.
+  ADD_TEST_PROGRAM(${PROG} FALSE TRUE VOLTDB_TEST_PROGRAMS TEST)
+  # MESSAGE("TEST ${TEST} IS EXPECTED TO FAIL: ${VOLTDB_TESTFAIL_${TEST}}")
+  # MESSAGE("TEST ${TEST}: VOLTDB_TESTDIR_${TEST} == ${VOLTDB_TESTDIR_${TEST}}")
+  # MESSAGE("TEST ${TEST}: VOLTDB_TESTGEN_${TEST} == ${VOLTDB_TESTGEN_${TEST}}")
+ENDFOREACH()
+
 FOREACH(PROG ${VOLTDB_MANUAL_FAILING_TEST_PROGRAMS})
-  # FALSE means we don't expect a failure.
-  ADD_TEST_PROGRAM(${PROG} TRUE VOLTDB_TEST_PROGRAMS)
+  # TRUE TRUE means we do expect a failure, run valgrind.
+  ADD_TEST_PROGRAM(${PROG} TRUE TRUE VOLTDB_TEST_PROGRAMS TEST)
 ENDFOREACH()
 FOREACH(PROG ${VOLTDB_MANUAL_VALGRIND_FAILING_TEST_PROGRAMS})
   # If IS_VALGRIND_BUILD is TRUE then we
   # expect a failure.  Otherwise we don't.
-  ADD_TEST_PROGRAM(${PROG} ${IS_VALGRIND_BUILD} VOLTDB_TEST_PROGRAMS)
+  # The TRUE says to run valgrind.
+  ADD_TEST_PROGRAM(${PROG} ${IS_VALGRIND_BUILD} TRUE VOLTDB_TEST_PROGRAMS TEST)
 ENDFOREACH()
-FOREACH(PROG ${VOLTDB_GENERATED_TEST_PROGRAMS})
-  # FALSE means we don't expect a failure.
-  ADD_TEST_PROGRAM(${PROG} FALSE VOLTDB_TEST_PROGRAMS)
+FOREACH(PROG ${VOLTDB_NOVALGRIND_TEST_PROGRAMS})
+  # FALSE FALSE means we don't expect a failure, but don't run valgrind.
+  ADD_TEST_PROGRAM(${PROG} FALSE FALSE VOLTDB_TEST_PROGRAMS TEST)
 ENDFOREACH()
 
 ADD_LIBRARY(voltdb_test_harness
   OBJECT
   ${CMAKE_SOURCE_DIR}/tests/ee/harness)
 
-MESSAGE("VoltDB_Tests: PROJECT_NAME Is ${PROJECT_NAME}")
-MESSAGE("VoltDB_Tests: PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}")
+# MESSAGE("VoltDB_Tests: PROJECT_NAME Is ${PROJECT_NAME}")
+# MESSAGE("VoltDB_Tests: PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}")
 TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
   SYSTEM
   PUBLIC
@@ -254,7 +267,7 @@ ENDFOREACH()
 #
 ########################################################################
 
-MESSAGE("VOLTDB_TEST_ALLTESTS IS ${VOLTDB_TEST_ALLTESTS}")
+# MESSAGE("VOLTDB_TEST_ALLTESTS IS ${VOLTDB_TEST_ALLTESTS}")
 FOREACH (TEST_NAME ${VOLTDB_TEST_ALLTESTS})
   DEFINE_TEST(${TEST_NAME})
 ENDFOREACH()
