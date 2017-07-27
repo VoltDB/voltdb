@@ -665,10 +665,12 @@
                             unit = "Transactions/s"
                     }
                     else if(chartContainer == null){
-                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time" || d.series[0].key == "Total Processing Time" || d.series[0].key == "Processing Time Detail")
+                        if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time")
                             unit = " ms"
                         else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail")
                             unit = ""
+                        else if(d.series[0].key == "Total Processing Time" || d.series[0].key == "Processing Time Detail")
+                            unit =" s"
                         else
                             unit = " %"
                     }
@@ -766,7 +768,7 @@
                         .html("Total Processing Time")
 
                         trowEnter3.append("td")
-                            .html(VoltDbAnalysis.procedureValue[d.data.label].TOTAL_PROCESSING_TIME.toFixed(3) + " ms");
+                            .html(VoltDbAnalysis.procedureValue[d.data.label].TOTAL_PROCESSING_TIME.toFixed(3) + " s");
                     }
 
                     if(d.series[0].key != "Execution Time"){
@@ -9118,18 +9120,22 @@
                         .attr('dy', '.32em')
                         .attr('style', function(d, i){
                             if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Total Processing Time")
-                            && (VoltDbAnalysis.procedureValue[d.label].TOTAL_PROCESSING_TIME > VoltDbUI.getFromLocalStorage("totalProcessingTime")
-                            || VoltDbAnalysis.procedureValue[d.label].AVG > VoltDbUI.getFromLocalStorage("averageExecutionTime")))
+                            && VoltDbAnalysis.procedureValue[d.label].AVG > VoltDbUI.getFromLocalStorage("averageExecutionTime"))
                                 return "fill:#C12026"
                         })
                         .text(function (d, i) {
+                            var unit = " ";
+                            if(d.key == "Execution Time" || d.key == "Avg Execution Time")
+                                unit = "ms";
+                            else if (d.key == "Total Processing Time" || d.key == "Processing Time Detail")
+                                unit = "s";
                             var t = valueFormat(getY(d, i))
                                 , yerr = getYerr(d, i);
                             if (yerr === undefined)
-                                return t;
+                                return t + unit;
                             if (!yerr.length)
-                                return t + '±' + valueFormat(Math.abs(yerr));
-                            return t + '+' + valueFormat(Math.abs(yerr[1])) + '-' + valueFormat(Math.abs(yerr[0]));
+                                return (t + '±' + valueFormat(Math.abs(yerr))) + unit;
+                            return (t + '+' + valueFormat(Math.abs(yerr[1])) + '-' + valueFormat(Math.abs(yerr[0]))) + unit;
                         });
                     bars.select('foreignObject')
                         .attr("style", 'color:#C12026;font-size:25px;font-weight:600;cursor:default')
@@ -9138,8 +9144,7 @@
                         .attr('y', (x.rangeBand() / (data.length * 2)) -15)
                         .html(function (d, i){
                             if((d.key == "Execution Time" || d.key == "Frequency" || d.key == "Total Processing Time")
-                            && (VoltDbAnalysis.procedureValue[d.label].TOTAL_PROCESSING_TIME > VoltDbUI.getFromLocalStorage("totalProcessingTime")
-                            || VoltDbAnalysis.procedureValue[d.label].AVG > VoltDbUI.getFromLocalStorage("averageExecutionTime")))
+                            && VoltDbAnalysis.procedureValue[d.label].AVG > VoltDbUI.getFromLocalStorage("averageExecutionTime"))
                                 return "&#9888;";
                             else
                                 return "";
@@ -9151,12 +9156,10 @@
                     bars.watchTransition(renderWatch, 'multibarhorizontal: bars')
                         .select('foreignObject')
                         .attr('x', function (d, i) {
-                            var charLength = d.key != "Frequency" ? d.value.toFixed(3).toString().length : d.value.toString().length;
+                            var strLenForDec = d.value.toFixed(3).toString().length;
+                            var charLength = d.key != "Frequency" ? (d.key == "Total Processing Time" ? strLenForDec : strLenForDec +2) : d.value.toString().length;
                             var xLength = getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) + 16;
-                            if(d.key == "Total Processing Time")
-                                xLength += VoltDbAnalysis.proceduresCount > 1 ? (6.5 * charLength) : (6.5 * charLength);
-                            else
-                                xLength += (6.5 * charLength);
+                            xLength += (6.5 * charLength);
                             return xLength;
                         })
                 } else {

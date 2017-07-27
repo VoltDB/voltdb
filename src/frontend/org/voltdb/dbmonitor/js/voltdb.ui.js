@@ -2444,6 +2444,7 @@ var loadPage = function (serverName, portid) {
             for (var key in procDetails){
                 finalDetails.push({"label": key, "value": procDetails[key]})
             }
+            finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
             MonitorGraphUI.RefreshLatencyDetailGraph(finalDetails);
         }
     });
@@ -2506,6 +2507,7 @@ var loadPage = function (serverName, portid) {
             for (var key in freqDetails){
                 finalDetails.push({"label": key,"value": freqDetails[key]})
             }
+            finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
             MonitorGraphUI.RefreshFrequencyDetailGraph(finalDetails);
         }
     });
@@ -2577,8 +2579,9 @@ var loadPage = function (serverName, portid) {
                 }
             }
             for (var key in combinedDetails){
-                finalDetails.push({"label": key,"value": combinedDetails[key]})
+                finalDetails.push({"label": key,"value": combinedDetails[key]/1000})
             }
+            finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
             MonitorGraphUI.RefreshCombinedDetailGraph(finalDetails);
         }
     });
@@ -2650,7 +2653,6 @@ var loadPage = function (serverName, portid) {
 
     $("#btnThreshold").popup({
         open: function (event, ui, ele) {
-            $("#partitionThreshold").val(VoltDbUI.getFromLocalStorage("totalProcessingTime"))
             $("#averageExecutionTime").val(VoltDbUI.getFromLocalStorage("averageExecutionTime"))
             $("#trShowHideSysProcedures").remove();
             $("#tblAnalysisSettings").append('<tr id="trShowHideSysProcedures">' +
@@ -2668,7 +2670,6 @@ var loadPage = function (serverName, portid) {
             var popup = $(this)[0];
             $("#btnSaveThreshold").unbind("click");
             $("#btnSaveThreshold").on("click", function () {
-                saveInLocalStorage("totalProcessingTime", $("#partitionThreshold").val())
                 saveInLocalStorage("averageExecutionTime", $("#averageExecutionTime").val())
                 saveInLocalStorage("showHideSysProcedures", $("#chkSystemProcedure").is(':checked'))
                 $("#btnAnalyzeNow").trigger("click");
