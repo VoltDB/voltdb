@@ -25,6 +25,7 @@ package metrocard;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,8 +55,6 @@ public class MetroSimulation {
 
     private Random rand = new Random();
 
-    // for random data generation
-    private RandomCollection<Integer> stations = new RandomCollection<Integer>();
     int[] balances = {5000,2000,1000,500};
     Calendar cal = Calendar.getInstance();
     int cardCount = 0;
@@ -82,7 +81,10 @@ public class MetroSimulation {
         String broker = "localhost:9092";
 
         @Option(desc = "Number of activities per train.")
-        long count = 5000000;
+        long count = 5000;
+
+        @Option(desc = "Number of Cards. If you loaded cards via csv make sure you use that number.")
+        int cardcount = 500000;
 
         @Option(desc = "Swipes are posted to this topic.")
         String swipe = "card_swipes";
@@ -97,7 +99,7 @@ public class MetroSimulation {
     }
 
     public static class RandomCollection<E> {
-        private final NavigableMap<Double, E> map = new TreeMap<Double, E>();
+        private final NavigableMap<Double, E> map = new TreeMap<>();
         private final Random random;
         private double total = 0;
 
@@ -138,25 +140,25 @@ public class MetroSimulation {
         System.out.println(config.getConfigDumpString());
     }
 
-    public static final Map<Integer,Integer> stationToNextTimeIn = new HashMap<>();
+    public static final Map<Integer,Integer> SATION_TO_NEXT_STATION = new HashMap<>();
     static {
-        stationToNextTimeIn.put(1, 2*60000);
-        stationToNextTimeIn.put(2, 2*60000);
-        stationToNextTimeIn.put(3, 3*60000);
-        stationToNextTimeIn.put(4, 4*60000);
-        stationToNextTimeIn.put(5, 2*60000);
-        stationToNextTimeIn.put(6, 2*60000);
-        stationToNextTimeIn.put(7, 1*60000);
-        stationToNextTimeIn.put(8, 2*60000);
-        stationToNextTimeIn.put(9, 2*60000);
-        stationToNextTimeIn.put(10,2*60000);
-        stationToNextTimeIn.put(11,2*60000);
-        stationToNextTimeIn.put(12,2*60000);
-        stationToNextTimeIn.put(13,2*60000);
-        stationToNextTimeIn.put(14,3*60000);
-        stationToNextTimeIn.put(15,2*60000);
-        stationToNextTimeIn.put(16,3*60000);
-        stationToNextTimeIn.put(17,3*60000);
+        SATION_TO_NEXT_STATION.put(1, 2*60000);
+        SATION_TO_NEXT_STATION.put(2, 2*60000);
+        SATION_TO_NEXT_STATION.put(3, 3*60000);
+        SATION_TO_NEXT_STATION.put(4, 4*60000);
+        SATION_TO_NEXT_STATION.put(5, 2*60000);
+        SATION_TO_NEXT_STATION.put(6, 2*60000);
+        SATION_TO_NEXT_STATION.put(7, 1*60000);
+        SATION_TO_NEXT_STATION.put(8, 2*60000);
+        SATION_TO_NEXT_STATION.put(9, 2*60000);
+        SATION_TO_NEXT_STATION.put(10,2*60000);
+        SATION_TO_NEXT_STATION.put(11,2*60000);
+        SATION_TO_NEXT_STATION.put(12,2*60000);
+        SATION_TO_NEXT_STATION.put(13,2*60000);
+        SATION_TO_NEXT_STATION.put(14,3*60000);
+        SATION_TO_NEXT_STATION.put(15,2*60000);
+        SATION_TO_NEXT_STATION.put(16,3*60000);
+        SATION_TO_NEXT_STATION.put(17,3*60000);
     }
 
 
@@ -175,6 +177,7 @@ public class MetroSimulation {
             m_producer = new KafkaProducer<>(m_producerConfig);
         }
 
+        protected abstract boolean doEnd();
         protected abstract void initialize();
         protected void close() {
             try {
@@ -194,10 +197,20 @@ public class MetroSimulation {
             try {
                 while (m_currentCount < m_totalCount) {
                     ProducerRecord<String, String> record = getNextRecord();
-                    m_producer.send(record);
-                    m_currentCount++;
+                    if (record != null) {
+                        m_producer.send(record);
+                        m_currentCount++;
+                    } else {
+                        //If we didnt get record that may be on purpose so wait.
+                        Thread.yield();
+                        Thread.sleep(200);
+                    }
+                    if (doEnd()) {
+                        System.out.println("Finishing on request.");
+                        break;
+                    }
                 }
-            } catch (Exception ex) {
+            } catch (InterruptedException ex) {
                 ex.printStackTrace();
             } finally {
                 close();
@@ -231,6 +244,11 @@ public class MetroSimulation {
         }
 
         @Override
+        protected boolean doEnd() {
+            return false;
+        }
+
+        @Override
         protected ProducerRecord<String, String> getNextRecord() {
             StringBuilder sb = new StringBuilder();
             long eventTime = startTime;
@@ -238,7 +256,7 @@ public class MetroSimulation {
                     .append(Integer.valueOf(curStation)).append(",")
                     .append(Integer.valueOf(lastState)).append(",")
                     .append(Long.valueOf(eventTime));
-            ProducerRecord<String, String> rec = new ProducerRecord<String, String>(m_config.trains, m_trainId, sb.toString());
+            ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.trains, m_trainId, sb.toString());
             curStation += direction*1;
             long wtime = stopTime;
             if (curStation > 17) {
@@ -253,7 +271,7 @@ public class MetroSimulation {
             if (lastState == 0) { //Stopped
                 startTime = startTime + wtime;
             } else { //Moving and arriving
-                startTime = startTime + stationToNextTimeIn.get(curStation) + wtime;
+                startTime = startTime + SATION_TO_NEXT_STATION.get(curStation) + wtime;
             }
             if (lastState == 0) {
                 lastState = 1;
@@ -266,20 +284,98 @@ public class MetroSimulation {
 
     }
 
+    Map<Integer,Long> cardsEntered = Collections.synchronizedMap(new HashMap<>());
     class SwipeActivityPublisher extends KafkaPublisher {
+        private final Random rand = new Random();
+        private final int max_station_id = 17;
+        private final RandomCollection<Integer> stations = new RandomCollection<>();
+        public long startTime;
+        public long swipeTime;
+        final MetroCardConfig m_config;
+        final int activity_code;
+        boolean massReached = false;
+        public boolean close = false;
 
-        SwipeActivityPublisher(MetroCardConfig config, Properties producerConfig, int count) {
+        SwipeActivityPublisher(MetroCardConfig config, int activity, Properties producerConfig, long count) {
             super(producerConfig, count);
+            activity_code = activity;
+            m_config = config;
+        }
+
+        @Override
+        protected boolean doEnd() {
+            if (activity_code == 0) return false;
+            return (close && cardsEntered.size() <= 1);
         }
 
         @Override
         protected void initialize() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            stations.add(242200,1);
+            stations.add(325479,2);
+            stations.add(221055,3);
+            stations.add(581530,4);
+            stations.add(406389,5);
+            stations.add(375640,6);
+            stations.add(259210,7);
+            stations.add(412809,8);
+            stations.add(496942,9);
+            stations.add(559110,10);
+            stations.add(131022,11);
+            stations.add(145955,12);
+            stations.add(207333,13);
+            stations.add(56457,14);
+            stations.add(122236,15);
+            stations.add(51981,16);
+            stations.add(203866,17);
+            startTime = System.currentTimeMillis();
+            if (activity_code == 0)
+                swipeTime = startTime;
+            else
+                swipeTime = startTime + 120000; // Exit time minimum after frst station.
         }
 
         @Override
         protected ProducerRecord<String, String> getNextRecord() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            int card_id = -1;
+            long atime;
+            if (activity_code == 0)  {
+                atime = swipeTime;
+                while (card_id == -1) {
+                    card_id = rand.nextInt(cardCount+1000); // use +1000 so sometimes we get an invalid card_id
+                    if (cardsEntered.containsKey(card_id)) {
+                        card_id = -1;
+                        continue;
+                    }
+                    cardsEntered.put(card_id, System.currentTimeMillis());
+                }
+            } else {
+                if (!close) {
+                    if (cardsEntered.size() < 100) return null;
+                }
+                if (cardsEntered.size() <= 1) return null;
+                Integer r = (Integer )cardsEntered.keySet().toArray()[rand.nextInt(cardsEntered.size()-1)];
+                long st = cardsEntered.get(r);
+                cardsEntered.remove(r);
+                card_id = r;
+                //Longest journy is 39 min so pick a random exit time from start.
+                atime = st + (rand.nextInt(36)*60000);
+            }
+
+            //Get a station.
+            int station_id;
+            if (rand.nextInt(5) == 0) {
+                station_id = rand.nextInt(max_station_id); // sometimes pick a random station
+            } else {
+                station_id = stations.next(); // pick a station based on the weights
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append(Integer.valueOf(card_id)).append(",")
+                    .append(Integer.valueOf(station_id)).append(",")
+                    .append(Integer.valueOf(activity_code)).append(",")
+                    .append(Long.valueOf(atime));
+            ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.trains, String.valueOf(card_id), sb.toString());
+            System.out.println(sb.toString());
+            return rec;
         }
 
     }
@@ -299,11 +395,18 @@ public class MetroSimulation {
 
         String trains[] = { "1", "2", "3", "4" };
         List<TrainActivityPublisher> trainPubs = new ArrayList<>();
-        for (int i = 0; i < trains.length; i++) {
-            TrainActivityPublisher redLine = new TrainActivityPublisher(trains[i], config, producerConfig, config.count);
+        for (String train : trains) {
+            TrainActivityPublisher redLine = new TrainActivityPublisher(train, config, producerConfig, config.count);
             redLine.start();
             trainPubs.add(redLine);
         }
+        SwipeActivityPublisher entry = new SwipeActivityPublisher(config, 0, producerConfig, config.count);
+        entry.start();
+        SwipeActivityPublisher exit = new SwipeActivityPublisher(config, 1, producerConfig, config.count);
+        exit.start();
+        entry.join();
+        exit.close = true;
+        exit.join();
         for (TrainActivityPublisher redLine : trainPubs) {
             redLine.join();
         }
