@@ -524,7 +524,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // write the new catalog to a temporary jar file
         errMsg = verifyAndWriteCatalogJar(ccr);
         if (errMsg != null) {
-            hostLog.error("Catalog jar verification and/or jar writes faile. " + errMsg);
+            hostLog.error("Catalog jar verification and/or jar writes failed: " + errMsg);
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
@@ -542,7 +542,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
         long genId = getNextGenerationId();
         try {
-            CatalogUtil.updateCatalogToZK(zk, genId, ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes);
+            CatalogUtil.updateCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId,
+                    ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes);
         } catch (KeeperException | InterruptedException e) {
             errMsg = "error writing catalog bytes on ZK";
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
@@ -563,6 +564,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                              ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                              ccr.hasSchemaChange ?  1 : 0,
                              ccr.requiresNewExportGeneration ? 1 : 0);
+    }
+
+    protected void logCatalogUpdateInvocation(String procName) {
+        if (getProcedureRunner().isUserAuthEnabled()) {
+            String warnMsg = "A user from " + getProcedureRunner().getConnectionIPAndPort() +
+                             " issued a " + procName + " to update the catalog.";
+            hostLog.info(warnMsg);
+        }
     }
 
 }

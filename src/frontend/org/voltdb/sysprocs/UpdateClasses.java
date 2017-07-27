@@ -44,6 +44,8 @@ public class UpdateClasses extends UpdateApplicationBase {
                     "to change application schema.  Use of @UpdateClasses is forbidden.");
         }
 
+        logCatalogUpdateInvocation("@UpdateClasses");
+
         return updateApplication("@UpdateClasses",
                                 jarfileBytes,
                                 classesToDeleteSelector,

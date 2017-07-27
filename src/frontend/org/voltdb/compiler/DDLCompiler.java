@@ -657,12 +657,6 @@ public class DDLCompiler {
         }
     }
 
-    public static class CreateProcedurePartitionData {
-        String tableName = null;
-        String columnName = null;
-        String parameterNo = null;
-    }
-
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
             throws VoltCompilerException {
         // skip checking for non-unique indexes.
