@@ -102,7 +102,9 @@
 <property name='cmake.generator'             value='Unix Makefiles' />
 <property name='cmake.build.obj'             value='${build.dir}' />
 <property name='cmake.build.tool'            value='${base.dir}/tools/build_cmake.py' />
-<property name='cmake.build.verbose'         value='no' />
+<property name='cmake.verbose.build'         value='yes' />
+<property name='cmake.verbose.config'        value='yes' />
+<property name='cmake.build.maxcores'        value='1' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -1419,7 +1421,9 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--verbose-build='${cmake.build.verbose}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
     </exec>
 </target>
 
@@ -1432,7 +1436,9 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--verbose-build='${cmake.build.verbose}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
         <arg line="--run-all-tests" />
     </exec>
 </target>
@@ -1446,7 +1452,9 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--verbose-build='${cmake.build.verbose}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
         <arg line="--build-tests" />
     </exec>
 </target>
@@ -1460,7 +1468,9 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--verbose-build='${cmake.build.verbose}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
         <arg line="--install-ipc" />
     </exec>
 </target>
@@ -1474,7 +1484,9 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--verbose-build='${cmake.build.verbose}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
         <arg line="--install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
@@ -1489,7 +1501,9 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--verbose-build='${cmake.build.verbose}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
         <arg line="--profile" />
         <arg line="--install" />
     </exec>
@@ -1505,7 +1519,9 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--verbose-build='${cmake.build.verbose}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
         <arg line="--coverage" />
         <arg line="--install" />
     </exec>

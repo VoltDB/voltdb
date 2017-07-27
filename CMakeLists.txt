@@ -36,6 +36,21 @@
 #       be packaged up, and this requires the shared library from
 #       the VoltDB_EE package.  So this is a separate CMake project.
 #
+# The two output artifacts are:
+#   1.) The jni library, which will be in
+#           obj/${BUILD}/ee/nativelibs/libvoltdb-VERSION.so
+#       for Linux and
+#           obj/${BUILD}/ee/nativelibs/libvoltdb-VERSION.dylib
+#       for Darwin.
+#   2.) The voltdbipcrun program, which is used for memory leak detection,
+#       and to debug this EE.  This will be found in
+#           obj/${BUILD}/ee/prod/voltdbipcrun
+#       on both Linux and Darwin.
+#
+# The main way to build this, and the procedure the ant build uses,
+# is to run "tools/build_cmake.py".  Run this command with --help
+# for details.
+#
 # To use this standalone, in the root of the voltdb hierarchy, run this
 # procedure. All files are relative to the VoltDB source tree root.  This
 # is the directory which contains src, test, voltdb and the VoltDB
@@ -57,8 +72,8 @@
 #       may produce faster builds, or they may just gum things up.
 #       If you use N=50 you will have to reboot your computer.  Really.
 #   5.) If this succeeds, then the build artifacts will be placed in
-#       obj/ee/${BUILD}/nativelibs and obj/ee/${BUILD}/prod.  The tests
-#       are not built this way.
+#       obj/${BUILD}/nativelibs and obj/${BUILD}/prod.  The tests
+#       are not built at this point.
 #   6.) There are several ways to build and run tests.  Tests are grouped
 #       into directories.  You can build and run individual tests, all tests
 #       in a directory and all tests.
@@ -67,19 +82,10 @@
 #       c.) To run all tests is a director run "make run-TESTDIR"
 #       d.) To build but not run tests, use the commands above, but
 #           use build- rather than run-.
-#       Note that in memcheck builds we run under valgrind.
-#       Note also that no output is shown unless the tests fail.
-#
-# The two artifacts are:
-#   1.) The jni library, which will be in
-#           obj/${BUILD}/ee/nativelibs/libvoltdb-VERSION.so
-#       for Linux and
-#           obj/${BUILD}/ee/nativelibs/libvoltdb-VERSION.dylib
-#       for Darwin.
-#   2.) The voltdbipcrun program, which is used for memory leak detection,
-#       and to debug this EE.  This will be found in
-#           obj/${BUILD}/ee/prod/voltdbipcrun
-#       on both Linux and Darwin.
+#       Note that in memcheck builds we run under valgrind.  The test
+#       system knows how to do this. Note also that no output is shown
+#       from any test unless the test fails.  If you run the test
+#       executable you can see the test output.
 #
 # Just to review the way CMake works:
 #    a. CMake is best thought of as a functional language which describes
@@ -198,126 +204,11 @@ ENDIF()
 
 ########################################################################
 #
-# Common Compiler Flags
-#
-########################################################################
-IF (IS_VALGRIND_BUILD)
-  ADD_COMPILE_OPTIONS(-g3 -DDEBUG -DMEMCHECK )
-  SET (VOLTDB_USE_VALGRIND --valgrind)
-ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "DEBUG")
-  ADD_COMPILE_OPTIONS(-g3 -DDEBUG)
-ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "RELEASE")
-  ADD_COMPILE_OPTIONS(-O3 -mmmx -msse -msse2 -msse3 -DNDEBUG)
-ELSE()
-  MESSAGE(FATAL_ERROR "BUILD TYPE ${VOLTDB_BUILD_TYPE} IS UNKNOWN.")
-ENDIF()
-
-COMPUTE_CORE_COUNT(VOLTDB_CORE_COUNT)
-# MESSAGE("VOLTDB_CORE_COUNT IS ${VOLTDB_CORE_COUNT}")
-
-########################################################################
-#
 # Encapsulate the compilation flags and definitions in one place.
 #
 ########################################################################
 INCLUDE(tools/VoltDBCompilation.cmake)
 
-
-########################################################################
-#
-# The external projects are used in testing and EE shared objects.
-# So we need to build them here and share them.
-#
-########################################################################
-#
-# Go and build the pcre2 library.
-# We have to untar it and configure it.  We will
-# do this at build time.
-#
-########################################################################
-SET (VOLTDB_PCRE2_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/pcre2)
-SET (VOLTDB_PCRE2_VERSION 10.10)
-SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
-SET (VOLTDB_PCRE2_TARBALL ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs/${VOLTDB_PCRE2_NAME}.tgz)
-SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_PREFIX}/src/${VOLTDB_PCRE2_NAME})
-SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
-
-BANNER("Describing PCRE2"
-       "  PREFIX at ${VOLTDB_PCRE2_PREFIX}"
-       "  SOURCE at ${VOLTDB_PCRE2_SRC}"
-       "  BINARY at ${VOLTDB_PCRE2_OBJ}"
-       "  TARBALL at ${VOLTDB_PCRE2_TARBALL}"
-       "  CONFIGURE_COMMAND: ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${CMAKE_BINARY_DIR}/3pty-install"
-   )
-ExternalProject_Add(pcre2
-  PREFIX ${VOLTDB_PCRE2_PREFIX}
-  URL ${VOLTDB_PCRE2_TARBALL}
-  SOURCE_DIR ${VOLTDB_PCRE2_SRC}
-  BINARY_DIR ${VOLTDB_PCRE2_OBJ}
-  CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${CMAKE_BINARY_DIR}/3pty-install
-  BUILD_COMMAND make
-  INSTALL_COMMAND make install)
-
-########################################################################
-#
-# Go and build the openssl library.  We only use this
-# for the arbitrary precision arithmetic code, which
-# S2GEO uses.
-#
-########################################################################
-SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
-SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
-SET (VOLTDB_OPENSSL_TARBALL ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs/${VOLTDB_OPENSSL_NAME}.tgz)
-SET (VOLTDB_OPENSSL_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/openssl)
-# Binary and source are the same for openssl.  There
-# are not obvious ways to do out-of-tree builds.
-SET (VOLTDB_OPENSSL_SRC ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
-SET (VOLTDB_OPENSSL_OBJ ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
-
-BANNER("Describing CRYPTO"
-       "  PREFIX at ${VOLTDB_OPENSSL_PREFIX}"
-       "  SOURCE at ${VOLTDB_OPENSSL_SRC}"
-       "  BINARY at ${VOLTDB_OPENSSL_OBJ}"
-       "  TARBALL at ${VOLTDB_OPENSSL_TARBALL}"
-       "  CONFIGURE_COMMAND: ./Configure --prefix=${CMAKE_BINARY_DIR}/3pty-install ${VOLTDB_OPENSSL_TOKEN}"
-   )
-ExternalProject_Add(crypto
-  PREFIX ${VOLTDB_OPENSSL_PREFIX}
-  URL ${VOLTDB_OPENSSL_TARBALL}
-  SOURCE_DIR ${VOLTDB_OPENSSL_SRC}
-  BINARY_DIR ${VOLTDB_OPENSSL_OBJ}
-  CONFIGURE_COMMAND ./Configure --prefix=${CMAKE_BINARY_DIR}/3pty-install ${VOLTDB_OPENSSL_TOKEN}
-  BUILD_COMMAND make
-  INSTALL_COMMAND make install)
-
-########################################################################
-#
-# Go and build the S2GEO library.
-#
-########################################################################
-SET (VOLTDB_S2GEO_SRC "${CMAKE_SOURCE_DIR}/third_party/cpp/google-s2-geometry")
-SET (VOLTDB_S2GEO_OBJ ${CMAKE_BINARY_DIR}/3pty-obj/google-s2-geometry)
-SET (VOLTDB_S2GEO_CMAKE_CONFIG
-  -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
-  -DVOLTDB_THIRD_PARTY_CPP_DIR=${CMAKE_SOURCE_DIR}/third_party/cpp
-  -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/3pty-install
-  -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
-SET (VOLTDB_S2GEO_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj)
-
-BANNER("Describing S2GEO"
-       "  PREFIX at ${VOLTDB_S2GEO_PREFIX}"
-       "  SOURCE at ${VOLTDB_S2GEO_SRC}"
-       "  BINARY at ${VOLTDB_S2GEO_OBJ}"
-       "  CMAKE_ARGS: ${VOLTDB_S2GEO_CMAKE_CONFIG}"
-       "  CMAKE_GENERATOR: ${CMAKE_GENERATOR}"
-   )
-ExternalProject_Add(s2geo
-  DEPENDS crypto
-  PREFIX ${VOLTDB_S2GEO_PREFIX}
-  SOURCE_DIR ${VOLTDB_S2GEO_SRC}
-  CMAKE_ARGS ${VOLTDB_S2GEO_CMAKE_CONFIG}
-  CMAKE_GENERATOR ${CMAKE_GENERATOR}
-  BINARY_DIR ${VOLTDB_S2GEO_OBJ})
 
 ########################################################################
 #

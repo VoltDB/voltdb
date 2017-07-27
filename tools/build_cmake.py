@@ -64,8 +64,12 @@ def makeParser():
                         If this option is included then all test output will be shown, even if
                         the tests pass.
                         ''')
+    parser.add_argument('--verbose-config',
+                        default='no',
+                        help='''
+                        Use verbose builds when building.
+                        ''')
     parser.add_argument('--verbose-build',
-                        dest='verbose_build',
                         default='no',
                         help='''
                         Use verbose builds when building.
@@ -95,6 +99,7 @@ def makeParser():
                         ''')
     parser.add_argument('--max-processors',
                         dest='max_processors',
+                        type=int,
                         default=-1,
                         help='''
                         Specify the maximum number of processors.  By default we use
@@ -236,6 +241,7 @@ def deleteDirectory(dirname, config):
 def getNumberProcessors(config):
     # np is the number of cores to use.
     np = multiprocessing.cpu_count()
+    print("config.max_processors is %s" % config.max_processors)
     if np < 1:
         np = 1
         if 0 < config.max_processors:
@@ -247,6 +253,7 @@ def getNumberProcessors(config):
         # If we have a core count but the user gave us one
         # which is smaller then use the user's number.
         np = config.max_processors
+    print("getNumberProcessors returns %d" % np)
     return np
 
 ########################################################################
@@ -257,16 +264,15 @@ def getNumberProcessors(config):
 ########################################################################
 def makeBuilderCall(config):
     np = getNumberProcessors(config)
-    verbose = (config.verbose_build == 'yes')
     if config.generator.endswith('Unix Makefiles'):
         return "make -j%d %s" % (
             np,
-            "VERBOSE=1" if verbose else ""
+            "VERBOSE=1" if config.verbose_build == 'yes' else ''
         )
     elif config.generator.endswith('Ninja'):
         return "ninja -j %d " % (
             np,
-            "-v" if verbose else ""
+            "-v" if config.verbose_build == 'yes' else ""
         )
     else:
         print('Unknown generator \'%s\'' % config.generator)
@@ -287,8 +293,9 @@ def configureCommandString(config):
         cmakeBuildType="Debug"
     else:
         cmakeBuildType="Release"
-    return 'cmake -DCMAKE_BUILD_TYPE=%s -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s -DVOLT_LOG_LEVEL=%s %s' \
-             % (cmakeBuildType, config.buildtype, config.generator, coverage, profile, config.log_level, config.srcdir)
+    verbose = "--debug" if config.verbose_config == 'yes' else ''
+    return 'cmake %s -DCMAKE_BUILD_TYPE=%s -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s -DVOLT_LOG_LEVEL=%s %s' \
+             % (verbose, cmakeBuildType, config.buildtype, config.generator, coverage, profile, config.log_level, config.srcdir)
 
 ########################################################################
 #
@@ -331,6 +338,12 @@ def buildCommandString(config):
     return cmdstr
 
 def runCommand(commandStr, config):
+    print("########################################################################")
+    print("#")
+    print("# Running command '%s'" % commandStr)
+    print("#")
+    print("########################################################################")
+    sys.stdout.flush()
     if config.debug:
         print(commandStr)
         return (True, 0)
@@ -424,8 +437,8 @@ def doConfigure(config):
     # We always want to do this.
     #
     configCmd = configureCommandString(config)
-    (retval, success) = runCommand(configCmd, config);
-    if success:
+    (success, retval) = runCommand(configCmd, config);
+    if not success:
         print("Cmake command \"%s\" failed, return status %d."
               % (configCmd, retval))
         sys.exit(100)

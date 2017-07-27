@@ -12,6 +12,22 @@
 # other linker options.
 #
 ########################################################################
+########################################################################
+#
+# Common Compiler Flags
+#
+########################################################################
+IF (IS_VALGRIND_BUILD)
+  ADD_COMPILE_OPTIONS(-g3 -DDEBUG -DMEMCHECK )
+  SET (VOLTDB_USE_VALGRIND --valgrind)
+ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "DEBUG")
+  ADD_COMPILE_OPTIONS(-g3 -DDEBUG)
+ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "RELEASE")
+  ADD_COMPILE_OPTIONS(-O3 -mmmx -msse -msse2 -msse3 -DNDEBUG)
+ELSE()
+  MESSAGE(FATAL_ERROR "BUILD TYPE ${VOLTDB_BUILD_TYPE} IS UNKNOWN.")
+ENDIF()
+
 ADD_COMPILE_OPTIONS(
   -Wall -Wextra -Werror -Woverloaded-virtual
   -Wpointer-arith -Wcast-qual -Wwrite-strings
@@ -23,6 +39,7 @@ ADD_COMPILE_OPTIONS(
   -Wno-deprecated-declarations  -Wno-unknown-pragmas
   -Wno-ignored-qualifiers -fno-strict-aliasing
   -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}
+  -D_USE_MATH_DEFINES
 )
 
 # Set coverage and profiling options

@@ -57,7 +57,7 @@ ENDIF()
 
 ########################################################################
 #
-# This CMakeLists.txt file describes the builds for VoltDB.
+# This CMakeLists.txt file describes the builds for the VoltDB Runtime.
 #
 # There are a few rules which may make things be more organized.
 # 1. All variables defined here should start with VOLTDB_, with a few
@@ -82,24 +82,6 @@ ENDIF()
 #                           by the third party install procedures,
 #                           but we don't care about anything but the
 #                           static libraries and includes.
-# 3. Just to review the way CMake works:
-#    a. CMake is best thought of as a functional language which describes
-#       the artifacts to be built by describing their constituents.
-#    b. Artifacts are called *targets*.  Targets can be libraries or
-#       executables.  We can also add tests.  These three are created
-#       with ADD_LIBRARY, ADD_EXECUTABLE and ADD_TEST.  No tests
-#       are built here, though.
-#    c. There are three kinds of library, SHARED, STATIC and OBJECT.
-#       SHARED is the usual dynamically linked library, denoted by a
-#       .so or .dylib suffix.  STATIC libraries are the usual .a
-#       archives, though we don't use these here.  OBJECT libraries,
-#       which we do use, are just sets of .o object files which
-#       CMake manages for us with a single name.
-#    d. Targets have properties, like compilation flags, link libraries
-#       and include directories.  These are associated with a target
-#       using ADD_COMPILE_OPTIONS, TARGET_LINK_LIBRARIES and
-#       TARGET_INCLUDE_DIRECTORIES.  Tests have names and other
-#       properties.
 ########################################################################
 #
 # Options.
@@ -110,6 +92,97 @@ ENDIF()
 ########################################################################
 OPTION(VOLTDB_USE_COVERAGE "Build for coverage analysis" OFF)
 OPTION(VOLTDB_USE_PROFILING "Build for profiling analysis" OFF)
+
+########################################################################
+#
+# Go and build the pcre2 library.
+# We have to untar it and configure it.  We will
+# do this at build time.
+#
+########################################################################
+SET (VOLTDB_PCRE2_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/pcre2)
+SET (VOLTDB_PCRE2_VERSION 10.10)
+SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
+SET (VOLTDB_PCRE2_TARBALL ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs/${VOLTDB_PCRE2_NAME}.tgz)
+SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_PREFIX}/src/${VOLTDB_PCRE2_NAME})
+SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
+
+BANNER("Describing PCRE2"
+       "  PREFIX at ${VOLTDB_PCRE2_PREFIX}"
+       "  SOURCE at ${VOLTDB_PCRE2_SRC}"
+       "  BINARY at ${VOLTDB_PCRE2_OBJ}"
+       "  TARBALL at ${VOLTDB_PCRE2_TARBALL}"
+       "  CONFIGURE_COMMAND: ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${CMAKE_BINARY_DIR}/3pty-install"
+   )
+ExternalProject_Add(pcre2
+  PREFIX ${VOLTDB_PCRE2_PREFIX}
+  URL ${VOLTDB_PCRE2_TARBALL}
+  SOURCE_DIR ${VOLTDB_PCRE2_SRC}
+  BINARY_DIR ${VOLTDB_PCRE2_OBJ}
+  CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${CMAKE_BINARY_DIR}/3pty-install
+  BUILD_COMMAND make
+  INSTALL_COMMAND make install)
+
+########################################################################
+#
+# Go and build the openssl library.  We only use this
+# for the arbitrary precision arithmetic code, which
+# S2GEO uses.
+#
+########################################################################
+SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
+SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
+SET (VOLTDB_OPENSSL_TARBALL ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs/${VOLTDB_OPENSSL_NAME}.tgz)
+SET (VOLTDB_OPENSSL_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/openssl)
+# Binary and source are the same for openssl.  There
+# are not obvious ways to do out-of-tree builds.
+SET (VOLTDB_OPENSSL_SRC ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
+SET (VOLTDB_OPENSSL_OBJ ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
+
+BANNER("Describing CRYPTO"
+       "  PREFIX at ${VOLTDB_OPENSSL_PREFIX}"
+       "  SOURCE at ${VOLTDB_OPENSSL_SRC}"
+       "  BINARY at ${VOLTDB_OPENSSL_OBJ}"
+       "  TARBALL at ${VOLTDB_OPENSSL_TARBALL}"
+       "  CONFIGURE_COMMAND: ./Configure --prefix=${CMAKE_BINARY_DIR}/3pty-install ${VOLTDB_OPENSSL_TOKEN}"
+   )
+ExternalProject_Add(crypto
+  PREFIX ${VOLTDB_OPENSSL_PREFIX}
+  URL ${VOLTDB_OPENSSL_TARBALL}
+  SOURCE_DIR ${VOLTDB_OPENSSL_SRC}
+  BINARY_DIR ${VOLTDB_OPENSSL_OBJ}
+  CONFIGURE_COMMAND ./Configure --prefix=${CMAKE_BINARY_DIR}/3pty-install ${VOLTDB_OPENSSL_TOKEN}
+  BUILD_COMMAND make
+  INSTALL_COMMAND make install)
+
+########################################################################
+#
+# Go and build the S2GEO library.
+#
+########################################################################
+SET (VOLTDB_S2GEO_SRC "${CMAKE_SOURCE_DIR}/third_party/cpp/google-s2-geometry")
+SET (VOLTDB_S2GEO_OBJ ${CMAKE_BINARY_DIR}/3pty-obj/google-s2-geometry)
+SET (VOLTDB_S2GEO_CMAKE_CONFIG
+  -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
+  -DVOLTDB_THIRD_PARTY_CPP_DIR=${CMAKE_SOURCE_DIR}/third_party/cpp
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/3pty-install
+  -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
+SET (VOLTDB_S2GEO_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj)
+
+BANNER("Describing S2GEO"
+       "  PREFIX at ${VOLTDB_S2GEO_PREFIX}"
+       "  SOURCE at ${VOLTDB_S2GEO_SRC}"
+       "  BINARY at ${VOLTDB_S2GEO_OBJ}"
+       "  CMAKE_ARGS: ${VOLTDB_S2GEO_CMAKE_CONFIG}"
+       "  CMAKE_GENERATOR: ${CMAKE_GENERATOR}"
+   )
+ExternalProject_Add(s2geo
+  DEPENDS crypto
+  PREFIX ${VOLTDB_S2GEO_PREFIX}
+  SOURCE_DIR ${VOLTDB_S2GEO_SRC}
+  CMAKE_ARGS ${VOLTDB_S2GEO_CMAKE_CONFIG}
+  CMAKE_GENERATOR ${CMAKE_GENERATOR}
+  BINARY_DIR ${VOLTDB_S2GEO_OBJ})
 
 ########################################################################
 #
