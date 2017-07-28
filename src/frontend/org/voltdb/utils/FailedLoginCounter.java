@@ -20,6 +20,11 @@ package org.voltdb.utils;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
+
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.RateLimitedLogger;
 
 public class FailedLoginCounter {
     // key is username, value is number of failed logging attempts count
@@ -28,6 +33,7 @@ public class FailedLoginCounter {
     private Map<Integer,Map<String,Integer>> m_buckets;
 
     final long ONE_MINUTE_IN_MILLIS = 60000;//millisecs
+    private static final VoltLogger authLog = new VoltLogger("AUTH");
 
     public FailedLoginCounter() {
         m_buckets = new HashMap<Integer, Map<String,Integer>>();
@@ -49,17 +55,25 @@ public class FailedLoginCounter {
         return 0;
     }
 
-    public void logMessage(int timestamp, String user) {
+    public void logMessage(long timestampMilis, String user) {
     	//checkCounter(timestamp);
-        if (m_buckets.containsKey(timestamp)) {
-            Map<String,Integer> bucket = m_buckets.get(timestamp);
+    	int timestampSeconds = (int)(timestampMilis/1000);
+        if (m_buckets.containsKey(timestampSeconds)) {
+            Map<String,Integer> bucket = m_buckets.get(timestampSeconds);
             int bucketCount = bucket.getOrDefault(user,0) + 1;
-              bucket.put(user,bucketCount);
+            bucket.put(user,bucketCount);
         } else {
-            m_buckets.put(timestamp, new HashMap<String,Integer>());
-            m_buckets.get(timestamp).put(user, 1);
+            m_buckets.put(timestampSeconds, new HashMap<String,Integer>());
+            m_buckets.get(timestampSeconds).put(user, 1);
         }
         int totalCount = m_userFailedAttempts.getOrDefault(user,0) + 1;
+        String messageFormat = "user "+ user +" failed to authenticate " + totalCount + " times in last minute";
+        RateLimitedLogger.tryLogForMessage(timestampMilis,
+                10000,
+                TimeUnit.MILLISECONDS,
+                authLog,
+                Level.WARN,
+                messageFormat);
         m_userFailedAttempts.put(user,totalCount);
     }
 
@@ -75,8 +89,6 @@ public class FailedLoginCounter {
                     m_userFailedAttempts.put(user, m_userFailedAttempts.get(user) - map.get(user));
                 }
                 it.remove();
-            } else {
-                break;
             }
         }
     }
