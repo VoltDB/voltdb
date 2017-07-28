@@ -106,7 +106,6 @@ function QueryUI(queryTab) {
                 if (nextString === null) {
                     break;
                 }
-                // stringBankOut.push(nextString);
                 let replacingStringLiteral = QuotedStringNonceLiteral + nonceNum;
                 stringBankOut[replacingStringLiteral] = nextString;
                 src = src.replace(nextString, replacingStringLiteral);
@@ -125,8 +124,6 @@ function QueryUI(queryTab) {
                     break;
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
-                // src = src.replace(QuotedStringNonceLiteral + nonceNum,
-                //             stringBank[nonceNum - QuotedStringNonceBase]);
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
                             stringBank[QuotedStringNonceLiteral + nonceNum]);
             }
@@ -143,15 +140,14 @@ function QueryUI(queryTab) {
             nonceNum = MultiStmtProcNonceBase;
             while (true) {
                 matchArr = src.match(MatchBeginCreateMultiStmtProcedure);
-                console.log(matchArr);
                 if (matchArr == null) {
                     break;
                 }
                 let endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
+                // get all the statements after CREATE PROCEDURE ... END
                 let mspStmts = src.substring(src.indexOf(matchArr[0]), endidx);
                 let replacingStringLiteral = MultiStmtProcNonceLiteral + nonceNum;
                 stringBankOut[replacingStringLiteral] = mspStmts;
-                // stringBankOut.push(mspStmts);
                 src = src.replace(mspStmts, replacingStringLiteral);
                 nonceNum += 1;
             }
@@ -186,7 +182,6 @@ function QueryUI(queryTab) {
 
             src = src.replace(MatchEndOfLineComments, '');
 
-
             // Extract quoted strings to keep their content from getting confused with
             // interesting statement syntax. This is required for statement splitting at 
             // semicolon boundaries -- semicolons might appear in quoted text.
@@ -219,7 +214,7 @@ function QueryUI(queryTab) {
             // Extract quoted strings to keep their content from getting confused with interesting
             // statement syntax.
             var splitParams, param, ii, len,
-                stringBank = [],
+                stringBank = {},
                 parameterBank = [];
             src = disguiseQuotedStrings(src, stringBank);
 
