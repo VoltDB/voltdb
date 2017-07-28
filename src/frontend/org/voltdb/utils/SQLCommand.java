@@ -61,6 +61,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.DDLParserCallback;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.parser.SQLParser.FileInfo;
 import org.voltdb.parser.SQLParser.FileOption;
@@ -221,7 +222,7 @@ public class SQLCommand
         // Reset the error state to avoid accidentally ignoring future FILE content
         // after a file had runtime errors (ENG-7335).
         m_returningToPromptAfterError = false;
-        final StringBuilder statement = new StringBuilder();
+        StringBuilder statement = new StringBuilder();
         boolean isRecall = false;
 
         while (true) {
@@ -240,6 +241,7 @@ public class SQLCommand
             // Was there a line-ending semicolon typed at the prompt?
             // This mostly matters for "non-directive" statements.
             boolean executeImmediate = SQLParser.isSemiColonTerminated(line);
+
 
             // When we are tracking the progress of a multi-line statement,
             // avoid coincidentally recognizing mid-statement SQL content as sqlcmd
@@ -324,11 +326,15 @@ public class SQLCommand
                 RecallableSessionLines.add(line);
                 if (executeImmediate) {
                     statement.append(line + "\n");
-                    executeStatements(statement.toString(), null, 0);
-                    if (m_testFrontEndOnly) {
-                        break; // test mode expects this early return before end of input.
+                    String incompleteSt = executeStatements(statement.toString(), null, 0);
+                    if (incompleteSt != null)
+                        statement = new StringBuilder(incompleteSt);
+                    else {
+                        if (m_testFrontEndOnly) {
+                            break; // test mode expects this early return before end of input.
+                        }
+                        statement.setLength(0);
                     }
-                    statement.setLength(0);
                     continue;
                 }
             }
@@ -784,6 +790,7 @@ public class SQLCommand
             statement.append(line).append("\n");
 
             // Check if the current statement ends here and now.
+            // if it is an incomplete multi statement procedure, it is returned back
             if (SQLParser.isSemiColonTerminated(line)) {
                 if (batch == null) {
                     String statementString = statement.toString();
@@ -791,11 +798,19 @@ public class SQLCommand
                     // like a blank line from stdin.
                     if ( ! statementString.trim().isEmpty()) {
                         //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                        executeStatements(statementString, callback, reader.getLineNumber());
+                        String incompleteSt = executeStatements(statementString, callback, reader.getLineNumber());
+                        if (incompleteSt != null) {
+                            statement = new StringBuilder(incompleteSt);
+                        }
+                        else {
+                            statement.setLength(0);
+                            statementStarted = false;
+                        }
+                    } else {
+                        statement.setLength(0);
+                        statementStarted = false;
                     }
-                    statement.setLength(0);
                 }
-                statementStarted = false;
             }
             else {
                 // Disable directive processing until end of statement.
@@ -811,12 +826,14 @@ public class SQLCommand
     // the end of a statement. It could give a false negative for something as
     // simple as an end-of-line comment.
     //
-    private static void executeStatements(String statements, DDLParserCallback callback, int lineNum)
+    private static String executeStatements(String statements, DDLParserCallback callback, int lineNum)
     {
-        List<String> parsedStatements = SQLParser.parseQuery(statements);
+        SplitStmtResults parsedOutput = SQLLexer.splitStatements(statements);
+        List<String> parsedStatements = parsedOutput.completelyParsedStmts;
         for (String statement: parsedStatements) {
             executeStatement(statement, callback, lineNum);
         }
+        return parsedOutput.incompleteMuliStmtProc;
     }
 
     private static void executeStatement(String statement, DDLParserCallback callback, int lineNum)
@@ -1325,7 +1342,7 @@ public class SQLCommand
         try {
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
             getInteractiveQueries(reader);
-            return SQLParser.parseQuery(m_testFrontEndResult);
+            return SQLLexer.splitStatements(m_testFrontEndResult).completelyParsedStmts;
         } catch (Exception ioe) {}
         return null;
     }
@@ -1392,7 +1409,7 @@ public class SQLCommand
                 kerberos = "VoltDBClient";
             }
             else if (arg.startsWith("--query=")) {
-                List<String> argQueries = SQLParser.parseQuery(arg.substring(8));
+                List<String> argQueries = SQLLexer.splitStatements(arg.substring(8)).completelyParsedStmts;
                 if (!argQueries.isEmpty()) {
                     if (queries == null) {
                         queries = argQueries;

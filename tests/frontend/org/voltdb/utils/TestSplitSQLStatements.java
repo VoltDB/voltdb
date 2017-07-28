@@ -41,7 +41,7 @@ public class TestSplitSQLStatements {
     }
 
     private void checkSplitter(final String strIn, final String... strsCmp) {
-        final List<String> strsOut = SQLLexer.splitStatements(strIn);
+        final List<String> strsOut = SQLLexer.splitStatements(strIn).completelyParsedStmts;
         assertEquals(strsCmp.length, strsOut.size());
         for (int i = 0; i < strsCmp.length; ++i) {
             assertEquals(strsCmp[i], strsOut.get(i));
@@ -62,24 +62,38 @@ public class TestSplitSQLStatements {
         checkSplitter(" a\"b ; c \\\" 'd;ef' \" ; ", "a\"b ; c \\\" 'd;ef' \"");
         checkSplitter(" a'b ; c \\' \"d;ef\" ' ; ", "a'b ; c \\' \"d;ef\" '");
         checkSplitter("a;;b;;c;;", "a", "b", "c");
-        checkSplitter("abc --;def\n;ghi", "abc --;def", "ghi");
+        checkSplitter("abc --;def\n;ghi", "abc", "ghi");
         checkSplitter("abc /*\";def\n;*/ghi", "abc /*\";def\n;*/ghi");
         checkSplitter("a\r\nb;c\r\nd;", "a\r\nb", "c\r\nd");
-        checkSplitter("--one\n--two\nreal", "--one", "--two", "real");
-        checkSplitter("  --one\n  --two\nreal", "--one", "--two", "real");
-        checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "--def", "/*ghi\njkl;*/");
+        checkSplitter("--one\n--two\nreal", "real");
+        checkSplitter("  --one\n  --two\nreal", "real");
+        checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "/*ghi\njkl;*/");
     }
 
     @Test
     public void testProcSQLSplit() {
         checkSplitter("begi", "begi");
         checkSplitter("begin end", "begin end");
-        checkSplitter("begin en", "begin en");
-        checkSplitter("begin enf", "begin enf");
+        checkSplitter("as begin end", "as begin end");
+
+        // the next test will not return completely parsed statements
+        // because begin has not end yet, they are incomplete
+        String sql = "as begin en";
+        SplitStmtResults parsedOut = SQLLexer.splitStatements(sql);
+        assertEquals(0, parsedOut.completelyParsedStmts.size());
+        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
         checkSplitter("CREATE PROCEDURE foo as SELECT * from t;", "CREATE PROCEDURE foo as SELECT * from t");
 
-        String sql = "CREATE PROCEDURE foo AS "
+        sql = "CREATE PROCEDURE foo AS "
+                + "BEGIN "
+                + "SELECT * from t; "
+                + "SELECT * from t; "
+                + "END;";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        // with white spaces between AS..BEGIN
+        sql = "CREATE PROCEDURE foo AS  \t"
                 + "BEGIN "
                 + "SELECT * from t; "
                 + "SELECT * from t; "
@@ -106,15 +120,19 @@ public class TestSplitSQLStatements {
           "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; END abc", "def");
 
         // there is no END statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
-        checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;",
-                "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t;");
+        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t;";
+        parsedOut = SQLLexer.splitStatements(sql);
+        assertEquals(0, parsedOut.completelyParsedStmts.size());
+        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
         // enf is not end of statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
-        checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;",
-                "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF;");
+        sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; ENF;";
+        parsedOut = SQLLexer.splitStatements(sql);
+        assertEquals(0, parsedOut.completelyParsedStmts.size());
+        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
-        checkSplitter("CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end",
-                "CREATE PROCEDURE foo BEGIN SELECT * from t; SELECT * from t; ENF; end");
+        checkSplitter("CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; ENF; end",
+                "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; ENF; end");
 
         String sql1 = "abc";
         sql = "SELECT a, "
@@ -227,6 +245,16 @@ public class TestSplitSQLStatements {
                 + "select emptycase from R; "
                 + "end;";
         checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
+
+        // begin as table and column name
+        sql = "create procedure p as "
+                + "select begin.begin from begin;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
+
+        // begin as table and column name with spaces after AS
+        sql = "create procedure p as      "
+                + "select begin.begin from begin;";
+        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
     }
 
     @Test
@@ -238,7 +266,13 @@ public class TestSplitSQLStatements {
                   + "select * from r where f = 'foo';"
                   + "select * from r where f = 'begin' or f = 'END';"
                   + "end;";
-        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+        String expected = "create procedure thisproc as "
+        + "begin \n"
+        + "select * from t;"
+        + "select * from r where f = 'foo';"
+        + "select * from r where f = 'begin' or f = 'END';"
+        + "end";
+        checkSplitter(sql, expected);
 
         sql = "create procedure thisproc as "
                 + "begin \n"
@@ -304,7 +338,7 @@ public class TestSplitSQLStatements {
         sql = "create procedure thisproc as "
                 + "begin "
                 + "SELECT a, "
-                + "select case when id < 0 then (id+0)end+100 from aaa;"
+                + "10+case when id < 0 then (id+0)end+100 from aaa;"
                 + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
 

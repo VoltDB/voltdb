@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.voltdb.utils.SplitStmtResults;
 
 /**
  * Provides an API for performing various lexing operations on SQL/DML/DDL text.
@@ -341,10 +342,16 @@ public class SQLLexer extends SQLPatternFactory
      * @param sql raw SQL text to split
      * @return list of individual SQL statements
      */
-    public static List<String> splitStatements(final String sql) {
+      public static SplitStmtResults splitStatements(final String sql) {
         List<String> statements = new ArrayList<>();
+        SplitStmtResults results = new SplitStmtResults();
+
+        // strip out comments
+        String sqlNoComments = SQLParser.AnyWholeLineComments.matcher(sql).replaceAll("");
+        sqlNoComments = SQLParser.EndOfLineComment.matcher(sqlNoComments).replaceAll("");
+
         // Use a character array for efficient character-at-a-time scanning.
-        char[] buf = sql.toCharArray();
+        char[] buf = sqlNoComments.toCharArray();
         // Set to null outside of quoted segments or the quote character inside them.
         Character cQuote = null;
         // Set to null outside of comments or to the string that ends the comment.
@@ -358,15 +365,14 @@ public class SQLLexer extends SQLPatternFactory
         boolean inStatement = false;
         // To indicate if inside multi statement procedure
         boolean inBegin = false;
+        boolean checkForNextBegin = false;
         // To indicate if inside CASE .. WHEN
         int inCase = 0;
-        // needed for string region matching
-        String bufStr = new String(buf);
         int iCur = 0;
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
             if (!inStatement) {
-                if (Character.isWhitespace(buf[iCur])) {
+                if (Character.isWhitespace(buf[iCur]) || Character.isSpaceChar(buf[iCur])) {
                     iCur++;
                     iStart = iCur;
                 }
@@ -422,12 +428,25 @@ public class SQLLexer extends SQLPatternFactory
                 }
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
-                if( matchToken(bufStr, iCur, "case") ) {
+
+                // check if the next token is BEGIN if the previous one is AS
+                // if not, do not look for BEGIN
+                if (checkForNextBegin
+                        && !(Character.isWhitespace(buf[iCur]) || Character.isSpaceChar(buf[iCur])) ) {
+                    // 'BEGIN' should only be followed after 'AS'
+                    // otherwise it is a column or table name
+                    if ( matchToken(sqlNoComments, iCur, "begin") ) {
+                        inBegin = true;
+                        iCur += 5;
+                    }
+                    checkForNextBegin = false;
+                }
+                if( matchToken(sqlNoComments, iCur, "case") ) {
                     inCase++;
                     iCur += 4;
-                } else if ( matchToken(bufStr, iCur, "begin") ) {
-                    inBegin = true;
-                    iCur += 5;
+                } else if ( matchToken(sqlNoComments, iCur, "as") ) {
+                    checkForNextBegin = true;
+                    iCur += 2;
                 } else if ( !inBegin && buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
                     // if it is not in a BEGIN ... END
@@ -442,7 +461,7 @@ public class SQLLexer extends SQLPatternFactory
                     // Start of quoted string.
                     cQuote = buf[iCur];
                     iCur++;
-                } else if ( matchToken(bufStr, iCur, "end") ) {
+                } else if ( matchToken(sqlNoComments, iCur, "end") ) {
                     if (inCase > 0) {
                         inCase--;
                     } else {
@@ -452,15 +471,7 @@ public class SQLLexer extends SQLPatternFactory
                     }
                     iCur += 3;
                 } else if (iCur <= buf.length - 2) {
-                    // Comment (double-dash or C-style)?
-                    if (buf[iCur] == '-' && buf[iCur+1] == '-') {
-                        // One line double-dash comment start.
-                        sCommentEnd = "\n"; // Works for *IX (\n) and Windows (\r\n).
-                        if (iCur == iStart) {
-                            statementIsComment = true;
-                        }
-                        iCur += 2;
-                    } else if (buf[iCur] == '/' && buf[iCur+1] == '*') {
+                    if (buf[iCur] == '/' && buf[iCur+1] == '*') {
                         // Multi-line C-style comment start.
                         sCommentEnd = "*/";
                         if (iCur == iStart) {
@@ -478,13 +489,23 @@ public class SQLLexer extends SQLPatternFactory
             }
         }
         // Get the last statement, if any.
+        // we are still processing a multi statement procedure if we are still in begin...end
         if (iStart < buf.length) {
-            String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-            if (!statement.isEmpty()) {
-                statements.add(statement);
+            if (!inBegin) {
+                String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
+                if (!statement.isEmpty()) {
+                    statements.add(statement);
+                }
+            } else {
+                // we only check for incomplete multi statement procedures right now
+                // add a mandatory space..
+                results.incompleteMuliStmtProc = String.copyValueOf(buf, iStart, iCur - iStart);
             }
         }
-        return statements;
+
+        results.completelyParsedStmts = statements;
+        return results;
+//        return statements;
     }
 
     /**
