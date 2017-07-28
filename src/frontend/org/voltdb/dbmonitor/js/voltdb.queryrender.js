@@ -54,46 +54,11 @@ function QueryUI(queryTab) {
             // That's 900000 strings per statement batch -- that should be enough.
             MatchOneQuotedStringNonce = /#COMMAND_PARSER_REPLACED_STRING#(\d\d\d\d\d\d)/,
             QuotedStringNonceBase = 100000,
+            MultiSPStringNonceBase = 100000,
 
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
             MatchParameterSeparators = /[\s,]+/g;
-
-        // Avoid false positives for statement grammar inside quoted strings by
-        // substituting a nonce for each string.
-        function disguiseQuotedStrings(src, stringBankOut) {
-            var nonceNum, nextString;
-
-            // Extract quoted strings to keep their content from getting confused with interesting
-            // statement syntax.
-            nonceNum = QuotedStringNonceBase;
-            while (true) {
-                nextString = MatchOneQuotedString.exec(src);
-                if (nextString === null) {
-                    break;
-                }
-                stringBankOut.push(nextString);
-                src = src.replace(nextString, QuotedStringNonceLiteral + nonceNum);
-                nonceNum += 1;
-            }
-            return src;
-        }
-
-        // Restore quoted strings by replcaing each nonce with its original quoted string.
-        function undisguiseQuotedStrings(src, stringBank) {
-            var nextNonce, nonceNum;
-            // Clean up by restoring the replaced quoted strings.
-            while (true) {
-                nextNonce = MatchOneQuotedStringNonce.exec(src);
-                if (nextNonce === null) {
-                    break;
-                }
-                nonceNum = parseInt(nextNonce[1], 10);
-                src = src.replace(QuotedStringNonceLiteral + nonceNum,
-                            stringBank[nonceNum - QuotedStringNonceBase]);
-            }
-            return src;
-        }
 
         function matchToken(buffer, position, token) {
             let tokLength = token.length;
@@ -131,6 +96,59 @@ function QueryUI(queryTab) {
             return str.toString().substring(0, start) + what + str.toString().substring(end);
         }
 
+        // Avoid false positives for statement grammar inside quoted strings by
+        // substituting a nonce for each string.
+        function disguiseQuotedStrings(src, stringBankOut) {
+            var nonceNum, nextString;
+
+            // Extract quoted strings to keep their content from getting confused with interesting
+            // statement syntax.
+            nonceNum = QuotedStringNonceBase;
+            while (true) {
+                nextString = MatchOneQuotedString.exec(src);
+                if (nextString === null) {
+                    break;
+                }
+                stringBankOut.push(nextString);
+                src = src.replace(nextString, QuotedStringNonceLiteral + nonceNum);
+                nonceNum += 1;
+            }
+            return src;
+        }
+
+        // Restore quoted strings by replcaing each nonce with its original quoted string.
+        function undisguiseQuotedStrings(src, stringBank) {
+            var nextNonce, nonceNum;
+            // Clean up by restoring the replaced quoted strings.
+            while (true) {
+                nextNonce = MatchOneQuotedStringNonce.exec(src);
+                if (nextNonce === null) {
+                    break;
+                }
+                nonceNum = parseInt(nextNonce[1], 10);
+                src = src.replace(QuotedStringNonceLiteral + nonceNum,
+                            stringBank[nonceNum - QuotedStringNonceBase]);
+            }
+            return src;
+        }
+
+        // Avoid false positives for statement grammar inside multi statement procedures by
+        // substituting a nonce for each string.
+        function disguiseMSP(src, stringBank) {
+            let nonceNum, nextString;
+
+            // Extract multi stmt procs to keep their content from getting confused with interesting
+            // statement syntax - (multiple statements with ;)
+            matchArr = src.match(MatchBeginCreateMultiStmtProcedure);
+            nonceNum = MultiSPStringNonceBase;
+            console.log(matchArr);
+            if (matchArr != null) {
+                var endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
+                var mspStmts = src.substring(src.indexOf(matchArr[0]), endidx);
+                // src = replaceBetween(src, src.indexOf(matchArr[0]), endidx, MultiStmtProcNonceLiteral);
+            }
+        }
+
         // break down a multi-statement string into a statement array.
         function parseUserInputMethod(src) {
             var splitStmts, stmt, ii, len,
@@ -148,11 +166,8 @@ function QueryUI(queryTab) {
             // interesting statement syntax. This is required for statement splitting at 
             // semicolon boundaries -- semicolons might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
-
-            matchArr = src.match(MatchBeginCreateMultiStmtProcedure);
-            console.log(matchArr);
-            var endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
-            src = replaceBetween(src, src.indexOf(matchArr[0]), endidx, MultiStmtProcNonceLiteral);
+            src = disguiseMSP(src, stringBank);
+            
             splitStmts = src.split(';');
 
             statementBank = [];
