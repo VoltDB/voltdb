@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,10 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
     private MpRoSitePool m_sitePool = null;
+
+    // Indicating which partitions are currently executing np tasks
+    private HashSet<Integer> usedPartitions = new HashSet<>();
+    private boolean isMP = false; // indicates whether a mp proc is executing
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
