@@ -18,7 +18,6 @@
 package org.voltdb.importclient.socket;
 
 import java.io.IOException;
-import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -50,32 +49,20 @@ public class ServerSocketImporterConfig implements ImporterConfig
         }
 
         String portStr = (String) propsCopy.get("port");
-        int port;
         try {
-            port = Integer.parseInt(portStr);
-            if (port <= 0) {
+            m_port = Integer.parseInt(portStr);
+            if (m_port <= 0) {
                 throw new NumberFormatException();
             }
         } catch(NumberFormatException e) {
             throw new IllegalArgumentException("Invalid port specification: " + portStr);
         }
 
-        propsCopy.getProperty("deferSocketCreation")
-
-        ServerSocket socket = null;
-        do {
-            try {
-                socket = new ServerSocket(port);
-            } catch (IOException e) {
-                if (e.getMessage().contains("Address already in use")) {
-                    port++;
-                } else {
-                    throw new IllegalArgumentException("Error starting socket importer listener on port: " + port, e);
-                }
-            }
-        } while (socket == null);
-        m_serverSocket = socket;
-        m_port = port;
+        try {
+            m_serverSocket = new ServerSocket(m_port);
+        } catch(IOException e) {
+            throw new IllegalArgumentException("Error starting socket importer listener on port: " + m_port, e);
+        }
 
         try {
             m_resourceID = new URI(SOCKET_IMPORTER_URI_SCHEME, portStr, null);
