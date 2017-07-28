@@ -20,16 +20,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -61,7 +57,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -74,10 +69,8 @@ public class ExportGeneration implements Generation {
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    public Long m_timestamp;
     public final File m_directory;
 
-    private String m_leadersZKPath;
     private String m_mailboxesZKPath;
 
     /**
@@ -93,63 +86,6 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    private int m_numSources = 0;
-    private final AtomicInteger m_drainedSources = new AtomicInteger(0);
-
-    private Runnable m_onAllSourcesDrained = null;
-
-    private final Runnable m_onSourceDrained = new Runnable() {
-        @Override
-        public void run() {
-            if (m_onAllSourcesDrained == null) {
-                VoltDB.crashLocalVoltDB("No export generation roller found.", true, null);
-                return;
-            }
-            int numSourcesDrained = m_drainedSources.incrementAndGet();
-            exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
-            if (numSourcesDrained == m_numSources) {
-                if (m_partitionLeaderZKName.isEmpty()) {
-                    m_onAllSourcesDrained.run();
-                } else {
-                    ListenableFuture<?> removeLeadership = m_childUpdatingThread.submit(new Runnable() {
-                        @Override
-                        public void run() {
-                            final HostMessenger messenger = ExportManager.instance().getHostMessenger();
-                            // We need this null check for tests which TestExportGeneration without messenger.
-                            if (messenger != null) {
-                                for (Map.Entry<Integer, String> entry : m_partitionLeaderZKName.entrySet()) {
-                                    messenger.getZK().delete(
-                                            m_leadersZKPath + "/" + entry.getKey() + "/" + entry.getValue(),
-                                            -1,
-                                            new AsyncCallback.VoidCallback() {
-
-                                                @Override
-                                                public void processResult(int rc,
-                                                        String path, Object ctx) {
-                                                    KeeperException.Code code = KeeperException.Code.get(rc);
-                                                    if (code != KeeperException.Code.OK) {
-                                                        VoltDB.crashLocalVoltDB(
-                                                                "Error in export leader election giving up leadership of "
-                                                                + path,
-                                                                true,
-                                                                KeeperException.create(code));
-                                                    }
-                                                }},
-                                            null);
-                                }
-                            }
-                        }
-                    }, null);
-                    removeLeadership.addListener(
-                            m_onAllSourcesDrained,
-                            MoreExecutors.sameThreadExecutor());
-                }
-
-                ;
-            }
-        }
-    };
-
     private Mailbox m_mbox;
 
     private volatile boolean shutdown = false;
@@ -157,52 +93,23 @@ public class ExportGeneration implements Generation {
     private static final ListeningExecutorService m_childUpdatingThread =
             CoreUtils.getListeningExecutorService("Export ZK Watcher", 1);
 
-    private final Map<Integer, String> m_partitionLeaderZKName = new HashMap<Integer, String>();
-    private final Set<Integer> m_partitionsIKnowIAmTheLeader = new HashSet<Integer>();
-
-    //This is maintained to detect if this is a continueing generation or not
-    private final boolean m_isContinueingGeneration;
     /**
      * Constructor to create a new generation of export data
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
-        m_timestamp = txnId;
-        m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
+    public ExportGeneration(File exportOverflowDirectory, boolean isRejoin) throws IOException {
+        m_directory = exportOverflowDirectory;
         if (!m_directory.canWrite()) {
             if (!m_directory.mkdirs()) {
                 throw new IOException("Could not create " + m_directory + " Rejoin: " + isRejoin);
             }
         }
-        m_isContinueingGeneration = true;
 
-        exportLog.info("Creating new export generation " + m_timestamp + " Rejoin: " + isRejoin);
+        exportLog.info("Creating new export generation. Rejoin: " + isRejoin);
     }
 
-    /**
-     * Constructor to create a generation based on one that has been persisted to disk
-     * @param generationDirectory
-     * @param catalogGen Generation from catalog.
-     * @throws IOException
-     */
-    public ExportGeneration(File generationDirectory, long catalogGen) throws IOException {
-        m_directory = generationDirectory;
-        try {
-            m_timestamp = Long.parseLong(generationDirectory.getName());
-        } catch (NumberFormatException ex) {
-            throw new IOException("Invalid Generation directory, directory name must be a number.");
-        }
-
-        m_isContinueingGeneration = (catalogGen == m_timestamp);
-    }
-
-    //This checks if the on disk generation is a catalog generation.
-    public boolean isContinueingGeneration() {
-        return m_isContinueingGeneration;
-    }
-
-    boolean initializeGenerationFromDisk(final CatalogMap<Connector> connectors, HostMessenger messenger) {
+    boolean initializeGenerationFromDisk(HostMessenger messenger) {
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -239,157 +146,6 @@ public class ExportGeneration implements Generation {
         return hadValidAd;
     }
 
-
-    /*
-     * Run a leader election for every partition to determine who will
-     * start consuming the export data.
-     *
-     */
-    public void kickOffLeaderElection(final HostMessenger messenger) {
-        m_childUpdatingThread.submit(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    /*
-                     * The path where leaders will register for this generation
-                     */
-                    m_leadersZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "leaders";
-
-                    /*
-                     * Create a directory for each partition
-                     */
-                    for (Integer partition : m_dataSourcesByPartition.keySet()) {
-                        ZKUtil.asyncMkdirs(messenger.getZK(), m_leadersZKPath + "/" + partition);
-                    }
-
-                    /*
-                     * Queue the creation of our ephemeral sequential and then queue
-                     * a task to retrieve the children to find the result of the election
-                     */
-                    List<ZKUtil.ChildrenCallback> callbacks = new ArrayList<ZKUtil.ChildrenCallback>();
-                    for (final Integer partition : m_dataSourcesByPartition.keySet()) {
-                        messenger.getZK().create(
-                                m_leadersZKPath + "/" + partition + "/leader",
-                                null,
-                                Ids.OPEN_ACL_UNSAFE,
-                                CreateMode.EPHEMERAL_SEQUENTIAL,
-                                new org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback() {
-                                    @Override
-                                    public void processResult(int rc, String path,
-                                            Object ctx, String name) {
-                                        KeeperException.Code code = KeeperException.Code.get(rc);
-                                        if (code != KeeperException.Code.OK) {
-                                            VoltDB.crashLocalVoltDB(
-                                                    "Error in export leader election",
-                                                    true,
-                                                    KeeperException.create(code));
-                                        }
-                                        String splitName[] = name.split("/");
-                                        m_partitionLeaderZKName.put(partition,  splitName[splitName.length - 1]);
-                                    }
-
-                                },
-                                null);
-                        ZKUtil.ChildrenCallback cb = new ZKUtil.ChildrenCallback();
-                        callbacks.add(cb);
-                        messenger.getZK().getChildren(
-                                m_leadersZKPath + "/" + partition,
-                                constructLeaderChildWatcher(partition, messenger),
-                                cb,
-                                null);
-                    }
-
-                    /*
-                     * Process the result of the per partition elections.
-                     * No worries about ordering with the watcher because the watcher tasks
-                     * all get funneled through this thread
-                     */
-                    Iterator<ZKUtil.ChildrenCallback> iter = callbacks.iterator();
-                    for (Integer partition : m_dataSourcesByPartition.keySet()) {
-                        ZKUtil.ChildrenCallback cb = iter.next();
-                        handleLeaderChildrenUpdate(partition,  cb.getChildren());
-                    }
-                } catch (Throwable t) {
-                    VoltDB.crashLocalVoltDB("Error in export leader election", true, t);
-                }
-            }
-        });
-    }
-
-    private Watcher constructLeaderChildWatcher(final Integer partition, final HostMessenger messenger) {
-        if (shutdown || m_drainedSources.get() == m_numSources) {
-            return null;
-        }
-        return new Watcher() {
-            @Override
-            public void process(final WatchedEvent event) {
-                final Runnable processRunnable = new Runnable() {
-                    @Override
-                    public void run() {
-                        if (shutdown || m_drainedSources.get() == m_numSources) {
-                            return;
-                        }
-                        final AsyncCallback.ChildrenCallback childrenCallback =
-                                new org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback() {
-                            @Override
-                            public void processResult(final int rc, final String path, Object ctx,
-                                                      final List<String> children) {
-                                KeeperException.Code code = KeeperException.Code.get(rc);
-                                if (code != KeeperException.Code.OK) {
-                                    VoltDB.crashLocalVoltDB(
-                                            "Error in export leader election",
-                                            true,
-                                            KeeperException.create(code));
-                                }
-                                m_childUpdatingThread.execute(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        try {
-                                            handleLeaderChildrenUpdate(partition, children);
-                                        } catch (Throwable t) {
-                                            VoltDB.crashLocalVoltDB("Error in export leader election", true, t);
-                                        }
-                                    }
-                                });
-                            }
-                        };
-                        messenger.getZK().getChildren(
-                                m_leadersZKPath + "/" + partition,
-                                constructLeaderChildWatcher(partition, messenger),
-                                childrenCallback, null);
-                    }
-                };
-                m_childUpdatingThread.execute(processRunnable);
-            }
-        };
-    }
-
-    private void handleLeaderChildrenUpdate(Integer partition, List<String> children) {
-        if (m_drainedSources.get() == m_numSources || children.isEmpty()) {
-            return;
-        }
-
-        String leader = Collections.min(children);
-        String part = m_partitionLeaderZKName.get(partition);
-        if (part == null) {
-            exportLog.warn("Unable to start exporting for partition (not master of): " + partition);
-            return;
-        }
-        if (m_partitionLeaderZKName.get(partition).equals(leader)) {
-            if (m_partitionsIKnowIAmTheLeader.add(partition)) {
-                for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
-                    try {
-                        if (!eds.setMaster()) {
-                            eds.acceptMastership();
-                        }
-                    } catch (Exception e) {
-                        exportLog.error("Unable to start exporting", e);
-                    }
-                }
-            }
-        }
-    }
-
     void initializeGenerationFromCatalog(
             final CatalogMap<Connector> connectors,
             int hostId,
@@ -416,21 +172,14 @@ public class ExportGeneration implements Generation {
         createAndRegisterAckMailboxes(partitionsInUse, messenger);
     }
 
-    void initializeMissingPartitionsFromCatalog(
-            final CatalogMap<Connector> connectors,
-            int hostId,
-            HostMessenger messenger,
-            List<Integer> partitions) {
-        Set<Integer> missingPartitions = new HashSet<Integer>();
-        findMissingDataSources(partitions, missingPartitions);
-        if (missingPartitions.size() > 0) {
-            exportLog.info("Found Missing partitions for continueing generation: " + missingPartitions);
-            initializeGenerationFromCatalog(connectors, hostId, messenger, new ArrayList(missingPartitions));
-        }
-    }
-
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
-        m_mailboxesZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "mailboxes";
+
+        if (m_mbox != null) {
+            // FIXME - need to clean up previous mailboxes and NOT return. Changes to partitions affects mailboxes.
+        //    return;
+        }
+
+        m_mailboxesZKPath = VoltZK.exportGenerations + "/" + "mailboxes";
 
         m_mbox = new LocalMailbox(messenger) {
             @Override
@@ -534,7 +283,7 @@ public class ExportGeneration implements Generation {
     }
 
     private Watcher constructMailboxChildWatcher(final HostMessenger messenger) {
-        if (shutdown || m_drainedSources.get() == m_numSources) {
+        if (shutdown) {
             return null;
         }
         return new Watcher() {
@@ -557,12 +306,12 @@ public class ExportGeneration implements Generation {
     }
 
     private void handleChildUpdate(final WatchedEvent event, final HostMessenger messenger) {
-        if (shutdown || m_drainedSources.get() == m_numSources) return;
+        if (shutdown) return;
         messenger.getZK().getChildren(event.getPath(), constructMailboxChildWatcher(messenger), constructChildRetrievalCallback(), null);
     }
 
     private AsyncCallback.ChildrenCallback constructChildRetrievalCallback() {
-        if (shutdown || m_drainedSources.get() == m_numSources) {
+        if (shutdown) {
             return null;
         }
         return new AsyncCallback.ChildrenCallback() {
@@ -606,6 +355,7 @@ public class ExportGeneration implements Generation {
         };
     }
 
+    @Override
     public long getQueuedExportBytes(int partitionId, String signature) {
         //assert(m_dataSourcesByPartition.containsKey(partitionId));
         //assert(m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
@@ -616,7 +366,7 @@ public class ExportGeneration implements Generation {
              * This is fine. If the table is dropped it won't have an entry in the generation created
              * after the table was dropped.
              */
-            //            exportLog.error("Could not find export data sources for generation " + m_timestamp + " partition "
+            //            exportLog.error("Could not find export data sources for partition "
             //                    + partitionId);
             return 0;
         }
@@ -627,7 +377,7 @@ public class ExportGeneration implements Generation {
              * This is fine. If the table is dropped it won't have an entry in the generation created
              * after the table was dropped.
              */
-            //exportLog.error("Could not find export data source for generation " + m_timestamp + " partition " + partitionId +
+            //exportLog.error("Could not find export data source for partition " + partitionId +
             //        " signature " + signature);
             return 0;
         }
@@ -638,11 +388,8 @@ public class ExportGeneration implements Generation {
      * Create a datasource based on an ad file
      */
     private void addDataSource(File adFile, Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, isContinueingGeneration());
+        ExportDataSource source = new ExportDataSource(adFile);
         partitions.add(source.getPartitionId());
-        if (source.getGeneration() != this.m_timestamp) {
-            throw new IOException("Failed to load generation from disk invalid data source generation found.");
-        }
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());
@@ -657,19 +404,6 @@ public class ExportGeneration implements Generation {
             }
         }
         dataSourcesForPartition.put( source.getSignature(), source);
-        m_numSources++;
-    }
-
-    /*
-     * An unfortunate test only method for supplying a mock source
-     */
-    public void addDataSource(ExportDataSource source) {
-        Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(source.getPartitionId());
-        if (dataSourcesForPartition == null) {
-            dataSourcesForPartition = new HashMap<String, ExportDataSource>();
-            m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
-        }
-        dataSourcesForPartition.put(source.getSignature(), source);
     }
 
     // silly helper to add datasources for a table catalog object
@@ -687,21 +421,20 @@ public class ExportGeneration implements Generation {
                     dataSourcesForPartition = new HashMap<String, ExportDataSource>();
                     m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
                 }
-                Column partColumn = table.getPartitioncolumn();
-                ExportDataSource exportDataSource = new ExportDataSource(
-                        m_onSourceDrained,
-                        "database",
-                        table.getTypeName(),
-                        partition,
-                        table.getSignature(),
-                        m_timestamp,
-                        table.getColumns(),
-                        partColumn,
-                        m_directory.getPath());
-                m_numSources++;
-                exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
-                        " signature " + table.getSignature() + " partition id " + partition);
-                dataSourcesForPartition.put(table.getSignature(), exportDataSource);
+                if (!dataSourcesForPartition.containsKey(table.getSignature())) {
+                    Column partColumn = table.getPartitioncolumn();
+                    ExportDataSource exportDataSource = new ExportDataSource(
+                            "database",
+                            table.getTypeName(),
+                            partition,
+                            table.getSignature(),
+                            table.getColumns(),
+                            partColumn,
+                            m_directory.getPath());
+                    exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
+                            " signature " + table.getSignature() + " partition id " + partition);
+                    dataSourcesForPartition.put(table.getSignature(), exportDataSource);
+                }
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB(
                         "Error creating datasources for table " +
@@ -710,18 +443,22 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    //Find missing partitions from this generation typicaally called for current generation to fill in missing partitions
-    private void findMissingDataSources(List<Integer> partitions, Set<Integer> missingPartitions) {
+    // pause polling on the all the data source for the given partitions
+    void pausePolling(List<Integer> partitions) {
         for (Integer partition : partitions) {
             Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
-            if (dataSourcesForPartition == null) {
-                missingPartitions.add(partition);
+            assert(dataSourcesForPartition != null);
+            for (ExportDataSource source: dataSourcesForPartition.values()) {
+                exportLog.debug("Pause polling for table:" + source.getTableName() + " partition:" + source.getPartitionId()
+                        + " signature:" + source.getSignature());
+                source.prepareForProcessorSwap();
             }
         }
     }
 
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
-        //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
+    @Override
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
+        //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
         //        }
@@ -731,7 +468,7 @@ public class ExportGeneration implements Generation {
 
         if (sources == null) {
             exportLog.error("Could not find export data sources for partition "
-                    + partitionId + " generation " + m_timestamp + " the export data is being discarded, endOfStream: " + endOfStream);
+                    + partitionId + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
@@ -741,15 +478,14 @@ public class ExportGeneration implements Generation {
         ExportDataSource source = sources.get(signature);
         if (source == null) {
             exportLog.error("Could not find export data source for partition " + partitionId +
-                    " signature " + signature + " generation " +
-                    m_timestamp + " the export data is being discarded, endOfStream: " + endOfStream);
+                    " signature " + signature + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }
             return;
         }
 
-        source.pushExportBuffer(uso, buffer, sync, endOfStream);
+        source.pushExportBuffer(uso, buffer, sync);
     }
 
     private void cleanup(final HostMessenger messenger) {
@@ -769,7 +505,6 @@ public class ExportGeneration implements Generation {
             }
             messenger.removeMailbox(m_mbox);
         }
-        m_onAllSourcesDrained = null;
     }
 
     public void closeAndDelete(final HostMessenger messenger) throws IOException {
@@ -788,10 +523,8 @@ public class ExportGeneration implements Generation {
         VoltFile.recursivelyDelete(m_directory);
     }
 
-    /*
-     * Returns true if the generatino was completely truncated away
-     */
-    public boolean truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
+    @Override
+    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
         // create an easy partitionId:txnId lookup.
         HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
         for (long tid : perPartitionTxnIds) {
@@ -826,8 +559,6 @@ public class ExportGeneration implements Generation {
                                     "You can back up export overflow data and start the " +
                                     "DB without it to get past this error", true, e);
         }
-
-        return m_drainedSources.get() == m_numSources;
     }
 
     public void sync(final boolean nofsync) {
@@ -848,6 +579,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
     public void close(final HostMessenger messenger) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
@@ -872,6 +604,7 @@ public class ExportGeneration implements Generation {
      * mastership role for the given partition id
      * @param partitionId
      */
+    @Override
     public void acceptMastershipTask( int partitionId) {
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
@@ -893,11 +626,6 @@ public class ExportGeneration implements Generation {
 
     @Override
     public String toString() {
-        return "Export Generation - " + m_timestamp.toString();
+        return "Export Generation";
     }
-
-    public void setGenerationDrainRunnable(Runnable onGenerationDrained) {
-        m_onAllSourcesDrained = onGenerationDrained;
-    }
-
 }

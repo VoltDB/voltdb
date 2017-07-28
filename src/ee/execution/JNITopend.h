@@ -45,12 +45,10 @@ public:
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(
-            int64_t exportGeneration,
             int32_t partitionId,
             std::string signature,
             StreamBlock *block,
-            bool sync,
-            bool endOfStream);
+            bool sync);
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 

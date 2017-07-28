@@ -54,31 +54,6 @@ void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t
     assert(generation > m_generation);
     assert(signature == m_signature || m_signature == string(""));
 
-    //The first time through this is catalog load and m_generation will be 0
-    //Don't send the end of stream notice.
-    if (generation != m_generation && m_generation > 0) {
-        //Notify that no more data is coming from this generation.
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                m_generation,
-                m_partitionId,
-                m_signature,
-                NULL,
-                false,
-                true);
-        /*
-         * With the new generational code the USO is reset to 0 for each
-         * generation. The sequence number stored on the table outside the wrapper
-         * is not reset and remains constant. USO is really just for transport purposes.
-         */
-        m_uso = 0;
-        m_openSpHandle = 0;
-        m_openTransactionUso = 0;
-        m_committedSpHandle = 0;
-        m_committedUso = 0;
-        //Reconstruct the next block so it has a USO of 0.
-        assert(m_currBlock->offset() == 0);
-        extendBufferChain(m_defaultCapacity);
-    }
     m_signature = signature;
     m_generation = generation;
 }
@@ -212,7 +187,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // write the row size in to the row header rowlength does not include
     // the 4 byte row header but does include the null array.
     hdr.writeInt((int32_t)(io.position()) + (int32_t)streamHeaderSz - 4);
-    hdr.writeLong(m_generation);                                // generation
+    hdr.writeLong(m_generation);                                // version of the catalog
     hdr.writeInt(METADATA_COL_CNT + partitionColumn);           // partition index
     hdr.writeInt(METADATA_COL_CNT + tuple.sizeInValues());      // column count
 
@@ -259,12 +234,10 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
             + dataSz;                   // non-null tuple data
 }
 
-void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
+void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync) {
     ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                    m_generation,
                     m_partitionId,
                     m_signature,
                     block,
-                    sync,
-                    endOfStream);
+                    sync);
 }

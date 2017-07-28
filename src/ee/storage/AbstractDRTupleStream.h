@@ -49,7 +49,7 @@ public:
 
     virtual ~AbstractDRTupleStream() {}
 
-    virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
+    virtual void pushExportBuffer(StreamBlock *block, bool sync);
     /** truncate stream back to mark */
     virtual void rollbackTo(size_t mark, size_t drRowCost);
 

@@ -147,7 +147,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(JILjava/lang/String;JJLjava/nio/ByteBuffer;ZZ)V");
+            "(ILjava/lang/String;JJLjava/nio/ByteBuffer;Z)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
@@ -429,12 +429,10 @@ int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
 }
 
 void JNITopend::pushExportBuffer(
-        int64_t exportGeneration,
         int32_t partitionId,
         string signature,
         StreamBlock *block,
-        bool sync,
-        bool endOfStream) {
+        bool sync) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
@@ -446,28 +444,24 @@ void JNITopend::pushExportBuffer(
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,
                 m_pushExportBufferMID,
-                exportGeneration,
                 partitionId,
                 signatureString,
                 block->uso(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
-                sync ? JNI_TRUE : JNI_FALSE,
-                endOfStream ? JNI_TRUE : JNI_FALSE);
+                sync ? JNI_TRUE : JNI_FALSE);
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
         //std::cout << "Block is null" << std::endl;
         m_jniEnv->CallStaticVoidMethod(
                         m_exportManagerClass,
                         m_pushExportBufferMID,
-                        exportGeneration,
                         partitionId,
                         signatureString,
                         static_cast<int64_t>(0),
                         NULL,
                         NULL,
-                        sync ? JNI_TRUE : JNI_FALSE,
-                        endOfStream ? JNI_TRUE : JNI_FALSE);
+                        sync ? JNI_TRUE : JNI_FALSE);
     }
     m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {

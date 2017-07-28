@@ -28,6 +28,12 @@ public class AdvertisedDataSource
 
     /*
      * Enumeration defining what format the blocks of export data are in.
+     *
+     * New export format added 7.x. This is the the format export uses.
+     * In 7.x format, each exported row contains schema of the tuple row -
+     * tablename, column info (type, name and length), and data is all
+     * wrapped in the row.
+     *
      * Updated for 4.4 to use smaller values for integers and a binary variable size
      * representation for decimals so that the format would be more efficient and
      * shareable with other features

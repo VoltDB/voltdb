@@ -20,13 +20,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.CUSTOM;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.ELASTICSEARCH;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.FILE;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.HTTP;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.JDBC;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.KAFKA;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.RABBITMQ;
 import org.voltdb.utils.CatalogUtil;
 
 public class PushSpecificGeneration {
@@ -80,7 +73,7 @@ public class PushSpecificGeneration {
                     }
                     break;
             }
-            StandaloneExportManager.initialize(0, args[1], exportClientClassName, dep.getExport().getConfiguration().get(0).getProperty());
+            StandaloneExportManager.initialize(args[1], exportClientClassName, dep.getExport().getConfiguration().get(0).getProperty());
             int maxPart = dep.getCluster().getSitesperhost();
             System.out.println("Please wait...|");
             while (true) {
