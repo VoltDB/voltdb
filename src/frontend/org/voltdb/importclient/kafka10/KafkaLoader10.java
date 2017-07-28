@@ -19,7 +19,6 @@ package org.voltdb.importclient.kafka10;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -59,19 +58,19 @@ public class KafkaLoader10 implements ImporterLifecycle {
     private static final String KEY_DESERIALIZER = ByteArrayDeserializer.class.getName();
     private static final String VALUE_DESERIALIZER = ByteArrayDeserializer.class.getName();
 
-    private CLIOptions m_cliOptions;
+    private Kafka10LoaderCLIArguments m_cliOptions;
     private final static AtomicLong m_failedCount = new AtomicLong(0);
     private CSVDataLoader m_loader = null;
     private Client m_client = null;
     private ExecutorService m_executorService = null;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     private List<Kafka10ExternalConsumerRunner> m_consumers;
-    private final long pollTimedWaitInMilliSec = Integer.getInteger("KAFKALOADER_POLLED_WAIT_MILLI_SECONDS", 1000); // 1 second
+    private final long pollTimedWaitInMilliSec = Integer.getInteger("KAFKALOADER_POLLED_WAIT_MILLI_SECONDS", 1000); // 1 second NEEDSWORK
     private ExecutorService m_callbackExecutor = null;
 
     private volatile boolean m_stopping = false;
 
-    public KafkaLoader10(CLIOptions options) {
+    public KafkaLoader10(Kafka10LoaderCLIArguments options) {
         m_cliOptions = options;
     }
 
@@ -128,110 +127,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
         closeClient();
     }
 
-    public static class CLIOptions extends CLIConfig {
-
-        @Option(shortOpt = "p", desc = "Procedure name to insert the data into the database")
-        String procedure = "";
-
-        // This is set to true when -p option us used.
-        boolean useSuppliedProcedure = false;
-
-        @Option(shortOpt = "t", desc = "Kafka topic to subscribe to")
-        String topic = "";
-
-        @Option(shortOpt = "m", desc = "Maximum errors allowed (default: 100)")
-        int maxerrors = 100;
-
-        @Option(shortOpt = "s", desc = "Comma separated list of the form server[:port] to connect to (default: localhost:"
-                + Client.VOLTDB_SERVER_PORT + ")")
-        String servers = "localhost:" + Client.VOLTDB_SERVER_PORT;
-
-        @Option(desc = "Username when connecting to the database")
-        String user = "";
-
-        @Option(desc = "Password to use when connecting to database")
-        String password = "";
-
-        @Option(shortOpt = "b", desc = "Comma separated list of kafka broker(s) to connect to. (format: broker:port)")
-        String brokers = ""; //No default here as default will clash with local voltdb cluster
-
-        @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds (default: 10)")
-        int flush = 10;
-
-        @Option(shortOpt = "k", desc = "Kafka topic partitions (default: 10)")
-        int kpartitions = 10;
-
-        @Option(shortOpt = "c", desc = "Kafka consumer configuration file")
-        String config = "";
-
-        @Option(desc = "Formatter configuration file (optional)")
-        String formatter = "";
-
-        /**
-         * Batch size for processing batched operations.
-         */
-        @Option(desc = "Batch Size for processing (default: 200)")
-        public int batch = 200;
-
-        /**
-         * Table name to insert CSV data into.
-         */
-        @AdditionalArgs(desc = "Insert the data into this table.")
-        public String table = "";
-
-        @Option(desc = "Use upsert instead of insert", hasArg = false)
-        boolean update = false;
-
-        @Option(desc = "Enable SSL, optionally provide configuration file")
-        String ssl = "";
-
-        //Read properties from formatter option and do basic validation.
-        Properties m_formatterProperties = new Properties();
-        /**
-         * Validate command line options.
-         */
-        @Override
-        public void validate() {
-            if (batch < 0) {
-                exitWithMessageAndUsage("batch size number must be >= 0");
-            }
-            if (flush <= 0) {
-                exitWithMessageAndUsage("Periodic Flush Interval must be > 0");
-            }
-            if (topic.trim().isEmpty()) {
-                exitWithMessageAndUsage("Topic must be specified.");
-            }
-            if (brokers.trim().isEmpty()) {
-                exitWithMessageAndUsage("Kafka bootstrap server must be specified.");
-            }
-            if (servers.trim().isEmpty()) {
-                exitWithMessageAndUsage("Provided server list can't be empty");
-            }
-
-            if (procedure.trim().isEmpty() && table.trim().isEmpty()) {
-                exitWithMessageAndUsage("procedure name or a table name required");
-            }
-            if (!procedure.trim().isEmpty() && !table.trim().isEmpty()) {
-                exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
-            }
-            if (!procedure.trim().isEmpty()) {
-                useSuppliedProcedure = true;
-            }
-            if ((useSuppliedProcedure) && (update)){
-                update = false;
-                exitWithMessageAndUsage("Update is not applicable when stored procedure specified");
-            }
-        }
-
-        /**
-         * Usage
-         */
-        @Override
-        public void printUsage() {
-            System.out.println("Usage: kafkaloader10 [args] -b kafka-brokers -t topic tablename");
-            super.printUsage();
-        }
-    }
 
     class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler, BulkLoaderSuccessCallback {
 
@@ -333,11 +228,11 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
 
         // create as many threads equal as number of partitions specified in config
-        ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.kpartitions); // NEEDSWORK: Change this CLI argument to be 'consumercount'
+        ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.getConsumerCount());
         m_consumers = new ArrayList<>();
         try {
             KafkaConsumer<byte[], byte[]> consumer = null;
-            for (int i = 0; i < m_cliOptions.kpartitions; i++) {
+            for (int i = 0; i < m_cliOptions.getConsumerCount(); i++) {
                 consumer = new KafkaConsumer<>(props);
                 m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer, m_loader));
 
@@ -381,7 +276,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
             clientConfig.enableSSL();
         }
         clientConfig.setProcedureCallTimeout(0);
-        m_client = getVoltClient(clientConfig, serverlist);
+        m_client = getVoltClient(clientConfig, m_cliOptions.getVoltHosts());
 
         KafkaBulkLoaderCallback kafkaBulkLoaderCallback = new KafkaBulkLoaderCallback();
 
@@ -405,30 +300,13 @@ public class KafkaLoader10 implements ImporterLifecycle {
         }
     }
 
-    /**
-     * Get connection to servers in cluster.
-     *
-     * @param config
-     * @param servers
-     * @return client
-     * @throws Exception
+    /*
+     * Create a Volt client from the supplied configuration and list of servers.
      */
-    public static Client getVoltClient(ClientConfig config, String[] servers) throws Exception {
-        config.setTopologyChangeAware(true);
+    private static Client getVoltClient(ClientConfig config, List<String> hosts) throws Exception {
         final Client client = ClientFactory.createClient(config);
-        for (String server : servers) {
-            try {
-                client.createConnection(server.trim());
-            } catch (IOException e) {
-                // Only swallow exceptions caused by Java network or connection problem
-                // Unresolved hostname exceptions will be thrown
-            }
-        }
-        if (client.getConnectedHostList().isEmpty()) {
-            try {
-                client.close();
-            } catch (Exception ignore) {}
-            throw new Exception("Unable to connect to any VoltDB hosts.");
+        for (String host : hosts) {
+            client.createConnection(host);
         }
         return client;
     }
@@ -440,25 +318,12 @@ public class KafkaLoader10 implements ImporterLifecycle {
      *
      */
     public static void main(String[] args) {
-        final CLIOptions options = new CLIOptions();
+
+        final Kafka10LoaderCLIArguments options = new Kafka10LoaderCLIArguments();
         options.parse(KafkaLoader10.class.getName(), args);
 
-        if (!options.formatter.trim().isEmpty()) {
-            try {
-                InputStream pfile = new FileInputStream(options.formatter);
-                options.m_formatterProperties.load(pfile);
-            } catch (IOException terminate) {
-                m_log.error("Failed to load formatter properties", terminate);
-                System.exit(-1);
-            }
-            String formatter = options.m_formatterProperties.getProperty("formatter");
-            if (formatter == null || formatter.trim().isEmpty()) {
-                m_log.error("Formatter class must be specified in formatter file as formatter=<class>: " + options.formatter);
-                System.exit(-1);
-            }
-        }
-
         KafkaLoader10 kloader = new KafkaLoader10(options);
+
         try {
             kloader.processKafkaMessages();
         } catch (Exception e) {

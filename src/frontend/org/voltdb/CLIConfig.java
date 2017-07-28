@@ -28,13 +28,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
+import javax.net.ssl.SSLContext;
+
 import org.apache.commons_voltpatches.cli.CommandLine;
 import org.apache.commons_voltpatches.cli.CommandLineParser;
 import org.apache.commons_voltpatches.cli.HelpFormatter;
 import org.apache.commons_voltpatches.cli.Options;
 import org.apache.commons_voltpatches.cli.PosixParser;
-
-import javax.net.ssl.SSLContext;
 
 public abstract class CLIConfig {
 
@@ -127,7 +127,7 @@ public abstract class CLIConfig {
         try {
             options.addOption("help","h", false, "Print this message");
             // add all of the declared options to the cli
-            for (Field field : getClass().getDeclaredFields()) {
+            for (Field field : getClass().getFields()) {
                 if (field.isAnnotationPresent(Option.class)) {
                         Option option = field.getAnnotation(Option.class);
 
@@ -165,7 +165,7 @@ public abstract class CLIConfig {
             // string key-value pairs
             Map<String, String> kvMap = new TreeMap<String, String>();
 
-            for (Field field : getClass().getDeclaredFields()) {
+            for (Field field : getClass().getFields()) {
                 if (field.isAnnotationPresent(Option.class) ) {
                          Option option = field.getAnnotation(Option.class);
                      String opt = option.opt();
@@ -206,7 +206,7 @@ public abstract class CLIConfig {
             }
             if (leftargs != null) {
                 if (leftargs.length <= leftover) {
-                        Field[] fields = getClass().getDeclaredFields();
+                        Field[] fields = getClass().getFields();
                     for (int i = 0,j=0; i<leftargs.length; i++) {
                         for (;j < fields.length; j++) {
                                 if (fields[j].isAnnotationPresent(AdditionalArgs.class)) {
