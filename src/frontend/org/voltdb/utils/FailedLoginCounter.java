@@ -56,8 +56,8 @@ public class FailedLoginCounter {
     }
 
     public void logMessage(long timestampMilis, String user) {
-    	//checkCounter(timestamp);
-    	int timestampSeconds = (int)(timestampMilis/1000);
+    //checkCounter(timestamp);
+    int timestampSeconds = (int)(timestampMilis/1000);
         if (m_buckets.containsKey(timestampSeconds)) {
             Map<String,Integer> bucket = m_buckets.get(timestampSeconds);
             int bucketCount = bucket.getOrDefault(user,0) + 1;
