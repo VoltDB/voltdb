@@ -154,6 +154,7 @@ class Stats(object):
                     'total': total,
                     'percent': percent
                 }
+
                 add_job = ('INSERT INTO `junit-builds` '
                            '(name, stamp, url, build, fails, total, percent) '
                            'VALUES (%(name)s, %(timestamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
@@ -191,8 +192,11 @@ class Stats(object):
                         for case in cases:
                             name = case['className'] + '.' + case['name']
                             status = case['status']
-                            testcase_url = child['child']['url'] + 'testReport/' + name
-                            testcase_url.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
+                            url_name = name.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
+                            if "vdm-py-test" in child['child']['url']:
+                                testcase_url = child['child']['url'] + 'testReport/' + '(root)/' + url_name
+                            else:
+                                testcase_url = child['child']['url'] + 'testReport/' + url_name
                             # Record tests that don't pass.
                             if status != 'PASSED':
                                 test_data = {

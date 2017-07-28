@@ -247,6 +247,10 @@ public class RegressionSuite extends TestCase {
         return getClientToHostId(hostId, 1000 * 60 * 10); // 10 minute default
     }
 
+    public Client getClientToSubsetHosts(int[] hostIds) throws IOException {
+        return getClientToSubsetHosts(hostIds, 1000 * 60 * 10); // 10 minute default
+    }
+
     public Client getFullyConnectedClient() throws IOException {
         return getFullyConnectedClient(1000 * 60 * 10); // 10 minute default
     }
@@ -360,6 +364,28 @@ public class RegressionSuite extends TestCase {
         // retry once
         catch (ConnectException e) {
             client.createConnection(listener);
+        }
+        m_clients.add(client);
+        return client;
+    }
+
+    public Client getClientToSubsetHosts(int[] hostIds, long timeout) throws IOException {
+        List<String> listeners = new ArrayList<String>();
+        for (int hostId : hostIds) {
+            listeners.add(m_config.getListenerAddress(hostId));
+        }
+        ClientConfig config = new ClientConfigForTest(m_username, m_password);
+        config.setConnectionResponseTimeout(timeout);
+        config.setProcedureCallTimeout(timeout);
+        final Client client = ClientFactory.createClient(config);
+        for (String listener : listeners) {
+            try {
+                client.createConnection(listener);
+            }
+            // retry once
+            catch (ConnectException e) {
+                client.createConnection(listener);
+            }
         }
         m_clients.add(client);
         return client;
@@ -495,7 +521,7 @@ public class RegressionSuite extends TestCase {
         validateTableOfLongs(sql, vt, expected);
     }
 
-    static protected void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
+    static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
         assertEquals("Different number of rows! ", expected.length, vt.getRowCount());
         int len = expected.length;

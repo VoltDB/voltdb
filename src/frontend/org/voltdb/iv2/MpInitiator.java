@@ -27,7 +27,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.ProducerDRGateway;
@@ -67,7 +66,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
@@ -83,15 +81,14 @@ public class MpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
-                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, false);
+                numberOfPartitions, startAction, null, null, cl, coreBindIds, false);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
                 backend,
                 catalogContext,
                 m_partitionId,
-                m_initiatorMailbox,
-                csp);
+                m_initiatorMailbox);
         sched.setMpRoSitePool(sitePool);
 
         // add ourselves to the ephemeral node list which BabySitters will watch for this
@@ -201,21 +198,21 @@ public class MpInitiator extends BaseInitiator implements Promotable
      * be blocked running the EveryPartitionTask for the catalog update, this
      * is currently safe with no locking.  And yes, I'm a horrible person.
      */
-    public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
+    public void updateCatalog(String diffCmds, CatalogContext context,
             boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
     {
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
-        m_executionSite.updateCatalog(diffCmds, context, csp, false, true, Long.MIN_VALUE, Long.MIN_VALUE,
+        m_executionSite.updateCatalog(diffCmds, context, false, true, Long.MIN_VALUE, Long.MIN_VALUE,
                 requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
         MpScheduler sched = (MpScheduler)m_scheduler;
-        sched.updateCatalog(diffCmds, context, csp);
+        sched.updateCatalog(diffCmds, context);
     }
 
-    public void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    public void updateSettings(CatalogContext context)
     {
-        m_executionSite.updateSettings(context, csp);
+        m_executionSite.updateSettings(context);
         MpScheduler sched = (MpScheduler)m_scheduler;
-        sched.updateSettings(context, csp);
+        sched.updateSettings(context);
     }
 
     @Override
