@@ -288,9 +288,9 @@ public class ImportManager implements ChannelChangeCallback {
         if (m_processor.get() == null) {
             return;
         }
-        if (m_serverStarted) {
+        //if (m_serverStarted) {
             m_processor.get().shutdown();
-        }
+        //}
         //Unset until it gets started.
         m_processor.set(null);
     }

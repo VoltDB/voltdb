@@ -60,6 +60,8 @@ public class ServerSocketImporterConfig implements ImporterConfig
             throw new IllegalArgumentException("Invalid port specification: " + portStr);
         }
 
+        propsCopy.getProperty("deferSocketCreation")
+
         ServerSocket socket = null;
         do {
             try {
