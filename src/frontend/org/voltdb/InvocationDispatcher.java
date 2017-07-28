@@ -43,7 +43,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
@@ -285,6 +284,8 @@ public final class InvocationDispatcher {
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
 
+        String clientInfo = ccxn.getHostnameAndIPAndPort();  // Storing the client's ip information
+
         final String procName = task.getProcName();
         final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final StoredProcedureInvocation finalTask = task;
@@ -395,6 +396,7 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
             else if ("@StopNode".equals(procName)) {
+                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                 return dispatchStopNode(task);
             }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
@@ -455,30 +457,25 @@ public final class InvocationDispatcher {
 
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
-            if ((   "@Pause".equals(procName)
+            if (    "@Pause".equals(procName)
                  || "@Resume".equals(procName)
                  || "@PrepareShutdown".equals(procName))
-               && !handler.isAdmin())
             {
-                return unexpectedFailureResponse(
-                        procName + " is not available to this client",
-                        task.clientHandle);
-            }
-
-            // After we verify the shutdown command from an admin user, the detailed information
-            // should be printed out properly. The following message is printed at the node where
-            // the client is connected to.
-            if ("@PrepareShutdown".equals(procName)) {
-                String msg = "Admin: " + ccxn.getHostnameAndIPAndPort() + " issued a PrepareShutdown.";
-                CoreUtils.PrintGoodLookingLog(hostLog, msg, Level.WARN);
+                if (handler.isAdmin() == false) {
+                    return unexpectedFailureResponse(
+                            procName + " is not available to this client",
+                            task.clientHandle);
+                }
+                // Log the invocation with user name and ip information
+                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
             }
         }
         // If you're going to copy and paste something, CnP the pattern
         // up above.  -rtb.
 
-        int partition = -1;
+        int[] partitions = null;
         try {
-            partition = getPartitionForProcedure(catProc, task);
+            partitions = getPartitionsForProcedure(catProc, task);
         } catch (Exception e) {
             // unable to hash to a site, return an error
             return getMispartitionedErrorResponse(task, catProc, e);
@@ -488,7 +485,7 @@ public final class InvocationDispatcher {
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
                         catProc.getEverysite(),
-                        partition,
+                        partitions,
                         task.getSerializedSize(),
                         nowNanos);
         if (!success) {
@@ -671,26 +668,17 @@ public final class InvocationDispatcher {
                     "Invalid Host Id or Host Id not member of cluster: " + ihid,
                     task.clientHandle);
         }
-        if (!m_cartographer.isClusterSafeIfNodeDies(liveHids, ihid)) {
-            hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
-                    + " Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
-                    + " And all rejoin nodes should be completed."
-                    + " Use shutdown to stop the cluster.");
+        String reason = m_cartographer.stopNodeIfClusterIsSafe(liveHids, ihid);
+        if (reason != null) {
+            hostLog.info("It's unsafe to shutdown node " + ihid
+                    + ". Cannot stop the requested node. " + reason
+                    + ". Use shutdown to stop the cluster.");
             return gracefulFailureResponse(
-                    "Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
-                  + " And all rejoin nodes should be completed."
-                  + " Use shutdown to stop the cluster.", task.clientHandle);
+                    "It's unsafe to shutdown node " + ihid
+                  + ". Cannot stop the requested node. " + reason
+                  + ". Use shutdown to stop the cluster.", task.clientHandle);
         }
 
-
-        int hid = hostMessenger.getHostId();
-        if (hid == ihid) {
-            //Killing myself no pill needs to be sent
-            VoltDB.instance().halt();
-        } else {
-            //Send poison pill with target to kill
-            hostMessenger.sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
-        }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
@@ -825,7 +813,7 @@ public final class InvocationDispatcher {
                           catProc.getReadonly(),
                           catProc.getSinglepartition(),
                           catProc.getEverysite(),
-                          partition,
+                          new int[] { partition },
                           task.getSerializedSize(),
                           System.nanoTime());
         return null;
@@ -1172,7 +1160,7 @@ public final class InvocationDispatcher {
             final boolean isReadOnly,
             final boolean isSinglePartition,
             final boolean isEveryPartition,
-            final int partition,
+            final int[] partitions,
             final int messageSize,
             final long nowNanos)
     {
@@ -1184,7 +1172,7 @@ public final class InvocationDispatcher {
                 isReadOnly,
                 isSinglePartition,
                 isEveryPartition,
-                partition,
+                partitions,
                 messageSize,
                 nowNanos,
                 false);  // is for replay.
@@ -1199,12 +1187,12 @@ public final class InvocationDispatcher {
             final boolean isReadOnly,
             final boolean isSinglePartition,
             final boolean isEveryPartition,
-            final int partition,
+            final int[] partitions,
             final int messageSize,
             long nowNanos,
             final boolean isForReplay)
     {
-        assert(!isSinglePartition || (partition >= 0));
+        assert(!isSinglePartition || (partitions.length == 1));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
             hostLog.rateLimitedLog(60, Level.WARN, null,
@@ -1226,12 +1214,12 @@ public final class InvocationDispatcher {
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
-                initiatorHSId = m_localReplicas.get().get(partition);
+                initiatorHSId = m_localReplicas.get().get(partitions[0]);
             }
             if (initiatorHSId != null) {
                 isShortCircuitRead = true;
             } else {
-                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
+                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
             }
         } else {
             // Multi-part transactions go to the multi-part coordinator
@@ -1244,7 +1232,7 @@ public final class InvocationDispatcher {
             }
         }
 
-        long handle = cihm.getHandle(isSinglePartition, partition, invocation.getClientHandle(),
+        long handle = cihm.getHandle(isSinglePartition, isSinglePartition ? partitions[0] : -1, invocation.getClientHandle(),
                 messageSize, nowNanos, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
 
         Iv2InitiateTaskMessage workRequest =
@@ -1255,6 +1243,7 @@ public final class InvocationDispatcher {
                     uniqueId,
                     isReadOnly,
                     isSinglePartition,
+                    (partitions == null) || (partitions.length < 2) ? null : partitions,
                     invocation,
                     handle,
                     connectionId,
@@ -1267,7 +1256,7 @@ public final class InvocationDispatcher {
                                                       invocation.getClientHandle(),
                                                       "clientHandle", Long.toString(invocation.getClientHandle()),
                                                       "ciHandle", Long.toString(handle),
-                                                      "partition", Integer.toString(partition),
+                                                      "partitions", partitions.toString(),
                                                       "dest", CoreUtils.hsIdToString(finalInitiatorHSId)));
         }
 
@@ -1276,14 +1265,24 @@ public final class InvocationDispatcher {
         return true;
     }
 
-    final static int getPartitionForProcedure(Procedure procedure, StoredProcedureInvocation task) {
+    final static int[] getPartitionsForProcedure(Procedure procedure, StoredProcedureInvocation task) {
         final CatalogContext.ProcedurePartitionInfo ppi =
-                (CatalogContext.ProcedurePartitionInfo)procedure.getAttachment();
+                (CatalogContext.ProcedurePartitionInfo) procedure.getAttachment();
         if (procedure.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
-            return getPartitionForProcedure( ppi.index, ppi.type, task);
+            return new int[] { getPartitionForProcedureParameter( ppi.index, ppi.type, task) };
+        } else if (procedure.getPartitioncolumn2() != null) {
+            // two-partition procedure
+            VoltType partitionParamType1 = VoltType.get((byte)procedure.getPartitioncolumn().getType());
+            VoltType partitionParamType2 = VoltType.get((byte)procedure.getPartitioncolumn2().getType());
+
+            int p1 = getPartitionForProcedureParameter(procedure.getPartitionparameter(), partitionParamType1, task);
+            int p2 = getPartitionForProcedureParameter(procedure.getPartitionparameter2(), partitionParamType2, task);
+
+            return new int[] { p1, p2 };
         } else {
-            return MpInitiator.MP_INIT_PID;
+            // multi-partition procedure
+            return new int[] { MpInitiator.MP_INIT_PID };
         }
     }
 
@@ -1316,7 +1315,7 @@ public final class InvocationDispatcher {
      * Identify the partition for an execution site task.
      * @return The partition best set up to execute the procedure.
      */
-    final static int getPartitionForProcedure(int partitionIndex, VoltType partitionType, StoredProcedureInvocation task) {
+    final static int getPartitionForProcedureParameter(int partitionIndex, VoltType partitionType, StoredProcedureInvocation task) {
         Object invocationParameter = task.getParameterAtIndex(partitionIndex);
         return TheHashinator.getPartitionForParameter(partitionType, invocationParameter);
     }

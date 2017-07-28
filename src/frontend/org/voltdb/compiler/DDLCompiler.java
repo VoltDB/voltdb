@@ -37,7 +37,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 
-import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -56,7 +55,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
-import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
@@ -69,7 +67,6 @@ import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
 import org.voltdb.compiler.statements.DropStream;
-import org.voltdb.compiler.statements.ImportClass;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
@@ -199,7 +196,6 @@ public class DDLCompiler {
                                 .addNextProcessor(new DropProcedure(this))
                                 .addNextProcessor(new PartitionStatement(this))
                                 .addNextProcessor(new ReplicateTable(this))
-                                .addNextProcessor(new ImportClass(this))
                                 .addNextProcessor(new CreateRole(this))
                                 .addNextProcessor(new DropRole(this))
                                 .addNextProcessor(new DropStream(this))
@@ -657,93 +653,6 @@ public class DDLCompiler {
                     + "expected syntax: CREATE STREAM <table> [PARTITION ON COLUMN <column-name>] [EXPORT TO TARGET <target>] (column datatype, ...); ",
                     statement.substring(0, statement.length() - 1)));
         }
-    }
-
-    public static class CreateProcedurePartitionData {
-        String tableName = null;
-        String columnName = null;
-        String parameterNo = null;
-    }
-
-    /**
-     * Parse and validate the substring containing ALLOW and PARTITION
-     * clauses for CREATE PROCEDURE.
-     * @param clauses  the substring to parse
-     * @param descriptor  procedure descriptor populated with role names from ALLOW clause
-     * @return  parsed and validated partition data or null if there was no PARTITION clause
-     * @throws VoltCompilerException
-     */
-    private CreateProcedurePartitionData parseCreateProcedureClauses(
-            ProcedureDescriptor descriptor,
-            String clauses) throws VoltCompilerException {
-
-        // Nothing to do if there were no clauses.
-        // Null means there's no partition data to return.
-        // There's also no roles to add.
-        if (clauses == null || clauses.isEmpty()) {
-            return null;
-        }
-        CreateProcedurePartitionData data = null;
-
-        Matcher matcher = SQLParser.matchAnyCreateProcedureStatementClause(clauses);
-        int start = 0;
-        while (matcher.find(start)) {
-            start = matcher.end();
-
-            if (matcher.group(1) != null) {
-                // Add roles if it's an ALLOW clause. More that one ALLOW clause is okay.
-                for (String roleName : StringUtils.split(matcher.group(1), ',')) {
-                    // Don't put the same role in the list more than once.
-                   String roleNameFixed = roleName.trim().toLowerCase();
-                    if (!descriptor.m_authGroups.contains(roleNameFixed)) {
-                        descriptor.m_authGroups.add(roleNameFixed);
-                    }
-                }
-            }
-            else {
-                // Add partition info if it's a PARTITION clause. Only one is allowed.
-                if (data != null) {
-                    throw m_compiler.new VoltCompilerException(
-                        "Only one PARTITION clause is allowed for CREATE PROCEDURE.");
-                }
-                data = new CreateProcedurePartitionData();
-                data.tableName = matcher.group(2);
-                data.columnName = matcher.group(3);
-                data.parameterNo = matcher.group(4);
-            }
-        }
-
-        return data;
-    }
-
-    private void addProcedurePartitionInfo(
-            String procName,
-            CreateProcedurePartitionData data,
-            String statement) throws VoltCompilerException {
-
-        assert(procName != null);
-
-        // Will be null when there is no optional partition clause.
-        if (data == null) {
-            return;
-        }
-
-        assert(data.tableName != null);
-        assert(data.columnName != null);
-
-        // Check the identifiers.
-        checkIdentifierStart(procName, statement);
-        checkIdentifierStart(data.tableName, statement);
-        checkIdentifierStart(data.columnName, statement);
-
-        // if not specified default parameter index to 0
-        if (data.parameterNo == null) {
-            data.parameterNo = "0";
-        }
-
-        String partitionInfo = String.format("%s.%s: %s", data.tableName, data.columnName, data.parameterNo);
-
-        m_tracker.addProcedurePartitionInfoTo(procName, partitionInfo);
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)

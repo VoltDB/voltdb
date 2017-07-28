@@ -513,13 +513,17 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "partition table Table1 on column Column1;" +
             "create procedure proc1 as select * from Table1 where Column1=?;" +
             "partition procedure proc1 on table Table1 column Column1;" +
-            "create procedure proc2 as select * from Table1 where Column2=?;" +
-            "import class org.voltdb_testprocs.fullddlfeatures.*;" +
-            "create procedure from class org.voltdb_testprocs.fullddlfeatures.testImportProc;";
+            "create procedure proc2 as select * from Table1 where Column2=?;";
 
         VoltCompiler c = compileForDDLTest2(schema);
+        InMemoryJarfile jar = new InMemoryJarfile(testout_jar);
+        c.addClassToJar(jar, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
+        c.addClassToJar(jar, org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc.class);
+        c.addClassToJar(jar, org.voltdb_testprocs.fullddlfeatures.NoMeaningClass.class);
+        c.compileInMemoryJarfileWithNewDDL(jar, "create procedure from class org.voltdb_testprocs.fullddlfeatures.testImportProc;", c.getCatalog());
+
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, jar);
         VoltTable classes = dut.getMetaData("classes");
         System.out.println(classes);
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testImportProc"));

@@ -29,6 +29,15 @@ public class SiteTaskerQueue
     private final LinkedTransferQueue<SiteTasker> m_tasks = new LinkedTransferQueue<SiteTasker>();
     private StarvationTracker m_starvationTracker;
     private QueueDepthTracker m_queueDepthTracker;
+    private int m_partitionId;
+
+    public SiteTaskerQueue(int partitionId) {
+        m_partitionId = partitionId;
+    }
+
+    public int getPartitionId() {
+        return m_partitionId;
+    }
 
     public boolean offer(SiteTasker task)
     {
@@ -86,8 +95,8 @@ public class SiteTaskerQueue
         m_starvationTracker = tracker;
     }
 
-    public void setQueueDepthTracker(QueueDepthTracker tracker) {
-        m_queueDepthTracker = tracker;
-        m_queueDepthTracker.beginQueueDepth(m_tasks.size(), m_tasks);
+    public QueueDepthTracker setupQueueDepthTracker(long siteId) {
+        m_queueDepthTracker = new QueueDepthTracker(siteId, m_tasks);
+        return m_queueDepthTracker;
     }
 }

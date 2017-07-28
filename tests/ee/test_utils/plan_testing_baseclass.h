@@ -181,6 +181,8 @@ public:
             //
             // When we delete the VoltDBEngine
             // it will cleanup all the tables for us.
+            // The m_pool will delete all of its memory
+            // as well.  So we should be good here.
             //
         }
 
@@ -234,18 +236,14 @@ public:
                          int                             num_strings) {
         voltdb::PersistentTable *pTable = getPersistentTableAndId(tableName.c_str(), tableId, table);
         if (pTable == NULL) {
-            std::cout << "Cannot find table "
-                      << tableName
-                      << " in the schema."
-                      << std::endl;
+            std::ostringstream oss;
+            oss << "Cannot find table "
+                << tableName
+                << " in the schema."
+                << std::endl;
+            throw std::logic_error(oss.str());
         }
         assert(pTable != NULL);
-        std::cout << "Initializing table "
-                  << tableName
-                  << " with "
-                  << nRows
-                  << " rows."
-                  << std::endl;
         for (int row = 0; row < nRows; row += 1) {
             if (row > 0 && (row % 100 == 0)) {
                 std::cout << '.';
@@ -260,16 +258,16 @@ public:
                     val = vals[(row*nCols) + col];
                     if (types[col] == voltdb::VALUE_TYPE_VARCHAR) {
                         if (val < 0 || (num_strings <= val)) {
-                            std::cerr << "string index "
-                                      << val
-                                      << " out of range [0, "
-                                      << num_strings
-                                      << "]"
-                                      << std::endl;
-                            ASSERT_TRUE(0);
+                            std::ostringstream oss;
+                            oss << "string index "
+                                << val
+                                << " out of range [0, "
+                                << num_strings
+                                << "]"
+                                << std::endl;
+                            throw std::logic_error(oss.str());
                         }
-                        strstr = std::string(strings[val]);
-                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strstr.c_str());
+                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strings[val], &m_pool);
                         tuple.setNValue(col, nval);
                     } else {
                         voltdb::NValue nval = voltdb::ValueFactory::getIntegerValue(val);
@@ -279,7 +277,7 @@ public:
                     // If we have no values, generate them randomly.
                     if (types[col] == voltdb::VALUE_TYPE_VARCHAR) {
                         strstr = getRandomString(1, typesizes[col]);
-                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strstr.c_str());
+                        voltdb::NValue nval = voltdb::ValueFactory::getStringValue(strstr.c_str(), &m_pool);
                         tuple.setNValue(col, nval);
                     } else {
                         val = getRandomInt(0, typesizes[col]);
@@ -351,21 +349,21 @@ public:
     void executeFragment(fragmentId_t fragmentId, const char *plan) {
         m_topend->addPlan(fragmentId, plan);
 
-            // Make sure the parameter buffer is filled
-            // with healthful zeros, and then create an input
-            // deserializer.
-            memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
-            voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), m_smallBufferSize);
+        // Make sure the parameter buffer is filled
+        // with healthful zeros, and then create an input
+        // deserializer.
+        memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
+        voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), m_smallBufferSize);
 
-            //
-            // Execute the plan.  You'd think this would be more
-            // impressive.
-            //
-            try {
-                m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1, false);
-            } catch (voltdb::SerializableEEException &ex) {
-                throw;
-            }
+        //
+        // Execute the plan.  You'd think this would be more
+        // impressive.
+        //
+        try {
+            m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1, false);
+        } catch (voltdb::SerializableEEException &ex) {
+            throw;
+        }
     }
 
     /**
@@ -384,12 +382,22 @@ public:
 
         const voltdb::TupleSchema* res_schema = result->schema();
         voltdb::TableTuple tuple(res_schema);
-        voltdb::TableIterator &iter = result->iterator();
+        voltdb::TableIterator iter = result->iterator();
         if (!iter.hasNext() && nRows > 0) {
             printf("No results!!\n");
             ASSERT_FALSE(true);
         }
-        ASSERT_EQ(nCols, result->columnCount());
+        int32_t resColCount = result->columnCount();
+        if (nCols != resColCount) {
+            std::ostringstream oss;
+            oss << "Error: nCols = "
+                << nCols
+                << " != resColCount = "
+                << resColCount
+                << "."
+                << std::endl;
+        }
+        ASSERT_EQ(nCols, resColCount);
         bool failed = false;
         for (int32_t row = 0; row < nRows; row += 1) {
             ASSERT_TRUE(iter.next(tuple));
@@ -426,17 +434,22 @@ public:
                         failed = true;
                     }
                 } else {
-                    printf("Value type %d is not expected.  Only %d and %d are supported.\n",
-                           answer->m_types[col],
-                           voltdb::VALUE_TYPE_INTEGER,
-                           voltdb::VALUE_TYPE_VARCHAR);
+                    std::ostringstream oss;
+                    oss << "Value type "
+                        << answer->m_types[col]
+                        << " Only "
+                        << voltdb::VALUE_TYPE_INTEGER
+                        << " and "
+                        << voltdb::VALUE_TYPE_VARCHAR
+                        << " are supported."
+                        << std::endl;
+                    throw std::logic_error(oss.str());
                 }
             }
         }
         bool hasNext = iter.next(tuple);
         if (hasNext) {
-            VOLT_TRACE("Unexpected next element\n");
-            failed = true;
+            throw std::logic_error("Unexpected next element\n");
         }
         ASSERT_EQ(expectFail, failed);
     }
@@ -532,6 +545,7 @@ protected:
     static const size_t  m_smallBufferSize = 4 * 1024;
     // The size of the result buffer.
     static const size_t m_resultBufferSize = 1024 * 1024 * 2;
+    voltdb::Pool        m_pool;
 };
 
 #endif /* TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_ */

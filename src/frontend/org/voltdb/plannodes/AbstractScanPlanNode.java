@@ -256,7 +256,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (m_tableSchema == null) {
             initTableSchema(db);
         }
-
+        InsertPlanNode ins = (InsertPlanNode)getInlinePlanNode(PlanNodeType.INSERT);
+        if (ins != null) {
+            ins.generateOutputSchema(db);
+        }
         initPreAggOutputSchema();
 
         // Generate the output schema for subqueries
@@ -282,9 +285,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     // specified for this table and whether or not there is an inlined
     // projection.
     //
-    // If there is an inlined projection, then we'll just steal that
+    // If there is an inline projection, then we'll just steal that
     // output schema as our own.
-    // If there is no inlined projection, then, if there are no scan columns
+    // If there is no existing projection, then, if there are no scan columns
     // specified, use the entire table's schema as the output schema.
     // Otherwise add an inline projection that projects the scan columns
     // and then take that output schema as our own.
@@ -389,11 +392,24 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             tve.setColumnIndexUsingSchema(m_tableSchema);
         }
 
-        // inline projection
+        // inline projection and insert
+        InsertPlanNode ins =
+                (InsertPlanNode)getInlinePlanNode(PlanNodeType.INSERT);
         ProjectionPlanNode proj =
             (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+        // Resolve the inline projection and insert if there are any.
         if (proj != null) {
             proj.resolveColumnIndexesUsingSchema(m_tableSchema);
+        }
+        if (ins != null) {
+            ins.resolveColumnIndexes();
+        }
+        // Snag the insert or projection node's output schema
+        // if there are any, in that order.
+        if (ins != null) {
+            m_outputSchema = ins.getOutputSchema().clone();
+        }
+        else if (proj != null) {
             m_outputSchema = proj.getOutputSchema().clone();
         }
         else {
@@ -502,6 +518,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     protected void copyDifferentiatorMap(
             Map<Integer, Integer> diffMap) {
         m_differentiatorMap = new HashMap<>(diffMap);
+    }
+
+    @Override
+    public String getUpdatedTable() {
+        InsertPlanNode ipn = (InsertPlanNode)getInlinePlanNode(PlanNodeType.INSERT);
+        if (ipn == null) {
+            return null;
+        }
+        return ipn.getUpdatedTable();
     }
 
 }
