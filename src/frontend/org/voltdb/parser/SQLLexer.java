@@ -458,6 +458,7 @@ public class SQLLexer extends SQLPatternFactory
                     inStatement = false;
                     inBegin = false;
                     inCase = 0;
+                    checkForNextBegin = false;
                 } else if (buf[iCur] == '"' || buf[iCur] == '\'') {
                     // Start of quoted string.
                     cQuote = buf[iCur];
