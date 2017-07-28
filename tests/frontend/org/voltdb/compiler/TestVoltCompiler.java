@@ -812,6 +812,11 @@ public class TestVoltCompiler extends TestCase {
                   + "allow r1 "
                   + "allow r2 "
                   + "from class org.voltdb.compiler.procedures.AddBook");
+
+        // check for table and column named begin
+        tester.runtest("create table begin (a int)");
+        tester.runtest("create table t (begin int)");
+        tester.runtest("create table begin (begin int)");
     }
 
     public void testUseInnerClassAsProc() throws Exception {

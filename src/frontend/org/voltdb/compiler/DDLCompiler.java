@@ -868,16 +868,23 @@ public class DDLCompiler {
     private static boolean inBegin = false;
     // To indicate if inside CASE .. WHEN .. END
     private static int inCase = 0;
+    // BEGIN should follow AS for create procedure
+    // added this case since 'begin' can be table or column name
+    private static boolean checkForNextBegin = false;
 
     private static int readingState(char[] nchar, DDLStatement retval) {
 
         if (!Character.isLetterOrDigit(nchar[0])) {
             char prev = prevChar(retval.statement);
-            if (prev == 'n' || prev == 'N') {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") ) {
-                    inBegin = true;
+            if (checkForNextBegin) {
+                if (prev == 'n' || prev == 'N') {
+                    if( checkForNextBegin && SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") ) {
+                        inBegin = true;
+                    }
                 }
-            } else if (prev == 'd' || prev == 'D') {
+                checkForNextBegin = false;
+            }
+            if (prev == 'd' || prev == 'D') {
                 if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 3, "end") ) {
                     if (inCase > 0) {
                         inCase--;
@@ -890,6 +897,10 @@ public class DDLCompiler {
             } else if (prev == 'e' || prev == 'E') {
                 if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 4, "case") ) {
                     inCase++;
+                }
+            } else if (prev == 's' || prev == 'S') {
+                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 2, "as") ) {
+                    checkForNextBegin = true;
                 }
             }
         }
@@ -1100,11 +1111,12 @@ public class DDLCompiler {
             retval.endLineNo = currLineNo;
             inBegin = false;
             inCase = 0;
+            checkForNextBegin = false;
 
             while (state != kStateCompleteStatement) {
                 if (reader.read(nchar) == -1) {
                     // might be useful for the users for debugging if we include the statement which caused the error
-                    String msg = "Schema file ended mid-statement (no semicolon found) for statment:\n" + retval.statement;
+                    String msg = "Schema file ended mid-statement (no semicolon found) for statment: " + retval.statement;
                     throw compiler.new VoltCompilerException(msg, retval.lineNo);
                 }
 
