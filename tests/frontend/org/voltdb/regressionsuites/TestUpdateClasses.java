@@ -152,7 +152,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             assertTrue(threw);
 
             resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
-            System.out.println(((ClientResponseImpl)resp).toJSONString());
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
             // Are we still like summer vacation?
             resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
@@ -858,7 +858,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             resp = m_client.callProcedure("@AdHoc", "select a from t1 where b = 10;");
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            // redundent operation
+            // redundant operation
             resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 

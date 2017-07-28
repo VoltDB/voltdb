@@ -140,6 +140,11 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     for (int i = 0; i < m_columnCount; ++i)
         m_columnNames[i] = columnNames[i];
 
+    m_allowNulls.resize(m_columnCount);
+    for (int i = m_columnCount - 1; i >= 0; --i) {
+        TupleSchema::ColumnInfo const* columnInfo = m_schema->getColumnInfo(i);
+        m_allowNulls[i] = columnInfo->allowNull;
+    }
     // initialize the temp tuple
     m_tempTupleMemory.reset(new char[m_schema->tupleLength() + TUPLE_HEADER_SIZE]);
     m_tempTuple = TableTuple(m_tempTupleMemory.get(), m_schema);
@@ -167,6 +172,17 @@ int Table::columnIndex(const std::string &name) const {
         }
     }
     return -1;
+}
+
+bool Table::checkNulls(TableTuple& tuple) const {
+    assert (m_columnCount == tuple.sizeInValues());
+    for (int i = m_columnCount - 1; i >= 0; --i) {
+        if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
+            VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
+            return false;
+        }
+    }
+    return true;
 }
 
 // ------------------------------------------------------------------

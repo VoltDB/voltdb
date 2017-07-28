@@ -303,7 +303,7 @@ public class ExportManager
         if (hasEnabledConnectors(connectors)) {
             em.createInitialExportProcessor(catalogContext, connectors, true, partitions, isRejoin);
         } else {
-            m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
+            m_lastNonEnabledGeneration = catalogContext.m_genId;
         }
     }
 
@@ -378,7 +378,6 @@ public class ExportManager
     {
         m_hostId = myHostId;
         m_messenger = messenger;
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
         if (!hasEnabledConnectors(connectors)) {
@@ -461,16 +460,16 @@ public class ExportManager
              * So construct one here, otherwise use the one provided
              */
             if (startup) {
-                if (!m_generations.containsKey(catalogContext.m_uniqueId)) {
+                if (!m_generations.containsKey(catalogContext.m_genId)) {
                     final ExportGeneration currentGeneration = new ExportGeneration(
-                            catalogContext.m_uniqueId,
+                            catalogContext.m_genId,
                             exportOverflowDirectory, isRejoin);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
                     currentGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-                    m_generations.put(catalogContext.m_uniqueId, currentGeneration);
+                    m_generations.put(catalogContext.m_genId, currentGeneration);
                 } else {
                     exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used and appended to");
-                    ExportGeneration currentGeneration = m_generations.get(catalogContext.m_uniqueId);
+                    ExportGeneration currentGeneration = m_generations.get(catalogContext.m_genId);
                     currentGeneration.initializeMissingPartitionsFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 }
             }
@@ -547,7 +546,7 @@ public class ExportManager
 
         //Only give the processor to the oldest generation
         for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_uniqueId);
+            ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_genId);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
             if (generation.initializeGenerationFromDisk(connectors, m_messenger)) {
@@ -630,8 +629,9 @@ public class ExportManager
         final CatalogMap<Connector> connectors = db.getConnectors();
 
         updateProcessorConfig(connectors);
+        long genid = catalogContext.m_genId;
         if (m_processorConfig.isEmpty()) {
-            m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
+            m_lastNonEnabledGeneration = genid;
             return;
         }
 
@@ -639,7 +639,6 @@ public class ExportManager
             exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
             return;
         }
-
         /**
          * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
          * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
@@ -652,10 +651,10 @@ public class ExportManager
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
         ExportGeneration newGeneration;
         try {
-            newGeneration = new ExportGeneration(catalogContext.m_uniqueId, exportOverflowDirectory, false);
+            newGeneration = new ExportGeneration(genid, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
             newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-            m_generations.put(catalogContext.m_uniqueId, newGeneration);
+            m_generations.put(genid, newGeneration);
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }

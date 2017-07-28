@@ -213,8 +213,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT A, count(B) from R2 where B > 2 group by A order by A;");
         assertEquals(1, pns.size());
         p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        p = p.getChild(0);
+        if (p instanceof ProjectionPlanNode) {
+            p = p.getChild(0);
+        }
         assertTrue(p instanceof OrderByPlanNode);
         p = p.getChild(0);
         assertTrue(p instanceof SeqScanPlanNode);
@@ -730,8 +731,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // ENG-5066: now Limit is pushed under Projection
         // Limit is also inlined with Orderby node
-        assertTrue(p instanceof ProjectionPlanNode);
-        p = p.getChild(0);
+        // ENG-12434 But maybe there is no projection node.
+        if (p instanceof ProjectionPlanNode) {
+            p = p.getChild(0);
+        }
         assertTrue(p instanceof OrderByPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
         assertTrue(p.getChild(0) instanceof AggregatePlanNode);
@@ -744,8 +747,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT F_D1, count(*) as tag FROM RF group by F_D1 order by tag");
         p = pns.get(0).getChild(0);
         //* enable to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
-        assertTrue(p instanceof ProjectionPlanNode);
-        p = p.getChild(0);
+        if (p instanceof ProjectionPlanNode) {
+            p = p.getChild(0);
+        }
         assertTrue(p instanceof OrderByPlanNode);
         p = p.getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
@@ -754,8 +758,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT F_D1, count(*) FROM RF group by F_D1 order by 2");
         p = pns.get(0).getChild(0);
         //* enable to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
-        assertTrue(p instanceof ProjectionPlanNode);
-        p = p.getChild(0);
+        if (p instanceof ProjectionPlanNode) {
+            p = p.getChild(0);
+        }
         assertTrue(p instanceof OrderByPlanNode);
         p = p.getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);

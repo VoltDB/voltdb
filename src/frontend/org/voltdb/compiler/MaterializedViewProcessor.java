@@ -296,20 +296,16 @@ public class MaterializedViewProcessor {
                     }
                 }
 
-                // Set up COUNT(*) column
-                ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.groupByColumns().size());
-                assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
-                assert(countCol.expression.getLeft() == null);
-                processMaterializedViewColumn(srcTable,
-                        destColumnArray.get(stmt.groupByColumns().size()),
-                        ExpressionType.AGGREGATE_COUNT_STAR, null);
-
-                // prepare info for aggregation columns.
+                // prepare info for aggregation columns and COUNT(*) column(s)
                 List<AbstractExpression> aggregationExprs = new ArrayList<>();
                 boolean hasAggregationExprs = false;
                 ArrayList<AbstractExpression> minMaxAggs = new ArrayList<>();
-                for (int i = stmt.groupByColumns().size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                for (int i = stmt.groupByColumns().size(); i < stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
+                    // skip COUNT(*)
+                    if ( col.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ) {
+                        continue;
+                    }
                     AbstractExpression aggExpr = col.expression.getLeft();
                     if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                         hasAggregationExprs = true;
@@ -336,7 +332,7 @@ public class MaterializedViewProcessor {
                 }
 
                 // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
-                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                for (Integer i = 0; i < minMaxAggs.size(); ++i) {
                     Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
                     IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
                     if (found != null) {
@@ -346,27 +342,29 @@ public class MaterializedViewProcessor {
                     }
                 }
 
-                // This is to fix the data type mismatch of the COUNT(*) column (and potentially other columns).
-                // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column.
-                for (int i=0; i<=stmt.groupByColumns().size(); i++) {
+                // This is to fix the data type mismatch of the group by columns (and potentially other columns).
+                // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column is fixed below loop.
+                for (int i = 0; i < stmt.groupByColumns().size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
                     setTypeAttributesForColumn(destColumn, col.expression);
                 }
 
                 // parse out the aggregation columns into the dest table
-                for (int i = stmt.groupByColumns().size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                for (int i = stmt.groupByColumns().size(); i < stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
 
                     AbstractExpression colExpr = col.expression.getLeft();
                     TupleValueExpression tve = null;
-                    if (colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+
+                    if ( col.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR
+                            && colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
                         tve = (TupleValueExpression)colExpr;
                     }
+
                     processMaterializedViewColumn(srcTable, destColumn,
                             col.expression.getExpressionType(), tve);
-
                     setTypeAttributesForColumn(destColumn, col.expression);
                 }
 
@@ -504,29 +502,23 @@ public class MaterializedViewProcessor {
 
         // check for count star in the display list
         boolean countStarFound = false;
-        if (i < displayColCount) {
-            AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
-            if (coli.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
-                countStarFound = true;
-            }
-        }
-
-        if (countStarFound == false) {
-            msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
-            throw m_compiler.new VoltCompilerException(msg.toString());
-        }
 
         UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
 
         // Finally, the display columns must have aggregate
         // calls.  But these are not any aggregate calls. They
         // must be count(), min(), max() or sum().
-        for (i++; i < displayColCount; i++) {
+        for (; i < displayColCount; i++) {
             ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             // Note that this expression does not catch all aggregates.
-            // An instance of count(*) here, or avg() would cause the
-            // exception.  We just required count(*) above, but a
-            // second one would fail.
+            // An instance of avg() would cause the exception.
+            // ENG-10945 - We can have count(*) anywhere after the group by columns and multiple count(*)(s)
+            if ( outcol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
+                if ( countStarFound == false )
+                    countStarFound = true;
+                continue;
+            }
+
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
@@ -544,6 +536,11 @@ public class MaterializedViewProcessor {
             outcol.expression.findUnsafeOperatorsForDDL(unsafeOps);
             assert(outcol.expression.getRight() == null);
             assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
+        }
+
+        if (countStarFound == false) {
+            msg.append("must have count(*) after the GROUP BY columns (if any)");
+            throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
         AbstractExpression where = stmt.getSingleTableFilterExpression();

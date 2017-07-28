@@ -51,6 +51,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -114,9 +115,9 @@ public class LocalCluster extends VoltServerConfig {
     int m_replicationPort = -1;
 
     // log message pattern match results by host
-    private Map<Integer, Set<String>> m_logMessageMatchResults = null;
+    private Map<Integer, Set<String>> m_logMessageMatchResults = new ConcurrentHashMap<>();
     // log message patterns
-    private Map<String, Pattern> m_logMessageMatchPatterns = null;
+    private Map<String, Pattern> m_logMessageMatchPatterns = new ConcurrentHashMap<>();
 
     Map<String, String> m_hostRoots = new HashMap<>();
     /** Gets the dedicated paths in the filesystem used as a root for each process.
@@ -149,7 +150,7 @@ public class LocalCluster extends VoltServerConfig {
     //to help matching the host id on the real cluster with the host id on the local
     //cluster
     private long m_deplayBetweenNodeStartupMS = 0;
-
+    private boolean m_httpPortEnabled = false;
     private final ArrayList<EEProcess> m_eeProcs = new ArrayList<>();
     //This is additional process invironment variables that can be passed.
     // This is used to pass JMX port. Any additional use cases can use this too.
@@ -212,17 +213,8 @@ public class LocalCluster extends VoltServerConfig {
     /*
      * Enable pre-compiled regex search in logs
      */
-    public LocalCluster(String jarFileName,
-                        List<String> regexes,
-                        int siteCount,
-                        int hostCount,
-                        int kfactor,
-                        BackendTarget target)
-    {
-        this(jarFileName, siteCount, hostCount, kfactor, target, null);
-        m_hasLocalServer = false;
-        m_logMessageMatchResults = new ConcurrentHashMap<>();
-        m_logMessageMatchPatterns = new ConcurrentHashMap<>();
+    public void setLogSearchPatterns(List<String> regexes) {
+        assert m_hasLocalServer == false;
         for (int i = 0; i < regexes.size(); i++) {
             String s = regexes.get(i);
             Pattern p = Pattern.compile(s);
@@ -320,10 +312,11 @@ public class LocalCluster extends VoltServerConfig {
             boolean debug,
             boolean isRejoinTest,
             Map<String, String> env) {
-        this(null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
+        this(null, null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
     }
 
     public LocalCluster(String schemaToStage,
+                        String classesJarToStage,
                         String catalogJarFileName,
                         int siteCount,
                         int hostCount,
@@ -335,20 +328,9 @@ public class LocalCluster extends VoltServerConfig {
                         boolean isRejoinTest,
                         Map<String, String> env)
     {
-        if (schemaToStage == null) {
-            assert catalogJarFileName != null : "Catalog jar file name is null";
-            setNewCli(isNewCli);
-        } else {
-            assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
-            setNewCli(true);
-            m_usesStagedSchema = true;
-            try {
-                templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
-                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
+        m_usesStagedSchema = schemaToStage != null || classesJarToStage != null;
+        setNewCli(isNewCli() || m_usesStagedSchema);
+
         assert siteCount > 0 : "site count is less than 0";
         assert hostCount > 0 : "host count is less than 0";
 
@@ -376,7 +358,7 @@ public class LocalCluster extends VoltServerConfig {
         m_callingMethodName = traces[i].getMethodName();
 
         if (catalogJarFileName == null) {
-            if (schemaToStage == null) {
+            if (m_usesStagedSchema == false) {
                 log.info("Instantiating empty LocalCluster with class.method: " +
                         m_callingClassName + "." + m_callingMethodName);
             } else {
@@ -384,6 +366,7 @@ public class LocalCluster extends VoltServerConfig {
                         m_callingClassName + "." + m_callingMethodName);
             }
         } else {
+            assert m_usesStagedSchema == false : "Cannot use OldCLI catalog with staged schema and/or classes";
             log.info("Instantiating LocalCluster for " + catalogJarFileName + " with class.method: " +
                     m_callingClassName + "." + m_callingMethodName);
         }
@@ -412,6 +395,20 @@ public class LocalCluster extends VoltServerConfig {
         m_failureState = m_kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<>();
         m_cmdLines = new ArrayList<>();
+        // m_userSchema and m_stagedClassesPath are only used by init.
+        // start ignores them silently if they are set.
+        if (schemaToStage != null) {
+            try {
+                templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
+                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if (classesJarToStage != null) {
+            templateCmdLine.m_stagedClassesPath = new VoltFile(classesJarToStage);
+            log.info("LocalCluster staged classes as \"" + templateCmdLine.m_stagedClassesPath + "\"");
+        }
 
         // if the user wants valgrind and it makes sense, give it to 'em
         // For now only one host works.
@@ -426,17 +423,20 @@ public class LocalCluster extends VoltServerConfig {
         if (buildDir == null) {
             buildDir = System.getProperty("user.dir") + "/obj/release";
         }
+        // Allow importer tests to find their bundles
+        String defaultBundleDir = System.getProperty("user.dir") + "/bundles";
+        m_additionalProcessEnv.putIfAbsent(
+                CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME,
+                System.getProperty(CatalogUtil.VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME, defaultBundleDir));
 
         String classPath = System.getProperty("java.class.path");
         if (m_jarFileName != null) {
             classPath += ":" + buildDir + File.separator + m_jarFileName;
         }
         classPath += ":" + buildDir + File.separator + "prod";
-        if (m_jarFileName != null) {
-            // Remove the stored procedures from the classpath.  Out-of-process nodes will
-            // only be able to find procedures and dependent classes in the catalog, as intended
-            classPath = classPath.replace(buildDir + File.separator + "testprocs:", "");
-        }
+        // Remove the stored procedures from the classpath.  Out-of-process nodes will
+        // only be able to find procedures and dependent classes in the catalog, as intended
+        classPath = classPath.replace(buildDir + File.separator + "testprocs:", "");
 
         // set the java lib path to the one for this process - Add obj/release/nativelibs
         String javaLibraryPath = System.getProperty("java.library.path");
@@ -611,6 +611,10 @@ public class LocalCluster extends VoltServerConfig {
         }
         // Force recompilation
         m_compiled = false;
+    }
+
+    public void setHttpPortEnabled(boolean enabled) {
+        m_httpPortEnabled = enabled;
     }
 
     public void setReplicationPort(int port) {
@@ -859,6 +863,9 @@ public class LocalCluster extends VoltServerConfig {
 
         templateCmdLine.leaderPort(portGenerator.nextInternalPort());
         templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
+        if (m_httpPortEnabled) {
+            templateCmdLine.httpPort(0); // Set this value to 0 would enable http port assignment
+        }
 
         m_eeProcs.clear();
         int hostCount = m_hostCount - m_missingHostCount;
@@ -1678,10 +1685,6 @@ public class LocalCluster extends VoltServerConfig {
         }
         shutDownExternal();
 
-        if (m_logMessageMatchPatterns != null) {
-            resetLogMessageMatchResults();
-        }
-
         VoltServerConfig.removeInstance(this);
     }
 
@@ -2028,6 +2031,10 @@ public class LocalCluster extends VoltServerConfig {
 
     public int port(int hostId) {
         return m_cmdLines.get(hostId).port();
+    }
+
+    public int httpPort(int hostId) {
+        return m_cmdLines.get(hostId).httpPort();
     }
 
     public int adminPort(int hostId) {

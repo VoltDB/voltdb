@@ -25,7 +25,7 @@ import java.util.Properties;
  * instantiate formatter. Every import configuration has its own instance of FormatterBuilder which
  * will ensure that formatter is not shared among import configurations.
  */
-public class FormatterBuilder<T> {
+public class FormatterBuilder {
 
     private final String m_formatterName;
     private final Properties m_formatterProps;
@@ -74,7 +74,7 @@ public class FormatterBuilder<T> {
         if (!(o instanceof FormatterBuilder)) {
             return false;
         }
-        FormatterBuilder<?> other = (FormatterBuilder<?>) o;
+        FormatterBuilder other = (FormatterBuilder) o;
         return ((m_formatterName == null && other.m_formatterName == null) || m_formatterName.equalsIgnoreCase(other.m_formatterName))
             && ((m_formatterProps == null && other.m_formatterProps == null) || m_formatterProps.equals(other.m_formatterProps))
             && ((m_formatterFactory == null && other.m_formatterFactory == null) || m_formatterFactory.equals(other.m_formatterFactory));

@@ -16,14 +16,42 @@
  */
 package org.voltdb.utils;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
+
 //Processor queue to keep track of line data and number and such.
-public class RowWithMetaData {
+public class RowWithMetaData implements BulkLoaderSuccessCallback {
 
     final public Object rawLine;
     final public long lineNumber;
+    final public ProcedureCallback procedureCallback;
+    private static final VoltLogger log = new VoltLogger(RowWithMetaData.class.getName());
 
     public RowWithMetaData(Object rawLine, long ln) {
         this.rawLine = rawLine;
-        lineNumber = ln;
+        this.lineNumber = ln;
+        this.procedureCallback = null;
     }
+
+    public RowWithMetaData(Object rawLine, long ln, ProcedureCallback cb) {
+        this.rawLine = rawLine;
+        this.lineNumber = ln;
+        this.procedureCallback = cb;
+    }
+
+    @Override
+    public void success(Object rowHandle, ClientResponse response) {
+        if (procedureCallback != null) {
+            try {
+                procedureCallback.clientCallback(response);
+            }
+            catch (Exception e) {
+                log.error("Exception in client callback", e);
+            }
+        }
+    }
+
+
 }

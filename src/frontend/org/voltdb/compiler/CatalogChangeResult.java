@@ -21,16 +21,7 @@ import org.voltdb.client.ProcedureInvocationType;
 
 public class CatalogChangeResult {
 
-    public static class PrepareDiffFailureException extends Exception {
-        private static final long serialVersionUID = 1L;
-
-        public final byte statusCode;
-        public PrepareDiffFailureException(byte statusCode, String msg) {
-            super(msg);
-            this.statusCode = statusCode;
-        }
-    }
-
+    public String errorMsg = null;
     public byte[] catalogHash;
     public byte[] catalogBytes;
     public String deploymentString;
