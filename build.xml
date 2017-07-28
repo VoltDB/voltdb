@@ -488,7 +488,7 @@ PRIMARY ENTRY POINTS
         <isset property="port"/>
     </condition>
     <exec executable="tools/killstragglers.sh"
-          failonerror="true" timeout="1800000">
+          failonerror="true" timeout="180000">
         <arg value="${set_port}" />
     </exec>
 </target>

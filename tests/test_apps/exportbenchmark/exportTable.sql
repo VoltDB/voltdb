@@ -1,4 +1,3 @@
-IMPORT CLASS exportbenchmark.procedures.SampleRecord;
 
 CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET default (
   txnid                     BIGINT        NOT NULL
@@ -26,4 +25,5 @@ CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET default (
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
+LOAD CLASSES exportbenchmark-procs.jar;
 CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.InsertExport;
