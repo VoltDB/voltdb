@@ -53,8 +53,9 @@ function QueryUI(queryTab) {
             // Generate fixed-length 5-digit nonce values from 100000 - 999999.
             // That's 900000 strings per statement batch -- that should be enough.
             MatchOneQuotedStringNonce = /#COMMAND_PARSER_REPLACED_STRING#(\d\d\d\d\d\d)/,
+            MatchMultiStmtProcStringNonce = /#COMMAND_PARSER_REPLACED_MULTISP#(\d\d\d\d\d\d)/,
             QuotedStringNonceBase = 100000,
-            MultiSPStringNonceBase = 100000,
+            MultiStmtProcNonceBase = 100000,
 
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
@@ -90,10 +91,6 @@ function QueryUI(queryTab) {
                     }
                 }
             }
-        }
-
-        function replaceBetween(str, start, end, what) {
-            return str.toString().substring(0, start) + what + str.toString().substring(end);
         }
 
         // Avoid false positives for statement grammar inside quoted strings by
@@ -134,19 +131,42 @@ function QueryUI(queryTab) {
 
         // Avoid false positives for statement grammar inside multi statement procedures by
         // substituting a nonce for each string.
-        function disguiseMSP(src, stringBank) {
+        function disguiseMultiStmtProc(src, stringBankOut) {
             let nonceNum, nextString;
 
             // Extract multi stmt procs to keep their content from getting confused with interesting
             // statement syntax - (multiple statements with ;)
-            matchArr = src.match(MatchBeginCreateMultiStmtProcedure);
-            nonceNum = MultiSPStringNonceBase;
-            console.log(matchArr);
-            if (matchArr != null) {
-                var endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
-                var mspStmts = src.substring(src.indexOf(matchArr[0]), endidx);
-                // src = replaceBetween(src, src.indexOf(matchArr[0]), endidx, MultiStmtProcNonceLiteral);
+            nonceNum = MultiStmtProcNonceBase;
+            while (true) {
+                matchArr = src.match(MatchBeginCreateMultiStmtProcedure);
+                console.log(matchArr);
+                if (matchArr == null) {
+                    break;
+                }
+                let endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
+                let mspStmts = src.substring(src.indexOf(matchArr[0]), endidx);
+                stringBankOut.push(mspStmts);
+                src = src.replace(mspStmts, MultiStmtProcNonceLiteral + nonceNum);
+                nonceNum += 1;
             }
+            return src;
+        }
+
+        // Restore quoted strings by replcaing each nonce with its original quoted string.
+        function undisguiseMultiStmtProc(src, stringBank) {
+            var nextNonce, nonceNum;
+            // Clean up by restoring the replaced quoted strings.
+            while (true) {
+                nextNonce = MatchMultiStmtProcStringNonce.exec(src);
+                if (nextNonce === null) {
+                    break;
+                }
+                nonceNum = parseInt(nextNonce[1], 10);
+                // TODO : update this string bank index and merge with undisguise function
+                src = src.replace(MultiStmtProcNonceLiteral + nonceNum,
+                            stringBank[nonceNum - MultiStmtProcNonceBase]);
+            }
+            return src;
         }
 
         // break down a multi-statement string into a statement array.
@@ -166,7 +186,7 @@ function QueryUI(queryTab) {
             // interesting statement syntax. This is required for statement splitting at 
             // semicolon boundaries -- semicolons might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
-            src = disguiseMSP(src, stringBank);
+            src = disguiseMultiStmtProc(src, stringBank);
             
             splitStmts = src.split(';');
 
@@ -176,6 +196,7 @@ function QueryUI(queryTab) {
                 if (stmt !== '') {
                     // Clean up by restoring the replaced quoted strings.
                     stmt = undisguiseQuotedStrings(stmt, stringBank);
+                    stmt = undisguiseMultiStmtProc(stmt, stringBank);
 
                     // Prepare double-quotes for HTTP request formatting by \-escaping them.
                     // NOTE: This is NOT a clean up of any mangling done inside this function.
