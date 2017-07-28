@@ -3087,11 +3087,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addStmtProcedure("Eng5926Insert", "insert into PWEE (ID,WEE,NUM,RATIO) VALUES(1+?,?||'WEE',NULL,1+?);");
 
         project.addStmtProcedure("Eng1316Insert_R", "insert into R1 values (?, ?, ?, ?);");
-        project.addStmtProcedure("Eng1316Update_R", "update R1 set num = num + 1 where id < 104");
+        project.addStmtProcedure("Eng1316Update_R", "update R1 set num = num + 1 where id < 104;");
         project.addStmtProcedure("Eng1316Insert_P", "insert into P1 values (?, ?, ?, ?);");
-        project.addStmtProcedure("Eng1316Update_P", "update P1 set num = num + 1 where id < 104");
+        project.addStmtProcedure("Eng1316Update_P", "update P1 set num = num + 1 where id < 104;");
         project.addStmtProcedure("Eng1316Insert_P1", "insert into P1 values (?, ?, ?, ?);", "P1.ID: 0");
-        project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
+        project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?;", "P1.ID: 0");
 
         //* CONFIG #1: JNI -- keep this enabled by default with / / vs. / *
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
