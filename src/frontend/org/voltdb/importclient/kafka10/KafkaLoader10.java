@@ -18,14 +18,9 @@ package org.voltdb.importclient.kafka10;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
@@ -35,10 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -47,15 +39,12 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.importer.formatter.FormatException;
-import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.utils.BulkLoaderErrorHandler;
 import org.voltdb.utils.CSVBulkDataLoader;
 import org.voltdb.utils.CSVDataLoader;
 import org.voltdb.utils.CSVTupleDataLoader;
 import org.voltdb.utils.RowWithMetaData;
-
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /**
  * KafkaConsumer loads data from kafka into voltdb
@@ -63,7 +52,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
  * VARBINARY columns are not supported
  */
 
-public class KafkaLoader10 {
+public class KafkaLoader10 implements ImporterLifecycle {
     private static final VoltLogger m_log = new VoltLogger("KAFKALOADER10");
     private static final String KEY_DESERIALIZER = ByteArrayDeserializer.class.getName();
     private static final String VALUE_DESERIALIZER = ByteArrayDeserializer.class.getName();
@@ -74,11 +63,29 @@ public class KafkaLoader10 {
     private Client m_client = null;
     private ExecutorService m_executorService = null;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
-    private List<Kafka10ConsumerRunner> m_consumers;
+    private List<Kafka10ExternalConsumerRunner> m_consumers;
     private final long pollTimedWaitInMilliSec = Integer.getInteger("KAFKALOADER_POLLED_WAIT_MILLI_SECONDS", 1000); // 1 second
+
+    private volatile boolean m_stopping = false;
 
     public KafkaLoader10(CLIOptions options) {
         m_cliOptions = options;
+    }
+
+    @Override
+    public boolean shouldRun() {
+        return !m_stopping;
+    }
+
+    @Override
+    public void stop() {
+        m_stopping = true;
+    }
+
+    @Override
+    public boolean hasTransaction() {
+        // TODO Auto-generated method stub
+        return false;
     }
 
     private void shutdownExecutorNow() {
@@ -301,27 +308,37 @@ public class KafkaLoader10 {
     }
 
     private ExecutorService getExecutor() throws Exception {
+
+        // NEEDSWORK: We might be able to refactor the properties into the base runner, too.
         Properties props = kafkaConfigProperties();
+
+        // NEEDSWORK: Straighten out properties, this is bogus
+        props.setProperty("topics", m_cliOptions.topic);
+
+        Kafka10StreamImporterConfig cfg = new Kafka10StreamImporterConfig(props, null); // NEEDSWORK: Hook up formatter
+
+
+
         // create as many threads equal as number of partitions specified in config
-        ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.kpartitions);
+        ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.kpartitions); // NEEDSWORK: Change this CLI argument to be 'consumercount'
         m_consumers = new ArrayList<>();
         try {
             KafkaConsumer<byte[], byte[]> consumer = null;
             for (int i = 0; i < m_cliOptions.kpartitions; i++) {
                 consumer = new KafkaConsumer<>(props);
-                m_consumers.add(new Kafka10ConsumerRunner(m_cliOptions, m_loader, consumer));
+                m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer));
 
             }
         } catch (Throwable terminate) {
             m_log.error("Failed creating Kafka consumer ", terminate);
-            for (Kafka10ConsumerRunner consumer : m_consumers) {
+            for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
                 // close all consumer connections
-                consumer.forceClose();
+                consumer.shutdown();
             }
             return null;
         }
 
-        for (Kafka10ConsumerRunner consumer : m_consumers) {
+        for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
             executor.submit(consumer);
         }
         return executor;
@@ -331,103 +348,8 @@ public class KafkaLoader10 {
     private void notifyShutdown() {
         if (m_shutdown.compareAndSet(false, true)) {
             m_log.info("Kafka consumer shutdown signalled ... ");
-            for (Kafka10ConsumerRunner consumer : m_consumers) {
+            for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
                 consumer.shutdown();
-            }
-        }
-    }
-
-    class Kafka10ConsumerRunner implements Runnable {
-        private KafkaConsumer<byte[], byte[]> m_consumer;
-        private CLIOptions m_config;
-        private final CSVDataLoader m_loader;
-        private final CSVParser m_csvParser;
-        private final Formatter m_formatter;
-        private AtomicBoolean m_closed = new AtomicBoolean(false);
-
-        Kafka10ConsumerRunner(CLIOptions config, CSVDataLoader loader, KafkaConsumer<byte[], byte[]> consumer)
-                throws FileNotFoundException, IOException, ClassNotFoundException, NoSuchMethodException,
-                SecurityException, InstantiationException, IllegalAccessException, IllegalArgumentException,
-                InvocationTargetException {
-            m_loader = loader;
-            m_csvParser = new CSVParser();
-            m_config = config;
-            if (m_config.m_formatterProperties.size() > 0) {
-                String formatter = m_config.m_formatterProperties.getProperty("formatter");
-                String format = m_config.m_formatterProperties.getProperty("format", "csv");
-                Class classz = Class.forName(formatter);
-                Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
-                Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
-                Object[] ctorParms = new Object[]{ format, m_config.m_formatterProperties };
-                m_formatter = (Formatter )ctor.newInstance(ctorParms);
-            } else {
-                m_formatter = null;
-            }
-            m_consumer = consumer;
-        }
-
-        void forceClose() {
-            m_closed.set(true);
-            try {
-                m_consumer.close();
-            } catch (Exception ignore) {}
-        }
-
-        void shutdown() {
-            if (m_closed.compareAndSet(false,  true)) {
-                m_consumer.wakeup();
-            }
-
-        }
-
-        @Override
-        public void run() {
-            String smsg = null;
-            try {
-                m_consumer.subscribe(Arrays.asList(m_config.topic));
-                while (!m_closed.get()) {
-                    ConsumerRecords<byte[], byte[]> records = m_consumer.poll(pollTimedWaitInMilliSec);
-                    for (ConsumerRecord<byte[], byte[]> record : records) {
-                        byte[] msg  = record.value();
-                        long offset = record.offset();
-                        smsg = new String(msg);
-                        Object params[];
-                        if (m_formatter != null) {
-                            try {
-                                params = m_formatter.transform(ByteBuffer.wrap(msg));
-                            } catch (FormatException badMsg) {
-                                m_log.warn("Failed to transform message " + smsg + " at offset " + offset
-                                        + ", error message: " + badMsg.getMessage());
-                                continue;
-                            }
-                        } else {
-                            params = m_csvParser.parseLine(smsg);
-                        }
-                        if (params == null) continue;
-                        m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
-                    }
-                }
-            } catch (IllegalArgumentException invalidTopic) {
-                m_closed.set(true);
-                m_log.error("Failed subscribing to the topic " + m_config.topic, invalidTopic);
-            } catch (WakeupException wakeup) {
-                m_closed.set(true);
-                m_log.debug("Consumer signalled to terminate ", wakeup);
-            } catch (IOException ioExcp) {
-                m_closed.set(true);
-                if (m_formatter == null) {
-                    m_log.error("Failed to parse message" + smsg);
-                } else {
-                    m_log.error("Error seen when processing message ", ioExcp);
-                }
-            } catch (Throwable terminate) {
-                m_closed.set(true);
-                m_log.error("Error seen during poll", terminate);
-            } finally {
-                try {
-                    m_consumer.close();
-                } catch (Exception ignore) {}
-                notifyShutdown();
             }
         }
     }
@@ -490,7 +412,7 @@ public class KafkaLoader10 {
             try {
                 client.close();
             } catch (Exception ignore) {}
-            throw new Exception("Unable to connect to any servers");
+            throw new Exception("Unable to connect to any VoltDB hosts.");
         }
         return client;
     }
@@ -519,6 +441,7 @@ public class KafkaLoader10 {
                 System.exit(-1);
             }
         }
+
         KafkaLoader10 kloader = new KafkaLoader10(options);
         try {
             kloader.processKafkaMessages();

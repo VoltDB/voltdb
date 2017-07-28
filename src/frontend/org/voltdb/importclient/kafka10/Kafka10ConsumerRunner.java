@@ -43,7 +43,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     protected CSVParser m_csvParser = new CSVParser();
     protected Formatter m_formatter;
     protected Kafka10StreamImporterConfig m_config;
-    private ImporterLifecycle m_lifecycle;
+    protected ImporterLifecycle m_lifecycle;
 
     private static final VoltLogger m_log = new VoltLogger("KAFKA10IMPORTER");
 

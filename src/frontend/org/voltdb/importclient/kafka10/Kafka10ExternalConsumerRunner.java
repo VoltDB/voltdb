@@ -15,7 +15,7 @@ public class Kafka10ExternalConsumerRunner extends Kafka10ConsumerRunner {
 
     @Override
     public void invoke(Object[] params, ProcedureCallback procedureCallback) {
-
+        m_log.warn(">>> Invoke: params=" + params);
     }
 
 }
