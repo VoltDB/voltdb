@@ -67,7 +67,6 @@ import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
 import org.voltdb.compiler.statements.DropStream;
-import org.voltdb.compiler.statements.ImportClass;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
@@ -197,7 +196,6 @@ public class DDLCompiler {
                                 .addNextProcessor(new DropProcedure(this))
                                 .addNextProcessor(new PartitionStatement(this))
                                 .addNextProcessor(new ReplicateTable(this))
-                                .addNextProcessor(new ImportClass(this))
                                 .addNextProcessor(new CreateRole(this))
                                 .addNextProcessor(new DropRole(this))
                                 .addNextProcessor(new DropStream(this))

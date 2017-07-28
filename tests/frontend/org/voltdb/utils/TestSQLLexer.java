@@ -84,14 +84,6 @@ public class TestSQLLexer {
         checkDDL("drtable pants disable", null);
         checkDDL("-- dr table pants disable", null);
 
-        checkDDL("import class org.dont.exist", "import");
-        checkDDL("IMPORT class org.dont.exist", "import");
-        checkDDL("ImPoRt class org.dont.exist", "import");
-        checkDDL("    import class org.dont.exist", "import");
-        checkDDL("importclass org.dont.exist", null);
-        checkDDL("-- import class org.dont.exist", null);
-        checkDDL("improt class org.dont.exist", null);
-
         checkDDL("partition table pants", "partition");
         checkDDL("PARTITION table pants", "partition");
         checkDDL("pArTiTioN table pants", "partition");
