@@ -111,7 +111,7 @@ public class Cartographer extends StatsSource
             m_hostMessenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
                         HostMessenger.CLIENT_INTERFACE_SITE_ID),
                     bpm);
-          }
+        }
         catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to propogate leader promotion to client interface.", true, e);
         }
