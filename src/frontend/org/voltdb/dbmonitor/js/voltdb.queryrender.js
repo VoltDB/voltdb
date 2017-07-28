@@ -106,8 +106,10 @@ function QueryUI(queryTab) {
                 if (nextString === null) {
                     break;
                 }
-                stringBankOut.push(nextString);
-                src = src.replace(nextString, QuotedStringNonceLiteral + nonceNum);
+                // stringBankOut.push(nextString);
+                let replacingStringLiteral = QuotedStringNonceLiteral + nonceNum;
+                stringBankOut[replacingStringLiteral] = nextString;
+                src = src.replace(nextString, replacingStringLiteral);
                 nonceNum += 1;
             }
             return src;
@@ -123,8 +125,10 @@ function QueryUI(queryTab) {
                     break;
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
+                // src = src.replace(QuotedStringNonceLiteral + nonceNum,
+                //             stringBank[nonceNum - QuotedStringNonceBase]);
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
-                            stringBank[nonceNum - QuotedStringNonceBase]);
+                            stringBank[QuotedStringNonceLiteral + nonceNum]);
             }
             return src;
         }
@@ -145,8 +149,10 @@ function QueryUI(queryTab) {
                 }
                 let endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
                 let mspStmts = src.substring(src.indexOf(matchArr[0]), endidx);
-                stringBankOut.push(mspStmts);
-                src = src.replace(mspStmts, MultiStmtProcNonceLiteral + nonceNum);
+                let replacingStringLiteral = MultiStmtProcNonceLiteral + nonceNum;
+                stringBankOut[replacingStringLiteral] = mspStmts;
+                // stringBankOut.push(mspStmts);
+                src = src.replace(mspStmts, replacingStringLiteral);
                 nonceNum += 1;
             }
             return src;
@@ -162,9 +168,8 @@ function QueryUI(queryTab) {
                     break;
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
-                // TODO : update this string bank index and merge with undisguise function
                 src = src.replace(MultiStmtProcNonceLiteral + nonceNum,
-                            stringBank[nonceNum - MultiStmtProcNonceBase]);
+                            stringBank[MultiStmtProcNonceLiteral + nonceNum]);
             }
             return src;
         }
@@ -172,7 +177,7 @@ function QueryUI(queryTab) {
         // break down a multi-statement string into a statement array.
         function parseUserInputMethod(src) {
             var splitStmts, stmt, ii, len,
-                stringBank = [],
+                stringBank = {},  // distionary to store disguised string literals with the actual content
                 statementBank = [];
             // Eliminate line comments permanently.
 
@@ -194,9 +199,9 @@ function QueryUI(queryTab) {
             for (ii = 0, len = splitStmts.length; ii < len; ii += 1) {
                 stmt = splitStmts[ii].trim();
                 if (stmt !== '') {
-                    // Clean up by restoring the replaced quoted strings.
-                    stmt = undisguiseQuotedStrings(stmt, stringBank);
+                    // Clean up by restoring the replaced quoted strings and multi statement procedures.
                     stmt = undisguiseMultiStmtProc(stmt, stringBank);
+                    stmt = undisguiseQuotedStrings(stmt, stringBank);
 
                     // Prepare double-quotes for HTTP request formatting by \-escaping them.
                     // NOTE: This is NOT a clean up of any mangling done inside this function.
