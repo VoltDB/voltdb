@@ -817,6 +817,16 @@ public class TestVoltCompiler extends TestCase {
         tester.runtest("create table begin (a int)");
         tester.runtest("create table t (begin int)");
         tester.runtest("create table begin (begin int)");
+
+        tester.runtest("create procedure thisproc as "
+                + "select * from books where title = 'a;b' or title = 'END'");
+
+        // semi colon and END inside quoted string
+        tester.runtest("create procedure thisproc as "
+                + "begin "
+                + "select * from books;"
+                + "select * from books where title = 'a;b' or title = 'END'; "
+                + "end");
     }
 
     public void testUseInnerClassAsProc() throws Exception {

@@ -50,6 +50,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
@@ -801,7 +802,7 @@ public abstract class ProcedureCompiler {
         }
         assert(info != null);
 
-        String[] stmts = stmtsStr.split(";");
+        String[] stmts = SQLLexer.splitStatements(stmtsStr).completelyParsedStmts.toArray(new String[0]);
 
         // ADD THE STATEMENTS in a loop
         int stmtNum = 0;
