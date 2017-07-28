@@ -63,7 +63,7 @@ CREATE TABLE wait_time (
   station_id          SMALLINT  NOT NULL,
   update_time         TIMESTAMP DEFAULT NOW,
   last_depart         TIMESTAMP NOT NULL,
-  total_time          BIGINT    NOT NULL,
+  total_time          BIGINT    NOT NULL, -- in seconds
   entries             INTEGER   NOT NULL,
   PRIMARY KEY (update_time, station_id)
 );
@@ -148,7 +148,7 @@ AS
 SELECT
   station_id,
   COUNT(*) AS calculations,
-  SUM(total_time) AS total_time,
+  SUM(total_time) AS total_time, -- in seconds
   SUM(entries) AS entries
 FROM wait_time
 GROUP BY
