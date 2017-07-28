@@ -81,10 +81,6 @@ public class ExportManager
 
     private final AtomicReference<ExportGeneration> m_generation = new AtomicReference<>(null);
 
-    //Keep track of initial or last generation that was set in EE but has no Java side as export is disabled and misconfigured.
-    //Typically start with table pointing to bad target. fix target and unfix it again...keep doing this and you will
-    //have a generation thats last one which has not java side as export s disabled.
-    // TODO this comment looks like it needs to be revisited
     private final HostMessenger m_messenger;
 
     /**
@@ -279,35 +275,13 @@ public class ExportManager
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
         File files[] = exportOverflowDirectory.listFiles();
         if (files == null) {
-            //Clean export overflow no generations seen.
             return;
         }
 
-        for (File f : files) {
-            if (f.isDirectory()) {
-                // TODO this is not approved UX
-                VoltDB.crashLocalVoltDB("BSDBG: there's more than one generation in export_overflow");
-            }
-        }
-
-        ExportGeneration generation = new ExportGeneration(exportOverflowDirectory, false);
-
-        if (generation.initializeGenerationFromDisk(m_messenger)) {
-            assert (m_generation.get() == null);
-            m_generation.set(generation);
-        } else {
-            String list[] = exportOverflowDirectory.list();
-            if (list != null && list.length == 0) {
-                try {
-                    VoltFile.recursivelyDelete(exportOverflowDirectory);
-                } catch (IOException ioe) {
-                }
-            } else {
-                exportLog.error("Invalid export generation in overflow directory " + exportOverflowDirectory
-                        + " this will need to be manually cleaned up. number of files left: "
-                        + (list != null ? list.length : 0));
-            }
-        }
+        ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
+        generation.initializeGenerationFromDisk(m_messenger);
+        assert (m_generation.get() == null);
+        m_generation.set(generation);
     }
 
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
@@ -370,7 +344,7 @@ public class ExportManager
         if (generation == null) {
             try {
                 File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-                generation = new ExportGeneration(exportOverflowDirectory, isRejoin);
+                generation = new ExportGeneration(exportOverflowDirectory);
                 m_generation.set(generation);
             } catch (IOException e1) {
                 VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
@@ -392,9 +366,6 @@ public class ExportManager
             if (m_generation.get() == null) {
                 generation = createGenerationIfNeeded(isRejoin);
                 generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-            } else {
-                // TODO - change or remove log message?
-                exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used and appended to");
             }
 
             newProcessor.setExportGeneration(generation);

@@ -57,7 +57,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -86,7 +85,7 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    private Mailbox m_mbox;
+    private Mailbox m_mbox = null;
 
     private volatile boolean shutdown = false;
 
@@ -98,18 +97,18 @@ public class ExportGeneration implements Generation {
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(File exportOverflowDirectory, boolean isRejoin) throws IOException {
+    public ExportGeneration(File exportOverflowDirectory) throws IOException {
         m_directory = exportOverflowDirectory;
         if (!m_directory.canWrite()) {
             if (!m_directory.mkdirs()) {
-                throw new IOException("Could not create " + m_directory + " Rejoin: " + isRejoin);
+                throw new IOException("Could not create " + m_directory);
             }
         }
 
-        exportLog.info("Creating new export generation. Rejoin: " + isRejoin);
+        exportLog.info("Creating new export generation.");
     }
 
-    boolean initializeGenerationFromDisk(HostMessenger messenger) {
+    void initializeGenerationFromDisk(HostMessenger messenger) {
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -117,7 +116,6 @@ public class ExportGeneration implements Generation {
          * and check for any data files related to the advertisement. If no data files
          * exist ignore the advertisement.
          */
-        boolean hadValidAd = false;
         for (File f : m_directory.listFiles()) {
             if (f.getName().endsWith(".ad")) {
                 boolean haveDataFiles = false;
@@ -132,7 +130,6 @@ public class ExportGeneration implements Generation {
                 if (haveDataFiles) {
                     try {
                         addDataSource(f, partitions);
-                        hadValidAd = true;
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
                     }
@@ -143,7 +140,6 @@ public class ExportGeneration implements Generation {
             }
         }
         createAndRegisterAckMailboxes(partitions, messenger);
-        return hadValidAd;
     }
 
     void initializeGenerationFromCatalog(
@@ -174,53 +170,51 @@ public class ExportGeneration implements Generation {
 
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
 
-        if (m_mbox != null) {
-            // FIXME - need to clean up previous mailboxes and NOT return. Changes to partitions affects mailboxes.
-        //    return;
-        }
-
         m_mailboxesZKPath = VoltZK.exportGenerations + "/" + "mailboxes";
 
-        m_mbox = new LocalMailbox(messenger) {
-            @Override
-            public void deliver(VoltMessage message) {
-                if (message instanceof BinaryPayloadMessage) {
-                    BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
-                    ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
-                    final int partition = buf.getInt();
-                    final int length = buf.getInt();
-                    byte stringBytes[] = new byte[length];
-                    buf.get(stringBytes);
-                    String signature = new String(stringBytes, Constants.UTF8ENCODING);
-                    final long ackUSO = buf.getLong();
-                    final boolean runEveryWhere = (buf.getShort() == (short )1);
+        if (m_mbox == null) {
+            m_mbox = new LocalMailbox(messenger) {
+                @Override
+                public void deliver(VoltMessage message) {
+                    if (message instanceof BinaryPayloadMessage) {
+                        BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
+                        ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
+                        final int partition = buf.getInt();
+                        final int length = buf.getInt();
+                        byte stringBytes[] = new byte[length];
+                        buf.get(stringBytes);
+                        String signature = new String(stringBytes, Constants.UTF8ENCODING);
+                        final long ackUSO = buf.getLong();
+                        final boolean runEveryWhere = (buf.getShort() == (short )1);
 
-                    final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
-                    if (partitionSources == null) {
-                        exportLog.error("Received an export ack for partition " + partition +
-                                " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
-                        return;
-                    }
+                        final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
+                        if (partitionSources == null) {
+                            exportLog.error("Received an export ack for partition " + partition +
+                                    " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
+                            return;
+                        }
 
-                    final ExportDataSource eds = partitionSources.get(signature);
-                    if (eds == null) {
-                        exportLog.warn("Received an export ack for partition " + partition +
-                                " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
-                        return;
-                    }
+                        final ExportDataSource eds = partitionSources.get(signature);
+                        if (eds == null) {
+                            exportLog.warn("Received an export ack for partition " + partition +
+                                    " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
+                            return;
+                        }
 
-                    try {
-                        eds.ack(ackUSO, runEveryWhere);
-                    } catch (RejectedExecutionException ignoreIt) {
-                        // ignore it: as it is already shutdown
+                        try {
+                            eds.ack(ackUSO, runEveryWhere);
+                        } catch (RejectedExecutionException ignoreIt) {
+                            // ignore it: as it is already shutdown
+                        }
+                    } else {
+                        exportLog.error("Receive unexpected message " + message + " in export subsystem");
                     }
-                } else {
-                    exportLog.error("Receive unexpected message " + message + " in export subsystem");
                 }
-            }
-        };
-        messenger.createMailbox(null, m_mbox);
+            };
+            messenger.createMailbox(null, m_mbox);
+        }
 
+        //If we have new partitions create mailbox paths.
         for (Integer partition : localPartitions) {
             final String partitionDN =  m_mailboxesZKPath + "/" + partition;
             ZKUtil.asyncMkdirs(messenger.getZK(), partitionDN);
@@ -505,22 +499,6 @@ public class ExportGeneration implements Generation {
             }
             messenger.removeMailbox(m_mbox);
         }
-    }
-
-    public void closeAndDelete(final HostMessenger messenger) throws IOException {
-        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-        for (Map<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
-            for (ExportDataSource source : map.values()) {
-                tasks.add(source.closeAndDelete());
-            }
-        }
-        try {
-            Futures.allAsList(tasks).get();
-        } catch (Exception e) {
-            Throwables.propagateIfPossible(e, IOException.class);
-        }
-        cleanup(messenger);
-        VoltFile.recursivelyDelete(m_directory);
     }
 
     @Override
