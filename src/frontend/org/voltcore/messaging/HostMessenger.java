@@ -1779,21 +1779,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (hostsToConnect.isEmpty()) return;
 
         for (int hostId : hostsToConnect) {
-            for (int ii = 0; ii < m_secondaryConnections; ii++) {
-                Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
-                if (it.hasNext()) {
-                    ForeignHost fh = it.next();
+            Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
+            if (it.hasNext()) {
+                InetSocketAddress listeningAddress = it.next().m_listeningAddress;
+                for (int ii = 0; ii < m_secondaryConnections; ii++) {
                     try {
-                        SocketChannel socket = m_joiner.requestForConnection(fh.m_listeningAddress);
+                        SocketChannel socket = m_joiner.requestForConnection(listeningAddress);
                         // Auxiliary connection never time out
                         ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
-                                fh.m_listeningAddress, new PicoNetwork(socket, true));
+                                listeningAddress, new PicoNetwork(socket, true));
                         putForeignHost(hostId, fhost);
                         fhost.enableRead(VERBOTEN_THREADS);
                     } catch (IOException | JSONException e) {
                         hostLog.error("Failed to connect to peer nodes.", e);
                         throw new RuntimeException("Failed to establish socket connection with " +
-                                fh.m_listeningAddress.getAddress().getHostAddress(), e);
+                                listeningAddress.getAddress().getHostAddress(), e);
                     }
                 }
             }
