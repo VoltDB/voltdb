@@ -49,17 +49,16 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -275,7 +274,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private FailedLoginCounter m_flc = new FailedLoginCounter();
     //private FailedLoginCounter[] m_flcArray = new FailedLoginCounter[128];
-    private Queue<Object[]> m_failedLoginMessageQueue = new ConcurrentLinkedQueue<Object[]>();
+    //private Queue<Object[]> m_failedLoginMessageQueue = new ConcurrentLinkedQueue<Object[]>();
 
     private NodeStateTracker m_statusTracker;
     // Should the execution sites be started in recovery mode
@@ -2093,6 +2092,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
         }, 0, StatsManager.POLL_INTERVAL, TimeUnit.MILLISECONDS));
+
+        // clear login count
+        m_periodicWorks.add(scheduleWork(new Runnable() {
+        	@Override
+        	public void run() {
+        		FailedLoginCounter flc = ((RealVoltDB)VoltDB.instance()).getFLC();
+        		Iterator<Entry<Integer, Map<String, Integer>>> it = flc.getTimeBuckets().entrySet().iterator();
+        		while(it.hasNext()) {
+                    Entry<Integer, Map<String, Integer>> entry = it.next();
+                    long previousTimestamp = entry.getKey();
+                    if (previousTimestamp <= (System.currentTimeMillis() - 60000)/1000) {
+                        Map<String,Integer> map = flc.getTimeBuckets().get(previousTimestamp);
+                        for (String user: map.keySet()) {
+                            flc.getUserFailedAttempts().put(user, flc.getUserFailedAttempts().get(user) - map.get(user));
+                        }
+                        it.remove();
+                    }
+                }
+        	}
+        }, 0, 10, TimeUnit.SECONDS));
 
         // small stats samples
         m_periodicWorks.add(scheduleWork(new Runnable() {
@@ -4594,19 +4613,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 //    }
 
 
-    public Queue<Object[]> getFailedLoginMessageQueue() {
-        return m_failedLoginMessageQueue;
-    }
-
-    public void setFailedLoginMessageQueue(Queue<Object[]> m_failedLoginMessageQueue) {
-        this.m_failedLoginMessageQueue = m_failedLoginMessageQueue;
-    }
+//    public Queue<Object[]> getFailedLoginMessageQueue() {
+//        return m_failedLoginMessageQueue;
+//    }
+//
+//    public void setFailedLoginMessageQueue(Queue<Object[]> m_failedLoginMessageQueue) {
+//        this.m_failedLoginMessageQueue = m_failedLoginMessageQueue;
+//    }
 
     public FailedLoginCounter getFLC() {
         return m_flc;
     }
-
-    public void setFLC(FailedLoginCounter m_flc) {
-        this.m_flc = m_flc;
-    }
+//
+//    public void setFLC(FailedLoginCounter m_flc) {
+//        this.m_flc = m_flc;
+//    }
 }

@@ -96,7 +96,6 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.security.AuthenticationRequest;
-import org.voltdb.utils.FailedLoginCounter;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
@@ -713,7 +712,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             @Override
                             public void run()
                             {
-                                ((RealVoltDB)VoltDB.instance()).getFLC().logMessage(System.currentTimeMillis(), username);
+                                ((RealVoltDB)VoltDB.instance()).getFLC().logMessage((int)System.currentTimeMillis()/1000, username);
                                 Exception faex = arq.getAuthenticationFailureException();
                                 if (faex != null) {
                                     authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
@@ -810,15 +809,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return handler;
         }
 
-        private int loopArray(FailedLoginCounter[] fLCArray, String user) {
-            int res = 0;
-            for (FailedLoginCounter ctr: fLCArray) {
-                if (ctr != null) {
-                    res += ctr.getCount(user);
-                }
-            }
-            return res;
-        }
     }
 
     /** A port that reads client procedure invocations and writes responses */

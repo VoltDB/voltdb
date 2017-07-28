@@ -17,62 +17,62 @@
 
 package org.voltdb.utils;
 
-import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
 public class FailedLoginCounter {
-    // key is username, value is number of attempts
-    private Map<String,Integer> userFailedAttempts;
-    // key is time bucket, value is user attempts
-    private Map<Long,Map<String,Integer>> buckets;
+    // key is username, value is number of failed logging attempts count
+    private Map<String,Integer> m_userFailedAttempts;
+    // key is time bucket, value is username/failed logging attempts count pair
+    private Map<Integer,Map<String,Integer>> m_buckets;
 
     final long ONE_MINUTE_IN_MILLIS = 60000;//millisecs
 
     public FailedLoginCounter() {
-        buckets = new HashMap<Long, Map<String,Integer>>();
-        userFailedAttempts = new HashMap<String,Integer>();
+        m_buckets = new HashMap<Integer, Map<String,Integer>>();
+        m_userFailedAttempts = new HashMap<String,Integer>();
     }
 
     public Map<String, Integer> getUserFailedAttempts() {
-        return userFailedAttempts;
+        return m_userFailedAttempts;
     }
 
-    public Map<Long, Map<String, Integer>> getTimeBuckets() {
-        return buckets;
+    public Map<Integer, Map<String, Integer>> getTimeBuckets() {
+        return m_buckets;
     }
 
     public int getCount(String user) {
-        if (userFailedAttempts.containsKey(user)) {
-            return userFailedAttempts.get(user);
+        if (m_userFailedAttempts.containsKey(user)) {
+            return m_userFailedAttempts.get(user);
         }
         return 0;
     }
 
-    public void logMessage(long timestamp, String user) {
-        System.out.println(Thread.currentThread().getId());
-        if (buckets.containsKey(timestamp)) {
-            Map<String,Integer> bucket = buckets.get(timestamp);
+    public void logMessage(int timestamp, String user) {
+    	//checkCounter(timestamp);
+        if (m_buckets.containsKey(timestamp)) {
+            Map<String,Integer> bucket = m_buckets.get(timestamp);
             int bucketCount = bucket.getOrDefault(user,0) + 1;
               bucket.put(user,bucketCount);
         } else {
-            buckets.put(timestamp, new HashMap<String,Integer>());
-            buckets.get(timestamp).put(user, 1);
+            m_buckets.put(timestamp, new HashMap<String,Integer>());
+            m_buckets.get(timestamp).put(user, 1);
         }
-        int totalCount = userFailedAttempts.getOrDefault(user,0) + 1;
-        userFailedAttempts.put(user,totalCount);
+        int totalCount = m_userFailedAttempts.getOrDefault(user,0) + 1;
+        m_userFailedAttempts.put(user,totalCount);
     }
 
-    public void checkCounter(Long timestamp) throws ParseException {
-        java.util.Iterator<Entry<Long, Map<String, Integer>>> it = buckets.entrySet().iterator();
-        while(it.hasNext()) {
-            Entry<Long, Map<String, Integer>> entry = it.next();
+    // time is in seconds now
+    public void checkCounter(int timestamp) {
+        java.util.Iterator<Entry<Integer, Map<String, Integer>>> it = m_buckets.entrySet().iterator();
+        while (it.hasNext()) {
+            Entry<Integer, Map<String, Integer>> entry = it.next();
             long previousTimestamp = entry.getKey();
             if (previousTimestamp <= timestamp - ONE_MINUTE_IN_MILLIS) {
-                Map<String,Integer> map = buckets.get(previousTimestamp);
+                Map<String,Integer> map = m_buckets.get(previousTimestamp);
                 for (String user: map.keySet()) {
-                    userFailedAttempts.put(user, userFailedAttempts.get(user) - map.get(user));
+                    m_userFailedAttempts.put(user, m_userFailedAttempts.get(user) - map.get(user));
                 }
                 it.remove();
             } else {
