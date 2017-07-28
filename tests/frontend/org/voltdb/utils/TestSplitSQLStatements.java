@@ -263,7 +263,7 @@ public class TestSplitSQLStatements {
         // prevent error propagating from one malformed statement to another
         // each statement should have a fresh value for checking in begin and in case...
         sql = "create table begin (a int);";
-        sql1 = "create procedure p as select a, case when a > 10 then 'a' else 'b' end from t;";
+        sql1 = "create procedure p as select a, case when a > 10 then 'a' else 'b' end from begin;";
         checkSplitter(sql + sql, sql.substring(0, sql.length() - 1), sql.substring(0, sql.length() - 1));
 
         // parsing AS BEGIN will only end with END
@@ -283,11 +283,11 @@ public class TestSplitSQLStatements {
                   + "select * from r where f = 'begin' or f = 'END';"
                   + "end;";
         String expected = "create procedure thisproc as "
-        + "begin \n"
-        + "select * from t;"
-        + "select * from r where f = 'foo';"
-        + "select * from r where f = 'begin' or f = 'END';"
-        + "end";
+                    + "begin \n"
+                    + "select * from t;"
+                    + "select * from r where f = 'foo';"
+                    + "select * from r where f = 'begin' or f = 'END';"
+                    + "end";
         checkSplitter(sql, expected);
 
         sql = "create procedure thisproc as "

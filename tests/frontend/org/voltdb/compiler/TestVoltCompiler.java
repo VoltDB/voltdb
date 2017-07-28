@@ -845,6 +845,7 @@ public class TestVoltCompiler extends TestCase {
         tester.runtest("create table t (begin int)");
         tester.runtest("create table begin (begin int)");
 
+        // begin outside begin...end
         tester.runtest("create table begin (begin int);"
                 + "create procedure p as "
                 + "select begin.begin from begin");
@@ -854,10 +855,77 @@ public class TestVoltCompiler extends TestCase {
                 + "create procedure p as \t "
                 + "select begin.begin from begin");
 
+        // begin inside begin...end
         tester.runtest("create table R (begin int);"
                 + "create procedure p as begin "
                 + "insert into R values(?); "
                 + "select begin from R; "
+                + "end");
+
+        // with comments
+        tester.runtest("create table t (f varchar(5));"
+                + "create procedure thisproc as "
+                + "begin --one\n"
+                + "select * from t;"
+                + "select * from t where f = 'foo';"
+                + "select * from t where f = 'begin' or f = 'END'; "
+                + "end");
+
+        // with case
+        tester.runtest("create procedure thisproc as "
+                + "begin "
+                + "SELECT cash, "
+                + "CASE WHEN cash > 100.00 "
+                + "THEN 'Expensive' "
+                + "ELSE 'Cheap' "
+                + "END "
+                + "FROM books; "
+                + "end");
+
+        // nested CASE-WHEN-THEN-ELSE-END
+        tester.runtest("create procedure thisproc as "
+                + "begin \n"
+                + "select * from books;"
+                + "select title, "
+                + "case when cash > 100.00 then "
+                + "case when cash > 1000.00 then 'Super Expensive' else 'Pricy' end "
+                + "else 'Cheap' end "
+                + "from books; "
+                + "end");
+
+        // c style block comments
+//        tester.runtest("create procedure thisproc as "
+//                + "begin \n"
+//                + "select * from books; /*comment will still exist*/"
+//                + "select title, "
+//                + "case when cash > 100.00 then "
+//                + "case when cash > 1000.00 then 'Super Expensive' else 'Pricy' end "
+//                + "'Expensive' else 'Cheap' end "
+//                + "from books; "
+//                + "end");
+
+        // case with no whitespace before it
+        tester.runtest("create procedure thisproc as "
+                + "begin "
+                + "SELECT title, "
+                + "100+CASE WHEN cash > 100.00 "
+                + "THEN 10 "
+                + "ELSE 5 "
+                + "END "
+                + "FROM books; "
+                + "end");
+
+        // case/end with no whitespace before and after it
+        tester.runtest("create procedure thisproc as "
+                + "begin "
+                + "SELECT title, "
+                + "10+case when cash < 0 then (cash+0)end+100 from books; "
+                + "end");
+
+        tester.runtest("create table t (a int, b int);"
+                + "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then a else b end desc; "
+                + "select * from t order by case when t.b < 1 then b else a end desc; "
                 + "end");
     }
 
