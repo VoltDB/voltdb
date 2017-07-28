@@ -202,10 +202,9 @@ class MpRoSitePool {
      */
     boolean doWork(long txnId, TransactionTask task)
     {
-        boolean retval = canAcceptWork();
-        if (!retval) {
-            return false;
-        }
+        // Checking is not necessary
+        assert(canAcceptWork());
+
         MpRoSiteContext site;
         // Repair case
         if (m_busySites.containsKey(txnId)) {
@@ -213,14 +212,15 @@ class MpRoSitePool {
         }
         else {
             if (m_idleSites.isEmpty()) {
-                m_idleSites.push(new MpRoSiteContext(m_siteId,
-                            m_backend,
-                            m_catalogContext,
-                            m_partitionId,
-                            m_initiatorMailbox,
-                            m_poolThreadFactory));
+                site = new MpRoSiteContext(m_siteId,
+                                           m_backend,
+                                           m_catalogContext,
+                                           m_partitionId,
+                                           m_initiatorMailbox,
+                                           m_poolThreadFactory);
+            } else {
+                site = m_idleSites.pop();
             }
-            site = m_idleSites.pop();
             m_busySites.put(txnId, site);
         }
         site.offer(task);
