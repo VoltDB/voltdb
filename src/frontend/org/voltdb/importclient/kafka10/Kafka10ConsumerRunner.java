@@ -79,7 +79,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
         m_consumer.close(m_config.getConsumerTimeoutMillis(), TimeUnit.MILLISECONDS);
     }
 
-    public abstract void invoke(Object[] params, ProcedureCallback procedureCallback);
+    public abstract void invoke(String rawMessage, long offset, Object[] params, ProcedureCallback procedureCallback) throws Exception;
 
     @Override
     public void run() {
@@ -114,7 +114,7 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
                         continue;
                     }
 
-                    invoke(params, procedureCallback);
+                    invoke(smsg, offset, params, procedureCallback);
                 }
             }
         }

@@ -15,7 +15,7 @@ public class Kafka10InternalConsumerRunner extends Kafka10ConsumerRunner {
     }
 
     @Override
-    public void invoke(Object[] params, ProcedureCallback procedureCallback) {
+    public void invoke(String rawMessage, long offset, Object[] params, ProcedureCallback procedureCallback) throws Exception {
         m_importer.callProcedure(new Invocation(m_config.getProcedure(), params), procedureCallback);
     }
 

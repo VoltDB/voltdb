@@ -33,12 +33,14 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.utils.BulkLoaderErrorHandler;
 import org.voltdb.utils.CSVBulkDataLoader;
@@ -65,6 +67,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     private List<Kafka10ExternalConsumerRunner> m_consumers;
     private final long pollTimedWaitInMilliSec = Integer.getInteger("KAFKALOADER_POLLED_WAIT_MILLI_SECONDS", 1000); // 1 second
+    private ExecutorService m_callbackExecutor = null;
 
     private volatile boolean m_stopping = false;
 
@@ -84,7 +87,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
     @Override
     public boolean hasTransaction() {
-        // TODO Auto-generated method stub
         return false;
     }
 
@@ -231,7 +233,18 @@ public class KafkaLoader10 implements ImporterLifecycle {
         }
     }
 
-    class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler {
+    class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler, BulkLoaderSuccessCallback {
+
+        @Override
+        public void success(Object rowHandle, ClientResponse response) {
+            RowWithMetaData metaData = (RowWithMetaData) rowHandle;
+            try {
+                metaData.procedureCallback.clientCallback(response);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         @Override
         public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
             if (m_cliOptions.maxerrors <= 0) return false;
@@ -326,7 +339,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
             KafkaConsumer<byte[], byte[]> consumer = null;
             for (int i = 0; i < m_cliOptions.kpartitions; i++) {
                 consumer = new KafkaConsumer<>(props);
-                m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer));
+                m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer, m_loader));
 
             }
         } catch (Throwable terminate) {
@@ -368,12 +381,15 @@ public class KafkaLoader10 implements ImporterLifecycle {
             clientConfig.enableSSL();
         }
         clientConfig.setProcedureCallTimeout(0);
-        m_client = getClient(clientConfig, serverlist);
+        m_client = getVoltClient(clientConfig, serverlist);
+
+        KafkaBulkLoaderCallback kafkaBulkLoaderCallback = new KafkaBulkLoaderCallback();
 
         if (m_cliOptions.useSuppliedProcedure) {
-            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_cliOptions.procedure, new KafkaBulkLoaderCallback());
+            m_callbackExecutor = CoreUtils.getSingleThreadExecutor( m_cliOptions.procedure + "-" + Thread.currentThread().getName());
+            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_cliOptions.procedure, kafkaBulkLoaderCallback, m_callbackExecutor, kafkaBulkLoaderCallback);
         } else {
-            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_cliOptions.table, m_cliOptions.batch, m_cliOptions.update, new KafkaBulkLoaderCallback());
+            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_cliOptions.table, m_cliOptions.batch, m_cliOptions.update, kafkaBulkLoaderCallback, kafkaBulkLoaderCallback);
         }
         m_loader.setFlushInterval(m_cliOptions.flush, m_cliOptions.flush);
 
@@ -397,7 +413,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
      * @return client
      * @throws Exception
      */
-    public static Client getClient(ClientConfig config, String[] servers) throws Exception {
+    public static Client getVoltClient(ClientConfig config, String[] servers) throws Exception {
         config.setTopologyChangeAware(true);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
