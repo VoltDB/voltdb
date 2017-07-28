@@ -41,6 +41,7 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.ScanPlanNodeWhichCanHaveInlineInsert;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
@@ -50,7 +51,7 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
-public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSortablePlanNode {
+public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSortablePlanNode, ScanPlanNodeWhichCanHaveInlineInsert {
 
     public enum Members {
         TARGET_INDEX_NAME,
@@ -85,7 +86,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<>();
 
     // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
-    protected final List<Boolean> m_compareNotDistinct = new ArrayList<Boolean>();
+    protected final List<Boolean> m_compareNotDistinct = new ArrayList<>();
 
     // for reverse scan LTE only.
     // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
@@ -363,8 +364,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
         }
         // Verify that all sort expressions are covered by the consecutive index expressions
         // starting from the first one
-        List<AbstractExpression> indexedExprs = new ArrayList<AbstractExpression>();
-        List<ColumnRef> indexedColRefs = new ArrayList<ColumnRef>();
+        List<AbstractExpression> indexedExprs = new ArrayList<>();
+        List<ColumnRef> indexedColRefs = new ArrayList<>();
         boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
                 indexedExprs, indexedColRefs);
         int indexExprCount = (columnIndex) ? indexedColRefs.size() : indexedExprs.size();
@@ -1043,6 +1044,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
     @Override
     public AbstractPlanNode planNode() {
         // TODO Auto-generated method stub
+        return this;
+    }
+
+    @Override
+    public boolean hasInlineAggregateNode() {
+        return AggregatePlanNode.getInlineAggregationNode(this) != null;
+    }
+
+    @Override
+    public AbstractPlanNode getAbstractNode() {
         return this;
     }
 

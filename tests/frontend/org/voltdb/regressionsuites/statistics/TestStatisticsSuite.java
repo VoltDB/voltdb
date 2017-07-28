@@ -656,7 +656,6 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
     public void testQueueDepthStatistics() throws Exception {
         System.out.println("\n\nTESTING QUEUEDEPTH STATS\n\n\n");
         Client client  = getFullyConnectedClient();
-
         ColumnInfo[] expectedSchema = new ColumnInfo[8];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);

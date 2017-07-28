@@ -71,7 +71,7 @@ public class Encoder {
 
     /**
      *
-     * @param hexString An (even-length) hexidecimal string to be decoded.
+     * @param hexString An (even-length) hexadecimal string to be decoded.
      * @return The binary byte array value for the string (half length).
      */
     public static byte[] hexDecode(String hexString) {

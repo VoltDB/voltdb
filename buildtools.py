@@ -712,10 +712,11 @@ def buildIPC(CTX):
     return retval
 
 class ValgrindErrorState:
-    def __init__(self, expectErrorsIn, valgrindFile):
+    def __init__(self, expectErrorsIn, retval, valgrindFile):
         self.expectErrors = expectErrorsIn
         self.foundErrors    = False
         self.valgrindFile = valgrindFile
+        self.retval = retval
         self.errorStrings = []
         self._process()
 
@@ -725,7 +726,11 @@ class ValgrindErrorState:
         errs = root.findall(".//error")
         for err in errs:
             self.foundErrors = True
-            self.errorStrings += [self._toString(err)]
+            self.errorStrings.append(self._toString(err))
+        if self.foundErrors != (self.retval != 0):
+            print('We %s some errors, but the return value was %d'
+                       % (('found' if self.foundErrors else 'did not find'),
+                          self.retval))
 
     def _toString(self, err):
         elements = '';
@@ -842,11 +847,15 @@ def runTests(CTX):
             tests += [(os.path.join(OUTPUT_PREFIX, 'generated', 'bin'),
                        dirname,
                        testname)]
-    noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
+    noValgrindTests = [ "harness_test", "serializeio_test" ]
     for bindirname, dirname, test in tests:
         # We expect valgrind failures in all tests in memleaktests
         # except for the test named no_losses.
         expectErrors = (dirname == "memleaktests") and ( test != "no_losses" )
+        print("In %s/%s: %sexpecting errors"
+                % (dirname,
+                   test,
+                   "" if expectErrors else "not "))
         srcpath = os.path.join("test", "ee", dirname, test)
         targetpath = os.path.join(bindirname, dirname, test)
         retval = 0
@@ -864,41 +873,46 @@ def runTests(CTX):
                         break
             if CTX.PLATFORM == "Linux" and isValgrindTest:
                 print('Executing valgrind test %s' % targetpath)
-                sys.stdout.flush()
                 valgrindDir = os.path.join(bindirname, dirname)
                 valgrindFile = makeValgrindFile(valgrindDir, "%p")
+                args = ["valgrind",
+                        "--leak-check=full",
+                        "--show-reachable=yes",
+                        "--error-exitcode=1",
+                        "--suppressions=" + os.path.join(TEST_PREFIX,
+                                                         "test_utils/vdbsuppressions.supp"),
+                        "--xml=yes",
+                        "--xml-file=" + valgrindFile,
+                        targetpath]
+                print('Full command: %s' % (" ".join(args)))
+                sys.stdout.flush()
                 if executing:
                     process = Popen(executable="valgrind",
-                                    args=["valgrind",
-                                          "--leak-check=full",
-                                          "--show-reachable=yes",
-                                          "--error-exitcode=-1",
-                                          "--suppressions=" + os.path.join(TEST_PREFIX,
-                                                                           "test_utils/vdbsuppressions.supp"),
-                                          "--xml=yes",
-                                          "--xml-file=" + valgrindFile,
-                                          targetpath], stderr=PIPE, bufsize=-1)
+                                    args=args, stderr=PIPE, bufsize=-1)
                     out_err = process.stderr.readlines()
                     retval = process.wait()
+                    print('  Returned code %d' % retval)
                     fileName = makeValgrindFile(valgrindDir, "%d" % process.pid)
+                    errorState = ValgrindErrorState(expectErrors, retval, fileName)
                 else:
                     fileName = None
                     retval = exretval
                     print('    Test %s was not run.' % os.path.join(dirname, test))
-                if retval != 0:
-                    errorState = ValgrindErrorState(expectErrors, fileName)
                 # If there are as many errors as we expect,
                 # then delete the xml file.  Otherwise keep it.
                 # It may be useful.
                 if errorState:
-                    if not errorState.isExpectedState():
+                    if errorState.isExpectedState():
+                        successes += 1
                         if fileName:
                             try:
                                 os.remove(fileName)
                             except ex:
                                 pass
+                    else:
+                        failures += 1
+                        failedTests += [os.path.join(dirname, test)]
                         print(errorState.errorMessage(retval))
-                        retval = -1
                         sys.stdout.flush()
             else:
                 print('Executing non-valgrind test %s' % targetpath)
@@ -907,11 +921,12 @@ def runTests(CTX):
                     retval = os.system(targetpath)
                 else:
                     retval = exretval
-        if retval == 0:
-            successes += 1
-        else:
-            failedTests += [os.path.join(dirname, test)]
-            failures += 1
+                if retval == 0:
+                    successes += 1
+                else:
+                    failures += 1
+                    failedTests.append(os.path.join(dirname, test))
+
     print("===============================================================================")
     print("TESTING COMPLETE (PASSED: %d, FAILED: %d)" % (successes, failures))
     for test in failedTests:

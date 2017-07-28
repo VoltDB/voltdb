@@ -1157,10 +1157,11 @@ public class PlanAssembler {
         String contentDeterminismMessage = m_parsedSelect.getContentDeterminismMessage();
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismMessage);
 
-        // Apply the micro-optimization:
+        // Apply the select construction phase micro-optimizations:
         // LIMIT push down, Table count / Counting Index, Optimized Min/Max
-        MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
-
+        MicroOptimizationRunner.applyAll(plan,
+                                         m_parsedSelect,
+                                         MicroOptimizationRunner.Phases.DURING_PLAN_ASSEMBLY);
         return plan;
     }
 
@@ -1657,8 +1658,12 @@ public class PlanAssembler {
             i++;
         }
 
-        // the root of the insert plan is always an InsertPlanNode
-        InsertPlanNode insertNode = new InsertPlanNode();
+        // the root of the insert plan may be an InsertPlanNode, or
+        // it may be a scan plan node.  We may do an inline InsertPlanNode
+        // as well.  All inlining of insert nodes will be done later,
+        // in a microoptimzation.  We can't do it here, since we
+        // may need to remove uneeded projection nodes.
+        InsertPlanNode insertNode = new InsertPlanNode(m_parsedInsert.m_isUpsert);
         insertNode.setTargetTableName(targetTable.getTypeName());
         if (subquery != null) {
             insertNode.setSourceIsPartitioned(! subquery.getIsReplicated());
@@ -1673,7 +1678,6 @@ public class PlanAssembler {
                     new MaterializePlanNode(matSchema);
             // connect the insert and the materialize nodes together
             insertNode.addAndLinkChild(matNode);
-
             retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
         }
         else {
@@ -1808,9 +1812,7 @@ public class PlanAssembler {
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
         // If the projection can be done inline. then add the
-        // projection node inline.  Even if the rootNode is a
-        // scan, if we have a windowed expression we need to
-        // add it out of line.
+        // projection node inline.
         if (rootNode instanceof AbstractScanPlanNode) {
             rootNode.addInlinePlanNode(projectionNode);
             return rootNode;

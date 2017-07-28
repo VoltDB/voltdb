@@ -28,7 +28,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -127,10 +126,10 @@ public class UpdateSettings extends VoltSystemProcedure {
             int version = ((Integer)paramarr[1]).intValue();
 
             ClusterSettings settings = ClusterSettings.create(settingsBytes);
-            Pair<CatalogContext, CatalogSpecificPlanner> ctgdef =
+            CatalogContext catalogContext =
                     getVoltDB().settingsUpdate(settings, version);
 
-            context.updateSettings(ctgdef.getFirst(), ctgdef.getSecond());
+            context.updateSettings(catalogContext);
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);

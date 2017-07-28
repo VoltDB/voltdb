@@ -23,11 +23,22 @@
 
 package org.voltdb.sysprocs;
 
-import java.io.File;
-import java.io.IOException;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import org.mockito.Matchers;
-import org.mockito.Mockito;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Enumeration;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.OperationMode;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
@@ -36,12 +47,9 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.sysprocs.UpdateCore.JavaClassForTest;
 import org.voltdb.utils.MiscUtils;
 
-import junit.framework.TestCase;
-
-public class TestMockUpdateApplicationCatalog extends TestCase {
+public class TestMockUpdateApplicationCatalog {
     private ServerThread m_localServer;
     private VoltDB.Configuration m_config;
     private Client m_client;
@@ -50,7 +58,7 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
                                     org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
                                     org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
-    @Override
+    @Before
     public void setUp() throws Exception
     {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
@@ -74,17 +82,12 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
         success = builder.compile(Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar"), 1, 1, 0);
         assert(success);
 
-        JavaClassForTest testClass = Mockito.mock(JavaClassForTest.class);
-        Mockito.when(testClass.forName(Matchers.anyString(), Matchers.anyBoolean(), Mockito.any(ClassLoader.class))).
-                     thenThrow(new UnsupportedClassVersionError("Unsupported major.minor version 52.0"));
-        UpdateCore.setJavaClassForTest(testClass);
-
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost:" + m_config.m_adminPort);
     }
 
-    @Override
+    @After
     public void tearDown() throws Exception {
         if (m_client != null) {
             m_client.close();
@@ -94,15 +97,56 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
         }
     }
 
-    public void testVersionCheck() throws IOException, ClassNotFoundException {
+    @Test
+    public void testInvalidCatalogJar() throws IOException, ClassNotFoundException {
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+
+        String tempjarURL = newCatalogURL + ".tmp";
+        JarOutputStream jos = new JarOutputStream(new FileOutputStream(tempjarURL));
+
+        // Create a corrupted new catalog jar
+        JarFile jarFile = new JarFile(new File(newCatalogURL));
+        for (Enumeration<JarEntry> e = jarFile.entries(); e.hasMoreElements();) {
+            JarEntry je = e.nextElement();
+            System.err.println(je.getName());
+
+            if (!je.getName().contains(".class")) {
+                // Other files
+                jos.putNextEntry(je);
+                InputStream is = jarFile.getInputStream(je);
+                byte[] bytes = new byte[2048];
+                int numOfBytes;
+                while ((numOfBytes = is.read(bytes)) != -1) {
+                    jos.write(bytes, 0, numOfBytes);
+                }
+                is.close();
+            } else {
+                // Corrupt the class files paths
+                JarEntry newJe = new JarEntry("fake/" + je.getName());
+                jos.putNextEntry(newJe);
+                InputStream is = jarFile.getInputStream(je);
+                byte[] bytes = new byte[2048];
+                int numOfBytes;
+                while ((numOfBytes = is.read(bytes)) != -1) {
+                    jos.write(bytes, 0, numOfBytes);
+                }
+                is.close();
+            }
+        }
+
+        jos.close();
+
+        // Replace the jar
+        new File(newCatalogURL).delete();
+        new File(tempjarURL).renameTo(new File(newCatalogURL));
+
         try {
             m_client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
             fail("Update catalog should fail with version error.");
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("Cannot load classes compiled with a higher version"));
-            assertTrue(e.getMessage().contains("Java 8"));
+            assertTrue(e.getMessage().contains("NoClassDefFoundError"));
+            assertTrue(e.getMessage().contains("Error loading class"));
         }
     }
 }

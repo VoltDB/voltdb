@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -37,7 +38,11 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
+import org.voltdb_testprocs.regressionsuites.fixedsql.InsertBoxed;
+import org.voltdb_testprocs.regressionsuites.fixedsql.BoxedByteArrays;
+import org.voltdb_testprocs.regressionsuites.fixedsql.InPrimitiveArrays;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
@@ -51,8 +56,8 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
 public class TestFixedSQLSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class,
-        TestENG2423.InnerProc.class };
+    static final Class<?>[] PROCEDURES = { Insert.class, InsertBoxed.class, TestENG1232.class, TestENG1232_2.class,
+        TestENG2423.InnerProc.class, BoxedByteArrays.class, InPrimitiveArrays.class };
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
@@ -300,6 +305,201 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
 
         truncateTables(client, tables);
+    }
+
+    // test for insert with boxed types
+    private void subTestBoxedTypes() throws IOException, ProcCallException
+    {
+        String[] tables = {"P1", "R1", "P2", "R2"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("InsertBoxed", table, new Long(1), "desc", new Long(100), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(2), "desc", new Long(100), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(3), "desc", new Long(100), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(6), "desc", new Long(300), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(7), "desc", new Long(300), new Double(14.5));
+            client.callProcedure("InsertBoxed", table, new Long(8), "desc", new Long(500), new Double(14.5));
+
+            String query =
+                String.format("select count(*), %s.NUM from %s group by %s.NUM",
+                              table, table, table);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(3, results[0].getRowCount());
+            while (results[0].advanceRow())
+            {
+                if (results[0].getLong(1) == 100)
+                {
+                    assertEquals(3, results[0].getLong(0));
+                }
+                else if (results[0].getLong(1) == 300)
+                {
+                    assertEquals(2, results[0].getLong(0));
+                }
+                else if (results[0].getLong(1) == 500)
+                {
+                    assertEquals(1, results[0].getLong(0));
+                }
+                else
+                {
+                    fail();
+                }
+            }
+        }
+
+        truncateTables(client, tables);
+    }
+
+    // all these tests should not actually fail
+    private void subTestInPrimitiveArrays() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable[] results;
+
+        validateTableOfLongs(client,
+                "insert into eng_12105 values (0, "
+                + "null, 1, 2, 3, "
+                + "1.0, 2.00, "
+                + "'foo', 'foo_inline_max', 'foo_inline', "
+                + "'2016-01-01 00:00:00.000000', "
+                + "x'deadbeef');", new long[][] {{1}});
+
+        if(!isHSQL()) {
+
+            String errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                    + "Incompatible parameter type: can not convert type 'byte\\[\\]\\[\\]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE VARBIN IN \\?;. "
+                    + "Try explicitly using a long\\[\\] parameter";
+            verifyProcFails(client, errMsg,
+                    "InPrimitiveArrays", "BYTES",
+                    new byte[][]{ Encoder.hexDecode("0A"), Encoder.hexDecode("1E") },
+                    null, null, null, null, null, null, null);
+
+            results = client.callProcedure("InPrimitiveArrays", "SHORTS", null, new short[]{1, 2, 3},
+                    null, null, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            results = client.callProcedure("InPrimitiveArrays", "INTS", null, null,
+                    new int[]{0, 1, 2}, null, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            results = client.callProcedure("InPrimitiveArrays", "LNGS", null, null, null,
+                    new long[]{1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                    + "Incompatible parameter type: can not convert type 'double\\[\\]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE NUM IN \\?;. "
+                    + "Try explicitly using a long\\[\\] parameter";
+            verifyProcFails(client, errMsg,
+                    "InPrimitiveArrays", "DBLS", null, null, null, null,
+                    new double[]{1.3, 3.1, 5.2}, null, null, null);
+
+            // works if we pass long[] to check for double[]
+            results = client.callProcedure("InPrimitiveArrays", "LNGDBL", null, null, null,
+                    new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure InPrimitiveArrays: "
+                    + "Incompatible parameter type: can not convert type 'BigDecimal\\[\\]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT \\* FROM ENG_12105 WHERE DEC IN \\?;. "
+                    + "Try explicitly using a long\\[\\] parameter";
+            verifyProcFails(client, errMsg,
+                    "InPrimitiveArrays", "BIGDS", null, null, null, null, null,
+                    new BigDecimal[]{new BigDecimal(1), new BigDecimal(2)}, null, null);
+
+            // works if we pass long[] to check for BigDecimal[]
+            results = client.callProcedure("InPrimitiveArrays", "LNGBIGD", null, null, null,
+                    new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            results = client.callProcedure("InPrimitiveArrays", "STRS", null, null, null, null, null, null,
+                    new String[]{"foo", "bar"}, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            results = client.callProcedure("InPrimitiveArrays", "LNGINT", null, null, null,
+                    new long[]{0L, 1L, 2L, 3L}, null, null, null, null).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            // HSQL does not convert convert null to null value for TIMESTAMP
+            results = client.callProcedure("InPrimitiveArrays", "INSBYTES", null, null,
+                    null, null, null, null, null, Encoder.hexDecode("0A")).getResults();
+            assertEquals(1, results[0].getRowCount());
+        }
+
+        truncateTables(client, "ENG_12105");
+    }
+
+    // test for boxed byte arrays
+    private void subTestBoxedByteArrays() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable[] results;
+
+        validateTableOfLongs(client,
+                "insert into ENG_539 values (0, "
+                + "x'ab', 1)", new long[][] {{1}});
+
+        Byte[] boxByteArr = ArrayUtils.toObject(Encoder.hexDecode("01"));
+        results = client.callProcedure("BoxedByteArrays", "VARBIN", new Integer(1),
+                boxByteArr, null, null, null, null).getResults();
+        assertEquals(1, results[0].getRowCount());
+
+        // String cannot be converted to VARBINARY
+        String errMsg = "Incompatible parameter type: "
+                + "can not convert type 'String' to 'VARBINARY' for arg 1 for SQL stmt";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "STR", new Integer(2), null, null, null, null, "3A");
+
+        errMsg = "Incompatible parameter type: "
+                + "can not convert type 'String' to 'VARBINARY' for arg 1 for SQL stmt";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "STR", new Integer(2), null, null, null, null, "x'3A'");
+
+        if( !isHSQL() ) {
+            // HSQL does not convert Strings to BigInt
+            results = client.callProcedure("BoxedByteArrays", "DSTR", new Integer(2), null,
+                    null, null, null, "1000").getResults();
+            assertEquals(1, results[0].getRowCount());
+        }
+
+        client.callProcedure("BoxedByteArrays", "BIGD", new Integer(3), null,
+                null, null, null, null);
+        client.callProcedure("BoxedByteArrays", "BIGD", new Integer(4), null,
+                null, null, null, null);
+
+        // Long cannot be converted to long in arrays
+        errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 4: "
+                    + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+                    + "Unable to match parameter array:java.lang.Long to provided long";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "LNGARR", null, null, null, new Long[]{1L, 2L, 3L}, null, null);
+
+        // Integer cannot be converted to int in arrays
+        errMsg = "VOLTDB ERROR: PROCEDURE BoxedByteArrays TYPE ERROR FOR PARAMETER 5: "
+                + "org.voltdb.VoltTypeException: tryScalarMakeCompatible: "
+                + "Unable to match parameter array:java.lang.Integer to provided int";
+        verifyProcFails(client, errMsg, "BoxedByteArrays",
+                "INTARR", null, null, null, null, new Integer[]{1, 2, 3}, null);
+
+        try {
+            Byte[][] box2DByteArr = new Byte[][]{ ArrayUtils.toObject(Encoder.hexDecode("0A")),
+                                                    ArrayUtils.toObject(Encoder.hexDecode("1E")) };
+            results = client.callProcedure("BoxedByteArrays", "SEL_VARBIN", null, null, box2DByteArr,
+                        null, null, null).getResults();
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("Type class [Ljava.lang.Byte; not supported in parameter set arrays"));
+        }
+
+        String query =
+                String.format("select * from ENG_539");
+        results = client.callProcedure("@AdHoc", query).getResults();
+        System.out.println(results);
+
+        truncateTables(client, "ENG_539");
     }
 
     //
@@ -697,6 +897,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG11256();
         subTestENG12105();
         subTestENG12116();
+        subTestBoxedTypes();
+        subTestInPrimitiveArrays();
+        subTestBoxedByteArrays();
     }
 
     private void subTestENG12105() throws Exception {
@@ -721,6 +924,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 + "GROUP BY TINY "
                 + "LIMIT 8372 "
                 + "OFFSET 0;", new long[][] {{-128}});
+
+        truncateTables(client, "ENG_12105");
     }
 
     private void subTestENG11256() throws Exception {
@@ -1645,9 +1850,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Insert into VarcharBYTES (id, var2) VALUES (1,'" + var + "')");
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column 'VAR2'",
-                            var.length(), var, 2)));
+            String expected = String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column 'VAR2'",
+                                            var.length(), var, 2);
+            String errmsg = String.format("Expected '%s' to contain '%s'",
+                                          ex.getMessage(), expected);
+            assertTrue(errmsg, ex.getMessage().contains(expected));
         }
 
         var = "贾鑫";
@@ -1770,9 +1977,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "Insert into VARLENGTH (id, var1) VALUES (2, repeat('" + var1 + "',2))");
             fail();
         } catch(Exception ex) {
-                assertTrue(ex.getMessage().contains(
-                    String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
-                                      var1.length() * 2, var1 + var1, 10)));
+            String expected = String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column 'VAR1'",
+                                            var1.length() * 2, var1 + var1, 10);
+            String errmsg = String.format("Expected '%s' to contain '%s'",
+                                          ex.getMessage(),
+                                          expected);
+            assertTrue(errmsg, ex.getMessage().contains(expected));
         }
 
         // Test upsert
@@ -2784,6 +2994,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // we can see that the indexes are correct, since the
         // values are different.
         assertContentOfTable(new Object[][] {{ 10, "foo", 20, 40.0, 11, "bar", 30, 99.0 }}, vt);
+
+        truncateTables(client, new String[]{"P1", "R1"});
     }
 
     public void testExistsBugEng12204() throws Exception {

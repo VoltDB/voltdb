@@ -58,4 +58,8 @@ public class VoltNTSystemProcedure extends VoltNonTransactionalProcedure {
     protected void noteRestoreCompleted() {
         m_runner.noteRestoreCompleted();
     }
+
+    protected ProcedureRunnerNT getProcedureRunner() {
+        return m_runner;
+    }
 }
