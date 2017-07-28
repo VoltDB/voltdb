@@ -2093,11 +2093,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // clear login count
         m_periodicWorks.add(scheduleWork(new Runnable() {
-        	@Override
-        	public void run() {
-        		FailedLoginCounter flc = ((RealVoltDB)VoltDB.instance()).getFLC();
-        		Iterator<Entry<Integer, Map<String, Integer>>> it = flc.getTimeBuckets().entrySet().iterator();
-        		while(it.hasNext()) {
+            @Override
+            public void run() {
+                FailedLoginCounter flc = ((RealVoltDB)VoltDB.instance()).getFLC();
+                Iterator<Entry<Integer, Map<String, Integer>>> it = flc.getTimeBuckets().entrySet().iterator();
+                while(it.hasNext()) {
                     Entry<Integer, Map<String, Integer>> entry = it.next();
                     long previousTimestamp = entry.getKey();
                     if (previousTimestamp <= (System.currentTimeMillis() - 60000)/1000) {
@@ -2108,7 +2108,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         it.remove();
                     }
                 }
-        	}
+            }
         }, 0, 10, TimeUnit.SECONDS));
 
         // small stats samples
