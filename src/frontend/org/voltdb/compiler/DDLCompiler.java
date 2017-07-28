@@ -874,8 +874,9 @@ public class DDLCompiler {
         if (!Character.isLetterOrDigit(nchar[0])) {
             char prev = prevChar(retval.statement);
             if (prev == 'n' || prev == 'N') {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") )
+                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") ) {
                     inBegin = true;
+                }
             } else if (prev == 'd' || prev == 'D') {
                 if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 3, "end") ) {
                     if (inCase > 0) {
@@ -887,8 +888,9 @@ public class DDLCompiler {
                     }
                 }
             } else if (prev == 'e' || prev == 'E') {
-                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 4, "case") )
+                if( SQLLexer.matchToken(retval.statement, retval.statement.length() - 4, "case") ) {
                     inCase++;
+                }
             }
         }
         if (nchar[0] == '-') {
@@ -1096,10 +1098,13 @@ public class DDLCompiler {
             // Set the line number to the start of the real statement.
             retval.lineNo = currLineNo;
             retval.endLineNo = currLineNo;
+            inBegin = false;
+            inCase = 0;
 
             while (state != kStateCompleteStatement) {
                 if (reader.read(nchar) == -1) {
-                    String msg = "Schema file ended mid-statement (no semicolon found).";
+                    // might be useful for the users for debugging if we include the statement which caused the error
+                    String msg = "Schema file ended mid-statement (no semicolon found) for statment:\n" + retval.statement;
                     throw compiler.new VoltCompilerException(msg, retval.lineNo);
                 }
 
