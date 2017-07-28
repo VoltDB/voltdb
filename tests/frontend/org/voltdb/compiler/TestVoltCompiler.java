@@ -813,11 +813,6 @@ public class TestVoltCompiler extends TestCase {
                   + "allow r2 "
                   + "from class org.voltdb.compiler.procedures.AddBook");
 
-        // check for table and column named begin
-        tester.runtest("create table begin (a int)");
-        tester.runtest("create table t (begin int)");
-        tester.runtest("create table begin (begin int)");
-
         tester.runtest("create procedure thisproc as "
                 + "select * from books where title = 'a;b' or title = 'END'");
 
@@ -826,6 +821,43 @@ public class TestVoltCompiler extends TestCase {
                 + "begin "
                 + "select * from books;"
                 + "select * from books where title = 'a;b' or title = 'END'; "
+                + "end");
+
+        // embedded case
+        tester.runtest("create table R (emptycase int, caseofbeer int, suitcaseofbeer int);"
+                + "create procedure p as begin "
+                + "select emptycase from R; "
+                + "select caseofbeer from R; "
+                + "select suitcaseofbeer from R; "
+                + "end");
+
+        //embedded end
+        tester.runtest("create table R (emptycase int, bendbeer int, endofbeer int, frontend tinyint);"
+                + "create procedure p as begin "
+                + "select emptycase from R; "
+                + "select bendbeer from R; "
+                + "select endofbeer from R; "
+                + "select frontend from R; "
+                + "end");
+
+        // check for table and column named begin
+        tester.runtest("create table begin (a int)");
+        tester.runtest("create table t (begin int)");
+        tester.runtest("create table begin (begin int)");
+
+        tester.runtest("create table begin (begin int);"
+                + "create procedure p as "
+                + "select begin.begin from begin");
+
+        // test space between AS BEGIN
+        tester.runtest("create table begin (begin int);"
+                + "create procedure p as \t "
+                + "select begin.begin from begin");
+
+        tester.runtest("create table R (begin int);"
+                + "create procedure p as begin "
+                + "insert into R values(?); "
+                + "select begin from R; "
                 + "end");
     }
 
