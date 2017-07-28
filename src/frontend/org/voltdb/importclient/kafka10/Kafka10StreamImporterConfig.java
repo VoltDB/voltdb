@@ -29,12 +29,15 @@ import org.voltdb.importer.formatter.FormatterBuilder;
  */
 public class Kafka10StreamImporterConfig implements ImporterConfig
 {
+    private static int KAFKA10_DEFAULT_CONSUMER_TIMEOUT_MILLIS = 5000;
+
     private URI m_uri;
     private String m_brokers;
     private String m_topics;
     private String m_groupId;
     private String m_procedure;
     private FormatterBuilder m_formatterBuilder;
+    private int m_consumerTimeoutMillis = KAFKA10_DEFAULT_CONSUMER_TIMEOUT_MILLIS;
 
     public Kafka10StreamImporterConfig(Properties properties, FormatterBuilder formatterBuilder) {
 
@@ -60,12 +63,20 @@ public class Kafka10StreamImporterConfig implements ImporterConfig
         return m_brokers;
     }
 
+    public String getTopics() {
+        return m_topics;
+    }
+
+    public String getGroupId() {
+        return m_groupId;
+    }
+
     public String getProcedure() {
         return m_procedure;
     }
 
-    public String getTopics() {
-        return m_topics;
+    public int getConsumerTimeoutMillis() {
+        return m_consumerTimeoutMillis;
     }
 
     @Override

@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
@@ -31,26 +31,24 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.Invocation;
+import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
-public class Kafka10ConsumerRunner implements Runnable {
+public abstract class Kafka10ConsumerRunner implements Runnable {
 
-    private Consumer<byte[], byte[]> m_consumer;
-    private CSVParser m_csvParser = new CSVParser();
-    private Formatter m_formatter;
-    private AtomicBoolean m_closed = new AtomicBoolean(false);
-    private Kafka10StreamImporterConfig m_config;
-    private AbstractImporter m_importer;
+    protected Consumer<byte[], byte[]> m_consumer;
+    protected CSVParser m_csvParser = new CSVParser();
+    protected Formatter m_formatter;
+    protected Kafka10StreamImporterConfig m_config;
+    private ImporterLifecycle m_lifecycle;
 
     private static final VoltLogger m_log = new VoltLogger("KAFKA10IMPORTER");
 
-    public Kafka10ConsumerRunner(AbstractImporter importer, Kafka10StreamImporterConfig config, Consumer<byte[], byte[]> consumer) throws Exception {
-        m_importer = importer;
+    public Kafka10ConsumerRunner(ImporterLifecycle lifecycle, Kafka10StreamImporterConfig config, Consumer<byte[], byte[]> consumer) throws Exception {
+        m_lifecycle = lifecycle;
         m_consumer = consumer;
         m_config = config;
     }
@@ -58,7 +56,7 @@ public class Kafka10ConsumerRunner implements Runnable {
     ProcedureCallback procedureCallback = new ProcedureCallback() {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
-            System.out.println("In clientCallback! clientResponse=" + clientResponse.getStatusString());
+            m_log.warn("In clientCallback! clientResponse=" + clientResponse.getStatusString());
         }
     };
 
@@ -66,22 +64,34 @@ public class Kafka10ConsumerRunner implements Runnable {
         m_consumer.subscribe(Arrays.asList(m_config.getTopics()), new ConsumerRebalanceListener() {
             @Override
             public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-                System.out.println("partitions revoked: " + partitions);
+                m_log.warn("Partitions revoked: " + partitions);
             }
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-                System.out.println("partitions assigned: " + partitions);
+                m_log.warn("Partitions assigned: " + partitions);
             }
         });
     }
+
+    void shutdown() {
+        m_log.warn("Shutdown called for consumer: " + m_consumer + " on thread:" + Thread.currentThread());
+        m_consumer.wakeup();
+        m_consumer.close(m_config.getConsumerTimeoutMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    public abstract void invoke(Object[] params, ProcedureCallback procedureCallback);
 
     @Override
     public void run() {
         String smsg = null;
         try {
+
+            m_log.warn("Starting consumer: " + m_consumer + " on thread:" + Thread.currentThread());
             subscribe();
-            while (!m_closed.get()) {
-                ConsumerRecords<byte[], byte[]> records = m_consumer.poll(0); // NEEDSWORK: pollTimedWaitInMilliSec);
+
+            while (m_lifecycle.shouldRun()) {
+
+                ConsumerRecords<byte[], byte[]> records = m_consumer.poll(m_config.getConsumerTimeoutMillis());
                 for (ConsumerRecord<byte[], byte[]> record : records) {
                     byte[] msg  = record.value();
                     long offset = record.offset();
@@ -91,49 +101,49 @@ public class Kafka10ConsumerRunner implements Runnable {
                     if (m_formatter != null) {
                         try {
                             params = m_formatter.transform(ByteBuffer.wrap(msg));
-                        } catch (FormatException badMsg) {
-                            m_log.warn("Failed to transform message " + smsg + " at offset " + offset
-                                    + ", error message: " + badMsg.getMessage());
+                        }
+                        catch (FormatException badMsg) {
+                            m_log.warn("Failed to transform message " + smsg + " at offset " + offset + ", error message: " + badMsg.getMessage());
                             continue;
                         }
-                    } else {
+                    }
+                    else {
                         params = m_csvParser.parseLine(smsg);
                     }
                     if (params == null) {
                         continue;
                     }
-                    m_importer.callProcedure(new Invocation(m_config.getProcedure(), params), procedureCallback);
 
+                    invoke(params, procedureCallback);
                 }
             }
         }
-        catch (IllegalArgumentException invalidTopic) {
-            m_closed.set(true);
-            m_log.error("Failed subscribing to the topic " + m_config.getTopics(), invalidTopic);
+        catch (IllegalArgumentException e) {
+            m_log.error("Failed subscribing to the topic " + m_config.getTopics(), e);
         }
-        catch (WakeupException wakeup) {
-            m_closed.set(true);
-            m_log.debug("Consumer signalled to terminate ", wakeup);
+        catch (WakeupException e) {
+            m_log.debug("Consumer signalled to terminate ", e);
         }
-        catch (IOException ioExcp) {
-            m_closed.set(true);
+        catch (IOException e) {
             if (m_formatter == null) {
                 m_log.error("Failed to parse message" + smsg);
-            } else {
-                m_log.error("Error seen when processing message ", ioExcp);
+            }
+            else {
+                m_log.error("Error seen when processing message ", e);
             }
         }
-        catch (Throwable terminate) {
-            terminate.printStackTrace();
-            m_closed.set(true);
-            m_log.error("Error seen during poll", terminate);
+        catch (Throwable t) {
+            m_log.error("Error seen during poll", t);
         }
         finally {
             try {
+                m_log.warn("Starting normal termination for consumer: " + m_consumer + " on thread:" + Thread.currentThread());
                 m_consumer.close();
+                m_log.warn("Finished normal termination for consumer: " + m_consumer + " on thread:" + Thread.currentThread());
             }
-            catch (Exception ignore) {}
-           // NEEDSWORK:  notifyShutdown();
+            catch (Exception e) {
+                m_log.warn("Exception while cleaning up Kafka consumer, ignoring.", e);
+            }
         }
     }
 }

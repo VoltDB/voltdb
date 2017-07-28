@@ -1416,6 +1416,9 @@ public abstract class CatalogUtil {
             case KAFKA:
                 importBundleUrl = "kafkastream.jar";
                 break;
+            case KAFKA_10:
+                importBundleUrl = "kafkastream10.jar";
+                break;
             case KINESIS:
                 importBundleUrl = "kinesisstream.jar";
                 break;
