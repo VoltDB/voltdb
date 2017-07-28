@@ -116,18 +116,11 @@ def makeParser():
     #   1.) --clean
     #       Do a clean before doing anything else.  This deletes the
     #       entire object directory.
-    #   2.) Building artifacts.
-    #       2a.) --build
+    #   2.) --build
     #           Build the VoltDB shared object.  This builds all the dependences,
     #           compiles all the files and links them into a shared library.
-    #       2b.) --build-ipc
-    #           Build the VoltDB IPC executable.  This builds all the dependences,
-    #           compiles all the files and links them along with the result of
-    #           compiling the ipc sources.  This implies --build as well, so the
-    #           shared object will be linked.
-    #   2.) --install
-    #       Install the VoltDB shared object and the voltipc excutable if
-    #       the latter exists.
+    #   3.) --install
+    #       Install the VoltDB shared object and the voltipc excutable.
     #   4.) Building Tests
     #       4a.) --build-one-test=test or --build-one-testdir=testdir
     #           Build one EE unit test or else build all the tests in a given
@@ -153,11 +146,6 @@ def makeParser():
                         action='store_true',
                         help='''
                         Just build the EE jni library.''')
-    parser.add_argument('--build-ipc',
-                        dest='buildipc',
-                        action='store_true',
-                        help='''
-                        Just build the EE IPC jni library (used for debugging).''')
     parser.add_argument('--build-all-tests',
                         dest='buildalltests',
                         action='store_true',
@@ -313,12 +301,8 @@ def buildCommandString(config):
     cmdstr = None
     if config.build:
         target += ' build'
-    if config.buildipc:
-        target += ' buildipc'
     if config.install:
         target += ' install'
-    if config.installipc:
-        target += ' installipc'
     if config.buildonetest:
         target += " build-test-%s" % config.buildonetest
     elif config.buildonetestdir:
@@ -360,11 +344,6 @@ def morethanoneof(a, b, c):
         return False
 
 def validateConfig(config):
-    # The config needs some variables
-    # which are not defined but implied by
-    # the command line parameters.
-    config.installipc=False
-
     # If we don't have an explicit objdir,
     # then it's obj/${BUILDTYPE}.
     if not config.objdir:
@@ -394,12 +373,8 @@ def validateConfig(config):
     if config.buildalltests or config.buildonetest or config.buildonetestdir:
         config.build = True
         config.install = True
-    if config.buildipc:
-        config.build = True
     if config.install:
         config.build = True
-        if config.buildipc:
-            config.installipc = True
 
 def doCleanBuild(config):
     #
