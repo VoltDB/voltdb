@@ -77,8 +77,7 @@ public class FailedLoginCounter {
         m_userFailedAttempts.put(user,totalCount);
     }
 
-    // time is in seconds now
-    public void checkCounter(int timestamp) {
+    public void checkCounter(long timestamp) {
         java.util.Iterator<Entry<Integer, Map<String, Integer>>> it = m_buckets.entrySet().iterator();
         while (it.hasNext()) {
             Entry<Integer, Map<String, Integer>> entry = it.next();

@@ -49,7 +49,6 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -2095,19 +2094,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
-                FailedLoginCounter flc = ((RealVoltDB)VoltDB.instance()).getFLC();
-                Iterator<Entry<Integer, Map<String, Integer>>> it = flc.getTimeBuckets().entrySet().iterator();
-                while(it.hasNext()) {
-                    Entry<Integer, Map<String, Integer>> entry = it.next();
-                    long previousTimestamp = entry.getKey();
-                    if (previousTimestamp <= (System.currentTimeMillis() - 60000)/1000) {
-                        Map<String,Integer> map = flc.getTimeBuckets().get(previousTimestamp);
-                        for (String user: map.keySet()) {
-                            flc.getUserFailedAttempts().put(user, flc.getUserFailedAttempts().get(user) - map.get(user));
-                        }
-                        it.remove();
-                    }
-                }
+                ((RealVoltDB)VoltDB.instance()).getFLC().checkCounter(System.currentTimeMillis());
             }
         }, 0, 10, TimeUnit.SECONDS));
 
