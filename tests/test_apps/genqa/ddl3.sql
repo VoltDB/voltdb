@@ -1,4 +1,4 @@
-IMPORT CLASS genqa.procedures.SampleRecord;
+--IMPORT CLASS genqa.procedures.SampleRecord;
 
 -- Partitioned Data Table
 CREATE TABLE partitioned_table
