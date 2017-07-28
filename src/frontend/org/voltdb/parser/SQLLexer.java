@@ -429,8 +429,7 @@ public class SQLLexer extends SQLPatternFactory
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
 
-                // check if the next token is BEGIN if the previous one is AS
-                // if not, do not look for BEGIN
+                // 'BEGIN' should only follow 'AS'
                 if (checkForNextBegin
                         && !(Character.isWhitespace(buf[iCur]) || Character.isSpaceChar(buf[iCur])) ) {
                     // 'BEGIN' should only be followed after 'AS'
@@ -449,7 +448,7 @@ public class SQLLexer extends SQLPatternFactory
                     iCur += 2;
                 } else if ( !inBegin && buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
-                    // if it is not in a BEGIN ... END
+                    // if it is not in a AS BEGIN ... END
                     String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
                     if (!statement.isEmpty()) {
                         statements.add(statement);
@@ -465,7 +464,7 @@ public class SQLLexer extends SQLPatternFactory
                     if (inCase > 0) {
                         inCase--;
                     } else {
-                        // we can terminate BEGIN ... END for multi stmt proc
+                        // we can terminate AS BEGIN ... END for multi stmt proc
                         // after all CASE ... END stmts are completed
                         inBegin = false;
                     }
@@ -505,7 +504,6 @@ public class SQLLexer extends SQLPatternFactory
 
         results.completelyParsedStmts = statements;
         return results;
-//        return statements;
     }
 
     /**
