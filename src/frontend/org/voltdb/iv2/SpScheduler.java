@@ -523,6 +523,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),

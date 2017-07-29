@@ -137,6 +137,8 @@ public class AdHoc extends AdHocNTBase {
                     "to change application schema.  AdHoc DDL is forbidden.");
         }
 
+        logCatalogUpdateInvocation("@AdHoc");
+
         return updateApplication("@AdHoc",
                                 null,
                                 null,

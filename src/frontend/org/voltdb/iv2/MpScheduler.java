@@ -262,6 +262,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     true, // isSinglePartition
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -289,6 +290,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -308,6 +310,19 @@ public class MpScheduler extends Scheduler
 
             // if cannot figure out the involved partitions, run it as an MP txn
         }
+
+        int[] nPartitionIds = message.getNParitionIds();
+        if (nPartitionIds != null) {
+            HashMap<Integer, Long> involvedPartitionMasters = new HashMap<>();
+            for (int partitionId : nPartitionIds) {
+                involvedPartitionMasters.put(partitionId, m_partitionMasters.get(partitionId));
+            }
+
+            task = instantiateNpProcedureTask(m_mailbox, procedureName,
+                    m_pendingTasks, mp, involvedPartitionMasters,
+                    m_buddyHSIds.get(m_nextBuddy), false);
+        }
+
 
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
@@ -375,6 +390,7 @@ public class MpScheduler extends Scheduler
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),

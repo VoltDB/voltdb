@@ -53,6 +53,8 @@ public class UpdateApplicationCatalog extends UpdateApplicationBase {
                     "Use of @UpdateApplicationCatalog is forbidden.");
         }
 
+        logCatalogUpdateInvocation("@UpdateApplicationCatalog");
+
         return updateApplication("@UpdateApplicationCatalog",
                                 catalogJarBytes,
                                 deploymentString,

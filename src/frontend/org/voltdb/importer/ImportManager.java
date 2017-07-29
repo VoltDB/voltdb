@@ -134,7 +134,10 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     private synchronized void startImporters(Map<String, ImportConfiguration> newProcessorConfig) throws BundleException {
-        Preconditions.checkState(m_processor.get() == null, "Attempt to start importers when they may already be running");
+        // ENG-12902 - there are scenarios where m_processor.get() is NOT null.
+        // Since these are not fully understood, always call close() as this ensure the importer is in a valid state.
+        close();
+
         m_processorConfig = newProcessorConfig;
         importLog.info("Currently loaded importer modules: " + m_loadedBundles.keySet() + ", types: " + m_importersByType.keySet());
 
