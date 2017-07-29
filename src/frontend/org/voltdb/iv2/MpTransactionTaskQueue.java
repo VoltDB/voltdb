@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -49,9 +48,21 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private MpRoSitePool m_sitePool = null;
 
-    // Indicating which partitions are currently executing np tasks
-    private HashSet<Integer> usedPartitions = new HashSet<>();
-    private boolean isMP = false; // indicates whether a mp proc is executing
+    // Partition r/w counts, the key is the partition master hsid
+    private HashMap<Long, PartitionLock> m_lockedPartitions = new HashMap<>();
+
+    private class PartitionLock {
+        int reads, writes;
+
+        public PartitionLock() {
+            reads = 0;
+            writes = 0;
+        }
+        public PartitionLock(int r, int w) {
+            reads = r;
+            writes = w;
+        }
+    }
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -100,6 +111,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
+    // TODO: handle partition locks here as well. Updating the partition masters for NP txn must be carefully handled.
     synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters)
     {
         // We know that every Site assigned to the MPI (either the main writer or
@@ -190,28 +202,47 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         if (!m_backlog.isEmpty()) {
             // We may not queue the next task, just peek to get the read-only state
             TransactionTask task = m_backlog.peekFirst();
-            if (!task.getTransactionState().isReadOnly()) {
-                if (m_currentReads.isEmpty() && m_currentWrites.isEmpty()) {
-                    task = m_backlog.pollFirst();
-                    m_currentWrites.put(task.getTxnId(), task);
-                    taskQueueOffer(task);
-                    retval = true;
+
+            while (task != null) {
+                if (!task.getTransactionState().isReadOnly()) {
+                    // write txn
+                    if ((task.isNP && checkPartitions(task))
+                        ||
+                        (!task.isNP && m_currentReads.isEmpty() && m_currentWrites.isEmpty())) {
+                        task = m_backlog.pollFirst();
+                        m_currentWrites.put(task.getTxnId(), task);
+                        taskQueueOffer(task);
+                        retval = true;
+                        updatePartitionLocks(task, 1);
+                    } else {
+                        break;
+                    }
                 }
-            }
-            else if (m_currentWrites.isEmpty()) {
-                while (task != null && task.getTransactionState().isReadOnly() &&
-                       m_sitePool.canAcceptWork())
-                {
-                    task = m_backlog.pollFirst();
-                    assert(task.getTransactionState().isReadOnly());
-                    m_currentReads.put(task.getTxnId(), task);
-                    taskQueueOffer(task);
-                    retval = true;
-                    // Prime the pump with the head task, if any.  If empty,
-                    // task will be null
-                    task = m_backlog.peekFirst();
+                else {
+                    // read txn
+                    if (m_sitePool.canAcceptWork() &&
+                           (
+                               (!task.isNP && m_currentWrites.isEmpty()) ||
+                               (task.isNP && checkPartitions(task))
+                           )
+                       )
+                    {
+                        task = m_backlog.pollFirst();
+                        assert(task.getTransactionState().isReadOnly());
+                        m_currentReads.put(task.getTxnId(), task);
+                        taskQueueOffer(task);
+                        retval = true;
+                        updatePartitionLocks(task, 1);
+                    } else {
+                        break;
+                    }
                 }
+
+                task = m_backlog.peekFirst();
             }
+
+            // DEBUG
+            // System.err.println();
         }
         return retval;
     }
@@ -227,11 +258,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     {
         int offered = 0;
         if (m_currentReads.containsKey(txnId)) {
+            updatePartitionLocks(m_currentReads.get(txnId), -1);
             m_currentReads.remove(txnId);
             m_sitePool.completeWork(txnId);
         }
         else {
             assert(m_currentWrites.containsKey(txnId));
+            updatePartitionLocks(m_currentWrites.get(txnId), -1);
             m_currentWrites.remove(txnId);
             assert(m_currentWrites.isEmpty());
         }
@@ -246,6 +279,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * instead of flush by the currently blocking MP transaction in the event a
      * restart is necessary.
      */
+    // TODO: handle this for np as well
     @Override
     synchronized void restart()
     {
@@ -287,5 +321,59 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             sb.append("\tHEAD: ").append(m_backlog.getFirst()).append("\n");
         }
         return sb.toString();
+    }
+
+    /**
+     * update the r/w locks for this task
+     * @param task
+     * @param count 1 for incrementing count by 1, -1 for decreasing by 1
+     */
+    private void updatePartitionLocks(TransactionTask task, int count) {
+        assert(count == 1 || count == -1);
+        List<Long> hsids = task.getPartitionMasterHsids();
+        assert(hsids != null);
+        for (Long hsid : hsids) {
+            PartitionLock pLock = m_lockedPartitions.get(hsid);
+            assert(pLock != null);
+            if (task.getTransactionState().isReadOnly())
+                pLock.reads += count;
+            else
+                pLock.writes += count;
+        }
+    }
+
+    /*
+     * If the partitions can be used, return true, otherwise false
+     */
+    private boolean checkPartitions(TransactionTask task) {
+        if (task.getTransactionState().isReadOnly()) {
+            for (Long hsid : task.getPartitionMasterHsids()) {
+                PartitionLock pLock = m_lockedPartitions.get(hsid);
+                if (pLock.writes > 0) { return false; }
+            }
+        } else {
+            for (Long hsid : task.getPartitionMasterHsids()) {
+                PartitionLock pLock = m_lockedPartitions.get(hsid);
+                if (pLock.reads > 0 || pLock.writes > 0) { return false; }
+            }
+        }
+
+        return true;
+    }
+
+    public synchronized void updatePartitions(List<Long> masters, Map<Integer, Long> masterHsids) {
+        // TODO: need to be carefuly considered during replica update
+        for (Long i : masters) {
+            System.err.println(i);
+        }
+        System.err.println("=======");
+        for (Integer i : masterHsids.keySet()) {
+            System.err.println(i + " -> " + masterHsids.get(i));
+        }
+
+        // Update the locked partitions
+        for (Long i : masters) {
+            m_lockedPartitions.putIfAbsent(i, new PartitionLock()); // for now this is enough
+        }
     }
 }

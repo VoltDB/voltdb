@@ -44,10 +44,10 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.Maps;
-import org.voltdb.utils.VoltTrace;
 
 public class MpTransactionState extends TransactionState
 {
@@ -462,5 +462,13 @@ public class MpTransactionState extends TransactionState
         Preconditions.checkArgument(m_masterHSIds.values().containsAll(m_useHSIds) &&
                                     m_useHSIds.containsAll(m_masterHSIds.values()));
         return m_masterHSIds.get(partition);
+    }
+
+    public int numOfPartitions() {
+        return m_useHSIds.size();
+    }
+
+    public List<Long> getPartitionMasterHsids() {
+        return m_useHSIds;
     }
 }

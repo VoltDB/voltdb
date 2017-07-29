@@ -258,4 +258,10 @@ public class MpProcedureTask extends ProcedureTask
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }
+
+    @Override
+    public List<Long> getPartitionMasterHsids() {
+        assert(m_txnState instanceof MpTransactionState);
+        return ((MpTransactionState) m_txnState).getPartitionMasterHsids();
+    }
 }
