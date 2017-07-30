@@ -52,15 +52,33 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private HashMap<Long, PartitionLock> m_lockedPartitions = new HashMap<>();
 
     private class PartitionLock {
-        int reads, writes;
+        private int reads, writes;
 
         public PartitionLock() {
             reads = 0;
             writes = 0;
         }
-        public PartitionLock(int r, int w) {
-            reads = r;
-            writes = w;
+
+        public void updateRead(int count) {
+            if (count == 1) {
+                assert(writes == 0);
+                reads += 1;
+            } else {
+                assert(count == -1);
+                reads -= 1;
+                assert(reads >= 0);
+            }
+        }
+
+        public void updateWrite(int count) {
+            if (count == 1) {
+                assert(reads == 0 && writes == 0);
+                writes += 1;
+            } else {
+                assert(count == -1);
+                writes -= 1;
+                assert(writes == 0);
+            }
         }
     }
 
@@ -336,9 +354,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             PartitionLock pLock = m_lockedPartitions.get(hsid);
             assert(pLock != null);
             if (task.getTransactionState().isReadOnly())
-                pLock.reads += count;
+                pLock.updateRead(count);
             else
-                pLock.writes += count;
+                pLock.updateWrite(count);
         }
     }
 
