@@ -114,8 +114,7 @@ public class ProcedureRunner {
     protected TransactionState m_txnState; // used for sysprocs only
     protected byte m_statusCode = ClientResponse.SUCCESS;
     protected String m_statusString = null;
-    // Status code that can be set by stored procedure upon invocation that will
-    // be returned with the response.
+    // Status code that can be set by stored procedure upon invocation that will be returned with the response.
     protected byte m_appStatusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
     protected String m_appStatusString = null;
     // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
@@ -148,7 +147,7 @@ public class ProcedureRunner {
     protected final DeterminismHash m_determinismHash = new DeterminismHash();
 
     // running procedure info
-    // - track the current call to voltExecuteSQL for logging progress
+    //  - track the current call to voltExecuteSQL for logging progress
     protected int m_batchIndex;
 
     /** boolean flag to mark whether the previous batch execution has EE exception or not.*/
@@ -161,19 +160,19 @@ public class ProcedureRunner {
     }
 
     ProcedureRunner(VoltProcedure procedure,
-            SiteProcedureConnection site,
-            Procedure catProc,
-            CatalogSpecificPlanner csp) {
+                    SiteProcedureConnection site,
+                    Procedure catProc,
+                    CatalogSpecificPlanner csp) {
         this(procedure, site, null, catProc, csp);
         // assert this constructor for non-system procedures
         assert(procedure instanceof VoltSystemProcedure == false);
     }
 
     ProcedureRunner(VoltProcedure procedure,
-            SiteProcedureConnection site,
-            SystemProcedureExecutionContext sysprocContext,
-            Procedure catProc,
-            CatalogSpecificPlanner csp) {
+                    SiteProcedureConnection site,
+                    SystemProcedureExecutionContext sysprocContext,
+                    Procedure catProc,
+                    CatalogSpecificPlanner csp) {
         if (catProc.getHasjava() == false) {
             m_procedureName = catProc.getTypeName().intern();
         } else {
@@ -206,9 +205,14 @@ public class ProcedureRunner {
 
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
         // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
-        m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(site.getCorrespondingSiteId(),
-                new ProcedureStatsCollector(m_site.getCorrespondingSiteId(), m_site.getCorrespondingPartitionId(),
-                        m_catProc, stmtList, true));
+        m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
+                                            site.getCorrespondingSiteId(),
+                                            new ProcedureStatsCollector(
+                                                    m_site.getCorrespondingSiteId(),
+                                                    m_site.getCorrespondingPartitionId(),
+                                                    m_catProc,
+                                                    stmtList,
+                                                    true));
 
         // Read the ProcStatsOption annotation from the procedure class.
         // Basically, it is about setting the sampling interval for this stored procedure.
@@ -222,11 +226,11 @@ public class ProcedureRunner {
     /**
      * This function returns the ExecutionEngine for this site.
      * ProcedureRunner needs the access to the ExecutionEngine for two purposes:
-     * - Telling the C++ side to turn on/off the per-fragment time measurement.
-     * - Collecting the time measurements and the failure indicator from
-     *      the per-fragment stats shared buffer.
+     *     - Telling the C++ side to turn on/off the per-fragment time measurement.
+     *     - Collecting the time measurements and the failure indicator from
+     *       the per-fragment stats shared buffer.
      * The ExecutionEngine may not have been initialized when a ProcedureRunner is created,
-     *      (See BaseInitiator.java, the configureCommon() function)
+     *     (See BaseInitiator.java, the configureCommon() function)
      * so we do not find this engine in the constructor.
      */
     public ExecutionEngine getExecutionEngine() {
@@ -245,7 +249,7 @@ public class ProcedureRunner {
 
     public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
         assert(m_procedure != null);
-        if (!m_isSysProc) {
+        if (! m_isSysProc) {
             return;
         }
         ((VoltSystemProcedure) m_procedure).initSysProc(m_site,
@@ -305,9 +309,9 @@ public class ProcedureRunner {
         }
 
         m_statsCollector.endProcedure(result.getStatus() == ClientResponse.USER_ABORT,
-                (result.getStatus() != ClientResponse.USER_ABORT) &&
-                (result.getStatus() != ClientResponse.SUCCESS),
-                m_perCallStats);
+                                     (result.getStatus() != ClientResponse.USER_ABORT) &&
+                                     (result.getStatus() != ClientResponse.SUCCESS),
+                                     m_perCallStats);
 
         return result;
     }
@@ -316,9 +320,9 @@ public class ProcedureRunner {
      * @return Custom batch timeout value or 0 if there isn't one.
      */
     private int getBatchTimeout() {
-        return m_txnState == null ? 0
-                : m_txnState.getInvocation() == null ? 0 :
-                    m_txnState.getInvocation().getBatchTimeout();
+        return m_txnState == null ? 0 :
+            m_txnState.getInvocation() == null ? 0 :
+                m_txnState.getInvocation().getBatchTimeout();
     }
 
     @SuppressWarnings("finally")
@@ -360,7 +364,7 @@ public class ProcedureRunner {
             if (isSystemProcedure()) {
                 final Object[] combinedParams = new Object[paramList.length + 1];
                 combinedParams[0] = m_systemProcedureContext;
-                for (int i = 0; i < paramList.length; ++i) {
+                for (int i=0; i < paramList.length; ++i) {
                     combinedParams[i+1] = paramList[i];
                 }
                 // swap the lists.
@@ -369,7 +373,7 @@ public class ProcedureRunner {
 
             if (paramList.length != m_paramTypes.length) {
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
-                        " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
+                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 m_statusCode = ClientResponse.GRACEFUL_FAILURE;
                 return getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
             }
@@ -401,27 +405,29 @@ public class ProcedureRunner {
                         throw new InvocationTargetException(e);
                     }
                     log.trace("invoked");
-                } catch (InvocationTargetException itex) {
+                }
+                catch (InvocationTargetException itex) {
                     // itex.printStackTrace();
                     Throwable ex = itex.getCause();
                     if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
-                        // If the stored procedure attempted to do something
-                        // other than linklibraray or instantiate
-                        // a missing object that results in an error, throw the
-                        // error and let the server deal with
-                        // the condition as best as it can (usually a
-                        // crashLocalVoltDB).
+                        // If the stored procedure attempted to do something other than linklibraray or instantiate
+                        // a missing object that results in an error, throw the error and let the server deal with
+                        // the condition as best as it can (usually a crashLocalVoltDB).
                         try {
                             m_statsCollector.endProcedure(false, true, m_perCallStats);
-                        } finally {
-                            // Ensure that ex is always re-thrown even if
-                            // endProcedure throws an exception.
-                            throw (Error) ex;
+                        }
+                        finally {
+                            // Ensure that ex is always re-thrown even if endProcedure throws an exception.
+                            throw (Error)ex;
                         }
                     }
 
-                    retval = getErrorResponse(m_procedureName, m_isReadOnly, getBatchTimeout(), m_appStatusCode,
-                            m_appStatusString, getNonVoltDBBackendIfExists(), ex);
+                    retval = getErrorResponse(m_procedureName,
+                                              m_isReadOnly,
+                                              getBatchTimeout(),
+                                              m_appStatusCode,
+                                              m_appStatusString, getNonVoltDBBackendIfExists(),
+                                              ex);
                 }
             }
             // single statement only work - now extended to multiple statements
