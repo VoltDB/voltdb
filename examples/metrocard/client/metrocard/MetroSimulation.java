@@ -255,7 +255,7 @@ public class MetroSimulation {
             sb.append(m_trainId).append(",")
                     .append(Integer.valueOf(curStation)).append(",")
                     .append(Integer.valueOf(lastState)).append(",")
-                    .append(Long.valueOf(eventTime));
+                    .append(Long.valueOf(eventTime*1000));
             ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.trains, m_trainId, sb.toString());
             curStation += direction*1;
             long wtime = stopTime;
@@ -370,9 +370,10 @@ public class MetroSimulation {
             }
             StringBuilder sb = new StringBuilder();
             sb.append(Integer.valueOf(card_id)).append(",")
+                    .append(Long.valueOf(atime*1000)).append(",")
                     .append(Integer.valueOf(station_id)).append(",")
                     .append(Integer.valueOf(activity_code)).append(",")
-                    .append(Long.valueOf(atime));
+                    .append("250");
             ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
             System.out.println(sb.toString());
             return rec;
