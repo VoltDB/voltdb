@@ -59,6 +59,15 @@ CREATE TABLE trains (
   CONSTRAINT PK_trains PRIMARY KEY (train_id)
 );
 
+CREATE TABLE wait_time (
+  station_id          SMALLINT  NOT NULL,
+  update_time         TIMESTAMP DEFAULT NOW,
+  last_depart         TIMESTAMP NOT NULL,
+  total_time          BIGINT    NOT NULL, -- in seconds
+  entries             INTEGER   NOT NULL,
+  PRIMARY KEY (update_time, station_id)
+);
+
 -------------- PARTITIONED TABLES -----------------------------------------------
 CREATE TABLE cards(
   card_id               INTEGER        NOT NULL,
@@ -82,6 +91,7 @@ CREATE TABLE activity(
   amount                INTEGER        NOT NULL
 );
 PARTITION TABLE activity ON COLUMN card_id;
+CREATE UNIQUE INDEX aStationDateCard ON activity (station_id, date_time, card_id);
 
 CREATE TABLE train_activity(
   train_id              INTEGER        NOT NULL,
@@ -90,6 +100,7 @@ CREATE TABLE train_activity(
   time                  TIMESTAMP
 );
 PARTITION TABLE train_activity ON COLUMN station_id;
+CREATE INDEX taStationDepart ON train_activity (station_id, dep_time);
 
 CREATE STREAM card_alert_export PARTITION ON COLUMN card_id EXPORT TO TARGET alertstream (
   card_id               INTEGER        NOT NULL,
@@ -132,10 +143,21 @@ FROM activity
 GROUP BY
   TRUNCATE(SECOND,date_time);
 
+CREATE VIEW wait_time_by_station
+AS
+SELECT
+  station_id,
+  COUNT(*) AS calculations,
+  SUM(total_time) AS total_time, -- in seconds
+  SUM(entries) AS entries
+FROM wait_time
+GROUP BY
+  station_id;
 
 -------------- PROCEDURES -------------------------------------------------------
 
 CREATE PROCEDURE PARTITION ON TABLE cards COLUMN card_id PARAMETER 0 FROM CLASS metrocard.CardSwipe;
+CREATE PROCEDURE FROM CLASS metrocard.UpdateWaitTime;
 
 CREATE PROCEDURE ReplenishCard PARTITION ON TABLE cards COLUMN card_id PARAMETER 1 AS
 UPDATE cards SET balance = balance + ?
@@ -154,7 +176,7 @@ CREATE PROCEDURE GetSwipesPerSecond AS
 SELECT second, activities, entries
 FROM secondly_stats
 WHERE
-  second >= DATEADD(SECOND, -1 * ?, NOW) AND
+  second >= DATEADD(SECOND, ?, NOW) AND
   second < TRUNCATE(SECOND, NOW)
 ORDER BY second;
 
