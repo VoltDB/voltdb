@@ -100,7 +100,7 @@ CREATE TABLE train_activity(
   time                  TIMESTAMP
 );
 PARTITION TABLE train_activity ON COLUMN station_id;
-CREATE INDEX taStationDepart ON train_activity (station_id, dep_time);
+CREATE INDEX taStationDepart ON train_activity (station_id, time);
 
 CREATE STREAM card_alert_export PARTITION ON COLUMN card_id EXPORT TO TARGET alertstream (
   card_id               INTEGER        NOT NULL,

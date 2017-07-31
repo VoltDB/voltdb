@@ -48,7 +48,7 @@ public class UpdateWaitTime extends VoltProcedure {
 
     // Get train departure times after the last calculation
     public static final SQLStmt getTrainDeparts = new SQLStmt(
-    "SELECT * FROM train_activity WHERE station_id = ? AND dep_time > ? ORDER BY dep_time;"
+    "SELECT * FROM train_activity WHERE station_id = ? AND time > ? ORDER BY time;"
     );
 
     // Get average wait time for each train departure by station
@@ -149,7 +149,7 @@ public class UpdateWaitTime extends VoltProcedure {
             final VoltTable departResult = voltExecuteSQL()[0];
 
             while (departResult.advanceRow()) {
-                final TimestampType departTime = departResult.getTimestampAsTimestamp("dep_time");
+                final TimestampType departTime = departResult.getTimestampAsTimestamp("time");
                 voltQueueSQL(getWaitTimeForTrain, departTime, station, lastDepartTime, departTime);
                 lastDepartTime = departTime;
             }
