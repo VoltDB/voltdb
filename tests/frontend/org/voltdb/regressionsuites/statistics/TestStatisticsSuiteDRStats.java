@@ -186,9 +186,9 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             assertEquals(1, results.length);
             System.out.println("Test DR table: " + results[0].toString());
             validateSchema(results[0], expectedTable1);
-            // One row per site (including the MPI on each host),
+            // One row per site,
             // don't have HSID for ease of check, just check a bunch of stuff
-            assertEquals(CONSUMER_CLUSTER_COUNT * (HOSTS * SITES + HOSTS), results[0].getRowCount());
+            assertEquals(CONSUMER_CLUSTER_COUNT * (HOSTS * SITES), results[0].getRowCount());
             results[0].advanceRow();
             Map<String, String> columnTargets = new HashMap<>();
             columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
