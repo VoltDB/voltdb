@@ -81,16 +81,13 @@ public class ProcedureRunner {
 
     // SQL statement queue info
     //
-    // This must be less than or equal to MAX_BATCH_COUNT in
-    // src/ee/execution/VoltDBEngine.h
+    // This must be less than or equal to MAX_BATCH_COUNT in src/ee/execution/VoltDBEngine.h
     final static int MAX_BATCH_SIZE = 200;
-
     static class QueuedSQL {
         SQLStmt stmt;
         ParameterSet params;
         Expectation expectation = null;
     }
-
     protected final ArrayList<QueuedSQL> m_batch = new ArrayList<QueuedSQL>(100);
     // cached fake SQLStmt array for single statement non-java procs
     protected final ArrayList<QueuedSQL> m_sqlStmts = new ArrayList<QueuedSQL>(100);
@@ -121,8 +118,7 @@ public class ProcedureRunner {
     // be returned with the response.
     protected byte m_appStatusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
     protected String m_appStatusString = null;
-    // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator()
-    // for
+    // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
     // a given call don't re-seed and generate the same number over and over
     private Random m_cachedRNG = null;
 
@@ -155,10 +151,7 @@ public class ProcedureRunner {
     // - track the current call to voltExecuteSQL for logging progress
     protected int m_batchIndex;
 
-    /**
-     * boolean flag to mark whether the previous batch execution has EE
-     * exception or not.
-     */
+    /** boolean flag to mark whether the previous batch execution has EE exception or not.*/
     private long m_spBigBatchBeginToken;
 
     // Used to get around the "abstract" for StmtProcedures.
@@ -167,15 +160,20 @@ public class ProcedureRunner {
         public final SQLStmt sql = new SQLStmt("TBD");
     }
 
-    ProcedureRunner(VoltProcedure procedure, SiteProcedureConnection site, Procedure catProc,
+    ProcedureRunner(VoltProcedure procedure,
+            SiteProcedureConnection site,
+            Procedure catProc,
             CatalogSpecificPlanner csp) {
         this(procedure, site, null, catProc, csp);
         // assert this constructor for non-system procedures
-        assert (procedure instanceof VoltSystemProcedure == false);
+        assert(procedure instanceof VoltSystemProcedure == false);
     }
 
-    ProcedureRunner(VoltProcedure procedure, SiteProcedureConnection site,
-            SystemProcedureExecutionContext sysprocContext, Procedure catProc, CatalogSpecificPlanner csp) {
+    ProcedureRunner(VoltProcedure procedure,
+            SiteProcedureConnection site,
+            SystemProcedureExecutionContext sysprocContext,
+            Procedure catProc,
+            CatalogSpecificPlanner csp) {
         if (catProc.getHasjava() == false) {
             m_procedureName = catProc.getTypeName().intern();
         } else {
@@ -188,7 +186,7 @@ public class ProcedureRunner {
         m_isReadOnly = catProc.getReadonly();
         m_isSinglePartition = m_catProc.getSinglepartition();
         if (m_isSinglePartition) {
-            ProcedurePartitionInfo ppi = (ProcedurePartitionInfo) m_catProc.getAttachment();
+            ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
             m_partitionColumn = ppi.index;
             m_partitionColumnType = ppi.type;
         } else {
@@ -201,23 +199,19 @@ public class ProcedureRunner {
 
         m_procedure.init(this);
 
-        // Analyze and process the stored procedure, return a list of variable
-        // names of
+        // Analyze and process the stored procedure, return a list of variable names of
         // the SQLStmts defined in the stored procedure.
         // The variable names are used in the granular statistics.
         ArrayList<String> stmtList = reflect();
 
-        // Normally m_statsCollector is returned as it is and there is no affect
-        // to assign it to itself.
-        // Sometimes when this procedure statistics needs to reuse the existing
-        // one, the old stats gets returned.
+        // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
+        // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
         m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(site.getCorrespondingSiteId(),
                 new ProcedureStatsCollector(m_site.getCorrespondingSiteId(), m_site.getCorrespondingPartitionId(),
                         m_catProc, stmtList, true));
 
         // Read the ProcStatsOption annotation from the procedure class.
-        // Basically, it is about setting the sampling interval for this stored
-        // procedure.
+        // Basically, it is about setting the sampling interval for this stored procedure.
         ProcStatsOption statsOption = m_procedure.getClass().getAnnotation(ProcStatsOption.class);
         if (statsOption != null) {
             m_statsCollector.setProcSamplingInterval(statsOption.procSamplingInterval());
@@ -226,37 +220,38 @@ public class ProcedureRunner {
     }
 
     /**
-     * This function returns the ExecutionEngine for this site. ProcedureRunner
-     * needs the access to the ExecutionEngine for two purposes: - Telling the
-     * C++ side to turn on/off the per-fragment time measurement. - Collecting
-     * the time measurements and the failure indicator from the per-fragment
-     * stats shared buffer. The ExecutionEngine may not have been initialized
-     * when a ProcedureRunner is created, (See BaseInitiator.java, the
-     * configureCommon() function) so we do not find this engine in the
-     * constructor.
+     * This function returns the ExecutionEngine for this site.
+     * ProcedureRunner needs the access to the ExecutionEngine for two purposes:
+     * - Telling the C++ side to turn on/off the per-fragment time measurement.
+     * - Collecting the time measurements and the failure indicator from
+     *      the per-fragment stats shared buffer.
+     * The ExecutionEngine may not have been initialized when a ProcedureRunner is created,
+     *      (See BaseInitiator.java, the configureCommon() function)
+     * so we do not find this engine in the constructor.
      */
     public ExecutionEngine getExecutionEngine() {
         if (m_ee != null) {
             return m_ee;
         }
         // m_site is declared as SiteProcedureConnection here.
-        // SiteProcedureConnection only has two implementations: Site and
-        // MpRoSite.
+        // SiteProcedureConnection only has two implementations: Site and MpRoSite.
         // Only SP site has an underlying ExecutionEngine, MpRoSite does not.
         if (m_site instanceof Site) {
-            m_ee = ((Site) m_site).getExecutionEngine();
+            m_ee = ((Site)m_site).getExecutionEngine();
             return m_ee;
         }
         return null;
     }
 
     public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
-        assert (m_procedure != null);
+        assert(m_procedure != null);
         if (!m_isSysProc) {
             return;
         }
-        ((VoltSystemProcedure) m_procedure).initSysProc(m_site, catalogContext.cluster,
-                catalogContext.getClusterSettings(), catalogContext.getNodeSettings());
+        ((VoltSystemProcedure) m_procedure).initSysProc(m_site,
+                catalogContext.cluster,
+                catalogContext.getClusterSettings(),
+                catalogContext.getNodeSettings());
 
         m_csp = csp;
     }
@@ -274,9 +269,7 @@ public class ProcedureRunner {
     }
 
     /**
-     * Note this fails for Sysprocs that use it in non-coordinating fragment
-     * work. Don't.
-     *
+     * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
      */
     long getTransactionId() {
@@ -312,7 +305,8 @@ public class ProcedureRunner {
         }
 
         m_statsCollector.endProcedure(result.getStatus() == ClientResponse.USER_ABORT,
-                (result.getStatus() != ClientResponse.USER_ABORT) && (result.getStatus() != ClientResponse.SUCCESS),
+                (result.getStatus() != ClientResponse.USER_ABORT) &&
+                (result.getStatus() != ClientResponse.SUCCESS),
                 m_perCallStats);
 
         return result;
@@ -323,17 +317,18 @@ public class ProcedureRunner {
      */
     private int getBatchTimeout() {
         return m_txnState == null ? 0
-                : m_txnState.getInvocation() == null ? 0 : m_txnState.getInvocation().getBatchTimeout();
+                : m_txnState.getInvocation() == null ? 0 :
+                    m_txnState.getInvocation().getBatchTimeout();
     }
 
     @SuppressWarnings("finally")
     private ClientResponseImpl coreCall(Object... paramListIn) {
         // verify per-txn state has been reset
-        assert (m_statusCode == ClientResponse.SUCCESS);
-        assert (m_statusString == null);
-        assert (m_appStatusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
-        assert (m_appStatusString == null);
-        assert (m_cachedRNG == null);
+        assert(m_statusCode == ClientResponse.SUCCESS);
+        assert(m_statusString == null);
+        assert(m_appStatusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
+        assert(m_appStatusString == null);
+        assert(m_cachedRNG == null);
 
         // reset batch context info
         m_batchIndex = -1;
@@ -356,7 +351,7 @@ public class ProcedureRunner {
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
-        assert (m_batch.size() == 0);
+        assert(m_batch.size() == 0);
 
         try {
             VoltTable[] results = null;
@@ -366,15 +361,15 @@ public class ProcedureRunner {
                 final Object[] combinedParams = new Object[paramList.length + 1];
                 combinedParams[0] = m_systemProcedureContext;
                 for (int i = 0; i < paramList.length; ++i) {
-                    combinedParams[i + 1] = paramList[i];
+                    combinedParams[i+1] = paramList[i];
                 }
                 // swap the lists.
                 paramList = combinedParams;
             }
 
             if (paramList.length != m_paramTypes.length) {
-                String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length)
-                        + " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
+                String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
+                        " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 m_statusCode = ClientResponse.GRACEFUL_FAILURE;
                 return getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
             }
@@ -383,10 +378,10 @@ public class ProcedureRunner {
                 try {
                     paramList[i] = ParameterConverter.tryToMakeCompatible(m_paramTypes[i], paramList[i]);
                     // check the result type in an assert
-                    assert (ParameterConverter.verifyParameterConversion(paramList[i], m_paramTypes[i]));
+                    assert(ParameterConverter.verifyParameterConversion(paramList[i], m_paramTypes[i]));
                 } catch (Exception e) {
-                    String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i + ": "
-                            + e.toString();
+                    String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
+                            ": " + e.toString();
                     m_statusCode = ClientResponse.GRACEFUL_FAILURE;
                     return getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
                 }
@@ -396,15 +391,13 @@ public class ProcedureRunner {
             if (m_hasJava) {
                 try {
                     if (HOST_TRACE_ENABLED) {
-                        log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class="
-                                + m_procMethod.getDeclaringClass().getName());
+                        log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + m_procMethod.getDeclaringClass().getName());
                     }
                     try {
                         Object rawResult = m_procMethod.invoke(m_procedure, paramList);
                         results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
                     } catch (IllegalAccessException e) {
-                        // If reflection fails, invoke the same error handling
-                        // that other exceptions do
+                        // If reflection fails, invoke the same error handling that other exceptions do
                         throw new InvocationTargetException(e);
                     }
                     log.trace("invoked");
