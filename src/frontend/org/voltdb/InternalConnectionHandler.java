@@ -102,6 +102,20 @@ public class InternalConnectionHandler {
             String procName,
             Object...args)
     {
+        return callProcedure(user, isAdmin, timeout, cb, ntPriority, backPressurePredicate, procName, null, args);
+    }
+
+    public boolean callProcedure(
+            AuthUser user,
+            boolean isAdmin,
+            int timeout,
+            ProcedureCallback cb,
+            boolean ntPriority,
+            Function<Integer, Boolean> backPressurePredicate,
+            String procName,
+            String hostname,
+            Object...args)
+    {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(procName, getCatalogContext());
         if (catProc == null) {
             String fmt = "Cannot invoke procedure %s. Procedure not found.";
@@ -139,8 +153,9 @@ public class InternalConnectionHandler {
 
         boolean mp = (partitions[0] == MpInitiator.MP_INIT_PID) || (partitions.length > 1);
         final InternalClientResponseAdapter adapter = mp ? m_adapters.get(MpInitiator.MP_INIT_PID) : m_adapters.get(partitions[0]);
+        String adapterName = (hostname == null ? DEFAULT_INTERNAL_ADAPTER_NAME : hostname);
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
-                DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, adapter.connectionId());
+                adapterName, isAdmin, adapter.connectionId());
 
         if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partitions, ntPriority, backPressurePredicate)) {
             m_failedCount.incrementAndGet();

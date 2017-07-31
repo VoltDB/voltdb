@@ -310,6 +310,7 @@ public class HTTPClientInterface {
 
             JSONProcCallback cb = new JSONProcCallback(continuation, jsonp);
             boolean success;
+            String hostname = request.getRemoteHost();
             if (params != null) {
                 ParameterSet paramSet = null;
                 try {
@@ -329,10 +330,10 @@ public class HTTPClientInterface {
                     continuation.complete();
                     return;
                 }
-                success = callProcedure(authResult, queryTimeout, cb, procName, paramSet.toArray());
+                success = callProcedure(authResult, queryTimeout, cb, procName, hostname, paramSet.toArray());
             }
             else {
-                success = callProcedure(authResult, queryTimeout, cb, procName);
+                success = callProcedure(authResult, queryTimeout, cb, procName, hostname);
             }
             if (!success) {
                 ok(jsonp, "Server is not accepting work at this time.", response);
@@ -355,12 +356,12 @@ public class HTTPClientInterface {
         }
     }
 
-    public boolean callProcedure(final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
-        return m_invocationHandler.get().callProcedure(ar.m_authUser, ar.m_adminMode, timeout, cb, procName, args);
+    public boolean callProcedure(final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, String hostname, Object...args) {
+        return m_invocationHandler.get().callProcedure(ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, hostname, args);
     }
 
-    public boolean callProcedure(final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, Object...args) {
-        return m_invocationHandler.get().callProcedure(user, adminMode, timeout, cb, procName, args);
+    public boolean callProcedure(final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, String hostname, Object...args) {
+        return m_invocationHandler.get().callProcedure(user, adminMode, timeout, cb, false, null, procName, hostname, args);
     }
 
     Configuration getVoltDBConfig() {
