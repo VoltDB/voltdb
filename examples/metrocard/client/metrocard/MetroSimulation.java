@@ -373,7 +373,7 @@ public class MetroSimulation {
                     .append(Integer.valueOf(station_id)).append(",")
                     .append(Integer.valueOf(activity_code)).append(",")
                     .append(Long.valueOf(atime));
-            ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.trains, String.valueOf(card_id), sb.toString());
+            ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
             System.out.println(sb.toString());
             return rec;
         }
