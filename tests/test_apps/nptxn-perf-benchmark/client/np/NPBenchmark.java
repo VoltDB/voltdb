@@ -409,9 +409,6 @@ class NPBenchmark {
     }
 
     public void initialize() throws Exception {
-        // hack
-        clients[0].callProcedure("@AdHoc", "CREATE PROCEDURE PARTITION ON TABLE card_activity COLUMN pan AND ON TABLE card_activity COLUMN pan FROM CLASS np.Transfer;");
-
         System.out.println("Generating " + config.cardcount + " cards...");
         for (int i = 0; i < config.cardcount; i++) {
             // generate a card

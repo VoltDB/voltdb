@@ -456,7 +456,7 @@ public abstract class CatalogSchemaTools {
         // Build the optional PARTITION clause.
         StringBuilder partitionClause = new StringBuilder();
         ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
-        if (proc.getSinglepartition()) {
+        if (proc.getSinglepartition() || proc.getPartitionparameter2() != 0) {
             if (annot != null && annot.classAnnotated) {
                 partitionClause.append("--Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement\n--");
             }
@@ -472,6 +472,20 @@ public abstract class CatalogSchemaTools {
                 partitionClause.append(String.format(
                         " PARAMETER %s",
                         String.valueOf(proc.getPartitionparameter()) ));
+            }
+
+            // For the second partition clause in 2p txn
+            if (proc.getPartitionparameter2() != 0) {
+                partitionClause.append(spacer);
+                partitionClause.append(String.format(
+                        "AND ON TABLE %s COLUMN %s",
+                        proc.getPartitiontable2().getTypeName(),
+                        proc.getPartitioncolumn2().getTypeName() ));
+                if (proc.getPartitionparameter2() != 1) {
+                    partitionClause.append(String.format(
+                            " PARAMETER %s",
+                            String.valueOf(proc.getPartitionparameter2()) ));
+                }
             }
         }
 

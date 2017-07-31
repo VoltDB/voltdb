@@ -37,7 +37,6 @@ PARTITION PROCEDURE Authorize ON TABLE card_activity COLUMN pan PARAMETER 0;
 CREATE PROCEDURE FROM CLASS np.Redeem;
 PARTITION PROCEDURE Redeem ON TABLE card_activity COLUMN pan PARAMETER 0;
 
--- Currently does not work when provided in stdin, need to explicitly type in interactive mode / callProc in client
--- CREATE PROCEDURE PARTITION ON TABLE card_activity COLUMN pan AND ON TABLE card_activity COLUMN pan FROM CLASS np.Transfer;
+CREATE PROCEDURE PARTITION ON TABLE card_activity COLUMN pan AND ON TABLE card_activity COLUMN pan FROM CLASS np.Transfer;
 
 CREATE PROCEDURE FROM CLASS np.Select;

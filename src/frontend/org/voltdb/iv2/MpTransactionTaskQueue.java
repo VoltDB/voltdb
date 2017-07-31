@@ -51,6 +51,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     // Partition r/w counts, the key is the partition master hsid
     private HashMap<Long, PartitionLock> m_lockedPartitions = new HashMap<>();
 
+    // A temporary implementation for the r/w lock, will be improved to
+    // use fixed arrays with primitives only.
     private class PartitionLock {
         private int reads, writes;
 
@@ -119,6 +121,10 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     @Override
     synchronized boolean offer(TransactionTask task)
     {
+        // if (task.isNP) {
+        //     System.err.println(task.getPartitionMasterHsids());
+        // }
+
         Iv2Trace.logTransactionTaskQueueOffer(task);
         m_backlog.addLast(task);
         taskQueueOffer();
