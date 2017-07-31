@@ -111,7 +111,7 @@ function client() {
          --mprate=0.005 \
          --skew=0.0 \
          --duration=30 \
-         --clients=3
+         --threads=1
 }
 
 ###################
