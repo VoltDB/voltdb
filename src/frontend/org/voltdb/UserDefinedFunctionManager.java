@@ -24,6 +24,7 @@ import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Function;
 import org.voltdb.common.Constants;
@@ -53,6 +54,13 @@ public class UserDefinedFunctionManager {
 
     public void loadFunctions(CatalogContext catalogContext) {
         final CatalogMap<Function> catalogFunctions = catalogContext.database.getFunctions();
+        // Remove obsolete tokens
+        for (UserDefinedFunctionRunner runner : m_udfs.values()) {
+            if (catalogFunctions.get(runner.m_functionName) == null) {
+                FunctionForVoltDB.deregisterUserDefinedFunction(runner.m_functionName);
+            }
+        }
+        // Build new UDF runners
         ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder = ImmutableMap.<Integer, UserDefinedFunctionRunner>builder();
         for (final Function catalogFunction : catalogFunctions) {
             final String className = catalogFunction.getClassname();
@@ -122,6 +130,7 @@ public class UserDefinedFunctionManager {
                         String.format("Error loading function %s: cannot find the %s() method.",
                                 m_functionName, methodName));
             }
+
             Class<?>[] paramTypeClasses = m_functionMethod.getParameterTypes();
             m_paramCount = paramTypeClasses.length;
             m_paramTypes = new VoltType[m_paramCount];
@@ -131,6 +140,8 @@ public class UserDefinedFunctionManager {
                 m_boxUpByteArray[i] = paramTypeClasses[i] == Byte[].class;
             }
             m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
+
+            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_functionMethod.getReturnType(), paramTypeClasses);
         }
 
         private static byte[] readVarbinary(ByteBuffer buffer) {
