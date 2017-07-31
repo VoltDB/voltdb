@@ -428,7 +428,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{1}}, vt1);
 
         vt = client.callProcedure("@AdHoc", "select * from t3;").getResults();
-        assertContentOfTable(new Object[][] {{2, "updated"}}, vt1);
+        assertContentOfTable(new Object[][] {{2, "updated"}}, vt[0]);
     }
 
     /**
