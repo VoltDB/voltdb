@@ -77,7 +77,7 @@ public interface SystemProcedureExecutionContext {
     public void updateBackendLogLevels();
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
-            boolean requiresSnapshotIsolation, long uniqueId, long spHandle,
+            boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean isReplay,
             boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration);
 
     public boolean updateSettings(CatalogContext context);
