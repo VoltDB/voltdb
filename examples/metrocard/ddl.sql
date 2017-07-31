@@ -87,7 +87,7 @@ CREATE TABLE activity(
   card_id               INTEGER        NOT NULL,
   date_time             TIMESTAMP      NOT NULL,
   station_id            SMALLINT       NOT NULL,
-  activity_code         TINYINT        NOT NULL, -- 1=entry, 2=purchase, 0=Exit
+  activity_code         TINYINT        NOT NULL, -- 1=entry, 2=purchase, -1=Exit
   amount                INTEGER        NOT NULL
 );
 PARTITION TABLE activity ON COLUMN card_id;
@@ -97,7 +97,8 @@ CREATE TABLE train_activity(
   train_id              INTEGER        NOT NULL,
   station_id            INTEGER        NOT NULL,
   activity_type         TINYINT        NOT NULL, -- 0 for arrival, 1 for departure.
-  time                  TIMESTAMP
+  time                  TIMESTAMP      NOT NULL,
+  PRIMARY KEY (station_id, train_id, time)
 );
 PARTITION TABLE train_activity ON COLUMN station_id;
 CREATE INDEX taStationDepart ON train_activity (station_id, time);

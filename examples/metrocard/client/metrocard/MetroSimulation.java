@@ -338,7 +338,7 @@ public class MetroSimulation {
         protected ProducerRecord<String, String> getNextRecord() {
             int card_id = -1;
             long atime;
-            if (activity_code == 0)  {
+            if (activity_code == -1)  { // Exit
                 atime = swipeTime;
                 while (card_id == -1) {
                     card_id = rand.nextInt(cardCount+1000); // use +1000 so sometimes we get an invalid card_id
@@ -348,7 +348,7 @@ public class MetroSimulation {
                     }
                     cardsEntered.put(card_id, System.currentTimeMillis());
                 }
-            } else {
+            } else if (activity_code == 1) { // Entry
                 if (!close) {
                     if (cardsEntered.size() < 100) return null;
                 }
@@ -359,6 +359,8 @@ public class MetroSimulation {
                 card_id = r;
                 //Longest journy is 39 min so pick a random exit time from start.
                 atime = st + (rand.nextInt(36)*60000);
+            } else {
+                throw new IllegalArgumentException("Unsupported activity code " + activity_code);
             }
 
             //Get a station.
@@ -401,9 +403,9 @@ public class MetroSimulation {
             redLine.start();
             trainPubs.add(redLine);
         }
-        SwipeActivityPublisher entry = new SwipeActivityPublisher(config, 0, producerConfig, config.count);
+        SwipeActivityPublisher entry = new SwipeActivityPublisher(config, 1, producerConfig, config.count);
         entry.start();
-        SwipeActivityPublisher exit = new SwipeActivityPublisher(config, 1, producerConfig, config.count);
+        SwipeActivityPublisher exit = new SwipeActivityPublisher(config, -1, producerConfig, config.count);
         exit.start();
         entry.join();
         exit.close = true;
