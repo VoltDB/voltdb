@@ -24,6 +24,7 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -183,9 +184,9 @@ public class UpdateBaseProc extends VoltProcedure {
 
     @SuppressWarnings("deprecation")
     protected VoltTable[] doWorkInProcAdHoc(byte cid, long rid, byte[] value, byte shouldRollback) {
-        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);
-        voltQueueSQLExperimental("SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
-        voltQueueSQLExperimental("SELECT * FROM replview WHERE cid = ? ORDER BY cid desc;", cid);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, "SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, "SELECT * FROM replview WHERE cid = ? ORDER BY cid desc;", cid);
         VoltTable[] results = voltExecuteSQL();
         VoltTable data = results[0];
         VoltTable adhoc = results[1];
@@ -224,11 +225,11 @@ public class UpdateBaseProc extends VoltProcedure {
                     " for cid " + cid);
         }
 
-        voltQueueSQLExperimental("INSERT INTO replicated (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
-        voltQueueSQLExperimental("INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
-        voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
-        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);
-        voltQueueSQLExperimental("SELECT * FROM replview WHERE cid = ? ORDER BY cid desc;", cid);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, "INSERT INTO replicated (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, "INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, "DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);
+        SQLStmtAdHocHelper.voltQueueSQLExperimental(this, "SELECT * FROM replview WHERE cid = ? ORDER BY cid desc;", cid);
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occurring.
