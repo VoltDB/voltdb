@@ -920,11 +920,14 @@ public class ProcedureRunner {
                 }
             }
             // Allow initialization of string or integer or even decimal or float?
-            // (microseconds) yet not decimal (?) from timestamp, for backward compatibility.
+            // (microseconds) yet not decimal (?) from timestamp,
+            // for backward compatibility.
             // TODO: Should we deprecate some or all of these conversions soon as
-            // something easy enough to work around and too easy to accidentally abuse?
+            // something easy enough to work around and too easy to accidentally
+            // abuse?
             else if (argType.isBackendIntegerType()) {
-                if (expectedType.isNumber() || expectedType == VoltType.STRING) {
+                if (expectedType.isNumber() ||
+                        expectedType == VoltType.STRING) {
                     return;
                 }
             }
@@ -937,10 +940,11 @@ public class ProcedureRunner {
         String argTypeName = argClass.getSimpleName();
         String preferredType = expectedType.getMostCompatibleJavaTypeName();
 
-        throw new VoltTypeException(
-                "Procedure " + m_procedureName + ": Incompatible parameter type: can not convert type '" + argTypeName
-                        + "' to '" + expectedType.getName() + "' for arg " + argInd + " for SQL stmt: " + stmt.getText()
-                        + "." + " Try explicitly using a " + preferredType + " parameter.");
+        throw new VoltTypeException( "Procedure " + m_procedureName +
+                        ": Incompatible parameter type: can not convert type '" + argTypeName +
+                        "' to '" + expectedType.getName() + "' for arg " + argInd +
+                        " for SQL stmt: " + stmt.getText() + "." +
+                        " Try explicitly using a " + preferredType + " parameter.");
     }
 
     private final ParameterSet getCleanParams(SQLStmt stmt, boolean verifyTypeConv, Object... inArgs) {
@@ -958,7 +962,7 @@ public class ProcedureRunner {
             // handle non-null values
             if (inArgs[ii] != null) {
                 args[ii] = inArgs[ii];
-                assert (type != VoltType.INVALID);
+                assert(type != VoltType.INVALID);
                 if (verifyTypeConv && type != VoltType.INVALID) {
                     throwIfInfeasibleTypeConversion(stmt, args[ii].getClass(), ii, type);
                 }
