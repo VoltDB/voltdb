@@ -119,18 +119,16 @@ def makeParser():
     #   2.) --build
     #           Build the VoltDB shared object.  This builds all the dependences,
     #           compiles all the files and links them into a shared library.
-    #   3.) --install
-    #       Install the VoltDB shared object and the voltipc excutable.
-    #   4.) Building Tests
-    #       4a.) --build-one-test=test or --build-one-testdir=testdir
+    #   3.) Building Tests
+    #       3a.) --build-one-test=test or --build-one-testdir=testdir
     #           Build one EE unit test or else build all the tests in a given
     #           test directory.
-    #       4b.) --build-tests
+    #       3b.) --build-tests
     #           This builds all the tests.
-    #   5.) Running Tests
-    #       5a.) --run-one-test=test or --run-one-testdir=testdir
+    #   4.) Running Tests
+    #       4a.) --run-one-test=test or --run-one-testdir=testdir
     #            Run one test or all the tests in the given test directory.
-    #       5b.) --run-all-tests
+    #       4b.) --run-all-tests
     #           This runs all the tests.  The tests are run concurrently.  The
     #           only output shown is failing output unless --show-test-output has
     #           been specified.  Note that this will run valgrind as well if
@@ -142,10 +140,6 @@ def makeParser():
                         action='store_true',
                         help='''
                         Do a completely clean build by deleting the obj directory first.''')
-    parser.add_argument('--build',
-                        action='store_true',
-                        help='''
-                        Just build the EE jni library.''')
     parser.add_argument('--build-all-tests',
                         dest='buildalltests',
                         action='store_true',
@@ -229,7 +223,6 @@ def deleteDirectory(dirname, config):
 def getNumberProcessors(config):
     # np is the number of cores to use.
     np = multiprocessing.cpu_count()
-    print("config.max_processors is %s" % config.max_processors)
     if np < 1:
         np = 1
         if 0 < config.max_processors:
@@ -241,7 +234,6 @@ def getNumberProcessors(config):
         # If we have a core count but the user gave us one
         # which is smaller then use the user's number.
         np = config.max_processors
-    print("getNumberProcessors returns %d" % np)
     return np
 
 ########################################################################
@@ -282,8 +274,16 @@ def configureCommandString(config):
     else:
         cmakeBuildType="Release"
     verbose = "--debug" if config.verbose_config == 'yes' else ''
-    return 'cmake %s -DCMAKE_BUILD_TYPE=%s -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s -DVOLT_LOG_LEVEL=%s %s' \
-             % (verbose, cmakeBuildType, config.buildtype, config.generator, coverage, profile, config.log_level, config.srcdir)
+    return 'cmake %s -DCMAKE_BUILD_TYPE=%s -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s -DVOLT_LOG_LEVEL=%s -DVOLTDB_CORE_COUNT=%d %s' \
+             % (verbose,
+                cmakeBuildType,
+                config.buildtype,
+                config.generator,
+                coverage,
+                profile,
+                config.log_level,
+                getNumberProcessors(config),
+                config.srcdir)
 
 ########################################################################
 #
@@ -299,8 +299,6 @@ def configureCommandString(config):
 def buildCommandString(config):
     target=''
     cmdstr = None
-    if config.build:
-        target += ' build'
     if config.install:
         target += ' install'
     if config.buildonetest:
@@ -362,7 +360,6 @@ def validateConfig(config):
     # If we have specifed running something then we need
     # to build it.
     if config.runalltests or config.runonetest or config.runonetestdir:
-        config.build = True
         config.install = True
         config.buildalltests = config.runalltests
         config.buildonetest = config.runonetest
@@ -371,10 +368,7 @@ def validateConfig(config):
     # then we need to build the shared library and install
     # it.
     if config.buildalltests or config.buildonetest or config.buildonetestdir:
-        config.build = True
         config.install = True
-    if config.install:
-        config.build = True
 
 def doCleanBuild(config):
     #

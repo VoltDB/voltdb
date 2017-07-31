@@ -138,6 +138,32 @@
 # error messages, so make sure autotools is installed.
 #
 ########################################################################
+# There are a few rules which may make things be more organized,
+# both here and in the subprojects in src/ee and tests/ee.
+#
+# 1. All variables defined here should start with VOLTDB_, with a few
+#    exceptions for historical reasons.  These exceptions are:
+#          VOLT_LOG_LEVEL   The numeric log level.  See the values
+#                           for VOLT_LEVEL_* in src/ee/common/debuglog.h
+#                           The default is 500.  This is cached, so it
+#                           needs to be specified to cmake each time it needs
+#                           to be changed.
+# 2. Object files generally go into these folders.  The variables are
+#    set in the root CMakeLists.txt file.
+#      ${CMAKE_BINARY_DIR}
+#                           Root of the output tree.  This is
+#                           generally obj/debug, obj/release or obj/memcheck.
+#                           It will have -profile or -coverage at the
+#                           end if those options are enabled, and this is
+#                           called from the ant build process.
+#      ${CMAKE_BINARY_DIR}/3pty_install
+#                           All third party artifacts on which which
+#                           voltdb depends go here, in lib or include.
+#                           There are some other subfolders created
+#                           by the third party install procedures,
+#                           but we don't care about anything but the
+#                           static libraries and includes.
+########################################################################
 
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.11 FATAL_ERROR)
 PROJECT(VoltDB)
@@ -170,12 +196,13 @@ IF (NOT DEFINED VOLTDB_BUILD_TYPE)
 ENDIF ()
 
 BANNER("Configuring the VoltDB Execution Engine."
-       "CMAKE_SOURCE_DIRECTORY: ${CMAKE_SOURCE_DIRECTORY}"
-       "CMAKE_BINARY_DIRECTORY: ${CMAKE_BINARY_DIRECTORY}"
-       "CMAKE_GENERATOR: ${CMAKE_GENERATOR}"
-       "${PROJECT_NAME}: PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}"
-       "${PROJECT_NAME}: PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
-       "VOLTDB_BUILD_TYPE: ${VOLTDB_BUILD_TYPE}"
+       "CMAKE_SOURCE_DIRECTORY: ${CMAKE_SOURCE_DIR}"
+       "CMAKE_BINARY_DIRECTORY: ${CMAKE_BINARY_DIR}"
+       "CMAKE_GENERATOR:        ${CMAKE_GENERATOR}"
+       "${PROJECT_NAME}:        PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}"
+       "${PROJECT_NAME}:        PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
+       "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
+       "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
    )
 
 ########################################################################
@@ -208,7 +235,6 @@ ENDIF()
 #
 ########################################################################
 INCLUDE(tools/VoltDBCompilation.cmake)
-
 
 ########################################################################
 #

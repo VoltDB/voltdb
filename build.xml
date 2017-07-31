@@ -404,7 +404,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library and minify the javascript artifacts."
 />
 <target name="check"
-    depends="licensecheck, default, voltdbipc"
+    depends="licensecheck, default, ee"
     description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
@@ -423,7 +423,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 <target name="check_noclustering"
-    depends="licensecheck, compile, voltdbipc"
+    depends="licensecheck, compile, ee"
     description="Run Java and C++ JNI testcases that apply to a single node." >
     <condition property="timeoutLength" value="${timeoutLength}" else='18000000'>
         <isset property="timeoutLength"/>
@@ -441,7 +441,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 <target name="check_quick"
-    depends="compile, voltdbipc"
+    depends="compile, ee"
     description="Run a subset of Java testcases and test fragments." >
     <condition property="timeoutLength" value="${timeoutLength}" else='480000'>
         <isset property="timeoutLength"/>
@@ -459,7 +459,7 @@ PRIMARY ENTRY POINTS
 </target>
 
 <target name="check_sql"
-    depends="licensecheck, compile, voltdbipc, eecheck"
+    depends="licensecheck, compile, ee, eecheck"
     description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
     <condition property="timeoutLength" value="${timeoutLength}" else='9000000'>
         <isset property="timeoutLength"/>
@@ -1413,7 +1413,7 @@ NATIVE EE STUFF
 </target>
 
 <target name='eeconfig' depends='catalog, jnicompile, buildinfo'
-    description="Configure the build area but do not do any building.  This is mostly interesting for testing.">
+    description="Configure the build area but do not do any building.  This is mostly interesting for debugging.">
     <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
         <!-- The tool ${cmake.build.tool} does all the EE building.
              See the comment in that file for complete details.
@@ -1424,54 +1424,6 @@ NATIVE EE STUFF
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
-    </exec>
-</target>
-
-<target name="eecheck" depends="ee"
-    description="Run testcases for C++ JNI library.">
-    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <!-- The tool ${cmake.build.tool} does all the EE building.
-             See the comment in that file for complete details.
-         -->
-        <arg line="--generator='${cmake.generator}'" />
-        <arg line="--build-type='${build}'" />
-    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--max-processors=${cmake.build.maxcores}" />
-        <arg line="--verbose-build='${cmake.verbose.build}'" />
-    	<arg line="--verbose-config='${cmake.verbose.config}'" />
-        <arg line="--run-all-tests" />
-    </exec>
-</target>
-
-<target name="eebuild" depends="voltdbipc"
-    description="Build but do not run test cases for C++ JNI library.">
-    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <!-- The tool ${cmake.build.tool} does all the EE building.
-             See the comment in that file for complete details.
-         -->
-        <arg line="--generator='${cmake.generator}'" />
-        <arg line="--build-type='${build}'" />
-    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--max-processors=${cmake.build.maxcores}" />
-        <arg line="--verbose-build='${cmake.verbose.build}'" />
-    	<arg line="--verbose-config='${cmake.verbose.config}'" />
-        <arg line="--build-tests" />
-    </exec>
-</target>
-
-<target name='voltdbipc' depends="ee"
-    description="Build the IPC client.">
-    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
-        <!-- The tool ${cmake.build.tool} does all the EE building.
-             See the comment in that file for complete details.
-         -->
-        <arg line="--generator='${cmake.generator}'" />
-        <arg line="--build-type='${build}'" />
-    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
-        <arg line="--max-processors=${cmake.build.maxcores}" />
-        <arg line="--verbose-build='${cmake.verbose.build}'" />
-    	<arg line="--verbose-config='${cmake.verbose.config}'" />
-        <arg line="--install-ipc" />
     </exec>
 </target>
 
@@ -1490,6 +1442,22 @@ NATIVE EE STUFF
         <arg line="--install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
+</target>
+
+<target name="eecheck" depends="ee"
+    description="Run testcases for C++ JNI library.">
+    <exec dir='.' executable='${cmake.build.tool}' failonerror='true'>
+        <!-- The tool ${cmake.build.tool} does all the EE building.
+             See the comment in that file for complete details.
+         -->
+        <arg line="--generator='${cmake.generator}'" />
+        <arg line="--build-type='${build}'" />
+    	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--max-processors=${cmake.build.maxcores}" />
+        <arg line="--verbose-build='${cmake.verbose.build}'" />
+    	<arg line="--verbose-config='${cmake.verbose.config}'" />
+        <arg line="--run-all-tests" />
+    </exec>
 </target>
 
 <target name='ee_profile' depends="catalog, jnicompile"
@@ -1532,7 +1500,7 @@ NATIVE EE STUFF
 ***************************************
 LICENSING
 ***************************************
--->
+<-->
 
 <target name='licensecheck' description="make sure all source files have approved licenses">
     <exec dir='.' executable='python' failonerror='true'>

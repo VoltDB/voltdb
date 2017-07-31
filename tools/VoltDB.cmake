@@ -70,17 +70,19 @@ FUNCTION(PYTHON_COMMAND TEST_DIR TEST_NAME TEST_EXE_CMD OUTPUT_VAR OUTPUT_IS_PYT
 ENDFUNCTION()
 
 FUNCTION(COMPUTE_CORE_COUNT OUTPUT_VARIABLE)
-  IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
+  IF ((NOT IS_DEFINED ${OUTPUT_VARIABBLE}) OR ($OUTPUT_VARIABBLE LESS 0))
+    IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
       # Surely there is some way to discover this.
       SET (VOLTDB_CORE_COUNT 4)
-  ELSE()
+    ELSE()
       EXECUTE_PROCESS(COMMAND bash -c "grep '^processor' /proc/cpuinfo | wc -l"
                       OUTPUT_VARIABLE VOLTDB_CORE_COUNT)
       STRING(STRIP "${VOLTDB_CORE_COUNT}" VOLTDB_CORE_COUNT)
       IF ( "${VOLTDB_CORE_COUNT}" STREQUAL "" )
           MESSAGE(FATAL_ERROR "Cannot calculate the core count.")
       ENDIF()
-    SET(${OUTPUT_VARIABLE} ${VOLTDB_CORE_COUNT} PARENT_SCOPE)
+      SET(${OUTPUT_VARIABLE} ${VOLTDB_CORE_COUNT} PARENT_SCOPE)
+    ENDIF()
   ENDIF()
 ENDFUNCTION()
 
@@ -145,7 +147,7 @@ FUNCTION(DEFINE_TEST TEST_NAME)
   # don't need this to define the executable, but we do
   # need it to define the output name of the executable.
   #
-  ADD_EXECUTABLE(${TEST_NAME}
+  VOLTDB_ADD_EXECUTABLE(${TEST_NAME}
       $<TARGET_OBJECTS:voltdb_test_harness>
       $<TARGET_OBJECTS:voltdbobjs>
       $<TARGET_OBJECTS:third_party_objs>
@@ -162,19 +164,19 @@ FUNCTION(DEFINE_TEST TEST_NAME)
     RUNTIME_OUTPUT_DIRECTORY ${TARGET_EXE_DIR}
     EXCLUDE_FROM_ALL TRUE)
   TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
-    SYSTEM PUBLIC
-    ${CMAKE_SOURCE_DIR}/third_party/cpp)
-  TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
     PUBLIC
+    ${CMAKE_SOURCE_DIR}/third_party/cpp
     ${${PROJECT_NAME}_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src/ee
-    ${CMAKE_BINARY_DIR}/3pty-install/include)
+    ${CMAKE_BINARY_DIR}/3pty-install/include
+    )
   TARGET_LINK_LIBRARIES(${TEST_NAME}
     ${VOLTDB_LINK_FLAGS}
     -L${CMAKE_BINARY_DIR}/3pty-install/lib
     -lpcre2-8 -ls2geo -lcrypto
-    -ldl)
+    -ldl
+    )
   ADD_DEPENDENCIES(${TEST_NAME}
     pcre2 crypto s2geo ${VOLTDB_LIBNAME})
 
@@ -227,4 +229,3 @@ FUNCTION(DEFINE_TEST TEST_NAME)
     ADD_DEPENDENCIES(build-generated-tests build-${TEST_NAME})
   ENDIF()
 ENDFUNCTION()
-

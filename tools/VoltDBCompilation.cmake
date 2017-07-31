@@ -17,18 +17,44 @@
 # Common Compiler Flags
 #
 ########################################################################
+SET (VOLTDB_COMPILE_OPTIONS)
+
+FUNCTION (VOLTDB_ADD_COMPILE_OPTIONS)
+  FOREACH(OPT ${ARGN})
+    SET(VOLTDB_COMPILE_OPTIONS "${VOLTDB_COMPILE_OPTIONS} ${OPT}")
+  ENDFOREACH()
+  SET(VOLTDB_COMPILE_OPTIONS ${VOLTDB_COMPILE_OPTIONS} PARENT_SCOPE)
+ENDFUNCTION()
+
+FUNCTION (VOLTDB_ADD_LIBRARY NAME KIND)
+  # MESSAGE("Defining ${NAME} kind ${KIND} SOURCES ${ARGN}")
+  ADD_LIBRARY(${NAME} ${KIND} ${ARGN})
+  SET_TARGET_PROPERTIES(${NAME}
+    PROPERTIES
+    COMPILE_FLAGS "${VOLTDB_COMPILE_OPTIONS}"
+      )
+ENDFUNCTION()
+
+FUNCTION (VOLTDB_ADD_EXECUTABLE NAME)
+  ADD_EXECUTABLE(${NAME} ${ARGN})
+  SET_TARGET_PROPERTIES(${NAME}
+    PROPERTIES
+    COMPILE_FLAGS "${VOLTDB_COMPILE_OPTIONS}"
+    )
+ENDFUNCTION()
+
 IF (IS_VALGRIND_BUILD)
-  ADD_COMPILE_OPTIONS(-g3 -DDEBUG -DMEMCHECK )
+  VOLTDB_ADD_COMPILE_OPTIONS(-g3 -DDEBUG -DMEMCHECK )
   SET (VOLTDB_USE_VALGRIND --valgrind)
 ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "DEBUG")
-  ADD_COMPILE_OPTIONS(-g3 -DDEBUG)
+  VOLTDB_ADD_COMPILE_OPTIONS(-g3 -DDEBUG)
 ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "RELEASE")
-  ADD_COMPILE_OPTIONS(-O3 -mmmx -msse -msse2 -msse3 -DNDEBUG)
+  VOLTDB_ADD_COMPILE_OPTIONS(-O3 -mmmx -msse -msse2 -msse3 -DNDEBUG)
 ELSE()
   MESSAGE(FATAL_ERROR "BUILD TYPE ${VOLTDB_BUILD_TYPE} IS UNKNOWN.")
 ENDIF()
 
-ADD_COMPILE_OPTIONS(
+VOLTDB_ADD_COMPILE_OPTIONS(
   -Wall -Wextra -Werror -Woverloaded-virtual
   -Wpointer-arith -Wcast-qual -Wwrite-strings
   -Winit-self -Wno-sign-compare -Wno-unused-parameter
@@ -97,34 +123,34 @@ MESSAGE("Using compiler ${CMAKE_CXX_COMPILER_ID}")
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} -pthread)
   SET (VOLTDB_IPC_LINK_FLAGS ${VOLTDB_LIB_LINK_FLAGS} -rdynamic)
-  ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas)
+  VOLTDB_ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas)
   # It turns out to be easier to go from a higher version to a lower
   # version, since we can't easily test <= and >=.
   IF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p04 )
     # COMPILER_VERSION > 6.3.0
     MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
     MESSAGE ("We're using the options for 6.2.0, which is the newest one we've tried.  Good Luck.")
-    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs)
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs)
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSEIF (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U16p10)
     # 6.2.0 < COMPILER_VERSION and COMPILER_VERSION <= 6.3.0
     MESSAGE("Using the Ubuntu 17.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs)
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs)
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U16p04 )
     # 5.4.0 < COMPILER_VERSION and COMPILER_VERSION <= 6.2.0
     MESSAGE("Using the Ubuntu 16.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U15p10 )
     # 5.2.1 < COMPILER_VERSION and COMPILER_VERSION <= 5.4.0
     MESSAGE("Using the Ubuntu 16.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    ADD_COMPILE_OPTIONS( -Wno-unused-local-typedefs )
+    VOLTDB_ADD_COMPILE_OPTIONS( -Wno-unused-local-typedefs )
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U15p04  )
     # 4.9.2 < COMPILER_VERSION and COMPILER_VERSION <= 5.2.1
     MESSAGE("Using the Ubuntu 15.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    ADD_COMPILE_OPTIONS( -Wno-unused-local-typedefs )
+    VOLTDB_ADD_COMPILE_OPTIONS( -Wno-unused-local-typedefs )
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U14p04 )
     # 4.8.4 < COMPILER_VERSION and COMPILER_VERSION <= 4.9.2
@@ -132,14 +158,14 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # for our needs here.
     # Nothing special added to the compile flags.
     MESSAGE("Using the Ubuntu 15.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_CXX0X)
     # 4.6.0 < COMPILER_VERSION and COMPILER_VERSION <= 4.8.4
     # Use -std=c++0x.  This is in GCC's experimental C++11 compiler
     # support region.
     MESSAGE("Using the Centos 6 settings for ${CMAKE_CXX_COMPILER_VERSION}")
-    ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
     SET (CXX_VERSION_FLAG -std=c++0x)
   ELSE()
     message(FATAL_ERROR "GNU Compiler version ${CMAKE_CXX_COMPILER_VERSION} is too old to build VoltdB.  Try at least 4.4.7.")
@@ -151,25 +177,25 @@ ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   IF ( ( "3.4.0" VERSION_LESS CMAKE_CXX_COMPILER_VERSION ) 
        AND ( CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.0.0" ) )
     # Some clang 3.4.x version
-    ADD_COMPILE_OPTIONS(-Wno-varargs)
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-varargs)
   ELSEIF ( "7.0.0" VERSION_LESS ${CMAKE_CXX_COMPILER_VERSION} )
     # This is some odd mac version number.  It's not
     # related to the LLVM versioning numbers.
-    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-absolute-value)
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-absolute-value)
   ENDIF()
 ELSE()
   MESSAGE (FATAL_ERROR "Unknown compiler family ${CMAKE_CXX_COMPILER_ID}.  We only support GNU and Clang.")
 ENDIF ()
 
-ADD_COMPILE_OPTIONS(${CXX_VERSION_FLAG})
+VOLTDB_ADD_COMPILE_OPTIONS(${CXX_VERSION_FLAG})
 
 #
 # Add VOLTDB_CXXFLAGS, supplied by the user.
 #
-ADD_COMPILE_OPTIONS(${VOLTDB_CXXFLAGS})
+VOLTDB_ADD_COMPILE_OPTIONS(${VOLTDB_CXXFLAGS})
 
 IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" )
-  ADD_COMPILE_OPTIONS(-Wno-attributes -Wcast-align -DLINUX -fpic)
+  VOLTDB_ADD_COMPILE_OPTIONS(-Wno-attributes -Wcast-align -DLINUX -fpic)
   SET (VOLTDB_NM_OPTIONS "-n --demangle")
   IF (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
     SET (VOLTDB_OPENSSL_TOKEN "linux-x86_64:gcc -fpic")
@@ -179,7 +205,7 @@ IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" )
 ELSEIF( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
   SET (VOLTDB_NM_OPTIONS "-n")
   SET (VOLTDB_OPENSSL_TOKEN "darwin64-x86_64-cc")
-  ADD_COMPILE_OPTIONS("-DMACOSX")
+  VOLTDB_ADD_COMPILE_OPTIONS("-DMACOSX")
 ELSE()
   MESSAGE(FATAL_ERROR "System nameed ${CMAKE_SYSTEM_NAME} is unknown")
 ENDIF()

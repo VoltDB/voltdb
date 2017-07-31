@@ -36,15 +36,27 @@
 # built separately from the Execution Engine.
 #
 ########################################################################
+#
+# A Note On Names.
+#
+# This project's name is VoltDB_EE.  This is in the variable
+# PROJECT_NAME.  The source and binary directories for this project
+# are in ${${PROJECT_NAME}_SOURCE_DIR} and ${${PROJECT_NAME}_BINARY_DIR}.
+# the name ${CMAKE_SOURCE_DIR} and ${CMAKE_BINARY_DIR} are the names of
+# the source and binary directories of the parent project.  These are
+# the root of the voltdb source tree and
+# ${CMAKE_SOURCE_DIR}/obj/${VOLTDB_BUILD_TYPE}.
+#
+########################################################################
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.11 FATAL_ERROR)
 PROJECT(VoltDB_EE)
 
 BANNER("Configuring the VoltDB Execution Engine Runtime."
-       "CMAKE_SOURCE_DIRECTORY: ${CMAKE_SOURCE_DIRECTORY}"
-       "CMAKE_BINARY_DIRECTORY: ${CMAKE_BINARY_DIRECTORY}"
-       "${PROJECT_NAME}: PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}"
-       "${PROJECT_NAME}: PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
-       "VOLTDB_BUILD_TYPE: ${VOLTDB_BUILD_TYPE}"
+       "CMAKE_SOURCE_DIRECTORY: ${CMAKE_SOURCE_DIR}"
+       "CMAKE_BINARY_DIRECTORY: ${CMAKE_BINARY_DIR}"
+       "${PROJECT_NAME}:        PROJECT_SOURCE_DIRECTORY is ${${PROJECT_NAME}_SOURCE_DIR}"
+       "${PROJECT_NAME}:        PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
+       "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
    )
 
 IF ( (CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND ( (CMAKE_VERSION VERSION_GREATER 3.0.0) OR (CMAKE_VERSION VERSION_EQUAL 3.0.0) ) )
@@ -60,28 +72,23 @@ ENDIF()
 # This CMakeLists.txt file describes the builds for the VoltDB Runtime.
 #
 # There are a few rules which may make things be more organized.
-# 1. All variables defined here should start with VOLTDB_, with a few
-#    exceptions for historical reasons.  These exceptions are:
-#          VOLT_LOG_LEVEL   The numeric log level.  See the values
-#                           for VOLT_LEVEL_* in src/ee/common/debuglog.h
-#                           The default is 500.  This is cached, so it
-#                           needs to be specified to cmake each time it needs
-#                           to be changed.
-# 2. Object files generally go into these folders.  The variables are
+# 1. Object files generally go into these folders.  The variables are
 #    set in the root CMakeLists.txt file.
-#      ${CMAKE_BINARY_DIR}
+#      ${${PROJECT_NAME}_BINARY_DIR}
 #                           Root of the output tree.  This is
-#                           generally obj/debug, obj/release or obj/memcheck.
+#                           generally obj/debug/ee, obj/release/ee
+#                           or obj/memcheck/ee.
 #                           It will have -profile or -coverage at the
-#                           end if those options are enabled, and this is
-#                           called from the ant build process.
-#       ${CMAKE_BINARY_DIR}/3pty_install
+#                           end if those options are enabled.
+#      ${CMAKE_BINARY_DIR}/3pty_install
 #                           All third party artifacts on which which
 #                           voltdb depends go here, in lib or include.
 #                           There are some other subfolders created
 #                           by the third party install procedures,
 #                           but we don't care about anything but the
-#                           static libraries and includes.
+#                           static libraries and includes.  Note that
+#                           this is not the project directory, but
+#                           in the parent project's directory.
 ########################################################################
 #
 # Options.
@@ -93,6 +100,55 @@ ENDIF()
 OPTION(VOLTDB_USE_COVERAGE "Build for coverage analysis" OFF)
 OPTION(VOLTDB_USE_PROFILING "Build for profiling analysis" OFF)
 
+SET (VOLTDB_TARBALLS ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs)
+SET (VOLTDB_3PTY_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/3pty-install)
+SET (VOLTDB_3PTY_BUILD_PREFIX ${${PROJECT_NAME}_BINARY_DIR}/3pty-obj)
+########################################################################
+#
+# Go and build the openssl library.  We only use this
+# for the arbitrary precision arithmetic code, which
+# S2GEO uses.  We have to untar it and build it, which
+# we do at build time.
+#
+########################################################################
+SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
+SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
+# Again, we unpack the tarball in the binary directory.  See pcre2 above.
+SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tgz)
+# VOLTDB_3PTY_INSTALL_PREFIX: voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
+# VOLTDB_3PTY_BUILD_PREFIX:   voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
+# VOLTDB_OPENSSL_BUILD_PREFIX:     /openssl
+# VOLTDB_OPENSSL_SRC:                  /src/openssl-1.0.2.d/ ... unpacked source
+# VOLTDB_OPENSSL_OBJ:                  /src/openssl-1.2.0.d/ ... generated binaries
+# Binary and source are the same for openssl.  There
+# are not obvious ways to do out-of-tree builds.
+SET (VOLTDB_OPENSSL_BUILD_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/openssl)
+SET (VOLTDB_OPENSSL_SRC ${VOLTDB_OPENSSL_BUILD_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
+SET (VOLTDB_OPENSSL_OBJ ${VOLTDB_OPENSSL_SRC})
+
+BANNER("Describing OPENSSL"
+       "  PREFIX at ${VOLTDB_OPENSSL_BUILD_PREFIX}"
+       "  SOURCE at ${VOLTDB_OPENSSL_SRC}"
+       "  BINARY at ${VOLTDB_OPENSSL_OBJ}"
+       "  TARBALL at ${VOLTDB_OPENSSL_TARBALL}"
+       "  CONFIGURE_COMMAND: ${VOLTDB_OPENSSL_SRC}/Configure --prefix=${VOLTDB_3PTY_INSTALL_PREFIX} ${VOLTDB_OPENSSL_TOKEN}"
+   )
+
+
+ExternalProject_Add(crypto
+  PREFIX ${VOLTDB_OPENSSL_BUILD_PREFIX} # Not sure this is necessary.
+  SOURCE_DIR ${VOLTDB_OPENSSL_SRC}
+  INSTALL_DIR ${VOLTDB_3PTY_INSTALL_PREFIX}
+  DOWNLOAD_DIR ${VOLTDB_OPENSSL_BUILD_PREFIX}/src
+  URL ${VOLTDB_OPENSSL_TARBALL}
+  CONFIGURE_COMMAND ${VOLTDB_OPENSSL_SRC}/Configure --prefix=${VOLTDB_3PTY_INSTALL_PREFIX} ${VOLTDB_OPENSSL_TOKEN}
+  BUILD_COMMAND $(MAKE)
+  BUILD_IN_SOURCE 1
+  INSTALL_COMMAND $(MAKE) install
+  )
+ExternalProject_get_property(crypto INSTALL_DIR)
+SET(VOLTDB_CRYPTO_INSTALL_DIR ${INSTALL_DIR})
+
 ########################################################################
 #
 # Go and build the pcre2 library.
@@ -100,60 +156,39 @@ OPTION(VOLTDB_USE_PROFILING "Build for profiling analysis" OFF)
 # do this at build time.
 #
 ########################################################################
-SET (VOLTDB_PCRE2_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/pcre2)
 SET (VOLTDB_PCRE2_VERSION 10.10)
 SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
-SET (VOLTDB_PCRE2_TARBALL ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs/${VOLTDB_PCRE2_NAME}.tgz)
-SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_PREFIX}/src/${VOLTDB_PCRE2_NAME})
-SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
+# We unpack the tarball in the binary directory.  It saves us
+# checking it all in to github.  That's why this is
+# ${PROJECT_NAME}_BINARY_DIR.
+SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_PCRE2_NAME}.tgz)
+#
+# VOLTDB_3PTY_INSTALL_PREFIX: voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-install
+# VOLTDB_3PTY_BUILD_PREFIX:   voltdb/obj/${VOLTDB_BUILD_TYPE}/ee/3pty-obj
+# VOLTDB_PCRE2_BUILD_PREFIX:      /pcre2
+# VOLTDB_PCRE2_SRC:                   /src/pcre2-10.10/ ... unpacked source
+# VOLTDB_PCRE2_OBJ:                   /obj/pcre2-10.10/ ... generated binaries
+SET (VOLTDB_PCRE2_BUILD_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/pcre2)
+SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_BUILD_PREFIX}/src/${VOLTDB_PCRE2_NAME})
+SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_BUILD_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
 
 BANNER("Describing PCRE2"
-       "  PREFIX at ${VOLTDB_PCRE2_PREFIX}"
        "  SOURCE at ${VOLTDB_PCRE2_SRC}"
        "  BINARY at ${VOLTDB_PCRE2_OBJ}"
        "  TARBALL at ${VOLTDB_PCRE2_TARBALL}"
-       "  CONFIGURE_COMMAND: ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${CMAKE_BINARY_DIR}/3pty-install"
+       "  CONFIGURE_COMMAND: ./configure --disable-shared --with-pic --prefix=${VOLTDB_3PTY_INSTALL_PREFIX}"
    )
 ExternalProject_Add(pcre2
-  PREFIX ${VOLTDB_PCRE2_PREFIX}
-  URL ${VOLTDB_PCRE2_TARBALL}
+  PREFIX ${VOLTDB_PCRE2_BUILD_PREFIX}  # Not sure this is necessary.
   SOURCE_DIR ${VOLTDB_PCRE2_SRC}
   BINARY_DIR ${VOLTDB_PCRE2_OBJ}
-  CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${CMAKE_BINARY_DIR}/3pty-install
-  BUILD_COMMAND make
-  INSTALL_COMMAND make install)
-
-########################################################################
-#
-# Go and build the openssl library.  We only use this
-# for the arbitrary precision arithmetic code, which
-# S2GEO uses.
-#
-########################################################################
-SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
-SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
-SET (VOLTDB_OPENSSL_TARBALL ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs/${VOLTDB_OPENSSL_NAME}.tgz)
-SET (VOLTDB_OPENSSL_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj/openssl)
-# Binary and source are the same for openssl.  There
-# are not obvious ways to do out-of-tree builds.
-SET (VOLTDB_OPENSSL_SRC ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
-SET (VOLTDB_OPENSSL_OBJ ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
-
-BANNER("Describing CRYPTO"
-       "  PREFIX at ${VOLTDB_OPENSSL_PREFIX}"
-       "  SOURCE at ${VOLTDB_OPENSSL_SRC}"
-       "  BINARY at ${VOLTDB_OPENSSL_OBJ}"
-       "  TARBALL at ${VOLTDB_OPENSSL_TARBALL}"
-       "  CONFIGURE_COMMAND: ./Configure --prefix=${CMAKE_BINARY_DIR}/3pty-install ${VOLTDB_OPENSSL_TOKEN}"
-   )
-ExternalProject_Add(crypto
-  PREFIX ${VOLTDB_OPENSSL_PREFIX}
-  URL ${VOLTDB_OPENSSL_TARBALL}
-  SOURCE_DIR ${VOLTDB_OPENSSL_SRC}
-  BINARY_DIR ${VOLTDB_OPENSSL_OBJ}
-  CONFIGURE_COMMAND ./Configure --prefix=${CMAKE_BINARY_DIR}/3pty-install ${VOLTDB_OPENSSL_TOKEN}
-  BUILD_COMMAND make
-  INSTALL_COMMAND make install)
+  INSTALL_DIR ${VOLTDB_3PTY_INSTALL_PREFIX}
+  DOWNLOAD_DIR ${VOLTDB_PCRE2_BUILD_PREFIX}/src
+  URL ${VOLTDB_PCRE2_TARBALL}
+  CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure --disable-shared --with-pic --prefix=${VOLTDB_3PTY_INSTALL_PREFIX}
+  BUILD_COMMAND $(MAKE)
+  INSTALL_COMMAND $(MAKE) install
+  )
 
 ########################################################################
 #
@@ -161,13 +196,13 @@ ExternalProject_Add(crypto
 #
 ########################################################################
 SET (VOLTDB_S2GEO_SRC "${CMAKE_SOURCE_DIR}/third_party/cpp/google-s2-geometry")
-SET (VOLTDB_S2GEO_OBJ ${CMAKE_BINARY_DIR}/3pty-obj/google-s2-geometry)
+SET (VOLTDB_S2GEO_OBJ ${${PROJECT_NAME}_BINARY_DIR}/3pty-obj/google-s2-geometry)
 SET (VOLTDB_S2GEO_CMAKE_CONFIG
   -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
   -DVOLTDB_THIRD_PARTY_CPP_DIR=${CMAKE_SOURCE_DIR}/third_party/cpp
-  -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/3pty-install
+  -DCMAKE_INSTALL_PREFIX=${VOLTDB_3PTY_INSTALL_PREFIX}
   -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
-SET (VOLTDB_S2GEO_PREFIX ${CMAKE_BINARY_DIR}/3pty-obj)
+SET (VOLTDB_S2GEO_PREFIX ${VOLTDB_3PTY_BUILD_PREFIX}/google-s2-geometry)
 
 BANNER("Describing S2GEO"
        "  PREFIX at ${VOLTDB_S2GEO_PREFIX}"
@@ -177,13 +212,15 @@ BANNER("Describing S2GEO"
        "  CMAKE_GENERATOR: ${CMAKE_GENERATOR}"
    )
 ExternalProject_Add(s2geo
-  DEPENDS crypto
-  PREFIX ${VOLTDB_S2GEO_PREFIX}
+  PREFIX ${VOLTDB_S2GEO_PREFIX}  # Not sure this is needed.
   SOURCE_DIR ${VOLTDB_S2GEO_SRC}
+  BINARY_DIR ${VOLTDB_S2GEO_OBJ}
   CMAKE_ARGS ${VOLTDB_S2GEO_CMAKE_CONFIG}
   CMAKE_GENERATOR ${CMAKE_GENERATOR}
-  BINARY_DIR ${VOLTDB_S2GEO_OBJ})
-
+  BUILD_COMMAND $(MAKE) all
+  INSTALL_COMMAND $(MAKE) install
+  )
+ADD_DEPENDENCIES(s2geo crypto)
 ########################################################################
 #
 # Go and build the VoltDB library and IPC command.
@@ -363,39 +400,37 @@ SET (VOLTDB_JNI_SRC
 SET (VOLTDB_IPC_SRC
   voltdbipc.cpp
 )
-ADD_LIBRARY(voltdbobjs OBJECT ${VOLTDB_SRC})
-ADD_LIBRARY(voltdbjniobjs OBJECT ${VOLTDB_JNI_SRC})
-ADD_LIBRARY(voltdbipcobjs OBJECT ${VOLTDB_IPC_SRC})
-ADD_LIBRARY(third_party_objs OBJECT ${VOLTDB_THIRD_PARTY_SRC})
+
+VOLTDB_ADD_LIBRARY(voltdbobjs OBJECT ${VOLTDB_SRC})
+VOLTDB_ADD_LIBRARY(voltdbjniobjs OBJECT ${VOLTDB_JNI_SRC})
+VOLTDB_ADD_LIBRARY(voltdbipcobjs OBJECT ${VOLTDB_IPC_SRC})
+VOLTDB_ADD_LIBRARY(third_party_objs OBJECT ${VOLTDB_THIRD_PARTY_SRC})
 
 ADD_DEPENDENCIES(voltdbobjs s2geo crypto pcre2)
-ADD_DEPENDENCIES(voltdbipcobjs s2geo crypto pcre2)
 ADD_DEPENDENCIES(voltdbjniobjs s2geo crypto pcre2)
+ADD_DEPENDENCIES(voltdbipcobjs s2geo crypto pcre2)
 
 TARGET_INCLUDE_DIRECTORIES(voltdbobjs
-  SYSTEM PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp)
-TARGET_INCLUDE_DIRECTORIES(voltdbobjs
   PUBLIC
+  ${CMAKE_SOURCE_DIR}/third_party/cpp
   ${${PROJECT_NAME}_SOURCE_DIR}
-  ${CMAKE_BINARY_DIR}/3pty-install/include)
-TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
-  SYSTEM PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp)
-TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
-  PUBLIC
-  ${${PROJECT_NAME}_SOURCE_DIR}
-  ${CMAKE_BINARY_DIR}/3pty-install/include)
-TARGET_INCLUDE_DIRECTORIES(voltdbjniobjs
-  SYSTEM PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp)
+  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
 TARGET_INCLUDE_DIRECTORIES(voltdbjniobjs
   PUBLIC
+  ${CMAKE_SOURCE_DIR}/third_party/cpp
   ${${PROJECT_NAME}_SOURCE_DIR}
-  ${CMAKE_BINARY_DIR}/3pty-install/include)
+  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
+TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
+  PUBLIC
+  ${CMAKE_SOURCE_DIR}/third_party/cpp
+  ${${PROJECT_NAME}_SOURCE_DIR}
+  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
 TARGET_INCLUDE_DIRECTORIES(third_party_objs
-  SYSTEM PUBLIC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp)
+  PUBLIC
+  ${CMAKE_SOURCE_DIR}/third_party/cpp
+  ${${PROJECT_NAME}_SOURCE_DIR}
+  ${CMAKE_SOURCE_DIR}/third_party/cpp
+  ${VOLTDB_3PTY_INSTALL_PREFIX}/include)
 
 ########################################################################
 #
@@ -403,7 +438,7 @@ TARGET_INCLUDE_DIRECTORIES(third_party_objs
 #
 ########################################################################
 SET (VOLTDB_LIBNAME voltdb-${VOLTDB_VERSION})
-ADD_LIBRARY(${VOLTDB_LIBNAME}
+VOLTDB_ADD_LIBRARY(${VOLTDB_LIBNAME}
   SHARED
   $<TARGET_OBJECTS:voltdbobjs>
   $<TARGET_OBJECTS:voltdbjniobjs>
@@ -411,17 +446,18 @@ ADD_LIBRARY(${VOLTDB_LIBNAME}
   )
 
 TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
-  -L${CMAKE_BINARY_DIR}/3pty-install/lib
+  -L${VOLTDB_3PTY_INSTALL_PREFIX}/lib
   -lpcre2-8 -ls2geo -lcrypto
   ${VOLTDB_LINK_FLAGS})
 
+ADD_DEPENDENCIES(${VOLTDB_LIBNAME} s2geo pcre2 crypto)
 ########################################################################
 #
 # Adding the voltdbipc executable.
 #
 ########################################################################
 SET (VOLTDB_IPCRUN_NAME voltdbipc)
-ADD_EXECUTABLE(${VOLTDB_IPCRUN_NAME}
+VOLTDB_ADD_EXECUTABLE(${VOLTDB_IPCRUN_NAME}
   $<TARGET_OBJECTS:voltdbobjs>
   $<TARGET_OBJECTS:third_party_objs>
   $<TARGET_OBJECTS:voltdbipcobjs>
@@ -429,7 +465,7 @@ ADD_EXECUTABLE(${VOLTDB_IPCRUN_NAME}
 
 TARGET_LINK_LIBRARIES(${VOLTDB_IPCRUN_NAME}
   ${VOLTDB_LINK_FLAGS}
-  -L${CMAKE_BINARY_DIR}/3pty-install/lib
+  -L${VOLTDB_3PTY_INSTALL_PREFIX}/lib
   -lpcre2-8 -ls2geo -lcrypto
   -ldl)
 
@@ -454,6 +490,5 @@ INSTALL(TARGETS ${VOLTDB_IPCRUN_NAME}
 #
 ########################################################################
 ADD_CUSTOM_TARGET(build
-  DEPENDS
-  ${VOLTDB_LIBNAME}
-  ${VOLTDB_IPCRUN_NAME})
+  DEPENDS ${VOLTDB_LIBNAME} ${VOLTDB_IPCRUN_NAME}
+  )
