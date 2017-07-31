@@ -343,6 +343,7 @@ public class ExportManager
             m_processor.set(newProcessor);
 
             ExportGeneration generation = initializePersistedGenerations();
+
             generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
             m_generation.set(generation);
             newProcessor.setExportGeneration(generation);
