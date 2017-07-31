@@ -1075,16 +1075,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 listeningAddress, new PicoNetwork(socket, true));
         putForeignHost(hostId, fhost);
         fhost.enableRead(VERBOTEN_THREADS);
-        boolean ready = true;
-        for (int peer : m_peers) {
-            ready = ready && m_foreignHosts.get(peer).size() == (m_secondaryConnections + 1);
-            if (!ready) return;
+        // Do all peers have enough secondary connections?
+        for (int hId : m_peers) {
+            if (m_foreignHosts.get(hId).size() != (m_secondaryConnections + 1)) {
+                return;
+            }
         }
-        if (ready) {
-            // Now it's time to use secondary pico network, see comments in presend() to know why we can't
-            // do this earlier.
-            m_hasAllSecondaryConnectionCreated = true;
-        }
+        // Now it's time to use secondary pico network, see comments in presend() to know why we can't
+        // do this earlier.
+        m_hasAllSecondaryConnectionCreated = true;
 }
 
 
@@ -1768,7 +1767,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 // This node sends connection request to all its peers, once the connection
                 // is established, both nodes will create a foreign host (contains a PicoNetwork thread).
                 // That said, here we only connect to the nodes that have higher host id to avoid double
-                // the network thread we expected.
+                // the number of network threads.
                 if (host > m_localHostId) {
                     hostsToConnect.add(host);
                 }
@@ -1798,16 +1797,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 }
             }
         }
-        boolean ready = true;
+        // Do all peers have enough secondary connections?
         for (int hostId : m_peers) {
-            ready = ready && m_foreignHosts.get(hostId).size() == (m_secondaryConnections + 1);
-            if (!ready) return;
+            if (m_foreignHosts.get(hostId).size() != (m_secondaryConnections + 1)) {
+                return;
+            }
         }
-        if (ready) {
-            // Now it's time to use secondary pico network, see comments in presend() to know why we can't
-            // do this earlier.
-            m_hasAllSecondaryConnectionCreated = true;
-        }
+        // Now it's time to use secondary pico network, see comments in presend() to know why we can't
+        // do this earlier.
+        m_hasAllSecondaryConnectionCreated = true;
     }
 
 }
