@@ -50,12 +50,15 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId,
               + getTextStringSerializedSize(VOLT_EXPORT_OPERATION))
 {}
 
-void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t generation) {
+void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t generation, bool eof) {
     assert(generation > m_generation);
     assert(signature == m_signature || m_signature == string(""));
 
     m_signature = signature;
     m_generation = generation;
+    if (eof) {
+        pushEndOfStream();
+    }
 }
 
 /*
@@ -240,4 +243,10 @@ void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync) {
                     m_signature,
                     block,
                     sync);
+}
+
+void ExportTupleStream::pushEndOfStream() {
+    ExecutorContext::getExecutorContext()->getTopend()->pushEndOfStream(
+                    m_partitionId,
+                    m_signature);
 }

@@ -36,7 +36,7 @@ public:
     virtual ~ExportTupleStream() {
     }
 
-    void setSignatureAndGeneration(std::string signature, int64_t generation);
+    void setSignatureAndGeneration(std::string signature, int64_t generation, bool eof = false);
 
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {
@@ -69,6 +69,7 @@ public:
     }
 
     void pushExportBuffer(StreamBlock *block, bool sync);
+    virtual void pushEndOfStream();
 
     /** write a tuple to the stream */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,

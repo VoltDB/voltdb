@@ -717,9 +717,9 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp) {
             auto streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
                 const std::string signature = tcd->signature();
-                streamedtable->setSignatureAndGeneration(signature, timestamp);
+                streamedtable->setSignatureAndGeneration(signature, timestamp, true);
                 m_exportingTables.erase(signature);
-                std::cout << "Dropping stream: " << signature << "\n";
+                std::cout << "EE Dropping stream: " << signature << "\n";
                 std::cout.flush();
             }
             delete tcd;

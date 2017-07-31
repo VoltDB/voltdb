@@ -57,6 +57,7 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.export.ExportGeneration.SourceDrained;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -99,6 +100,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile boolean m_performPoll = false;            // flag to pause/resume polling
     private volatile boolean m_isInCatalog;
 
+    private final Runnable m_onDrain;
     /**
      * Create a new data source.
      * @param db
@@ -113,9 +115,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             String signature,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
-            String overflowPath
+            String overflowPath, SourceDrained onDrain
             ) throws IOException
     {
+        m_onDrain = onDrain;
         m_format = ExportFormat.SEVENDOTX;
         m_database = db;
         m_tableName = tableName;
@@ -159,7 +162,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
     }
 
-    public ExportDataSource(File adFile) throws IOException {
+    public ExportDataSource(File adFile, Runnable onDrain) throws IOException {
+        m_onDrain = onDrain;
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
         long hsid = -1;
@@ -434,6 +438,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     }
 
+    public void pushEndOfStream() {
+        exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
+        m_isInCatalog = false;
+        poll();
+    }
+
     public void pushExportBuffer(
             final long uso,
             final ByteBuffer buffer,
@@ -619,9 +629,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             StreamBlock first_unpolled_block = null;
 
+            if (!m_isInCatalog && m_committedBuffers.isEmpty()) {
+                //Returning null indicates end of stream
+                try {
+                    fut.set(null);
+                } catch (RejectedExecutionException reex) {
+                    //We are closing source.
+                }
+                try {
+                    if (m_onDrain != null) {
+                        m_onDrain.run();
+                    }
+                } finally {
+                    forwardAckToOtherReplicas(Long.MIN_VALUE);
+                }
+                return;
+            }
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
-            ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
+            ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
             //Inside this critical section do the work to find out
             //what block should be returned by the next poll.
             //Copying and sending the data will take place outside the critical section
@@ -655,12 +681,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
             //If there are no unpolled blocks return the firstUnpolledUSO with no data
             if (first_unpolled_block == null) {
-                if (!isInCatalog()) {
-                    exportLog.info("Export table " + getTableName() + " at partition " + getPartitionId() + " Is DONE and no more data will come.");
-                    fut.set(null);
-                } else {
-                    m_pollFuture = fut;
-                }
+                m_pollFuture = fut;
             } else {
                 final AckingContainer ackingContainer = new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                                                             first_unpolled_block.uso() + first_unpolled_block.totalUso());
@@ -780,6 +801,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
      private void ackImpl(long uso) {
+
+         if (uso == Long.MIN_VALUE) {
+            m_onDrain.run();
+            return;
+         }
 
         //Process the ack if any and add blocks to the delete list or move the released USO pointer
         if (uso > 0) {

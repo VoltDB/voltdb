@@ -47,6 +47,18 @@ public class StandaloneExportGeneration implements Generation {
 
     public final File m_directory;
 
+    class SourceDrained implements Runnable {
+
+        @Override
+        public void run() {
+            synchronized(StandaloneExportManager.class) {
+                System.out.println("Source is drained.....");
+                StandaloneExportManager.m_cdl--;
+            }
+        }
+
+    }
+    SourceDrained m_onDrain = new SourceDrained();
     /**
      * Data sources, one per table per site, provide the interface to
      * poll() and ack() Export data from the execution engines. Data sources
@@ -137,7 +149,7 @@ public class StandaloneExportGeneration implements Generation {
     private void addDataSource(
             File adFile,
             Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(adFile);
+        ExportDataSource source = new ExportDataSource(adFile, m_onDrain);
         partitions.add(source.getPartitionId());
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
@@ -157,6 +169,10 @@ public class StandaloneExportGeneration implements Generation {
         } else {
             dataSourcesForPartition.put(source.getSignature(), source);
         }
+    }
+
+    @Override
+    public void pushEndOfStream(int partitionId, String signature) {
     }
 
     @Override

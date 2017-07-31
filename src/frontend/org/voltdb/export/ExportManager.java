@@ -520,6 +520,29 @@ public class ExportManager
      * End of stream indicates that no more data is coming from this source
      * for this generation.
      */
+    public static void pushEndOfStream(
+            int partitionId,
+            String signature) {
+        ExportManager instance = instance();
+        try {
+            ExportGeneration generation = instance.m_generation.get();
+            if (generation == null) {
+                VoltDB.crashLocalVoltDB("BSDBG: pushed export end of stream before generation was initialized");
+                return;
+            }
+            generation.pushEndOfStream(partitionId, signature);
+        } catch (Exception e) {
+            //Don't let anything take down the execution site thread
+            exportLog.error("Error pushing export end of stream", e);
+        }
+    }
+    /*
+     * This method pulls double duty as a means of pushing export buffers
+     * and "syncing" export data to disk. Syncing doesn't imply fsync, it just means
+     * writing the data to a file instead of keeping it all in memory.
+     * End of stream indicates that no more data is coming from this source
+     * for this generation.
+     */
     public static void pushExportBuffer(
             int partitionId,
             String signature,

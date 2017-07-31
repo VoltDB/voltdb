@@ -92,12 +92,24 @@ public class ExportGeneration implements Generation {
     private static final ListeningExecutorService m_childUpdatingThread =
             CoreUtils.getListeningExecutorService("Export ZK Watcher", 1);
 
+    class SourceDrained implements Runnable {
+
+        @Override
+        public void run() {
+            //Lock everything.
+
+        }
+
+    }
+    private final SourceDrained m_onSourceDrained;
+
     /**
      * Constructor to create a new generation of export data
      * @param exportOverflowDirectory
      * @throws IOException
      */
     public ExportGeneration(File exportOverflowDirectory) throws IOException {
+        m_onSourceDrained = new SourceDrained();
         m_directory = exportOverflowDirectory;
         if (!m_directory.canWrite()) {
             if (!m_directory.mkdirs()) {
@@ -382,7 +394,7 @@ public class ExportGeneration implements Generation {
      * Create a datasource based on an ad file
      */
     private void addDataSource(File adFile, Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(adFile);
+        ExportDataSource source = new ExportDataSource(adFile, m_onSourceDrained);
         partitions.add(source.getPartitionId());
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
@@ -424,7 +436,8 @@ public class ExportGeneration implements Generation {
                             table.getSignature(),
                             table.getColumns(),
                             partColumn,
-                            m_directory.getPath());
+                            m_directory.getPath(),
+                            m_onSourceDrained);
                     exportLog.info("Creating ExportDataSource for table in catalog " + table.getTypeName() +
                             " signature " + table.getSignature() + " partition id " + partition);
                     dataSourcesForPartition.put(table.getSignature(), exportDataSource);
@@ -480,6 +493,32 @@ public class ExportGeneration implements Generation {
         }
 
         source.pushExportBuffer(uso, buffer, sync);
+    }
+
+    @Override
+    public void pushEndOfStream(int partitionId, String signature) {
+        //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
+        //        for (Integer i : m_dataSourcesByPartition.keySet()) {
+        //            System.out.println("Have partition " + i);
+        //        }
+        assert(m_dataSourcesByPartition.containsKey(partitionId));
+        assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
+        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+
+        if (sources == null) {
+            exportLog.error("Could not find export data sources for partition "
+                    + partitionId + ". The export end of stream is being discarded.");
+            return;
+        }
+
+        ExportDataSource source = sources.get(signature);
+        if (source == null) {
+            exportLog.error("Could not find export data source for partition " + partitionId +
+                    " signature " + signature + ". The export end of stream is being discarded.");
+            return;
+        }
+
+        source.pushEndOfStream();
     }
 
     private void cleanup(final HostMessenger messenger) {

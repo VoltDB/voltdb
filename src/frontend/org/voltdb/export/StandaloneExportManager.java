@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
@@ -75,10 +74,9 @@ public class StandaloneExportManager
 
     private volatile Properties m_processorConfig = new Properties();
 
-    // FIXME - this needs to be re-worked since drain went away.
-    public static AtomicBoolean m_exit = new AtomicBoolean(false);
+    public static long m_cdl;
     public static boolean shouldExit() {
-        return m_exit.get();
+        return m_cdl <= 0;
     }
 
     /**
@@ -92,7 +90,7 @@ public class StandaloneExportManager
     {
         StandaloneExportManager em = new StandaloneExportManager(exportConnectorClassName, exportConfiguration);
 
-        em.createInitialExportProcessor(overflow);
+        m_cdl = em.createInitialExportProcessor(overflow);
         m_self = em;
     }
 
@@ -115,7 +113,7 @@ public class StandaloneExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", "/tmp"));
     }
 
-    private synchronized void createInitialExportProcessor(String overflow) {
+    private synchronized int createInitialExportProcessor(String overflow) {
         try {
             exportLog.info("Creating connector " + PROCESSOR_CLASS);
             final Class<?> loaderClass = Class.forName(PROCESSOR_CLASS);
@@ -129,7 +127,7 @@ public class StandaloneExportManager
             StandaloneExportGeneration nextGeneration = m_generation.get();
             if (nextGeneration == null) {
                 System.out.println("Nothing loaded. exiting");
-                return;
+                return 0;
             }
             newProcessor.setExportGeneration(nextGeneration);
             newProcessor.readyForData();
@@ -143,6 +141,7 @@ public class StandaloneExportManager
                     }
                 }
             }
+            return nextGeneration.getDataSourceByPartition().values().size();
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
@@ -151,6 +150,7 @@ public class StandaloneExportManager
         catch (final Exception e) {
             Throwables.propagate(e);
         }
+        return 0;
     }
 
     private void initializePersistedGenerations(File exportOverflowDirectory) throws IOException {

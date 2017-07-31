@@ -80,6 +80,12 @@ namespace voltdb {
         receivedExportBuffer = true;
     }
 
+    void DummyTopend::pushEndOfStream(int32_t partitionId, std::string signature) {
+        partitionIds.push(partitionId);
+        signatures.push(signature);
+        receivedExportBuffer = true;
+    }
+
     int64_t DummyTopend::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
         receivedDRBuffer = true;
         partitionIds.push(partitionId);
