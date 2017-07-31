@@ -37,6 +37,7 @@ def drop(runner):
         runner.info(message)
     else:
         runner.error(message)
+        sys.exit(1)
 
     # post check for drop
     actionMessage = 'Not all connected clusters report received reset. You may continue monitoring remaining consumer clusters with @Statistics'
