@@ -566,24 +566,28 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             for (Map.Entry<Byte, Integer> entry : clusterIdToPartitionCountMap.entrySet()) {
                 int producerClusterId = entry.getKey();
-                if (m_maxSeenDrLogsBySrcPartition.containsKey(producerClusterId)) {
-                    continue;
+                Map<Integer, DRConsumerDrIdTracker> clusterSources =
+                        m_maxSeenDrLogsBySrcPartition.getOrDefault(producerClusterId, new HashMap<>());
+                // TODO remove after rebase
+                if (clusterSources.isEmpty()) {
+                        DRConsumerDrIdTracker tracker =
+                                DRConsumerDrIdTracker.createPartitionTracker(
+                                        DRLogSegmentId.makeEmptyDRId(producerClusterId),
+                                        Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
+                        clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
                 }
-                int producerPartitionCount = entry.getValue();
-                assert(producerPartitionCount != -1);
-                Map<Integer, DRConsumerDrIdTracker> clusterSources = new HashMap<>();
-                for (int i = 0; i < producerPartitionCount; i++) {
+                int oldProducerPartitionCount = clusterSources.size()-1;
+                int newProducerPartitionCount = entry.getValue();
+                assert(oldProducerPartitionCount >= 0);
+                assert(newProducerPartitionCount != -1);
+
+                for (int i = oldProducerPartitionCount; i < newProducerPartitionCount; i++) {
                     DRConsumerDrIdTracker tracker =
                             DRConsumerDrIdTracker.createPartitionTracker(
                                     DRLogSegmentId.makeEmptyDRId(producerClusterId),
                                     Long.MIN_VALUE, Long.MIN_VALUE, i);
                     clusterSources.put(i, tracker);
                 }
-                DRConsumerDrIdTracker tracker =
-                        DRConsumerDrIdTracker.createPartitionTracker(
-                                DRLogSegmentId.makeEmptyDRId(producerClusterId),
-                                Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
-                clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
 
                 m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
             }
