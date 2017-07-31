@@ -78,27 +78,24 @@ public class CatalogContext {
             if (deploymentBytes == null) {
                 throw new IllegalArgumentException("Can't create CatalogContext with null deployment bytes.");
             }
-
-            if (catalogBytes != null) {
-                try {
-                    m_catalogBytes = catalogBytes;
-                    m_jarfile = new InMemoryJarfile(catalogBytes);
-                    m_catalogCRC = m_jarfile.getCRC();
-                }
-                catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-
-                if (catalogBytesHash != null) {
-                    // This is expensive to compute so if it was passed in to us, use it.
-                    m_catalogHash = catalogBytesHash;
-                }
-                else {
-                    m_catalogHash = m_jarfile.getSha1Hash();
-                }
-            }
-            else {
+            if (catalogBytes == null) {
                 throw new IllegalArgumentException("Can't create CatalogContext with null catalog bytes.");
+            }
+
+            try {
+                m_catalogBytes = catalogBytes;
+                m_jarfile = new InMemoryJarfile(catalogBytes);
+                m_catalogCRC = m_jarfile.getCRC();
+            }
+            catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            if (catalogBytesHash == null) {
+                m_catalogHash = m_jarfile.getSha1Hash();
+            } else {
+                // This is expensive to compute so if it was passed in, use it.
+                m_catalogHash = catalogBytesHash;
             }
 
             m_deploymentBytes = deploymentBytes;
@@ -169,7 +166,7 @@ public class CatalogContext {
             throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
         }
         if (settings == null) {
-            throw new IllegalArgumentException("Cant't create CatalogContent with null cluster settings");
+            throw new IllegalArgumentException("Cant't create CatalogContext with null cluster settings");
         }
 
         this.catalog = catalog;
@@ -303,15 +300,15 @@ public class CatalogContext {
     public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedures(SiteProcedureConnection site) {
         long hsId = site.getCorrespondingSiteId();
         ImmutableMap<String, ProcedureRunner> userProcs = m_catalogInfo.m_userProcsMap.get(hsId);
-        // swap site and reinit stats
+        // swap site and initiate the statistics
 
         if (userProcs == null) {
             // this may be the MPI site
-            hostLog.warn("look for MPI site: " + hsId + " in Map: " + m_catalogInfo.m_userProcsMap.keySet());
+            hostLog.debug("look for MPI site: " + hsId + " in Map: " + m_catalogInfo.m_userProcsMap.keySet());
             long siteId = CoreUtils.getSiteIdFromHSId(hsId);
             userProcs = m_catalogInfo.m_userProcsMap.get(siteId);
             if (userProcs == null) {
-                hostLog.error("look for site id : " + siteId + " in Map: "
+                throw new RuntimeException("look for site id : " + siteId + " in Map: "
                             + m_catalogInfo.m_userProcsMap.keySet());
             }
         }

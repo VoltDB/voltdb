@@ -180,9 +180,6 @@ public class ProcedureRunner {
         m_isReadOnly = catProc.getReadonly();
         m_isSinglePartition = m_catProc.getSinglepartition();
         if (m_isSinglePartition) {
-            // FIXME(xin):
-            // why use (ProcedurePartitionInfo) ?
-//            ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
             m_partitionColumn = m_catProc.getPartitionparameter();
             m_partitionColumnType = VoltType.get((byte) m_catProc.getPartitioncolumn().getType());
         } else {

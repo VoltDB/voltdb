@@ -858,8 +858,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         catch (Throwable t)
         {
-            t.printStackTrace(System.err);
-
             String errmsg = "Site: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) +
                 " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
             hostLog.error(errmsg);

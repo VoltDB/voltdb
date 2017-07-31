@@ -3380,6 +3380,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
         } catch (Exception e) {
+            // catch all exceptions, anything may fail now can be safely rolled back
             return e.getMessage();
         }
 
@@ -3409,7 +3410,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                                     classesMap.build(), null);
                     ctx.m_preparedCatalogInfo.m_userProcsMap.put(site, userProcs);
                 } catch (Exception e) {
-                    e.printStackTrace();
                     String msg = "error setting up user procedure runners using NT-procedure pattern: "
                                 + e.getMessage();
                     hostLog.error(msg);
@@ -3422,11 +3422,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         for (Future<String> ft : resultFutureMap.values()) {
             try {
-                if ((errorMsg = ft.get()) == null)
+                errorMsg = ft.get();
+                if (errorMsg == null)
+                    // this means there are no errors executing the this catalog preparation job
                     continue;
             } catch (InterruptedException | ExecutionException e) {
                 return "Exception throw waiting for procedure runner creation result: " + e.getMessage();
             }
+            // catalog preparation job has errors
             hostLog.error(errorMsg);
             return errorMsg;
         }
@@ -3484,14 +3487,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         catalogBytesHash = catalogStuff.catalogHash;
                         deploymentBytes = catalogStuff.deploymentBytes;
                     } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
+                        // impossible to hit, log for debug purpose
+                        hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes);
+                        throw new RuntimeException("Error reading catalog from zookeeper");
                     }
                 } else {
                     CatalogContext ctx = VoltDB.instance().getCatalogContext();
-                    if (ctx.m_preparedCatalogInfo != null) {
-                        hostLog.fatal("prepared catalog is null...");
+                    if (ctx.m_preparedCatalogInfo == null) {
+                        // impossible to hit, log for debug purpose
+                        throw new RuntimeException("Unexpected: @UpdateCore's prepared catalog is null during non-replay case.");
                     }
-                    assert(ctx.m_preparedCatalogInfo != null);
                     newCatalogBytes = ctx.m_preparedCatalogInfo.m_catalogBytes;
                     catalogBytesHash = ctx.m_preparedCatalogInfo.m_catalogHash;
                     deploymentBytes = ctx.m_preparedCatalogInfo.m_deploymentBytes;
