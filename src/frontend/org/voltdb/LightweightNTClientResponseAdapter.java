@@ -287,7 +287,8 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
         try {
             task = MiscUtils.roundTripForCL(task);
         } catch (Exception e) {
-            String msg = String.format("Cannot invoke procedure %s. failed to create task.", procName);
+            String msg = String.format("Cannot invoke procedure %s. failed to create task: %s",
+                    procName, e.getMessage());
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, msg);
             ClientResponseImpl cri = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             try {
