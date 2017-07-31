@@ -32,9 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class UpdateWaitTime extends VoltProcedure {
-    // Keep the last 5 minutes of wait time calculation
-    private static final long TTL_SECOND = 5 * 60;
-
     // Assuming we use the same timestamp for all stations in the wait_time table.
     // Get all station IDs
     public static final SQLStmt getStations = new SQLStmt(
@@ -68,7 +65,7 @@ public class UpdateWaitTime extends VoltProcedure {
 
     // Delete old wait time calculations
     public static final SQLStmt deleteOldData = new SQLStmt(
-    String.format("DELETE FROM wait_time WHERE update_time < DATEADD(SECOND, -%d, NOW);", TTL_SECOND)
+    "DELETE FROM wait_time WHERE update_time < DATEADD(SECOND, ?, NOW);"
     );
 
     private static class StationStats {
@@ -97,7 +94,13 @@ public class UpdateWaitTime extends VoltProcedure {
         }
     }
 
-    public VoltTable[] run() throws VoltAbortException {
+    /**
+     * Calculate the current average wait time for each station and prune old wait time calculations.
+     * @param ttl_seconds Time-to-live for wait time calculations, results older than this will be deleted.
+     * @return
+     * @throws VoltAbortException
+     */
+    public VoltTable[] run(long ttl_seconds) throws VoltAbortException {
         // Find last departure time since last calculation for each station
         voltQueueSQL(getStations);
         final VoltTable stationsResult = voltExecuteSQL()[0];
@@ -120,7 +123,7 @@ public class UpdateWaitTime extends VoltProcedure {
                          stats.totalEntries);
         }
         // Prune old data
-        voltQueueSQL(deleteOldData);
+        voltQueueSQL(deleteOldData, -ttl_seconds);
 
         return voltExecuteSQL(true);
     }
