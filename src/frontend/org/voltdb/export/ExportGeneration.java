@@ -425,9 +425,11 @@ public class ExportGeneration implements Generation {
                             table.getColumns(),
                             partColumn,
                             m_directory.getPath());
-                    exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
+                    exportLog.info("Creating ExportDataSource for table in catalog " + table.getTypeName() +
                             " signature " + table.getSignature() + " partition id " + partition);
                     dataSourcesForPartition.put(table.getSignature(), exportDataSource);
+                } else {
+                    dataSourcesForPartition.get(table.getSignature()).markInCatalog();
                 }
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB(
@@ -443,9 +445,7 @@ public class ExportGeneration implements Generation {
             Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
             assert(dataSourcesForPartition != null);
             for (ExportDataSource source: dataSourcesForPartition.values()) {
-                exportLog.debug("Pause polling for table:" + source.getTableName() + " partition:" + source.getPartitionId()
-                        + " signature:" + source.getSignature());
-                source.prepareForProcessorSwap();
+                source.pausePolling();
             }
         }
     }

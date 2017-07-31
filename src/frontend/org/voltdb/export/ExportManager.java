@@ -270,18 +270,14 @@ public class ExportManager
         processor.startPolling();
     }
 
-    private void initializePersistedGenerations() throws IOException {
-
+    private ExportGeneration initializePersistedGenerations() throws IOException {
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-        File files[] = exportOverflowDirectory.listFiles();
-        if (files == null) {
-            return;
-        }
-
         ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
-        generation.initializeGenerationFromDisk(m_messenger);
-        assert (m_generation.get() == null);
-        m_generation.set(generation);
+        File files[] = exportOverflowDirectory.listFiles();
+        if (files != null) {
+            generation.initializeGenerationFromDisk(m_messenger);
+        }
+        return generation;
     }
 
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
@@ -339,20 +335,6 @@ public class ExportManager
         return m_connCount;
     }
 
-    private ExportGeneration createGenerationIfNeeded(boolean isRejoin) {
-        ExportGeneration generation = m_generation.get();
-        if (generation == null) {
-            try {
-                File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-                generation = new ExportGeneration(exportOverflowDirectory);
-                m_generation.set(generation);
-            } catch (IOException e1) {
-                VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
-            }
-        }
-        return generation;
-    }
-
     /** Creates the initial export processor if export is enabled */
     private void initialize(CatalogMap<Connector> connectors, List<Integer> partitions, boolean isRejoin) {
         try {
@@ -360,14 +342,9 @@ public class ExportManager
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
             m_processor.set(newProcessor);
 
-            initializePersistedGenerations();
-
-            ExportGeneration generation = m_generation.get();
-            if (m_generation.get() == null) {
-                generation = createGenerationIfNeeded(isRejoin);
-                generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-            }
-
+            ExportGeneration generation = initializePersistedGenerations();
+            generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+            m_generation.set(generation);
             newProcessor.setExportGeneration(generation);
             newProcessor.readyForData(true);
         }
@@ -405,9 +382,20 @@ public class ExportManager
             exportLog.info("Skipped rolling generations as generation not created in EE.");
             return;
         }
-
-        ExportGeneration generation = createGenerationIfNeeded(false);
-        generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+        ExportGeneration generation;
+        if (m_generation.get() == null) {
+            File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
+            try {
+                generation = new ExportGeneration(exportOverflowDirectory);
+                m_generation.set(generation);
+            } catch (IOException crash) {
+                //This means durig UAC we had a bad disk on a node or bad directory.
+                VoltDB.crashLocalVoltDB("Error creating export generation", true, crash);
+                return;
+            }
+        } else {
+            generation = m_generation.get();
+        }
 
         /*
          * If there is no existing export processor, create an initial one.
@@ -417,6 +405,7 @@ public class ExportManager
             exportLog.info("First stream created processor will be initialized: " + m_loaderClass);
 
             try {
+                generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 exportLog.info("Creating connector " + m_loaderClass);
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
@@ -448,7 +437,7 @@ public class ExportManager
         }
         else {
             // install new export processors with export config from this time
-            swapWithNewProcessor(generation, partitions, m_processorConfig);
+            swapWithNewProcessor(connectors, generation, partitions, m_processorConfig);
         }
     }
 
@@ -461,17 +450,18 @@ public class ExportManager
     }
 
     // remove and install new processor
-    private void swapWithNewProcessor(
-            ExportGeneration generation,
-            List<Integer> partitions,
-            Map<String, Pair<Properties, Set<String>>> config) {
+    private void swapWithNewProcessor(final CatalogMap<Connector> connectors, final ExportGeneration generation,
+            final List<Integer> partitions, final Map<String, Pair<Properties, Set<String>>> config) {
+
         generation.pausePolling(partitions);
+
         m_dataProcessorHandler.submit(new Runnable() {
             @Override
             public void run() {
                 ExportDataProcessor oldProcessor = m_processor.get();
                 exportLog.info("Shutdown guestprocessor");
                 oldProcessor.shutdown();
+                generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 if (config.isEmpty()) {
                     m_processor.getAndSet(null);
                     exportLog.info("Processor shutdown completed");
