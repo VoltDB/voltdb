@@ -143,13 +143,20 @@ public class StandaloneExportGeneration implements Generation {
         return qb;
     }
 
+    @Override
+    public void onSourceDone(int partitionId, String signature) {
+        synchronized(StandaloneExportManager.class) {
+            StandaloneExportManager.m_cdl--;
+        }
+    }
+
     /*
      * Create a datasource based on an ad file
      */
     private void addDataSource(
             File adFile,
             Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(adFile, m_onDrain);
+        ExportDataSource source = new ExportDataSource(this, adFile);
         partitions.add(source.getPartitionId());
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +

@@ -57,7 +57,6 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import org.voltdb.export.ExportGeneration.SourceDrained;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -99,8 +98,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
     private volatile boolean m_performPoll = false;            // flag to pause/resume polling
     private volatile boolean m_isInCatalog;
+    private final Generation m_generation;
 
-    private final Runnable m_onDrain;
     /**
      * Create a new data source.
      * @param db
@@ -109,16 +108,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param catalogMap
      */
     public ExportDataSource(
+            Generation generation,
             String db,
             String tableName,
             int partitionId,
             String signature,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
-            String overflowPath, SourceDrained onDrain
+            String overflowPath
             ) throws IOException
     {
-        m_onDrain = onDrain;
+        m_generation = generation;
         m_format = ExportFormat.SEVENDOTX;
         m_database = db;
         m_tableName = tableName;
@@ -162,8 +162,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
     }
 
-    public ExportDataSource(File adFile, Runnable onDrain) throws IOException {
-        m_onDrain = onDrain;
+    public ExportDataSource(Generation generation, File adFile) throws IOException {
+        m_generation = generation;
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
         long hsid = -1;
@@ -441,7 +441,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushEndOfStream() {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
         m_isInCatalog = false;
-        poll();
     }
 
     public void pushExportBuffer(
@@ -636,13 +635,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (RejectedExecutionException reex) {
                     //We are closing source.
                 }
-                try {
-                    if (m_onDrain != null) {
-                        m_onDrain.run();
-                    }
-                } finally {
-                    forwardAckToOtherReplicas(Long.MIN_VALUE);
-                }
+                //Let generation know to cleanup. Processor needs to do its own cleanup.
+                m_generation.onSourceDone(m_partitionId, m_signature);
+                forwardAckToOtherReplicas(Long.MIN_VALUE);
                 return;
             }
             //Assemble a list of blocks to delete so that they can be deleted
@@ -803,7 +798,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      private void ackImpl(long uso) {
 
          if (uso == Long.MIN_VALUE) {
-            m_onDrain.run();
             return;
          }
 

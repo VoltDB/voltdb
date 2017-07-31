@@ -57,8 +57,6 @@ public interface ExportDataProcessor  {
      */
     public void startPolling();
 
-    public void queueWork(Runnable r);
-
     /**
      * The system is terminating. Cleanup and exit the processor.
      */
