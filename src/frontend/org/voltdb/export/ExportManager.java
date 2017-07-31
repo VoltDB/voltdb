@@ -365,9 +365,9 @@ public class ExportManager
             ExportGeneration generation = m_generation.get();
             if (m_generation.get() == null) {
                 generation = createGenerationIfNeeded(isRejoin);
-                generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
             }
 
+            generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
             newProcessor.setExportGeneration(generation);
             newProcessor.readyForData(true);
         }
