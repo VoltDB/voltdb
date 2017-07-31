@@ -92,13 +92,11 @@ public:
     void setTempTableDeleteAsGo(bool flag) {
         switch (m_iteratorType) {
         case TEMP:
-            m_state.m_tempTableDeleteAsGo = flag;
-            break;
         case LARGE_TEMP:
             m_state.m_tempTableDeleteAsGo = flag;
             break;
         default:
-            assert(false);
+            // For persistent tables, this has no effect
         }
     }
 
@@ -126,10 +124,6 @@ protected:
     /** Constructor for large temp tables */
     TableIterator(Table *, std::vector<int64_t>::iterator);
 
-
-    /* /\** Constructor used for both persistent and temp tables *\/ */
-    /* TableIterator(Table *); */
-
     /** moves iterator to beginning of table.
         (Called only for persistent tables) */
     void reset(TBMapI);
@@ -144,6 +138,9 @@ protected:
 
     bool continuationPredicate();
 
+    /** Next methods for each table type.  (In a perfect world these
+        would be virtual methods in subclasses.)
+     */
     bool persistentNext(TableTuple &out);
     bool tempNext(TableTuple &out);
     bool largeTempNext(TableTuple &out);
@@ -180,29 +177,17 @@ protected:
 
 private:
 
+    /** The type of table we're iterating over */
     enum IteratorType {
         PERSISTENT,
         TEMP,
         LARGE_TEMP
     };
 
-    // State only for persistent table iterators
-    struct PersistentState {
-
-    };
-
-    // State only for temp table iterators
-    struct TempState {
-
-
-    };
-
-    // State for large temp table iterators only
-    struct LargeTempState {
-
-
-    };
-
+    /**
+     * A struct for members that are used only for some types of
+     * iterators.
+     */
     struct TypeSpecificState {
 
         TypeSpecificState()
@@ -242,15 +227,22 @@ private:
         {
         }
 
+        /** Table block iterator for persistent tables */
         TBMapI m_persBlockIterator;
+
+        /** Table block iterator for normal temp tables */
         std::vector<TBPtr>::iterator m_tempBlockIterator;
+
+        /** Table block iterator for large temp tables */
         std::vector<int64_t>::iterator m_largeTempBlockIterator;
 
-        // valid for large and normal temp tables
+        /** "delete as you go" flag for normal and large temp tables
+         * (Not used for persistent tables)
+         */
         bool m_tempTableDeleteAsGo;
     };
 
-    // State that is common to all kinds of iterators
+    // State that is common to all kinds of iterators:
     Table *m_table;
     uint32_t m_activeTuples;
     uint32_t m_tupleLength;
@@ -262,6 +254,8 @@ private:
     uint32_t m_location;
     IteratorType m_iteratorType;
 
+    // State that is specific to the type of table we're iterating
+    // over:
     TypeSpecificState m_state;
 };
 
