@@ -212,7 +212,8 @@ public class ProcedureRunner {
                         m_site.getCorrespondingPartitionId(),
                         m_catProc,
                         stmtList,
-                        true));
+                        true)
+                );
 
         // Read the ProcStatsOption annotation from the procedure class.
         // Basically, it is about setting the sampling interval for this stored procedure.
@@ -682,23 +683,31 @@ public class ProcedureRunner {
                 throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");
             }
 
-            assert (1 == batch.plannedStatements.size());
+            assert(1 == batch.plannedStatements.size());
 
             QueuedSQL queuedSQL = new QueuedSQL();
             AdHocPlannedStatement plannedStatement = batch.plannedStatements.get(0);
 
-            long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(plannedStatement.core.aggregatorHash,
-                    plannedStatement.core.aggregatorFragment, sql);
+            long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
+                    plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment, sql);
             long collectorFragId = 0;
             if (plannedStatement.core.collectorFragment != null) {
-                collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(plannedStatement.core.collectorHash,
-                        plannedStatement.core.collectorFragment, sql);
+                collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
+                        plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment, sql);
             }
 
-            queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(plannedStatement.sql, aggFragId,
-                    plannedStatement.core.aggregatorHash, true, collectorFragId, plannedStatement.core.collectorHash,
-                    true, plannedStatement.core.isReplicatedTableDML, plannedStatement.core.readOnly,
-                    plannedStatement.core.parameterTypes, m_site);
+            queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
+                    plannedStatement.sql,
+                    aggFragId,
+                    plannedStatement.core.aggregatorHash,
+                    true,
+                    collectorFragId,
+                    plannedStatement.core.collectorHash,
+                    true,
+                    plannedStatement.core.isReplicatedTableDML,
+                    plannedStatement.core.readOnly,
+                    plannedStatement.core.parameterTypes,
+                    m_site);
             Object[] argumentParams = args;
             // case handles if there were parameters OR
             // if there were no constants to pull out
@@ -715,8 +724,9 @@ public class ProcedureRunner {
             // supporting @AdHocSpForTest with queries that contain '?' parameters.
             if (plannedStatement.hasExtractedParams()) {
                 if (args.length > 0) {
-                    throw new VoltAbortException("Number of arguments provided was " + args.length
-                            + " where 0 were expected for statement: " + sql);
+                    throw new VoltAbortException(
+                            "Number of arguments provided was " + args.length +
+                            " where 0 were expected for statement: " + sql);
                 }
                 argumentParams = plannedStatement.extractedParamArray();
                 if (argumentParams.length != queuedSQL.stmt.statementParamTypes.length) {
@@ -745,20 +755,20 @@ public class ProcedureRunner {
         try {
             if (m_seenFinalBatch) {
                 throw new RuntimeException("Procedure " + m_procedureName +
-                        " attempted to execute a batch " +
-                        "after claiming a previous batch was final " +
-                        "and will be aborted.\n  Examine calls to " +
-                        "voltExecuteSQL() and verify that the call " +
-                        "with the argument value 'true' is actually " +
-                        "the final one");
+                                           " attempted to execute a batch " +
+                                           "after claiming a previous batch was final " +
+                                           "and will be aborted.\n  Examine calls to " +
+                                           "voltExecuteSQL() and verify that the call " +
+                                           "with the argument value 'true' is actually " +
+                                           "the final one");
             }
             m_seenFinalBatch = isFinalSQL;
 
             // should check whether the batch is read only or not
             // e.g. read only query may have timed out...
             if (!m_isSinglePartition && m_txnState.needsRollback()) {
-                throw new SerializableException("Multi-partition procedure " + m_procedureName
-                        + " attempted to execute new batch after hitting EE exception in a previous batch");
+                throw new SerializableException("Multi-partition procedure " + m_procedureName +
+                        " attempted to execute new batch after hitting EE exception in a previous batch");
             }
 
             // memo-ize the original batch size here
@@ -787,7 +797,7 @@ public class ProcedureRunner {
 
                     // get the beginning of the batch (or all if small enough)
                     // note: this is a view into the larger list and changes to it
-                    // will mutate the larger m_batch.
+                    //  will mutate the larger m_batch.
                     List<QueuedSQL> subBatch = m_batch.subList(0, subSize);
 
                     // decide if this sub-batch should be marked final
@@ -795,14 +805,14 @@ public class ProcedureRunner {
 
                     // run the sub-batch and copy the sub-results into the list of lists of results
                     // note: executeQueriesInABatch removes items from the batch as it runs.
-                    // this means subBatch will be empty after running and since subBatch is a
-                    // view on the larger batch, it removes subBatch.size() elements from m_batch.
+                    //  this means subBatch will be empty after running and since subBatch is a
+                    //  view on the larger batch, it removes subBatch.size() elements from m_batch.
                     results.add(executeQueriesInABatch(subBatch, finalSubBatch));
                 }
 
                 // merge the list of lists into something returnable
                 VoltTable[] retval = MiscUtils.concatAll(new VoltTable[0], results);
-                assert (retval.length == batchSize);
+                assert(retval.length == batchSize);
 
                 return retval;
             }
