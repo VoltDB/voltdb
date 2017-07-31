@@ -146,6 +146,25 @@ public class StandaloneExportGeneration implements Generation {
     @Override
     public void onSourceDone(int partitionId, String signature) {
         synchronized(StandaloneExportManager.class) {
+            assert(m_dataSourcesByPartition.containsKey(partitionId));
+            assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
+            Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+
+            if (sources == null) {
+                exportLog.error("Could not find export data sources for partition "
+                        + partitionId + ". The export clear is being discarded.");
+                return;
+            }
+
+            ExportDataSource source = sources.get(signature);
+            if (source == null) {
+                exportLog.error("Could not find export data source for partition " + partitionId +
+                        " signature " + signature + ". The export clear is being discarded.");
+                return;
+            }
+            sources.remove(signature);
+            source.sync(true);
+            source.close();
             StandaloneExportManager.m_cdl--;
         }
     }

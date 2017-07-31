@@ -132,6 +132,7 @@ public class StandaloneExportManager
             newProcessor.setExportGeneration(nextGeneration);
             newProcessor.readyForData();
 
+            int sz = nextGeneration.getDataSourceByPartition().values().size();
             for (Map<String, ExportDataSource> sources : nextGeneration.getDataSourceByPartition().values()) {
                 for (final ExportDataSource source : sources.values()) {
                     try {
@@ -141,7 +142,7 @@ public class StandaloneExportManager
                     }
                 }
             }
-            return nextGeneration.getDataSourceByPartition().values().size();
+            return sz;
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);

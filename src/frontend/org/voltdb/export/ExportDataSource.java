@@ -441,6 +441,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushEndOfStream() {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
         m_isInCatalog = false;
+        poll();
     }
 
     public void pushExportBuffer(
@@ -890,6 +891,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     @Override
     public String toString() {
-        return "ExportDataSource for Table " + getTableName() + " Partition " + getPartitionId();
+        return "ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId();
     }
 }

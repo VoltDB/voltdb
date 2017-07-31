@@ -387,22 +387,27 @@ public class ExportGeneration implements Generation {
     public void onSourceDone(int partitionId, String signature) {
         assert(m_dataSourcesByPartition.containsKey(partitionId));
         assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
-        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+        ExportDataSource source;
+        synchronized(this) {
+            Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
-        if (sources == null) {
-            exportLog.error("Could not find export data sources for partition "
-                    + partitionId + ". The export cleanup stream is being discarded.");
-            return;
-        }
+            if (sources == null) {
+                exportLog.error("Could not find export data sources for partition "
+                        + partitionId + ". The export cleanup stream is being discarded.");
+                return;
+            }
 
-        ExportDataSource source = sources.get(signature);
-        if (source == null) {
-            exportLog.error("Could not find export data source for partition " + partitionId +
-                    " signature " + signature + ". The export cleanup stream is being discarded.");
-            return;
+            source = sources.get(signature);
+            if (source == null) {
+                exportLog.error("Could not find export data source for partition " + partitionId +
+                        " signature " + signature + ". The export cleanup stream is being discarded.");
+                return;
+            }
+            //Remove first then do cleanup. After this is done trigger processor cleanup.
+            sources.remove(signature);
         }
-        //Remove first then do cleanup. After this is done trigger processor cleanup.
-        sources.remove(signature);
+        //Do closing outside the synchronized block.
+        exportLog.info("Finished processing " + source);
         source.closeAndDelete();
     }
 
