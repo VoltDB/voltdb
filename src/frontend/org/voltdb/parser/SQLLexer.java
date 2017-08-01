@@ -301,7 +301,7 @@ public class SQLLexer extends SQLPatternFactory
      * eg: emptycase, caseofbeer, suitcaseofbeer,
      * (id+0)end+100, suit2case3ofbeer, 100+case
      */
-    private static boolean matchToken(String buffer, int position, String token) {
+    public static boolean matchToken(String buffer, int position, String token) {
 
         final int tokLength = token.length();
         final int bufLength = buffer.length();
@@ -366,7 +366,7 @@ public class SQLLexer extends SQLPatternFactory
         // To indicate if inside multi statement procedure
         boolean inBegin = false;
         boolean checkForNextBegin = false;
-        // To indicate if inside CASE .. WHEN
+        // To indicate if inside CASE .. WHEN .. END
         int inCase = 0;
         int iCur = 0;
         while (iCur < buf.length) {
@@ -389,12 +389,8 @@ public class SQLLexer extends SQLPatternFactory
                     // Move past the comment end.
                     iCur += sCommentEnd.length();
                     sCommentEnd = null;
-                    // If the comment is the whole of the statement so far, terminate it
+                    // If the comment is the whole of the statement so far, do not add to output
                     if (statementIsComment) {
-                        String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-                        if (!statement.isEmpty()) {
-                            statements.add(statement);
-                        }
                         iStart = iCur;
                         statementIsComment = false;
                         inStatement = false;
@@ -429,8 +425,7 @@ public class SQLLexer extends SQLPatternFactory
             } else {
                 // Outside of a quoted string - watch for the next separator, quote or comment.
 
-                // check if the next token is BEGIN if the previous one is AS
-                // if not, do not look for BEGIN
+                // 'BEGIN' should only follow 'AS'
                 if (checkForNextBegin
                         && !(Character.isWhitespace(buf[iCur]) || Character.isSpaceChar(buf[iCur])) ) {
                     // 'BEGIN' should only be followed after 'AS'
@@ -449,7 +444,7 @@ public class SQLLexer extends SQLPatternFactory
                     iCur += 2;
                 } else if ( !inBegin && buf[iCur] == ';') {
                     // Add terminated statement (if not empty after trimming).
-                    // if it is not in a BEGIN ... END
+                    // if it is not in a AS BEGIN ... END
                     String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
                     if (!statement.isEmpty()) {
                         statements.add(statement);
@@ -457,6 +452,9 @@ public class SQLLexer extends SQLPatternFactory
                     iStart = iCur + 1;
                     iCur = iStart;
                     inStatement = false;
+                    inBegin = false;
+                    inCase = 0;
+                    checkForNextBegin = false;
                 } else if (buf[iCur] == '"' || buf[iCur] == '\'') {
                     // Start of quoted string.
                     cQuote = buf[iCur];
@@ -465,7 +463,7 @@ public class SQLLexer extends SQLPatternFactory
                     if (inCase > 0) {
                         inCase--;
                     } else {
-                        // we can terminate BEGIN ... END for multi stmt proc
+                        // we can terminate AS BEGIN ... END for multi stmt proc
                         // after all CASE ... END stmts are completed
                         inBegin = false;
                     }
@@ -505,7 +503,6 @@ public class SQLLexer extends SQLPatternFactory
 
         results.completelyParsedStmts = statements;
         return results;
-//        return statements;
     }
 
     /**

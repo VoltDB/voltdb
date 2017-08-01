@@ -50,6 +50,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
@@ -758,6 +759,10 @@ public abstract class ProcedureCompiler {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
         }
 
+        // if there are multiple statements,
+        // all the statements are stored in m_singleStmt as a single string
+        String stmtsStr = procedureDescriptor.m_singleStmt;
+
         // get the short name of the class (no package if a user procedure)
         // use the Table.<builtin> name (allowing the period) if builtin.
         String shortName = className;
@@ -797,92 +802,110 @@ public abstract class ProcedureCompiler {
         }
         assert(info != null);
 
-        // ADD THE STATEMENT
+        String[] stmts = SQLLexer.splitStatements(stmtsStr).completelyParsedStmts.toArray(new String[0]);
 
-        // add the statement to the catalog
-        Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
+        // ADD THE STATEMENTS in a loop
+        int stmtNum = 0;
+        // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
+        boolean procHasWriteStmts = false;
+        boolean procHasSeqScans = false;
 
-        // compile the statement
         StatementPartitioning partitioning =
-            info.singlePartition ? StatementPartitioning.forceSP() :
-                                   StatementPartitioning.forceMP();
-        // default to FASTER detmode because stmt procs can't feed read output into writes
-        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
-                estimates, catalogStmt, procedureDescriptor.m_singleStmt,
-                procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
+                info.singlePartition ? StatementPartitioning.forceSP() :
+                                       StatementPartitioning.forceMP();
 
-        // if the single stmt is not read only, then the proc is not read only
-        boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);
+        for (String curStmt: stmts) {
+            // skip processing 'END' statement in multi statement procedures
+            if (curStmt.equalsIgnoreCase("end")) continue;
+
+            // add the statement to the catalog
+            Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME + String.valueOf(stmtNum));
+            stmtNum++;
+
+            // compile the statement
+            // default to FASTER detmode because stmt procs can't feed read output into writes
+            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
+                    estimates, catalogStmt, curStmt,//procedureDescriptor.m_singleStmt,
+                    procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
+
+            // if a single stmt is not read only, then the proc is not read only
+            if (catalogStmt.getReadonly() == false) {
+                procHasWriteStmts = true;
+            }
+
+            if (catalogStmt.getSeqscancount() > 0) {
+                procHasSeqScans = true;
+            }
+
+            // set procedure parameter types
+            CatalogMap<ProcParameter> params = procedure.getParameters();
+            CatalogMap<StmtParameter> stmtParams = catalogStmt.getParameters();
+
+            // set the procedure parameter types from the statement parameter types
+            int paramCount = params.size();
+            for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmtParams, "index")) {
+                // name each parameter "param1", "param2", etc...
+                ProcParameter procParam = params.add("param" + String.valueOf(paramCount));
+                procParam.setIndex(paramCount);
+                procParam.setIsarray(stmtParam.getIsarray());
+                procParam.setType(stmtParam.getJavatype());
+                paramCount++;
+            }
+
+            // parse the procinfo
+            procedure.setSinglepartition(info.singlePartition);
+            if (info.singlePartition) {
+                parsePartitionInfo(compiler, db, procedure, info.partitionInfo);
+                if (procedure.getPartitionparameter() >= params.size()) {
+                    String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
+                    throw compiler.new VoltCompilerException(msg);
+                }
+                // TODO: The planner does not currently validate that a single-statement plan declared as single-partition correctly uses
+                // the designated parameter as a partitioning filter, maybe some day.
+                // In theory, the PartitioningForStatement would confirm the use of (only) a parameter as a partition key --
+                // or if the partition key was determined to be some other hard-coded constant (expression?) it might display a warning
+                // message that the passed parameter is assumed to be equal to that constant (expression).
+            } else {
+                if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
+                    AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
+                    if (statementPartitionExpression != null) {
+                        // The planner has uncovered an overlooked opportunity to run the statement SP.
+                        String msg = "This procedure " + shortName + " would benefit from being partitioned, by ";
+                        String tableName = "tableName", partitionColumnName = "partitionColumnName";
+                        try {
+                            assert(partitioning.getFullColumnName() != null);
+                            String array[] = partitioning.getFullColumnName().split("\\.");
+                            tableName = array[0];
+                            partitionColumnName = array[1];
+                        } catch(Exception ex) {
+                        }
+
+                        if (statementPartitionExpression instanceof ParameterValueExpression) {
+                            paramCount = ((ParameterValueExpression) statementPartitionExpression).getParameterIndex();
+                        } else {
+                            String valueDescription = null;
+                            Object partitionValue = partitioning.getInferredPartitioningValue();
+                            if (partitionValue == null) {
+                                // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
+                                valueDescription = "of " + statementPartitionExpression.explain("");
+                            } else {
+                                valueDescription = partitionValue.toString(); // A simple constant value COULD have been a parameter.
+                            }
+                            msg += "adding a parameter to be passed the value " + valueDescription + " and ";
+                        }
+                        msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN " +
+                                partitionColumnName + " PARAMETER " + paramCount + "' clause to the " +
+                                "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
+                        compiler.addWarn(msg);
+                    }
+                }
+            }
+        }
 
         // set the read onlyness of a proc
         procedure.setReadonly(procHasWriteStmts == false);
 
-        int seqs = catalogStmt.getSeqscancount();
-        procedure.setHasseqscans(seqs > 0);
-
-        // set procedure parameter types
-        CatalogMap<ProcParameter> params = procedure.getParameters();
-        CatalogMap<StmtParameter> stmtParams = catalogStmt.getParameters();
-
-        // set the procedure parameter types from the statement parameter types
-        int paramCount = 0;
-        for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmtParams, "index")) {
-            // name each parameter "param1", "param2", etc...
-            ProcParameter procParam = params.add("param" + String.valueOf(paramCount));
-            procParam.setIndex(stmtParam.getIndex());
-            procParam.setIsarray(stmtParam.getIsarray());
-            procParam.setType(stmtParam.getJavatype());
-            paramCount++;
-        }
-
-        // parse the procinfo
-        procedure.setSinglepartition(info.singlePartition);
-        if (info.singlePartition) {
-            parsePartitionInfo(compiler, db, procedure, info.partitionInfo);
-            if (procedure.getPartitionparameter() >= params.size()) {
-                String msg = "PartitionInfo parameter not a valid parameter for procedure: " + procedure.getClassname();
-                throw compiler.new VoltCompilerException(msg);
-            }
-            // TODO: The planner does not currently validate that a single-statement plan declared as single-partition correctly uses
-            // the designated parameter as a partitioning filter, maybe some day.
-            // In theory, the PartitioningForStatement would confirm the use of (only) a parameter as a partition key --
-            // or if the partition key was determined to be some other hard-coded constant (expression?) it might display a warning
-            // message that the passed parameter is assumed to be equal to that constant (expression).
-        } else {
-            if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
-                AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
-                if (statementPartitionExpression != null) {
-                    // The planner has uncovered an overlooked opportunity to run the statement SP.
-                    String msg = "This procedure " + shortName + " would benefit from being partitioned, by ";
-                    String tableName = "tableName", partitionColumnName = "partitionColumnName";
-                    try {
-                        assert(partitioning.getFullColumnName() != null);
-                        String array[] = partitioning.getFullColumnName().split("\\.");
-                        tableName = array[0];
-                        partitionColumnName = array[1];
-                    } catch(Exception ex) {
-                    }
-
-                    if (statementPartitionExpression instanceof ParameterValueExpression) {
-                        paramCount = ((ParameterValueExpression) statementPartitionExpression).getParameterIndex();
-                    } else {
-                        String valueDescription = null;
-                        Object partitionValue = partitioning.getInferredPartitioningValue();
-                        if (partitionValue == null) {
-                            // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
-                            valueDescription = "of " + statementPartitionExpression.explain("");
-                        } else {
-                            valueDescription = partitionValue.toString(); // A simple constant value COULD have been a parameter.
-                        }
-                        msg += "adding a parameter to be passed the value " + valueDescription + " and ";
-                    }
-                    msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN " +
-                            partitionColumnName + " PARAMETER " + paramCount + "' clause to the " +
-                            "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
-                    compiler.addWarn(msg);
-                }
-            }
-        }
+        procedure.setHasseqscans(procHasSeqScans);
     }
 
     /**

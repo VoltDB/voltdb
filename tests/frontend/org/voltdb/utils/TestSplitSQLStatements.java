@@ -68,6 +68,15 @@ public class TestSplitSQLStatements {
         checkSplitter("--one\n--two\nreal", "real");
         checkSplitter("  --one\n  --two\nreal", "real");
         checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "/*ghi\njkl;*/");
+        checkSplitter("  abc;/* comments*/  def;", "abc", "def");
+        checkSplitter("  abc;'/*' comments*/  def;", "abc", "'/*' comments*/  def");
+        checkSplitter("  abc;'/* comments*/'  def;", "abc", "'/* comments*/'  def");
+        checkSplitter(" -- abc;/* comments*/\n  def;", "def");
+        checkSplitter("  abc;/* comments*/\n  def;", "abc", "def");
+        checkSplitter("  abc;/* comments ; with ;*/\n  def;", "abc", "def");
+        checkSplitter("  abc;/* this is a long \n comment \n in 3 lines*/  def;", "abc", "def");
+        checkSplitter("/* comments*/  abc;/* comments \n multiline*/  --def\n\n  /*ghi\njkl;*/", "abc", "/*ghi\njkl;*/");
+        checkSplitter("testing comments in quotes /* not ending will remain '*/'", "testing comments in quotes /* not ending will remain '*/'");
     }
 
     @Test
@@ -83,7 +92,11 @@ public class TestSplitSQLStatements {
         assertEquals(0, parsedOut.completelyParsedStmts.size());
         assertEquals(sql, parsedOut.incompleteMuliStmtProc);
 
-        checkSplitter("CREATE PROCEDURE foo as SELECT * from t;", "CREATE PROCEDURE foo as SELECT * from t");
+        sql = "create table begin (a int);";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        sql = "create table begin (a int, begin int);";
+        checkSplitter(sql, sql.substring(0, sql.length() - 1));
 
         sql = "CREATE PROCEDURE foo AS "
                 + "BEGIN "
@@ -171,7 +184,7 @@ public class TestSplitSQLStatements {
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'begin' or f = 'END';"
                 + "end;";
-        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
+        checkSplitter(sql + sql1, sql.substring(0, sql.length() - 1), sql1);
 
         // semi colon in quoted string
         sql = "create procedure thisproc as "
@@ -180,7 +193,7 @@ public class TestSplitSQLStatements {
                 + "select * from r where f = 'foo';"
                 + "select * from r where f = 'beg;in' or f = 'END;';"
                 + "end;";
-        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
+        checkSplitter(sql + sql1, sql.substring(0, sql.length() - 1), sql1);
 
         // partition clause
         sql = "create procedure thisproc "
@@ -190,7 +203,7 @@ public class TestSplitSQLStatements {
                 + "select * from t;"
                 + "select * from r where f = 'foo';"
                 + "end;";
-        checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
+        checkSplitter(sql + sql1, sql.substring(0, sql.length() - 1), sql1);
 
         // case inside longer strings
         sql = "create procedure p as begin "
@@ -255,6 +268,18 @@ public class TestSplitSQLStatements {
         sql = "create procedure p as      "
                 + "select begin.begin from begin;";
         checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1);
+
+        // prevent error propagating from one malformed statement to another
+        // each statement should have a fresh value for checking in begin and in case...
+        sql = "create table begin (a int);";
+        sql1 = "create procedure p as select a, case when a > 10 then 'a' else 'b' end from begin;";
+        checkSplitter(sql + sql, sql.substring(0, sql.length() - 1), sql.substring(0, sql.length() - 1));
+
+        // parsing AS BEGIN will only end with END
+        sql = "create table as begin (a int);";
+        parsedOut = SQLLexer.splitStatements(sql + sql1);
+        assertEquals(0, parsedOut.completelyParsedStmts.size());
+        assertEquals(sql + sql1, parsedOut.incompleteMuliStmtProc);
     }
 
     @Test
@@ -267,11 +292,11 @@ public class TestSplitSQLStatements {
                   + "select * from r where f = 'begin' or f = 'END';"
                   + "end;";
         String expected = "create procedure thisproc as "
-        + "begin \n"
-        + "select * from t;"
-        + "select * from r where f = 'foo';"
-        + "select * from r where f = 'begin' or f = 'END';"
-        + "end";
+                    + "begin \n"
+                    + "select * from t;"
+                    + "select * from r where f = 'foo';"
+                    + "select * from r where f = 'begin' or f = 'END';"
+                    + "end";
         checkSplitter(sql, expected);
 
         sql = "create procedure thisproc as "
@@ -281,6 +306,14 @@ public class TestSplitSQLStatements {
                 + "select * from r where f = 'begin' or f = 'END';"
                 + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        sql = "select * from books;";
+        String sql1 = "select title, case when cash > 100.00 "
+                + "then case when cash > 1000.00 "
+                + "then 'Super Expensive' else 'Pricy' end "
+                + "'Expensive' else 'Cheap' end from books;";
+        checkSplitter(sql + "/* comments will not exist if they are at beginning of statements */" + sql1,
+                sql.substring(0, sql.length() - 1), sql1.substring(0, sql1.length() - 1));
     }
 
     @Test
@@ -354,6 +387,10 @@ public class TestSplitSQLStatements {
                 + "select * from s order by case when s.a < 1 then s.a + 100 else s.a end; "
                 + "end;";
         checkSplitter(sql+sql1, sql.substring(0, sql.length() - 1), sql1.substring(0, sql1.length() - 1));
+
+        // to prevent propagating error from malformed case...end to next statement
+        sql1 = "CREATE INDEX FunkyIndex on FUNKYDEFAULTS (CASE WHEN i < 10 THEN 0 ELSE 10 END CASE);";
+        checkSplitter(sql1 + sql, sql1.substring(0, sql1.length() - 1), sql.substring(0, sql.length() - 1));
     }
 
 }

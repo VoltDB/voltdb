@@ -174,6 +174,27 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_CREATE_PROCEDURE_FROM_SQL");
 
     /*
+     * CREATE PROCEDURE <NAME> [ <MODIFIER_CLAUSE> ... ] AS BEGIN <SQL_STATEMENTS> END
+     *
+     * CREATE PROCEDURE with multiple SELECT or DML statement pattern
+     * NB supports only unquoted table and column names
+     * This regular expression is only for matching BEGIN...END and NOT for finding multi statement procedures
+     * because multi statement procedures cannot be captured using regular expressions (nested CASE-END issue),
+     * matching is done in a loop in SQLexer.splitStatements()
+     *
+     * Capture groups:
+     *  (1) Procedure name
+     *  (2) ALLOW/PARTITION clauses full text - needs further parsing
+     *  (3) SELECT or DML statement
+     */
+    private static final Pattern PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL =
+        SPF.statement(
+            SPF.token("create"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
+            unparsedProcedureModifierClauses(),
+            SPF.token("as"), SPF.token("begin"), SPF.capture(SPF.anyClause())
+        ).compile("PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL");
+
+    /*
      * CREATE FUNCTION <NAME> FROM METHOD <CLASS NAME>.<METHOD NAME>
      *
      * CREATE FUNCTION with the designated method from the given class.
@@ -733,6 +754,17 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * Match statement against pattern for create procedure as SQL
+     * with allow/partition clauses with multiple statements
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchCreateMultiStmtProcedureAsSQL(String statement)
+    {
+        return PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL.matcher(statement);
+    }
+
+    /**
      * Match statement against pattern for create procedure as script
      * with allow/partition clauses
      * @param statement  statement to match against
@@ -752,6 +784,8 @@ public class SQLParser extends SQLPatternFactory
     {
         return PAT_CREATE_PROCEDURE_FROM_CLASS.matcher(statement);
     }
+
+
 
     /**
      * Match statement against the pattern for create function from method
