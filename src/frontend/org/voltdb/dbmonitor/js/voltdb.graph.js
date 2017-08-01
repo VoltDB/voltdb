@@ -458,6 +458,7 @@
             d3.selectAll("#chartProcessingTimeAnalysis .nv-bar").on('click',
                 function(data){
                     $("#hidProcedureName").html(data.label);
+                    $("#hidPartitionType").html(data.type);
                     $('#showAnalysisCombinedDetails').trigger("click");
                 }
             );
@@ -639,12 +640,6 @@
 
         this.initializeCombinedDetailGraph = function(){
             nv.addGraph(function() {
-                ChartCombinedDetailAnalysis.x(function(d) {
-                    if(d.label.length > 20)
-                        return d.label.substring(0,20) + ".."
-                    return  d.label
-                  }).y(function(d) { return d.value }).height(barHeight)
-                  .showValues(true);
                 ChartCombinedDetailAnalysis.valueFormat(d3.format(',.3f'));
                 ChartCombinedDetailAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
@@ -736,16 +731,39 @@
         }
 
         this.RefreshCombinedDetailGraph = function(dataCombined){
+            ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+            if($("#hidPartitionType").html() == "Single Partitioned"){
+                ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(true).showControls(false);
+                getBarHeightAndSpacing(dataCombined[0].values, ChartCombinedDetailAnalysis);
+            }
+            else{
+                getBarHeightAndSpacing(dataCombined, ChartCombinedDetailAnalysis);
+                  ChartCombinedDetailAnalysis.x(function(d) {
+                    if(d.label.length > 20)
+                        return d.label.substring(0,20) + ".."
+                    return  d.label
+                  }).y(function(d) { return d.value }).height(barHeight)
+                  .showValues(true);
+            }
             ChartCombinedDetailAnalysis.update;
-            getBarHeightAndSpacing(dataCombined, ChartCombinedDetailAnalysis);
+
             ChartCombinedDetailAnalysis.height(barHeight);
             $("#divVisualizeCombinedDetail").css("height", barHeight-10);
             ChartCombinedDetailAnalysis.margin({"left": 80})
             dataCombinedDetailAnalysis[0]["values"] = dataCombined;
-            d3.select("#visualizeCombinedDetails")
+            if($("#hidPartitionType").html() == "Single Partitioned"){
+                d3.select("#visualizeCombinedDetails")
+                .datum(dataCombined)
+                .transition().duration(500)
+                .call(ChartCombinedDetailAnalysis);
+            }
+            else{
+                d3.select("#visualizeCombinedDetails")
                 .datum(dataCombinedDetailAnalysis)
                 .transition().duration(500)
                 .call(ChartCombinedDetailAnalysis);
+            }
+
             d3.select('#visualizeCombinedDetails > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
             .each(function(d,i){wordWrap(this, d, 110, -115, -8);});
             $("#visualizeCombinedDetails").find('.nvd3').attr("x",344);
