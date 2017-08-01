@@ -102,10 +102,11 @@ public class InternalConnectionHandler {
             String procName,
             Object...args)
     {
-        return callProcedure(user, isAdmin, timeout, cb, ntPriority, backPressurePredicate, procName, null, args);
+        return callProcedure(null, user, isAdmin, timeout, cb, ntPriority, backPressurePredicate, procName, args);
     }
 
     public boolean callProcedure(
+            String hostname,
             AuthUser user,
             boolean isAdmin,
             int timeout,
@@ -113,7 +114,6 @@ public class InternalConnectionHandler {
             boolean ntPriority,
             Function<Integer, Boolean> backPressurePredicate,
             String procName,
-            String hostname,
             Object...args)
     {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(procName, getCatalogContext());

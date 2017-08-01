@@ -330,10 +330,10 @@ public class HTTPClientInterface {
                     continuation.complete();
                     return;
                 }
-                success = callProcedure(authResult, queryTimeout, cb, procName, hostname, paramSet.toArray());
+                success = callProcedure(hostname, authResult, queryTimeout, cb, procName, paramSet.toArray());
             }
             else {
-                success = callProcedure(authResult, queryTimeout, cb, procName, hostname);
+                success = callProcedure(hostname, authResult, queryTimeout, cb, procName);
             }
             if (!success) {
                 ok(jsonp, "Server is not accepting work at this time.", response);
@@ -356,12 +356,12 @@ public class HTTPClientInterface {
         }
     }
 
-    public boolean callProcedure(final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, String hostname, Object...args) {
-        return m_invocationHandler.get().callProcedure(ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, hostname, args);
+    public boolean callProcedure(String hostname, final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
+        return m_invocationHandler.get().callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, args);
     }
 
-    public boolean callProcedure(final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, String hostname, Object...args) {
-        return m_invocationHandler.get().callProcedure(user, adminMode, timeout, cb, false, null, procName, hostname, args);
+    public boolean callProcedure(String hostname, final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, Object...args) {
+        return m_invocationHandler.get().callProcedure(hostname, user, adminMode, timeout, cb, false, null, procName, args);
     }
 
     Configuration getVoltDBConfig() {
