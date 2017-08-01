@@ -64,8 +64,9 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         m_commitPolicy = properties.getProperty("commit.policy");
         m_consumerTimeoutMillis = Integer.parseInt(properties.getProperty("socket.timeout.ms", "30000"));
         m_maxMessageFetchSize =  Integer.parseInt(properties.getProperty("fetch.message.max.bytes", "65536"));
-        m_uri = createURI(m_brokers, m_topics, m_groupId);
+
         validate();
+        m_uri = createURI(m_brokers, m_topics, m_groupId);
     }
 
     public Kafka10StreamImporterConfig(Kafka10LoaderCLIArguments args, FormatterBuilder formatterBuilder) {
@@ -77,13 +78,15 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
         m_commitPolicy = args.commitpolicy;
         m_consumerTimeoutMillis = args.timeout;
         m_maxMessageFetchSize = args.buffersize;
-        m_uri = createURI(m_brokers, m_topics, m_groupId);
+
         validate();
+        m_uri = createURI(m_brokers, m_topics, m_groupId);
+
     }
 
     private void validate() {
 
-        if (m_topics.isEmpty()) {
+        if (m_topics == null || m_topics.isEmpty()) {
             throw new IllegalArgumentException("Missing topic(s).");
         }
         if (m_table == null && m_procedure == null) {
@@ -106,7 +109,6 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     }
 
     private URI createURI(String brokers, String topics, String groupId) {
-        // NEEDSWORK: Something like this would be better: kafka://<kafka-server>/<kafka-topic>/groupid
         try {
             return  new URI("kafka://" + m_brokerKey + "/" + KafkaImporterUtils.getNormalizedKey(topics) + "/" + groupId);
         }
