@@ -295,7 +295,7 @@ public class ImportManager implements ChannelChangeCallback {
     public synchronized void resume(OperationMode mode) {
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
         m_self.create(catalogContext);
-        m_self.readyForDataInternal(catalogContext, m_messenger, mode);
+        m_self.readyForDataInternal(mode);
     }
 
     public synchronized void updateCatalog(CatalogContext catalogContext, HostMessenger messenger) {
@@ -303,19 +303,19 @@ public class ImportManager implements ChannelChangeCallback {
             Map<String, ImportConfiguration> newProcessorConfig = loadNewConfigAndBundles(catalogContext);
             if (m_processorConfig == null || !m_processorConfig.equals(newProcessorConfig)) {
                 restartImporters(newProcessorConfig);
-                readyForDataInternal(catalogContext, messenger, VoltDB.instance().getMode());
+                readyForDataInternal(VoltDB.instance().getMode());
             }
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error updating importers with new DDL and/or deployment.", true, e);
         }
     }
 
-    public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
+    public synchronized void readyForData() {
         m_serverStarted = true; // Note that server is ready, so that we know whether to process catalog updates
-        readyForDataInternal(catalogContext, messenger, VoltDB.instance().getMode());
+        readyForDataInternal(VoltDB.instance().getMode());
     }
 
-    public synchronized void readyForDataInternal(CatalogContext catalogContext, HostMessenger messenger, OperationMode newOperationMode) {
+    public synchronized void readyForDataInternal(OperationMode newOperationMode) {
         if (!m_serverStarted) {
             if (importLog.isDebugEnabled()) {
                 importLog.debug("Server not started. Not sending readyForData to ImportProcessor");
@@ -330,7 +330,7 @@ public class ImportManager implements ChannelChangeCallback {
 
         if (newOperationMode != OperationMode.PAUSED) {
             //Tell import processors and in turn ImportHandlers that we are ready to take in data.
-            m_processor.get().readyForData(catalogContext, messenger);
+            m_processor.get().readyForData();
         }
     }
 

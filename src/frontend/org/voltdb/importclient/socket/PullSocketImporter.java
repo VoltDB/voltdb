@@ -75,18 +75,18 @@ public class PullSocketImporter extends AbstractImporter {
         return "PullSocketImporter";
     }
 
-    private static void closeSocket(Socket socket) {
+    private void closeSocket(Socket socket) {
         if (socket != null) {
             try {
                 socket.close();
             } catch (IOException unexpected){
+                error(unexpected, "Unexpected exception closing socket");
             }
         }
     }
 
     /** Set the socket to newSocket, unless we're shutting down.
      * The most reliable way to ensure the importer thread exits is to close its socket.
-     * This method ensures that is always done safely.
      * @param newSocket socket to replace any previous socket. May be null.
      */
     private void replaceSocket(Socket newSocket) {

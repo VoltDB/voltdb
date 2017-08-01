@@ -45,7 +45,9 @@ import org.voltdb.EELibraryLoader;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
-import org.voltdb.client.*;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
@@ -2250,18 +2252,6 @@ public class LocalCluster extends VoltServerConfig {
         // since staged catalog tests use multi-node clusters with node specific voltdbroots.
         templateCmdLine.pathToDeployment(voltProjectBuilder.compileDeploymentOnly(m_voltdbroot, m_hostCount, m_siteCount, m_kfactor, m_clusterId));
         m_compiled = true;
-    }
-
-    public String recompileAndUpdateDeployment(Client client, VoltProjectBuilder projectBuilder) throws IOException, ProcCallException, AssertionError {
-        assert m_compiled;
-        String newDeploymentLocation = projectBuilder.compileDeploymentOnly(m_voltdbroot, m_hostCount, m_siteCount, m_kfactor, m_clusterId);
-        File newDeployment = new File(newDeploymentLocation);
-        assert newDeployment.exists();
-        ClientResponse response = client.updateApplicationCatalog(null, newDeployment);
-        if (response.getStatus() != ClientResponse.SUCCESS) {
-            throw new AssertionError("Updating deployment did not succeed");
-        }
-        return newDeploymentLocation;
     }
 
     public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
