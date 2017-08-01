@@ -199,10 +199,19 @@ public class UserDefinedTestFunctions {
 
     /** Usually just returns the input value; but certain special input values
      *  (generally between -100 and -120) trigger an exception to be thrown,
+     *  or special VoltDB "null" values to be returned. When <i>useTrueNullValue</i>
+     *  is true, and the special input value -100 is given, a true Java <b>null</b>
+     *  is returned. */
+    private Double testExceptions(Double value, boolean useTrueNullValue) {
+        Number result = testExceptionsByValue(value, useTrueNullValue);
+        return (result == null ? null : result.doubleValue());
+    }
+
+    /** Usually just returns the input value; but certain special input values
+     *  (generally between -100 and -120) trigger an exception to be thrown,
      *  or special VoltDB "null" values to be returned. */
     private Double testExceptions(Double value) {
-        Number result = testExceptionsByValue(value);
-        return (result == null ? null : result.doubleValue());
+        return testExceptions(value, false);
     }
 
     /** Usually just returns the input value; but certain special input values
@@ -315,7 +324,7 @@ public class UserDefinedTestFunctions {
         // We don't bother to "test" Latitude, because it must be between -90
         // and 90, so it cannot have any of the "interesting" values, such as
         // -100, -101, etc.
-        Double longitude = testExceptions(value.getLongitude());
+        Double longitude = testExceptions(value.getLongitude(), true);
         return (longitude == null ? null : new GeographyPointValue(Math.min(180, Math.max(-180, longitude)), value.getLatitude() ) );
     }
 
@@ -335,7 +344,7 @@ public class UserDefinedTestFunctions {
         for (int i=0; i < rings.size(); i++) {
             List<GeographyPointValue> ring = rings.get(i);
             for (int j=0; j < ring.size(); j++) {
-                if (testExceptions(ring.get(j).getLongitude()) == null) {
+                if (testExceptions(ring.get(j).getLongitude(), true) == null) {
                     return null;
                 }
             }
@@ -587,8 +596,8 @@ public class UserDefinedTestFunctions {
         // We don't bother to "test" Latitude, because it must be between -90
         // and 90, so it cannot have any of the "interesting" values, such as
         // -101, -102, etc.
-        Double p_long = testExceptions(p.getLongitude());
-        Double q_long = testExceptions(q.getLongitude());
+        Double p_long = testExceptions(p.getLongitude(), true);
+        Double q_long = testExceptions(q.getLongitude(), true);
         if (p_long == null || q_long == null) {
             return null;
         }
