@@ -25,7 +25,7 @@ public class BaseKafkaImporterConfig {
     public static final int KAFKA_DEFAULT_BROKER_PORT = 9092;
 
     // We don't allow period in topic names because we construct URIs using it
-    protected static final Pattern TOPIC_LEGAL_NAMES_PATTERN = Pattern.compile("[a-zA-Z0-9\\_-]+");
-    protected static final int TOPIC_MAX_NAME_LENGTH = 255;
+    public static final Pattern TOPIC_LEGAL_NAMES_PATTERN = Pattern.compile("[a-zA-Z0-9\\_-]+");
+    public static final int TOPIC_MAX_NAME_LENGTH = 255;
 
 }

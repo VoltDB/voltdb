@@ -42,7 +42,6 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
     private String m_topics;
     private String m_groupId;
     private String m_procedure;
-    private String m_table = null; // NEEDSWORK: Implement
     private FormatterBuilder m_formatterBuilder;
     private int m_consumerTimeoutMillis;
     private String m_commitPolicy = null;
@@ -86,11 +85,11 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
 
     private void validate() {
 
-        if (m_topics == null || m_topics.isEmpty()) {
+        if (m_topics == null || m_topics.trim().isEmpty()) {
             throw new IllegalArgumentException("Missing topic(s).");
         }
-        if (m_table == null && m_procedure == null) {
-            throw new IllegalArgumentException("Must supply either a table procedure name.");
+        if (m_procedure == null || m_procedure.trim().isEmpty()) {
+            throw new IllegalArgumentException("Missing procedure name.");
         }
 
         List<String> topicList = Arrays.asList(m_topics.split("\\s*,\\s*"));
@@ -128,6 +127,10 @@ public class Kafka10StreamImporterConfig extends BaseKafkaImporterConfig impleme
                 brokerListString = StringUtils.join(brokerList.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
             }
             else {
+
+                if (brokers == null || brokers.isEmpty()) {
+                    throw new IllegalArgumentException("Kafka broker configuration is missing.");
+                }
                 brokerListString = brokers.trim();
                 brokerList = Arrays.stream(brokerListString.split(",")).map(s -> HostAndPort.fromString(s)).collect(Collectors.toList());
             }

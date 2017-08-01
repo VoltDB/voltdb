@@ -16,12 +16,23 @@
  */
 package org.voltdb.importclient.kafka10;
 
+import java.io.PrintWriter;
+
 import org.voltdb.importclient.kafka.util.BaseKafkaLoaderCLIArguments;
 
 public class Kafka10LoaderCLIArguments extends BaseKafkaLoaderCLIArguments {
 
     @Option(shortOpt = "n", desc = "Number of Kafka consumers.")
     public int consumercount = 1;
+
+    public Kafka10LoaderCLIArguments(PrintWriter pw) {
+        super(pw);
+        this.warningWriter = pw;
+    }
+
+    public Kafka10LoaderCLIArguments() {
+        super();
+    }
 
     public int getConsumerCount() {
         return consumercount;
