@@ -37,6 +37,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -1350,15 +1351,15 @@ public class AbstractTopology {
      * @param hostId the given hostId
      * @return all the hostIds in the partition group
      */
-    public Set<Integer> getPartitionGroupHostIds(int hostId) {
-        Set<Integer> partitionGroupHostIds = Sets.newHashSet();
+    public Set<Integer> getPartitionGroupPeers(int hostId) {
+        Set<Integer> peers = Sets.newHashSet();
         for (Integer pid : getPartitionIdList(hostId)) {
             Partition p = partitionsById.get(pid);
             if (p != null) {
-                partitionGroupHostIds.addAll(p.hostIds);
+                peers.addAll(p.hostIds);
             }
         }
-        return partitionGroupHostIds;
+        return peers;
     }
 
     public List<Integer> getPartitionIdList(int hostId) {
