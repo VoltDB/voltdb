@@ -41,7 +41,6 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -97,7 +96,6 @@ import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.utils.VersionChecker;
 import org.voltcore.zk.CoreZK;
@@ -2096,21 +2094,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }, 0, StatsManager.POLL_INTERVAL, TimeUnit.MILLISECONDS));
 
-        // test periodic signal and ratelimitedlogger
-        m_periodicWorks.add(scheduleWork(new Runnable() {
-            @Override
-            public void run() {
-                // consoleLog.info(new Timestamp(System.currentTimeMillis()) + " You are in the console");
-            	String messageFormat = new Timestamp(System.currentTimeMillis()) + " You are in the console";
-                RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
-                                                   10000,
-                                                   TimeUnit.MILLISECONDS,
-                                                   consoleLog,
-                                                   Level.INFO,
-                                                   messageFormat);
-            }
-        }, 0, 1000, TimeUnit.MILLISECONDS));
-
         // clear login count
         m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
@@ -2122,7 +2105,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         public void run()
                         {
                             int timestamp = (int)(System.currentTimeMillis() / 1000);
-                            ((RealVoltDB)VoltDB.instance()).getFLC().checkCounter(timestamp);
+                            m_flc.checkCounter(timestamp);
                         }
                     });
                 }
@@ -4691,7 +4674,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.error(sb.toString());
     }
 
-    public FailedLoginCounter getFLC() {
-        return m_flc;
+    public void logMessageToFLC(long timestampMilis, String user) {
+    	m_flc.logMessage(timestampMilis, user);
     }
 }

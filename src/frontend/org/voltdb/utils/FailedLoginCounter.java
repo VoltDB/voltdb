@@ -56,15 +56,12 @@ public class FailedLoginCounter {
         return m_userFailedAttempts;
     }
 
-
-
     public int getCount(String user) {
         if (m_userFailedAttempts.containsKey(user)) {
             return m_userFailedAttempts.get(user);
         }
         return 0;
     }
-
 
     public void logMessage(long timestampMilis, String user) {
         checkCounter((int)timestampMilis/1000);
@@ -79,16 +76,17 @@ public class FailedLoginCounter {
             bucket.m_userFailedAttempts.put(user,bucketCount);
         }
         int totalCount = m_userFailedAttempts.getOrDefault(user,0) + 1;
-        String messageFormat = "user "+ user +" failed to authenticate " + totalCount + " times in last minute";
+        String messageFormat = "user %s failed to authenticate %d times in last minute";
         RateLimitedLogger.tryLogForMessage(timestampMilis,
-                10000,
+                ONE_MINUTE_IN_MILLIS,
                 TimeUnit.MILLISECONDS,
                 authLog,
                 Level.WARN,
-                messageFormat);
+                messageFormat,
+                user,
+                totalCount);
         m_userFailedAttempts.put(user,totalCount);
     }
-
 
     public void checkCounter(int timestamp) {
         while (!m_timeBucketQueue.isEmpty() && m_timeBucketQueue.peek().m_ts < timestamp) {
