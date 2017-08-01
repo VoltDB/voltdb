@@ -441,7 +441,7 @@ public class TestVoltProcedure extends TestCase {
         NullProcedureWrapper wrapper = new LongProcedure();
         ProcedureRunner runner = new ProcedureRunner(
                 wrapper, site, null,
-                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()), null);
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()));
 
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L);
         assertNotNull(agent.m_selector);
@@ -469,7 +469,7 @@ public class TestVoltProcedure extends TestCase {
         GetClusterIdProcedure gcip = new GetClusterIdProcedure();
         ProcedureRunner runner = new ProcedureRunner(
                 gcip, site, null,
-                VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()), null);
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()));
         runner.setupTransaction(null);
         ClientResponse r = runner.call((Object) null);
         assertEquals(expectedClusterId, gcip.clusterId);
@@ -491,7 +491,7 @@ public class TestVoltProcedure extends TestCase {
         }
         ProcedureRunner runner = new ProcedureRunner(
                 wrapper, site, null,
-                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()), null);
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()));
 
         runner.setupTransaction(null);
         return runner.call(args);

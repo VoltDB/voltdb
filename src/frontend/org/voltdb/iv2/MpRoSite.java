@@ -27,7 +27,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
@@ -228,14 +227,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle,
+                boolean requiresSnapshotIsolation, long uniqueId, long spHandle, boolean isReplay,
                 boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
-        public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+        public boolean updateSettings(CatalogContext context)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -611,7 +610,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
-    public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
+    public boolean updateCatalog(String diffCmds, CatalogContext context,
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");

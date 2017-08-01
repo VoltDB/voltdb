@@ -39,7 +39,6 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DRLogSegmentId;
@@ -356,7 +355,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public byte[] getDeploymentHash() {
-            return m_context.deploymentHash;
+            return m_context.getDeploymentHash();
         }
 
         @Override
@@ -393,20 +392,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation,
+                boolean requiresSnapshotIsolation,
                 long uniqueId, long spHandle,
+                boolean isReplay,
                 boolean requireCatalogDiffCmdsApplyToEE,
                 boolean requiresNewExportGeneration)
         {
-            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation,
-                    false, uniqueId, spHandle,
+            return Site.this.updateCatalog(diffCmds, context, requiresSnapshotIsolation,
+                    false, uniqueId, spHandle, isReplay,
                     requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
         }
 
         @Override
-        public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+        public boolean updateSettings(CatalogContext context)
         {
-            return Site.this.updateSettings(context, csp);
+            return Site.this.updateSettings(context);
         }
 
         @Override
@@ -637,7 +637,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_rejoinState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
-        m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
+        m_startupConfig = new StartupConfig(serializedCatalog, context.m_genId);
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_spHandleForSnapshotDigest = m_lastCommittedSpHandle;
         m_currentTxnId = Long.MIN_VALUE;
@@ -860,13 +860,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             String errmsg = "Site: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) +
                 " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
+            hostLog.error(errmsg);
+
+            for (StackTraceElement ste: t.getStackTrace()) {
+                hostLog.error(ste.toString());
+            }
+
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
 
         try {
             shutdown();
         } finally {
-            CompressionService.releaseThreadLocal();        }
+            CompressionService.releaseThreadLocal();
+        }
     }
 
     ParticipantTransactionState global_replay_mpTxn = null;
@@ -1502,8 +1509,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
-    public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
+    public boolean updateCatalog(String diffCmds, CatalogContext context,
             boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle,
+            boolean isReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration)
     {
@@ -1511,7 +1519,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
-        m_loadedProcedures.loadProcedures(m_context, csp, false);
+        m_loadedProcedures.loadProcedures(m_context, isReplay);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs
@@ -1567,7 +1575,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         m_ee.quiesce(m_lastCommittedSpHandle);
-        m_ee.updateCatalog(m_context.m_ccrTime, requiresNewExportGeneration, diffCmds);
+        m_ee.updateCatalog(m_context.m_genId, requiresNewExportGeneration, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
@@ -1583,10 +1591,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * @param csp catalog specific planner
      * @return true if it succeeds
      */
-    public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp) {
+    public boolean updateSettings(CatalogContext context) {
         m_context = context;
         // here you could bring the timeout settings
-        m_loadedProcedures.loadProcedures(m_context, csp);
+        m_loadedProcedures.loadProcedures(m_context);
         return true;
     }
 
@@ -1709,6 +1717,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
     }
 
+    @Override
     public void setDRStreamEnd(long spHandle, long uniqueId) {
         generateDREvent(
                 EventType.DR_STREAM_END, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);

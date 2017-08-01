@@ -187,16 +187,13 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         final long retryInterval = 10; // 10 seconds
 
         while(remainingWaitTime > 0) {
-            VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker);
-
-            if (m_messenger.getZK().exists(VoltZK.uacActiveBlocker, false) == null) {
+            String blockerError = VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker,
+                                                                    REJOINLOG, "node rejoin");
+            if (blockerError == null) {
                 return;
             }
 
-            // uac zk blocker exists, rejoin node should wait to watch its stat
-            VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
-
-            REJOINLOG.info(String.format("Rejoin node will wait %d seconds for @UpdateApplicationCatalog to finish",
+            REJOINLOG.info(String.format("Rejoin node will wait %d seconds for catalog update or elastic join to finish",
                     retryInterval));
 
             try {
@@ -207,8 +204,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             remainingWaitTime -= retryInterval;
         }
 
-        VoltDB.crashLocalVoltDB("Rejoin node is timed out " + maxWaitTime + " seconds waiting for @UpdateApplicationCatalog, "
-                + "please retry node rejoin later manually.");
+        VoltDB.crashLocalVoltDB("Rejoin node is timed out " + maxWaitTime +
+                " seconds waiting for catalog update or elastic join, please retry node rejoin later manually.");
     }
 
     @Override
