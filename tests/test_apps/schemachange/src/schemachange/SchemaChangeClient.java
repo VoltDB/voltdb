@@ -541,7 +541,9 @@ public class SchemaChangeClient {
 
                 // create verify procedure
                 batch.add("CREATE PROCEDURE FROM CLASS %s", this.newSchema.verifyProc.getName());
-                if (this.newSchema.viewRep != null) {
+                // this view ddl can't be used if the table already contains data, only use it
+                // on empty tables
+                if (this.newSchema.viewRep != null && this.start == 0 ) {
                     batch.add(this.newSchema.viewRep.ddlForView());
                 }
 

@@ -18,7 +18,6 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -244,10 +243,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
 
             //Always get deployment after its adjusted.
-            retval.deploymentString = CatalogUtil.getDeployment(dt, true);
+            String newDeploymentString = CatalogUtil.getDeployment(dt, true);
+            retval.deploymentBytes = newDeploymentString.getBytes(Constants.UTF8ENCODING);
+
             // make deployment hash from string
-            retval.deploymentHash =
-                    CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
+            retval.deploymentHash = CatalogUtil.makeDeploymentHash(retval.deploymentBytes);
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify
@@ -398,10 +398,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * Check the results map from every host and return error message if needed.
      * @return  A String describing the error messages. If all hosts return success, NULL is returned.
      */
-    protected String verifyAndWriteCatalogJar(byte[] catalogBytes) {
+    protected String verifyAndWriteCatalogJar(CatalogChangeResult ccr)
+    {
         String procedureName = "@VerifyCatalogAndWriteJar";
+        String diffCommands = Encoder.decodeBase64AndDecompress(ccr.encodedDiffCommands);
+
         CompletableFuture<Map<Integer,ClientResponse>> cf =
-                callNTProcedureOnAllHosts(procedureName, catalogBytes);
+                callNTProcedureOnAllHosts(procedureName, ccr.catalogBytes, diffCommands,
+                        ccr.catalogHash, ccr.deploymentBytes);
 
         Map<Integer, ClientResponse> resultMapByHost = null;
         String err;
@@ -518,9 +522,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
 
         // write the new catalog to a temporary jar file
-        errMsg = verifyAndWriteCatalogJar(ccr.catalogBytes);
+        errMsg = verifyAndWriteCatalogJar(ccr);
         if (errMsg != null) {
-            hostLog.error("Catalog jar verification and/or jar writes faile. " + errMsg);
+            hostLog.error("Catalog jar verification and/or jar writes failed: " + errMsg);
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
@@ -538,12 +542,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
         long genId = getNextGenerationId();
         try {
-            byte[] deploymentBytes = ccr.deploymentString.getBytes("UTF-8");
             CatalogUtil.updateCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId,
-                    ccr.catalogBytes, ccr.catalogHash, deploymentBytes);
-        } catch (UnsupportedEncodingException e) {
-            errMsg = "error converting deployment string to bytes";
-            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+                    ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes);
         } catch (KeeperException | InterruptedException e) {
             errMsg = "error writing catalog bytes on ZK";
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
@@ -552,15 +552,15 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // update the catalog jar
         return callProcedure("@UpdateCore",
                              ccr.encodedDiffCommands,
-                             ccr.catalogHash,
-                             ccr.catalogBytes,
                              ccr.expectedCatalogVersion,
                              genId,
-                             ccr.deploymentString,
+                             ccr.catalogBytes,
+                             ccr.catalogHash,
+                             ccr.deploymentBytes,
+                             ccr.deploymentHash,
                              ccr.tablesThatMustBeEmpty,
                              ccr.reasonsForEmptyTables,
                              ccr.requiresSnapshotIsolation ? 1 : 0,
-                             ccr.deploymentHash,
                              ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
                              ccr.hasSchemaChange ?  1 : 0,
                              ccr.requiresNewExportGeneration ? 1 : 0);
