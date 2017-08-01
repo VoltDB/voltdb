@@ -760,6 +760,11 @@ public class TestVoltCompiler extends TestCase {
                   + "AS begin select * from books where cash = ?; "
                   + "select * from books; end");
 
+        // multi statement proc with no space after semi colons
+        tester.runtest("create procedure multifoo "
+                  + "AS begin select * from books where cash = ?;"
+                  + "select * from books;end");
+
         // multi statement proc with partition
         tester.runtest("create procedure multifoo "
                 + "PARTITION on table books COLUMN cash PARAMETER 0 "
