@@ -2098,7 +2098,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_periodicWorks.add(scheduleWork(new Runnable() {
             @Override
             public void run() {
-                ScheduledExecutorService es = VoltDB.instance().getSES(true);
+                ScheduledExecutorService es = VoltDB.instance().getSES(false);
                 if (es != null && !es.isShutdown()) {
                     es.submit(new Runnable() {
                         @Override
