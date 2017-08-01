@@ -864,7 +864,7 @@ public class TestVoltCompiler extends TestCase {
         tester.runtest("create table R (begin int);"
                 + "create procedure p as begin "
                 + "insert into R values(?); "
-                + "select begin from R; "
+                + "select begin from R;"
                 + "end");
 
         // with comments
@@ -873,7 +873,7 @@ public class TestVoltCompiler extends TestCase {
                 + "begin --one\n"
                 + "select * from t;"
                 + "select * from t where f = 'foo';"
-                + "select * from t where f = 'begin' or f = 'END'; "
+                + "select * from t where f = 'begin' or f = 'END';"
                 + "end");
 
         // with case
