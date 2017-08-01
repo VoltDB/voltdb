@@ -286,6 +286,7 @@ public class TestSqlCmdInterface
             // TODO Auto-generated catch block
             e1.printStackTrace();
         }
+        // code is updated now so that we do not have a separate statement for block comment
         int blockCommentCount = 0;
         try {
             Pattern regex = Pattern.compile("(?:/\\*.*\\*/)", Pattern.DOTALL | Pattern.MULTILINE);
@@ -312,9 +313,11 @@ public class TestSqlCmdInterface
         while(opnScanner.hasNext()) {
             String line = opnScanner.nextLine();
             // To filter out sql comments starting with '--'
-            // Note that currently, we only filter out the comments lines with
+            // Note that currently, we filter out the comments lines with
             // leading '--'. For instance:
             // 1) --this commenting line will be filtered out
+            // and statements starting with C style block comments
+            // 2) /* comments will be removed */ select * from t;
             if (line.matches("--.*")) {
                 // The value of numOfQueries hides in a special structured comment
                 if (line.matches("^--num=\\d+$")) {
@@ -486,8 +489,8 @@ public class TestSqlCmdInterface
         List<String> parsed = SQLLexer.splitStatements(qryStr).completelyParsedStmts;
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + numOfQry + "\n";
-        err1 += "Actual # of queries: " + (parsed.size() - blockCommentCount) + "\n";
-        assertEquals(msg+err1, numOfQry + blockCommentCount, parsed.size());
+        err1 += "Actual # of queries: " + parsed.size() + "\n";
+        assertEquals(msg+err1, numOfQry, parsed.size());
         String parsedString = Joiner.on(";").join(parsed) + ";";
         String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
         err2 += "Actual queries: \n#" + parsedString + "#\n";
