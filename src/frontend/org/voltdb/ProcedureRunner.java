@@ -435,9 +435,11 @@ public class ProcedureRunner {
             // single statement only work - now extended to multiple statements
             // (this could be made faster, but with less code re-use)
             else {
-                // assert(m_catProc.getStatements().size() == 1);
+                 assert(m_catProc.getStatements().size() >= 1);
                 int curParamOffset = 0;
                 try {
+                    // get all the statements and their corresponding parameters
+                    // the parameter offset ensures the right parameters are obtained for each statement
                     for (int i = 0; i < m_catProc.getStatements().size(); i++) {
                         QueuedSQL curStmt = m_sqlStmts.get(i);
                         int numStmtParams = curStmt.stmt.statementParamTypes.length;
