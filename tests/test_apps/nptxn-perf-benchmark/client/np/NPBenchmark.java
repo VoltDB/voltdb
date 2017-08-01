@@ -91,8 +91,8 @@ class NPBenchmark {
         @Option(desc = "Data skew ratio")
         double skew = 0.2;
 
-        @Option(desc = "Number of threads to run clients")
-        int threads = 1;
+        @Option(desc = "Number of clients for the test")
+        int clientscount = 1;
 
         @Override
         public void validate() {
@@ -115,7 +115,7 @@ class NPBenchmark {
                 exitWithMessageAndUsage("Invalid duration...");
             }
 
-            if (threads <= 0) {
+            if (clientscount <= 0) {
                 exitWithMessageAndUsage("Invalid client number...");
             }
         }
@@ -138,11 +138,11 @@ class NPBenchmark {
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
 
-        clients = new Client[config.threads];
-        periodicStatsContexts = new ClientStatsContext[config.threads];
-        fullStatsContexts = new ClientStatsContext[config.threads];
+        clients = new Client[config.clientscount];
+        periodicStatsContexts = new ClientStatsContext[config.clientscount];
+        fullStatsContexts = new ClientStatsContext[config.clientscount];
 
-        for (int i = 0; i < config.threads; i++) {
+        for (int i = 0; i < config.clientscount; i++) {
             clients[i] = ClientFactory.createClient(clientConfig);
             periodicStatsContexts[i] = clients[i].createStatsContext();
             fullStatsContexts[i] = clients[i].createStatsContext();
@@ -239,9 +239,9 @@ class NPBenchmark {
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
-        final CountDownLatch connections = new CountDownLatch(serverArray.length * config.threads);
+        final CountDownLatch connections = new CountDownLatch(serverArray.length * config.clientscount);
 
-        for (int i = 0; i < config.threads; i++) {
+        for (int i = 0; i < config.clientscount; i++) {
             final int index = i;
             // use a new thread to connect to each server
             for (final String server : serverArray) {
@@ -287,7 +287,7 @@ class NPBenchmark {
 
         long totalInvoc = 0;
 
-        for (int i = 0; i < config.threads; i++) {
+        for (int i = 0; i < config.clientscount; i++) {
             ClientStats stats = periodicStatsContexts[i].fetchAndResetBaseline().getStats();
 
             thruput += stats.getTxnThroughput();
@@ -329,7 +329,7 @@ class NPBenchmark {
 
         long totalInvoc = 0;
 
-        for (int i = 0; i < config.threads; i++) {
+        for (int i = 0; i < config.clientscount; i++) {
             ClientStats stats = fullStatsContexts[i].fetchAndResetBaseline().getStats();
 
             thruput += stats.getTxnThroughput();
@@ -390,12 +390,12 @@ class NPBenchmark {
 
             fw.append(String.format("%d,%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d\n",
                 0,
-                config.duration,
+                config.duration * 1000,
                 totalInvoc,
                 thruput,
-                k99pLatcy,
-                k95pLatcy,
                 avgLatcy,
+                k95pLatcy,
+                k99pLatcy,
                 internalLatcy,
                 0.0,
                 0.0,
@@ -440,7 +440,7 @@ class NPBenchmark {
         double count = ((double) config.cardcount) * (1.0 - config.skew);
         int offset = (int) (((double) config.cardcount) / 2.0 - count / 2.0);
 
-        for (int num = 0; num < config.threads; num++) {
+        for (int num = 0; num < config.clientscount; num++) {
             // SP transaction
             if (rand.nextDouble() < config.sprate) {
                 String pan1 = generate16DString(rand.nextInt(config.cardcount));
@@ -523,7 +523,7 @@ class NPBenchmark {
         }
 
         // reset the stats after warmup
-        for (int i = 0; i < config.threads; i++) {
+        for (int i = 0; i < config.clientscount; i++) {
             fullStatsContexts[i].fetchAndResetBaseline();
             periodicStatsContexts[i].fetchAndResetBaseline();
         }
@@ -544,7 +544,7 @@ class NPBenchmark {
         timer.cancel();
 
         // block until all outstanding txns return
-        for (int i = 0; i < config.threads; i++) {
+        for (int i = 0; i < config.clientscount; i++) {
             clients[i].drain();
         }
 
@@ -552,7 +552,7 @@ class NPBenchmark {
         printResults();
 
         // close down the client connections
-        for (int i = 0; i < config.threads; i++) {
+        for (int i = 0; i < config.clientscount; i++) {
             clients[i].close();
         }
     }
