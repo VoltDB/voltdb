@@ -297,6 +297,14 @@ public class TestSplitSQLStatements {
                 + "select * from r where f = 'begin' or f = 'END';"
                 + "end;";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
+
+        sql = "select * from books;";
+        String sql1 = "select title, case when cash > 100.00 "
+                + "then case when cash > 1000.00 "
+                + "then 'Super Expensive' else 'Pricy' end "
+                + "'Expensive' else 'Cheap' end from books;";
+        checkSplitter(sql + "/* comments will not exist if they are at beginning of statements */" + sql1,
+                sql.substring(0, sql.length() - 1), sql1.substring(0, sql1.length() - 1));
     }
 
     @Test

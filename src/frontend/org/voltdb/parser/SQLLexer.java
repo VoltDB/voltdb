@@ -389,12 +389,8 @@ public class SQLLexer extends SQLPatternFactory
                     // Move past the comment end.
                     iCur += sCommentEnd.length();
                     sCommentEnd = null;
-                    // If the comment is the whole of the statement so far, terminate it
+                    // If the comment is the whole of the statement so far, do not add to output
                     if (statementIsComment) {
-                        String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-                        if (!statement.isEmpty()) {
-                            statements.add(statement);
-                        }
                         iStart = iCur;
                         statementIsComment = false;
                         inStatement = false;

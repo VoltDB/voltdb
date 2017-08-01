@@ -899,15 +899,15 @@ public class TestVoltCompiler extends TestCase {
                 + "end");
 
         // c style block comments
-//        tester.runtest("create procedure thisproc as "
-//                + "begin \n"
-//                + "select * from books; /*comment will still exist*/"
-//                + "select title, "
-//                + "case when cash > 100.00 then "
-//                + "case when cash > 1000.00 then 'Super Expensive' else 'Pricy' end "
-//                + "'Expensive' else 'Cheap' end "
-//                + "from books; "
-//                + "end");
+        tester.runtest("create procedure thisproc as "
+                + "begin \n"
+                + "select * from books; /*comment will still exist*/"
+                + "select title, "
+                + "case when cash > 100.00 then "
+                + "case when cash > 1000.00 then 'Super Expensive' else 'Pricy' end "
+                + "'Expensive' else 'Cheap' end "
+                + "from books; "
+                + "end");
 
         // case with no whitespace before it
         tester.runtest("create procedure thisproc as "
