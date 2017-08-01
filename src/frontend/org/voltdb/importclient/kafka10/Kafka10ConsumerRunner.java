@@ -45,12 +45,15 @@ public abstract class Kafka10ConsumerRunner implements Runnable {
     protected Kafka10StreamImporterConfig m_config;
     protected ImporterLifecycle m_lifecycle;
 
-    private static final VoltLogger m_log = new VoltLogger("KAFKA10IMPORTER");
+    private static final VoltLogger m_log = new VoltLogger("KAFKAIMPORTER");
 
     public Kafka10ConsumerRunner(ImporterLifecycle lifecycle, Kafka10StreamImporterConfig config, Consumer<byte[], byte[]> consumer) throws Exception {
         m_lifecycle = lifecycle;
         m_consumer = consumer;
         m_config = config;
+        if (config.getFormatterBuilder() != null) {
+            m_formatter = config.getFormatterBuilder().create();
+        }
     }
 
     ProcedureCallback procedureCallback = new ProcedureCallback() {

@@ -163,7 +163,7 @@
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/kafkastream.jar" basedir="${build.prod.dir}">
             <include name="org/voltdb/importclient/kafka/*.class"/>
-            <include name="org/voltdb/importclient/kafka/utils/*.class"/>
+            <include name="org/voltdb/importclient/kafka/util/*.class"/>
             <include name="org/voltdb/importclient/ImportBaseException.class"/>
             <zipgroupfileset dir="${base.dir}/lib/" includes="scala-library-2.11.5.jar" />
             <zipgroupfileset dir="${base.dir}/lib/" includes="scala-parser-combinators_2.11-1.0.2.jar" />
@@ -214,6 +214,7 @@
  	    </fileset>
  	    <fileset dir='${lib.dir}'> 
  	       <include name='felix.jar'/>
+ 	       <include name='commons-lang3-3.0.jar'/>
  	    </fileset>
  		<fileset refid="voltpro.classpath"/>
  	</path>
@@ -274,7 +275,7 @@
     <target name="kafkastream10">
  	    <javac  srcdir="src/frontend"
             destdir="${build.prod.dir}"
-            includes="org/voltdb/importclient/kafka10/**/*.java org/voltdb/importer/kafka/utils/*.java"
+            includes="org/voltdb/importclient/kafka10/**/*.java org/voltdb/importclient/kafka/util/*.java"
             encoding='UTF-8'
             debug='true'
             includeAntRuntime='false'>            
@@ -285,7 +286,7 @@
             <include name="org/voltdb/importclient/kafka/*.class"/>
             <include name="org/voltdb/importclient/*.class"/>
    	        <include name="org/voltdb/importclient/kafka10/*.class"/>
-  	        <include name="org/voltdb/importclient/kafka/utils/*.class"/>
+  	        <include name="org/voltdb/importclient/kafka/util/*.class"/>
    	        <include name="au/com/bytecode/opencsv_voltpatches/**/*.class"/>
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="kafka-clients-0.10.2.1.jar" />
             <zipgroupfileset dir="${base.dir}/third_party/java/jars" includes="snappy-java-1.1.2.6.jar" />

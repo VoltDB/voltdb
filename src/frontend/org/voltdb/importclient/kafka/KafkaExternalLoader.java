@@ -16,16 +16,10 @@
  */
 package org.voltdb.importclient.kafka;
 
-import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -33,11 +27,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.WatchedEvent;
-import org.apache.zookeeper_voltpatches.Watcher;
-import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -49,20 +38,16 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
-import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
+import org.voltdb.importclient.kafka.util.HostAndPort;
+import org.voltdb.importclient.kafka.util.KafkaImporterUtils;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.ImporterLogger;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
-import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.importer.formatter.FormatterBuilder;
-import org.voltdb.importer.formatter.builtin.VoltCSVFormatterFactory;
 import org.voltdb.utils.BulkLoaderErrorHandler;
 import org.voltdb.utils.CSVBulkDataLoader;
 import org.voltdb.utils.CSVDataLoader;
 import org.voltdb.utils.CSVTupleDataLoader;
 import org.voltdb.utils.RowWithMetaData;
-
-import kafka.cluster.Broker;
 
 /**
  * Import Kafka data into the database, using a remote Volt client and manual offset management.
@@ -304,7 +289,7 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         String brokerListString;
 
         if (!properties.zookeeper.trim().isEmpty()) {
-            brokerList = getBrokersFromZookeeper(properties.zookeeper, properties.zookeeperSessionTimeoutMillis);
+            brokerList = KafkaImporterUtils.getBrokersFromZookeeper(properties.zookeeper, properties.zookeeperSessionTimeoutMillis);
             brokerListString = StringUtils.join(brokerList.stream().map(s -> s.getHost() + ":" + s.getPort()).collect(Collectors.toList()), ",");
         }
         else {
@@ -313,57 +298,13 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         }
 
         // Derive the key from the list of broker URIs:
-        String brokerKey = KafkaStreamImporterConfig.getBrokerKey(brokerListString);
+        String brokerKey = KafkaImporterUtils.getNormalizedKey(brokerListString);
 
         // Create the input formatter:
-        FormatterBuilder builder = createFormatterBuilder(properties);
+        FormatterBuilder builder = FormatterBuilder.createFormatterBuilder(properties.formatterProperties);
 
         return KafkaStreamImporterConfig.getConfigsForPartitions(brokerKey, brokerList, properties.topic, properties.groupid,
                                                 properties.procedure, properties.timeout, properties.buffersize, properties.commitpolicy, builder);
-    }
-
-    /*
-     * Create a FormatterBuilder from the supplied arguments. If no formatter is specified by configuration, return a default CSV formatter builder.
-     */
-    private FormatterBuilder createFormatterBuilder(KafkaExternalLoaderCLIArguments properties) throws Exception {
-
-        FormatterBuilder builder;
-        Properties formatterProperties = m_args.formatterProperties;
-        AbstractFormatterFactory factory;
-
-        if (formatterProperties.size() > 0) {
-            String formatterClass = m_args.formatterProperties.getProperty("formatter");
-            String format = m_args.formatterProperties.getProperty("format", "csv");
-            Class<?> classz = Class.forName(formatterClass);
-            Class<?>[] ctorParmTypes = new Class[]{ String.class, Properties.class };
-            Constructor<?> ctor = classz.getDeclaredConstructor(ctorParmTypes);
-            Object[] ctorParms = new Object[]{ format, m_args.formatterProperties };
-
-            factory = new AbstractFormatterFactory() {
-                @Override
-                public Formatter create(String formatName, Properties props) {
-                    try {
-                        return (Formatter) ctor.newInstance(ctorParms);
-                    }
-                    catch (Exception e) {
-                        e.printStackTrace();
-                        return null;
-                    }
-
-                }
-            };
-            builder = new FormatterBuilder(format, formatterProperties);
-        }
-        else {
-            factory = new VoltCSVFormatterFactory();
-            Properties props = new Properties();
-            factory.create("csv", props);
-            builder = new FormatterBuilder("csv", props);
-        }
-
-        builder.setFormatterFactory(factory);
-        return builder;
-
     }
 
     /*
@@ -377,74 +318,9 @@ public class KafkaExternalLoader implements ImporterLifecycle, ImporterLogger {
         return client;
     }
 
-    /*
-     * Fetch the list of brokers from Zookeeper, and return a list of their URIs.
-     */
-    static private class ZooKeeperConnection {
 
-        private ZooKeeper zoo;
-        private boolean connected = false;
-        /*
-         * Connect to Zookeeper. Throws an exception if we can't connect for any reason.
-         */
-        public ZooKeeper connect(String host, int timeoutMillis) throws IOException, InterruptedException {
 
-            final CountDownLatch latch = new CountDownLatch(1);
-            Watcher w = new Watcher() {
-                @Override
-                public void process(WatchedEvent event) {
-                    if (event.getState() == KeeperState.SyncConnected) {
-                        connected = true;
-                        latch.countDown();
-                     }
-                }
-            };
 
-            try {
-                zoo = new ZooKeeper(host, timeoutMillis, w, new HashSet<Long>());
-                latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
-            }
-            catch (InterruptedException e) {
-            }
-
-            if (connected) {
-                return zoo;
-            }
-            else {
-                throw new RuntimeException("Could not connect to Zookeeper at host:" + host);
-            }
-
-        }
-
-        public void close() throws InterruptedException {
-            zoo.close();
-        }
-
-     }
-
-    private static List<HostAndPort> getBrokersFromZookeeper(String zookeeperHost, int timeoutMillis) throws InterruptedException, IOException, KeeperException {
-
-        ZooKeeperConnection zkConnection = new ZooKeeperConnection();
-
-        try {
-            ZooKeeper zk = zkConnection.connect(zookeeperHost, timeoutMillis);
-            List<String> ids = zk.getChildren("/brokers/ids", false);
-            ArrayList<HostAndPort> brokers = new ArrayList<HostAndPort>();
-
-            for (String id : ids) {
-                String brokerInfo = new String(zk.getData("/brokers/ids/" + id, false, null));
-                Broker broker = Broker.createBroker(Integer.valueOf(id), brokerInfo);
-                if (broker != null) {
-                    m_log.warn("Adding broker: " + broker.connectionString());
-                    brokers.add(new HostAndPort(broker.host(), broker.port()));
-                }
-            }
-            return brokers;
-        }
-        finally {
-            zkConnection.close();
-        }
-    }
 
     /*
      * Shut down, close connections, and clean up.

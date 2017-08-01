@@ -17,8 +17,11 @@
 
 package org.voltdb.importer.formatter;
 
+import java.lang.reflect.Constructor;
 import java.util.Objects;
 import java.util.Properties;
+
+import org.voltdb.importer.formatter.builtin.VoltCSVFormatterFactory;
 
 /**
  * FormatterBuilder will delegate the formatter creation to concrete formatter factory to
@@ -79,4 +82,48 @@ public class FormatterBuilder {
             && ((m_formatterProps == null && other.m_formatterProps == null) || m_formatterProps.equals(other.m_formatterProps))
             && ((m_formatterFactory == null && other.m_formatterFactory == null) || m_formatterFactory.equals(other.m_formatterFactory));
     }
+
+    /*
+     * Create a FormatterBuilder from the supplied arguments. If no formatter is specified by configuration, return a default CSV formatter builder.
+     */
+    public static FormatterBuilder createFormatterBuilder(Properties formatterProperties) throws Exception {
+
+        FormatterBuilder builder;
+        AbstractFormatterFactory factory;
+
+        if (formatterProperties.size() > 0) {
+            String formatterClass = formatterProperties.getProperty("formatter");
+            String format = formatterProperties.getProperty("format", "csv");
+            Class<?> classz = Class.forName(formatterClass);
+            Class<?>[] ctorParmTypes = new Class[]{ String.class, Properties.class };
+            Constructor<?> ctor = classz.getDeclaredConstructor(ctorParmTypes);
+            Object[] ctorParms = new Object[]{ format, formatterProperties };
+
+            factory = new AbstractFormatterFactory() {
+                @Override
+                public Formatter create(String formatName, Properties props) {
+                    try {
+                        return (Formatter) ctor.newInstance(ctorParms);
+                    }
+                    catch (Exception e) {
+                        e.printStackTrace();
+                        return null;
+                    }
+
+                }
+            };
+            builder = new FormatterBuilder(format, formatterProperties);
+        }
+        else {
+            factory = new VoltCSVFormatterFactory();
+            Properties props = new Properties();
+            factory.create("csv", props);
+            builder = new FormatterBuilder("csv", props);
+        }
+
+        builder.setFormatterFactory(factory);
+        return builder;
+
+    }
 }
+

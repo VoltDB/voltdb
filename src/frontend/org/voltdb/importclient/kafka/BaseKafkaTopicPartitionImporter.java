@@ -33,7 +33,7 @@ import java.util.function.LongBinaryOperator;
 
 import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
-import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
+import org.voltdb.importclient.kafka.util.HostAndPort;
 import org.voltdb.importer.CommitTracker;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.importer.ImporterLogger;

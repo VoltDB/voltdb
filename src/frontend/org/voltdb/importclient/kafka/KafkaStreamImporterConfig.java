@@ -27,10 +27,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.voltdb.importclient.ImportBaseException;
+import org.voltdb.importclient.kafka.util.BaseKafkaImporterConfig;
+import org.voltdb.importclient.kafka.util.HostAndPort;
+import org.voltdb.importclient.kafka.util.KafkaImporterUtils;
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.FormatterBuilder;
 
@@ -43,17 +45,10 @@ import kafka.javaapi.consumer.SimpleConsumer;
 /**
  * Holds configuration information required to connect to a single partition for a topic.
  */
-public class KafkaStreamImporterConfig implements ImporterConfig
+public class KafkaStreamImporterConfig extends BaseKafkaImporterConfig implements ImporterConfig
 {
+
     private static final Logger m_logger = Logger.getLogger("IMPORT");
-
-    public static final String CLIENT_ID = "voltdb-importer";
-    private static final String GROUP_ID = "voltdb";
-    private static final int KAFKA_DEFAULT_BROKER_PORT = 9092;
-
-    // We don't allow period in topic names because we construct URIs using it
-    private static final Pattern legalTopicNamesPattern = Pattern.compile("[a-zA-Z0-9\\_-]+");
-    private static final int topicMaxNameLength = 255;
 
     private final URI m_uri;
     private final List<HostAndPort> m_brokers;
@@ -161,7 +156,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         if (brokers.isEmpty()) {
             throw new IllegalArgumentException("Missing kafka broker");
         }
-        String key = getBrokerKey(brokers);
+        String key = KafkaImporterUtils.getNormalizedKey(brokers);
         List<String> brokerList = Arrays.asList(brokers.split("\\s*,\\s*"));
         if (brokerList == null || brokerList.isEmpty()) {
             throw new IllegalArgumentException("Missing kafka broker");
@@ -196,13 +191,14 @@ public class KafkaStreamImporterConfig implements ImporterConfig
             throw new IllegalArgumentException("Missing topic(s).");
         }
         String commitPolicy = props.getProperty("commit.policy", "none");
+
         Map<URI, ImporterConfig> configs = new HashMap<>();
         for (String topic : ttopicList) {
-            if (topic.length() > topicMaxNameLength) {
+            if (topic.length() > TOPIC_MAX_NAME_LENGTH) {
                 throw new IllegalArgumentException("topic name is illegal, can't be longer than "
-                        + topicMaxNameLength + " characters");
+                        + TOPIC_MAX_NAME_LENGTH + " characters");
             }
-            if (!legalTopicNamesPattern.matcher(topic).matches()) {
+            if (!TOPIC_LEGAL_NAMES_PATTERN.matcher(topic).matches()) {
                 throw new IllegalArgumentException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '_' and '-'");
             }
             try {
@@ -304,74 +300,11 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         return configs;
     }
 
-    public static String getBrokerKey(String brokers)
-    {
-        String key = brokers.replace(':', '_');
-        key = key.replace(',', '_');
-        return key.toLowerCase();
-    }
-
     public static void closeConsumer(SimpleConsumer consumer) {
         if (consumer != null) try {
             consumer.close();
         } catch (Exception e) {
             m_logger.warn("Failed to close consumer connection.", e);
-        }
-    }
-
-    //Simple Host and Port abstraction....dont want to use our big stuff here osgi bundle import nastiness.
-    public static class HostAndPort {
-
-        private final String m_host;
-        private final int m_port;
-        private final String m_connectionString;
-
-        public HostAndPort(String h, int p) {
-            m_host = h;
-            m_port = p;
-            m_connectionString = m_host + ":" + m_port;
-        }
-
-        public static HostAndPort fromString(String hap) {
-            String s[] = hap.split(":");
-            int p = KAFKA_DEFAULT_BROKER_PORT;
-            if (s.length > 1 && s[1] != null && s[1].length() > 0) {
-                p = Integer.parseInt(s[1].trim());
-            }
-            return new HostAndPort(s[0].trim(), p);
-        }
-
-        public String getHost() {
-            return m_host;
-        }
-
-        public int getPort() {
-            return m_port;
-        }
-
-        @Override
-        public String toString() {
-            return m_connectionString;
-        }
-
-        @Override
-        public int hashCode() {
-            return m_connectionString.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (!(o instanceof HostAndPort)) {
-                return false;
-            }
-            if (this.getClass() != o.getClass()) {
-                return false;
-            }
-            HostAndPort hap = (HostAndPort )o;
-            if (hap == this) {
-                return true;
-            }
-            return (hap.getHost().equals(getHost()) && hap.getPort() == getPort());
         }
     }
 

@@ -41,6 +41,7 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.importer.ImporterLifecycle;
+import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.utils.BulkLoaderErrorHandler;
 import org.voltdb.utils.CSVBulkDataLoader;
 import org.voltdb.utils.CSVDataLoader;
@@ -54,6 +55,7 @@ import org.voltdb.utils.RowWithMetaData;
  */
 
 public class KafkaLoader10 implements ImporterLifecycle {
+
     private static final VoltLogger m_log = new VoltLogger("KAFKALOADER10");
     private static final String KEY_DESERIALIZER = ByteArrayDeserializer.class.getName();
     private static final String VALUE_DESERIALIZER = ByteArrayDeserializer.class.getName();
@@ -65,7 +67,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
     private ExecutorService m_executorService = null;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     private List<Kafka10ExternalConsumerRunner> m_consumers;
-    private final long pollTimedWaitInMilliSec = Integer.getInteger("KAFKALOADER_POLLED_WAIT_MILLI_SECONDS", 1000); // 1 second NEEDSWORK
     private ExecutorService m_callbackExecutor = null;
 
     private volatile boolean m_stopping = false;
@@ -165,22 +166,24 @@ public class KafkaLoader10 implements ImporterLifecycle {
         }
     }
 
-    private Properties kafkaConfigProperties() throws IOException {
-        //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
-        String groupId = "voltdb-" + (m_cliOptions.useSuppliedProcedure ? m_cliOptions.procedure : m_cliOptions.table);
+    private Properties getKafkaConfigFromCLIArguments(Kafka10LoaderCLIArguments args) throws IOException {
 
         Properties props = new Properties();
-        if (m_cliOptions.config.trim().isEmpty()) {
+
+        // Get group id which should be unique for table so as to keep offsets clean for multiple runs.
+        String groupId = "voltdb-" + (args.useSuppliedProcedure ? args.procedure : args.table);
+
+        if (args.config.trim().isEmpty()) {
             props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             // default liveness check of consumer is 5 minutes
         } else {
-            props.load(new FileInputStream(new File(m_cliOptions.config)));
+            props.load(new FileInputStream(new File(args.config)));
             //Get GroupId from property if present and use it.
             groupId = props.getProperty("group.id", groupId);
 
             // get kafka broker connections from properties file if present - supplied brokers, if any, overrides
             // the supplied command line
-            m_cliOptions.brokers = props.getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
+            args.brokers = props.getProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
 
             String autoCommit = props.getProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG);
             if (autoCommit != null && !autoCommit.trim().isEmpty() &&
@@ -207,7 +210,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
         // populate/override kafka consumer properties
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_cliOptions.brokers);
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, args.brokers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
@@ -217,30 +220,21 @@ public class KafkaLoader10 implements ImporterLifecycle {
 
     private ExecutorService getExecutor() throws Exception {
 
-        // NEEDSWORK: We might be able to refactor the properties into the base runner, too.
-        Properties props = kafkaConfigProperties();
+        Properties consumerProps = getKafkaConfigFromCLIArguments(m_cliOptions);
+        FormatterBuilder formatterBuilder = FormatterBuilder.createFormatterBuilder(m_cliOptions.formatterProperties);
+        Kafka10StreamImporterConfig cfg = new Kafka10StreamImporterConfig(m_cliOptions, formatterBuilder);
 
-        // NEEDSWORK: Straighten out properties, this is bogus
-        props.setProperty("topics", m_cliOptions.topic);
-
-        Kafka10StreamImporterConfig cfg = new Kafka10StreamImporterConfig(props, null); // NEEDSWORK: Hook up formatter
-
-
-
-        // create as many threads equal as number of partitions specified in config
         ExecutorService executor = Executors.newFixedThreadPool(m_cliOptions.getConsumerCount());
         m_consumers = new ArrayList<>();
         try {
             KafkaConsumer<byte[], byte[]> consumer = null;
             for (int i = 0; i < m_cliOptions.getConsumerCount(); i++) {
-                consumer = new KafkaConsumer<>(props);
+                consumer = new KafkaConsumer<>(consumerProps);
                 m_consumers.add(new Kafka10ExternalConsumerRunner(this, cfg, consumer, m_loader));
-
             }
         } catch (Throwable terminate) {
             m_log.error("Failed creating Kafka consumer ", terminate);
             for (Kafka10ExternalConsumerRunner consumer : m_consumers) {
-                // close all consumer connections
                 consumer.shutdown();
             }
             return null;
@@ -263,8 +257,6 @@ public class KafkaLoader10 implements ImporterLifecycle {
     }
 
     private void processKafkaMessages() throws Exception {
-        // Split server list
-        final String[] serverlist = m_cliOptions.servers.split(",");
 
         // If we need to prompt the user for a VoltDB password, do so.
         m_cliOptions.password = CLIConfig.readPasswordIfNeeded(m_cliOptions.user, m_cliOptions.password, "Enter password: ");
@@ -275,7 +267,7 @@ public class KafkaLoader10 implements ImporterLifecycle {
             clientConfig.setTrustStoreConfigFromPropertyFile(m_cliOptions.ssl);
             clientConfig.enableSSL();
         }
-        clientConfig.setProcedureCallTimeout(0);
+        clientConfig.setProcedureCallTimeout(0); // NEEDSWORK: Add config for this?
         m_client = getVoltClient(clientConfig, m_cliOptions.getVoltHosts());
 
         KafkaBulkLoaderCallback kafkaBulkLoaderCallback = new KafkaBulkLoaderCallback();

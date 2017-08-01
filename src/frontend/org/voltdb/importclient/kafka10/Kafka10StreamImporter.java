@@ -33,7 +33,7 @@ import org.voltdb.importer.AbstractImporter;
 
 public class Kafka10StreamImporter extends AbstractImporter {
 
-    private static final VoltLogger m_log = new VoltLogger("KAFKA10IMPORTER");
+    private static final VoltLogger m_log = new VoltLogger("KAFKAIMPORTER");
 
     protected Kafka10StreamImporterConfig m_config;
     protected Kafka10ConsumerRunner m_runner;
@@ -53,7 +53,12 @@ public class Kafka10StreamImporter extends AbstractImporter {
         return m_config.getURI();
     }
 
-    // Make overrideable for unit tests
+    /**
+     * Create a Kafka consumer and runner. Overrideable for unit tests
+     *
+     * @param properties Kafka consumer properties
+     * @throws Exception on error
+     */
     public Kafka10ConsumerRunner createConsumerRunner(Properties properties) throws Exception {
 
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
@@ -72,7 +77,8 @@ public class Kafka10StreamImporter extends AbstractImporter {
     @Override
     public void accept() {
 
-        // NEEDSWORK: We might be able to refactor the properties into the base runner, too.
+        // Build up a Kafka Consumer properties from the supplied configuration.  Supported property values
+        // are documented here: https://kafka.apache.org/0100/documentation.html#consumerconfigs
 
         Properties props = new Properties();
         props.put(ConsumerConfig.GROUP_ID_CONFIG, m_config.getGroupId());
@@ -80,16 +86,19 @@ public class Kafka10StreamImporter extends AbstractImporter {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, m_config.getMaxMessageFetchSize());
+        props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, m_config.getConsumerTimeoutMillis());
 
-        String consumerAssignorStrategy = org.apache.kafka.clients.consumer.RangeAssignor.class.getName(); // "partition.assignment.strategy"
-        props.put("partition.assignment.strategy", consumerAssignorStrategy); // NEEDSWORK: Put this in the config properties, with default
+        // Someday, we might want to support customers overriding the default assignor strategy. But not now.
+        String consumerAssignorStrategy = org.apache.kafka.clients.consumer.RangeAssignor.class.getName();
+        props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, consumerAssignorStrategy);
 
         try {
             m_runner = createConsumerRunner(props);
         }
         catch (Exception e) {
             // Error in creating the runner, give up.
-            m_log.warn(e);
+            m_log.error("Exception creating consumer runner", e.getCause() == null ? e : e.getCause());
             return;
         }
 
@@ -99,7 +108,7 @@ public class Kafka10StreamImporter extends AbstractImporter {
         ExecutorService executor = Executors.newSingleThreadExecutor(new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
-                return new Thread(r, "Kafka_Consumer_" + m_config.getTopics());
+                return new Thread(r, "Kafka_Consumer_" + m_config.getTopics()); //NEEDSWORK: Replace commas, special characters if any
             }
         });
 
