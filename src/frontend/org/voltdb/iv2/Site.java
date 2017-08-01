@@ -354,7 +354,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public byte[] getDeploymentHash() {
-            return m_context.deploymentHash;
+            return m_context.getDeploymentHash();
         }
 
         @Override
@@ -393,11 +393,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 boolean requiresSnapshotIsolation,
                 long uniqueId, long spHandle,
+                boolean isReplay,
                 boolean requireCatalogDiffCmdsApplyToEE,
                 boolean requiresNewExportGeneration)
         {
             return Site.this.updateCatalog(diffCmds, context, requiresSnapshotIsolation,
-                    false, uniqueId, spHandle,
+                    false, uniqueId, spHandle, isReplay,
                     requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
         }
 
@@ -859,13 +860,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             String errmsg = "Site: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) +
                 " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
+            hostLog.error(errmsg);
+
+            for (StackTraceElement ste: t.getStackTrace()) {
+                hostLog.error(ste.toString());
+            }
+
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
 
         try {
             shutdown();
         } finally {
-            CompressionService.releaseThreadLocal();        }
+            CompressionService.releaseThreadLocal();
+        }
     }
 
     ParticipantTransactionState global_replay_mpTxn = null;
@@ -1503,6 +1511,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context,
             boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle,
+            boolean isReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration)
     {
@@ -1510,7 +1519,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
-        m_loadedProcedures.loadProcedures(m_context, false);
+        m_loadedProcedures.loadProcedures(m_context, isReplay);
         m_ee.loadFunctions(m_context);
 
         if (isMPI) {

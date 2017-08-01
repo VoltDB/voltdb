@@ -239,7 +239,7 @@ public class NTProcedureService {
 
         m_mailbox = mailbox;
 
-        m_sysProcs = loadSystemProcedures();
+        m_sysProcs = loadSystemProcedures(true);
     }
 
     /**
@@ -247,10 +247,7 @@ public class NTProcedureService {
      * Optionally don't load UAC but use parameter instead.
      */
     @SuppressWarnings("unchecked")
-    private ImmutableMap<String, ProcedureRunnerNTGenerator> loadSystemProcedures() {
-        // todo need to skip UAC creation
-        // but can wait until UAC is an NT proc
-
+    private ImmutableMap<String, ProcedureRunnerNTGenerator> loadSystemProcedures(boolean startup) {
         ImmutableMap.Builder<String, ProcedureRunnerNTGenerator> builder =
                 ImmutableMap.<String, ProcedureRunnerNTGenerator>builder();
 
@@ -279,14 +276,16 @@ public class NTProcedureService {
                     VoltDB.crashLocalVoltDB("Missing Java class for NT System Procedure: " + procName);
                 }
 
-                // This is a startup-time check to make sure we can instantiate
-                try {
-                    if ((procClass.newInstance() instanceof VoltNTSystemProcedure) == false) {
-                        VoltDB.crashLocalVoltDB("NT System Procedure is incorrect class type: " + procName);
+                if (startup) {
+                    // This is a startup-time check to make sure we can instantiate
+                    try {
+                        if ((procClass.newInstance() instanceof VoltNTSystemProcedure) == false) {
+                            VoltDB.crashLocalVoltDB("NT System Procedure is incorrect class type: " + procName);
+                        }
                     }
-                }
-                catch (InstantiationException | IllegalAccessException e) {
-                    VoltDB.crashLocalVoltDB("Unable to instantiate NT System Procedure: " + procName);
+                    catch (InstantiationException | IllegalAccessException e) {
+                        VoltDB.crashLocalVoltDB("Unable to instantiate NT System Procedure: " + procName);
+                    }
                 }
 
                 ProcedureRunnerNTGenerator prntg = new ProcedureRunnerNTGenerator(procClass);
@@ -318,7 +317,7 @@ public class NTProcedureService {
                 continue;
             }
 
-            // this code is mostly lifted from transactionally procedures
+            // this code is mostly lifted from transactional procedures
             String className = procedure.getClassname();
             Class<? extends VoltNonTransactionalProcedure> clz = null;
             try {
@@ -344,7 +343,7 @@ public class NTProcedureService {
 
         // reload all sysprocs (I wish we didn't have to do this, but their stats source
         // gets wiped out)
-        loadSystemProcedures();
+        loadSystemProcedures(false);
 
         // Set the system to start accepting work again now that ebertything is updated.
         // We had to stop because stats would be wonky if we called a proc while updating

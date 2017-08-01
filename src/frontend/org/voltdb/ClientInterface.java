@@ -1029,14 +1029,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                 try {
                     ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                    int partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
+                    int partition = InvocationDispatcher.getPartitionForProcedureParameter(ppi.index,
                             ppi.type, response.getInvocation());
-                    createTransaction(cihm.connection.connectionId(),
+                    m_dispatcher.createTransaction(cihm.connection.connectionId(),
                             response.getInvocation(),
                             isReadonly,
                             true, // Only SP could be mis-partitioned
                             false, // Only SP could be mis-partitioned
-                            partition,
+                            new int [] { partition },
                             messageSize,
                             nowNanos);
                     return true;
@@ -1074,7 +1074,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isReadOnly,
                 isSinglePartition,
                 isEveryPartition,
-                partition,
+                new int [] { partition },
                 messageSize,
                 nowNanos,
                 false);  // is for replay.
@@ -1102,7 +1102,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isReadOnly,
                 isSinglePartition,
                 isEveryPartition,
-                partition,
+                new int [] { partition },
                 messageSize,
                 nowNanos,
                 isForReplay);
@@ -1775,10 +1775,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return;
         }
         // initiate the transaction
-        createTransaction(m_snapshotDaemonAdapter.connectionId(),
+        m_dispatcher.createTransaction(m_snapshotDaemonAdapter.connectionId(),
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
-                0,
+                new int[] { 0 }, // partition id
                 0, System.nanoTime());
     }
 
@@ -2055,9 +2055,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             spi = MiscUtils.roundTripForCL(spi);
         }
         synchronized (m_executeTaskAdpater) {
-            createTransaction(m_executeTaskAdpater.connectionId(), spi,
+            m_dispatcher.createTransaction(m_executeTaskAdpater.connectionId(), spi,
                     proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
-                    0 /* Can provide anything for multi-part */,
+                    new int[] { 0 } /* Can provide anything for multi-part */,
                     spi.getSerializedSize(), System.nanoTime());
         }
     }

@@ -324,6 +324,7 @@ public class Inits {
                     // publish the catalog bytes to ZK
                     CatalogUtil.updateCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
+                            0, // Initial version
                             exportInitialGenerationUniqueId,
                             catalogBytes,
                             null,
@@ -375,7 +376,7 @@ public class Inits {
                 } catch (IOException e){
                     VoltDB.crashLocalVoltDB("Failed to load initialized schema: " + e.getMessage(), false, e);
                 }
-                if (!Arrays.equals(catalogStuff.getCatalogHash(), thisNodeCatalog.getSha1Hash())) {
+                if (!Arrays.equals(catalogStuff.catalogHash, thisNodeCatalog.getSha1Hash())) {
                     VoltDB.crashGlobalVoltDB("Nodes have been initialized with different schemas. All nodes must initialize with identical schemas.", false, null);
                 }
             }
@@ -414,14 +415,13 @@ public class Inits {
 
             try {
                 m_rvdb.m_catalogContext = new CatalogContext(
-                        catalogStuff.genId,
                         catalog,
                         new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_nodeSettings),
+                        catalogStuff.version, // catalog version from zk (rejoin node needs the latest version)
+                        catalogStuff.genId,
                         catalogJarBytes,
                         catalogJarHash,
-                        // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
-                        0, // start up catalog version
                         m_rvdb.m_messenger);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
