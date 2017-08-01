@@ -80,6 +80,14 @@ public class FailedLoginCounter {
                 totalCount);
         m_userFailedAttempts.put(user,totalCount);
         m_totalFailedAttempts++;
+        messageFormat = "Total failed authentication: %d times in last minute";
+        RateLimitedLogger.tryLogForMessage(timestampMilis,
+                ONE_MINUTE_IN_MILLIS,
+                TimeUnit.MILLISECONDS,
+                authLog,
+                Level.WARN,
+                messageFormat,
+                m_totalFailedAttempts);
     }
 
     public void checkCounter(int timestamp) {

@@ -4630,6 +4630,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     public void logMessageToFLC(long timestampMilis, String user) {
-    	m_flc.logMessage(timestampMilis, user);
+        m_flc.logMessage(timestampMilis, user);
     }
 }
