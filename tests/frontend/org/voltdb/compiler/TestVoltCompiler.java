@@ -905,7 +905,7 @@ public class TestVoltCompiler extends TestCase {
                 + "select title, "
                 + "case when cash > 100.00 then "
                 + "case when cash > 1000.00 then 'Super Expensive' else 'Pricy' end "
-                + "'Expensive' else 'Cheap' end "
+                + "else 'Cheap' end "
                 + "from books; "
                 + "end");
 
