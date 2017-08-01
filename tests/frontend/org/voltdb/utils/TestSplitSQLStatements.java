@@ -69,10 +69,14 @@ public class TestSplitSQLStatements {
         checkSplitter("  --one\n  --two\nreal", "real");
         checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "/*ghi\njkl;*/");
         checkSplitter("  abc;/* comments*/  def;", "abc", "def");
+        checkSplitter("  abc;'/*' comments*/  def;", "abc", "'/*' comments*/  def");
+        checkSplitter("  abc;'/* comments*/'  def;", "abc", "'/* comments*/'  def");
         checkSplitter(" -- abc;/* comments*/\n  def;", "def");
         checkSplitter("  abc;/* comments*/\n  def;", "abc", "def");
+        checkSplitter("  abc;/* comments ; with ;*/\n  def;", "abc", "def");
         checkSplitter("  abc;/* this is a long \n comment \n in 3 lines*/  def;", "abc", "def");
         checkSplitter("/* comments*/  abc;/* comments \n multiline*/  --def\n\n  /*ghi\njkl;*/", "abc", "/*ghi\njkl;*/");
+        checkSplitter("testing comments in quotes /* not ending will remain '*/'", "testing comments in quotes /* not ending will remain '*/'");
     }
 
     @Test
