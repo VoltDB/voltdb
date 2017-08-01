@@ -110,8 +110,14 @@ function train() {
         --broker=localhost:9092
 }
 
+# generate metro cards
+function generate-cards() {
+    jars-ifneeded
+    java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.CardGenerator
+}
+
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help|generate-cards|train}"
 }
 
 # Run the targets pass on the command line
