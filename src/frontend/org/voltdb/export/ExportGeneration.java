@@ -151,7 +151,6 @@ public class ExportGeneration implements Generation {
         //Only populate partitions in use if export is actually happening
         Set<Integer> partitionsInUse = new HashSet<Integer>();
 
-        boolean mailboxNeeded = false;
         /*
          * Now create datasources based on the catalog
          */
@@ -159,65 +158,58 @@ public class ExportGeneration implements Generation {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
-                    if (addDataSources(table, hostId, partitions)) {
-                        partitionsInUse.addAll(partitions);
-                        mailboxNeeded = true;
-                    }
-
+                    addDataSources(table, hostId, partitions);
+                    partitionsInUse.addAll(partitions);
                 }
             }
         }
 
-        if (mailboxNeeded) {
-            createAndRegisterAckMailboxes(partitionsInUse, messenger);
-        }
+        createAndRegisterAckMailboxes(partitionsInUse, messenger);
     }
 
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
 
         m_mailboxesZKPath = VoltZK.exportGenerations + "/" + "mailboxes";
 
-        if (m_mbox == null) {
-            m_mbox = new LocalMailbox(messenger) {
-                @Override
-                public void deliver(VoltMessage message) {
-                    if (message instanceof BinaryPayloadMessage) {
-                        BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
-                        ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
-                        final int partition = buf.getInt();
-                        final int length = buf.getInt();
-                        byte stringBytes[] = new byte[length];
-                        buf.get(stringBytes);
-                        String signature = new String(stringBytes, Constants.UTF8ENCODING);
-                        final long ackUSO = buf.getLong();
-                        final boolean runEveryWhere = (buf.getShort() == (short )1);
+        m_mbox = new LocalMailbox(messenger) {
+            @Override
+            public void deliver(VoltMessage message) {
+                if (message instanceof BinaryPayloadMessage) {
+                    BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
+                    ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
+                    final int partition = buf.getInt();
+                    final int length = buf.getInt();
+                    byte stringBytes[] = new byte[length];
+                    buf.get(stringBytes);
+                    String signature = new String(stringBytes, Constants.UTF8ENCODING);
+                    final long ackUSO = buf.getLong();
+                    final boolean runEveryWhere = (buf.getShort() == (short )1);
 
-                        final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
-                        if (partitionSources == null) {
-                            exportLog.error("Received an export ack for partition " + partition +
-                                    " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
-                            return;
-                        }
-
-                        final ExportDataSource eds = partitionSources.get(signature);
-                        if (eds == null) {
-                            exportLog.warn("Received an export ack for partition " + partition +
-                                    " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
-                            return;
-                        }
-
-                        try {
-                            eds.ack(ackUSO, runEveryWhere);
-                        } catch (RejectedExecutionException ignoreIt) {
-                            // ignore it: as it is already shutdown
-                        }
-                    } else {
-                        exportLog.error("Receive unexpected message " + message + " in export subsystem");
+                    final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
+                    if (partitionSources == null) {
+                        exportLog.error("Received an export ack for partition " + partition +
+                                " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
+                        return;
                     }
+
+                    final ExportDataSource eds = partitionSources.get(signature);
+                    if (eds == null) {
+                        exportLog.warn("Received an export ack for partition " + partition +
+                                " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
+                        return;
+                    }
+
+                    try {
+                        eds.ack(ackUSO, runEveryWhere);
+                    } catch (RejectedExecutionException ignoreIt) {
+                        // ignore it: as it is already shutdown
+                    }
+                } else {
+                    exportLog.error("Receive unexpected message " + message + " in export subsystem");
                 }
-            };
-            messenger.createMailbox(null, m_mbox);
-        }
+            }
+        };
+        messenger.createMailbox(null, m_mbox);
 
         //If we have new partitions create mailbox paths.
         for (Integer partition : localPartitions) {
@@ -434,9 +426,8 @@ public class ExportGeneration implements Generation {
     }
 
     // silly helper to add datasources for a table catalog object
-    private boolean addDataSources(Table table, int hostId, List<Integer> partitions)
+    private void addDataSources(Table table, int hostId, List<Integer> partitions)
     {
-        boolean dataSourceAdded = false;
         for (Integer partition : partitions) {
 
             /*
@@ -463,6 +454,7 @@ public class ExportGeneration implements Generation {
                             " signature " + table.getSignature() + " partition id " + partition);
                     dataSourcesForPartition.put(table.getSignature(), exportDataSource);
                 } else {
+                    //Since we are loading from catalog any found EDS mark it to be in catalog.
                     dataSourcesForPartition.get(table.getSignature()).markInCatalog();
                 }
             } catch (IOException e) {
@@ -471,7 +463,6 @@ public class ExportGeneration implements Generation {
                         table.getTypeName() + " host id " + hostId, true, e);
             }
         }
-        return dataSourceAdded;
     }
 
     // pause polling on the all the data source for the given partitions
