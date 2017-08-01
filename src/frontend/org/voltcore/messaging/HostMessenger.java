@@ -1690,7 +1690,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             try {
                 task.get();
             } catch (InterruptedException | ExecutionException e) {
-                m_hostLog.info("Failed to send StopNode notice to other nodes.");
+                hostLog.info("Failed to send StopNode notice to other nodes.");
             }
         }
     }
