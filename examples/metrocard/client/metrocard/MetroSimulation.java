@@ -57,8 +57,6 @@ public class MetroSimulation {
 
     int[] balances = {5000,2000,1000,500};
     Calendar cal = Calendar.getInstance();
-    int cardCount = 0;
-    int max_station_id = 0;
     Properties producerConfig;
 
     /**
@@ -341,7 +339,7 @@ public class MetroSimulation {
             if (activity_code == -1)  { // Exit
                 atime = swipeTime;
                 while (card_id == -1) {
-                    card_id = rand.nextInt(cardCount+1000); // use +1000 so sometimes we get an invalid card_id
+                    card_id = rand.nextInt(config.cardcount+1000); // use +1000 so sometimes we get an invalid card_id
                     if (cardsEntered.containsKey(card_id)) {
                         card_id = -1;
                         continue;
@@ -374,8 +372,7 @@ public class MetroSimulation {
             sb.append(Integer.valueOf(card_id)).append(",")
                     .append(Long.valueOf(atime*1000)).append(",")
                     .append(Integer.valueOf(station_id)).append(",")
-                    .append(Integer.valueOf(activity_code)).append(",")
-                    .append("250");
+                    .append(Integer.valueOf(activity_code));
             ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
             System.out.println(sb.toString());
             return rec;

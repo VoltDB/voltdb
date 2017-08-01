@@ -61,7 +61,7 @@ public class CardSwipe extends VoltProcedure {
         return String.format("%d.%02d", i/100, i%100);
     }
 
-    public VoltTable run(int cardId, int stationId) throws VoltAbortException {
+    public VoltTable run(int cardId, TimestampType ts, int stationId, byte activity_code) throws VoltAbortException {
 
         // check station fare, card status, get card owner's particulars
         voltQueueSQL(checkCard, EXPECT_ZERO_OR_ONE_ROW, cardId);
@@ -69,10 +69,18 @@ public class CardSwipe extends VoltProcedure {
         VoltTable[] checks = voltExecuteSQL();
         VoltTable cardInfo = checks[0];
         VoltTable stationInfo = checks[1];
+        byte accepted = 0;
 
         // check that card exists
         if (cardInfo.getRowCount() == 0) {
-            return buildResult(0,"Card Invalid");
+            return buildResult(accepted,"Card Invalid");
+        }
+
+        // TODO: exit
+        if (activity_code == -1) {
+            voltQueueSQL(insertActivity, cardId, ts, stationId, activity_code, 0);
+            voltExecuteSQL(true);
+            return buildResult(1, "");
         }
 
         // card exists, so advanceRow to read the record
@@ -93,7 +101,7 @@ public class CardSwipe extends VoltProcedure {
 
         // if card is disabled
         if (enabled == 0) {
-                return buildResult(0,"Card Disabled");
+                return buildResult(accepted,"Card Disabled");
         }
 
         // check balance or expiration for valid cards
@@ -101,12 +109,12 @@ public class CardSwipe extends VoltProcedure {
                 if (balance > fare) {
                         // charge the fare
                         voltQueueSQL(chargeCard, balance-fare,cardId);
-                        voltQueueSQL(insertActivity, cardId, getTransactionTime(), stationId, 1, fare);
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, 1, fare);
                         voltExecuteSQL(true);
                         return buildResult(1,"Remaining Balance: "+intToCurrency(balance-fare));
                 } else {
                         // insufficient balance
-                        voltQueueSQL(insertActivity, cardId, getTransactionTime(), stationId, 0, 0);
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, 0, 0);
                         if (notify != 0) {  // only export if notify is 1 or 2 -- email or text
                             voltQueueSQL(exportActivity, cardId, getTransactionTime().getTime(), stationName, owner, phone, email, notify, "Insufficient Balance");
                         }
@@ -115,12 +123,12 @@ public class CardSwipe extends VoltProcedure {
                 }
         }
         else { // unlimited card (e.g. monthly or weekly pass)
-                if (expires.compareTo(new TimestampType(getTransactionTime())) > 0) {
-                        voltQueueSQL(insertActivity, cardId, getTransactionTime(), stationId, 1, 0);
+                if (expires.compareTo(ts) > 0) {
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, 1, 0);
                         voltExecuteSQL(true);
                         return buildResult(1,"Card Expires: " + expires.toString());
                 } else {
-                        voltQueueSQL(insertActivity, cardId, getTransactionTime(), stationId, 0, 0);
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, 0, 0);
                         voltExecuteSQL(true);
                         return buildResult(0,"Card Expired");
                 }
