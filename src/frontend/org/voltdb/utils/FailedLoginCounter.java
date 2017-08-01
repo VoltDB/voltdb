@@ -56,13 +56,6 @@ public class FailedLoginCounter {
         return m_userFailedAttempts;
     }
 
-    public int getCount(String user) {
-        if (m_userFailedAttempts.containsKey(user)) {
-            return m_userFailedAttempts.get(user);
-        }
-        return 0;
-    }
-
     public void logMessage(long timestampMilis, String user) {
         checkCounter((int)timestampMilis/1000);
         int timestampSeconds = (int)(timestampMilis/1000);
