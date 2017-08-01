@@ -43,7 +43,7 @@ public class FailedLoginCounter {
     private Map<String,Integer> m_userFailedAttempts;
     Deque<TimeBucket> m_timeBucketQueue;
 
-    int totalFailedAttempts;
+    int m_totalFailedAttempts;
     final long ONE_MINUTE_IN_MILLIS = 60000;//millisecs
     private static final VoltLogger authLog = new VoltLogger("AUTH");
 
@@ -86,12 +86,13 @@ public class FailedLoginCounter {
                 user,
                 totalCount);
         m_userFailedAttempts.put(user,totalCount);
+        m_totalFailedAttempts++;
     }
 
     public void checkCounter(int timestamp) {
         while (!m_timeBucketQueue.isEmpty() && m_timeBucketQueue.peek().m_ts < timestamp) {
             TimeBucket tb = m_timeBucketQueue.poll();
-            totalFailedAttempts -= tb.m_totalFailedAttempts;
+            m_totalFailedAttempts -= tb.m_totalFailedAttempts;
             Iterator<Entry<String, Integer>> it = tb.m_userFailedAttempts.entrySet().iterator();
             while (it.hasNext()) {
                 Entry<String, Integer> entry = it.next();
