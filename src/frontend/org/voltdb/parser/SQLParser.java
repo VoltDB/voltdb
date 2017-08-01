@@ -191,7 +191,7 @@ public class SQLParser extends SQLPatternFactory
         SPF.statement(
             SPF.token("create"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
             unparsedProcedureModifierClauses(),
-            SPF.token("as"), SPF.token("begin"), SPF.capture(SPF.anyClause()), SPF.token("end")
+            SPF.token("as"), SPF.token("begin"), SPF.capture(SPF.anyClause())
         ).compile("PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL");
 
     /*

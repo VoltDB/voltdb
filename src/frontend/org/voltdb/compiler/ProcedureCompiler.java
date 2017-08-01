@@ -815,6 +815,8 @@ public abstract class ProcedureCompiler {
                                        StatementPartitioning.forceMP();
 
         for (String curStmt: stmts) {
+            // skip processing 'END' statement in multi statement procedures
+            if (curStmt.equalsIgnoreCase("end")) continue;
 
             // add the statement to the catalog
             Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME + String.valueOf(stmtNum));
