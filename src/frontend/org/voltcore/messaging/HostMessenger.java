@@ -1721,7 +1721,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
         partitionGroupPeers.remove(m_localHostId);
         m_peers = partitionGroupPeers;
-        m_secondaryConnections = computeSecondaryConnections(hostCount);
+        if (m_peers.isEmpty()) { /* when K-factor = 0 */
+            m_secondaryConnections = 0;
+        } else {
+            m_secondaryConnections = computeSecondaryConnections(hostCount);
+        }
     }
 
     /**
