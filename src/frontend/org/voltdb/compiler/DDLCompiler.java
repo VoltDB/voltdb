@@ -871,11 +871,17 @@ public class DDLCompiler {
     // BEGIN should follow AS for create procedure
     // added this case since 'begin' can be table or column name
     private static boolean checkForNextBegin = false;
+    // inBegin and checkForNextBegin are not k-state values since we cannot have BEGIN within a BEGIN
+    // also we check for next BEGIN only after AS. If the next token after AS is not BEGIN,
+    // then we need not store the state (i.e, checkForNextBegin)
 
     private static int readingState(char[] nchar, DDLStatement retval) {
 
         if (!Character.isLetterOrDigit(nchar[0])) {
             char prev = prevChar(retval.statement);
+            /* since we only have access to the current character and the characters we have seen so far,
+             * we can check for the token only after its completed and then look if it matches the required token
+             */
             if (checkForNextBegin) {
                 if (prev == 'n' || prev == 'N') {
                     if( checkForNextBegin && SQLLexer.matchToken(retval.statement, retval.statement.length() - 5, "begin") ) {
