@@ -151,7 +151,6 @@ public class ExportGeneration implements Generation {
         //Only populate partitions in use if export is actually happening
         Set<Integer> partitionsInUse = new HashSet<Integer>();
 
-        boolean mailboxNeeded = false;
         /*
          * Now create datasources based on the catalog
          */
@@ -165,9 +164,7 @@ public class ExportGeneration implements Generation {
             }
         }
 
-        if (mailboxNeeded) {
-            createAndRegisterAckMailboxes(partitionsInUse, messenger);
-        }
+        createAndRegisterAckMailboxes(partitionsInUse, messenger);
     }
 
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
