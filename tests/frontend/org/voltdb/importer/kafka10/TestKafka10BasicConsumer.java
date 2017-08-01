@@ -94,6 +94,8 @@ public class TestKafka10BasicConsumer {
         Properties props = new Properties();
         props.setProperty("groupid", "myGroupId");
         props.setProperty("topics", "my_topic");
+        props.setProperty("brokers", "fake://broker");
+        props.setProperty("procedure", "myProc");
 
         Kafka10StreamImporterConfig config = new Kafka10StreamImporterConfig(props, null);
         MockConsumer<byte[], byte[]> consumer = new MockConsumer<byte[], byte[]>(OffsetResetStrategy.EARLIEST);
@@ -128,6 +130,11 @@ public class TestKafka10BasicConsumer {
     public void testBasicOperation() throws Exception {
 
         Properties props = new Properties();
+        props.setProperty("groupid", "myGroupId");
+        props.setProperty("topics", "my_topic");
+        props.setProperty("brokers", "fake://broker");
+        props.setProperty("procedure", "myProc");
+
         Kafka10StreamImporterConfig config = new Kafka10StreamImporterConfig(props, null);
 
         ArrayList<String> procValues = new ArrayList<>();
