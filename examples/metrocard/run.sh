@@ -113,7 +113,8 @@ function train() {
 # generate metro cards
 function generate-cards() {
     jars-ifneeded
-    java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.CardGenerator
+    java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.CardGenerator \
+        --output=data/cards.csv
 }
 
 function help() {

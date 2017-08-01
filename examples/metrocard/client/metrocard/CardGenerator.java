@@ -34,16 +34,19 @@ public class CardGenerator {
         @Option(desc = "Number of Cards.")
         int cardcount = 500000;
 
+        @Option(desc = "File output location.")
+        String output = "data/cards.csv";
+
         @Override
         public void validate() {
             if (cardcount < 0) exitWithMessageAndUsage("cardcount must be > 0");
         }
     }
 
-    private static void gencards(long count) throws IOException
+    private static void gencards(Config config) throws IOException
     {
-        final BufferedWriter writer = new BufferedWriter(new FileWriter("/tmp/metrocards.csv"));
-        for (int i = 0; i < count; i++) {
+        final BufferedWriter writer = new BufferedWriter(new FileWriter(config.output));
+        for (int i = 0; i < config.cardcount; i++) {
             final StringBuilder sb = new StringBuilder();
             sb.append(i).append(",1,0,100000,2020-01-01 12:00:00,Rider").append(i).append(",7815551212,Rider").append(i).append("@test.com,0\n");
             i++;
@@ -66,6 +69,6 @@ public class CardGenerator {
         final Config config = new Config();
         config.parse(CardGenerator.class.getName(), args);
 
-        gencards(config.cardcount);
+        gencards(config);
     }
 }
