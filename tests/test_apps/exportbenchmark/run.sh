@@ -16,23 +16,11 @@ else
     echo "to your PATH."
     echo
 fi
-# installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
-if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
-    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
-    VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
-    VOLTDB_VOLTDB="$VOLTDB_LIB"
-# distribution layout has libraries in separate lib and voltdb directories
-else
-    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
-    VOLTDB_LIB="$VOLTDB_BASE/lib"
-    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
-fi
 
-APPCLASSPATH=$CLASSPATH:$({ \
-    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/*.jar; \
-    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
-} 2> /dev/null | paste -sd ':' - )
+# call script to set up paths, including
+# java classpaths and binary paths
+source $VOLTDB_BIN/voltenv
+
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -41,6 +29,10 @@ HOST="localhost"
 # remove build artifacts
 function clean() {
     rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/ExportBenchmark.jar"
+}
+
+function clean() {
+    rm -rf voltdbroot log obj *.log *.jar
 }
 
 # Grab the necessary command line arguments
@@ -70,36 +62,27 @@ function build_deployment_file() {
     exit
 }
 
-# compile the source code for procedures and the client
+# compile the source code for procedures and the client into jarfiles
 function srccompile() {
-    mkdir -p obj
-    javac -classpath $APPCLASSPATH -d obj \
-        src/exportbenchmark/*.java \
-        src/exportbenchmark/procedures/*.java
+    javac -classpath $APPCLASSPATH src/procedures/exportbenchmark/*.java
+    javac -classpath $CLIENTCLASSPATH src/client/exportbenchmark/ExportBenchmark.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-    (cd obj && jar cvf ExportBenchmark.jar exportbenchmark/*)
-
-    cp ./obj/*.jar "$VOLTDB_LIB/"
+    jar cf exportbenchmark-procs.jar -C src/procedures exportbenchmark
+    jar cf exportbenchmark-client.jar -C src/client exportbenchmark
+    rm -rf src/client/exportbenchmark/*.class src/procedures/exportbenchmark/*.class
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    echo "Compiling the export-benchmark application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar exportTable.sql"
-    echo
-    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar exportTable.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the procedure and client jarfiles if they don't exist
+function srccompile-ifneeded() {
+    if [ ! -e exportbenchmark-procs.jar ] || [ ! -e exportbenchmark-client.jar ]; then
+        srccompile;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    voltdb init --force
     FR_TEMP=/tmp/${USER}/fr
     mkdir -p ${FR_TEMP}
     # Set up flight recorder options
@@ -114,9 +97,16 @@ function server() {
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "VOLTDB_OPTS=\"${VOLTDB_OPTS}\" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar"
+    echo "VOLTDB_OPTS=\"${VOLTDB_OPTS}\" ${VOLTDB} start -H $HOST -l ${LICENSE}"
     echo
-    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar
+    #VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar
+    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE}
+}
+
+# load schema and procedures
+function init() {
+    srccompile-ifneeded
+    sqlcmd < exportTable.sql
 }
 
 # run the client that drives the example
@@ -125,21 +115,21 @@ function client() {
 }
 
 function run_benchmark_help() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj exportbenchmark.ExportBenchmark --help
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH exportbenchmark.ExportBenchmark --help
 }
 
 function run_benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    srccompile-ifneeded
+    java -classpath exportbenchmark-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --duration=30 \
         --servers=localhost \
-	--statsfile=exportbench.csv
+        --statsfile=exportbench.csv
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|run-benchmark|run-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|server|run-benchmark|run-benchmark-help|...}"
 }
 
 parse_command_line $@

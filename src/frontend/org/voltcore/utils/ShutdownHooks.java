@@ -132,7 +132,7 @@ public class ShutdownHooks
         if (m_iAmAServer && !m_crashing && ShutdownHooks.m_crashMessage) {
             VoltLogger voltLogger = new VoltLogger("CONSOLE");
             String msg = "The VoltDB server will shut down due to a control-C or other JVM exit.";
-            CoreUtils.PrintGoodLookingLog(voltLogger, msg, Level.WARN);
+            CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
         }
         for (Entry<Integer, List<ShutdownTask>> tasks : m_shutdownTasks.entrySet()) {
             for (ShutdownTask task : tasks.getValue()) {
