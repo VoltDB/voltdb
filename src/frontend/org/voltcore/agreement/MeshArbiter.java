@@ -459,19 +459,22 @@ public class MeshArbiter {
                     // In case of concurrent fault, handle it
                     m_mailbox.deliverFront(msg);
                     return false;
-                } else {
-                    // Can this final update message give us new information?
-                    // For every final update message this node expects to receive, two messages will be
-                    // actually send to ZookeeperServer thread. One is a fault message which is used to
-                    // trigger a new round of message broadcasting, another is the original final update
-                    // message which is used by mesh arbiter to reach the agreement.
-                    if (!m_seeker.alreadyKnow(fm)) {
-                        if (mayIgnore(hsIds, fm) == Discard.DoNot) {
-                            m_mailbox.deliverFront(msg);
-                            return false;
-                        }
-                    }
                 }
+
+                /* So this is a final update message.
+                 * For every final update message this node expects to receive, two messages will be
+                 * actually send to ZookeeperServer thread. One is a fault message which is used to
+                 * trigger a new round of message broadcasting, another is the original final update
+                 * message which is used by mesh arbiter to reach the agreement.
+                 */
+
+                // Send the message to ZookeeperServer thread only if the final update message can give
+                // us new information (new alive/dead host)
+                if (!m_seeker.alreadyKnow(fm) && mayIgnore(hsIds, fm) == Discard.DoNot) {
+                    m_mailbox.deliverFront(msg);
+                    return false;
+                }
+
             }
 
             for (SiteFailureMessage remoteDecision : m_decidedSurvivors.values()) {
