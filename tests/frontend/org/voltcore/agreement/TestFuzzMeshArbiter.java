@@ -149,7 +149,9 @@ public class TestFuzzMeshArbiter extends TestCase
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
-        FuzzTestState state = new FuzzTestState(0L, m_nodes.keySet());
+        long seed = System.currentTimeMillis();
+        System.out.println("Fuzz State Seed: " + seed);
+        FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
         state.killNode(0);
         state.setUpExpectations();
 
@@ -166,7 +168,9 @@ public class TestFuzzMeshArbiter extends TestCase
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
-        FuzzTestState state = new FuzzTestState(0L, m_nodes.keySet());
+        long seed = System.currentTimeMillis();
+        System.out.println("Fuzz State Seed: " + seed);
+        FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
         state.killLink(0, 1);
         state.setUpExpectations();
 
@@ -182,7 +186,9 @@ public class TestFuzzMeshArbiter extends TestCase
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
-        FuzzTestState state = new FuzzTestState(0L, m_nodes.keySet());
+        long seed = System.currentTimeMillis();
+        System.out.println("Fuzz State Seed: " + seed);
+        FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
         state.killUnidirectionalLink(0, 1);
         state.setUpExpectations();
 
@@ -553,7 +559,9 @@ public class TestFuzzMeshArbiter extends TestCase
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
-        FuzzTestState state = new FuzzTestState(0L, m_nodes.keySet());
+        long seed = System.currentTimeMillis();
+        System.out.println("Fuzz State Seed: " + seed);
+        FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
         int nextid = clusterSize;
         for (int i = 0; i < 8; ++i) {
             for (int k = 0; k < killSize; ++k){
