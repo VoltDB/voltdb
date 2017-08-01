@@ -29,8 +29,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Random;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -40,10 +38,11 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
-import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UDF_TEST;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UserDefinedTestException;
+
+import junit.framework.Test;
 
 /**
  * Tests of SQL statements that use User-Defined Functions (UDF's).
@@ -391,13 +390,14 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         GeographyPointValue expectedResult = new GeographyPointValue(4, 6);
         testFunction("add2GeographyPoint(POINT1, POINT2)", expectedResult, VoltType.GEOGRAPHY_POINT, columnNames, columnValues);
     }
-    public void testAddGeographyPointToGeography() throws IOException, ProcCallException {
-        String[] columnNames  = {"POLYGON", "POINT1"};
-        String[] columnValues = {SIMPLE_POLYGON_WTK, "PointFromText('POINT(1 2)')"};
-        GeographyValue expectedResult = new GeographyValue("POLYGON((4 5, -2 5, -2 -1, 4 -1, 4 5),"
-                                                         + "(2 3, 2 4, 3 3, 2 3),(0 1, 0 0, -1 1, 0 1))");
-        testFunction("addGeographyPointToGeography(POLYGON, POINT1)", expectedResult, VoltType.GEOGRAPHY, columnNames, columnValues);
-    }
+
+//    public void testAddGeographyPointToGeography() throws IOException, ProcCallException {
+//        String[] columnNames  = {"POLYGON", "POINT1"};
+//        String[] columnValues = {SIMPLE_POLYGON_WTK, "PointFromText('POINT(1 2)')"};
+//        GeographyValue expectedResult = new GeographyValue("POLYGON((4 5, -2 5, -2 -1, 4 -1, 4 5),"
+//                                                         + "(2 3, 2 4, 3 3, 2 3),(0 1, 0 0, -1 1, 0 1))");
+//        testFunction("addGeographyPointToGeography(POLYGON, POINT1)", expectedResult, VoltType.GEOGRAPHY, columnNames, columnValues);
+//    }
 
     // Test more UDF's with two arguments; these UDF calls have results that
     // exceed their limits; in some cases, this means that they wrap around,
@@ -852,8 +852,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("tudf-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
-        // TODO: uncomment this once UDF's work on multiple-node clusters (ENG-12861):
-//        builder.addServerConfig(config);
+        builder.addServerConfig(config);
 
         return builder;
     }
