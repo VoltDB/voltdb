@@ -159,11 +159,8 @@ public class ExportGeneration implements Generation {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
-                    if (addDataSources(table, hostId, partitions)) {
-                        partitionsInUse.addAll(partitions);
-                        mailboxNeeded = true;
-                    }
-
+                    addDataSources(table, hostId, partitions);
+                    partitionsInUse.addAll(partitions);
                 }
             }
         }
@@ -406,11 +403,9 @@ public class ExportGeneration implements Generation {
     }
 
     // silly helper to add datasources for a table catalog object
-    private boolean addDataSources(Table table, int hostId, List<Integer> partitions)
+    private void addDataSources(Table table, int hostId, List<Integer> partitions)
     {
-        boolean dataSourceAdded = false;
         for (Integer partition : partitions) {
-
             /*
              * IOException can occur if there is a problem
              * with the persistent aspects of the datasource storage
@@ -434,7 +429,6 @@ public class ExportGeneration implements Generation {
                     exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
                             " signature " + table.getSignature() + " partition id " + partition);
                     dataSourcesForPartition.put(table.getSignature(), exportDataSource);
-                    dataSourceAdded = true;
                 }
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB(
@@ -442,7 +436,6 @@ public class ExportGeneration implements Generation {
                         table.getTypeName() + " host id " + hostId, true, e);
             }
         }
-        return dataSourceAdded;
     }
 
     // pause polling on the all the data source for the given partitions
