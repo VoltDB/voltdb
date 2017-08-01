@@ -140,25 +140,25 @@ public class MetroSimulation {
         System.out.println(config.getConfigDumpString());
     }
 
-    public static final Map<Integer,Integer> SATION_TO_NEXT_STATION = new HashMap<>();
+    public static final Map<Integer,Integer> STATION_TO_NEXT_STATION = new HashMap<>();
     static {
-        SATION_TO_NEXT_STATION.put(1, 2*60000);
-        SATION_TO_NEXT_STATION.put(2, 2*60000);
-        SATION_TO_NEXT_STATION.put(3, 3*60000);
-        SATION_TO_NEXT_STATION.put(4, 4*60000);
-        SATION_TO_NEXT_STATION.put(5, 2*60000);
-        SATION_TO_NEXT_STATION.put(6, 2*60000);
-        SATION_TO_NEXT_STATION.put(7, 1*60000);
-        SATION_TO_NEXT_STATION.put(8, 2*60000);
-        SATION_TO_NEXT_STATION.put(9, 2*60000);
-        SATION_TO_NEXT_STATION.put(10,2*60000);
-        SATION_TO_NEXT_STATION.put(11,2*60000);
-        SATION_TO_NEXT_STATION.put(12,2*60000);
-        SATION_TO_NEXT_STATION.put(13,2*60000);
-        SATION_TO_NEXT_STATION.put(14,3*60000);
-        SATION_TO_NEXT_STATION.put(15,2*60000);
-        SATION_TO_NEXT_STATION.put(16,3*60000);
-        SATION_TO_NEXT_STATION.put(17,3*60000);
+        STATION_TO_NEXT_STATION.put(1, 2*60000);
+        STATION_TO_NEXT_STATION.put(2, 2*60000);
+        STATION_TO_NEXT_STATION.put(3, 3*60000);
+        STATION_TO_NEXT_STATION.put(4, 4*60000);
+        STATION_TO_NEXT_STATION.put(5, 2*60000);
+        STATION_TO_NEXT_STATION.put(6, 2*60000);
+        STATION_TO_NEXT_STATION.put(7, 1*60000);
+        STATION_TO_NEXT_STATION.put(8, 2*60000);
+        STATION_TO_NEXT_STATION.put(9, 2*60000);
+        STATION_TO_NEXT_STATION.put(10, 2*60000);
+        STATION_TO_NEXT_STATION.put(11, 2*60000);
+        STATION_TO_NEXT_STATION.put(12, 2*60000);
+        STATION_TO_NEXT_STATION.put(13, 2*60000);
+        STATION_TO_NEXT_STATION.put(14, 3*60000);
+        STATION_TO_NEXT_STATION.put(15, 2*60000);
+        STATION_TO_NEXT_STATION.put(16, 3*60000);
+        STATION_TO_NEXT_STATION.put(17, 3*60000);
     }
 
 
@@ -271,7 +271,7 @@ public class MetroSimulation {
             if (lastState == 0) { //Stopped
                 startTime = startTime + wtime;
             } else { //Moving and arriving
-                startTime = startTime + SATION_TO_NEXT_STATION.get(curStation) + wtime;
+                startTime = startTime + STATION_TO_NEXT_STATION.get(curStation) + wtime;
             }
             if (lastState == 0) {
                 lastState = 1;
