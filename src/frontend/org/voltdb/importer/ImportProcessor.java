@@ -20,9 +20,11 @@ package org.voltdb.importer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -33,7 +35,6 @@ import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Throwables;
-import java.util.concurrent.ExecutionException;
 
 public class ImportProcessor implements ImportDataProcessor {
 
@@ -169,19 +170,24 @@ public class ImportProcessor implements ImportDataProcessor {
         try {
 
             ImporterWrapper wrapper = m_importers.get(bundleJar);
+            boolean addNew = false;
             if (wrapper == null) {
                 AbstractImporterFactory importFactory = importerModules.get(bundleJar);
+                addNew = true;
                 wrapper = new ImporterWrapper(importFactory);
                 String name = wrapper.getImporterType();
                 if (name == null || name.trim().isEmpty()) {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
-                m_importers.put(bundleJar, wrapper);
             }
             wrapper.configure(properties, formatterBuilder);
+            if (addNew) {
+                m_importers.put(bundleJar, wrapper);
+            }
+
         } catch(Throwable t) {
+            // Don't crash the cluster, just don't keep the importer around.
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
-            Throwables.propagate(t);
         }
     }
 
