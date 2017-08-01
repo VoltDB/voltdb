@@ -707,7 +707,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                 if (!authenticated) {
                     ScheduledExecutorService es = VoltDB.instance().getSES(true);
-
                     if (es != null && !es.isShutdown()) {
                         es.submit(new Runnable() {
                             @Override
