@@ -25,7 +25,6 @@ import java.util.Set;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.StatementCompiler;
@@ -83,48 +82,48 @@ public class LoadedProcedureSet {
      * @param catalogContext
      */
     public void loadProcedures(CatalogContext catalogContext) {
-        loadProcedures(catalogContext, false);
+        loadProcedures(catalogContext, true);
     }
 
     /**
      * Load procedures.
-     * If @param forUpdateOnly, it will try to reuse existing loaded procedures
-     * as many as possible, other than completely loading procedures from beginning.
-     * @param catalogContext
-     * @param forUpdateOnly
      */
-    public void loadProcedures(CatalogContext catalogContext, boolean forUpdateOnly)
+    public void loadProcedures(CatalogContext catalogContext, boolean isInitOrReplay)
     {
         m_defaultProcManager = catalogContext.m_defaultProcs;
         // default proc caches clear on catalog update
         m_defaultProcCache.clear();
         m_plannerTool = catalogContext.m_ptool;
 
-        // reload user procedures
-        m_userProcs = loadUserProcedureRunners(catalogContext, m_site);
+        // reload all system procedures from beginning
+        m_sysProcs = loadSystemProcedures(catalogContext, m_site);
 
-        if (forUpdateOnly) {
-            // When catalog updates, only user procedures needs to be reloaded.
-            // System procedures can be left without changes.
-            reInitSystemProcedureRunners(catalogContext);
-        } else {
-            // reload all system procedures from beginning
-            m_sysProcs = loadSystemProcedures(catalogContext, m_site);
+        try {
+            if (isInitOrReplay) {
+                // reload user procedures
+                m_userProcs = loadUserProcedureRunners(catalogContext.database.getProcedures(),
+                                                       catalogContext.getCatalogJar().getLoader(),
+                                                       null,
+                                                       m_site);
+            } else {
+                // When catalog updates, only user procedures needs to be reloaded.
+                m_userProcs = catalogContext.getPreparedUserProcedures(m_site);
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error trying to load user procedures: " + e.getMessage());
         }
     }
 
-    private static ImmutableMap<String, ProcedureRunner> loadUserProcedureRunners(
-            CatalogContext catalogContext,
-            SiteProcedureConnection site
-            ) {
+    public static ImmutableMap<String, ProcedureRunner> loadUserProcedureRunners(
+            Iterable<Procedure> catalogProcedures,
+            ClassLoader loader,
+            ImmutableMap<String, Class<?>> classesMap,
+            SiteProcedureConnection site) throws Exception
+    {
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
 
-        // load up all the stored procedures
-        final CatalogMap<Procedure> catalogProcedures = catalogContext.database.getProcedures();
-
         for (final Procedure proc : catalogProcedures) {
-            // Sysprocs used to be in the catalog. Now they aren't. Ignore
-            // sysprocs found in old catalog versions. (PRO-365)
+            // Ignore sysprocs found in catalog.
             if (proc.getTypeName().startsWith("@")) {
                 continue;
             }
@@ -137,30 +136,27 @@ public class LoadedProcedureSet {
             VoltProcedure procedure = null;
 
             if (proc.getHasjava()) {
-
                 final String className = proc.getClassname();
                 Class<?> procClass = null;
-                try {
-                    procClass = catalogContext.classForProcedure(className);
-                }
-                catch (final ClassNotFoundException e) {
-                    if (className.startsWith("org.voltdb.")) {
-                        String msg = String.format(LoadedProcedureSet.ORGVOLTDB_PROCNAME_ERROR_FMT, className);
-                        VoltDB.crashLocalVoltDB(msg, false, null);
+                if (loader == null) {
+                    assert(classesMap != null);
+                    procClass = classesMap.get(className);
+                } else {
+                    try {
+                        procClass = CatalogContext.classForProcedure(className, loader);
+                    } catch (final ClassNotFoundException e) {
+                        String msg; // generate a better ClassNotFoundException message
+                        if (className.startsWith("org.voltdb.")) {
+                            msg = String.format(LoadedProcedureSet.ORGVOLTDB_PROCNAME_ERROR_FMT, className);
+                        } else {
+                            msg = String.format(LoadedProcedureSet.UNABLETOLOAD_ERROR_FMT, className);
+                        }
+                        throw new ClassNotFoundException(msg);
                     }
-                    else {
-                        String msg = String.format(LoadedProcedureSet.UNABLETOLOAD_ERROR_FMT, className);
-                        VoltDB.crashLocalVoltDB(msg, false, null);
-                    }
                 }
-                try {
-                    procedure = (VoltProcedure) procClass.newInstance();
-                }
-                catch (final Exception e) {
-                    // TODO: remove the extra meaningless parameter "0"
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                                    new Object[] { site.getCorrespondingSiteId(), 0}, e);
-                }
+
+                // create new instance VoltProcedure
+                procedure = (VoltProcedure) procClass.newInstance();
             }
             else {
                 procedure = new ProcedureRunner.StmtProcedure();
@@ -172,7 +168,6 @@ public class LoadedProcedureSet {
         }
         return builder.build();
     }
-
 
     private ImmutableMap<String, ProcedureRunner> loadSystemProcedures(
             CatalogContext catalogContext,
@@ -245,14 +240,6 @@ public class LoadedProcedureSet {
             }
         }
         return builder.build();
-    }
-
-    public void reInitSystemProcedureRunners(CatalogContext catalogContext)
-    {
-        for (Entry<String, ProcedureRunner> entry: m_sysProcs.entrySet()) {
-            ProcedureRunner runner = entry.getValue();
-            runner.reInitSysProc(catalogContext);
-        }
     }
 
     public ProcedureRunner getProcByName(String procName)
