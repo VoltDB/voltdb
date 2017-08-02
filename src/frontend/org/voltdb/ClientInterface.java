@@ -88,6 +88,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
+import org.voltdb.iv2.BalanceSpiInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
@@ -2125,20 +2126,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * and find the host which hosts the partition replica and the least number of partition leaders.
      * send BalanceSPIMessage to the host with older partition leader to initiate @BalanceSPI
      * Repeatedly call this task until no qualified partition is available.
-     * @param interval task execution interval
      */
-    public void balanceSPI(int interval, int hostCount) {
+    public void balanceSPI(int hostCount) {
 
-        //grab a zk lock
+        //grab a lock
         final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
         if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Snapshot, node joining or BalanceSPI in progress, no BalanceSPI on this host");
+                tmLog.debug("Snapshot, rejoin or spi migration, in progress.");
             }
             return;
         }
 
-        //The candidate pair is deterministic on every host.
         Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(hostCount, hostId);
 
         //The host does not have any thing to do this time. It does not mean that the host does not
@@ -2172,7 +2171,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return;
         }
 
-        RealVoltDB db = (RealVoltDB)VoltDB.instance();
         try {
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
             final String procedureName = "@BalanceSPI";
@@ -2181,10 +2179,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             StoredProcedureInvocation spi = new StoredProcedureInvocation();
             spi.setProcName(procedureName);
 
-            tmLog.info(String.format("Moving the leader of partition %d to host %d (partition key %d)",
-                    partitionId, targetHostId, partitionKey));
-
             if (tmLog.isDebugEnabled()) {
+                tmLog.debug(String.format("Move the leader of partition %d to host %d", partitionId, targetHostId));
                 VoltTable vt = Cartographer.peekTopology(m_cartographer);
                 tmLog.debug("[@balanceSPI]\n" + vt.toFormattedString());
             }
@@ -2193,6 +2189,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (spi.getSerializedParams() == null) {
                 spi = MiscUtils.roundTripForCL(spi);
             }
+
+            CoreZK.removeSPIBalanceInfo(m_zk);
+            //Info saved for the node failure handling
+            BalanceSpiInfo spiInfo = new BalanceSpiInfo(hostId, targetHostId,
+                    m_cartographer.getHSIDForPartitionHost(hostId, partitionId),
+                    m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
+                    partitionId);
+            CoreZK.createSPIBalanceInfo(m_zk, spiInfo);
 
             synchronized (m_executeTaskAdpater) {
                 createTransaction(m_executeTaskAdpater.connectionId(),
@@ -2207,35 +2211,35 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final long timeoutMS = 5 * 60 * 1000;
             ClientResponse resp= cb.getResponse(timeoutMS);
             if (resp.getStatus() == ClientResponse.SUCCESS) {
-                tmLog.info(String.format("The mastership for partition %d has been moved to host %d.",
+                tmLog.info(String.format("The partition leader for %d has been moved to host %d.",
                         partitionId, targetHostId));
-              //spin wait till it sees the new master
-              long remainingWaitTime = TimeUnit.MINUTES.toSeconds(5); // 5 max minutes;
-              final int waitingInterval = 1;
-              while (remainingWaitTime > 0) {
-                  try {
-                      Thread.sleep(TimeUnit.SECONDS.toMillis(waitingInterval));
-                  } catch (InterruptedException ignoreIt) {
-                  }
-                  remainingWaitTime -= waitingInterval;
-                  if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
-                      break;
-                  }
-              }
             } else {
+                //not necessary a failure.
                 tmLog.warn(String.format("Fail to move the leader of partition %d to host %d. %s",
                         partitionId, targetHostId, resp.getStatusString()));
             }
         } catch (IOException | InterruptedException e) {
-            tmLog.error(String.format("Fail to process leader change for partition %d: %s", partitionId, e.getMessage()));
+            tmLog.warn(String.format("errors in leader change for partition %d: %s", partitionId, e.getMessage()));
         } finally {
-            //wait to avoid another host to start @BalaneSPI right away
+            long remainingWaitTime = TimeUnit.MINUTES.toSeconds(5);
+            final int waitingInterval = 1;
+            while (remainingWaitTime > 0) {
+                try {
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(waitingInterval));
+                } catch (InterruptedException ignoreIt) {
+                }
+                remainingWaitTime -= waitingInterval;
+                if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
+                    break;
+                }
+            }
+            RealVoltDB db = (RealVoltDB)VoltDB.instance();
             db.scheduleWork(new Runnable() {
                 @Override
                 public void run() {
                     CoreZK.removeSPIBalanceIndicator(m_zk);
                 }
-            }, interval, 0, TimeUnit.SECONDS);
+            }, 5, 0, TimeUnit.SECONDS);
         }
     }
 }

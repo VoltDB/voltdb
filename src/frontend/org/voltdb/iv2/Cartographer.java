@@ -88,6 +88,9 @@ public class Cartographer extends StatsSource
     private final int m_configuredReplicationFactor;
     private final boolean m_partitionDetectionEnabled;
 
+    //partition masters by host
+    private final Map<Integer, Set<Long>> m_currentMastersByHost = Maps.newTreeMap();
+
     private final ExecutorService m_es
             = CoreUtils.getCachedSingleThreadExecutor("Cartographer", 15000);
 
@@ -143,10 +146,18 @@ public class Cartographer extends StatsSource
             Map<Long, Integer> hsIdToPart = new HashMap<Long, Integer>();
             Set<LeaderCallBackInfo> newMasters = new HashSet<LeaderCallBackInfo>();
             Set<Long> newHSIDs = Sets.newHashSet();
+            Map<Integer, Set<Long>> newMastersByHost = Maps.newTreeMap();
             for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
                 Long hsid = e.getValue().m_HSID;
                 newHSIDs.add(hsid);
                 hsIdToPart.put(hsid, e.getKey());
+                int hostId = CoreUtils.getHostIdFromHSId(hsid);
+                Set<Long> masters = newMastersByHost.get(hostId);
+                if (masters == null) {
+                    masters = Sets.newHashSet();
+                    newMastersByHost.put(hostId, masters);
+                }
+                masters.add(hsid);
                 if (!m_currentSPMasters.contains(hsid)) {
                     // we want to see items which are present in the new map but not in the old,
                     // these are newly promoted SPIs
@@ -174,6 +185,8 @@ public class Cartographer extends StatsSource
 
             m_currentSPMasters.clear();
             m_currentSPMasters.addAll(newHSIDs);
+            m_currentMastersByHost.clear();
+            m_currentMastersByHost.putAll(newMastersByHost);
         }
     };
 
@@ -869,6 +882,15 @@ public class Cartographer extends StatsSource
             }
         }
         return -1;
+    }
+
+    //return the number of masters on a host
+    public int getMasterCount(int hostid) {
+        Set<Long> masters = m_currentMastersByHost.get(hostid);
+        if (masters == null) {
+            return 0;
+        }
+        return masters.size();
     }
 
     //Utility method to peek the topology

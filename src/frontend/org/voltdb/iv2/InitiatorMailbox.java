@@ -66,11 +66,11 @@ public class InitiatorMailbox implements Mailbox
         SCHEDULE_IN_SITE_THREAD = Boolean.valueOf(System.getProperty("SCHEDULE_IN_SITE_THREAD", "true"));
     }
 
-    public static enum BALANCE_SPI_STATUS {
-        NONE,  //no or complete balance spi
-        SRC_TXN_DRAINED, //new master is notified that old master has drained
-        SRC_STARTED, // @BalanceSPI on old master has been started
-        DEST_TXN_RESTART // new master needs txn restart before old master drains txns
+    public static enum BalanceSpiStatus {
+        NONE,               //no or complete balance spi
+        SRC_TXN_DRAINED,    //new master is notified that old master has drained
+        SRC_STARTED,        //@BalanceSPI on old master has been started
+        DEST_TXN_RESTART    //new master needs txn restart before old master drains txns
     }
 
     VoltLogger hostLog = new VoltLogger("HOST");
@@ -89,7 +89,7 @@ public class InitiatorMailbox implements Mailbox
     //Queue all the transactions on the new master after SPI balance till it receives a message
     //from its older master which has drained all the transactions.
     private long m_newLeaderHSID = Long.MIN_VALUE;
-    private BALANCE_SPI_STATUS m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+    private BalanceSpiStatus m_balanceSPIStatus = BalanceSpiStatus.NONE;
 
     /*
      * Hacky global map of initiator mailboxes to support assertions
@@ -394,7 +394,7 @@ public class InitiatorMailbox implements Mailbox
         scheduler.checkPointBalanceSPI();
         scheduler.m_isLeader = false;
         m_newLeaderHSID = newLeaderHSId;
-        m_balanceSPIStatus = BALANCE_SPI_STATUS.SRC_STARTED;
+        m_balanceSPIStatus = BalanceSpiStatus.SRC_STARTED;
 
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
@@ -423,7 +423,7 @@ public class InitiatorMailbox implements Mailbox
         }
 
         if (message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.FAST
-                && m_balanceSPIStatus == BALANCE_SPI_STATUS.NONE) {
+                && m_balanceSPIStatus == BalanceSpiStatus.NONE) {
             return false;
         }
 
@@ -432,7 +432,7 @@ public class InitiatorMailbox implements Mailbox
         //(1) The site has been demoted, not a leader any more,  but receives messages which are intended to the leader
         //(2) The site becomes new leader via @BalanceSPI. Transactions will be restarted before is gets notification from old
         //    leader that transactions on older leader have been drained
-        if (!m_scheduler.isLeader() || (m_scheduler.isLeader() && m_balanceSPIStatus == BALANCE_SPI_STATUS.DEST_TXN_RESTART)) {
+        if (!m_scheduler.isLeader() || (m_scheduler.isLeader() && m_balanceSPIStatus == BalanceSpiStatus.DEST_TXN_RESTART)) {
             InitiateResponseMessage response = new InitiateResponseMessage(message);
             response.setMisrouted(message.getStoredProcedureInvocation());
             response.m_sourceHSId = getHSId();
@@ -613,12 +613,12 @@ public class InitiatorMailbox implements Mailbox
     //that previous partition leader has drained its txns
     private void setBalanceSPIStatus(BalanceSPIMessage message) {
 
-        if (m_balanceSPIStatus == BALANCE_SPI_STATUS.NONE) {
+        if (m_balanceSPIStatus == BalanceSpiStatus.NONE) {
             //message comes before this site is promoted
-            m_balanceSPIStatus = BALANCE_SPI_STATUS.SRC_TXN_DRAINED;
-        } else if (m_balanceSPIStatus == BALANCE_SPI_STATUS.DEST_TXN_RESTART) {
+            m_balanceSPIStatus = BalanceSpiStatus.SRC_TXN_DRAINED;
+        } else if (m_balanceSPIStatus == BalanceSpiStatus.DEST_TXN_RESTART) {
             //if the new leader has been promoted, stop restarting txns.
-            m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+            m_balanceSPIStatus = BalanceSpiStatus.NONE;
         }
 
         tmLog.info("Balance spi new leader " +
@@ -629,21 +629,21 @@ public class InitiatorMailbox implements Mailbox
     //the site for new partition leader
     public void setBalanceSPIStatus(boolean spiBalanced) {
         if (!spiBalanced) {
-            m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+            m_balanceSPIStatus = BalanceSpiStatus.NONE;
             m_newLeaderHSID = Long.MIN_VALUE;
             return;
         }
 
         //The previous leader has already drained all txns
-        if (m_balanceSPIStatus == BALANCE_SPI_STATUS.SRC_TXN_DRAINED) {
-            m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+        if (m_balanceSPIStatus == BalanceSpiStatus.SRC_TXN_DRAINED) {
+            m_balanceSPIStatus = BalanceSpiStatus.NONE;
             tmLog.info("Balance spi transactions on previous partition leader are drained. New leader:" +
                             CoreUtils.hsIdToString(m_hsId) + " status:" + m_balanceSPIStatus);
             return;
         }
 
         //Wait for the notification from old partition leader
-        m_balanceSPIStatus = BALANCE_SPI_STATUS.DEST_TXN_RESTART;
+        m_balanceSPIStatus = BalanceSpiStatus.DEST_TXN_RESTART;
         tmLog.info("Balance spi restart txns on new leader:" + CoreUtils.hsIdToString(m_hsId) + " status:" + m_balanceSPIStatus);
     }
 
@@ -665,7 +665,7 @@ public class InitiatorMailbox implements Mailbox
         send(message.getNewLeaderHSID(), message);
 
         //reset status on the old partition leader
-        m_balanceSPIStatus = BALANCE_SPI_STATUS.NONE;
+        m_balanceSPIStatus = BalanceSpiStatus.NONE;
         m_repairLog.setLeaderState(false);
         tmLog.info("Balance spi previous leader " + CoreUtils.hsIdToString(m_hsId) + " notifies new leader " +
                 CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_balanceSPIStatus);

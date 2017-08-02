@@ -26,8 +26,10 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONException;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-
+import org.voltdb.iv2.BalanceSpiInfo;
 import com.google_voltpatches.common.collect.Lists;
 
 /**
@@ -189,22 +191,37 @@ public class CoreZK {
     }
 
     /**
+     * Checks if the cluster suffered an aborted join or node shutdown and is still in the process of cleaning up.
+     * @param zk    ZooKeeper client
+     * @return true if the cluster is still cleaning up.
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    public static boolean isPartitionCleanupInProgress(ZooKeeper zk) throws KeeperException, InterruptedException
+    {
+        List<String> children = zk.getChildren(VoltZK.leaders_initiators, null);
+        List<ZKUtil.ChildrenCallback> childrenCallbacks = Lists.newArrayList();
+        for (String child : children) {
+            ZKUtil.ChildrenCallback callback = new ZKUtil.ChildrenCallback();
+            zk.getChildren(ZKUtil.joinZKPath(VoltZK.leaders_initiators, child), false, callback, null);
+            childrenCallbacks.add(callback);
+        }
+
+        for (ZKUtil.ChildrenCallback callback : childrenCallbacks) {
+            if (callback.getChildren().isEmpty()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Creates a SPI migration blocker for the given rejoining host.
      * This prevents other hosts from migrating SPI at the same time.
      *
-     * @param zk        ZooKeeper client
-     * @param hostId    The rejoining host ID
-     * @return true if the blocker is created successfully, or the host ID
      */
-    public static boolean createSPIBalanceIndicator(ZooKeeper zk, int hostId)
-    {
-        try {
-            if (CoreZK.isPartitionCleanupInProgress(zk)) {
-                return false;
-            }
-        } catch (KeeperException | InterruptedException e) {
-            return false;
-        }
+    public static boolean createSPIBalanceInfo(ZooKeeper zk, BalanceSpiInfo info) {
 
         try {
           //snapshot in progress
@@ -223,11 +240,82 @@ public class CoreZK {
         } catch (KeeperException | InterruptedException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("Unable to check the existence of join or rejoin indicator", true, e);
         }
+
         try {
-            zk.create(spi_balance_blocker,
-                      ByteBuffer.allocate(4).putInt(hostId).array(),
-                      Ids.OPEN_ACL_UNSAFE,
-                      CreateMode.PERSISTENT);
+            zk.create(spi_balance_blocker, info.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NODEEXISTS) {
+                return false;
+            }
+
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+        } catch (InterruptedException | JSONException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to create spi balance Indicator", true, e);
+        }
+
+        return true;
+    }
+
+    /**
+     * get the id of the host which started spi balance
+     */
+    public static BalanceSpiInfo getSPIBalanceInfo(ZooKeeper zk) {
+        try {
+            byte[] data = zk.getData(spi_balance_blocker, null, null);
+            if (data != null) {
+                BalanceSpiInfo info;
+                info = new BalanceSpiInfo(data);
+                return info;
+            }
+        } catch (KeeperException | InterruptedException | JSONException e) {
+        }
+        return null;
+    }
+
+    /**
+     * Removes the spi balance blocker if the current rejoin blocker contains the given host ID.
+     * @return true if the blocker is removed successfully, false otherwise.
+     */
+    public static boolean removeSPIBalanceInfo(ZooKeeper zk) {
+        try {
+            Stat stat = new Stat();
+            zk.getData(spi_balance_blocker, false, stat);
+            zk.delete(spi_balance_blocker, stat.getVersion());
+            return true;
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NONODE ||
+                e.code() == KeeperException.Code.BADVERSION) {
+                return true;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return false;
+    }
+
+    public static boolean createSPIBalanceIndicator(ZooKeeper zk, int hostId) {
+
+        try {
+             //snapshot in progress
+            List<String> keys = zk.getChildren(VoltZK.nodes_currently_snapshotting, false);
+            if (keys.isEmpty()) {
+                List<String> requests = zk.getChildren(VoltZK.request_truncation_snapshot, false);
+                if (!(requests.isEmpty())) {
+                    return false;
+                }
+            }
+            //elastic join or rejoin is in progress
+            if(zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null ||
+                    zk.exists(rejoin_node_blocker, false) != null) {
+                return false;
+            }
+        } catch (KeeperException | InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to check the existence of join or rejoin indicator", true, e);
+        }
+
+        try {
+            zk.create(spi_balance_blocker, ByteBuffer.allocate(4).putInt(hostId).array(),
+                      Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (KeeperException e) {
             if (e.code() == KeeperException.Code.NODEEXISTS) {
                 return false;
@@ -260,32 +348,6 @@ public class CoreZK {
         } catch (Exception e) {
             return false;
         }
-        return false;
-    }
-
-    /**
-     * Checks if the cluster suffered an aborted join or node shutdown and is still in the process of cleaning up.
-     * @param zk    ZooKeeper client
-     * @return true if the cluster is still cleaning up.
-     * @throws KeeperException
-     * @throws InterruptedException
-     */
-    public static boolean isPartitionCleanupInProgress(ZooKeeper zk) throws KeeperException, InterruptedException
-    {
-        List<String> children = zk.getChildren(VoltZK.leaders_initiators, null);
-        List<ZKUtil.ChildrenCallback> childrenCallbacks = Lists.newArrayList();
-        for (String child : children) {
-            ZKUtil.ChildrenCallback callback = new ZKUtil.ChildrenCallback();
-            zk.getChildren(ZKUtil.joinZKPath(VoltZK.leaders_initiators, child), false, callback, null);
-            childrenCallbacks.add(callback);
-        }
-
-        for (ZKUtil.ChildrenCallback callback : childrenCallbacks) {
-            if (callback.getChildren().isEmpty()) {
-                return true;
-            }
-        }
-
         return false;
     }
 }

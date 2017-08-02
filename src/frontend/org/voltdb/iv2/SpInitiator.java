@@ -44,6 +44,8 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.messaging.BalanceSPIMessage;
+
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Sets;
 
@@ -212,11 +214,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                     if (balanceSPI) {
                         String hsidStr = VoltZK.suffixHSIdsWithBalanceSPIRequest(m_initiatorMailbox.getHSId());
-                        iv2masters.put(m_partitionId,hsidStr);
-                        if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("Site " + CoreUtils.hsIdToString(m_initiatorMailbox.getHSId()) +
-                                    " becomes new leader from SPI balance request.");
-                        }
+                        iv2masters.put(m_partitionId, hsidStr);
+                        tmLog.info(m_whoami + "becomes new leader from SPI balance request.");
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
@@ -232,7 +231,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + "interrupted during leader promotion after "
                             + (System.currentTimeMillis() - startTime) + " ms. of "
                             + "trying. Retrying.");
-                    m_initiatorMailbox.setBalanceSPIStatus(false);
                 }
             }
             // Tag along and become the export master too
@@ -281,5 +279,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
             tmLog.info("Interrupted during shutdown", e);
         }
         super.shutdown();
+    }
+
+    public void setBalanceSPIStatus(long hsId) {
+        tmLog.info("Reset Balance SPI status on "+ CoreUtils.hsIdToString(getInitiatorHSId()));
+        BalanceSPIMessage message = new BalanceSPIMessage(hsId, getInitiatorHSId());
+        m_initiatorMailbox.deliver(message);
     }
 }

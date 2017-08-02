@@ -131,11 +131,13 @@ import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
+import org.voltdb.iv2.BalanceSpiInfo;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
+import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -1632,6 +1634,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 false, null);
                         return;
                     }
+
+                    handleHostsFailedForBalanceSpi(failedHosts);
+
                     // Send KSafety trap - BTW the side effect of
                     // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
                     // creates the ksafety stats set
@@ -1669,7 +1674,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 hostLog);
                         m_messenger.removeStopNodeNotice(hostId);
                     }
-                    CoreZK.removeSPIBalanceIndicator(m_messenger.getZK());
                     // If the current node hasn't finished rejoin when another
                     // node fails, fail this node to prevent locking up the
                     // system.
@@ -1684,6 +1688,54 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_clientInterface.handleFailedHosts(failedHosts);
                 }
             });
+        }
+    }
+
+    private void handleHostsFailedForBalanceSpi(Set<Integer> failedHosts) {
+
+        BalanceSpiInfo spiInfo = CoreZK.getSPIBalanceInfo(m_messenger.getZK());
+        if (spiInfo == null){
+            return;
+        }
+
+        //The host which started spi balance is down.
+        //The older leader may not have notified the new leader that it has drained sp transactions.
+        //Thus notify the new leader to process transactions as leader
+        if (failedHosts.contains(spiInfo.getOldLeaderHostId()) &&
+                spiInfo.getNewLeaderHostId() == m_messenger.getHostId()) {
+            for (Initiator initiator : m_iv2Initiators.values()) {
+                if (initiator instanceof SpInitiator) {
+                    SpInitiator init = (SpInitiator)initiator;
+                    if (init.getInitiatorHSId() == spiInfo.getNewLeaderHostId()) {
+                        init.setBalanceSPIStatus(spiInfo.getOldLeaderHostId());
+                        break;
+                    }
+                }
+            }
+        }
+
+        //Is new leader down?
+        if (!failedHosts.contains(spiInfo.getNewLeaderHostId())){
+            return;
+        }
+
+        if (spiInfo.getOldLeaderHostId() == m_messenger.getHostId()) {
+            long leader = m_cartographer.getHSIdForMaster(spiInfo.getPartitionId());
+            //leader still on the old host, that is the new leader does not get chance to be promoted.
+            if (leader == m_messenger.getHostId()) {
+                LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
+                try {
+                    leaderAppointee.start(true);
+                    leaderAppointee.put(spiInfo.getPartitionId(), spiInfo.getOldLeaderHsid());
+                } catch (InterruptedException | ExecutionException | KeeperException e) {
+                    VoltDB.crashLocalVoltDB("fail to move spi back to " + CoreUtils.hsIdToString(spiInfo.getOldLeaderHsid()),true, e);
+                } finally {
+                    try {
+                        leaderAppointee.shutdown();
+                    } catch (InterruptedException e) {
+                    }
+                }
+            }
         }
     }
 
@@ -2127,16 +2179,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private void scheduleBalanceSpiTask() {
         final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
         if (disableSpiTask) {
-            hostLog.info("BalanceSPI task is not scheduled.");
+            hostLog.info("Balance SPI is not scheduled.");
             return;
         }
+        //cleanup when a node start
+        CoreZK.removeSPIBalanceInfo(m_messenger.getZK());
+        CoreZK.removeSPIBalanceIndicator(m_messenger.getZK());
         final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
         final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "30"));
         Runnable task = () -> {
-            //only works if the cluster is full
-            if (isClusterCompelte()) {
-                m_clientInterface.balanceSPI(interval, m_config.m_hostCount);
+            if (m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0 || !isClusterCompelte()) {
+                return;
             }
+
+            //if the host has less masters than expected minimal, skip the task
+            final int minMasters = (m_cartographer.getPartitionCount() / m_config.m_hostCount);
+            final int currentMasters = m_cartographer.getMasterCount(m_messenger.getHostId());
+            if (currentMasters <= minMasters) {
+                return;
+            }
+            m_clientInterface.balanceSPI(m_config.m_hostCount);
         };
         m_periodicWorks.add(scheduleWork(task, delay, interval, TimeUnit.SECONDS));
     }
