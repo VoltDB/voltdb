@@ -57,6 +57,10 @@
 
 namespace voltdb {
 
+/**
+ * A special iterator class used only for testing.  This class allows
+ * utility functions getRandomTuple and the like to work.
+ */
 class JumpingTableIterator : public TableIterator {
 public:
     JumpingTableIterator(PersistentTable* table);

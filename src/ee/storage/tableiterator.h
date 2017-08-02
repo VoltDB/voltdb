@@ -187,9 +187,18 @@ private:
     /**
      * A struct for members that are used only for some types of
      * iterators.
+     *
+     * The iterator members of this struct will be exclusive based on
+     * the type of table: an iterator for a persistent table will
+     * never use m_tempBlockIterator or m_largeTempBlockIterator.
+     * This struct could actually be a union, but without C++11
+     * support the iterators that use non-trivial constructors are
+     * problematic.
      */
     struct TypeSpecificState {
 
+        /** Construct an invalid iterator that needs to be
+            intitialized. */
         TypeSpecificState()
         : m_persBlockIterator()
         , m_tempBlockIterator()
@@ -198,6 +207,7 @@ private:
         {
         }
 
+        /** Construct an iterator for a persistent table */
         TypeSpecificState(TBMapI it)
         : m_persBlockIterator(it)
         , m_tempBlockIterator()
@@ -206,7 +216,7 @@ private:
         {
         }
 
-
+        /** Construct an iterator for a temp table */
         TypeSpecificState(std::vector<TBPtr>::iterator it, bool deleteAsGo)
         : m_persBlockIterator()
         , m_tempBlockIterator(it)
@@ -215,6 +225,7 @@ private:
         {
         }
 
+        /** Construct an iterator for a large temp table */
         TypeSpecificState(std::vector<int64_t>::iterator it, bool deleteAsGo)
         : m_persBlockIterator()
         , m_tempBlockIterator()
