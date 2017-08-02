@@ -62,6 +62,9 @@ public class CoreZK {
     // root for spi migration nodes
     public static final String spi_balance_blocker = "/core/spi_balance_blocker";
 
+    // root for spi migration nodes
+    public static final String spi_balance_info = "/core/spi_balance_info";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
         root, hosts, readyhosts, readyjoininghosts, hostids
@@ -242,7 +245,7 @@ public class CoreZK {
         }
 
         try {
-            zk.create(spi_balance_blocker, info.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zk.create(spi_balance_info, info.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (KeeperException e) {
             if (e.code() == KeeperException.Code.NODEEXISTS) {
                 return false;
@@ -261,7 +264,7 @@ public class CoreZK {
      */
     public static BalanceSpiInfo getSPIBalanceInfo(ZooKeeper zk) {
         try {
-            byte[] data = zk.getData(spi_balance_blocker, null, null);
+            byte[] data = zk.getData(spi_balance_info, null, null);
             if (data != null) {
                 BalanceSpiInfo info;
                 info = new BalanceSpiInfo(data);
@@ -279,8 +282,8 @@ public class CoreZK {
     public static boolean removeSPIBalanceInfo(ZooKeeper zk) {
         try {
             Stat stat = new Stat();
-            zk.getData(spi_balance_blocker, false, stat);
-            zk.delete(spi_balance_blocker, stat.getVersion());
+            zk.getData(spi_balance_info, false, stat);
+            zk.delete(spi_balance_info, stat.getVersion());
             return true;
         } catch (KeeperException e) {
             if (e.code() == KeeperException.Code.NONODE ||
