@@ -47,7 +47,7 @@ function QueryUI(queryTab) {
             MatchOneQuotedString = /'[^']*'/m,
             MatchDoubleQuotes = /\"/g,
             EscapedDoubleQuoteLiteral = '\\"',
-            MatchBeginCreateMultiStmtProcedure = /as\s+begin\b/gm
+            MatchBeginCreateMultiStmtProcedure = /\bas\s+begin\b/gmi,
             MultiStmtProcNonceLiteral = "#COMMAND_PARSER_REPLACED_MULTISP#",
             QuotedStringNonceLiteral = "#COMMAND_PARSER_REPLACED_STRING#",
             // Generate fixed-length 5-digit nonce values from 100000 - 999999.
