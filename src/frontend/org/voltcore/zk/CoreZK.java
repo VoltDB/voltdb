@@ -225,25 +225,6 @@ public class CoreZK {
      *
      */
     public static boolean createSPIBalanceInfo(ZooKeeper zk, BalanceSpiInfo info) {
-
-        try {
-          //snapshot in progress
-            List<String> keys = zk.getChildren(VoltZK.nodes_currently_snapshotting, false);
-            if (keys.isEmpty()) {
-                List<String> requests = zk.getChildren(VoltZK.request_truncation_snapshot, false);
-                if (!(requests.isEmpty())) {
-                    return false;
-                }
-            }
-            //elastic join or rejoin is in progress
-            if(zk.exists(VoltZK.elasticJoinActiveBlocker, false) != null ||
-                    zk.exists(rejoin_node_blocker, false) != null) {
-                return false;
-            }
-        } catch (KeeperException | InterruptedException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to check the existence of join or rejoin indicator", true, e);
-        }
-
         try {
             zk.create(spi_balance_info, info.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (KeeperException e) {
