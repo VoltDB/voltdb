@@ -66,7 +66,7 @@ function jars-ifneeded() {
 
 # Init to directory voltdbroot
 function voltinit-ifneeded() {
-    voltdb init --force
+    voltdb init -C deployment.xml --force
 }
 
 # run the voltdb server locally
@@ -83,6 +83,10 @@ function init() {
     #csvloader --servers $SERVERS --file data/stations.csv --reportdir log stations
     csvloader --servers $SERVERS --file data/redline.csv --reportdir log stations
     csvloader --servers $SERVERS --file data/trains.csv --reportdir log trains
+    rm -f data/cards.csv
+    echo "----Loading Cards----"
+    java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.CardGenerator \
+        --output=data/cards.csv
 }
 
 # run this target to see what command line options the client offers
@@ -107,7 +111,7 @@ function client() {
 function train() {
     jars-ifneeded
     java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.MetroSimulation \
-        --broker=localhost:9092
+        --broker=localhost:9092 --count=100000
 }
 
 # generate metro cards

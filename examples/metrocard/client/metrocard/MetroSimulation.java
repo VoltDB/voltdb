@@ -276,7 +276,7 @@ public class MetroSimulation {
             } else {
                 lastState = 0;
             }
-            System.out.println(sb.toString());
+            //System.out.println(sb.toString());
             return rec;
         }
 
@@ -285,7 +285,7 @@ public class MetroSimulation {
     Map<Integer,Long> cardsEntered = Collections.synchronizedMap(new HashMap<>());
     class SwipeActivityPublisher extends KafkaPublisher {
         private final Random rand = new Random();
-        private final int max_station_id = 17;
+        private final int max_station_id = 16;
         private final RandomCollection<Integer> stations = new RandomCollection<>();
         public long startTime;
         public long swipeTime;
@@ -336,6 +336,7 @@ public class MetroSimulation {
         protected ProducerRecord<String, String> getNextRecord() {
             int card_id = -1;
             long atime;
+            int amt = 0;
             if (activity_code == -1)  { // Exit
                 atime = swipeTime;
                 while (card_id == -1) {
@@ -357,6 +358,14 @@ public class MetroSimulation {
                 card_id = r;
                 //Longest journy is 39 min so pick a random exit time from start.
                 atime = st + (rand.nextInt(36)*60000);
+            } else if (activity_code == 2) { //Replenish
+                //Every 20 get an amount
+                if (rand.nextInt(20) != 0) {
+                    return null;
+                }
+                card_id = rand.nextInt(config.cardcount+50); // use +50 so sometimes we get an invalid card_id
+                atime = System.currentTimeMillis();
+                amt = (rand.nextInt(18)+2)*1000; // $2 to $20
             } else {
                 throw new IllegalArgumentException("Unsupported activity code " + activity_code);
             }
@@ -364,7 +373,7 @@ public class MetroSimulation {
             //Get a station.
             int station_id;
             if (rand.nextInt(5) == 0) {
-                station_id = rand.nextInt(max_station_id); // sometimes pick a random station
+                station_id = rand.nextInt(max_station_id) + 1; // sometimes pick a random station
             } else {
                 station_id = stations.next(); // pick a station based on the weights
             }
@@ -372,9 +381,10 @@ public class MetroSimulation {
             sb.append(Integer.valueOf(card_id)).append(",")
                     .append(Long.valueOf(atime*1000)).append(",")
                     .append(Integer.valueOf(station_id)).append(",")
-                    .append(Integer.valueOf(activity_code));
+                    .append(Integer.valueOf(activity_code)).append(",")
+                    .append(Integer.valueOf(amt));
             ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
-            System.out.println(sb.toString());
+            //System.out.println(sb.toString());
             return rec;
         }
 
@@ -404,9 +414,12 @@ public class MetroSimulation {
         entry.start();
         SwipeActivityPublisher exit = new SwipeActivityPublisher(config, -1, producerConfig, config.count);
         exit.start();
+        SwipeActivityPublisher replenish = new SwipeActivityPublisher(config, 2, producerConfig, config.count/5);
+        replenish.start();
         entry.join();
         exit.close = true;
         exit.join();
+        replenish.join();
         for (TrainActivityPublisher redLine : trainPubs) {
             redLine.join();
         }

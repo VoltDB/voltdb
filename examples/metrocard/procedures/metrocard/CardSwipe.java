@@ -45,6 +45,7 @@ public class CardSwipe extends VoltProcedure {
 
     public final SQLStmt exportActivity = new SQLStmt(
         "INSERT INTO card_alert_export (card_id, export_time, station_name, name, phone, email, notify, alert_message) VALUES (?,?,?,?,?,?,?,?);");
+    public final SQLStmt replenishCard = new SQLStmt("UPDATE cards SET balance = balance + ? WHERE card_id = ? AND card_type = 0");
 
     // for returning results as a VoltTable
     final VoltTable resultTemplate = new VoltTable(
@@ -61,7 +62,7 @@ public class CardSwipe extends VoltProcedure {
         return String.format("%d.%02d", i/100, i%100);
     }
 
-    public VoltTable run(int cardId, TimestampType ts, int stationId, byte activity_code) throws VoltAbortException {
+    public VoltTable run(int cardId, TimestampType ts, int stationId, byte activity_code, int amt) throws VoltAbortException {
 
         // check station fare, card status, get card owner's particulars
         voltQueueSQL(checkCard, EXPECT_ZERO_OR_ONE_ROW, cardId);
@@ -81,6 +82,12 @@ public class CardSwipe extends VoltProcedure {
             voltQueueSQL(insertActivity, cardId, ts, stationId, activity_code, 0);
             voltExecuteSQL(true);
             return buildResult(1, "");
+        }
+        //Replenish card.
+        if (activity_code == 2) {
+            voltQueueSQL(replenishCard, amt, cardId);
+            voltExecuteSQL(true);
+            return buildResult(1, "Replinished");
         }
 
         // card exists, so advanceRow to read the record
