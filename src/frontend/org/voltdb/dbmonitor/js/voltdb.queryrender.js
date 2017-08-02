@@ -84,7 +84,7 @@ function QueryUI(queryTab) {
         function findEndOfMultiStmtProc(src, idx) {
             let inCase = 0;
             for (let i = idx; i < src.length; i++) {
-                if ( matchToken(src, i, "end") ) {
+                if ( matchToken(src, i, "end") || matchToken(src, i, "END")) {
                     if (inCase == 0) {
                         console.log("found end of msp");
                         return i;
