@@ -67,24 +67,27 @@ function QueryUI(queryTab) {
             let firstLo = token.charAt(0).toLowerCase();
             let firstHi = token.charAt(0).toUpperCase();
             var letterNumber = /^[0-9a-zA-Z]/;
+            // for case insenstive comparison
+            token = token.toUpperCase();
 
             if (
                 (position == 0 || buffer.charAt(position-1).match(letterNumber) == null )
                 && (buffer.charAt(position) == firstLo || buffer.charAt(position) == firstHi)
                 && (position <= bufLength - tokLength)
-                // TODO: check what match returns when there are multiple occurrances and update matching code
-                && (buffer.match(token) != null && buffer.match(token).index == position)
+                // the substring starting from 'position' should match token, so the matched index will be 0
+                && (buffer.toUpperCase().substring(position).indexOf(token) == 0)
                 && (position + tokLength == bufLength || buffer.charAt(position + tokLength).match(letterNumber) == null)
                 ) {
                 console.log("matched token : " + token );
                 return true;
             }
+            return false;
         }
 
         function findEndOfMultiStmtProc(src, idx) {
             let inCase = 0;
             for (let i = idx; i < src.length; i++) {
-                if ( matchToken(src, i, "end") || matchToken(src, i, "END")) {
+                if ( matchToken(src, i, "END") ) {
                     if (inCase == 0) {
                         console.log("found end of msp");
                         return i;
