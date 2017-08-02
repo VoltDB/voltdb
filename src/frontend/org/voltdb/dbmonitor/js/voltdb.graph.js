@@ -733,6 +733,7 @@
         this.RefreshCombinedDetailGraph = function(dataCombined){
             ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
             if($("#hidPartitionType").html() == "Single Partitioned"){
+
                 ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(true).showControls(false);
                 getBarHeightAndSpacing(dataCombined[0].values, ChartCombinedDetailAnalysis);
             }
@@ -742,14 +743,13 @@
                     if(d.label.length > 20)
                         return d.label.substring(0,20) + ".."
                     return  d.label
-                  }).y(function(d) { return d.value }).height(barHeight)
+                  }).y(function(d) { return d.value })
                   .showValues(true);
             }
             ChartCombinedDetailAnalysis.update;
 
-            ChartCombinedDetailAnalysis.height(barHeight);
             $("#divVisualizeCombinedDetail").css("height", barHeight-10);
-            ChartCombinedDetailAnalysis.margin({"left": 80})
+            ChartCombinedDetailAnalysis.margin({"left": 80, "right": 60 })
             dataCombinedDetailAnalysis[0]["values"] = dataCombined;
             if($("#hidPartitionType").html() == "Single Partitioned"){
                 d3.select("#visualizeCombinedDetails")

@@ -712,10 +712,6 @@
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ keyName +"</span>" );
                     }
                 }
-                //trowEnter.append("td")
-                //    .classed("key", true)
-                //    .html(function (p, i) { return keyFormatter(p.key, i) });
-
 
                 if(isPartitionIdleGraph){
                     trowEnter.append("td")
@@ -815,9 +811,6 @@
                     .html("Min Execution Time")
 
                     var statement = d.data.label;
-//                    if(statement.indexOf(')') !== -1){
-//                        statement = d.data.label.split(') ')[1]
-//                    }
 
                     trowEnter1.append("td")
                         .html(VoltDbUI.executionDetails[statement].MIN/1000000+ " ms");
