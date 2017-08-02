@@ -493,7 +493,7 @@ public abstract class ProcedureCompiler {
                     throws VoltCompilerException {
         // parse the procedureInfo
         procedure.setSinglepartition(info.singlePartition);
-        if (!info.singlePartition && info.partitionInfo.length() == 0) return;
+        if (info.isAllPartition()) return;
 
         parsePartitionInfo(compiler, db, procedure, info.partitionInfo);
         if (procedure.getPartitionparameter() >= paramTypes.length) {
