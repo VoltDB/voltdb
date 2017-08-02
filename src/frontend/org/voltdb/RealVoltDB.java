@@ -2059,7 +2059,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         @Override
                         public void run()
                         {
-                            int timestamp = (int)(System.currentTimeMillis() / 1000);
+                            long timestamp = System.currentTimeMillis();
                             m_flc.checkCounter(timestamp);
                         }
                     });

@@ -706,7 +706,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 boolean authenticated = arq.authenticate(hashScheme, socket.socket().getRemoteSocketAddress().toString());
 
                 if (!authenticated) {
-                long timestamp = System.currentTimeMillis();
+                    long timestamp = System.currentTimeMillis();
                     ScheduledExecutorService es = VoltDB.instance().getSES(false);
                     if (es != null && !es.isShutdown()) {
                         es.submit(new Runnable() {

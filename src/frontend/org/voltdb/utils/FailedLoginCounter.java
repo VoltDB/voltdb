@@ -32,7 +32,7 @@ import org.voltcore.utils.RateLimitedLogger;
 public class FailedLoginCounter {
     public class TimeBucket {
         int m_totalFailedAttempts;
-        int m_ts;
+        long m_ts;
         Map<String, Integer> m_userFailedAttempts;
         public TimeBucket () {
             m_userFailedAttempts = new HashMap<String, Integer>();
@@ -52,53 +52,53 @@ public class FailedLoginCounter {
         m_userFailedAttempts = new HashMap<String,Integer>();
     }
 
-    public Map<String, Integer> getUserFailedAttempts() {
-        return m_userFailedAttempts;
-    }
-
     public void logMessage(long timestampMilis, String user) {
-        checkCounter((int)timestampMilis/1000);
-        int timestampSeconds = (int)(timestampMilis/1000);
-        if (m_timeBucketQueue.peekLast().m_ts == timestampSeconds) {
+        checkCounter(timestampMilis);
+        long timestampSeconds = timestampMilis / 1000;
+        if (!m_timeBucketQueue.isEmpty() && m_timeBucketQueue.peekLast().m_ts == timestampSeconds) {
             TimeBucket bucket = m_timeBucketQueue.peekLast();
             int bucketCount = bucket.m_userFailedAttempts.getOrDefault(user,0) + 1;
             bucket.m_userFailedAttempts.put(user,bucketCount);
+            bucket.m_totalFailedAttempts++;
         } else {
             TimeBucket bucket = new TimeBucket();
-            int bucketCount = bucket.m_userFailedAttempts.getOrDefault(user,0) + 1;
-            bucket.m_userFailedAttempts.put(user,bucketCount);
+            bucket.m_userFailedAttempts.put(user, 1);
+            bucket.m_ts = timestampSeconds;
+            bucket.m_totalFailedAttempts = 1;
+            m_timeBucketQueue.offer(bucket);
         }
-        int totalCount = m_userFailedAttempts.getOrDefault(user,0) + 1;
-        String messageFormat = "user %s failed to authenticate %d times in last minute";
+        int userFailedCount = m_userFailedAttempts.getOrDefault(user,0) + 1;
+        String messageFormat = "User %s failed to authenticate %d times in last minute";
         RateLimitedLogger.tryLogForMessage(timestampMilis,
-                ONE_MINUTE_IN_MILLIS,
-                TimeUnit.MILLISECONDS,
-                authLog,
-                Level.WARN,
-                messageFormat,
-                user,
-                totalCount);
-        m_userFailedAttempts.put(user,totalCount);
+                                           ONE_MINUTE_IN_MILLIS,
+                                           TimeUnit.MILLISECONDS,
+                                           authLog,
+                                           Level.WARN,
+                                           messageFormat,
+                                           user,
+                                           userFailedCount);
+        m_userFailedAttempts.put(user,userFailedCount);
         m_totalFailedAttempts++;
         messageFormat = "Total failed authentication: %d times in last minute";
         RateLimitedLogger.tryLogForMessage(timestampMilis,
-                ONE_MINUTE_IN_MILLIS,
-                TimeUnit.MILLISECONDS,
-                authLog,
-                Level.WARN,
-                messageFormat,
-                m_totalFailedAttempts);
+                                           ONE_MINUTE_IN_MILLIS,
+                                           TimeUnit.MILLISECONDS,
+                                           authLog,
+                                           Level.WARN,
+                                           messageFormat,
+                                           m_totalFailedAttempts);
     }
 
-    public void checkCounter(int timestamp) {
-        while (!m_timeBucketQueue.isEmpty() && m_timeBucketQueue.peek().m_ts < timestamp) {
+    public void checkCounter(long timestamp) {
+        while (!m_timeBucketQueue.isEmpty() && m_timeBucketQueue.peek().m_ts < (timestamp - ONE_MINUTE_IN_MILLIS)/1000) {
             TimeBucket tb = m_timeBucketQueue.poll();
             m_totalFailedAttempts -= tb.m_totalFailedAttempts;
             Iterator<Entry<String, Integer>> it = tb.m_userFailedAttempts.entrySet().iterator();
             while (it.hasNext()) {
                 Entry<String, Integer> entry = it.next();
                 String user = entry.getKey();
-                m_userFailedAttempts.put(user, m_userFailedAttempts.get(user) - tb.m_userFailedAttempts.get(user));
+                int currentUserFailedAttempts = m_userFailedAttempts.get(user) - tb.m_userFailedAttempts.get(user);
+                m_userFailedAttempts.put(user, currentUserFailedAttempts);
             }
         }
     }
