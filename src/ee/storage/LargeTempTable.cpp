@@ -16,7 +16,6 @@
  */
 
 #include "common/LargeTempTableBlockCache.h"
-#include "storage/LargeTempTableIterator.h"
 #include "storage/LargeTempTable.h"
 #include "storage/LargeTempTableBlock.h"
 

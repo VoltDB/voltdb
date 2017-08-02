@@ -97,6 +97,7 @@ public:
             break;
         default:
             // For persistent tables, this has no effect
+            break;
         }
     }
 
