@@ -260,6 +260,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
          */
         static final int kErrorCode_pushPerFragmentStatsBuffer = 106;
 
+        /**
+         * An error code that can be sent at any time indicating that
+         * an export stream is dropped
+         */
+        static final int kErrorCode_pushEndOfStream = 113;
+
         ByteBuffer getBytes(int size) throws IOException {
             ByteBuffer header = ByteBuffer.allocate(size);
             while (header.hasRemaining()) {
@@ -404,6 +410,32 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     while (buf.hasRemaining()) {
                         m_socketChannel.write(buf);
                     }
+                }
+                else if (status == kErrorCode_pushEndOfStream) {
+                    ByteBuffer header = ByteBuffer.allocate(8);
+                    while (header.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(header);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    header.flip();
+
+                    int partitionId = header.getInt();
+                    int signatureLength = header.getInt();
+                    ByteBuffer sigbuf = ByteBuffer.allocate(signatureLength);
+                    while (sigbuf.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(sigbuf);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    sigbuf.flip();
+                    byte signatureBytes[] = new byte[signatureLength];
+                    sigbuf.get(signatureBytes);
+                    String signature = new String(signatureBytes, "UTF-8");
+
+                    ExportManager.pushEndOfStream(partitionId, signature);
                 }
                 else if (status == ExecutionEngine.ERRORCODE_DECODE_BASE64_AND_DECOMPRESS) {
                     int dataLength = m_connection.readInt();
