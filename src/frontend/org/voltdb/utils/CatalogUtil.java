@@ -2132,9 +2132,9 @@ public abstract class CatalogUtil {
             ByteBuffer.allocate(
                     4 +  // version number
                     8 +  // generation Id
-                    20 + // catalog SHA-1 hash
                     4 +  // catalog bytes length
                     catalogBytes.length +
+                    20 + // catalog SHA-1 hash
                     4 +  // deployment bytes length
                     deploymentBytes.length
                     );
@@ -2151,9 +2151,9 @@ public abstract class CatalogUtil {
 
         versionAndBytes.putInt(version);
         versionAndBytes.putLong(genId);
-        versionAndBytes.put(catalogHash);
         versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
+        versionAndBytes.put(catalogHash);
         versionAndBytes.putInt(deploymentBytes.length);
         versionAndBytes.put(deploymentBytes);
         return versionAndBytes;
@@ -2202,27 +2202,22 @@ public abstract class CatalogUtil {
     public static class CatalogAndDeployment {
         public final int version;
         public final long genId;
-        private final byte[] catalogHash;
         public final byte[] catalogBytes;
+        public final byte[] catalogHash;
         public final byte[] deploymentBytes;
 
-        private CatalogAndDeployment(
+        public CatalogAndDeployment(
                 int version,
                 long genId,
-                byte[] catalogHash,
                 byte[] catalogBytes,
+                byte[] catalogHash,
                 byte[] deploymentBytes)
         {
             this.version = version;
             this.genId = genId;
-            this.catalogHash = catalogHash;
             this.catalogBytes = catalogBytes;
+            this.catalogHash = catalogHash;
             this.deploymentBytes = deploymentBytes;
-        }
-
-        public byte[] getCatalogHash()
-        {
-            return catalogHash.clone();
         }
 
         @Override
@@ -2248,17 +2243,17 @@ public abstract class CatalogUtil {
                 ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
         int version = catalogDeploymentBytes.getInt();
         long genId = catalogDeploymentBytes.getLong();
-        byte[] catalogHash = new byte[20]; // sha-1 hash size
-        catalogDeploymentBytes.get(catalogHash);
         int catalogLength = catalogDeploymentBytes.getInt();
         byte[] catalogBytes = new byte[catalogLength];
         catalogDeploymentBytes.get(catalogBytes);
+        byte[] catalogHash = new byte[20]; // sha-1 hash size
+        catalogDeploymentBytes.get(catalogHash);
         int deploymentLength = catalogDeploymentBytes.getInt();
         byte[] deploymentBytes = new byte[deploymentLength];
         catalogDeploymentBytes.get(deploymentBytes);
         catalogDeploymentBytes = null;
 
-        return new CatalogAndDeployment(version, genId, catalogHash, catalogBytes, deploymentBytes);
+        return new CatalogAndDeployment(version, genId, catalogBytes, catalogHash, deploymentBytes);
     }
 
     /**
