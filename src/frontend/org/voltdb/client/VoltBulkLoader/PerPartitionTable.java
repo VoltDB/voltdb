@@ -313,16 +313,16 @@ public class PerPartitionTable {
         }
 
         if (m_autoReconnect) {
-            long sleepTime = 1000;
             while (true) {
                 try {
                     load(callback, toSend);
                     // Table loaded successfully. So move on
                     break;
                 } catch (IOException e) {
-                    // Maximum retry interval is eight seconds
-                    sleepTime = Math.min(sleepTime * 2, 8000);
-                    Thread.sleep(sleepTime);
+                   synchronized (m_clientImpl) {
+                       // If the connection is lost, suspend and wait for reconnect listener's notification
+                       m_clientImpl.wait();
+                   }
                 }
             }
         } else {
