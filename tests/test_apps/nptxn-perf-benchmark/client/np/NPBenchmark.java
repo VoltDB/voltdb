@@ -48,7 +48,7 @@ class NPBenchmark {
     final NPBenchmarkConfig config;
     // Reference to the database connection we will use
     // Each client is backed by a single thread for execution
-    final Client[] clients;
+    final Client[] clients; // the 1st client is for sending sp only
 
     // Statistics manager objects from the client
     final ClientStatsContext[] periodicStatsContexts;
@@ -58,6 +58,11 @@ class NPBenchmark {
     long benchmarkStartTS;
 
     private Random rand = new Random();
+
+    // Count the sp / np procs that have been sent so far, use volatile variable for
+    // optimal performance
+    volatile long spCount = 0;
+    volatile long npCount = 0;
 
     static class NPBenchmarkConfig extends CLIConfig {
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
@@ -92,7 +97,10 @@ class NPBenchmark {
         double skew = 0.2;
 
         @Option(desc = "Number of clients for the test")
-        int clientscount = 1;
+        int clientscount = 2;
+
+        @Option(desc = "max tps allowed for each client sending np procs")
+        int maxnptps = 600;
 
         @Override
         public void validate() {
@@ -115,8 +123,12 @@ class NPBenchmark {
                 exitWithMessageAndUsage("Invalid duration...");
             }
 
-            if (clientscount <= 0) {
-                exitWithMessageAndUsage("Invalid client number...");
+            // if (clientscount < 2) {
+            //     exitWithMessageAndUsage("Invalid client number...");
+            // }
+
+            if (maxnptps <= 0) {
+                exitWithMessageAndUsage("Invalid maxnptps...");
             }
         }
     }
