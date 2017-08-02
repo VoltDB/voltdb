@@ -137,6 +137,7 @@ class NPBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        clientConfig.setMaxTransactionsPerSecond(1500);
 
         clients = new Client[config.clientscount];
         periodicStatsContexts = new ClientStatsContext[config.clientscount];
