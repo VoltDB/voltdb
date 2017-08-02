@@ -672,6 +672,12 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         header.tabSchema.click()
     }
 
+    /*
+     * click DbMonitor tab to go to Db Monitor
+     */
+    def boolean gotoAnalysis() {
+        header.tabAnalysis.click()
+    }
 
     /*
      * get query to create a table

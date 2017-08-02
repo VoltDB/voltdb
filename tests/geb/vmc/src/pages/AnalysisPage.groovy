@@ -29,6 +29,16 @@ class AnalysisPage extends VoltDBManagementCenterPage {
     static content = {
         divAnalysis                 { $('#divAnalysis') }
         analyzeNowContent           { $('.analyzeNowContent') }
+        tabProcedureBtn             { $('#tabProcedureBtn') }
+        tabProcedure                { $('#tabProcedure') }
+        btnThreshold                { $('#btnThreshold') }
+        btnAnalyzeNow               { $('#btnAnalyzeNow') }
+        procedureNoDataContent      { $('#tabProcedure > div.mainContentAnalysis.noDataContent') }
+        procedureNoDataMsg          { $('#tabProcedure > div.mainContentAnalysis.noDataContent > p') }
+        divTabProcedure             { $('#divTabProcedure') }
+        executionTimeSubTab         { $('#ulProcedure > li:nth-child(1)') }
+        frequencySubTab             { $('#ulProcedure > li:nth-child(2)') }
+        processingTimeSubTab        { $('#ulProcedure > li:nth-child(3)') }
     }
     static at = {
         analysisTab.displayed
@@ -38,4 +48,166 @@ class AnalysisPage extends VoltDBManagementCenterPage {
     def isAnalyzeNowContentDisplayed(){
         return analyzeNowContent.displayed
     }
+
+    def checkForProcedureNoDataContent(){
+        return procedureNoDataContent.displayed
+    }
+
+    def checkForProcedureDataContent(){
+        return divTabProcedure.displayed
+    }
+
+    /*
+     * click SQL Query to go to SqlQueryPage
+     */
+    def boolean gotoSqlQuery() {
+        header.tabSQLQuery.click()
+    }
+
+    /*
+     * get query to create a table
+     */
+    def String getQueryToCreateTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#create") {
+        }
+
+        while ((line = br.readLine()) != "#delete") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+     * get query to delete a table
+     */
+    def String getQueryToDeleteTable() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#delete") {
+        }
+
+        while ((line = br.readLine()) != "#name") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getQueryToCreateStoredProcedure() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#createStoredProcedure") {
+        }
+
+        while ((line = br.readLine()) != "#executeStoredProcedure") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getQueryToExecuteProcedureQuery() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#executeStoredProcedure") {
+        }
+
+        while ((line = br.readLine()) != "#dropStoredProcedure") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getQueryToDropProcedureQuery() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#dropStoredProcedure") {
+        }
+
+        while ((line = br.readLine()) != "#procedureName") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getNameOfStoredProcedure() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#procedureName") {
+        }
+
+        query = br.readLine()
+
+        return query
+    }
+
+    /*
+     get tablename that is created and deleted
+    */
+    def String getTableName() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#name") {
+        }
+
+        query = br.readLine()
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getQueryToDropTableAndProcedureQuery() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#dropTableAndProcedure") {
+        }
+
+        while ((line = br.readLine()) != "#endQuery") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
 }

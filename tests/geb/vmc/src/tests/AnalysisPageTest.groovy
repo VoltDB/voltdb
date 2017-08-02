@@ -63,4 +63,107 @@ class AnalysisPageTest extends TestBase {
         println("Analysis tab is opened")
     }
 
+    def checkIfAnalyzeNowMsgDisplayed(){
+        when:
+        waitFor(2){ page.analyzeNowContent.isDisplayed() }
+        then:
+        println("Analyze now message is displayed")
+    }
+
+    def check
+
+    def checkAnalyzeBtn(){
+        //CLick on procedure tab and verify its content are displayed.
+        when:
+        waitFor(2){ page.analyzeNowContent.isDisplayed() }
+        waitFor(2){ page.tabProcedureBtn.isDisplayed() }
+        page.tabProcedureBtn.click();
+        then:
+        waitFor(2){ page.tabProcedure.isDisplayed() }
+
+        //Click on Analyze Now button and verify if it is working.
+        when:
+        waitFor(2){ page.btnAnalyzeNow.isDisplayed() }
+        page.btnAnalyzeNow.click();
+        then:
+        if(!page.checkForProcedureNoDataContent()){
+            if(page.checkForProcedureDataContent()){
+               println("Data is available")
+            } else {
+                assert false;
+            }
+        } else {
+            page.procedureNoDataMsg.equals("No data is available.")
+            println("No data is available." )
+        }
+    }
+
+    def checkProcedureSubTabs(){
+        String createQuery = page.getQueryToCreateTable()
+        String createProcedureQuery = page.getQueryToCreateStoredProcedure()
+        String execProcedureQuery = page.getQueryToExecuteProcedureQuery()
+        String dropTableAndProcQuery = page.getQueryToDropTableAndProcedureQuery()
+        when: 'Click SQL tab'
+        page.gotoSqlQuery()
+        then: 'at SQL page'
+        at SqlQueryPage
+
+        when: 'Set create table query in the box'
+        page.setQueryText(createQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        when: 'Set create procedure query in the box'
+        page.setQueryText(createProcedureQuery)
+        and: 'run the query'
+        page.runQuery()
+        then: 'refresh the query tab'
+        page.refreshquery.click()
+
+        when: 'Set exec procedure query in the box'
+        page.setQueryText(execProcedureQuery)
+        and: 'run the query'
+        page.runQuery()
+        then: 'refresh the page'
+        page.refreshquery.click()
+
+        when: 'Analysis tab is clicked'
+        page.gotoAnalysis()
+        then: 'at Analysis Page'
+        at AnalysisPage
+
+        when:
+        waitFor(2){ page.analyzeNowContent.isDisplayed() }
+        waitFor(2){ page.tabProcedureBtn.isDisplayed() }
+        page.tabProcedureBtn.click();
+        then:
+        waitFor(2){ page.tabProcedure.isDisplayed() }
+
+        //Click on Analyze Now button and verify if it is working.
+        when:
+        waitFor(2){ page.btnAnalyzeNow.isDisplayed() }
+        page.btnAnalyzeNow.click();
+        then:
+        if(page.checkForProcedureDataContent()){
+            //Check if procedure sub tab are present
+            waitFor(2){ executionTimeSubTab.isDisplayed() }
+            waitFor(2){ frequencySubTab.isDisplayed() }
+            waitFor(2){ processingTimeSubTab.isDisplayed() }
+            println("Tabs are displayed properly.")
+        } else {
+            assert false;
+        }
+
+        when: 'Click SQL tab'
+        page.gotoSqlQuery()
+        then: 'at SQL page'
+        at SqlQueryPage
+
+        when: 'Set drop table and procedure query in the box'
+        page.setQueryText(dropTableAndProcQuery)
+        then: 'run the query'
+        page.runQuery()
+        println("Table created successfully.")
+
+    }
 }
