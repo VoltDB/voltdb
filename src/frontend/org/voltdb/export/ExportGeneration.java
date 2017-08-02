@@ -465,17 +465,6 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    // pause polling on the all the data source for the given partitions
-    void pausePolling(List<Integer> partitions) {
-        for (Integer partition : partitions) {
-            Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
-            assert(dataSourcesForPartition != null);
-            for (ExportDataSource source: dataSourcesForPartition.values()) {
-                source.pausePolling();
-            }
-        }
-    }
-
     @Override
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
         //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));

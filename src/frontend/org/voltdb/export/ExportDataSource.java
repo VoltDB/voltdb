@@ -96,7 +96,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile boolean m_replicaMastershipRequested = false;
     private volatile ListeningExecutorService m_es;
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
-    private volatile boolean m_performPoll = false;            // flag to pause/resume polling
     private volatile boolean m_isInCatalog;
     private final Generation m_generation;
 
@@ -284,6 +283,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public int compareTo(ExportDataSource o) {
         int result;
 
+        result = (m_partitionId - o.m_partitionId);
+        if (result != 0) {
+            return result;
+        }
+
         result = m_database.compareTo(o.m_database);
         if (result != 0) {
             return result;
@@ -294,7 +298,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return result;
         }
 
-        result = (m_partitionId - o.m_partitionId);
+        result = m_signature.compareTo(o.m_signature);
         if (result != 0) {
             return result;
         }
@@ -321,6 +325,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         int result = 0;
         result += m_database.hashCode();
         result += m_tableName.hashCode();
+        result += m_signature.hashCode();
         result += m_partitionId;
         // does not factor in replicated / unreplicated.
         // does not factor in column names / schema
@@ -415,29 +420,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
 
-    public void resumePolling() {
-        exportLog.info("Resume polling for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
-        m_performPoll = true;
-    }
-
-    // update internal state of export data source - poll, mastership and m_pollfuture, in preparation
-    // for delegating existing data sources to the new processor
-    void pausePolling() {
-        exportLog.info("Pause polling for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
-        m_performPoll = false;              // disable polling
-        m_mastershipAccepted.set(false);    // unassign mastership for this partition
-
-        // For case where the previous export processor had only row of the first block to process
-        // and it completed processing it, poll future is not set to null still. Set it to null to
-        // prepare for the new processor polling
-        if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
-            m_pollFuture = null;
-        }
-        //Mark EDS not in catalog so when EDS is checked from catalog they can be marked back ti be in catalog.
-        m_isInCatalog = false;
-
-    }
-
     public void pushEndOfStream() {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
         m_isInCatalog = false;
@@ -464,7 +446,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(uso, buffer, sync, m_performPoll);
+                            pushExportBufferImpl(uso, buffer, sync, true);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);

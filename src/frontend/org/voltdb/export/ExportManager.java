@@ -404,13 +404,11 @@ public class ExportManager
          */
         if (m_processor.get() == null) {
             exportLog.info("First stream created processor will be initialized: " + m_loaderClass);
-
             try {
                 generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 exportLog.info("Creating connector " + m_loaderClass);
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
-
                 newProcessor.setExportGeneration(generation);
                 newProcessor.readyForData(false);
 
@@ -437,8 +435,18 @@ public class ExportManager
             }
         }
         else {
-            // install new export processors with export config from this time
-            swapWithNewProcessor(connectors, generation, partitions, m_processorConfig);
+            //Load new tables from catalog and create data sources.
+            //Update processor config to create any missing clients.
+            //Accept mastership of missing partitions.
+            //TODO: How to update client configuration and recreate the client.
+            //TODO: How to handle ack coming from node which has gone past this phase but this node is still processing? Or will synchronized UAC will take care?
+
+            //Load any missing table data sources.
+            generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+            m_processor.get().updateProcessorConfig(m_processorConfig);
+            for (Integer partitionId: m_masterOfPartitions) {
+                generation.acceptMastershipTask(partitionId);
+            }
         }
     }
 
@@ -448,43 +456,6 @@ public class ExportManager
         newProcessor.addLogger(exportLog);
         newProcessor.setProcessorConfig(config);
         return newProcessor;
-    }
-
-    // remove and install new processor
-    private void swapWithNewProcessor(final CatalogMap<Connector> connectors, final ExportGeneration generation,
-            final List<Integer> partitions, final Map<String, Pair<Properties, Set<String>>> config) {
-
-        generation.pausePolling(partitions);
-
-        m_dataProcessorHandler.submit(new Runnable() {
-            @Override
-            public void run() {
-                ExportDataProcessor oldProcessor = m_processor.get();
-                exportLog.info("Shutdown guestprocessor");
-                oldProcessor.shutdown();
-                generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-                if (config.isEmpty()) {
-                    m_processor.getAndSet(null);
-                    exportLog.info("Processor shutdown completed");
-                    return;
-                }
-                exportLog.info("Processor shutdown completed, install new export processor");
-                ExportDataProcessor newProcessor = null;
-                try {
-                    newProcessor = getNewProcessorWithProcessConfigSet(config);
-                }
-                catch (Exception crash) {
-                    VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
-                }
-                m_processor.getAndSet(newProcessor);
-                newProcessor.setExportGeneration(generation);
-                newProcessor.readyForData(false);
-                for ( Integer partitionId: m_masterOfPartitions) {
-                    generation.acceptMastershipTask(partitionId);
-                }
-            }
-        });
-
     }
 
     public void shutdown() {

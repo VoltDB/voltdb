@@ -69,6 +69,11 @@ public interface ExportDataProcessor  {
     public void setProcessorConfig(Map<String, Pair<Properties, Set<String>>> config);
 
     /**
+     * Pass processor specific processor configuration properties
+     * @param config an instance of {@linkplain Properties}
+     */
+    public void updateProcessorConfig(Map<String, Pair<Properties, Set<String>>> config);
+    /**
      * Pass processor specific processor configuration properties for checking
      * @param config an instance of {@linkplain Properties}
      */
