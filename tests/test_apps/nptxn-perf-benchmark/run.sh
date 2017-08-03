@@ -111,8 +111,8 @@ function client() {
          --mprate=0.005 \
          --skew=0.0 \
          --duration=25 \
-         --clientscount=2 \
-         --maxnptps=1200
+         --clientscount=8 \
+         --displayinterval=1
 }
 
 ###################

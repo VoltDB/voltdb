@@ -69,7 +69,7 @@ class NPBenchmark {
         String servers = "localhost";
 
         @Option(desc = "Interval for performance feedback, in seconds.")
-        long displayinterval =60;
+        long displayinterval = 60;
 
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 20;
@@ -99,9 +99,6 @@ class NPBenchmark {
         @Option(desc = "Number of clients for the test")
         int clientscount = 2;
 
-        @Option(desc = "max tps allowed for each client sending np procs")
-        int maxnptps = 700;
-
         @Override
         public void validate() {
             if (sprate > 1 || sprate < 0) {
@@ -125,10 +122,6 @@ class NPBenchmark {
 
             if (clientscount < 2) {
                 exitWithMessageAndUsage("Invalid client number...");
-            }
-
-            if (maxnptps <= 0) {
-                exitWithMessageAndUsage("Invalid maxnptps...");
             }
         }
     }
@@ -154,9 +147,6 @@ class NPBenchmark {
 
         for (int i = 0; i < config.clientscount; i++) {
             ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-            if (i > 0) {
-                clientConfig.setMaxTransactionsPerSecond(config.maxnptps);
-            }
 
             clients[i] = ClientFactory.createClient(clientConfig);
             periodicStatsContexts[i] = clients[i].createStatsContext();
@@ -285,8 +275,8 @@ class NPBenchmark {
             public void run() { printStatistics(); }
         };
         timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 6000,
-                                  config.displayinterval * 6000);
+                                  config.displayinterval * 1000,
+                                  config.displayinterval * 1000);
     }
 
     /**
@@ -453,7 +443,7 @@ class NPBenchmark {
         String pan1 = generate16DString(rand.nextInt(config.cardcount));
         String pan2 = generate16DString(rand.nextInt((int) count) + offset);    // a smaller range of entities
 
-        clients[num].callProcedure(new ProcCallback("Transfer",10000),
+        clients[num].callProcedure(
                                 "Transfer",
                                 pan1,
                                 pan2,
@@ -472,7 +462,7 @@ class NPBenchmark {
             pan1 = generate16DString(id1);
             pan2 = generate16DString(id2);
 
-            clients[num].callProcedure(new ProcCallback("Select"),
+            clients[num].callProcedure(
                                 "Select",
                                 pan1,
                                 pan2);
@@ -554,9 +544,11 @@ class NPBenchmark {
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
 
+        Thread[] threads = new Thread[config.clientscount];
+
         // First thread for running SP proc only, using only the first client
         // SP txns are very fast to execute and usually do not trigger thrashing issue
-        Thread t1 =  new Thread(() -> {
+        threads[0] = new Thread(() -> {
             try {
                 while (benchmarkEndTime > System.currentTimeMillis()) {
                     iterateSP(count, offset);
@@ -566,25 +558,28 @@ class NPBenchmark {
             }
         });
 
-        // Second thread for running NP proc only
+        // Other threads for running NP proc only
         // use more clients and round-robin strategy to avoid thrashing (with max tps set)
-        Thread t2 = new Thread(() -> {
-            try {
-                int k = 1;
-                while (benchmarkEndTime > System.currentTimeMillis()) {
-                    iterateNP(count, offset, k++);
-                    if (k == config.clientscount) { k = 1; }
+        for (int i = 1; i < config.clientscount; i++) {
+            final int index = i;
+            threads[i] = new Thread(() -> {
+                try {
+                    while (benchmarkEndTime > System.currentTimeMillis()) {
+                        iterateNP(count, offset, index);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+            });
+        }
 
-        t1.start();
-        t2.start();
+        for (Thread t : threads) {
+            t.start();
+        }
 
-        t1.join();
-        t2.join();
+        for (Thread t : threads) {
+            t.join();
+        }
 
         // cancel periodic stats printing
         timer.cancel();
