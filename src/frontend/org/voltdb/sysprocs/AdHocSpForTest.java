@@ -77,6 +77,7 @@ public class AdHocSpForTest extends AdHocNTBase {
                               userPartitionKey,
                               ExplainMode.NONE,
                               false,
+                              false,
                               userParams);
     }
 }
