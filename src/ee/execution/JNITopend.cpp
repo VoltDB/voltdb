@@ -198,9 +198,15 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             m_partitionDRGatewayClass,
             "pushDRBuffer",
             "(IJJJJILjava/nio/ByteBuffer;)J");
-    if (m_pushDRBufferMID == NULL) {
+
+    m_pushPoisonPillMID = m_jniEnv->GetStaticMethodID(
+            m_partitionDRGatewayClass,
+            "pushPoisonPill",
+            "(ILjava/nio/ByteBuffer;)V");
+
+    if (m_pushDRBufferMID == NULL || m_pushPoisonPillMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_pushDRBufferMID != NULL);
+        assert(m_pushDRBufferMID != NULL && m_pushPoisonPillMID != NULL);
         throw std::exception();
     }
 
@@ -523,6 +529,23 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
         m_jniEnv->DeleteLocalRef(buffer);
     }
     return retval;
+}
+
+void JNITopend::pushPoisonPill(int32_t partitionId, StreamBlock *block) {
+    if (block != NULL) {
+        jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
+        if (buffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+        //std::cout << "Block is length " << block->rawLength() << std::endl;
+        m_jniEnv->CallStaticLongMethod(
+                m_partitionDRGatewayClass,
+                m_pushPoisonPillMID,
+                partitionId,
+                buffer);
+        m_jniEnv->DeleteLocalRef(buffer);
+    }
 }
 
 static boost::shared_array<char> serializeToDirectByteBuffer(JNIEnv *jniEngine, Table *table, jobject &byteBuffer) {

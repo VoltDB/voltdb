@@ -347,6 +347,21 @@ bool DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
         }
         switchedToOpen = true;
     }
+    else {
+        if (m_openUniqueId != uniqueId && m_enabled) {
+            commitTransactionCommon();
+            ExecutorContext::getExecutorContext()->getTopend()->pushPoisonPill(m_partitionId, m_currBlock);
+            m_currBlock = NULL;
+            ++m_openSequenceNumber;
+            if (m_enabled) {
+                beginTransaction(m_openSequenceNumber, spHandle, uniqueId);
+            }
+            else {
+                openTransactionCommon(spHandle, uniqueId);
+            }
+            switchedToOpen = true;
+        }
+    }
     assert(m_opened);
     return switchedToOpen;
 }

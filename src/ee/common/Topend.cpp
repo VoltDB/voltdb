@@ -89,6 +89,13 @@ namespace voltdb {
     }
 
 
+    void DummyTopend::pushPoisonPill(int32_t partitionId, StreamBlock *block) {
+        partitionIds.push(partitionId);
+        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
+        data.push_back(boost::shared_array<char>(block->rawPtr()));
+    }
+
+
     int DummyTopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
             Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
