@@ -748,14 +748,14 @@
    "sqlCmd":"create procedure msp7 as begin\n
               select j, 10+i when i<0 then (i+0)end+100
               from ddl_table;\n
-              end;";
+              end;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 # Multi statement procedure with CASE in ORDER BY
 {"testName":"DdlCreateMultiStmtProcedure8",
    "sqlCmd":"create procedure msp8 as begin\n
              select * from ddl_table order by case when i<1 then i else j end desc;\n
              select * from t order by case when j<1 then j else i end desc;\n
-             end;";
+             end;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 # Multi statement procedure with CASE in ORDER BY
 {"testName":"DdlCreateMultiStmtProcedure9",
@@ -768,7 +768,7 @@
              as begin\n
                 select * from books where cash = ?;\n
                 select * from books;\n
-             end;";
+             end;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 # Drop the procedures created above (to test Drop Procedure, and so test is repeatable):
 {"testName":"DdlDropProcedure1",
