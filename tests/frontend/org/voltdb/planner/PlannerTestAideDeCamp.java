@@ -145,7 +145,7 @@ public class PlannerTestAideDeCamp {
         String procName = catalogStmt.getParent().getTypeName();
         QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
                 partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
-                costModel, null, joinOrder, detMode);
+                costModel, null, joinOrder, detMode, false);
 
         CompiledPlan plan = null;
         planner.parse();
@@ -168,9 +168,9 @@ public class PlannerTestAideDeCamp {
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<>();
-        nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
+        nodeLists.add(new PlanNodeList(plan.rootPlanGraph, false));
         if (plan.subPlanGraph != null) {
-            nodeLists.add(new PlanNodeList(plan.subPlanGraph));
+            nodeLists.add(new PlanNodeList(plan.subPlanGraph, false));
         }
 
         // Now update our catalog information

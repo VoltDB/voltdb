@@ -27,11 +27,12 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 
-public class Explain extends AdHocNTBase {
-
+public class AdHocLarge extends AdHocNTBase {
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
-
-        // dispatch common
+        if (params.size() == 0) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                    "Adhoc system procedure requires at least the query parameter.");
+        }
 
         Object[] paramArray = params.toArray();
         String sql = (String) paramArray[0];
@@ -50,29 +51,22 @@ public class Explain extends AdHocNTBase {
                     ClientResponse.GRACEFUL_FAILURE,
                     "Failed to plan, no SQL statement provided.");
         }
-
-        else if (mix == AdHocSQLMix.MIXED) {
+        else if (mix != AdHocSQLMix.ALL_DML_OR_DQL) {
             // No mixing DDL and DML/DQL.  Turn this into an error returned to client.
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
-                    "DDL mixed with DML and queries is unsupported.");
+                    "DDL is not supported in @AdHocLarge.");
         }
 
-        else if (mix == AdHocSQLMix.ALL_DDL) {
-            return makeQuickResponse(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    "Explain doesn't support DDL.");
-        }
+        assert (mix == AdHocSQLMix.ALL_DML_OR_DQL);
 
-        // assume all DML/DQL at this point
         return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
-                              sqlStatements,
-                              true,
-                              null,
-                              ExplainMode.EXPLAIN_ADHOC,
-                              false,
-                              false,
-                              userParams);
+                sqlStatements,
+                true,
+                null,
+                ExplainMode.NONE,
+                true, // is a large query
+                false,
+                userParams);
     }
-
 }

@@ -69,6 +69,7 @@ public class ExplainProc extends AdHocNTBase {
                             null,
                             ExplainMode.EXPLAIN_DEFAULT_PROC,
                             false,
+                            false,
                             new Object[0]);
                 }
 

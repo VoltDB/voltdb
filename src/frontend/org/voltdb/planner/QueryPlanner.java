@@ -35,11 +35,9 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
-import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.ConstraintType;
-import org.voltdb.types.PlanNodeType;
 
 /**
  * The query planner accepts catalog data, SQL statements from the catalog, then
@@ -60,6 +58,7 @@ public class QueryPlanner {
     ScalarValueHints[] m_paramHints;
     String m_joinOrder;
     DeterminismMode m_detMode;
+    private final boolean m_isLargeQuery;
     PlanSelector m_planSelector;
     boolean m_isUpsert;
 
@@ -105,7 +104,8 @@ public class QueryPlanner {
                         AbstractCostModel costModel,
                         ScalarValueHints[] paramHints,
                         String joinOrder,
-                        DeterminismMode detMode) {
+                        DeterminismMode detMode,
+                        boolean isLargeQuery) {
         assert(sql != null);
         assert(stmtName != null);
         assert(procName != null);
@@ -126,6 +126,7 @@ public class QueryPlanner {
         m_paramHints = paramHints;
         m_joinOrder = joinOrder;
         m_detMode = detMode;
+        m_isLargeQuery = isLargeQuery;
         m_planSelector = new PlanSelector(m_estimates, m_stmtName,
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
                 suppressDebugOutput);
@@ -391,7 +392,7 @@ public class QueryPlanner {
         // Init Assembler. Each plan assembler requires a new instance of the PlanSelector
         // to keep track of the best plan
         PlanAssembler assembler = new PlanAssembler(m_db, m_partitioning,
-                (PlanSelector) m_planSelector.clone());
+                (PlanSelector) m_planSelector.clone(), m_isLargeQuery);
         // find the plan with minimal cost
         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 
