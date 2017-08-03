@@ -799,7 +799,7 @@ public class Cartographer extends StatsSource
             return null;
         }
 
-        final int maxMastersPerHost = (int)Math.ceil((double)(getPartitionCount()) / hostCount);
+        final int maxMastersPerHost = (int)Math.ceil(((double)getPartitionCount()) / hostCount);
         final int minMastersPerHost = (getPartitionCount() / hostCount);
 
         //collect host and partition info
@@ -811,7 +811,7 @@ public class Cartographer extends StatsSource
             int leaderHostId = CoreUtils.getHostIdFromHSId(m_iv2Masters.pointInTimeCache().get(partitionId));
 
             //sanity check to make sure that the topology is not in the middle of leader promotion
-            if (!liveHosts.contains(new Integer(leaderHostId))) {
+            if (!liveHosts.contains(leaderHostId)) {
                 return null;
             }
             Host leaderHost = hostsMap.get(leaderHostId);
@@ -822,7 +822,7 @@ public class Cartographer extends StatsSource
             List<Long> sites = getReplicasForPartition(partitionId);
             for (long site : sites) {
                 int hostId = CoreUtils.getHostIdFromHSId(site);
-                if (!liveHosts.contains(new Integer(hostId))) {
+                if (!liveHosts.contains(hostId)) {
                     return null;
                 }
                 Host host = hostsMap.get(hostId);
@@ -842,9 +842,13 @@ public class Cartographer extends StatsSource
         //The local ClientInterface will pick it up and start @BalanceSPI
         Iterator<Host> it = hostList.iterator();
         Host srcHost = it.next();
+
+        //@BalanceSPI is initiated on the host with the old leader to facilitate DR integration
+        //If current host does not have the most partition leaders, give it up.
         if (srcHost.m_hostId != localHostId) {
             return null;
         }
+
         //The new host is the one with least number of partition leaders and the partition replica
         for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
             Host targetHost = reverseIt.next();

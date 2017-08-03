@@ -2129,22 +2129,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void balanceSPI(int hostCount) {
 
-        //grab a lock
         final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
-        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Snapshot, rejoin or spi migration, in progress.");
-            }
-            return;
-        }
-
         Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(hostCount, hostId);
 
         //The host does not have any thing to do this time. It does not mean that the host does not
         //have more partition leaders than expected. Other hosts may have more partition leaders
         //than this one. So let other hosts do @BalanceSPI first.
         if (target == null) {
-            CoreZK.removeSPIBalanceIndicator(m_zk);
             return;
         }
 
@@ -2152,6 +2143,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final int targetHostId = target.getSecond();
         int partitionKey = -1;
 
+        //Others may also iterate through the partition keys. So make a copy and find the key
         VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
         ByteBuffer buf = ByteBuffer.allocate(partitionKeys.getSerializedSize());
         partitionKeys.flattenToBuffer(buf);
@@ -2167,8 +2159,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (partitionKey == -1) {
             tmLog.warn("Could not find the partition key for partition " + partitionId);
-            CoreZK.removeSPIBalanceIndicator(m_zk);
             return;
+        }
+
+        //grab a lock
+        if (!CoreZK.createSPIBalanceIndicator(m_zk, hostId)) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Snapshot, rejoin or spi migration, in progress.");
+            }
+            return;
+        }
+
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(String.format("Move the leader of partition %d to host %d", partitionId, targetHostId));
+            VoltTable vt = Cartographer.peekTopology(m_cartographer);
+            tmLog.debug("[@balanceSPI]\n" + vt.toFormattedString());
         }
 
         try {
@@ -2178,24 +2183,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             Procedure proc = procedureConfig.asCatalogProcedure();
             StoredProcedureInvocation spi = new StoredProcedureInvocation();
             spi.setProcName(procedureName);
-
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(String.format("Move the leader of partition %d to host %d", partitionId, targetHostId));
-                VoltTable vt = Cartographer.peekTopology(m_cartographer);
-                tmLog.debug("[@balanceSPI]\n" + vt.toFormattedString());
-            }
-            spi.setParams(partitionKey, partitionId, targetHostId);
             spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
+            spi.setParams(partitionKey, partitionId, targetHostId);
             if (spi.getSerializedParams() == null) {
                 spi = MiscUtils.roundTripForCL(spi);
             }
 
-            CoreZK.removeSPIBalanceInfo(m_zk);
             //Info saved for the node failure handling
             BalanceSpiInfo spiInfo = new BalanceSpiInfo(hostId, targetHostId,
                     m_cartographer.getHSIDForPartitionHost(hostId, partitionId),
                     m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
                     partitionId);
+            CoreZK.removeSPIBalanceInfo(m_zk);
             CoreZK.createSPIBalanceInfo(m_zk, spiInfo);
 
             synchronized (m_executeTaskAdpater) {
@@ -2208,6 +2207,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         spi.getSerializedSize(),
                         System.nanoTime());
             }
+
             final long timeoutMS = 5 * 60 * 1000;
             ClientResponse resp= cb.getResponse(timeoutMS);
             if (resp.getStatus() == ClientResponse.SUCCESS) {
@@ -2221,11 +2221,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         } catch (IOException | InterruptedException e) {
             tmLog.warn(String.format("errors in leader change for partition %d: %s", partitionId, e.getMessage()));
         } finally {
-            long remainingWaitTime = TimeUnit.MINUTES.toSeconds(5);
-            final int waitingInterval = 1;
+
+            //wait for the Cartographer to see the new partition leader. The leader promotion process should happens instantly.
+            //If the new partition leader does not show up in 5 min, the host with new partition leader does not get chance
+            //to promote itself before it is down or stale--the cluster ma experience problems.
+            //remove the blocker on ZooKeeper anyway
+            long remainingWaitTime = TimeUnit.MINUTES.toMillis(5);
+            final long waitingInterval = TimeUnit.SECONDS.toMillis(1);
             while (remainingWaitTime > 0) {
                 try {
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(waitingInterval));
+                    Thread.sleep(waitingInterval);
                 } catch (InterruptedException ignoreIt) {
                 }
                 remainingWaitTime -= waitingInterval;

@@ -312,7 +312,6 @@ public class InitiatorMailbox implements Mailbox
     protected void deliverInternal(VoltMessage message) {
         assert(lockingVows());
         logRxMessage(message);
-        notifyNewLeaderOfTxnDone();
         boolean canDeliver = m_scheduler.sequenceForReplay(message);
         if (message instanceof DumpMessage) {
             hostLog.warn("Received DumpMessage at " + CoreUtils.hsIdToString(m_hsId));
@@ -412,7 +411,7 @@ public class InitiatorMailbox implements Mailbox
         tmLog.info("Balance spi for partition " + pid + " to " + CoreUtils.hsIdToString(newLeaderHSId));
 
         //notify the new leader right away if the current leader has drained all transactions.
-        notifyNewLeaderOfTxnDone();
+        notifyNewLeaderOfTxnDoneIfNeeded();
     }
 
     // After the SPI migration has been requested, all the sp requests will be sent back to the sender
@@ -649,7 +648,7 @@ public class InitiatorMailbox implements Mailbox
 
     //Old master notifies new master that the transactions before the checkpoint on old master have been drained.
     //Then new master can proceed to process transactions.
-    public void notifyNewLeaderOfTxnDone() {
+    public void notifyNewLeaderOfTxnDoneIfNeeded() {
 
         //return quickly to avoid performance hit
         if (m_newLeaderHSID == Long.MIN_VALUE ) {
