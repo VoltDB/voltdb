@@ -69,8 +69,6 @@ public interface ConsumerDRGateway extends Promotable {
 
     void startConsumerDispatcher(final MeshMemberInfo member);
 
-    void createNewPartitionBufferReceiver(byte clusterId, int newPartitionCount);
-
     void deactivateConsumerDispatcher(byte clusterId);
 
     void addLocallyLedPartition(int partitionId);
