@@ -39,10 +39,28 @@ class AnalysisPage extends VoltDBManagementCenterPage {
         executionTimeSubTab         { $('#ulProcedure > li:nth-child(1)') }
         frequencySubTab             { $('#ulProcedure > li:nth-child(2)') }
         processingTimeSubTab        { $('#ulProcedure > li:nth-child(3)') }
+        chartLatencyAnalysis        { $('#chartLatencyAnalysis') }
+        chartFrequencyAnalysis      { $('#chartFrequencyAnalysis') }
+        chartProcessingTimeAnalysis { $('#chartProcessingTimeAnalysis') }
+        settingMessage              { $('.settingMessage') }
+        tblAnalysisSettings         { $('#tblAnalysisSettings') }
+        btnSaveThreshold            { $('#btnSaveThreshold') }
+        btnCancelThreshold          { $('#btnCancelThreshold') }
+        chkShowSysProcedureDiv      { $('#trShowHideSysProcedures > td:nth-child(2) > div') }
+        chkShowSysProcedure         { $('#trShowHideSysProcedures > td:nth-child(2) > div > ins') }
+        foreignObjectForSys         { $('p', text: 'org.voltdb.sysprocs.UpdateCore')}
+        averageExecutionTime        { $('#averageExecutionTime') }
+        warningSign                 { $('foreignObject', text: '⚠')}
+        analysisRemarks             { $('#analysisRemarks') }
     }
+
     static at = {
         analysisTab.displayed
         analysisTab.attr('class') == 'active'
+    }
+
+    def boolean checkSysProcedureDisplayed(){
+        return foreignObjectForSys.displayed
     }
 
     def isAnalyzeNowContentDisplayed(){
