@@ -746,7 +746,7 @@
 # Multi statement procedure with CASE/END and no whitespace surrounding them
 {"testName":"DdlCreateMultiStmtProcedure7",
    "sqlCmd":"create procedure msp7 as begin\n
-              select j, 10+i when i<0 then (i+0)end+100
+              select j, 10+case when i<0 then (i+0) else (i+10)end+100
               from ddl_table;\n
               end;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
@@ -754,7 +754,7 @@
 {"testName":"DdlCreateMultiStmtProcedure8",
    "sqlCmd":"create procedure msp8 as begin\n
              select * from ddl_table order by case when i<1 then i else j end desc;\n
-             select * from t order by case when j<1 then j else i end desc;\n
+             select * from ddl_table order by case when j<1 then j else i end desc;\n
              end;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 # Multi statement procedure with CASE in ORDER BY
@@ -846,6 +846,13 @@
 {"testName":"DdlCreateMultiStmtProcInvalidCase",
    "sqlCmd":"create procedure pr as begin select * from t; case when a>10 then 11 else 9;",
  "response":{"result":"ERROR","status":"FAILURE","error":"no SQL statement provided"}}
+# invalid table reference in one of the statements
+{"testName":"DdlCreateMultiStmtProcInvalidStmt",
+   "sqlCmd":"create procedure pr as begin
+              select * from ddl_table;
+              select * from q;
+             end;",
+ "response":{"result":"ERROR","status":"FAILURE","error":"Failed to plan for statement (sql1)"}}
 
 # Finally, drop ddl_table, so test is repeatable.
 {"testName":"DdlDropTable",
