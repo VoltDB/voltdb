@@ -69,7 +69,7 @@ class NPBenchmark {
         String servers = "localhost";
 
         @Option(desc = "Interval for performance feedback, in seconds.")
-        long displayinterval = 5;
+        long displayinterval =60;
 
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 20;
