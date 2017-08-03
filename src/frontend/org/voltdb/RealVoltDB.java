@@ -1703,26 +1703,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         //Thus notify the new leader to process transactions as leader
         if (failedHosts.contains(spiInfo.getOldLeaderHostId()) &&
                 spiInfo.getNewLeaderHostId() == m_messenger.getHostId()) {
-            for (Initiator initiator : m_iv2Initiators.values()) {
-                if (initiator instanceof SpInitiator) {
-                    SpInitiator init = (SpInitiator)initiator;
-                    if (init.getInitiatorHSId() == spiInfo.getNewLeaderHostId()) {
-                        init.setBalanceSPIStatus(spiInfo.getOldLeaderHostId());
-                        break;
-                    }
-                }
-            }
+            Initiator initiator = m_iv2Initiators.get(spiInfo.getPartitionId());
+            ((SpInitiator)initiator).setBalanceSPIStatus(spiInfo.getOldLeaderHostId());
         }
 
-        //Is new leader down?
-        if (!failedHosts.contains(spiInfo.getNewLeaderHostId())){
-            return;
-        }
+        int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(spiInfo.getPartitionId()));
 
-        if (spiInfo.getOldLeaderHostId() == m_messenger.getHostId()) {
-            long leader = m_cartographer.getHSIdForMaster(spiInfo.getPartitionId());
-            //leader still on the old host, that is the new leader does not get chance to be promoted.
-            if (leader == m_messenger.getHostId()) {
+        //new leader is down. current partition leader still on the older host.
+        //the new leader has not got a chance to be promoted yet. then re-install the old leader
+        if (failedHosts.contains(spiInfo.getNewLeaderHostId()) &&
+                spiInfo.getOldLeaderHostId() == m_messenger.getHostId() &&
+                spiInfo.getOldLeaderHostId() == currentLeaderHostId) {
+            SpInitiator initiator = (SpInitiator)m_iv2Initiators.get(spiInfo.getPartitionId());
+
+            //leader on this host but the initiator is marked as none-leader
+            //re-elect the older site as leader
+            if (!initiator.isLeader()) {
                 LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
                 try {
                     leaderAppointee.start(true);

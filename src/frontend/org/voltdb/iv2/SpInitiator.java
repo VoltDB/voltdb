@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
@@ -282,8 +283,15 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     public void setBalanceSPIStatus(long hsId) {
-        tmLog.info("Reset Balance SPI status on "+ CoreUtils.hsIdToString(getInitiatorHSId()));
+
+        //use console log for message pattern match in unit test.
+        VoltLogger log = new VoltLogger("CONSOLE");
+        log.info("Reset Balance SPI status on "+ CoreUtils.hsIdToString(getInitiatorHSId()));
         BalanceSPIMessage message = new BalanceSPIMessage(hsId, getInitiatorHSId());
         m_initiatorMailbox.deliver(message);
+    }
+
+    public boolean isLeader() {
+        return m_scheduler.isLeader();
     }
 }
