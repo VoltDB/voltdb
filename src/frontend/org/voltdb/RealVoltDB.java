@@ -3858,7 +3858,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
-        System.out.println("You are logged in as" + System.getProperty("user.name") + " user.");
     }
 
     @Override
