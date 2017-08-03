@@ -23,38 +23,27 @@
 
 package org.voltdb.utils;
 
-import java.util.Random;
-
+import java.io.IOException;
 import junit.framework.TestCase;
 
-public class TestEncoder extends TestCase {
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 
-    public void testHexEncoderWithString() {
+public class TestCompressionService extends TestCase {
+
+    public void testCompressionAndBase64EncoderWithString() {
         String someText = "This is some text\nwith a newline.";
-        String hexText = Encoder.hexEncode(someText);
-        String result = Encoder.hexDecodeToString(hexText);
+        String b64Text = CompressionService.compressAndBase64Encode(someText);
+        String result = CompressionService.decodeBase64AndDecompress(b64Text);
 
         assertEquals(someText, result);
     }
 
-    public void testHexEncoderWithBytes() {
-        byte[] bytes = new byte[1024];
-        new Random().nextBytes(bytes);
+    public void testB64WithBigness() throws IOException {
+        String someText = TPCCProjectBuilder.getTPCCSchemaCatalog().serialize();
 
-        for (int i = 0; i < bytes.length; i++)
-            System.out.print(String.valueOf(bytes[i]) + " ");
-        System.out.println();
+        String b64Text = CompressionService.compressAndBase64Encode(someText);
+        String result = CompressionService.decodeBase64AndDecompress(b64Text);
 
-        String hexText = Encoder.hexEncode(bytes);
-        byte[] result = Encoder.hexDecode(hexText);
-
-        for (int i = 0; i < result.length; i++)
-            System.out.print(String.valueOf(result[i]) + " ");
-        System.out.println();
-
-        System.out.println(hexText);
-
-        for (int i = 0; i < bytes.length; i++)
-            assertEquals(bytes[i], result[i]);
+        assertEquals(someText, result);
     }
 }
