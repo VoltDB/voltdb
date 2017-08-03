@@ -723,6 +723,10 @@
 {"testName":"DdlCreateMultiStmtProcedure8",
    "sqlCmd":"create procedure msp8 as begin\n select * from ddl_table order by case when i<1 then i else j end desc;\n select * from t order by case when j<1 then j else i end desc;\n end;";
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Multi statement procedure with CASE in ORDER BY
+{"testName":"DdlCreateMultiStmtProcedure9",
+   "sqlCmd":"create table books (cash integer not null, title varchar(3), primary key(cash)); partition table books on column cash;\n create role r1;\n create procedure msp9\n allow r1 partition on table books column cash parameter 0\n as begin\n select * from books where cash = ?;\n select * from books;\n end;";
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 # Drop the procedures created above (to test Drop Procedure, and so test is repeatable):
 {"testName":"DdlDropProcedure1",
    "sqlCmd":"DROP procedure p1;",
@@ -742,14 +746,19 @@
              DROP procedure msp5 if exists;\n
              DROP procedure msp6 if exists;\n
              DROP procedure msp7 if exists;\n
-             DROP procedure msp8 if exists;",
+             DROP procedure msp8 if exists;\n
+             DROP procedure msp9 if exists;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
  {"testName":"DdlDropTablesForProcTests",
    "sqlCmd":"DROP table ddl_table if exists;\n
              DROP table R if exists;\n
              DROP table S if exists;\n
              DROP table T if exists;\n
+             DROP table books if exists;\n
              DROP table BEGIN if exists;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+ {"testName":"DdlDropRoleForProcTests",
+   "sqlCmd":"DROP ROLE r1 if exists;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 
 
