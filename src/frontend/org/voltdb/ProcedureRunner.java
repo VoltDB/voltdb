@@ -63,6 +63,7 @@ import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
@@ -1012,7 +1013,7 @@ public class ProcedureRunner {
 
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
-            byte[] plan = Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
+            byte[] plan = CompressionService.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
             long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan, catStmt.getSqltext());
             boolean transactional = frag.getNontransactional() == false;
 
