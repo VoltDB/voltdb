@@ -78,7 +78,6 @@ function QueryUI(queryTab) {
                 && (buffer.toUpperCase().substring(position).indexOf(token) == 0)
                 && (position + tokLength == bufLength || buffer.charAt(position + tokLength).match(letterNumber) == null)
                 ) {
-                console.log("matched token : " + token );
                 return true;
             }
             return false;
@@ -87,9 +86,16 @@ function QueryUI(queryTab) {
         function findEndOfMultiStmtProc(src, idx) {
             let inCase = 0;
             for (let i = idx; i < src.length; i++) {
-                if ( matchToken(src, i, "END") ) {
-                    if (inCase == 0) {
-                        console.log("found end of msp");
+                if ( matchToken(src, i, "CASE") ) {
+                    inCase++;
+                    i += 4
+                } else if ( matchToken(src, i, "END") ) {
+                    if (inCase > 0) {
+                        inCase--;
+                        i += 3;
+                    } else {
+                        // found the end of multi statement procedure
+                        // return the index of the end
                         return i;
                     }
                 }
