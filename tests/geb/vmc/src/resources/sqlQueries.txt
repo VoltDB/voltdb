@@ -622,7 +622,7 @@
 # Table "ddl_table" is created here and dropped and recreated for subsequent tests.
 # It's finally dropped below (last test).
 {"testName":"DdlCreateTable",
-   "sqlCmd":"drop table ddl_table cascade if exists;\n Create table ddl_table (i integer)",
+   "sqlCmd":"drop table ddl_table if exists;\n Create table ddl_table (i integer)",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlAlterTableDropColumn",
    "sqlCmd":"DROP table ddl_table if exists;\n
@@ -705,7 +705,7 @@
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 # Multi statement procedure with embedded END
 {"testName":"DdlCreateMultiStmtProcedure5",
-   "sqlCmd":"drop table S if exists;\n create table S (emptycase int, bendbeer int, endofbeer int, frontend tinyint);\n create procedure msp5 as begin\n select emptycase from R;\n select bendbeer from R;\n select endofbeer from R;\n select frontend from R;\n end;",
+   "sqlCmd":"drop table S if exists;\n create table S (emptycase int, bendbeer int, endofbeer int, frontend tinyint);\n create procedure msp5 as begin\n select emptycase from S;\n select bendbeer from S;\n select endofbeer from S;\n select frontend from S;\n end;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 # Single statement procedure with table BEGIN
 {"testName":"DdlCreateProcedure5",
