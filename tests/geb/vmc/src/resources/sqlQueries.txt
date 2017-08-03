@@ -622,7 +622,7 @@
 # Table "ddl_table" is created here and dropped and recreated for subsequent tests.
 # It's finally dropped below (last test).
 {"testName":"DdlCreateTable",
-   "sqlCmd":"drop table ddl_table if exists;\n Create table ddl_table (i integer)",
+   "sqlCmd":"drop table ddl_table if exists;\n Create table ddl_table (i integer);",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlAlterTableDropColumn",
    "sqlCmd":"DROP table ddl_table if exists;\n
@@ -853,6 +853,9 @@
               select * from q;
              end;",
  "response":{"result":"ERROR","status":"FAILURE","error":"Failed to plan for statement (sql1)"}}
+{"testName":"DdlDropInvalidProc",
+   "sqlCmd":"drop procedure pr if exists;",
+ "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 
 # Finally, drop ddl_table, so test is repeatable.
 {"testName":"DdlDropTable",
