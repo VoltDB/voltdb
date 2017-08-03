@@ -794,6 +794,16 @@
    "sqlCmd":"create procedure as alter table dynamic_table add column j integer;",
  "response":{"result":"ERROR","status":"FAILURE","error":"Invalid CREATE PROCEDURE"}}
 
+#
+# multi statement procedure negative tests
+#
+{"testName":"DdlCreateMultiStmtProcInvalid",
+   "sqlCmd":"create procedure as begin select * from t;",
+ "response":{"result":"ERROR","status":"FAILURE","error":"no SQL statement provided"}}
+{"testName":"DdlCreateMultiStmtProcInvalidCase",
+   "sqlCmd":"create procedure pr as begin select * from t; case when a>10 then 11 else 9;",
+ "response":{"result":"ERROR","status":"FAILURE","error":"no SQL statement provided"}}
+
 # Finally, drop ddl_table, so test is repeatable.
 {"testName":"DdlDropTable",
    "sqlCmd":"drop table ddl_table",
