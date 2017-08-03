@@ -713,7 +713,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             @Override
                             public void run()
                             {
-                                ((RealVoltDB)VoltDB.instance()).logMessageToFLC(timestamp, username);
+                                ((RealVoltDB)VoltDB.instance()).logMessageToFLC(timestamp, username, socket.socket().getRemoteSocketAddress().toString());
                             }
                         });
                     }

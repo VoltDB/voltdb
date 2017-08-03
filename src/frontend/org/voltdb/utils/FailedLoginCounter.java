@@ -34,13 +34,17 @@ public class FailedLoginCounter {
         int m_totalFailedAttempts;
         long m_ts;
         Map<String, Integer> m_userFailedAttempts;
+        Map<String, Integer> m_ipFailedAttempts;
+
         public TimeBucket () {
             m_userFailedAttempts = new HashMap<String, Integer>();
+            m_ipFailedAttempts = new HashMap<String, Integer>();
         }
     }
 
     // key is username, value is number of failed logging attempts count
     private Map<String,Integer> m_userFailedAttempts;
+    private Map<String,Integer> m_ipFailedAttempts;
     Deque<TimeBucket> m_timeBucketQueue;
 
     int m_totalFailedAttempts;
@@ -50,34 +54,49 @@ public class FailedLoginCounter {
     public FailedLoginCounter() {
         m_timeBucketQueue = new LinkedList<TimeBucket>();
         m_userFailedAttempts = new HashMap<String,Integer>();
+        m_ipFailedAttempts = new HashMap<String,Integer>();
     }
 
-    public void logMessage(long timestampMilis, String user) {
+    public void logMessage(long timestampMilis, String user, String ip) {
         checkCounter(timestampMilis);
         long timestampSeconds = timestampMilis / 1000;
         if (!m_timeBucketQueue.isEmpty() && m_timeBucketQueue.peekLast().m_ts == timestampSeconds) {
             TimeBucket bucket = m_timeBucketQueue.peekLast();
-            int bucketCount = bucket.m_userFailedAttempts.getOrDefault(user,0) + 1;
-            bucket.m_userFailedAttempts.put(user,bucketCount);
+            int bucketUserFailedCount = bucket.m_userFailedAttempts.getOrDefault(user, 0) + 1;
+            bucket.m_userFailedAttempts.put(user,bucketUserFailedCount);
+            int bucketIPFailedCount = bucket.m_ipFailedAttempts.getOrDefault(ip, 0) + 1;
+            bucket.m_ipFailedAttempts.put(ip, bucketIPFailedCount);
             bucket.m_totalFailedAttempts++;
         } else {
             TimeBucket bucket = new TimeBucket();
             bucket.m_userFailedAttempts.put(user, 1);
+            bucket.m_ipFailedAttempts.put(ip, 1);
             bucket.m_ts = timestampSeconds;
             bucket.m_totalFailedAttempts = 1;
             m_timeBucketQueue.offer(bucket);
         }
         int userFailedCount = m_userFailedAttempts.getOrDefault(user,0) + 1;
-        String messageFormat = "User %s failed to authenticate %d times in last minute";
+        String messageFormat = "User "+ user +" failed to authenticate %d times in last minute";
         RateLimitedLogger.tryLogForMessage(timestampMilis,
-                                           ONE_MINUTE_IN_MILLIS,
+                                           10000,
                                            TimeUnit.MILLISECONDS,
                                            authLog,
                                            Level.WARN,
                                            messageFormat,
-                                           user,
                                            userFailedCount);
-        m_userFailedAttempts.put(user,userFailedCount);
+        m_userFailedAttempts.put(user, userFailedCount);
+
+        int ipFailedCount = m_ipFailedAttempts.getOrDefault(ip, 0) + 1;
+        messageFormat = "IP address "+ ip +" failed to authenticate %d times in last minute";
+        RateLimitedLogger.tryLogForMessage(timestampMilis,
+                                           10000,
+                                           TimeUnit.MILLISECONDS,
+                                           authLog,
+                                           Level.WARN,
+                                           messageFormat,
+                                           ipFailedCount);
+        m_ipFailedAttempts.put(ip, ipFailedCount);
+
         m_totalFailedAttempts++;
         messageFormat = "Total failed authentication: %d times in last minute";
         RateLimitedLogger.tryLogForMessage(timestampMilis,
@@ -93,13 +112,28 @@ public class FailedLoginCounter {
         while (!m_timeBucketQueue.isEmpty() && m_timeBucketQueue.peek().m_ts < (timestamp - ONE_MINUTE_IN_MILLIS)/1000) {
             TimeBucket tb = m_timeBucketQueue.poll();
             m_totalFailedAttempts -= tb.m_totalFailedAttempts;
-            Iterator<Entry<String, Integer>> it = tb.m_userFailedAttempts.entrySet().iterator();
-            while (it.hasNext()) {
-                Entry<String, Integer> entry = it.next();
+            Iterator<Entry<String, Integer>> userIter = tb.m_userFailedAttempts.entrySet().iterator();
+            while (userIter.hasNext()) {
+                Entry<String, Integer> entry = userIter.next();
                 String user = entry.getKey();
                 int currentUserFailedAttempts = m_userFailedAttempts.get(user) - tb.m_userFailedAttempts.get(user);
                 m_userFailedAttempts.put(user, currentUserFailedAttempts);
             }
+            Iterator<Entry<String, Integer>> ipIter = tb.m_ipFailedAttempts.entrySet().iterator();
+            while (ipIter.hasNext()) {
+                Entry<String, Integer> entry = ipIter.next();
+                String ip = entry.getKey();
+                int currentIPFailedAttempts = m_ipFailedAttempts.get(ip) - tb.m_ipFailedAttempts.get(ip);
+                m_ipFailedAttempts.put(ip, currentIPFailedAttempts);
+            }
         }
+    }
+
+    public Map<String, Integer> getUserFailedAttempts() {
+        return m_userFailedAttempts;
+    }
+
+    public Map<String, Integer> getIPFailedAttempts() {
+        return m_ipFailedAttempts;
     }
 }

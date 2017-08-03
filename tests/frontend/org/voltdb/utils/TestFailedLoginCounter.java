@@ -29,36 +29,61 @@ import junit.framework.TestCase;
 
 public class TestFailedLoginCounter extends TestCase {
 
-    public void testHexEncoderWithString() {
-        String someText = "This is some text\nwith a newline.";
-        String hexText = Encoder.hexEncode(someText);
-        String result = Encoder.hexDecodeToString(hexText);
-
-        assertEquals(someText, result);
-    }
-
     @Test
     public void testLogMessage() {
-    	FailedLoginCounter flc = new FailedLoginCounter();
-    	long ts = System.currentTimeMillis();
-    	flc.logMessage(ts, "voltdbuser");
+        FailedLoginCounter flc = new FailedLoginCounter();
+        long ts = System.currentTimeMillis();
+        flc.logMessage(ts, "voltdbuser", "10.0.0.1");
 
-    	assertEquals(flc.m_totalFailedAttempts, 1);
-    	assertEquals(flc.m_timeBucketQueue.peek().m_ts, ts/1000);
+        assertEquals(flc.m_totalFailedAttempts, 1);
+        assertEquals(flc.m_timeBucketQueue.peek().m_ts, ts/1000);
     }
 
     @Test
     public void testCheckCounter() {
-    	FailedLoginCounter flc = new FailedLoginCounter();
-    	long ts = System.currentTimeMillis();
-    	flc.logMessage(ts, "voltdbuser1");
-    	flc.logMessage(ts + 1, "voltdbuser2");
-    	flc.logMessage(ts + 2, "voltdbuser3");
+        FailedLoginCounter flc = new FailedLoginCounter();
+        long ts = System.currentTimeMillis();
+        flc.logMessage(ts, "voltdbuser1", "10.0.0.1");
+        flc.logMessage(ts + 1, "voltdbuser2", "10.0.0.1");
+        flc.logMessage(ts + 2, "voltdbuser3", "10.0.0.1");
+        System.out.println(flc.m_totalFailedAttempts);
+        assertEquals(flc.m_totalFailedAttempts, 3);
+        flc.checkCounter(ts + 70000);
+        System.out.println(flc.m_totalFailedAttempts);
+        assertEquals(flc.m_totalFailedAttempts, 0);
+    }
 
-    	assertEquals(flc.m_totalFailedAttempts, 3);
-    	flc.checkCounter(ts + 70000);
-    	//System.out.println(ts);
-    	System.out.println(flc.m_totalFailedAttempts);
-    	assertEquals(flc.m_totalFailedAttempts, 0);
+    @Test
+    public void testUserCounter() {
+        FailedLoginCounter flc = new FailedLoginCounter();
+        long ts = System.currentTimeMillis();
+        flc.logMessage(ts, "voltdbuser1", "10.0.0.1");
+        flc.logMessage(ts + 1, "voltdbuser2", "10.0.0.1");
+        flc.logMessage(ts + 2, "voltdbuser3", "10.0.0.1");
+
+        assertTrue(flc.getUserFailedAttempts().get("voltdbuser1") == 1);
+        assertTrue(flc.getUserFailedAttempts().get("voltdbuser2") == 1);
+        assertTrue(flc.getUserFailedAttempts().get("voltdbuser3") == 1);
+        flc.checkCounter(ts + 70000);
+        assertTrue(flc.getUserFailedAttempts().get("voltdbuser1") == 0);
+        assertTrue(flc.getUserFailedAttempts().get("voltdbuser2") == 0);
+        assertTrue(flc.getUserFailedAttempts().get("voltdbuser3") == 0);
+    }
+
+    @Test
+    public void testIPCounter() {
+        FailedLoginCounter flc = new FailedLoginCounter();
+        long ts = System.currentTimeMillis();
+        flc.logMessage(ts, "voltdbuser1", "10.0.0.1");
+        flc.logMessage(ts + 1, "voltdbuser1", "10.0.0.2");
+        flc.logMessage(ts + 2, "voltdbuser1", "10.0.0.3");
+
+        assertTrue(flc.getIPFailedAttempts().get("10.0.0.1") == 1);
+        assertTrue(flc.getIPFailedAttempts().get("10.0.0.2") == 1);
+        assertTrue(flc.getIPFailedAttempts().get("10.0.0.3") == 1);
+        flc.checkCounter(ts + 70000);
+        assertTrue(flc.getIPFailedAttempts().get("10.0.0.1") == 0);
+        assertTrue(flc.getIPFailedAttempts().get("10.0.0.2") == 0);
+        assertTrue(flc.getIPFailedAttempts().get("10.0.0.3") == 0);
     }
 }
