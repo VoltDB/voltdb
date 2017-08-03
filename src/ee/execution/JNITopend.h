@@ -101,7 +101,7 @@ private:
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
-    jclass m_encoderClass;
+    jclass m_decompressionClass;
 };
 
 }
