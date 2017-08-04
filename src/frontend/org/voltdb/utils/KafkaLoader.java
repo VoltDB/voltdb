@@ -109,6 +109,7 @@ public class KafkaLoader {
             c_config.enableSSL();
         }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
+        c_config.setReconnectOnConnectionLoss(!m_config.stopondisconnect);
 
         m_client = getClient(c_config, serverlist, m_config.port);
 
@@ -195,6 +196,9 @@ public class KafkaLoader {
 
         @Option(desc = "Enable SSL, Optionally provide configuration file.")
         String ssl = "";
+
+        @Option(desc = "Stop when all connections are lost", hasArg = false)
+        boolean stopondisconnect = false;
 
         //Read properties from formatter option and do basic validation.
         Properties m_formatterProperties = new Properties();
@@ -424,7 +428,6 @@ public class KafkaLoader {
      */
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {
         config.setTopologyChangeAware(true);
-        config.setReconnectOnConnectionLoss(true);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
             try {

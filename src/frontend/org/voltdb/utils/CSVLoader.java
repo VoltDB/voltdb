@@ -113,7 +113,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      */
     public static final boolean DEFAULT_HEADER = false;
     /**
-     *
+     * Stop when all connections are lost?
      */
     public static final boolean DEFAULT_STOP_ON_DISCONNECT = false;
     /**
