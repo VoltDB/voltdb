@@ -201,25 +201,25 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private void taskQueueOffer(TransactionTask task)
     {
         Iv2Trace.logSiteTaskerQueueOffer(task);
-        if (task.getTransactionState().isReadOnly()) {
+//        if (task.getTransactionState().isReadOnly()) {
             m_sitePool.doWork(task.getTxnId(), task);
-        }
-        else {
-            m_taskQueue.offer(task);
-        }
+//        }
+//        else {
+//            m_taskQueue.offer(task);
+//        }
     }
 
     private boolean taskQueueOffer()
     {
         // Do we have something to do?
+        // Keep do the following until first failure :
+
         // - If so, is it a write?
-        //   - If so, are there reads or writes outstanding?
-        //     - if not, pull it from the backlog, add it to current write set, and queue it
+        //   - If so, are there reads or writes outstanding on the partitions used ?
+        //     - if not, pull it from the backlog, add it to current write set, update the r/w counts, and queue it
         //     - if so, bail for now
-        //   - If not, are there writes outstanding?
-        //     - if not, while there are reads on the backlog and the pool has capacity:
-        //       - pull the read from the backlog, add it to the current read set, and queue it.
-        //       - bail when done
+        //   - If not, are there writes outstanding on the partitions used ?
+        //     - if not, pull the read from the backlog, add it to the current read set, update the r/w counts, and queue it.
         //     - if so, bail for now
 
         boolean retval = false;
@@ -290,6 +290,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             assert(m_currentWrites.containsKey(txnId));
             updatePartitionLocks(m_currentWrites.get(txnId), -1);
             m_currentWrites.remove(txnId);
+            m_sitePool.completeWork(txnId);
             assert(m_currentWrites.isEmpty());
         }
         if (taskQueueOffer()) {
