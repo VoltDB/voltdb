@@ -6,6 +6,7 @@ import urllib2
 
 def getdata(url, build):
     url = 'http://ci.voltdb.lan:8080/' + url + str(build) + "/api/python"
+    print url
     return eval(urllib2.urlopen(url).read())
 
 if __name__ == '__main__':
