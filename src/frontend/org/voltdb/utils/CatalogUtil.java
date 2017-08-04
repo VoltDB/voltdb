@@ -2771,4 +2771,11 @@ public abstract class CatalogUtil {
         }
         return sb.toString();
     }
+
+    /*
+     * Check if the procedure is partitioned or not
+     */
+    public static boolean isProcedurePartitioned(Procedure proc) {
+        return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
+    }
 }
