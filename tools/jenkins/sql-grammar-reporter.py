@@ -37,7 +37,8 @@ class Issues(object):
 
         existing = jira.search_issues('summary ~ \'%s\'' % summary)
         if len(existing) > 0:
-            return 'Already reported'
+            print 'No new Jira issue created. Build ' + str(build) + ' has already been reported.'
+            return
 
         build_report_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
         build_report = eval(self.read_url(build_report_url))
@@ -45,6 +46,7 @@ class Issues(object):
         build_result = build_report.get('result')
 
         if build_result == 'SUCCESS':  # only generate Jira issue if the test fails
+            print 'No new issue created. Build ' + str(build) + 'resulted in: ' + build_result
             return
 
         summary_url = self.jhost + '/job/' + job + '/' + str(build) + '/artifact/tests/sqlgrammar/summary.out'
@@ -96,6 +98,7 @@ class Issues(object):
             'issuetype': {'name': 'Bug'},
             'priority': {'name': 'Blocker'},
             'labels': labels,
+            'customfield_10430': {'value': 'CORE team'},
             'components': [jira_component],
             'versions': [jira_version]
         }
