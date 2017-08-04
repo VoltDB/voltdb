@@ -113,6 +113,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      */
     public static final boolean DEFAULT_HEADER = false;
     /**
+     *
+     */
+    public static final boolean DEFAULT_STOP_ON_DISCONNECT = false;
+    /**
      * Used for testing only.
      */
     public static boolean testMode = false;
@@ -322,6 +326,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         @Option(desc = "Use upsert instead of insert", hasArg = false)
         boolean update = DEFAULT_UPSERT_MODE;
+
+        @Option(desc = "Stop when all connections are lost", hasArg = false)
+        boolean stopondisconnect = DEFAULT_STOP_ON_DISCONNECT;
         /**
          * Validate command line options.
          */
@@ -585,7 +592,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
     public static Client getClient(ClientConfig config, String[] servers,
             int port) throws Exception {
         config.setTopologyChangeAware(true); // Set client to be topology-aware
-        config.setReconnectOnConnectionLoss(true);
+        config.setReconnectOnConnectionLoss(!CSVLoader.config.stopondisconnect);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
             // Try connecting servers one by one until we have a success
