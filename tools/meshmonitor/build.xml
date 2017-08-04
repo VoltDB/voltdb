@@ -1,13 +1,8 @@
 <project name="meshmonitor" default="dist">
 
-    <!-- make environment var foo available as env.foo -->
-    <property environment="env"/>
-    <!-- VOLTHOME env variable points to voltdb checkout -->
-    <condition property="volthome" value="${env.VOLTHOME}" else="../..">
-      <isset property="env.VOLTHOME"/>
-    </condition>
-
-    <property name='volthome.obj' value="${volthome}/obj/release/prod"/>
+    <property name='volthome' location="../.."/>
+    <property name='voltdb.build' value='release'/>
+    <property name='volthome.obj' location="${volthome}/obj/${voltdb.build}/prod"/>
 
     <target name="clean">
         <delete includeEmptyDirs="true" dir="build"/>
@@ -23,7 +18,6 @@
             <classpath path="${volthome.obj}"/>
         </javac>
     </target>
-
 
     <target name="jar" depends="clean,compile">
         <mkdir dir="build/jar"/>
