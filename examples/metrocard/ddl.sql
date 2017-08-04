@@ -67,7 +67,7 @@ CREATE TABLE wait_time (
   entries             INTEGER   NOT NULL,
   PRIMARY KEY (update_time, station_id)
 );
-
+PARTITION TABLE wait_time ON COLUMN station_id;
 -------------- PARTITIONED TABLES -----------------------------------------------
 CREATE TABLE cards(
   card_id               INTEGER        NOT NULL,
@@ -114,6 +114,10 @@ CREATE STREAM card_alert_export PARTITION ON COLUMN card_id EXPORT TO TARGET ale
   alert_message         VARCHAR(64)    NOT NULL
 );
 
+CREATE STREAM update_requests PARTITION ON COLUMN station_id EXPORT TO TARGET updatewaittime (
+  station_id SMALLINT NOT NULL,
+  ttl        INTEGER DEFAULT 300000 -- 5 min
+);
 -------------- VIEWS ------------------------------------------------------------
 CREATE VIEW secondly_entries_by_station
 AS
@@ -159,6 +163,8 @@ GROUP BY
 
 CREATE PROCEDURE PARTITION ON TABLE cards COLUMN card_id PARAMETER 0 FROM CLASS metrocard.CardSwipe;
 CREATE PROCEDURE FROM CLASS metrocard.UpdateWaitTime;
+CREATE PROCEDURE PARTITION ON TABLE train_activity COLUMN station_id PARAMETER 0 FROM CLASS metrocard.UpdateWaitTimeForStation;
+CREATE PROCEDURE PARTITION ON TABLE train_activity COLUMN station_id PARAMETER 1 FROM CLASS metrocard.TrainActivity;
 
 CREATE PROCEDURE ReplenishCard PARTITION ON TABLE cards COLUMN card_id PARAMETER 1 AS
 UPDATE cards SET balance = balance + ?

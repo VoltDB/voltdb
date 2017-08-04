@@ -13,8 +13,14 @@
         <configuration type="kafka" format="csv" enabled="true">
           <property name="brokers">localhost:9092</property>
           <property name="topics">train_activity</property>
-          <property name="procedure">TRAIN_ACTIVITY.insert</property>
+          <property name="procedure">TrainActivity</property>
         </configuration>
     </import>
+    <export>
+       <configuration target="updatewaittime" type="custom" exportconnectorclass="org.voltdb.exportclient.loopback.LoopbackExportClient" enabled="true">
+           <property name="procedure">UpdateWaitTimeForStation</property>
+           <property name="skipinternals">true</property>
+       </configuration>
+    </export>
     <commandlog enabled="false" />
 </deployment>

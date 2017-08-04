@@ -87,6 +87,7 @@ function init() {
     echo "----Loading Cards----"
     java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.CardGenerator \
         --output=data/cards.csv
+    csvloader --servers $SERVERS --file data/cards.csv --reportdir log cards
 }
 
 # run this target to see what command line options the client offers
