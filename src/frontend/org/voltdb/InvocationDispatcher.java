@@ -240,6 +240,10 @@ public final class InvocationDispatcher {
         m_NTProcedureService.update(m_catalogContext.get());
     }
 
+    LightweightNTClientResponseAdapter getInternelAdapterNT () {
+        return m_NTProcedureService.m_internalNTClientAdapter;
+    }
+
     /*
      * This does a ZK lookup which apparently is full of fail
      * if you run TestRejoinEndToEnd. Kind of lame, but initializing this data

@@ -1225,14 +1225,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     };
 
-                    m_internalConnectionHandler.callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
-                                                              true,
-                                                              1000 * 120,
-                                                              cb,
-                                                              true, // priority NT
-                                                              null, // back pressure predicate
-                                                              invocation.getProcName(),
-                                                              itm.getParameters());
+                    m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
+                            true, 1000 * 120, cb, invocation.getProcName(), itm.getParameters());
                 }
                 else {
                     // m_d is for test only
