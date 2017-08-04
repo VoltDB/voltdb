@@ -62,6 +62,8 @@ class Issues(object):
             + 'SIGSEGV Message: \n' + '#' + sigsegv_message + ' \n \n' \
             + 'Query that Caused the Crash: ' + crash_query
 
+        description = description.replace('#', '\#')
+
         labels = ['grammar-gen']
 
         component = 'Core'
@@ -99,6 +101,7 @@ class Issues(object):
         }
 
         new_issue = jira.create_issue(fields=issue_dict)
+        print 'New issue created for failure on build ' + str(build)
 
 if __name__ == '__main__':
     this_build = os.environ.get('build', None)
