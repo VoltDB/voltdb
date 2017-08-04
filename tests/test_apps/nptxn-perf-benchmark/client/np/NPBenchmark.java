@@ -30,6 +30,7 @@ import java.util.concurrent.CountDownLatch;
 import java.io.FileWriter;
 import java.util.Arrays;
 import java.util.TimerTask;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.voltdb.*;
 import org.voltdb.client.*;
@@ -56,8 +57,6 @@ class NPBenchmark {
 
     Timer timer;
     long benchmarkStartTS;
-
-    private Random rand = new Random();
 
     // Count the sp / np procs that have been sent so far, use volatile variable for
     // optimal performance
@@ -440,22 +439,22 @@ class NPBenchmark {
 
     public void iterateNP(double count, int offset, int num) throws Exception {
          // 2P transaction
-        String pan1 = generate16DString(rand.nextInt(config.cardcount));
-        String pan2 = generate16DString(rand.nextInt((int) count) + offset);    // a smaller range of entities
+        String pan1 = generate16DString(ThreadLocalRandom.current().nextInt(config.cardcount));
+        String pan2 = generate16DString(ThreadLocalRandom.current().nextInt((int) count) + offset);    // a smaller range of entities
 
         clients[num].callProcedure(
                                 "Transfer",
                                 pan1,
                                 pan2,
-                                rand.nextDouble() < 0.5 ? -1 : 1,   // random transfer direction
+                                ThreadLocalRandom.current().nextDouble() < 0.5 ? -1 : 1,   // random transfer direction
                                 "USD"
                                 );
 
         npCount += 1;
 
-        if (rand.nextDouble() < config.mprate) {
+        if (ThreadLocalRandom.current().nextDouble() < config.mprate) {
             // MP transaction
-            int id1 = rand.nextInt(config.cardcount);
+            int id1 = ThreadLocalRandom.current().nextInt(config.cardcount);
             int id2 = id1 + 2000 < config.cardcount ?
                     id1 + 2000 : config.cardcount - 1;
 
@@ -475,8 +474,8 @@ class NPBenchmark {
     public void iterateSP(double count, int offset) throws Exception {
 
         if ((double) spCount < (double) npCount * config.sprate) {
-            String pan1 = generate16DString(rand.nextInt(config.cardcount));
-            String pan2 = generate16DString(rand.nextInt(config.cardcount));
+            String pan1 = generate16DString(ThreadLocalRandom.current().nextInt(config.cardcount));
+            String pan2 = generate16DString(ThreadLocalRandom.current().nextInt(config.cardcount));
 
             clients[0].callProcedure(new ProcCallback("Authorize"),
                                 "Authorize",
