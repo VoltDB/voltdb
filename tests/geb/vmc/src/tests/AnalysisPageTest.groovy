@@ -72,10 +72,10 @@ class AnalysisPageTest extends TestBase {
         try{
             page.setQueryText(dropTableAndProcQuery)
             page.runQuery()
-            println("Table deleted successfully.")
+//            println("Table deleted successfully.")
             return true;
         } catch (Exception e){
-            println("sdfsdfsdfsdffsdf")
+//            println("sdfsdfsdfsdffsdf")
             return false;
         }
 
@@ -255,7 +255,6 @@ class AnalysisPageTest extends TestBase {
         btnSaveThreshold.click()
         then:
 
-
         waitFor(2){ btnAnalyzeNow.isDisplayed() }
         btnAnalyzeNow.click()
         report 'test warning'
@@ -270,4 +269,50 @@ class AnalysisPageTest extends TestBase {
 
         deleteTableAndProcedure(dropTableAndProcQuery)
     }
+
+    def openAndCloseGraphDetailPopup() {
+        given:
+        String createQuery = page.getQueryToCreateTable()
+        String createProcedureQuery = page.getQueryToCreateStoredProcedure()
+        String execProcedureQuery = page.getQueryToExecuteProcedureQuery()
+
+        when: 'Click SQL tab'
+        page.gotoSqlQuery()
+        then: 'at SQL page'
+        at SqlQueryPage
+        createExecuteTableAndProcedure(createQuery, createProcedureQuery, execProcedureQuery)
+
+        when: 'Analysis tab is clicked'
+        page.gotoAnalysis()
+        then: 'at Analysis Page'
+        at AnalysisPage
+
+        when: 'wait for analyze now button to be displayed'
+        waitFor(waitTime) { page.btnAnalyzeNow.isDisplayed() }
+        then: 'click analyze now button'
+        page.btnAnalyzeNow.click()
+
+        when: 'click open the first bar'
+        page.firstBar.click();
+        then: ''
+        assert page.detailsPopup.isDisplayed();
+
+        when:
+        page.detailsPopupCloseButton.click();
+        report "hello"
+        then:
+        assert !page.detailsPopupCloseButton.isDisplayed()
+        println();
+    }
+
+    def cleanup() {
+        String dropTableAndProcQuery = page.getQueryToDropTableAndProcedureQuery()
+        when: 'Click SQL tab'
+        page.gotoSqlQuery()
+        then: 'at SQL page'
+        at SqlQueryPage
+        deleteTableAndProcedure(dropTableAndProcQuery)
+    }
+//    #visualiseLatencyAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g > g > foreignObject > p
+//    #visualiseLatencyAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g > g:nth-child(2) > foreignObject > p
 }

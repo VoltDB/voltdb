@@ -52,6 +52,16 @@ class AnalysisPage extends VoltDBManagementCenterPage {
         averageExecutionTime        { $('#averageExecutionTime') }
         warningSign                 { $('foreignObject', text: '⚠')}
         analysisRemarks             { $('#analysisRemarks') }
+
+        allBars                     { $("#visualiseLatencyAnalysis > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g") }
+        firstBar                    { allBars.find("g") }
+//        secondBar                   { allBars.find("g")[1] }
+
+        detailsPopup                { $("body > div.popup_cont.\\32 0 > div.popup > div") }
+        detailsPopupCloseButton     (required: false) { $("body > div.popup_cont.\\32 0 > div.popup_close") }
+
+        allNames                    { $("#visualiseLatencyAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g") }
+        firstName                   { allNames.find("g") }
     }
 
     static at = {
