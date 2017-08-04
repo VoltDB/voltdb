@@ -81,7 +81,7 @@ public class FailedLoginCounter {
                                            10000,
                                            TimeUnit.MILLISECONDS,
                                            authLog,
-                                           Level.WARN,
+                                           Level.INFO,
                                            messageFormat,
                                            userFailedCount);
         m_userFailedAttempts.put(user, userFailedCount);
@@ -92,7 +92,7 @@ public class FailedLoginCounter {
                                            10000,
                                            TimeUnit.MILLISECONDS,
                                            authLog,
-                                           Level.WARN,
+                                           Level.INFO,
                                            messageFormat,
                                            ipFailedCount);
         m_ipFailedAttempts.put(ip, ipFailedCount);
@@ -103,7 +103,7 @@ public class FailedLoginCounter {
                                            ONE_MINUTE_IN_MILLIS,
                                            TimeUnit.MILLISECONDS,
                                            authLog,
-                                           Level.WARN,
+                                           Level.INFO,
                                            messageFormat,
                                            m_totalFailedAttempts);
     }
