@@ -100,7 +100,7 @@ class NPBenchmark {
 
         @Override
         public void validate() {
-            if (sprate > 1 || sprate < 0) {
+            if (sprate < 0) {
                 exitWithMessageAndUsage("Invalid sprate...");
             }
 
