@@ -20,6 +20,7 @@ package org.voltdb.jni;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -36,6 +37,7 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
+import org.voltdb.UserDefinedFunctionManager.UserDefinedFunctionRunner;
 import org.voltdb.VoltTable;
 import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
@@ -46,6 +48,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -260,6 +263,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
          */
         static final int kErrorCode_pushPerFragmentStatsBuffer = 106;
 
+        /**
+         * Instruct the Java side to invoke a user-defined function and
+         * return the result.
+         */
+        static final int kErrorCode_callJavaUserDefinedFunction = 107;
+
         ByteBuffer getBytes(int size) throws IOException {
             ByteBuffer header = ByteBuffer.allocate(size);
             while (header.hasRemaining()) {
@@ -296,6 +305,54 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                         m_executionTimes[m_succeededFragmentsCount] = perFragmentStatsBuffer.getLong();
                     }
                 }
+            }
+            catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        // Internal function to receive and execute the UDF invocation request.
+        void callJavaUserDefinedFunctionInternal() {
+            try {
+                // Read the request content from the wire.
+                int bufferSize = m_connection.readInt();
+                final ByteBuffer udfBuffer = ByteBuffer.allocate(bufferSize);
+                while (udfBuffer.hasRemaining()) {
+                    int read = m_socketChannel.read(udfBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                }
+                udfBuffer.flip();
+
+                int functionId = udfBuffer.getInt();
+                UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
+                assert(udfRunner != null);
+                Throwable throwable = null;
+                Object returnValue = null;
+                try {
+                    returnValue = udfRunner.call(udfBuffer);
+                }
+                catch (InvocationTargetException ex1) {
+                    throwable = ex1.getCause();
+                }
+                catch (Throwable ex2) {
+                    throwable = ex2;
+                }
+                m_data.clear();
+                if (throwable != null) {
+                    // Exception thrown, put return code = -1.
+                    m_data.putInt(-1);
+                    byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+                    SerializationHelper.writeVarbinary(errorMsg, m_data);
+                }
+                else {
+                    // Success
+                    m_data.putInt(0);
+                    UserDefinedFunctionRunner.writeValueToBuffer(m_data, udfRunner.getReturnType(), returnValue);
+                }
+                m_data.flip();
+                m_connection.write();
             }
             catch (IOException e) {
                 throw new RuntimeException(e);
@@ -465,6 +522,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 else if (status == kErrorCode_pushPerFragmentStatsBuffer) {
                     // The per-fragment stats are in the very beginning.
                     extractPerFragmentStatsInternal();
+                }
+                else if (status == kErrorCode_callJavaUserDefinedFunction) {
+                    callJavaUserDefinedFunctionInternal();
                 }
                 else {
                     break;

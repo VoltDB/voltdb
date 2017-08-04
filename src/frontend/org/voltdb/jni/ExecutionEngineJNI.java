@@ -749,24 +749,34 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_fallbackBuffer = buffer;
     }
 
-    public int callJavaUserDefinedFunction(int functionId) throws Throwable {
+    public int callJavaUserDefinedFunction() {
+        m_udfBuffer.clear();
+        m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
+        int functionId = m_udfBuffer.getInt();
         UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
         assert(udfRunner != null);
         Throwable throwable = null;
+        Object returnValue = null;
         try {
-            udfRunner.call(m_udfBuffer);
+            returnValue = udfRunner.call(m_udfBuffer);
         }
         catch (InvocationTargetException ex1) {
             throwable = ex1.getCause();
         }
-        catch (Exception ex2) {
+        catch (Throwable ex2) {
             throwable = ex2;
         }
-        if (throwable != null) {
+        try {
             m_udfBuffer.clear();
-            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
-            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
-            return -1;
+            if (throwable != null) {
+                byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+                SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+                return -1;
+            }
+            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, udfRunner.getReturnType(), returnValue);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
         }
         return 0;
     }

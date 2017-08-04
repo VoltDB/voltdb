@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
@@ -56,12 +55,15 @@ public class UserDefinedFunctionManager {
         final CatalogMap<Function> catalogFunctions = catalogContext.database.getFunctions();
         // Remove obsolete tokens
         for (UserDefinedFunctionRunner runner : m_udfs.values()) {
+            // The function that the current UserDefinedFunctionRunner is referring to
+            // does not exist in the catalog anymore, we need to remove its token.
             if (catalogFunctions.get(runner.m_functionName) == null) {
                 FunctionForVoltDB.deregisterUserDefinedFunction(runner.m_functionName);
             }
         }
         // Build new UDF runners
-        ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder = ImmutableMap.<Integer, UserDefinedFunctionRunner>builder();
+        ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder =
+                            ImmutableMap.<Integer, UserDefinedFunctionRunner>builder();
         for (final Function catalogFunction : catalogFunctions) {
             final String className = catalogFunction.getClassname();
             Class<?> funcClass = null;
@@ -141,8 +143,11 @@ public class UserDefinedFunctionManager {
             }
             m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
 
-            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_functionMethod.getReturnType(), paramTypeClasses);
+            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId,
+                                                  m_functionMethod.getReturnType(), paramTypeClasses);
         }
+
+        // We should refactor those functions into SerializationHelper
 
         private static byte[] readVarbinary(ByteBuffer buffer) {
             // Sanity check the size against the remaining buffer size.
@@ -265,7 +270,8 @@ public class UserDefinedFunctionManager {
                 VoltDecimalHelper.serializeBigDecimal((BigDecimal)value, buffer);
                 break;
             case GEOGRAPHY_POINT:
-                ((GeographyPointValue)value).flattenToBuffer(buffer);
+                GeographyPointValue geoValue = (GeographyPointValue)value;
+                geoValue.flattenToBuffer(buffer);
                 break;
             case GEOGRAPHY:
                 GeographyValue gv = (GeographyValue)value;
@@ -277,8 +283,7 @@ public class UserDefinedFunctionManager {
             }
         }
 
-        public void call(ByteBuffer udfBuffer) throws Throwable {
-            udfBuffer.clear();
+        public Object call(ByteBuffer udfBuffer) throws Throwable {
             Object[] paramsIn = new Object[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
                 paramsIn[i] = getValueFromBuffer(udfBuffer, m_paramTypes[i]);
@@ -286,14 +291,11 @@ public class UserDefinedFunctionManager {
                     paramsIn[i] = SerializationHelper.boxUpByteArray((byte[])paramsIn[i]);
                 }
             }
-            try {
-                Object returnValue = m_functionMethod.invoke(m_functionInstance, paramsIn);
-                udfBuffer.clear();
-                writeValueToBuffer(udfBuffer, m_returnType, returnValue);
-            }
-            catch (InvocationTargetException ex) {
-                throw ex.getCause();
-            }
+            return m_functionMethod.invoke(m_functionInstance, paramsIn);
+        }
+
+        public VoltType getReturnType() {
+            return m_returnType;
         }
     }
 }
