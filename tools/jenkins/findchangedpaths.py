@@ -29,7 +29,6 @@ if __name__ == '__main__':
             affectedPaths = []
             for i in cs['items']:
                 affectedPaths.extend(i['affectedPaths'])
-            print affectedPaths
 
         actions = DATA['actions']
         for a in actions:
@@ -41,4 +40,5 @@ if __name__ == '__main__':
                     DATA = getdata(upstream['upstreamUrl'], str(upstream['upstreamBuild']))
                     break
                 else:
+                    print affectedPaths
                     sys.exit(len(affectedPaths) == 0)
