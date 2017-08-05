@@ -16,25 +16,29 @@ if __name__ == '__main__':
     DATA = getdata('job/'+os.environ['JOB_BASE_NAME'], '/'+ os.environ['BUILD_NUMBER'])
 
     affectedPaths = []
+
     while True:
         #for f in DATA.iteritems():
         #    print f
+
         # look at job's changeset
         cs = dict(DATA['changeSet'])
 
         if len(cs['items']) > 0:
             # process changes
+            affectedPaths = []
             for i in cs['items']:
                 affectedPaths.extend(i['affectedPaths'])
             print affectedPaths
-            sys.exit(len(affectedPaths))
 
-        else:
-            actions = DATA['actions']
-            for a in actions:
-                if 'causes' in a:
-                    upstream = a['causes']
-                    if len(upstream) > 0:
-                        upstream = upstream[0]
-                        DATA = getdata(upstream['upstreamUrl'], str(upstream['upstreamBuild']))
-                        break
+        actions = DATA['actions']
+        for a in actions:
+            if 'causes' in a:
+                upstream = a['causes']
+                if 'upstreamUrl' in upstream[0]:
+                    upstream = upstream[0]
+                    #print upstream
+                    DATA = getdata(upstream['upstreamUrl'], str(upstream['upstreamBuild']))
+                    break
+                else:
+                    sys.exit(len(affectedPaths) == 0)
