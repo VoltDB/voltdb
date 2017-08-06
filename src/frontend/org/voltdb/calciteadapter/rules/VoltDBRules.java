@@ -23,8 +23,8 @@ import org.apache.calcite.rel.rules.FilterJoinRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.JoinCommuteRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
+import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
-import org.apache.calcite.rel.rules.SortProjectTransposeRule;
 import org.apache.calcite.rel.rules.SortRemoveRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
@@ -36,8 +36,10 @@ import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendPullUpRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBJoinSendPullUpRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
+import org.voltdb.calciteadapter.rules.rel.VoltDBSeqToIndexScans;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSortIndexScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSortSeqScanMergeRule;
+import org.voltdb.calciteadapter.rules.rel.calcite.SortProjectTransposeRule;
 
 public class VoltDBRules {
     //public static final ConverterRule PROJECT_RULE = new VoltDBProjectRule();
@@ -45,13 +47,14 @@ public class VoltDBRules {
 
     public static Program[] getProgram() {
 
-        Program standardRules = Programs.ofRules(
+        Program program0 = Programs.ofRules(
                 CalcMergeRule.INSTANCE,
                 FilterCalcMergeRule.INSTANCE,
                 FilterToCalcRule.INSTANCE,
                 ProjectCalcMergeRule.INSTANCE,
                 ProjectToCalcRule.INSTANCE,
-                SortProjectTransposeRule.INSTANCE, // Pushes Sort rel through Project
+                ProjectMergeRule.INSTANCE,
+                SortProjectTransposeRule.INSTANCE, // Pushes Sort rel through Project. VoltDB Version
 
                 // Join Order
 //                LoptOptimizeJoinRule.INSTANCE,
@@ -64,8 +67,6 @@ public class VoltDBRules {
                 , VoltDBCalcScanMergeRule.INSTANCE
                 , VoltDBCalcJoinMergeRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
-                , VoltDBSortIndexScanMergeRule.INSTANCE
-                , VoltDBSortSeqScanMergeRule.INSTANCE
 
                 // Convert rules
                 , VoltDBProjectRule.INSTANCE
@@ -73,15 +74,23 @@ public class VoltDBRules {
                 , VoltDBSortRule.INSTANCE
                 );
 
+        Program program1 = Programs.ofRules(
+                VoltDBSortIndexScanMergeRule.INSTANCE
+                , VoltDBSortSeqScanMergeRule.INSTANCE
+                , VoltDBSeqToIndexScans.INSTANCE
+                , VoltDBProjectScanMergeRule.INSTANCE
+                );
+
         // Pull up the send nodes as high as possible
-        Program voltDBRules = Programs.ofRules(
+        Program program2 = Programs.ofRules(
+
                 VoltDBCalcSendPullUpRule.INSTANCE
                 , VoltDBJoinSendPullUpRule.INSTANCE
 //                , VoltDBProjectSendPullUpRule.INSTANCE
 //                VoltDBSendPullUpJoin.INSTANCE,//);
                 );
 
-        return new Program[] {standardRules, voltDBRules};
+        return new Program[] {program0, program1};
 //        Program metaProgram = Programs.sequence(
 //                standardRules
 //                , voltDBRules);//,

@@ -48,6 +48,13 @@ public class TestCalciteIndexScan extends TestCalciteBase {
         comparePlans(sql);
     }
 
+    public void testIndexScanNoFilter10() throws Exception {
+        String sql;
+        // Calcite produces a SeqScan here
+        sql = "select i, bi from RI1";
+        comparePlans(sql);
+    }
+
     public void testIndexScan() throws Exception {
         String sql;
         sql = "select * from RI1 where i=5";

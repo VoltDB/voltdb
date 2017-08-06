@@ -35,12 +35,9 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
-import org.apache.calcite.util.Pair;
 import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.calciteadapter.VoltDBConvention;
 import org.voltdb.calciteadapter.VoltDBTable;
-import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -67,6 +64,15 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
           m_program = program;
     }
 
+    protected AbstractVoltDBTableScan(RelOptCluster cluster, RelOptTable table,
+            VoltDBTable voltDBTable, RexProgram program, RexNode limit, RexNode offset) {
+          super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
+          this.m_voltDBTable = voltDBTable;
+          m_program = program;
+          m_limit = limit;
+          m_offset = offset;
+    }
+
     public RexProgram getProgram() {
         return m_program;
     }
@@ -86,6 +92,8 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
     @Override
     protected String computeDigest() {
         String dg = super.computeDigest();
+        // To make an instance of the scan is unique for Calcite to be able to distinguish them
+        // it must have a unique digest. Are there better ways of doing this?
         if (m_program != null) {
             dg += "_program_" + m_program.toString();
         }
@@ -113,7 +121,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
             RelMetadataQuery mq) {
-        double dRows = table.getRowCount();
+        double dRows = estimateRowCount(mq);
         double dCpu = dRows + 1; // ensure non-zero cost
         double dIo = 0;
         RexLocalRef cond = m_program.getCondition();
@@ -153,12 +161,20 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
         return pw;
     }
 
+    public RexNode getLimitRexNode() {
+        return m_limit;
+    }
+
     protected int getLimit() {
         if (m_limit != null) {
             return RexLiteral.intValue(m_limit);
         } else {
             return Integer.MAX_VALUE;
         }
+    }
+
+    public RexNode getOffsetRexNode() {
+        return m_offset;
     }
 
     protected int getOffset() {
@@ -202,7 +218,6 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
     }
 
     public static RelNode copy(AbstractVoltDBTableScan relScan, RexProgram program, RexBuilder programRexBuilder) {
-        AbstractVoltDBTableScan newScan;
         RexProgram newProgram;
         if (relScan.m_program == null) {
             newProgram = program;
@@ -215,55 +230,27 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
             assert(newProgram.getOutputRowType() == program.getOutputRowType());
         }
 
-        // Identify a suitable index if any
-        Pair<Index, RexProgram> indexProgramTuple = selectScanIndex(relScan, newProgram);
-        if (indexProgramTuple == null) {
+        if (relScan instanceof VoltDBTableSeqScan) {
             // Sequential Scan
-            newScan = new VoltDBTableSeqScan(
+            return new VoltDBTableSeqScan(
                     relScan.getCluster(),
                     relScan.getTable(),
                     relScan.getVoltDBTable(),
-                    newProgram);
+                    newProgram,
+                    relScan.m_limit,
+                    relScan.m_offset);
         } else {
             // Index Scan
-            newScan = new VoltDBTableIndexScan(
-                    relScan.getCluster(),
-                    relScan.getTable(),
-                    relScan.getVoltDBTable(),
-                    indexProgramTuple.right,
-                    indexProgramTuple.left);
+            assert(relScan instanceof VoltDBTableIndexScan);
+            VoltDBTableIndexScan indexScan = (VoltDBTableIndexScan) relScan;
+            return new VoltDBTableIndexScan(
+                    indexScan.getCluster(),
+                    indexScan.getTable(),
+                    indexScan.getVoltDBTable(),
+                    newProgram,
+                    indexScan.getIndex(),
+                    indexScan.m_limit,
+                    indexScan.m_offset);
         }
-
-        newScan.m_limit = relScan.m_limit;
-        newScan.m_offset = relScan.m_offset;
-
-        return newScan;
     }
-
-    private static Pair<Index, RexProgram> selectScanIndex(AbstractVoltDBTableScan relScan, RexProgram program) {
-        Pair<Index, RexProgram> indexProgramTuple = null;
-
-        // @TODO for now
-        if ("RI1".equals(relScan.getVoltDBTable().getCatTable().getTypeName())) {
-
-            RexLocalRef condition = program.getCondition();
-            if (condition == null) {
-                // The filter is null - no index
-                return indexProgramTuple;
-            }
-
-            AbstractExpression filter = RexConverter.convert(program.expandLocalRef(condition));
-            // Iterate over table indexes and pick the best one
-            VoltDBTable voltTable = relScan.getVoltDBTable();
-            assert(voltTable != null);
-            Table catTable = voltTable.getCatTable();
-            assert(catTable != null);
-            for (Index index : catTable.getIndexes()) {
-                return new Pair<Index, RexProgram>(index, program);
-            }
-        }
-
-        return indexProgramTuple;
-    }
-
 }

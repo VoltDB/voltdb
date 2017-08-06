@@ -19,6 +19,7 @@ package org.voltdb.calciteadapter.rules.rel;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgramBuilder;
@@ -45,7 +46,8 @@ public class VoltDBProjectScanMergeRule extends RelOptRule {
         for (Pair<RexNode, String> item : proj.getNamedProjects()) {
             rpb.addProject(item.left, item.right);
         }
-        call.transformTo(AbstractVoltDBTableScan.copy(scan, rpb.getProgram(), rexBuilder));
+        RelNode newScan = AbstractVoltDBTableScan.copy(scan, rpb.getProgram(), rexBuilder);
+        call.transformTo(newScan);
     }
 
 }

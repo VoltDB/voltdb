@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.VoltDBTable;
@@ -33,12 +34,17 @@ public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltD
     public VoltDBTableSeqScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable) {
           this(cluster, table, voltDBTable,
-                  RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())));
+                  RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())), null, null);
     }
 
     protected VoltDBTableSeqScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable, RexProgram program) {
-          super(cluster, table, voltDBTable, program);
+          super(cluster, table, voltDBTable, program, null, null);
+    }
+
+    protected VoltDBTableSeqScan(RelOptCluster cluster, RelOptTable table,
+            VoltDBTable voltDBTable, RexProgram program, RexNode limit, RexNode offset) {
+          super(cluster, table, voltDBTable, program, limit, offset);
     }
 
     /**
@@ -49,6 +55,11 @@ public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltD
     protected String computeDigest() {
         String dg = super.computeDigest();
         return dg;
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        return super.estimateRowCount(mq) * 2;
     }
 
     @Override

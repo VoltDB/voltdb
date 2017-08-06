@@ -19,6 +19,7 @@ package org.voltdb.calciteadapter.rules.rel;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalCalc;
 import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 
@@ -34,6 +35,7 @@ public class VoltDBCalcScanMergeRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         LogicalCalc calc = call.rel(0);
         AbstractVoltDBTableScan scan = call.rel(1);
-        call.transformTo(AbstractVoltDBTableScan.copy(scan, calc.getProgram(), calc.getCluster().getRexBuilder()));
+        RelNode newScan = AbstractVoltDBTableScan.copy(scan, calc.getProgram(), calc.getCluster().getRexBuilder());
+        call.transformTo(newScan);
     }
 }

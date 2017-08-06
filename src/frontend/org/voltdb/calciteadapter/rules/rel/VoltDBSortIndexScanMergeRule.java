@@ -19,13 +19,11 @@ package org.voltdb.calciteadapter.rules.rel;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.RelTrait;
-import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.rel.VoltDBTableIndexScan;
 
 public class VoltDBSortIndexScanMergeRule extends RelOptRule {
@@ -41,15 +39,9 @@ public class VoltDBSortIndexScanMergeRule extends RelOptRule {
         Sort sort = call.rel(0);
         VoltDBTableIndexScan scan = call.rel(1);
 
-        // @TODO if we can get collations from the RelMetadataQuery then we don't need to
-        // make Sort and Scan to be next to each other (I think)
-        // final RelMetadataQuery mq = call.getMetadataQuery();
-        //mq.collations(scan);
-        RelTraitDef collTraitDef = sort.getCollation().getTraitDef();
-        RelTrait scanCollationTrait = scan.getTraitSet().getTrait(collTraitDef);
-        assert (scanCollationTrait instanceof RelCollation);
-        RelCollation scanCollation = (RelCollation) scanCollationTrait;
-        boolean matches = areCollationsCompartible(scanCollation, sort.collation);
+        RelCollation sortCollation = sort.getCollation();
+        RelCollation scanCollation = scan.getCollation();
+        boolean matches = areCollationsCompartible(scanCollation, sortCollation);
         return matches;
     }
 
@@ -58,7 +50,7 @@ public class VoltDBSortIndexScanMergeRule extends RelOptRule {
         Sort sort = call.rel(0);
         VoltDBTableIndexScan scan = call.rel(1);
 
-        // The collation is either empty or redundant. Simply inline LIMIT/OFFSET
+        // Push down the sort data (limit and offset). The sort collation is redundant
         RexNode offset = sort.offset;
         RexNode fetch = sort.fetch;
         RelNode newScan = scan.copyWithLimitOffset(fetch, offset);
@@ -66,6 +58,9 @@ public class VoltDBSortIndexScanMergeRule extends RelOptRule {
     }
 
     private boolean areCollationsCompartible(RelCollation scanCollation, RelCollation sortCollation) {
-        return sortCollation.satisfies(scanCollation);
-    }
+      return sortCollation == RelCollations.EMPTY ||
+              (scanCollation.getFieldCollations().size() == sortCollation.getFieldCollations().size()
+              && sortCollation.satisfies(scanCollation));
+  }
+
 }
