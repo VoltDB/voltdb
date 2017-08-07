@@ -45,8 +45,7 @@ import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.Encoder;
-
+import org.voltdb.utils.CompressionService;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 
@@ -440,7 +439,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 else if (status == ExecutionEngine.ERRORCODE_DECODE_BASE64_AND_DECOMPRESS) {
                     int dataLength = m_connection.readInt();
                     String data = m_connection.readString(dataLength);
-                    byte[] decodedDecompressedData = Encoder.decodeBase64AndDecompressToBytes(data);
+                    byte[] decodedDecompressedData = CompressionService.decodeBase64AndDecompressToBytes(data);
                     m_data.clear();
                     m_data.put(decodedDecompressedData);
                     m_data.flip();
