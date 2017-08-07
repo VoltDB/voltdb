@@ -530,6 +530,14 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.GetTableInformationOnly = function (onInformationLoaded) {
+            VoltDBService.GetTableInformationOnly(function (connection) {
+                var tablesData = {};
+                getTableDataOnly(connection, tablesData, 'TABLE_INFORMATION_ONLY')
+                onInformationLoaded(tablesData);
+            });
+        };
+
         this.GetTableInformationClientPort = function () {
             VoltDBService.GetTableInformationClientPort(function (connection) {
                 var tablesData = {};
@@ -2683,7 +2691,6 @@ function alertNodeClicked(obj) {
             if (processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT") {
                 suffix = "_" + processName;
             }
-
             var rawTables = connection.Metadata['@Statistics_TABLE' + suffix].data;
             var rawIndexes = connection.Metadata['@Statistics_INDEX' + suffix].data;
             var rawColumns = connection.Metadata['@SystemCatalog_COLUMNS' + suffix].data;
@@ -2791,6 +2798,58 @@ function alertNodeClicked(obj) {
             procedureColumnsData['procedureColumns'] = procedureColumns;
             sysProceduresData['sysProcedures'] = connection.Metadata['sysprocs'];
             exportTableData['exportTables'] = connection.Metadata['exports']
+        }
+
+        function getTableDataOnly(connection, tablesData, processName) {
+            var suffix = "";
+            if (processName == "TABLE_INFORMATION_ONLY") {
+                suffix = "_" + processName;
+            }
+
+            var rawTablePartitions = connection.Metadata["@Statistics_TABLE" + suffix].data;
+            var rawTables = connection.Metadata["@SystemCatalog_TABLES" + suffix].data;
+
+            var tablesArr = [];
+            var tableObj = {}
+
+            for (var k = 0; k < rawTables.length; k++) {
+                var tableName = rawTables[k][2];
+                var tableType = rawTables[k][3];
+                var tableRemarks = rawTables[k][4] == null ? "" : rawTables[k][4];
+                if(tableType == "TABLE"){
+                    if(!tableObj.hasOwnProperty(tableName)){
+                        tableObj[tableName] = {};
+                    }
+                    tableObj[tableName]["TYPE"] = tableType;
+                    tableObj[tableName]["PARTITION_TYPE"] = tableRemarks.indexOf("partitionColumn") > -1 ? "Partitioned" : "Replicated";
+                }
+            }
+
+            $.each(tableObj, function(key, value){
+                var tableName = key;
+                for(var i = 0; i < rawTablePartitions.length; i++){
+                    if(tableName == rawTablePartitions[i][5]){
+                        var partitionObj = {};
+                        if(!tableObj[tableName].hasOwnProperty('PARTITIONS')){
+                            tableObj[tableName]["PARTITIONS"] = [];
+                            tableObj[tableName]["TUPLE_COUNT"] = 0;
+                        }
+
+                        if(value["PARTITION_TYPE"] == "Partitioned"){
+                            tableObj[tableName]["TUPLE_COUNT"] += rawTablePartitions[i][7];
+                            tableObj[tableName]["PARTITIONS"].push({"partition_id": rawTablePartitions[i][4], "tupleCount": rawTablePartitions[i][7]});
+                        } else {
+                            tableObj[tableName]["TUPLE_COUNT"] = rawTablePartitions[i][7];
+                            tableObj[tableName]["PARTITIONS"].push({"partition_id": rawTablePartitions[i][4], "tupleCount": rawTablePartitions[i][7]});
+                        }
+                    }
+                }
+            });
+            if (!tablesData.hasOwnProperty('TABLES')) {
+                tablesData['TABLES'] = {};
+            }
+
+            tablesData['TABLES'] = tableObj;
         }
 
         var formatTableData = function (connection) {
