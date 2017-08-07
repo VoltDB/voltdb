@@ -54,6 +54,13 @@
         var ChartOutTrans = nv.models.lineChart();
         var ChartSuccessRate =  nv.models.lineChart();
         var ChartFailureRate = nv.models.lineChart();
+        var ChartLatencyAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartFrequencyAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartProcessingTimeAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartFrequencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+
         var drChartList = {}
         var ChartCommandlog = nv.models.lineChart();
         var dataMapperSec = {};
@@ -80,6 +87,16 @@
             minGraph: 1800000,
             dayGraph: 27000000
         }
+
+        this.refreshGraphLatency = function(){
+            ChartLatencyAnalysis.update;
+
+            d3.select('#visualiseLatencyAnalysis')
+                .datum(exampleData())
+                .transition().duration(350)
+                .call(ChartLatencyAnalysis);
+        }
+
         this.GetPartitionDetailData = function (partitionDetails) {
             dataParitionDetails = partitionDetails;
         };
@@ -338,9 +355,402 @@
             "color": "rgb(27, 135, 200)"
         }];
 
+        var dataLatencyAnalysis = [{
+            key: "Execution Time",
+            values: [],
+            color: "rgb(27, 135, 200)"
+        }]
+
+        var dataFrequencyAnalysis = [{
+            key: "Frequency",
+            values: [],
+            color: "rgb(27, 135, 200)"
+        }]
+
+        var dataProcessingTimeAnalysis = [{
+            key: "Total Processing Time",
+            values: [],
+            color: "rgb(27, 135, 200)"
+        }]
+
+        var dataLatencyDetailAnalysis = [{
+            key: "Avg Execution Time",
+            values: [],
+            color: "rgb(118, 189, 29)"
+        }]
+
+        var dataFrequencyDetailAnalysis = [{
+            key: "Frequency Detail",
+            values: [],
+            color: "rgb(118, 189, 29)"
+        }]
+
+        var dataCombinedDetailAnalysis = [{
+            key: "Processing Time Detail",
+            values: [],
+            color: "rgb(118, 189, 29)"
+        }]
+
         var dataPartitionIdleTime = [];
 
         var dataParitionDetails = [];
+
+        var barHeight = 0;
+
+        function getBarHeightAndSpacing(dataSet, chart){
+            var dataCount = dataSet.length;
+            if(dataCount == 0){
+                barHeight = 400;
+            }
+            else if(dataCount == 1){
+                barHeight = 260;
+                chart.groupSpacing(.6);
+            }
+            else if(dataCount == 2){
+                barHeight = 305;
+                chart.groupSpacing(0.5);
+            }
+            else if(dataCount < 5){
+                barHeight = (dataCount * 111) + 56;
+                chart.groupSpacing(0.5);
+            }
+            else if(dataCount < 8){
+                barHeight = (dataCount * 75) + 25;
+                chart.groupSpacing(0.3);
+            }
+            else if(dataCount < 14){
+                barHeight = (dataCount * 72) + 24;
+                chart.groupSpacing(0.3);
+            }
+            else if(dataCount < 25){
+                barHeight = (dataCount * 70) + 24;
+                chart.groupSpacing(0.3);
+            }
+            else{
+                barHeight = (dataCount * 66) + 22;
+                chart.groupSpacing(0.3);
+            }
+        }
+
+        function updateLatencyAnalysis(){
+            ChartLatencyAnalysis.update();
+            d3.selectAll("#chartLatencyAnalysis .nv-bar").on('click',
+                function(data){
+                    $("#hidProcedureName").html(data.label);
+                    $('#showAnalysisDetails').trigger("click");
+                }
+            );
+        }
+
+        function updateFrequencyAnalysis(){
+            ChartFrequencyAnalysis.update();
+            d3.selectAll("#chartFrequencyAnalysis .nv-bar").on('click',
+                function(data){
+                    $("#hidProcedureName").html(data.label);
+                    $('#showAnalysisFreqDetails').trigger("click");
+                }
+            );
+
+        }
+
+        function updateCombinedAnalysis(){
+            ChartProcessingTimeAnalysis.update();
+            d3.selectAll("#chartProcessingTimeAnalysis .nv-bar").on('click',
+                function(data){
+                    $("#hidProcedureName").html(data.label);
+                    $('#showAnalysisCombinedDetails').trigger("click");
+                }
+            );
+        }
+
+        var wordWrap = function (textObj, data, width, labelSpacingX, labelSpacingY) {
+            var txtElement = d3.select(textObj);
+            var parentElement = d3.select(textObj.parentNode);
+            parentElement.append("foreignObject")
+                .attr('x', labelSpacingX)
+                .attr('y', labelSpacingY)
+                .attr("width", width)
+                .attr("height", 60)
+              .append("xhtml:p")
+                .attr('style','word-wrap: break-word;font-size:11px;text-align:right;')
+                .html(data);
+            txtElement.remove();
+        };
+
+        function updateLatencyDetailAnalysis(){
+            ChartLatencyDetailAnalysis.update;
+        }
+
+        this.initializeAnalysisGraph = function(){
+            nv.addGraph(function() {
+                ChartLatencyAnalysis
+                  .y(function(d) { return d.value }).height(barHeight)
+                  .x(function(d) { return  d.label })
+                  .showValues(true);
+
+                $("#chartLatencyAnalysis").css("height", barHeight-10)
+                ChartLatencyAnalysis.margin({"left": 115,"right": 40})
+                ChartLatencyAnalysis.valueFormat(d3.format(',.3f'));
+                ChartLatencyAnalysis.yAxis
+                    .tickFormat(d3.format(',.2f'));
+                ChartLatencyAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartLatencyAnalysis.yAxis.axisLabelDistance(10);
+                d3.select('#visualiseLatencyAnalysis')
+                    .datum(dataLatencyAnalysis)
+                    .transition().duration(350)
+                    .call(ChartLatencyAnalysis);
+                d3.selectAll("#visualiseLatencyAnalysis .nv-barsWrap .nv-bar rect")
+                .attr("style", "cursor: pointer");
+                d3.selectAll("#visualiseLatencyAnalysis .nv-barsWrap .nv-bar rect")
+                .style("fill", function(d, i){
+                    var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
+                    return procedureType == "Multi Partitioned" ? "#14416d":"#1B87C8";
+                });
+                d3.select('#visualiseLatencyAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
+                .each(function(d,i){ wordWrap(this, d, 110, -115, -6); });
+                d3.selectAll("#chartLatencyAnalysis .nv-bar").on('click',
+                    function(data){
+                        $("#hidProcedureName").html(data.label);
+                        $('#showAnalysisDetails').trigger("click");
+                    }
+                );
+                nv.utils.windowResize(updateLatencyAnalysis);
+                return ChartLatencyAnalysis;
+            });
+
+            nv.addGraph(function() {
+                ChartFrequencyAnalysis
+                    .y(function(d) { return d.value }).height(barHeight)
+                    .x(function(d) { return  d.label })
+                    .showValues(true);
+
+                $("#chartFrequencyAnalysis").css("height", barHeight-10);
+                ChartLatencyAnalysis.margin({"left": 115,"right": 40})
+                ChartFrequencyAnalysis.valueFormat(d3.format(',.0d'));
+                ChartFrequencyAnalysis.yAxis
+                    .tickFormat(d3.format(',.0d'));
+                ChartFrequencyAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartFrequencyAnalysis.yAxis.axisLabelDistance(10)
+                d3.select('#visualiseFrequencyAnalysis')
+                    .datum(dataFrequencyAnalysis)
+                    .transition().duration(350)
+                    .call(ChartFrequencyAnalysis);
+                d3.selectAll("#visualiseFrequencyAnalysis .nv-barsWrap .nv-bar rect")
+                .attr("style", "cursor: pointer");
+                d3.selectAll("#visualiseFrequencyAnalysis .nv-barsWrap .nv-bar rect")
+                .style("fill", function(d, i){
+                    var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
+                    return procedureType == "Multi Partitioned" ? "#14416d":"#1B87C8";
+                });
+                d3.select('#visualiseFrequencyAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
+                .each(function(d,i){ wordWrap(this, d, 110, -115, -6); });
+                d3.selectAll("#chartFrequencyAnalysis .nv-bar").on('click',
+                    function(data){
+                        $("#hidProcedureName").html(data.label);
+                        $('#showAnalysisFreqDetails').trigger("click");
+                    }
+                );
+                nv.utils.windowResize(updateFrequencyAnalysis);
+                return ChartFrequencyAnalysis;
+            });
+
+            nv.addGraph(function() {
+                ChartProcessingTimeAnalysis
+                    .y(function(d) { return d.value }).height(barHeight)
+                    .x(function(d) { return  d.label })
+                    .showValues(true);
+
+                $("#chartProcessingTimeAnalysis").css("height", barHeight-10);
+                ChartLatencyAnalysis.margin({"left": 115,"right": 40})
+                ChartProcessingTimeAnalysis.valueFormat(d3.format(',.3f'));
+                ChartProcessingTimeAnalysis.yAxis
+                    .tickFormat(d3.format(',.2f'));
+                ChartProcessingTimeAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartProcessingTimeAnalysis.yAxis.axisLabelDistance(10)
+                d3.select('#visualiseProcessingTimeAnalysis')
+                    .datum(dataProcessingTimeAnalysis)
+                    .transition().duration(350)
+                    .call(ChartProcessingTimeAnalysis);
+                d3.selectAll("#visualiseProcessingTimeAnalysis .nv-barsWrap .nv-bar rect")
+                .attr("style", "cursor: pointer");
+                d3.selectAll("#visualiseProcessingTimeAnalysis .nv-barsWrap .nv-bar rect")
+                .style("fill", function(d, i){
+                    var procedureType = VoltDbAnalysis.procedureValue[d.label].TYPE
+                    return procedureType == "Multi Partitioned" ? "#14416d":"#1B87C8";
+                });
+                d3.select('#visualiseProcessingTimeAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
+                .each(function(d,i){ wordWrap(this, d, 110, -115, -6); });
+                d3.selectAll("#chartProcessingTimeAnalysis .nv-bar").on('click',
+                    function(data){
+                        $("#hidProcedureName").html(data.label);
+                        $('#showAnalysisCombinedDetails').trigger("click");
+                    }
+                );
+                nv.utils.windowResize(updateCombinedAnalysis);
+                return ChartProcessingTimeAnalysis;
+            });
+        }
+
+        this.initializeProcedureDetailGraph = function(){
+            nv.addGraph(function() {
+                ChartLatencyDetailAnalysis.x(function(d) {
+                    return  d.label
+                  }).y(function(d) { return d.value }).height(barHeight)
+                  .showValues(true);
+                ChartLatencyDetailAnalysis.valueFormat(d3.format(',.6f'));
+                ChartLatencyDetailAnalysis.yAxis
+                    .tickFormat(d3.format(',.2f'));
+                ChartLatencyDetailAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartLatencyDetailAnalysis.yAxis.axisLabelDistance(10)
+                d3.select('#visualizeLatencyDetail')
+                    .datum(dataLatencyDetailAnalysis)
+                    .transition().duration(350)
+                    .call(ChartLatencyDetailAnalysis);
+                nv.utils.windowResize(ChartLatencyDetailAnalysis.update);
+                return ChartLatencyDetailAnalysis;
+            });
+        }
+
+        this.initializeFrequencyDetailGraph = function(){
+            nv.addGraph(function() {
+                ChartFrequencyDetailAnalysis.x(function(d) {
+                    return  d.label
+                  }).y(function(d) { return d.value }).height(barHeight)
+                  .showValues(true);
+                ChartFrequencyDetailAnalysis.valueFormat(d3.format(',.0d'));
+                ChartFrequencyDetailAnalysis.yAxis
+                    .tickFormat(d3.format(',.0d'));
+                ChartFrequencyDetailAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartFrequencyDetailAnalysis.yAxis.axisLabelDistance(10)
+                d3.select('#visualizeFrequencyDetail')
+                    .datum(dataFrequencyDetailAnalysis)
+                    .transition().duration(350)
+                    .call(ChartFrequencyDetailAnalysis);
+
+                nv.utils.windowResize(ChartFrequencyDetailAnalysis.update);
+                return ChartFrequencyDetailAnalysis;
+            });
+        }
+
+        this.initializeCombinedDetailGraph = function(){
+            nv.addGraph(function() {
+                ChartCombinedDetailAnalysis.x(function(d) {
+                    if(d.label.length > 20)
+                        return d.label.substring(0,20) + ".."
+                    return  d.label
+                  }).y(function(d) { return d.value }).height(barHeight)
+                  .showValues(true);
+                ChartCombinedDetailAnalysis.valueFormat(d3.format(',.3f'));
+                ChartCombinedDetailAnalysis.yAxis
+                    .tickFormat(d3.format(',.2f'));
+                ChartCombinedDetailAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartCombinedDetailAnalysis.yAxis.axisLabelDistance(10)
+                d3.select('#visualizeCombinedDetail')
+                    .datum(dataCombinedDetailAnalysis)
+                    .transition().duration(350)
+                    .call(ChartCombinedDetailAnalysis);
+
+                nv.utils.windowResize(ChartCombinedDetailAnalysis.update);
+                return ChartCombinedDetailAnalysis;
+            });
+        }
+
+        this.RefreshAnalysisLatencyGraph = function(dataLatency, dataFrequency){
+            ChartLatencyAnalysis.update;
+            getBarHeightAndSpacing(dataLatency, ChartLatencyAnalysis);
+            ChartLatencyAnalysis.height(barHeight);
+            $("#chartLatencyAnalysis").css("height", barHeight-10);
+            ChartLatencyAnalysis.margin({"left": 115,"right": 40});
+            dataLatencyAnalysis[0]["values"] = dataLatency;
+            d3.select("#visualiseLatencyAnalysis")
+                .datum(dataLatencyAnalysis)
+                .transition().duration(500)
+                .call(ChartLatencyAnalysis);
+        }
+
+        this.RefreshAnalysisFrequencyGraph = function(dataFrequency){
+            ChartFrequencyAnalysis.update;
+            getBarHeightAndSpacing(dataFrequency, ChartFrequencyAnalysis);
+            ChartFrequencyAnalysis.height(barHeight);
+            $("#chartFrequencyAnalysis").css("height", barHeight-10);
+            ChartFrequencyAnalysis.margin({"left": 115,"right": 40});
+            dataFrequencyAnalysis[0]["values"] = dataFrequency;
+            d3.select("#visualiseFrequencyAnalysis")
+                .datum(dataFrequencyAnalysis)
+                .transition().duration(500)
+                .call(ChartFrequencyAnalysis);
+        }
+
+        this.RefreshAnalysisProcessingTimeGraph = function(dataProcessingTime){
+            ChartProcessingTimeAnalysis.update;
+            getBarHeightAndSpacing(dataProcessingTime, ChartProcessingTimeAnalysis);
+            ChartProcessingTimeAnalysis.height(barHeight);
+            $("#chartProcessingTimeAnalysis").css("height", barHeight-10);
+            ChartProcessingTimeAnalysis.margin({"left": 115,"right": 40});
+            dataProcessingTimeAnalysis[0]["values"] = dataProcessingTime;
+            d3.select("#visualiseProcessingTimeAnalysis")
+                .datum(dataProcessingTimeAnalysis)
+                .transition().duration(500)
+                .call(ChartProcessingTimeAnalysis);
+        }
+
+        this.RefreshLatencyDetailGraph = function(dataLatency){
+            ChartLatencyDetailAnalysis.update;
+            getBarHeightAndSpacing(dataLatency, ChartLatencyDetailAnalysis);
+            ChartLatencyDetailAnalysis.height(barHeight);
+            $("#divVisualizeLatencyDetail").css("height", barHeight-10);
+            ChartLatencyDetailAnalysis.margin({"left": 80})
+            dataLatencyDetailAnalysis[0]["values"] = dataLatency;
+            d3.select("#visualizeLatencyDetail")
+                .datum(dataLatencyDetailAnalysis)
+                .transition().duration(500)
+                .call(ChartLatencyDetailAnalysis);
+            d3.select('#visualizeLatencyDetail > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
+            .each(function(d,i){wordWrap(this, d, 110, -115, -8);});
+            $("#visualizeLatencyDetail").find('.nvd3').removeAttr("x");
+            $("#visualizeLatencyDetail").find('.nvd3').attr("x",344);
+            $("#visualizeLatencyDetail").find('.nvd3').attr("y",172);
+        }
+
+        this.RefreshFrequencyDetailGraph = function(freqDetails){
+            ChartFrequencyDetailAnalysis.update;
+            getBarHeightAndSpacing(freqDetails, ChartFrequencyDetailAnalysis);
+            ChartFrequencyDetailAnalysis.height(barHeight);
+            $("#divVisualizeFreqDetail").css("height", barHeight-10);
+            ChartFrequencyDetailAnalysis.margin({"left": 80})
+            dataFrequencyDetailAnalysis[0]["values"] = freqDetails;
+            d3.select("#visualizeFrequencyDetails")
+                .datum(dataFrequencyDetailAnalysis)
+                .transition().duration(500)
+                .call(ChartFrequencyDetailAnalysis);
+            d3.select('#visualizeFrequencyDetails > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
+            .each(function(d,i){wordWrap(this, d, 110, -115, -8);});
+            $("#visualizeFrequencyDetails").find('.nvd3').attr("x",344);
+            $("#visualizeFrequencyDetails").find('.nvd3').attr("y",172);
+        }
+
+        this.RefreshCombinedDetailGraph = function(dataCombined){
+            ChartCombinedDetailAnalysis.update;
+            getBarHeightAndSpacing(dataCombined, ChartCombinedDetailAnalysis);
+            ChartCombinedDetailAnalysis.height(barHeight);
+            $("#divVisualizeCombinedDetail").css("height", barHeight-10);
+            ChartCombinedDetailAnalysis.margin({"left": 80})
+            dataCombinedDetailAnalysis[0]["values"] = dataCombined;
+            d3.select("#visualizeCombinedDetails")
+                .datum(dataCombinedDetailAnalysis)
+                .transition().duration(500)
+                .call(ChartCombinedDetailAnalysis);
+            d3.select('#visualizeCombinedDetails > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
+            .each(function(d,i){wordWrap(this, d, 110, -115, -8);});
+            $("#visualizeCombinedDetails").find('.nvd3').attr("x",344);
+            $("#visualizeCombinedDetails").find('.nvd3').attr("y",172);
+        }
 
         nv.addGraph({
             generate: function() {
