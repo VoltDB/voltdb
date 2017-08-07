@@ -98,7 +98,7 @@ public class FailedLoginCounter {
         m_ipFailedAttempts.put(ip, ipFailedCount);
 
         m_totalFailedAttempts++;
-        messageFormat = "Total failed authentication: %d times in last minute";
+        messageFormat = "Total failed logins: %d in last minute";
         RateLimitedLogger.tryLogForMessage(timestampMilis,
                                            ONE_MINUTE_IN_MILLIS,
                                            TimeUnit.MILLISECONDS,
