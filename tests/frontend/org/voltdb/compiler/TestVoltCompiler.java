@@ -2972,12 +2972,12 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
-                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, FRAC FLOAT, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE PKEY = ?; END;" +
-                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 2;"
+                "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE FRAC > ?; END;" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN FRAC PARAMETER 0;"
                 );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        expectedError = "PartitionInfo for procedure Foo refers to a column in schema which is not a partition key.";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
