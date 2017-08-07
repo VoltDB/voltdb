@@ -612,6 +612,11 @@ public class InitiatorMailbox implements Mailbox
     //that previous partition leader has drained its txns
     private void setBalanceSPIStatus(BalanceSPIMessage message) {
 
+        if (message.isStatusReset()) {
+            m_balanceSPIStatus = BalanceSpiStatus.NONE;
+            return;
+        }
+
         if (m_balanceSPIStatus == BalanceSpiStatus.NONE) {
             //message comes before this site is promoted
             m_balanceSPIStatus = BalanceSpiStatus.SRC_TXN_DRAINED;

@@ -283,11 +283,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     public void setBalanceSPIStatus(long hsId) {
-
-        //use console log for message pattern match in unit test.
-        VoltLogger log = new VoltLogger("CONSOLE");
-        log.info("Reset Balance SPI status on "+ CoreUtils.hsIdToString(getInitiatorHSId()));
         BalanceSPIMessage message = new BalanceSPIMessage(hsId, getInitiatorHSId());
+        message.setStatusReset();
         m_initiatorMailbox.deliver(message);
     }
 

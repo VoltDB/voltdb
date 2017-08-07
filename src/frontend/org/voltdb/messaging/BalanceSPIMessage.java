@@ -33,6 +33,8 @@ public class BalanceSPIMessage extends VoltMessage {
     //otherwise, ClientInterface will stop balance sip service if it has been started.
     private boolean m_startingBalanceSpiService = false;
 
+    private boolean m_resetStatus = false;
+
     public BalanceSPIMessage() {
         super();
     }
@@ -49,6 +51,7 @@ public class BalanceSPIMessage extends VoltMessage {
         msgsize += 8; // m_newLeaderHSID,
         msgsize += 8; // m_priorLeaderHSID
         msgsize += 1; // m_startingBalanceSpiService
+        msgsize += 1; // m_resetStatus
         return msgsize;
     }
 
@@ -58,6 +61,7 @@ public class BalanceSPIMessage extends VoltMessage {
         buf.putLong(m_newLeaderHSID);
         buf.putLong(m_priorLeaderHSID);
         buf.put(m_startingBalanceSpiService ? (byte) 1 : (byte) 0);
+        buf.put(m_resetStatus ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -67,6 +71,7 @@ public class BalanceSPIMessage extends VoltMessage {
         m_newLeaderHSID = buf.getLong();
         m_priorLeaderHSID = buf.getLong();
         m_startingBalanceSpiService = buf.get() == 1;
+        m_resetStatus = buf.get() == 1;
     }
 
     public long getNewLeaderHSID() {
@@ -83,5 +88,13 @@ public class BalanceSPIMessage extends VoltMessage {
 
     public boolean startTask() {
         return m_startingBalanceSpiService;
+    }
+
+    public void setStatusReset() {
+        m_resetStatus = true;
+    }
+
+    public boolean isStatusReset() {
+        return m_resetStatus;
     }
 }

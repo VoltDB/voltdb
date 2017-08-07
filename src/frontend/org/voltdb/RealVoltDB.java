@@ -1695,7 +1695,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void handleHostsFailedForBalanceSpi(Set<Integer> failedHosts) {
 
-        //stop balance spi service
+        //hosts are down, so stop balance spi service if there is one
         m_messenger.send(CoreUtils.getHSIdFromHostAndSite(m_messenger.getHostId(),
                         HostMessenger.CLIENT_INTERFACE_SITE_ID), new BalanceSPIMessage());
 
@@ -1704,39 +1704,52 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
 
-        //The host which started spi balance is down.
-        //The older leader may not have notified the new leader that it has drained sp transactions.
-        //Thus notify the new leader to process transactions as leader
-        if (failedHosts.contains(spiInfo.getOldLeaderHostId()) &&
-                spiInfo.getNewLeaderHostId() == m_messenger.getHostId()) {
-            Initiator initiator = m_iv2Initiators.get(spiInfo.getPartitionId());
-            ((SpInitiator)initiator).setBalanceSPIStatus(spiInfo.getOldLeaderHostId());
+        final int oldHostId = spiInfo.getOldLeaderHostId();
+        final int newHostId = spiInfo.getNewLeaderHostId();
+
+        //if both old and new hosts fail or no one fails
+        if ((!failedHosts.contains(oldHostId) && !failedHosts.contains(newHostId)) ||
+                (failedHosts.contains(oldHostId) && failedHosts.contains(newHostId))) {
             return;
         }
 
-        int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(spiInfo.getPartitionId()));
+        //On new leader host:
+        //The host which started spi balance is down before it got chance to notify new leader that
+        //it has drained sp transactions.
+        //Then reset the BalanceSPI status on the new leader to allow it process transactions as leader
+        if (failedHosts.contains(oldHostId) && newHostId == m_messenger.getHostId()) {
+            Initiator initiator = m_iv2Initiators.get(spiInfo.getPartitionId());
+            ((SpInitiator)initiator).setBalanceSPIStatus(oldHostId);
+            consoleLog.info("Reset Balance SPI status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
+            return;
+        }
 
-        //new leader is down. current partition leader still on the older host.
-        //the new leader has not got a chance to be promoted yet. then re-install the old leader
-        if (failedHosts.contains(spiInfo.getNewLeaderHostId()) &&
-                spiInfo.getOldLeaderHostId() == m_messenger.getHostId() &&
-                spiInfo.getOldLeaderHostId() == currentLeaderHostId) {
+        //On old leader host:
+        //The new leader is down and does not get chance to be promoted. The partition leader is still on the old host.
+        //then re-install the old leader.
+        if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) {
+            int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(spiInfo.getPartitionId()));
+            if (oldHostId != currentLeaderHostId) {
+                return;
+            }
+
+            //valid leader status
             SpInitiator initiator = (SpInitiator)m_iv2Initiators.get(spiInfo.getPartitionId());
+            if (initiator.isLeader()) {
+                return;
+            }
 
-            //leader on this host but the initiator is marked as none-leader
-            //re-elect the older site as leader
-            if (!initiator.isLeader()) {
-                LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
+            //leader on this host (ZooKeeper) but the initiator is marked as none-leader
+            LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
+            try {
+                leaderAppointee.start(true);
+                leaderAppointee.put(spiInfo.getPartitionId(), spiInfo.getOldLeaderHsid());
+            } catch (InterruptedException | ExecutionException | KeeperException e) {
+                VoltDB.crashLocalVoltDB("fail to move spi back to " + CoreUtils.hsIdToString(spiInfo.getOldLeaderHsid()),true, e);
+            } finally {
                 try {
-                    leaderAppointee.start(true);
-                    leaderAppointee.put(spiInfo.getPartitionId(), spiInfo.getOldLeaderHsid());
-                } catch (InterruptedException | ExecutionException | KeeperException e) {
-                    VoltDB.crashLocalVoltDB("fail to move spi back to " + CoreUtils.hsIdToString(spiInfo.getOldLeaderHsid()),true, e);
-                } finally {
-                    try {
-                        leaderAppointee.shutdown();
-                    } catch (InterruptedException e) {
-                    }
+                    leaderAppointee.shutdown();
+                } catch (InterruptedException e) {
                 }
             }
         }
