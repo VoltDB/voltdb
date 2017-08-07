@@ -678,7 +678,7 @@ public class HTTPAdminListener {
                 }
                 Object[] params = new Object[] { null, dep};
                 SyncCallback cb = new SyncCallback();
-                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                httpClientInterface.callProcedure(baseRequest.getRemoteHost(), ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
                 cb.waitForResponse();
                 ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
                 if (r.getStatus() == ClientResponse.SUCCESS) {
@@ -744,7 +744,7 @@ public class HTTPAdminListener {
                 Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
                 SyncCallback cb = new SyncCallback();
-                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                httpClientInterface.callProcedure(baseRequest.getRemoteHost(), ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
                 cb.waitForResponse();
                 ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
                 if (r.getStatus() == ClientResponse.SUCCESS) {
@@ -815,7 +815,7 @@ public class HTTPAdminListener {
                 Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
                 SyncCallback cb = new SyncCallback();
-                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                httpClientInterface.callProcedure(baseRequest.getRemoteHost(), ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
                 cb.waitForResponse();
                 ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
                 if (r.getStatus() == ClientResponse.SUCCESS) {
@@ -863,7 +863,7 @@ public class HTTPAdminListener {
                 Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
                 SyncCallback cb = new SyncCallback();
-                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                httpClientInterface.callProcedure(baseRequest.getRemoteHost(), ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
                 cb.waitForResponse();
                 ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
