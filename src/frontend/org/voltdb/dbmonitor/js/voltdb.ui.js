@@ -207,8 +207,6 @@ $(document).ready(function () {
             $(".showhideImporterIcon").addClass('collapsed');
         }
         $('#mainImporterGraphBlock').slideToggle();
-
-        //MonitorGraphUI.UpdateCharts();
     });
 
 
@@ -817,10 +815,6 @@ var loadPage = function (serverName, portid) {
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
 
-//    var currentProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-//    var priorProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-//    var currentTableAction = VoltDbUI.ACTION_STATES.NONE;
-//    var priorTableAction = VoltDbUI.ACTION_STATES.NONE;
     VoltDbUI.CurrentTab = getCurrentTab();
 
     RefreshServerUI();
@@ -1255,7 +1249,6 @@ var loadPage = function (serverName, portid) {
                                                     var userPreference = getUserPreferences();
                                                     VoltDbUI.isDRInfoRequired = true;
                                                     VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
-                                                    // showHideLastLineClass(true);
                                                     $("#divDrWrapperAdmin").show();
                                                     if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
                                                         if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
@@ -2392,7 +2385,7 @@ var loadPage = function (serverName, portid) {
 
             var procedureName = $("#hidProcedureName").html();
             $("#procedureName").html(procedureName);
-             //filter specific procedure calls from list of datas
+            //filter specific procedure calls from list of datas
             var procDetails = {};
             var finalDetails = [];
             var statement = '';
@@ -2409,9 +2402,7 @@ var loadPage = function (serverName, portid) {
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                 var newStatement = '';
                 var latValue;
-//                $("#generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
                 if(item.PROCEDURE == procedureName ){
-//                    newStatement = item.STATEMENT;
                     if (statement == item.STATEMENT){
                         sum += item.value;
                         isMultiple = true;
@@ -2470,8 +2461,6 @@ var loadPage = function (serverName, portid) {
                 var newStatement = '';
                 //order items w.r.to latency
                 var latValue;
-
-//                $(".generatedDate").html(VoltDbAnalysis.formatDateTime(item.TIMESTAMP));
                 if(item.PROCEDURE == procedureName ){
                     newStatement = item.STATEMENT;
                      if(item.type == "Single Partitioned"){
@@ -2520,7 +2509,6 @@ var loadPage = function (serverName, portid) {
             var count = 0;
             var combinedDetails = {};
             var combinedWeight = 0;
-//            var sumOfEachProcedure = 0;
             var statement = '';
             var finalDetails = [];
             var sum = 0;
@@ -2536,7 +2524,6 @@ var loadPage = function (serverName, portid) {
                 var obj = VoltDbAnalysis.combinedDetail[key];
                 if(key == procedureName){
                     //Calculate sumOfEachProcedure
-//                    var sumOfEachProcedure = VoltDbUI.calculateCombinedDetailValue(obj);
                     obj.forEach(function(subItems){
                         if(subItems.STATEMENT == statement){
                             if(subItems.TYPE == "Single Partitioned"){
@@ -3106,14 +3093,6 @@ var adjustImporterGraphSpacing = function() {
                 );
             }
         };
-
-//        this.calculateCombinedDetailValue=function(profileData){
-//            var totalValue = 0;
-//            for(var j = 0; j < profileData.length; j++){
-//                totalValue += (profileData[j].AVG/1000000) * profileData[j].INVOCATIONS;
-//            }
-//            return totalValue;
-//        }
 
         this.loadSchemaTab = function () {
             this.isSchemaTabLoading = true;
