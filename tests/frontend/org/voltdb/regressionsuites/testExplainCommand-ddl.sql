@@ -80,3 +80,11 @@ AS BEGIN
   insert into t2 values (?, ?, ?);
   select * from t2;
 END;
+
+CREATE PROCEDURE MultiSPSingle1
+PARTITION ON TABLE t2 COLUMN PKEY PARAMETER 4
+AS BEGIN
+  select * from t2 where PKEY = ? AND A_INT = ?;
+  insert into t2 values (?, ?, ?);
+  select * from t2;
+END;
