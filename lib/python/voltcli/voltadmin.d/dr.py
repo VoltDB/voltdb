@@ -89,11 +89,11 @@ def dr(runner):
     if runner.opts.timeout < 0:
         runner.abort_with_help('The timeout value must be non-negative seconds.')
     if runner.opts.clusterId < -1 or runner.opts.clusterId > 127:
-        runner.abort_with_help('The remote-cluster-ID must be in the range of 0 to 127.')
-    if runner.opts.clusterId > 0 and runner.opts.clusterId == getOwnClusterId(runner):
-        runner.abort_with_help('The remote-cluster-ID must be different from local cluster ID.')
-    if runner.opts.clusterId > 0 and runner.opts.clusterId not in getRemoteClusterIds(runner):
-        runner.abort_with_help('The remote-cluster ' + str(runner.opts.clusterId) + ' is not connected with local cluster.')
+        runner.abort_with_help('The specified cluster ID must be in the range of 0 to 127.')
+    if runner.opts.clusterId >= 0 and runner.opts.clusterId == getOwnClusterId(runner):
+        runner.abort_with_help('You cannot specify the current cluster ID in the DR RESET command. You must specify the ID of a different cluster.')
+    if runner.opts.clusterId >= 0 and runner.opts.clusterId not in getRemoteClusterIds(runner):
+        runner.abort_with_help('The specified cluster ID ' + str(runner.opts.clusterId) + ' is not recognized as a member of the current DR environment.')
 
     runner.go()
 
