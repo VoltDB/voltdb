@@ -495,6 +495,7 @@ if whichtests in ("${eetestsuite}", "execution"):
     CTX.TESTS['execution'] = """
      add_drop_table
      engine_test
+     ExecutorVectorTest
      FragmentManagerTest
     """
 if whichtests in ("${eetestsuite}", "executors"):
