@@ -699,7 +699,7 @@
                         trowEnter.append("td")
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
                     }
-                    else if (!isNaN(d.series[0].key)){
+                    else if (d.series[0].key == "Total Processing Time MP"){
                         var keyName = d.series[0].key;
                         keyName = (keyName == "Frequency Detail" ? "Frequency":(keyName == "Processing Time Detail" ? "Total Processing Time" : keyName));
                         trowEnter.append("td")
@@ -724,9 +724,9 @@
                     trowEnter.append("td")
                         .html(function (p, i) { return (d.series[0].key != "Frequency"  && d.series[0].key != "Frequency Detail" ? p.value.toFixed(3) : p.value)+ unit });
                 }
-                else if (!isNaN(d.series[0].key)){
+                else if (d.series[0].key == "Total Processing Time MP"){
                     trowEnter.append("td")
-                        .html(function (p, i) { return ((d.data.y / VoltDbUI.totalProcessingTime[d.data.x]) * 100).toFixed(3) + unit });
+                        .html(function (p, i) { return ((d.data.y / d.data.z) * 100).toFixed(3) + unit });
                 }
                 else {
                     trowEnter.append("td")
@@ -835,13 +835,13 @@
                         trowEnter3.append("td")
                             .html(VoltDbUI.executionDetails[statement].INVOCATION);
                 }
-                else if(!isNaN(d.series[0].key)) {
+                else if(d.series[0].key == "Total Processing Time MP") {
                     var trowEnter1 = tbodyEnter.selectAll("tr")
                     .append("tr");
-
+                    debugger;
                     trowEnter1.append("td")
                     .html("Partition ID")
-                    var partitionId = d.series[0].key;
+                    var partitionId = d.data.PARTITION_ID;
 
                     trowEnter1.append("td")
                         .html(partitionId);
@@ -9047,14 +9047,15 @@
                     .style('stroke-opacity', 1e-6)
                     .style('fill-opacity', 1e-6)
                     .remove();
+
                 groups
                     .attr('class', function (d, i) { return 'nv-group nv-series-' + i })
                     .classed('hover', function (d) { return d.hover })
-                    .style('fill', function (d, i) { return color(d, i) })
-                    .style('stroke', function (d, i) { return color(d, i) });
+                    .style('fill', function (d, i) { return "rgb(27, 135, 200)" })
+                    .style('stroke', function (d, i) { return "rgb(27, 135, 200)"  })
                 groups.watchTransition(renderWatch, 'multibarhorizontal: groups')
                     .style('stroke-opacity', 1)
-                    .style('fill-opacity', .75);
+                    .style('fill-opacity', .75)
 
                 var bars = groups.selectAll('g.nv-bar')
                     .data(function (d) { return d.values });
@@ -9224,7 +9225,7 @@
                         })
                         .select('rect')
                         .attr('width', function (d, i) {
-                            return Math.abs(y(getY(d, i) + d.y0) - y(d.y0))
+                            return Math.abs(y(getY(d, i) + d.y0) - y(d.y0)) - 0.6
                         })
                         .attr('height', x.rangeBand());
                 else
@@ -9258,7 +9259,21 @@
                 .attr('y', (x.rangeBand() - 20))
                 .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) })
                 .text(function (d, i) {
-                    return VoltDbUI.totalProcessingTime[d.x].toFixed(3) + 's';
+                    return d.z.toFixed(3) + 's';
+                });
+
+
+                 d3.select('#visualizeLatencyDetail > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
+               .data(function (d) {
+                if(d != undefined)
+                    return d.values })
+                .attr('dy', '.32em')
+                .attr('text-anchor', function (d, i) { return getY(d, i) < 0 ? 'end' : 'start' })
+                .attr('y', (x.rangeBand() - 20))
+                .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) })
+                .text(function (d, i) {
+                    debugger;
+                    return d.z.toFixed(3) + 's';
                 });
             }
             renderWatch.renderEnd('multibarHorizontal immediate');
@@ -9678,6 +9693,7 @@
             },
             tooltipContent: {
                 get: function () { return tooltip.contentGenerator(); }, set: function (_) {
+
                     // deprecated after 1.7.1
                     nv.deprecated('tooltipContent', 'use chart.tooltip.contentGenerator() instead');
                     tooltip.contentGenerator(_);

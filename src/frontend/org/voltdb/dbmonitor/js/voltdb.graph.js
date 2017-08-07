@@ -57,7 +57,7 @@
         var ChartLatencyAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartFrequencyAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartProcessingTimeAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
-        var ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(true).showControls(false);
         var ChartFrequencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
 
@@ -437,6 +437,7 @@
             d3.selectAll("#chartLatencyAnalysis .nv-bar").on('click',
                 function(data){
                     $("#hidProcedureName").html(data.label);
+                    $("#hidPartitionType").html(data.type);
                     $('#showAnalysisDetails').trigger("click");
                 }
             );
@@ -597,10 +598,10 @@
 
         this.initializeProcedureDetailGraph = function(){
             nv.addGraph(function() {
-                ChartLatencyDetailAnalysis.x(function(d) {
-                    return  d.label
-                  }).y(function(d) { return d.value }).height(barHeight)
-                  .showValues(true);
+//                ChartLatencyDetailAnalysis.x(function(d) {
+//                    return  d.label
+//                  }).y(function(d) { return d.value }).height(barHeight)
+//                  .showValues(true);
                 ChartLatencyDetailAnalysis.valueFormat(d3.format(',.6f'));
                 ChartLatencyDetailAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
@@ -702,10 +703,35 @@
             $("#divVisualizeLatencyDetail").css("height", barHeight-10);
             ChartLatencyDetailAnalysis.margin({"left": 80})
             dataLatencyDetailAnalysis[0]["values"] = dataLatency;
-            d3.select("#visualizeLatencyDetail")
+
+            ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+            if($("#hidPartitionType").html() == "Single Partitioned"){
+                ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(true).showControls(false);
+                getBarHeightAndSpacing(dataLatency[0].values, ChartLatencyDetailAnalysis);
+            }
+            else{
+                getBarHeightAndSpacing(dataLatency, ChartLatencyDetailAnalysis);
+                  ChartLatencyDetailAnalysis.x(function(d) {
+                    if(d.label.length > 20)
+                        return d.label.substring(0,20) + ".."
+                    return  d.label
+                  }).y(function(d) { return d.value })
+                  .showValues(true);
+            }
+
+            if($("#hidPartitionType").html() == "Single Partitioned"){
+                d3.select("#visualizeLatencyDetail")
+                .datum(dataLatency)
+                .transition().duration(500)
+                .call(ChartLatencyDetailAnalysis);
+            }
+            else{
+                 d3.select("#visualizeLatencyDetail")
                 .datum(dataLatencyDetailAnalysis)
                 .transition().duration(500)
                 .call(ChartLatencyDetailAnalysis);
+            }
+
             d3.select('#visualizeLatencyDetail > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
             .each(function(d,i){wordWrap(this, d, 110, -115, -8);});
             $("#visualizeLatencyDetail").find('.nvd3').removeAttr("x");
