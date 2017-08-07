@@ -430,7 +430,7 @@ Table* AbstractPlanNode::TableReference::getTable() const
     return m_tempTable;
 }
 
-AbstractPlanNode::TableOwner::~TableOwner() { delete m_tempTable; }
+AbstractPlanNode::TableOwner::~TableOwner() { delete getTempTable(); }
 
 AbstractPlanNode::OwningExpressionVector::~OwningExpressionVector()
 {

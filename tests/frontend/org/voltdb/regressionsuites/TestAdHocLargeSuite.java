@@ -12,7 +12,9 @@ public class TestAdHocLargeSuite extends RegressionSuite {
 
         client.callProcedure("@AdHoc", "create table t (i integer not null);");
 
-        ClientResponse cr = client.callProcedure("@AdHocLarge", "select count(*) from t");
+        ClientResponse cr;
+
+        cr = client.callProcedure("@AdHocLarge", "select count(*) from (select * from t as t1, t  as t2) as dtbl");
         assertEquals(0, cr.getResults()[0].asScalarLong());
     }
 
