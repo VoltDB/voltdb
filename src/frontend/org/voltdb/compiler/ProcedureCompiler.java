@@ -853,6 +853,11 @@ public abstract class ProcedureCompiler {
             }
         }
 
+        if (stmtNum == 0) {
+            throw compiler.new VoltCompilerException("Cannot create a stored procedure with no statements "
+                    + "for procedure: " + procedure.getClassname());
+        }
+
         int paramCount = procedure.getParameters().size();
         // parse the procinfo
         procedure.setSinglepartition(info.singlePartition);
