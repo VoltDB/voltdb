@@ -84,32 +84,4 @@ public class TestAdhocCompilerErrorMessages extends AdhocDDLTestBase
             teardownSystem();
         }
     }
-
-    @Test
-    public void testMultiStmtProcErrors() throws Exception
-    {
-        try {
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            startSystem(config);
-            boolean threw = false;
-
-            try {
-                m_client.callProcedure("@AdHoc", "create table t (a int);"
-                        +"create procedure test as begin "
-                        + "select * from t;"
-                        + "select * from q;"
-                        + "end;");
-            }
-            catch (ProcCallException pce) {
-                String message = pce.getLocalizedMessage();
-                assertTrue(message.contains("Failed to plan for statement (sql1) \"select * from q;\". "
-                        + "Error: \"Error in \"select * from q;\" user lacks privilege or object not found: Q\""));
-                threw = true;
-            }
-            assertTrue("Expected exception", threw);
-        }
-        finally {
-            teardownSystem();
-        }
-    }
 }

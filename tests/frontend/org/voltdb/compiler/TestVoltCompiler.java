@@ -2986,7 +2986,8 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER; SELECT * FROM PKEY_INTEGER END;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        expectedError = "Failed to plan for statement (sql1) \"SELECT * FROM PKEY_INTEGER END;\". "
+                + "Error: \"SQL Syntax error in \"SELECT * FROM PKEY_INTEGER END;\" unexpected token: END\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
