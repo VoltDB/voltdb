@@ -436,6 +436,8 @@
             ChartLatencyAnalysis.update();
             d3.selectAll("#chartLatencyAnalysis .nv-bar").on('click',
                 function(data){
+                    VoltDbUI.isTotalProcessing = false;
+                    VoltDbUI.isLatency = true;
                     $("#hidProcedureName").html(data.label);
                     $("#hidPartitionType").html(data.type);
                     $('#showAnalysisDetails').trigger("click");
@@ -458,6 +460,8 @@
             ChartProcessingTimeAnalysis.update();
             d3.selectAll("#chartProcessingTimeAnalysis .nv-bar").on('click',
                 function(data){
+                    VoltDbUI.isTotalProcessing = true;
+                    VoltDbUI.isLatency = false;
                     $("#hidProcedureName").html(data.label);
                     $("#hidPartitionType").html(data.type);
                     $('#showAnalysisCombinedDetails').trigger("click");
@@ -697,13 +701,6 @@
         }
 
         this.RefreshLatencyDetailGraph = function(dataLatency){
-            ChartLatencyDetailAnalysis.update;
-            getBarHeightAndSpacing(dataLatency, ChartLatencyDetailAnalysis);
-            ChartLatencyDetailAnalysis.height(barHeight);
-            $("#divVisualizeLatencyDetail").css("height", barHeight-10);
-            ChartLatencyDetailAnalysis.margin({"left": 80})
-            dataLatencyDetailAnalysis[0]["values"] = dataLatency;
-
             ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
             if($("#hidPartitionType").html() == "Single Partitioned"){
                 ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(true).showControls(false);
@@ -712,12 +709,17 @@
             else{
                 getBarHeightAndSpacing(dataLatency, ChartLatencyDetailAnalysis);
                   ChartLatencyDetailAnalysis.x(function(d) {
-                    if(d.label.length > 20)
-                        return d.label.substring(0,20) + ".."
                     return  d.label
                   }).y(function(d) { return d.value })
                   .showValues(true);
             }
+
+            ChartLatencyDetailAnalysis.update;
+            ChartLatencyDetailAnalysis.height(barHeight);
+            $("#divVisualizeLatencyDetail").css("height", barHeight-10);
+            ChartLatencyDetailAnalysis.margin({"left": 80, "right": 60})
+            dataLatencyDetailAnalysis[0]["values"] = dataLatency;
+
 
             if($("#hidPartitionType").html() == "Single Partitioned"){
                 d3.select("#visualizeLatencyDetail")
@@ -734,9 +736,9 @@
 
             d3.select('#visualizeLatencyDetail > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
             .each(function(d,i){wordWrap(this, d, 110, -115, -8);});
-            $("#visualizeLatencyDetail").find('.nvd3').removeAttr("x");
-            $("#visualizeLatencyDetail").find('.nvd3').attr("x",344);
-            $("#visualizeLatencyDetail").find('.nvd3').attr("y",172);
+//            $("#visualizeLatencyDetail").find('.nvd3').removeAttr("x");
+//            $("#visualizeLatencyDetail").find('.nvd3').attr("x",344);
+//            $("#visualizeLatencyDetail").find('.nvd3').attr("y",172);
         }
 
         this.RefreshFrequencyDetailGraph = function(freqDetails){
@@ -766,8 +768,6 @@
             else{
                 getBarHeightAndSpacing(dataCombined, ChartCombinedDetailAnalysis);
                   ChartCombinedDetailAnalysis.x(function(d) {
-                    if(d.label.length > 20)
-                        return d.label.substring(0,20) + ".."
                     return  d.label
                   }).y(function(d) { return d.value })
                   .showValues(true);

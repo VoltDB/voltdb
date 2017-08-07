@@ -838,7 +838,6 @@
                 else if(d.series[0].key == "Total Processing Time MP") {
                     var trowEnter1 = tbodyEnter.selectAll("tr")
                     .append("tr");
-                    debugger;
                     trowEnter1.append("td")
                     .html("Partition ID")
                     var partitionId = d.data.PARTITION_ID;
@@ -9252,29 +9251,31 @@
 
             });
              if(stacked){
-                d3.select('#visualizeCombinedDetails > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
-               .data(function (d) { return d.values })
-                .attr('dy', '.32em')
-                .attr('text-anchor', function (d, i) { return getY(d, i) < 0 ? 'end' : 'start' })
-                .attr('y', (x.rangeBand() - 20))
-                .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) })
-                .text(function (d, i) {
-                    return d.z.toFixed(3) + 's';
-                });
+               if(VoltDbUI.isTotalProcessing){
+                     d3.select('#visualizeCombinedDetails > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
+                   .data(function (d) { return d.values })
+                    .attr('dy', '.32em')
+                    .attr('text-anchor', function (d, i) { return getY(d, i) < 0 ? 'end' : 'start' })
+                    .attr('y', (x.rangeBand() - 20))
+                    .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) })
+                    .text(function (d, i) {
+                        return d.z.toFixed(3) + 's';
+                    });
+                   }
 
 
-                 d3.select('#visualizeLatencyDetail > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
-               .data(function (d) {
-                if(d != undefined)
-                    return d.values })
-                .attr('dy', '.32em')
-                .attr('text-anchor', function (d, i) { return getY(d, i) < 0 ? 'end' : 'start' })
-                .attr('y', (x.rangeBand() - 20))
-                .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) })
-                .text(function (d, i) {
-                    debugger;
-                    return d.z.toFixed(3) + 's';
-                });
+                if(VoltDbUI.isLatency){
+                    d3.select('#visualizeLatencyDetail > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
+                   .data(function (d) {
+                        return d.values})
+                    .attr('dy', '.32em')
+                    .attr('text-anchor', function (d, i) { return getY(d, i) < 0 ? 'end' : 'start' })
+                    .attr('y', (x.rangeBand() - 20))
+                    .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) })
+                    .text(function (d, i) {
+                        return d.z.toFixed(3) + 's';
+                    });
+                }
             }
             renderWatch.renderEnd('multibarHorizontal immediate');
             return chart;

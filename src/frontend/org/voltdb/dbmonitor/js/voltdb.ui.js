@@ -2402,7 +2402,7 @@ var loadPage = function (serverName, portid) {
             var count = 0;
             var isMultiple= false;
             var i =0;
-            
+
             if(VoltDbAnalysis.latencyDetailValue.length == 0){
                  $("#spanAnalysisLegend").hide();
                  $("#execTimeLegend").hide();
@@ -2424,7 +2424,7 @@ var loadPage = function (serverName, portid) {
 
                     if(isMultiple){
                         count = calculateStatementCount(VoltDbAnalysis.latencyDetailValue, item.STATEMENT)
-                        procDetails[item.STATEMENT] = sum/count;
+                        procDetails[item.STATEMENT] = sum;
                     }
                     else{
                         procDetails[item.STATEMENT] = sum;
@@ -3245,6 +3245,8 @@ var adjustImporterGraphSpacing = function() {
             SQLQueryRender.populateTablesAndViews();
         };
         this.hasPermissionToView = true;
+        this.isLatency = false;
+        this.isTotalProcessing = false;
         this.getCookie = function (name) {
             return $.cookie(name + "_" + VoltDBConfig.GetPortId());
         },
