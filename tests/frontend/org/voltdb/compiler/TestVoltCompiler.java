@@ -2981,6 +2981,16 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
+                "CREATE TABLE PKEY_FLOAT ( PKEY FLOAT NOT NULL, FRAC FLOAT, PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_FLOAT ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE FRAC > ?; END;" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_FLOAT COLUMN PKEY PARAMETER 0;"
+                );
+        expectedError = "In database, Partition column 'PKEY_FLOAT.pkey' is not a valid type. "
+                + "Partition columns must be an integer, varchar or varbinary type.";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER; SELECT * FROM PKEY_INTEGER END;" +
