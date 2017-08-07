@@ -127,9 +127,8 @@ public class MpScheduler extends Scheduler
         m_partitionMasters.clear();
         m_partitionMasters.putAll(partitionMasters);
 
-        m_pendingTasks.updatePartitions(replicas, partitionMasters);
-
         if (!m_isLeader) {
+            m_pendingTasks.updatePartitions(replicas, partitionMasters);
             return;
         }
 

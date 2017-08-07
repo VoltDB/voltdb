@@ -61,6 +61,16 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             writes = 0;
         }
 
+        public PartitionLock(PartitionLock lock) {
+            reads = lock.reads;
+            writes = lock.writes;
+        }
+
+        public PartitionLock(int r, int w) {
+            reads = r;
+            writes = w;
+        }
+
         public void updateRead(int count) {
             if (count == 1) {
                 assert(writes == 0);
@@ -142,21 +152,19 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         // any of the MP read pool) will only have one active transaction at a time,
         // and that we either have active reads or active writes, but never both.
         // Figure out which we're doing, and then poison all of the appropriate sites.
-        Map<Long, TransactionTask> currentSet;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
             tmLog.debug("MpTTQ: repairing reads");
             for (Long txnId : m_currentReads.keySet()) {
                 m_sitePool.repair(txnId, task);
             }
-            currentSet = m_currentReads;
         }
-        else {
+        if (!m_currentWrites.isEmpty()) {
             tmLog.debug("MpTTQ: repairing writes");
             m_taskQueue.offer(task);
-            currentSet = m_currentWrites;
         }
-        for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
+
+        for (Entry<Long, TransactionTask> e : m_currentReads.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)e.getValue();
                 tmLog.debug("MpTTQ: poisoning task: " + next);
@@ -180,6 +188,26 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 // to the duplicate counter in MpScheduler for this transaction.
             }
         }
+        for (Entry<Long, TransactionTask> e : m_currentWrites.entrySet()) {
+            if (e.getValue() instanceof MpProcedureTask) {
+                MpProcedureTask next = (MpProcedureTask)e.getValue();
+                tmLog.debug("MpTTQ: poisoning task: " + next);
+                next.doRestart(masters, partitionMasters);
+                MpTransactionState txn = (MpTransactionState)next.getTransactionState();
+                // inject poison pill
+                FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+                FragmentResponseMessage poison =
+                    new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
+                // Provide a TransactionRestartException which will be converted
+                // into a ClientResponse.RESTART, so that the MpProcedureTask can
+                // detect the restart and take the appropriate actions.
+                TransactionRestartException restart = new TransactionRestartException(
+                        "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
+                poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
+                txn.offerReceivedFragmentResponse(poison);
+            }
+        }
+
         // Now, iterate through the backlog and update the partition masters
         // for all ProcedureTasks
         Iterator<TransactionTask> iter = m_backlog.iterator();
@@ -196,6 +224,24 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 next.updateMasters(masters);
             }
         }
+
+        // TODO: what if the corresponding partition number(s) changed for a txn ? Is it possible ?
+        // Update the map, but remember to keep the r/w counts
+        HashMap<Long, PartitionLock> newPartitionMap = new HashMap<>();
+        // Update the locked partitions
+        for (Entry<Integer, Long> entry : partitionMasters.entrySet()) {
+            Integer partition = entry.getKey();
+            Long hsid = entry.getValue();
+
+            if (m_lockedPartitions.containsKey(partition)) {
+                PartitionLock lock = new PartitionLock(m_lockedPartitions.get(partition));
+                newPartitionMap.put(hsid, lock);
+            } else {
+                newPartitionMap.put(hsid, new PartitionLock());
+            }
+        }
+
+        m_lockedPartitions = newPartitionMap;
     }
 
     private void taskQueueOffer(TransactionTask task)
@@ -396,9 +442,22 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             System.err.println(i + " -> " + String.format("0x%12X", masterHsids.get(i)));
         }
 
+        // TODO: what if the corresponding partition number(s) changed for a txn ? Is it possible ?
+        // Update the map, but remember to keep the r/w counts
+        HashMap<Long, PartitionLock> newPartitionMap = new HashMap<>();
         // Update the locked partitions
-        for (Long i : masters) {
-            m_lockedPartitions.putIfAbsent(i, new PartitionLock()); // for now this is enough
+        for (Entry<Integer, Long> entry : masterHsids.entrySet()) {
+            Integer partition = entry.getKey();
+            Long hsid = entry.getValue();
+
+            if (m_lockedPartitions.containsKey(partition)) {
+                PartitionLock lock = new PartitionLock(m_lockedPartitions.get(partition));
+                newPartitionMap.put(hsid, lock);
+            } else {
+                newPartitionMap.put(hsid, new PartitionLock());
+            }
         }
+
+        m_lockedPartitions = newPartitionMap;
     }
 }
