@@ -593,7 +593,7 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     for (int i = 0; i < arguments.size(); i++) {
         arguments[i].serializeTo(m_udfOutput);
     }
-    
+
     ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
     // callJavaUserDefinedFunction() will inform the Java end to execute the
     // Java user-defined function according to the function Id and the parameters
