@@ -201,12 +201,12 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private void taskQueueOffer(TransactionTask task)
     {
         Iv2Trace.logSiteTaskerQueueOffer(task);
-//        if (task.getTransactionState().isReadOnly()) {
+        if (task.getTransactionState().isReadOnly()) {
             m_sitePool.doWork(task.getTxnId(), task);
-//        }
-//        else {
-//            m_taskQueue.offer(task);
-//        }
+        }
+        else {
+            m_taskQueue.offer(task);
+        }
     }
 
     private boolean taskQueueOffer()
@@ -290,7 +290,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             assert(m_currentWrites.containsKey(txnId));
             updatePartitionLocks(m_currentWrites.get(txnId), -1);
             m_currentWrites.remove(txnId);
-            m_sitePool.completeWork(txnId);
             assert(m_currentWrites.isEmpty());
         }
         if (taskQueueOffer()) {
@@ -356,14 +355,15 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private void updatePartitionLocks(TransactionTask task, int count) {
         assert(count == 1 || count == -1);
         List<Long> hsids = task.getPartitionMasterHsids();
-        assert(hsids != null);
-        for (Long hsid : hsids) {
-            PartitionLock pLock = m_lockedPartitions.get(hsid);
-            assert(pLock != null);
-            if (task.getTransactionState().isReadOnly())
-                pLock.updateRead(count);
-            else
-                pLock.updateWrite(count);
+        if (hsids != null) {    // avoid the MPIEndOfLogTask case
+            for (Long hsid : hsids) {
+                PartitionLock pLock = m_lockedPartitions.get(hsid);
+                assert(pLock != null);
+                if (task.getTransactionState().isReadOnly())
+                    pLock.updateRead(count);
+                else
+                    pLock.updateWrite(count);
+            }
         }
     }
 
@@ -393,7 +393,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
         System.err.println("=======");
         for (Integer i : masterHsids.keySet()) {
-            System.err.println(i + " -> " + masterHsids.get(i));
+            System.err.println(i + " -> " + String.format("0x%12X", masterHsids.get(i)));
         }
 
         // Update the locked partitions
