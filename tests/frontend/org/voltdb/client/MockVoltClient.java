@@ -300,6 +300,11 @@ public class MockVoltClient implements Client {
     }
 
     @Override
+    public boolean isAutoReconnectEnabled() {
+        return false;
+    }
+
+    @Override
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack callback) {
         return null;
     }

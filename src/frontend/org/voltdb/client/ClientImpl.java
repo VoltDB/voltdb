@@ -1029,6 +1029,7 @@ public final class ClientImpl implements Client {
         }
     }
 
+    @Override
     public boolean isAutoReconnectEnabled() {
         return (m_reconnectStatusListener != null);
     }

@@ -57,8 +57,7 @@ public class PerPartitionTable {
     //Queue for processing pending rows for this table
     LinkedBlockingQueue<VoltBulkLoaderRow> m_partitionRowQueue;
 
-    final ExecutorService m_insertExecutor;
-    final ExecutorService m_reinsertExecutor;
+    final ExecutorService m_es;
 
     //Zero based index of the partitioned column in the table
     final int m_partitionedColumnIndex;
@@ -99,7 +98,7 @@ public class PerPartitionTable {
         public void clientCallback(final ClientResponse response) throws InterruptedException {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 // Queue up all rows for individual processing by originating BulkLoader's FailureProcessor.
-                m_insertExecutor.execute(new Runnable() {
+                m_es.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
@@ -115,7 +114,7 @@ public class PerPartitionTable {
                 // necessary bookkeeping (like managing offsets, for example). Do this in the executor
                 // so as not to hold up the callback.
                 if (m_successCallback != null) {
-                    m_insertExecutor.execute(new Runnable() {
+                    m_es.execute(new Runnable() {
                         @Override
                         public void run() {
                             for (VoltBulkLoaderRow r : m_batchRowList) {
@@ -142,7 +141,7 @@ public class PerPartitionTable {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() == ClientResponse.CONNECTION_LOST && m_autoReconnect) {
-                m_reinsertExecutor.execute(new Runnable() {
+                m_es.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
@@ -165,8 +164,7 @@ public class PerPartitionTable {
     }
 
     PerPartitionTable(ClientImpl clientImpl, String tableName, int partitionId, boolean isMP,
-            VoltBulkLoader firstLoader, int minBatchTriggerSize, BulkLoaderSuccessCallback successCallback,
-            boolean autoReconnect) {
+            VoltBulkLoader firstLoader, int minBatchTriggerSize, BulkLoaderSuccessCallback successCallback) {
         m_clientImpl = clientImpl;
         m_partitionId = partitionId;
         m_isMP = isMP;
@@ -181,10 +179,9 @@ public class PerPartitionTable {
         m_tableName = tableName;
         m_successCallback = successCallback;
         m_table = new VoltTable(m_columnInfo);
-        m_autoReconnect = autoReconnect;
+        m_autoReconnect = m_clientImpl.isAutoReconnectEnabled();
 
-        m_insertExecutor = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
-        m_reinsertExecutor = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId + "-reinsert");
+        m_es = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
     }
 
     boolean updateMinBatchTriggerSize(int minBatchTriggerSize) {
@@ -205,7 +202,7 @@ public class PerPartitionTable {
     synchronized void insertRowInTable(final VoltBulkLoaderRow nextRow) throws InterruptedException {
         m_partitionRowQueue.put(nextRow);
         if (m_partitionRowQueue.size() == m_minBatchTriggerSize) {
-            m_insertExecutor.execute(new Runnable() {
+            m_es.execute(new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -226,7 +223,7 @@ public class PerPartitionTable {
      * are either inserted or failed definitively, call shutdown().
      */
     Future<?> flushAllTableQueues() throws InterruptedException {
-        return m_insertExecutor.submit(new Callable<Boolean>() {
+        return m_es.submit(new Callable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
                 loadTable(buildTable(), m_table);
@@ -241,10 +238,8 @@ public class PerPartitionTable {
         } catch (ExecutionException e) {
             throw (Exception) e.getCause();
         }
-        m_insertExecutor.shutdown();
-        m_reinsertExecutor.shutdown();
-        m_insertExecutor.awaitTermination(365, TimeUnit.DAYS);
-        m_reinsertExecutor.awaitTermination(365, TimeUnit.DAYS);
+        m_es.shutdown();
+        m_es.awaitTermination(365, TimeUnit.DAYS);
     }
 
     private void reinsertFailed(List<VoltBulkLoaderRow> rows) throws Exception {

@@ -247,7 +247,7 @@ public class VoltBulkLoader {
             // Set up the BulkLoaderPerPartitionTables
             for(int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++) {
                 m_partitionTable[i] = new PerPartitionTable(m_clientImpl, m_tableName,
-                        i, i == m_maxPartitionProcessors-1, this, maxBatchSize, successCallback, m_clientImpl.isAutoReconnectEnabled());
+                        i, i == m_maxPartitionProcessors-1, this, maxBatchSize, successCallback);
             }
             loaderList = new ArrayList<VoltBulkLoader>();
             loaderList.add(this);
