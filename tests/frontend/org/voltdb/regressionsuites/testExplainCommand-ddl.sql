@@ -74,7 +74,9 @@ CREATE PROCEDURE MultiSP AS BEGIN
   select * from t1;
 END;
 
-CREATE PROCEDURE MultiSPSingle AS BEGIN
+CREATE PROCEDURE MultiSPSingle
+PARTITION ON TABLE t2 COLUMN PKEY PARAMETER 0
+AS BEGIN
   insert into t2 values (?, ?, ?);
   select * from t2;
 END;
