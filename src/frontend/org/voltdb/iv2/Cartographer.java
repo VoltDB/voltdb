@@ -858,7 +858,11 @@ public class Cartographer extends StatsSource
                 return pair;
             }
         }
-        return null;
+
+        //indicate that the cluster is balanced.
+        Pair<Integer, Integer> pair = new Pair<Integer, Integer> (-1, -1);
+        System.out.println("###########################");
+        return pair;
     }
 
     private int findNewLeaderHost(Host src, Host target, int maxMastersPerHost, int minMastersPerHost) {
@@ -889,8 +893,8 @@ public class Cartographer extends StatsSource
     }
 
     //return the number of masters on a host
-    public int getMasterCount(int hostid) {
-        Set<Long> masters = m_currentMastersByHost.get(hostid);
+    public int getMasterCount(int hostId) {
+        Set<Long> masters = m_currentMastersByHost.get(hostId);
         if (masters == null) {
             return 0;
         }

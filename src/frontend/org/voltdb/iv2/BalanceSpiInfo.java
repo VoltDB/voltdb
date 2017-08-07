@@ -20,12 +20,12 @@ package org.voltdb.iv2;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.CoreUtils;
+
 import com.google_voltpatches.common.base.Charsets;
 
 public class BalanceSpiInfo {
 
-    private int m_oldLeaderHostId = Integer.MIN_VALUE;
-    private int m_newLeaderHostId = Integer.MIN_VALUE;
     private long m_oldLeaderHsid = Long.MIN_VALUE;
     private long m_newLeaderHsid = Long.MIN_VALUE;
     private int m_partitionId = Integer.MIN_VALUE;
@@ -34,16 +34,12 @@ public class BalanceSpiInfo {
 
     public BalanceSpiInfo(byte[] data) throws JSONException {
         JSONObject jsObj = new JSONObject(new String(data, Charsets.UTF_8));
-        m_oldLeaderHostId = jsObj.getInt("oldHostId");
-        m_newLeaderHostId = jsObj.getInt("newHostId");
         m_oldLeaderHsid = jsObj.getLong("oldHsid");
         m_newLeaderHsid = jsObj.getLong("newHsid");
         m_partitionId = jsObj.getInt("partitionId");
     }
 
-    public BalanceSpiInfo(int oldHostId, int newHostId, long oldHsid, long newHsid, int partitionId) {
-        m_oldLeaderHostId = oldHostId;
-        m_newLeaderHostId = newHostId;
+    public BalanceSpiInfo(long oldHsid, long newHsid, int partitionId) {
         m_oldLeaderHsid = oldHsid;
         m_newLeaderHsid = newHsid;
         m_partitionId = partitionId;
@@ -52,8 +48,6 @@ public class BalanceSpiInfo {
     public byte[] toBytes() throws JSONException {
         JSONStringer js = new JSONStringer();
         js.object();
-        js.key("oldHostId").value(m_oldLeaderHostId);
-        js.key("newHostId").value(m_newLeaderHostId);
         js.key("oldHsid").value(m_oldLeaderHsid);
         js.key("newHsid").value(m_newLeaderHsid);
         js.key("partitionId").value(m_partitionId);
@@ -70,11 +64,11 @@ public class BalanceSpiInfo {
     }
 
     public int getOldLeaderHostId() {
-        return m_oldLeaderHostId;
+        return CoreUtils.getHostIdFromHSId(m_oldLeaderHsid);
     }
 
     public int getNewLeaderHostId() {
-        return m_newLeaderHostId;
+        return CoreUtils.getHostIdFromHSId(m_newLeaderHsid);
     }
 
     public int getPartitionId() {

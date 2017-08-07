@@ -184,7 +184,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         @Override
         public void run() {
             try {
-                processParentEvent(m_event);
+                processParentEvent();
             } catch (Exception e) {
                 // ignore post-shutdown session termination exceptions.
                 if (!m_shutdown.get()) {
@@ -260,10 +260,8 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     /**
      * Rebuild the point-in-time snapshot of the children objects
      * and set watches on new children.
-     *
-     * @Param event may be null on the first initialization.
      */
-    private void processParentEvent(WatchedEvent event) throws Exception {
+    private void processParentEvent() throws Exception {
         // get current children snapshot and reset this watch.
         Set<String> children = new TreeSet<String>(m_zk.getChildren(m_rootNode, m_parentWatch));
         // intersect to get newChildren and update m_lastChildren to the current set.

@@ -36,10 +36,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -92,6 +94,7 @@ import org.voltdb.iv2.BalanceSpiInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -213,6 +216,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     //Dispatched stored procedure invocations
     private final InvocationDispatcher m_dispatcher;
+
+    private ScheduledExecutorService m_balanceSpiExecutor;
 
     /*
      * This list of ACGs is iterated to retrieve initiator statistics in IV2.
@@ -1208,6 +1213,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
                 }
+                else if (message instanceof BalanceSPIMessage) {
+                    processBalanceSpiTask((BalanceSPIMessage)message);
+                }
                 /*
                  * InitiateTaskMessage only get delivered here for all-host NT proc calls.
                  */
@@ -1715,6 +1723,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_snapshotDaemon != null) {
             m_snapshotDaemon.shutdown();
         }
+
+        if (m_balanceSpiExecutor != null) {
+            m_balanceSpiExecutor.shutdown();
+        }
         m_notifier.shutdown();
     }
 
@@ -2121,16 +2133,48 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_dispatcher.handleFailedHosts(failedHosts);
     }
 
+    //start or stop BalanceSPI task
+    void processBalanceSpiTask(BalanceSPIMessage message) {
+
+        //start BalanceSPI service
+        if (message.startTask()) {
+            if (m_balanceSpiExecutor == null) {
+                m_balanceSpiExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("BalanceSPI"));
+                final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
+                final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "30"));
+                m_balanceSpiExecutor.scheduleAtFixedRate(new Runnable() {
+                    public void run() {balanceSPI();}
+                }, delay, interval, TimeUnit.SECONDS);
+            }
+            hostLog.info("BalanceSPI task is started.");
+            return;
+        }
+
+        if (m_balanceSpiExecutor == null) {
+            return;
+        }
+
+        //stop BalanceSPI service
+        m_balanceSpiExecutor.shutdown();
+        try {
+            m_balanceSpiExecutor.awaitTermination(365,  TimeUnit.DAYS);
+        } catch (InterruptedException e) {
+        }
+        m_balanceSpiExecutor = null;
+        hostLog.info("BalanceSPI task is stopped.");
+    }
+
     /**Move partition leader from one host to another.
      * find a partition leader from a host which hosts the most partition leaders
      * and find the host which hosts the partition replica and the least number of partition leaders.
      * send BalanceSPIMessage to the host with older partition leader to initiate @BalanceSPI
      * Repeatedly call this task until no qualified partition is available.
      */
-    public void balanceSPI(int hostCount) {
+    void balanceSPI() {
 
+        RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
         final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
-        Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(hostCount, hostId);
+        Pair<Integer, Integer> target = m_cartographer.getPartitionForBalanceSPI(voltDB.getHostCount(), hostId);
 
         //The host does not have any thing to do this time. It does not mean that the host does not
         //have more partition leaders than expected. Other hosts may have more partition leaders
@@ -2142,6 +2186,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final int partitionId = target.getFirst();
         final int targetHostId = target.getSecond();
         int partitionKey = -1;
+
+        //Balance spi is completed! Stop BalanceSPI service on this host
+        if (targetHostId == -1) {
+            voltDB.scheduleWork(new Runnable() {
+                public void run() {m_mailbox.deliver(new BalanceSPIMessage());}
+            }, 0, 0, TimeUnit.SECONDS);
+            return;
+        }
 
         //Others may also iterate through the partition keys. So make a copy and find the key
         VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
@@ -2190,11 +2242,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             //Info saved for the node failure handling
-            BalanceSpiInfo spiInfo = new BalanceSpiInfo(hostId, targetHostId,
+            BalanceSpiInfo spiInfo = new BalanceSpiInfo(
                     m_cartographer.getHSIDForPartitionHost(hostId, partitionId),
                     m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
                     partitionId);
-            CoreZK.removeSPIBalanceInfo(m_zk);
             CoreZK.createSPIBalanceInfo(m_zk, spiInfo);
 
             synchronized (m_executeTaskAdpater) {
@@ -2238,12 +2289,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     break;
                 }
             }
-            RealVoltDB db = (RealVoltDB)VoltDB.instance();
-            db.scheduleWork(new Runnable() {
-                @Override
-                public void run() {
-                    CoreZK.removeSPIBalanceIndicator(m_zk);
-                }
+            voltDB.scheduleWork(new Runnable() {
+                 public void run() { CoreZK.removeSPIBalanceIndicator(m_zk);}
             }, 5, 0, TimeUnit.SECONDS);
         }
     }

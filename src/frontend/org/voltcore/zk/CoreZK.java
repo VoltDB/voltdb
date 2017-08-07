@@ -220,15 +220,17 @@ public class CoreZK {
     }
 
     /**
-     * Creates a SPI migration blocker for the given rejoining host.
-     * This prevents other hosts from migrating SPI at the same time.
-     *
+     * Save balance spi information for error handling
      */
     public static boolean createSPIBalanceInfo(ZooKeeper zk, BalanceSpiInfo info) {
         try {
             zk.create(spi_balance_info, info.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (KeeperException e) {
             if (e.code() == KeeperException.Code.NODEEXISTS) {
+                try {
+                    zk.setData(spi_balance_info, info.toBytes(), -1);
+                } catch (KeeperException | InterruptedException | JSONException e1) {
+                }
                 return false;
             }
 
@@ -241,7 +243,7 @@ public class CoreZK {
     }
 
     /**
-     * get the id of the host which started spi balance
+     * get balance spi information
      */
     public static BalanceSpiInfo getSPIBalanceInfo(ZooKeeper zk) {
         try {
@@ -257,24 +259,13 @@ public class CoreZK {
     }
 
     /**
-     * Removes the spi balance blocker if the current rejoin blocker contains the given host ID.
-     * @return true if the blocker is removed successfully, false otherwise.
+     * Removes the spi balance info
      */
-    public static boolean removeSPIBalanceInfo(ZooKeeper zk) {
+    public static void removeSPIBalanceInfo(ZooKeeper zk) {
         try {
-            Stat stat = new Stat();
-            zk.getData(spi_balance_info, false, stat);
-            zk.delete(spi_balance_info, stat.getVersion());
-            return true;
-        } catch (KeeperException e) {
-            if (e.code() == KeeperException.Code.NONODE ||
-                e.code() == KeeperException.Code.BADVERSION) {
-                return true;
-            }
-        } catch (Exception e) {
-            return false;
+            zk.delete(spi_balance_info, -1);
+        } catch (KeeperException | InterruptedException e) {
         }
-        return false;
     }
 
     public static boolean createSPIBalanceIndicator(ZooKeeper zk, int hostId) {
@@ -313,25 +304,11 @@ public class CoreZK {
         return true;
     }
 
-    /**
-     * Removes the spi balance blocker if the current rejoin blocker contains the given host ID.
-     * @return true if the blocker is removed successfully, false otherwise.
-     */
-    public static boolean removeSPIBalanceIndicator(ZooKeeper zk)
+    public static void removeSPIBalanceIndicator(ZooKeeper zk)
     {
         try {
-            Stat stat = new Stat();
-            zk.getData(spi_balance_blocker, false, stat);
-            zk.delete(spi_balance_blocker, stat.getVersion());
-            return true;
-        } catch (KeeperException e) {
-            if (e.code() == KeeperException.Code.NONODE ||
-                e.code() == KeeperException.Code.BADVERSION) {
-                return true;
-            }
-        } catch (Exception e) {
-            return false;
+            zk.delete(spi_balance_blocker, -1);
+        } catch (KeeperException | InterruptedException e) {
         }
-        return false;
     }
 }

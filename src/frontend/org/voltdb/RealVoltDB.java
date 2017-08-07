@@ -49,6 +49,7 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -146,6 +147,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.planner.ActivePlanRepository;
@@ -1693,6 +1695,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void handleHostsFailedForBalanceSpi(Set<Integer> failedHosts) {
 
+        //stop balance spi service
+        m_messenger.send(CoreUtils.getHSIdFromHostAndSite(m_messenger.getHostId(),
+                        HostMessenger.CLIENT_INTERFACE_SITE_ID), new BalanceSPIMessage());
+
         BalanceSpiInfo spiInfo = CoreZK.getSPIBalanceInfo(m_messenger.getZK());
         if (spiInfo == null){
             return;
@@ -1705,6 +1711,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 spiInfo.getNewLeaderHostId() == m_messenger.getHostId()) {
             Initiator initiator = m_iv2Initiators.get(spiInfo.getPartitionId());
             ((SpInitiator)initiator).setBalanceSPIStatus(spiInfo.getOldLeaderHostId());
+            return;
         }
 
         int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(spiInfo.getPartitionId()));
@@ -2171,32 +2178,35 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
     }
 
-    // The latest joined host will take over partition leader migration.
-    private void scheduleBalanceSpiTask() {
+    private void startBalanceSpiTask() {
+
         final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
         if (disableSpiTask) {
             hostLog.info("Balance SPI is not scheduled.");
             return;
         }
-        //cleanup when a node start
+
+        if(!isClusterCompelte() || m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0) {
+            return;
+        }
+
+        //Balance spi service will be started up only after the last rejoining has finished
+        //So remove any blocker or persisted data on ZK.
         CoreZK.removeSPIBalanceInfo(m_messenger.getZK());
         CoreZK.removeSPIBalanceIndicator(m_messenger.getZK());
-        final int interval = Integer.parseInt(System.getProperty("SPI_BALANCE_INTERVAL", "10"));
-        final int delay = Integer.parseInt(System.getProperty("SPI_BALANCE_DELAY", "30"));
-        Runnable task = () -> {
-            if (m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0 || !isClusterCompelte()) {
-                return;
-            }
 
-            //if the host has less masters than expected minimal, skip the task
-            final int minMasters = (m_cartographer.getPartitionCount() / m_config.m_hostCount);
-            final int currentMasters = m_cartographer.getMasterCount(m_messenger.getHostId());
-            if (currentMasters <= minMasters) {
-                return;
+        BalanceSPIMessage msg = new BalanceSPIMessage();
+        msg.setStartTask();
+        final int minimalNumberOfLeaders = (m_cartographer.getPartitionCount() / m_config.m_hostCount);
+        Set<Integer> hosts = m_messenger.getLiveHostIds();
+        for (Iterator<Integer> it = hosts.iterator(); it.hasNext();) {
+            int hostId = it.next();
+            final int currentMasters = m_cartographer.getMasterCount(hostId);
+            if (currentMasters > minimalNumberOfLeaders) {
+                m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
+                        HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
             }
-            m_clientInterface.balanceSPI(m_config.m_hostCount);
-        };
-        m_periodicWorks.add(scheduleWork(task, delay, interval, TimeUnit.SECONDS));
+        }
     }
 
     private void startHealthMonitor() {
@@ -3899,7 +3909,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             //start balance spi task
-            scheduleBalanceSpiTask();
+            startBalanceSpiTask();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
@@ -4089,9 +4099,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             //Tell import processors that they can start ingesting data.
             ImportManager.instance().readyForData(m_catalogContext, m_messenger);
-
-            // start balance spi task
-            scheduleBalanceSpiTask();
 
              try {
                 if (m_adminListener != null) {
@@ -4664,5 +4671,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         hostLog.error(sb.toString());
+    }
+
+    public int getHostCount() {
+        return m_config.m_hostCount;
     }
 }
