@@ -861,7 +861,6 @@ public class Cartographer extends StatsSource
 
         //indicate that the cluster is balanced.
         Pair<Integer, Integer> pair = new Pair<Integer, Integer> (-1, -1);
-        System.out.println("###########################");
         return pair;
     }
 
