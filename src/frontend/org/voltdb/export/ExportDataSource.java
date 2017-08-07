@@ -423,7 +423,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushEndOfStream() {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
         m_isInCatalog = false;
-        poll();
+        pollImpl(m_pollFuture);
     }
 
     public void pushExportBuffer(
@@ -620,7 +620,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 //Let generation know to cleanup. Processor needs to do its own cleanup.
                 m_generation.onSourceDone(m_partitionId, m_signature);
-                forwardAckToOtherReplicas(Long.MIN_VALUE);
+                //TODO: handle ack.
+//                forwardAckToOtherReplicas(Long.MIN_VALUE);
                 return;
             }
             //Assemble a list of blocks to delete so that they can be deleted

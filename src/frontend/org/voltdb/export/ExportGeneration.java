@@ -380,6 +380,7 @@ public class ExportGeneration implements Generation {
         assert(m_dataSourcesByPartition.containsKey(partitionId));
         assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
         ExportDataSource source;
+        System.out.println("Done: " + signature + " Partition: "  + partitionId);
         synchronized(this) {
             Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
@@ -391,7 +392,7 @@ public class ExportGeneration implements Generation {
 
             source = sources.get(signature);
             if (source == null) {
-                exportLog.error("Could not find export data source for partition " + partitionId +
+                exportLog.error("Could not find export data source for signature " + partitionId +
                         " signature " + signature + ". The export cleanup stream is being discarded.");
                 return;
             }
@@ -503,6 +504,7 @@ public class ExportGeneration implements Generation {
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
         //        }
+        System.out.println("EOS pushed for: " + signature + " Partition: " + partitionId);
         assert(m_dataSourcesByPartition.containsKey(partitionId));
         assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
