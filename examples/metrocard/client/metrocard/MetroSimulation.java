@@ -223,10 +223,10 @@ public class MetroSimulation {
         public final long lastStopWait = 120000;
         public int curStation = 1;
         public long startTime;
-        public int lastState = 0; // 0 for arrival, 1 for departure
+        public volatile int lastState = 0; // 0 for arrival, 1 for departure
         public long arrivalTime;
         public long departureTime;
-        public int direction = 1;
+        public volatile int direction = 1;
         TrainActivityPublisher(String trainId, MetroCardConfig config, Properties producerConfig, long count) {
             super(producerConfig, count);
             m_trainId = trainId;
@@ -254,28 +254,30 @@ public class MetroSimulation {
                     .append(Integer.valueOf(lastState)).append(",")
                     .append(Long.valueOf(eventTime*1000));
             ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.trains, m_trainId, sb.toString());
-            curStation += direction*1;
             long wtime = stopTime;
-            if (curStation > 17) {
-                curStation = 17;
-                wtime += lastStopWait;
-                direction = -1;
-            } else if (curStation < 1) {
-                curStation = 1;
-                direction = 1;
-                wtime += lastStopWait;
+            if (lastState == 1) { // Only move station when departing.
+                curStation = curStation + direction;
+                if (curStation > 17) {
+                    curStation = 17;
+                    wtime += lastStopWait;
+                    direction = -1;
+                } else if (curStation <= 0) {
+                    curStation = 1;
+                    direction = 1;
+                    wtime += lastStopWait;
+                }
             }
             if (lastState == 0) { //Stopped
                 startTime = startTime + wtime;
             } else { //Moving and arriving
                 startTime = startTime + STATION_TO_NEXT_STATION.get(curStation) + wtime;
             }
-            if (lastState == 0) {
-                lastState = 1;
-            } else {
+            if (lastState == 1) {
                 lastState = 0;
+            } else {
+                lastState = 1;
             }
-            //System.out.println(sb.toString());
+            System.out.println(sb.toString());
             return rec;
         }
 
@@ -554,8 +556,9 @@ public class MetroSimulation {
 
         String trains[] = { "1", "2", "3", "4" };
         List<TrainActivityPublisher> trainPubs = new ArrayList<>();
+        long num_activity = config.count;
         for (String train : trains) {
-            TrainActivityPublisher redLine = new TrainActivityPublisher(train, config, producerConfig, config.count);
+            TrainActivityPublisher redLine = new TrainActivityPublisher(train, config, producerConfig, num_activity);
             redLine.start();
             trainPubs.add(redLine);
         }
