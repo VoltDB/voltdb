@@ -2944,13 +2944,13 @@ public class TestVoltCompiler extends TestCase {
         ArrayList<Feedback> fbs;
         String expectedError;
 
-//        fbs = checkInvalidDDL(
-//                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
-//                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-//                "CREATE PROCEDURE Foo AS BEGIN SELECT * FROM PKEY_INTEGER;\n"
-//                );
-//        expectedError = "Schema file ended mid-statement (no semicolon found)";
-//        assertTrue(isFeedbackPresent(expectedError, fbs));
+        fbs = checkInvalidDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS BEGIN SELECT * FROM PKEY_INTEGER;\n"
+                );
+        expectedError = "Schema file ended mid-statement (no semicolon found)";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
