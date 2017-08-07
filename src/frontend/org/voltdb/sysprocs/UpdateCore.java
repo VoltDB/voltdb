@@ -47,8 +47,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -280,7 +279,7 @@ public class UpdateCore extends VoltSystemProcedure {
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
             String catalogDiffCommands = (String)params.toArray()[0];
-            String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
+            String commands = CompressionService.decodeBase64AndDecompress(catalogDiffCommands);
             int expectedCatalogVersion = (Integer)params.toArray()[1];
             boolean requiresSnapshotIsolation = ((Byte) params.toArray()[2]) != 0;
             boolean requireCatalogDiffCmdsApplyToEE = ((Byte) params.toArray()[3]) != 0;
@@ -288,30 +287,21 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean requiresNewExportGeneration = ((Byte) params.toArray()[5]) != 0;
             long genId = (Long) params.toArray()[6];
 
-            CatalogAndDeployment catalogStuff = null;
-            try {
-                catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error reading catalog from zookeeper");
-            }
-
-            String replayInfo = m_runner.getTxnState().isForReplay() ? " (FOR REPLAY)" : "";
+            boolean isForReplay = m_runner.getTxnState().isForReplay();
 
             // if this is a new catalog, do the work to update
             if (context.getCatalogVersion() == expectedCatalogVersion) {
 
                 // update the global catalog if we get there first
                 CatalogContext catalogContext =
-                VoltDB.instance().catalogUpdate(
-                        commands,
-                        catalogStuff.catalogBytes,
-                        catalogStuff.getCatalogHash(),
-                        expectedCatalogVersion,
-                        genId,
-                        catalogStuff.deploymentBytes,
-                        requireCatalogDiffCmdsApplyToEE,
-                        hasSchemaChange,
-                        requiresNewExportGeneration);
+                        VoltDB.instance().catalogUpdate(
+                                commands,
+                                expectedCatalogVersion,
+                                genId,
+                                isForReplay,
+                                requireCatalogDiffCmdsApplyToEE,
+                                hasSchemaChange,
+                                requiresNewExportGeneration);
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
@@ -325,26 +315,13 @@ public class UpdateCore extends VoltSystemProcedure {
                 long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
                 context.updateCatalog(commands, catalogContext,
                         requiresSnapshotIsolation, uniqueId, spHandle,
+                        isForReplay,
                         requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
-
-                if (log.isDebugEnabled()) {
-                    byte[] debugDeploymentHash = CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes);
-                    log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
-                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                            Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
-                            Encoder.hexEncode(debugDeploymentHash).substring(0, 10),
-                            replayInfo));
-                }
             }
             // if seen before by this code, then check to see if this is a restart
-            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
-                    Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
-                    Arrays.equals(context.getDeploymentHash(),
-                            CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))) {
-                log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
-                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                            Encoder.hexEncode(catalogStuff.getCatalogHash()),
-                            Encoder.hexEncode(CatalogUtil.makeDeploymentHash(catalogStuff.deploymentBytes))));
+            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1)) {
+                log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update.",
+                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId())));
             }
             else {
                 VoltDB.crashLocalVoltDB("Invalid catalog update.  Expected version: " + expectedCatalogVersion +
@@ -440,15 +417,15 @@ public class UpdateCore extends VoltSystemProcedure {
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String catalogDiffCommands,
-                           byte[] catalogHash,
-                           byte[] catalogBytes,
                            int expectedCatalogVersion,
                            long genId,
-                           String deploymentString,
+                           byte[] catalogBytes,
+                           byte[] catalogHash,
+                           byte[] deploymentBytes,
+                           byte[] deploymentHash,
                            String[] tablesThatMustBeEmpty,
                            String[] reasonsForEmptyTables,
                            byte requiresSnapshotIsolation,
-                           byte[] deploymentHash,
                            byte requireCatalogDiffCmdsApplyToEE,
                            byte hasSchemaChange,
                            byte requiresNewExportGeneration)

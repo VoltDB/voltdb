@@ -977,7 +977,7 @@ public class TestJSONInterface extends TestCase {
             // Call @AdHoc with many parameters (more than 2)
             pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
             responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-            System.err.println(responseJSON);
+            System.out.println(responseJSON);
             assertTrue(responseJSON.contains("Too many actual arguments were passed for the parameters in the sql "
                     + "statement(s): (2 vs. 0)"));
 
