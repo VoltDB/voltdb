@@ -1,0 +1,11 @@
+
+create table identicalproct1 (
+  identicalproccol1 integer not null primary key
+);
+Command succeeded.
+
+create procedure identicalprocproc1 as select count(*) from identicalproct1;
+Command succeeded.
+
+create view identicalprocview1 (identicalproccol1) as select count(*) from identicalproct1 where identicalproccol1 < 100;
+Command succeeded.

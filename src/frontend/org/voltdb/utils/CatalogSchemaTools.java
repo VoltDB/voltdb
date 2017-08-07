@@ -507,24 +507,11 @@ public abstract class CatalogSchemaTools {
     }
 
     /**
-     * Convert a List of class names into a string containing equivalent IMPORT CLASS DDL statements.
-     * @param sb The ddl being built.
-     * @param importLines The import lines to add.
-     */
-    public static void toSchema(StringBuilder sb, Set<String> importLines)
-    {
-        for (String importLine : importLines) {
-            sb.append(importLine);
-        }
-    }
-
-    /**
      * Convert a catalog into a string containing all DDL statements.
      * @param catalog
-     * @param importLines A set of importLines, should not be mutated.
      * @return String of DDL statements.
      */
-    public static String toSchema(Catalog catalog, Set<String> importLines)
+    public static String toSchema(Catalog catalog)
     {
         StringBuilder sb = new StringBuilder();
 
@@ -548,8 +535,6 @@ public abstract class CatalogSchemaTools {
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
-                toSchema(sb, importLines);
-
                 for (Group grp : db.getGroups()) {
                     toSchema(sb, grp);
                 }

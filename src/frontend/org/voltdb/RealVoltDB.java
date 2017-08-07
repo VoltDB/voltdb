@@ -58,7 +58,10 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -105,6 +108,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -2481,15 +2485,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(result);
             }
 
-            m_catalogContext = new CatalogContext(
-                            0, //timestamp
-                            catalog,
-                            new DbSettings(m_clusterSettings, m_nodeSettings),
-                            new byte[] {},
-                            null,
-                            deploymentBytes,
-                            0,
-                            m_messenger);
+            m_catalogContext = new CatalogContext(catalog,
+                                                  new DbSettings(m_clusterSettings, m_nodeSettings),
+                                                  0, //timestamp
+                                                  0,
+                                                  new byte[] {},
+                                                  null,
+                                                  deploymentBytes,
+                                                  m_messenger);
 
             return ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled()));
         } catch (Exception e) {
@@ -3322,23 +3325,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         configInfoDir.mkdirs();
 
         InMemoryJarfile.writeToFile(catalogBytes,
-                                    new VoltFile(configInfoDir.getPath(), InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
+                                    new VoltFile(configInfoDir.getPath(),
+                                                 InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
     }
 
     // Verify the integrity of the newly updated catalog stored on the ZooKeeper
     @Override
-    public String checkLoadingClasses(byte[] catalogBytes) {
+    public String verifyJarAndPrepareProcRunners(byte[] catalogBytes, String diffCommands,
+            byte[] catalogBytesHash, byte[] deploymentBytes) {
+        ImmutableMap.Builder<String, Class<?>> classesMap = ImmutableMap.<String, Class<?>>builder();
+        InMemoryJarfile newCatalogJar;
+        JarLoader jarLoader;
+        String errorMsg;
         try {
-            InMemoryJarfile testjar = new InMemoryJarfile(catalogBytes);
-            JarLoader testjarloader = testjar.getLoader();
-            for (String classname : testjarloader.getClassNames()) {
+            newCatalogJar = new InMemoryJarfile(catalogBytes);
+            jarLoader = newCatalogJar.getLoader();
+            for (String classname : jarLoader.getClassNames()) {
                 try {
-                    CatalogContext.classForProcedureOrUDF(classname, testjarloader);
+                    Class<?> procCls = CatalogContext.classForProcedureOrUDF(classname, jarLoader);
+                    classesMap.put(classname, procCls);
                 }
                 // LinkageError catches most of the various class loading errors we'd
                 // care about here.
                 catch (UnsupportedClassVersionError e) {
-                    String msg = "Cannot load classes compiled with a higher version of Java than currently" +
+                    errorMsg = "Cannot load classes compiled with a higher version of Java than currently" +
                                  " in use. Class " + classname + " was compiled with ";
 
                     Integer major = 0;
@@ -3350,27 +3360,78 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
 
                     if (VerifyCatalogAndWriteJar.SupportedJavaVersionMap.containsKey(major)) {
-                        msg = msg.concat(VerifyCatalogAndWriteJar.SupportedJavaVersionMap.get(major) + ", current runtime version is " +
+                        errorMsg = errorMsg.concat(VerifyCatalogAndWriteJar.SupportedJavaVersionMap.get(major) + ", current runtime version is " +
                                          System.getProperty("java.version") + ".");
                     } else {
-                        msg = msg.concat("an incompatable Java version.");
+                        errorMsg = errorMsg.concat("an incompatable Java version.");
                     }
-                    hostLog.error(msg);
-                    return msg;
+                    hostLog.error(errorMsg);
+                    return errorMsg;
                 }
                 catch (LinkageError | ClassNotFoundException e) {
                     String cause = e.getMessage();
                     if (cause == null && e.getCause() != null) {
                         cause = e.getCause().getMessage();
                     }
-                    String msg = "Error loading class \'" + classname + "\': " +
+                    errorMsg = "Error loading class \'" + classname + "\': " +
                         e.getClass().getCanonicalName() + " for " + cause;
-                    hostLog.warn(msg);
-                    return msg;
+                    hostLog.warn(errorMsg);
+                    return errorMsg;
                 }
             }
         } catch (Exception e) {
+            // catch all exceptions, anything may fail now can be safely rolled back
             return e.getMessage();
+        }
+
+        CatalogContext ctx = VoltDB.instance().getCatalogContext();
+        Catalog newCatalog = ctx.getNewCatalog(diffCommands);
+
+        Database db = newCatalog.getClusters().get("cluster").getDatabases().get("database");
+        CatalogMap<Procedure> catalogProcedures = db.getProcedures();
+
+        ExecutorService es = Executors.newSingleThreadScheduledExecutor();
+
+        SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
+        List<Long> immutableSites = siteTracker.getSitesForHost(m_messenger.getHostId());
+        ArrayList<Long> sites = new ArrayList<>(immutableSites);
+        sites.add((long) immutableSites.size());
+
+        ctx.m_preparedCatalogInfo = new CatalogContext.CatalogInfo(catalogBytes, catalogBytesHash, deploymentBytes);
+        ctx.m_preparedCatalogInfo.m_catalog = newCatalog;
+        ctx.m_preparedCatalogInfo.m_userProcsMap = new ConcurrentHashMap<>();
+
+        Map<Long, Future<String>> resultFutureMap = new HashMap<>();
+        for (Long site : sites) {
+            Future<String> ft = es.submit(() -> {
+                try {
+                    ImmutableMap<String, ProcedureRunner> userProcs =
+                        LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
+                                                                    classesMap.build(), null);
+                    ctx.m_preparedCatalogInfo.m_userProcsMap.put(site, userProcs);
+                } catch (Exception e) {
+                    String msg = "error setting up user procedure runners using NT-procedure pattern: "
+                                + e.getMessage();
+                    hostLog.error(msg);
+                    return msg;
+                }
+                return null;
+            });
+            resultFutureMap.put(site, ft);
+        }
+
+        for (Future<String> ft : resultFutureMap.values()) {
+            try {
+                errorMsg = ft.get();
+                if (errorMsg == null)
+                    // this means there are no errors executing the this catalog preparation job
+                    continue;
+            } catch (InterruptedException | ExecutionException e) {
+                return "Exception throw waiting for procedure runner creation result: " + e.getMessage();
+            }
+            // catalog preparation job has errors
+            hostLog.error(errorMsg);
+            return errorMsg;
         }
 
         return null;
@@ -3393,11 +3454,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public CatalogContext catalogUpdate(
             String diffCommands,
-            byte[] newCatalogBytes,
-            byte[] catalogBytesHash,
             int expectedCatalogVersion,
             long genId,
-            byte[] deploymentBytes,
+            boolean isForReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration)
@@ -3408,36 +3467,53 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 m_statusTracker.setNodeState(NodeState.UPDATING);
                 if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
-                    if (m_catalogContext.catalogVersion > expectedCatalogVersion);
+                    if (m_catalogContext.catalogVersion < expectedCatalogVersion) {
+                        throw new RuntimeException("Trying to update main catalog context with diff " +
+                                "commands generated for an out-of date catalog. Expected catalog version: " +
+                                expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
+                    };
+                    assert(m_catalogContext.catalogVersion == expectedCatalogVersion + 1);
                     return m_catalogContext;
                 }
 
-                // get old debugging info
-                SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
-                byte[] oldDeployHash = m_catalogContext.deploymentHash;
+                byte[] newCatalogBytes = null;
+                byte[] catalogBytesHash = null;
+                byte[] deploymentBytes = null;
+                if (isForReplay) {
+                    try {
+                        CatalogAndDeployment catalogStuff =
+                                CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+                        newCatalogBytes = catalogStuff.catalogBytes;
+                        catalogBytesHash = catalogStuff.catalogHash;
+                        deploymentBytes = catalogStuff.deploymentBytes;
+                    } catch (Exception e) {
+                        // impossible to hit, log for debug purpose
+                        hostLog.error("Error reading catalog from zookeeper for node: " + VoltZK.catalogbytes);
+                        throw new RuntimeException("Error reading catalog from zookeeper");
+                    }
+                } else {
+                    CatalogContext ctx = VoltDB.instance().getCatalogContext();
+                    if (ctx.m_preparedCatalogInfo == null) {
+                        // impossible to hit, log for debug purpose
+                        throw new RuntimeException("Unexpected: @UpdateCore's prepared catalog is null during non-replay case.");
+                    }
+                    newCatalogBytes = ctx.m_preparedCatalogInfo.m_catalogBytes;
+                    catalogBytesHash = ctx.m_preparedCatalogInfo.m_catalogHash;
+                    deploymentBytes = ctx.m_preparedCatalogInfo.m_deploymentBytes;
+                }
+
+                byte[] oldDeployHash = m_catalogContext.getCatalogHash();
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
                 // 0. A new catalog! Update the global context and the context tracker
-                m_catalogContext =
-                    m_catalogContext.update(
-                            genId,
-                            newCatalogBytes,
-                            catalogBytesHash,
-                            diffCommands,
-                            true,
-                            deploymentBytes,
-                            m_messenger,
-                            hasSchemaChange);
-
-                // log the stuff that's changed in this new catalog update
-                SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
-                for (Entry<String, String> e : newDbgMap.entrySet()) {
-                    // skip log lines that are unchanged
-                    if (oldDbgMap.containsKey(e.getKey()) && oldDbgMap.get(e.getKey()).equals(e.getValue())) {
-                        continue;
-                    }
-                    hostLog.info(e.getValue());
-                }
+                m_catalogContext = m_catalogContext.update(isForReplay,
+                                                           diffCommands,
+                                                           genId,
+                                                           newCatalogBytes,
+                                                           catalogBytesHash,
+                                                           deploymentBytes,
+                                                           m_messenger,
+                                                           hasSchemaChange);
 
                 //Construct the list of partitions and sites because it simply doesn't exist anymore
                 SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
@@ -3448,7 +3524,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     Integer partition = siteTracker.getPartitionForSite(site);
                     partitions.add(partition);
                 }
-
 
                 // 1. update the export manager.
                 ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration, partitions);
@@ -3490,11 +3565,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // this after flushing the stats -- this will re-register
                 // the MPI statistics.
                 if (m_MPI != null) {
-                    m_MPI.updateCatalog(diffCommands, m_catalogContext,
+                    m_MPI.updateCatalog(diffCommands, m_catalogContext, isForReplay,
                             requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
                 }
 
-                // Update catalog for import processor this should be just/stop start and updat partitions.
+                // Update catalog for import processor this should be just/stop start and update partitions.
                 ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
                 // 6. Perform updates required by the DR subsystem
@@ -3529,7 +3604,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 new ConfigLogging().logCatalogAndDeployment(CatalogJarWriteMode.CATALOG_UPDATE);
 
                 // log system setting information if the deployment config has changed
-                if (!Arrays.equals(oldDeployHash, m_catalogContext.deploymentHash)) {
+                if (!Arrays.equals(oldDeployHash, m_catalogContext.getDeploymentHash())) {
                     logSystemSettingFromCatalogContext();
                 }
                 //Before starting resource monitor update any Snmp configuration changes.

@@ -85,7 +85,6 @@ import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
 import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Compiles a project XML file and some metadata into a Jarfile
@@ -137,7 +136,6 @@ public class VoltCompiler {
     private String m_currentFilename = NO_FILENAME;
     Map<String, String> m_ddlFilePaths = new HashMap<>();
     String[] m_addedClasses = null;
-    Set<String> m_importLines = null;
 
     // generated html text for catalog report
     String m_reportPath = null;
@@ -714,7 +712,7 @@ public class VoltCompiler {
         assert(database != null);
 
         // Build DDL from Catalog Data
-        String ddlWithBatchSupport = CatalogSchemaTools.toSchema(catalog, m_importLines);
+        String ddlWithBatchSupport = CatalogSchemaTools.toSchema(catalog);
         m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
 
         // generate the catalog report and write it to disk
@@ -1058,9 +1056,6 @@ public class VoltCompiler {
 
         // add extra classes from the DDL
         m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
-        // Also, grab the IMPORT CLASS lines so we can add them to the
-        // generated DDL
-        m_importLines = ImmutableSet.copyOf(voltDdlTracker.m_importLines);
         addExtraClasses(jarOutput);
 
         compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
