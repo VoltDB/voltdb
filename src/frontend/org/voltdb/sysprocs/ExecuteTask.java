@@ -41,6 +41,8 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.utils.VoltTableUtil;
 
+// ExecuteTask is now restartable system Procedure
+// make sure each sub task is either idempotent or can rollback (i.e. generateDREvent)
 public class ExecuteTask extends VoltSystemProcedure {
 
     private static final int DEP_executeTask = (int) SysProcFragmentId.PF_executeTask | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -107,9 +109,10 @@ public class ExecuteTask extends VoltSystemProcedure {
                 int drVersion = buffer.getInt();
                 int createStartStream = buffer.getInt();
                 if (createStartStream > 0) {
+                    long txnId = m_runner.getTxnState().txnId;
                     long uniqueId = m_runner.getUniqueId();
                     long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
-                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, spHandle, uniqueId);
+                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, txnId, spHandle, uniqueId);
                 } else {
                     context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
                 }
@@ -197,10 +200,11 @@ public class ExecuteTask extends VoltSystemProcedure {
                 }
                 if (producer.isActive()) {
                     // Only generate the event if we are generating binary log buffers
+                    long txnId = m_runner.getTxnState().txnId;
                     long uniqueId = m_runner.getUniqueId();
                     long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
                     context.getSiteProcedureConnection().generateElasticChangeEvents(oldPartitionCnt,
-                            newPartitionCnt, spHandle, uniqueId);
+                            newPartitionCnt, txnId, spHandle, uniqueId);
                 }
                 result.addRow(STATUS_OK);
                 break;
