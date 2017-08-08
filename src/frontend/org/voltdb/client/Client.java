@@ -315,6 +315,11 @@ public interface Client {
     public void close() throws InterruptedException;
 
     /**
+     * <p>Notify this Client that the connection is restored and it should resume to work.</p>
+     */
+    public void resume();
+
+    /**
      * <p>Blocks the current thread until there is no more backpressure or there are no more connections
      * to the database</p>
      *
@@ -394,9 +399,9 @@ public interface Client {
     public List<InetSocketAddress> getConnectedHostList();
 
     /**
-     * <p>Tell whether the client has turned on the auto-reconnect feature. If this feature
-     * is on, the client would pause rather than stop when all connections to the server
-     * are lost. After connections have been restored, the client would resume its work.
+     * <p>Tell whether Client has turned on the auto-reconnect feature. If it is on,
+     * Client would pause instead of stop when all connections to the server are lost,
+     * and would resume after the connection is restored.
      * @return true if the client wants to use auto-reconnect feature.</p>
      */
     public boolean isAutoReconnectEnabled();

@@ -131,38 +131,6 @@ public class PerPartitionTable {
         }
     }
 
-    class ReinsertCallback implements ProcedureCallback {
-        final VoltBulkLoaderRow m_reinsertRow;
-
-        ReinsertCallback(VoltBulkLoaderRow row) {
-            m_reinsertRow = row;
-        }
-
-        @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-            if (response.getStatus() == ClientResponse.CONNECTION_LOST && m_autoReconnect) {
-                m_es.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            reinsertFailed(Arrays.asList(m_reinsertRow));
-                        } catch (Exception e) {
-                            loaderLog.error("Failed to re-insert failed batch", e);
-                        }
-                    }
-                });
-                return;
-            }
-            else if (response.getStatus() != ClientResponse.SUCCESS) {
-                m_reinsertRow.m_loader.m_notificationCallBack.failureCallback(m_reinsertRow.m_rowHandle, m_reinsertRow.m_rowData, response);
-            }
-
-            m_reinsertRow.m_loader.m_loaderCompletedCnt.incrementAndGet();
-            m_reinsertRow.m_loader.m_outstandingRowCount.decrementAndGet();
-        }
-
-    }
-
     PerPartitionTable(ClientImpl clientImpl, String tableName, int partitionId, boolean isMP,
             VoltBulkLoader firstLoader, int minBatchTriggerSize, BulkLoaderSuccessCallback successCallback) {
         m_clientImpl = clientImpl;
@@ -262,8 +230,32 @@ public class PerPartitionTable {
                 assert false: "Type conversion exception" + ex.getMessage();
                 continue;
             }
-            //one insert at a time callback
-            ProcedureCallback callback = new ReinsertCallback(row);
+
+            ProcedureCallback callback = new ProcedureCallback() {
+                @Override
+                public void clientCallback(ClientResponse response) throws Exception {
+                    //one insert at a time callback
+                    if (response.getStatus() == ClientResponse.CONNECTION_LOST && m_autoReconnect) {
+                        m_es.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    reinsertFailed(Arrays.asList(row));
+                                } catch (Exception e) {
+                                    loaderLog.error("Failed to re-insert failed batch", e);
+                                }
+                            }
+                        });
+                        return;
+                    }
+                    else if (response.getStatus() != ClientResponse.SUCCESS) {
+                        row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
+                    }
+
+                    row.m_loader.m_loaderCompletedCnt.incrementAndGet();
+                    row.m_loader.m_outstandingRowCount.decrementAndGet();
+                }
+            };
             loadTable(callback, tmpTable);
         }
     }
@@ -314,9 +306,9 @@ public class PerPartitionTable {
                     // Table loaded successfully. So move on
                     break;
                 } catch (IOException e) {
-                   synchronized (m_clientImpl) {
+                   synchronized (this) {
                        // If the connection is lost, suspend and wait for reconnect listener's notification
-                       m_clientImpl.wait();
+                       this.wait();
                    }
                 }
             }
