@@ -601,7 +601,8 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
     switch (type) {
     case CATALOG_UPDATE:
     case DR_STREAM_END:
-    case DR_STREAM_START: {
+    case DR_STREAM_START:
+    case DR_ELASTIC_REBALANCE: {
         writeEventData(type, payloads);
         m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
         if (UniqueId::isMpUniqueId(uniqueId)) {
