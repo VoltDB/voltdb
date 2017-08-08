@@ -477,7 +477,6 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
     public static Client getClient(ClientConfig config, String[] servers,
             int port) throws Exception {
         config.setTopologyChangeAware(true);
-        config.setReconnectOnConnectionLoss(!m_config.stopondisconnect);
         final Client client = ClientFactory.createClient(config);
 
         for (String server : servers) {

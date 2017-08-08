@@ -453,7 +453,6 @@ public class KafkaLoader10 {
             clientConfig.enableSSL();
         }
         clientConfig.setProcedureCallTimeout(0);
-        clientConfig.setReconnectOnConnectionLoss(!m_cliOptions.stopondisconnect);
         m_client = getClient(clientConfig, serverlist);
 
         if (m_cliOptions.useSuppliedProcedure) {
