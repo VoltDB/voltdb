@@ -38,6 +38,7 @@ import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 /**
@@ -68,7 +69,7 @@ public class PlannerTool {
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb();
         String binDDL = m_database.getSchema();
-        String ddl = Encoder.decodeBase64AndDecompress(binDDL);
+        String ddl = CompressionService.decodeBase64AndDecompress(binDDL);
         String[] commands = ddl.split("\n");
         for (String command : commands) {
             String decoded_cmd = Encoder.hexDecodeToString(command);

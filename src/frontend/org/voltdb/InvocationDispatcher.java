@@ -129,7 +129,6 @@ public final class InvocationDispatcher {
         Mailbox m_mailbox;
         ReplicationRole m_replicationRole;
         SnapshotDaemon m_snapshotDaemon;
-        long m_plannerSiteId;
         long m_siteId;
 
         public Builder clientInterface(ClientInterface clientInterface) {
@@ -162,11 +161,6 @@ public final class InvocationDispatcher {
             return this;
         }
 
-        public Builder plannerSiteId(long plannerSiteId) {
-            m_plannerSiteId = plannerSiteId;
-            return this;
-        }
-
         public Builder snapshotDaemon(SnapshotDaemon snapshotDaemon) {
             m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
             return this;
@@ -186,7 +180,6 @@ public final class InvocationDispatcher {
                     m_mailbox,
                     m_snapshotDaemon,
                     m_replicationRole,
-                    m_plannerSiteId,
                     m_siteId
                     );
         }
@@ -204,7 +197,6 @@ public final class InvocationDispatcher {
             Mailbox mailbox,
             SnapshotDaemon snapshotDaemon,
             ReplicationRole replicationRole,
-            long plannerSiteId,
             long siteId)
     {
         m_siteId = siteId;
@@ -238,6 +230,10 @@ public final class InvocationDispatcher {
      */
     void notifyNTProcedureServiceOfCatalogUpdate() {
         m_NTProcedureService.update(m_catalogContext.get());
+    }
+
+    LightweightNTClientResponseAdapter getInternelAdapterNT () {
+        return m_NTProcedureService.m_internalNTClientAdapter;
     }
 
     /*

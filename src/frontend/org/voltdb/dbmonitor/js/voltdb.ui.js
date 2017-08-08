@@ -207,8 +207,6 @@ $(document).ready(function () {
             $(".showhideImporterIcon").addClass('collapsed');
         }
         $('#mainImporterGraphBlock').slideToggle();
-
-        //MonitorGraphUI.UpdateCharts();
     });
 
 
@@ -683,7 +681,7 @@ var loadPage = function (serverName, portid) {
     $("#showHideDrBlock").addClass('expanded');
     $("#showHideCLPBlock").removeClass('collapsed');
     $("#showHideCLPBlock").addClass('expanded');
-
+    loadAnalysisPage();
     var userName = VoltDbUI.getCookie('username') != undefined ? VoltDbUI.getCookie('username') : "";
     var password = VoltDbUI.getCookie('password') != undefined ? VoltDbUI.getCookie('password') : "";
 
@@ -750,6 +748,9 @@ var loadPage = function (serverName, portid) {
                 }
             } else if (curTab == NavigationTabs.DR){
                 //Do nothing
+            }  else if (curTab == NavigationTabs.Analysis) {
+                $("#overlay").show();
+                setTimeout(function () { $("#navAnalysis > a").trigger("click"); }, 100);
             } else{
                 setTimeout(function () { $("#navDbmonitor > a").trigger("click"); }, 100);
             }
@@ -814,10 +815,6 @@ var loadPage = function (serverName, portid) {
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
 
-//    var currentProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-//    var priorProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-//    var currentTableAction = VoltDbUI.ACTION_STATES.NONE;
-//    var priorTableAction = VoltDbUI.ACTION_STATES.NONE;
     VoltDbUI.CurrentTab = getCurrentTab();
 
     RefreshServerUI();
@@ -1252,7 +1249,6 @@ var loadPage = function (serverName, portid) {
                                                     var userPreference = getUserPreferences();
                                                     VoltDbUI.isDRInfoRequired = true;
                                                     VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
-                                                    // showHideLastLineClass(true);
                                                     $("#divDrWrapperAdmin").show();
                                                     if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
                                                         if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
@@ -2384,6 +2380,299 @@ var loadPage = function (serverName, portid) {
         }
     });
 
+    $("#showAnalysisDetails").popup({
+        open: function (event, ui, ele)  {
+
+            var procedureName = $("#hidProcedureName").html();
+            $("#procedureName").html(procedureName);
+            //filter specific procedure calls from list of datas
+            var procDetails = {};
+            var finalDetails = [];
+            var statement = '';
+            var sum=0;
+            var j = 0;
+            var count = 0;
+            var isMultiple= false;
+            var i =0;
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                 $("#spanAnalysisLegend").hide();
+                 $("#execTimeLegend").hide();
+            }
+            getTooltipValues(procedureName);
+            VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+                var newStatement = '';
+                var latValue;
+                if(item.PROCEDURE == procedureName ){
+                    if (statement == item.STATEMENT){
+                        sum += item.value;
+                        isMultiple = true;
+                    }
+                    else{
+                        i++;
+                        isMultiple = false;
+                        sum = item.value;
+                    }
+
+                    if(isMultiple){
+                        count = calculateStatementCount(VoltDbAnalysis.latencyDetailValue, item.STATEMENT)
+                        procDetails[item.STATEMENT] = sum/count;
+                    }
+                    else{
+                        procDetails[item.STATEMENT] = sum;
+                    }
+                    statement = item.STATEMENT;
+                }
+            });
+            if($.isEmptyObject(procDetails)){
+                $("#spanAnalysisLegend").hide();
+                $("#execTimeLegend").hide();
+            }
+            else{
+                $("#spanAnalysisLegend").show();
+                $("#execTimeLegend").show();
+            }
+
+            for (var key in procDetails){
+                finalDetails.push({"label": key, "value": procDetails[key]})
+            }
+            finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
+            MonitorGraphUI.RefreshLatencyDetailGraph(finalDetails);
+        }
+    });
+
+    $("#showAnalysisFreqDetails").popup({
+        open: function (event, ui, ele)  {
+            var statement = '';
+            var totalInvocations=0;
+            var procedureName = $("#hidProcedureName").html();
+            $(".procedureName").html(procedureName);
+             //filter specific procedure calls from list of datas
+            var finalDetails = [];
+            var freqDetails = {};
+            var i =0;
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                $("#spanFreqLegend").hide();
+                $("#freqLegend").hide();
+            }
+
+            getTooltipValues(procedureName);
+
+            VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+                var newStatement = '';
+                //order items w.r.to latency
+                var latValue;
+                if(item.PROCEDURE == procedureName ){
+                    newStatement = item.STATEMENT;
+                     if(item.type == "Single Partitioned"){
+                        if (newStatement == statement){
+
+                            totalInvocations += item.INVOCATION;
+                        }
+                        else{
+                            i++;
+                            totalInvocations = item.INVOCATION;
+                        }
+                     }
+                     else{
+                        totalInvocations = item.INVOCATION;
+                     }
+
+                    freqDetails[item.STATEMENT] = totalInvocations;
+
+                    statement = newStatement;
+
+                }
+            });
+
+            if($.isEmptyObject(freqDetails)){
+                $("#spanFreqLegend").hide();
+                $("#freqLegend").hide();
+            }
+            else{
+                $("#spanFreqLegend").show();
+                $("#freqLegend").show();
+            }
+
+            for (var key in freqDetails){
+                finalDetails.push({"label": key,"value": freqDetails[key]})
+            }
+            finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
+            MonitorGraphUI.RefreshFrequencyDetailGraph(finalDetails);
+        }
+    });
+
+    $("#showAnalysisCombinedDetails").popup({
+        open: function (event, ui, ele)  {
+            var procedureName = $("#hidProcedureName").html();
+            $(".procedureName").html(procedureName);
+             //filter specific procedure calls from list of datas
+            var count = 0;
+            var combinedDetails = {};
+            var combinedWeight = 0;
+            var statement = '';
+            var finalDetails = [];
+            var sum = 0;
+
+            if(VoltDbAnalysis.latencyDetailValue.length == 0){
+                 $("#spanCombinedLegend").hide();
+                 $("#totalProcTimeLegend").hide();
+            }
+
+            getTooltipValues(procedureName);
+
+            for (var key in VoltDbAnalysis.combinedDetail){
+                var obj = VoltDbAnalysis.combinedDetail[key];
+                if(key == procedureName){
+                    //Calculate sumOfEachProcedure
+                    obj.forEach(function(subItems){
+                        if(subItems.STATEMENT == statement){
+                            if(subItems.TYPE == "Single Partitioned"){
+                                sum += subItems.AVG * subItems.INVOCATIONS
+                            }
+                            else{ //For Multi partitioned
+                                sum += subItems.AVG
+                            }
+                        }
+                        else{
+                            if(subItems.TYPE == "Single Partitioned"){
+                                sum = subItems.AVG * subItems.INVOCATIONS
+                            }
+                            else{
+                                sum += subItems.AVG
+                            }
+
+                        }
+
+                        statement = subItems.STATEMENT;
+
+                        if(subItems.TYPE == "Single Partitioned"){
+                            combinedDetails[subItems.STATEMENT]= sum;
+                        }
+                        else{
+                            count = objectLength(obj, statement);
+                            combinedWeight = (sum/count) * subItems.INVOCATIONS
+                            combinedDetails[subItems.STATEMENT]= combinedWeight;
+                        }
+                    })
+
+                    if($.isEmptyObject(combinedDetails)){
+                        $("#spanCombinedLegend").hide();
+                        $("#totalProcTimeLegend").hide();
+                    }
+                    else{
+                        $("#spanCombinedLegend").show();
+                        $("#totalProcTimeLegend").show();
+                    }
+                }
+            }
+            for (var key in combinedDetails){
+                finalDetails.push({"label": key,"value": combinedDetails[key]/1000})
+            }
+            finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
+            MonitorGraphUI.RefreshCombinedDetailGraph(finalDetails);
+        }
+    });
+
+    function getTooltipValues(procedureName){
+        VoltDbUI.executionDetails = {};
+        var statement = '';
+
+        VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
+            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
+
+            if(item.PROCEDURE == procedureName ){
+                if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
+                    VoltDbUI.executionDetails[item.STATEMENT]={};
+                }
+
+                if (statement == item.STATEMENT){
+                    if(item.MIN < smallest){
+                        smallest = item.MIN;
+                    }
+
+                    if(item.MAX > largest){
+                       largest = item.MAX;
+                    }
+
+                    if(item.type == "Single Partitioned"){
+                        VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] += item.INVOCATION;
+                    }
+                    else{
+                        VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = item.INVOCATION;
+                    }
+
+                    VoltDbUI.executionDetails[item.STATEMENT]["MIN"] = smallest;
+                    VoltDbUI.executionDetails[item.STATEMENT]["MAX"] = largest;
+                }
+                else{
+                    VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] = item.INVOCATION;
+                }
+            }
+            statement = item.STATEMENT;
+        });
+    }
+
+    function objectLength(obj, statement) {
+      var result = 0;
+      for(var prop in obj) {
+        if (obj.hasOwnProperty(prop)) {
+
+        // or Object.prototype.hasOwnProperty.call(obj, prop)
+          if(obj[prop]["STATEMENT"] == statement){
+            result++;
+          }
+
+        }
+      }
+      return result;
+    }
+
+    function calculateStatementCount(arr, statement){
+        var count = 0;
+        var j = 0;
+        while(j < arr.length){
+            if (arr[j]['STATEMENT'] == statement) count += 1;
+                j += 1;
+        }
+        return count;
+    }
+
+    $("#btnThreshold").popup({
+        open: function (event, ui, ele) {
+            $("#averageExecutionTime").val(VoltDbUI.getFromLocalStorage("averageExecutionTime"))
+            $("#trShowHideSysProcedures").remove();
+            $("#tblAnalysisSettings").append('<tr id="trShowHideSysProcedures">' +
+                                                '<td>Show System Procedures</td>' +
+                                                '<td style="text-align:right"><input type="checkbox" value="" id="chkSystemProcedure"></td>' +
+                                                '<td></td>' +
+                                            '</tr>');
+            $('#chkSystemProcedure').iCheck({
+                checkboxClass: 'icheckbox_square-aero customCheckbox',
+                increaseArea: '20%'
+            });
+            $("#chkSystemProcedure").iCheck(VoltDbUI.getFromLocalStorage("showHideSysProcedures") ? 'check' : 'uncheck');
+        },
+       afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnSaveThreshold").unbind("click");
+            $("#btnSaveThreshold").on("click", function () {
+                saveInLocalStorage("averageExecutionTime", $("#averageExecutionTime").val())
+                saveInLocalStorage("showHideSysProcedures", $("#chkSystemProcedure").is(':checked'))
+                $("#btnAnalyzeNow").trigger("click");
+                //Close the popup
+                popup.close();
+            });
+
+            $("#btnCancelThreshold").unbind("click");
+            $("#btnCancelThreshold").on("click", function () {
+                popup.close();
+            });
+        }
+
+    });
+
+
     VoltDbUI.refreshConnectionTime('20000');
 };
 
@@ -2401,7 +2690,6 @@ var configureUserPreferences = function () {
     userPreference["partitionIdleTime"] = {};
     userPreference["storedProcedures "] = {};
     userPreference["databaseTables "] = {};
-
     $('#showMyPreference').popup({
         open: function (event, ui, ele) {
             userPreference = getUserPreferences();
@@ -2487,7 +2775,8 @@ var NavigationTabs = {
     Schema: 3,
     SQLQuery: 4,
     DR: 5,
-    Importer: 6
+    Importer: 6,
+    Analysis: 7
 };
 
 var getCurrentTab = function () {
@@ -2511,6 +2800,10 @@ var getCurrentTab = function () {
     } else if (activeLinkId ==  "navImporter"){
         $(".nvtooltip").show();
         return NavigationTabs.Importer;
+    } else if(activeLinkId == "navAnalysis"){
+        VoltDbAnalysis.refreshChart();
+        $(".nvtooltip").show();
+        return NavigationTabs.Analysis;
     }
     $(".nvtooltip").show();
     return NavigationTabs.DBMonitor;
@@ -2756,6 +3049,7 @@ var adjustImporterGraphSpacing = function() {
         this.gutterInstanceHor = null;
         this.gutterInstanceVer = null;
         this.vars = {};
+        this.executionDetails = {};
         //load schema tab and table and views tabs inside sql query
         this.refreshSqlAndSchemaTab = function () {
             this.loadSchemaTab();
