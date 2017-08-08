@@ -787,6 +787,11 @@ public class TestVoltCompiler extends TestCase {
                   + "AS begin select * from books where cash = ?;"
                   + "select * from books; end");
 
+        // single statement proc with CASE
+        tester.runtest("create procedure foocase as "
+                + "select title, CASE WHEN cash > 100 THEN 'expensive' ELSE 'cheap' END "
+                + "from books");
+
         // multi statement proc with CASE
         tester.runtest("create procedure multifoo "
                   + "AS BEGIN select * from books where cash = ?; "
@@ -810,6 +815,14 @@ public class TestVoltCompiler extends TestCase {
                   + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook",
                     "Only one PARTITION clause is allowed for CREATE PROCEDURE");
 
+        tester.runtest("create procedure mutlitpart "
+                + "partition on table books column cash "
+                + "partition on table books column cash "
+                + "as begin "
+                + "select * from books where cash = ?; "
+                + "select * from books; end",
+                  "Only one PARTITION clause is allowed for CREATE PROCEDURE");
+
         // Class proc with two ALLOW clauses (should work)
         tester.runtest("create role r1;\n"
                   + "create role r2;\n"
@@ -818,10 +831,19 @@ public class TestVoltCompiler extends TestCase {
                   + "allow r2 "
                   + "from class org.voltdb.compiler.procedures.AddBook");
 
+        tester.runtest("create role r1;\n"
+                + "create role r2;\n"
+                + "create procedure fooroles "
+                + "allow r1 "
+                + "allow r2 "
+                + "as begin "
+                + "select * from books where cash = ?; "
+                + "select * from books; end");
+
+        // semi colon and END inside quoted string
         tester.runtest("create procedure thisproc as "
                 + "select * from books where title = 'a;b' or title = 'END'");
 
-        // semi colon and END inside quoted string
         tester.runtest("create procedure thisproc as "
                 + "begin "
                 + "select * from books;"
@@ -2944,13 +2966,13 @@ public class TestVoltCompiler extends TestCase {
         ArrayList<Feedback> fbs;
         String expectedError;
 
-//        fbs = checkInvalidDDL(
-//                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
-//                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-//                "CREATE PROCEDURE Foo AS BEGIN SELECT * FROM PKEY_INTEGER;\n"
-//                );
-//        expectedError = "Schema file ended mid-statement (no semicolon found)";
-//        assertTrue(isFeedbackPresent(expectedError, fbs));
+        fbs = checkInvalidDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS BEGIN SELECT * FROM PKEY_INTEGER;\n"
+                );
+        expectedError = "Schema file ended mid-statement (no semicolon found)";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
@@ -2972,12 +2994,22 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
-                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, FRAC FLOAT, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE PKEY = ?; END;" +
-                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 2;"
+                "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE FRAC > ?; END;" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN FRAC PARAMETER 0;"
                 );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        expectedError = "PartitionInfo for procedure Foo refers to a column in schema which is not a partition key.";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidDDL(
+                "CREATE TABLE PKEY_FLOAT ( PKEY FLOAT NOT NULL, FRAC FLOAT, PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_FLOAT ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER WHERE FRAC > ?; END;" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_FLOAT COLUMN PKEY PARAMETER 0;"
+                );
+        expectedError = "In database, Partition column 'PKEY_FLOAT.pkey' is not a valid type. "
+                + "Partition columns must be an integer, varchar or varbinary type.";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2986,7 +3018,8 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS BEGIN DELETE FROM PKEY_INTEGER; SELECT * FROM PKEY_INTEGER END;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        expectedError = "Failed to plan for statement (sql1) \"SELECT * FROM PKEY_INTEGER END;\". "
+                + "Error: \"SQL Syntax error in \"SELECT * FROM PKEY_INTEGER END;\" unexpected token: END\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
