@@ -160,11 +160,11 @@ function loadAnalysisPage(){
 
                 if(procedureName.indexOf("org.voltdb.sysprocs") > -1){
                     dataLatencySysProcedures.push({"label": procedureName , "value": avgExecTime, "index": avgExecTime, "type": type});
-                    dataFrequencySysProcedures.push({"label": procedureName, "value": invocation, "index": invocation});
+                    dataFrequencySysProcedures.push({"label": procedureName, "value": invocation, "index": invocation, "type": type});
                     dataTotalProcessingSysProcedures.push({"label": procedureName, "value": calculatedProcessingTime, "index": calculatedProcessingTime, "type": type});
                 } else {
                     dataLatencyProcedures.push({"label": procedureName , "value": avgExecTime, "index": avgExecTime, "type": type});
-                    dataFrequencyProcedures.push({"label": procedureName, "value": invocation, "index": invocation});
+                    dataFrequencyProcedures.push({"label": procedureName, "value": invocation, "index": invocation, "type": type});
                     dataTotalProcessingProcedures.push({"label": procedureName, "value": calculatedProcessingTime, "index": calculatedProcessingTime, "type": type});
                 }
             });

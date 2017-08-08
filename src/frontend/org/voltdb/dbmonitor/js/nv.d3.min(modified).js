@@ -9276,6 +9276,19 @@
                         return d.z.toFixed(3) + 's';
                     });
                 }
+
+                if(VoltDbUI.isFrequency){
+                    d3.select('#visualizeFrequencyDetails > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
+                   .data(function (d) {
+                        return d.values})
+                    .attr('dy', '.32em')
+                    .attr('text-anchor', function (d, i) { return getY(d, i) < 0 ? 'end' : 'start' })
+                    .attr('y', (x.rangeBand() - 20))
+                    .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) })
+                    .text(function (d, i) {
+                        return d.z.toFixed(3) + 's';
+                    });
+                }
             }
             renderWatch.renderEnd('multibarHorizontal immediate');
             return chart;
