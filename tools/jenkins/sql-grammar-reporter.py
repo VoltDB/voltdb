@@ -58,12 +58,12 @@ class Issues(object):
         old_issue = ''
         existing = jira.search_issues('summary ~ \'%s\'' % 'voltdb::StringRef::getObject(int*)')
         for issue in existing:
-            if str(issue.fields.status) == 'Open' and u'grammar-gen' in issue.fields.labels:
+            if str(issue.fields.status) != 'Closed' and u'grammar-gen' in issue.fields.labels:
                 old_issue = issue
 
         build_artifacts = build_report.get('artifacts')[0]
         pid_fileName = build_artifacts['fileName']
-        pid_url = build_url + '/artifact/' + pid_fileName
+        pid_url = build_url + 'artifact/' + pid_fileName
 
         query_split = summary_report.split('(or it was never started??), after SQL statement:')
         crash_query = query_split[1]
