@@ -758,27 +758,34 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         Throwable throwable = null;
         Object returnValue = null;
         try {
+            // Call the user-defined function.
             returnValue = udfRunner.call(m_udfBuffer);
+            // Write the result to the shared buffer.
+            m_udfBuffer.clear();
+            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, udfRunner.getReturnType(), returnValue);
+            // Return zero status code for a successful execution.
+            return 0;
         }
         catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
             throwable = ex1.getCause();
         }
         catch (Throwable ex2) {
             throwable = ex2;
         }
+        // Getting here means the execution was not successful.
         try {
             m_udfBuffer.clear();
             if (throwable != null) {
                 byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
                 SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
-                return -1;
             }
-            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, udfRunner.getReturnType(), returnValue);
         }
         catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return 0;
+        return -1;
     }
 
     @Override

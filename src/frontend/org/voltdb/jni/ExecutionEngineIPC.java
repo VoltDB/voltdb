@@ -331,25 +331,32 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 Throwable throwable = null;
                 Object returnValue = null;
                 try {
+                    // Call the user-defined function.
                     returnValue = udfRunner.call(udfBuffer);
+                    m_data.clear();
+                    // Put the status code for success (zero) into the buffer.
+                    m_data.putInt(0);
+                    // Write the result to the buffer.
+                    UserDefinedFunctionRunner.writeValueToBuffer(m_data, udfRunner.getReturnType(), returnValue);
+                    m_data.flip();
+                    m_connection.write();
+                    return;
                 }
                 catch (InvocationTargetException ex1) {
+                    // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+                    // We need to get its cause and throw that to the user.
                     throwable = ex1.getCause();
                 }
                 catch (Throwable ex2) {
                     throwable = ex2;
                 }
+                // Getting here means the execution was not successful.
                 m_data.clear();
                 if (throwable != null) {
                     // Exception thrown, put return code = -1.
                     m_data.putInt(-1);
                     byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
                     SerializationHelper.writeVarbinary(errorMsg, m_data);
-                }
-                else {
-                    // Success
-                    m_data.putInt(0);
-                    UserDefinedFunctionRunner.writeValueToBuffer(m_data, udfRunner.getReturnType(), returnValue);
                 }
                 m_data.flip();
                 m_connection.write();
