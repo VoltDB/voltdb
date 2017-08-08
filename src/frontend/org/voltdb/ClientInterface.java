@@ -232,23 +232,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     };
 
     final long m_siteId;
-    final long m_plannerSiteId;
-
     final Mailbox m_mailbox;
-
-    /**
-     * This boolean allows the DTXN to communicate to the
-     * ClientInputHandler the presence of DTXN backpressure.
-     * The m_connections ArrayList is used as the synchronization
-     * point to ensure that modifications to read interest ops
-     * that are based on the status of this information are atomic.
-     * Additionally each connection must be synchronized on before modification
-     * because the disabling of read selection for an individual connection
-     * due to backpressure (not DTXN backpressure, client backpressure due to a client
-     * that refuses to read responses) occurs inside the SimpleDTXNInitiator which
-     * doesn't have access to m_connections
-     */
-    private final boolean m_hasDTXNBackPressure = false;
 
     // MAX_CONNECTIONS is updated to be (FD LIMIT - 300) after startup
     private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
@@ -808,11 +792,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public int getMaxRead() {
-            if (m_hasDTXNBackPressure) {
-                return 0;
-            } else {
-                return Math.max( MAX_READ, getNextMessageLength());
-            }
+            return Math.max( MAX_READ, getNextMessageLength());
         }
 
         @Override
@@ -1239,14 +1219,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     };
 
-                    m_internalConnectionHandler.callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
-                                                              true,
-                                                              1000 * 120,
-                                                              cb,
-                                                              true, // priority NT
-                                                              null, // back pressure predicate
-                                                              invocation.getProcName(),
-                                                              itm.getParameters());
+                    m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
+                            true, 1000 * 120, cb, invocation.getProcName(), itm.getParameters());
                 }
                 else {
                     // m_d is for test only
@@ -1261,7 +1235,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         };
         messenger.createMailbox(m_mailbox.getHSId(), m_mailbox);
-        m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
 
@@ -1276,7 +1249,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .catalogContext(m_catalogContext)
                 .mailbox(m_mailbox)
                 .clientInterfaceHandleManagerMap(m_cihm)
-                .plannerSiteId(m_plannerSiteId)
                 .siteId(m_siteId)
                 .build();
     }

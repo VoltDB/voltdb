@@ -1256,10 +1256,6 @@ public abstract class CatalogUtil {
                     if (key.toLowerCase().contains("passw")) {
                         // Don't trim password
                         processorProperties.setProperty(key, value);
-                    } else if (key.toLowerCase().contains("delim")){
-                        // Don't trim \n in delimiters
-                        String trimmedDelimiters = value.replaceAll("^(\r|\f|\t| )+", "").replaceAll("(\r|\f|\t| )+$", "");
-                        processorProperties.setProperty(key, StringEscapeUtils.escapeJava(trimmedDelimiters));
                     } else {
                         processorProperties.setProperty(key, value.trim());
                     }
