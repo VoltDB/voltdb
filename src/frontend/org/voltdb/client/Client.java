@@ -315,11 +315,6 @@ public interface Client {
     public void close() throws InterruptedException;
 
     /**
-     * <p>Notify this Client that the connection is restored and it should resume to work.</p>
-     */
-    public void resume();
-
-    /**
      * <p>Blocks the current thread until there is no more backpressure or there are no more connections
      * to the database</p>
      *

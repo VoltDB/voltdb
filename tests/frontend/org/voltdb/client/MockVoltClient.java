@@ -172,12 +172,6 @@ public class MockVoltClient implements Client {
     }
 
     @Override
-    public void resume() {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
     public int calculateInvocationSerializedSize(String procName,
             Object... parameters) {
         // TODO Auto-generated method stub

@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -331,7 +332,15 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter VoltDB password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null);
+        final ClientConfig c_config;
+        AutoReconnectListener listener = new AutoReconnectListener();
+        if (m_config.stopondisconnect) {
+            c_config = new ClientConfig(m_config.user, m_config.password, null);
+            c_config.setAutoReconnect(false);
+        } else {
+            c_config = new ClientConfig(m_config.user, m_config.password, listener);
+
+        }
         if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
             c_config.enableSSL();
@@ -361,6 +370,11 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, m_config.procedure, errHandler);
             } else {
                 dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, m_config.table, m_config.batch, m_config.update, errHandler);
+            }
+
+            if (!m_config.stopondisconnect) {
+                listener.setClient(csvClient);
+                listener.setLoader(dataLoader);
             }
 
             // If we need to prompt the user for a JDBC datasource password, do so.

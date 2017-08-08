@@ -202,8 +202,8 @@ public class CSVTupleDataLoader implements CSVDataLoader {
                     break;
                 } catch (IOException e) {
                     // If the connection is lost, suspend and wait for reconnect listener's notification
-                    synchronized (m_client) {
-                        m_client.wait();
+                    synchronized (this) {
+                        this.wait();
                     }
                 } catch (Exception e) {
                     m_errHandler.handleError(metaData, null, e.toString());
@@ -258,5 +258,12 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     {
         //No operation.
         return null;
+    }
+
+    @Override
+    public void resumeLoading() {
+        synchronized (this) {
+            this.notifyAll();
+        }
     }
 }

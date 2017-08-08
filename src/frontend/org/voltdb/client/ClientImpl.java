@@ -22,7 +22,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -81,6 +80,7 @@ public final class ClientImpl implements Client {
     private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
+    private boolean m_autoReconnect;
     final InternalClientStatusListener m_listener = new InternalClientStatusListener();
     ClientStatusListenerExt m_clientStatusListener = null;
 
@@ -159,6 +159,7 @@ public final class ClientImpl implements Client {
             m_reconnectStatusListener = null;
         }
 
+        m_autoReconnect = config.m_autoReconnect;
         m_hashScheme = config.m_hashScheme;
         if (config.m_cleartext) {
             m_passwordHash = ConnectionUtil.getHashedPassword(m_hashScheme, config.m_password);
@@ -881,8 +882,6 @@ public final class ClientImpl implements Client {
 
     private final ReconnectStatusListener m_reconnectStatusListener;
 
-    private final List<VoltBulkLoader> m_bulkLoaders = new ArrayList<>();
-
     @Override
     public void configureBlocking(boolean blocking) {
         m_blockingQueue = blocking;
@@ -1013,9 +1012,7 @@ public final class ClientImpl implements Client {
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback) throws Exception
     {
         synchronized(m_vblGlobals) {
-            VoltBulkLoader loader = new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, null);
-            m_bulkLoaders.add(loader);
-            return loader;
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, null);
         }
     }
 
@@ -1023,31 +1020,20 @@ public final class ClientImpl implements Client {
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack failureCallback) throws Exception
     {
         synchronized(m_vblGlobals) {
-            VoltBulkLoader loader = new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, failureCallback);
-            m_bulkLoaders.add(loader);
-            return loader;
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, failureCallback);
         }
     }
 
     @Override
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
         synchronized(m_vblGlobals) {
-            VoltBulkLoader loader = new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, successCallback);
-            m_bulkLoaders.add(loader);
-            return loader;
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, successCallback);
         }
     }
 
     @Override
     public boolean isAutoReconnectEnabled() {
-        return (m_reconnectStatusListener != null);
-    }
-
-    @Override
-    public void resume() {
-        for (VoltBulkLoader loader : m_bulkLoaders) {
-            loader.resumeLoading();
-        }
+        return m_autoReconnect;
     }
 
     @Override

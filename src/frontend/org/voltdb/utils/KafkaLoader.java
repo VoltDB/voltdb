@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -103,13 +104,21 @@ public class KafkaLoader {
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null);
+        final ClientConfig c_config;
+        AutoReconnectListener listener = new AutoReconnectListener();
+        if (m_config.stopondisconnect) {
+            c_config = new ClientConfig(m_config.user, m_config.password, null);
+            c_config.setAutoReconnect(false);
+        } else {
+            c_config = new ClientConfig(m_config.user, m_config.password, listener);
+
+        }
+
         if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
             c_config.enableSSL();
         }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
-        c_config.setReconnectOnConnectionLoss(!m_config.stopondisconnect);
 
         m_client = getClient(c_config, serverlist, m_config.port);
 
@@ -117,6 +126,10 @@ public class KafkaLoader {
             m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_config.procedure, new KafkaBulkLoaderCallback());
         } else {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.update, new KafkaBulkLoaderCallback());
+        }
+        if (!m_config.stopondisconnect) {
+            listener.setClient(m_client);
+            listener.setLoader(m_loader);
         }
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
         m_consumer = new KafkaConsumerConnector(m_config);

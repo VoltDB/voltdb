@@ -101,7 +101,6 @@ public class ReconnectStatusListener extends ClientStatusListenerExt {
             try {
                 m_client.createConnection(hostname, port);
                 LOG.info(String.format("Connected to VoltDB node at %s:%d.", hostname, port));
-                m_client.resume();
                 break;
             } catch (Exception e) {
                 LOG.warn(String.format("Connection to VoltDB node at %s:%d failed - retrying in %d second(s).",

@@ -33,6 +33,7 @@ import org.supercsv.prefs.CsvPreference;
 import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -452,7 +453,15 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         config.password = CLIConfig.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(config.user, config.password, null);
+        final ClientConfig c_config;
+        AutoReconnectListener listener = new AutoReconnectListener();
+        if (config.stopondisconnect) {
+            c_config = new ClientConfig(config.user, config.password, null);
+            c_config.setAutoReconnect(false);
+        } else {
+            c_config = new ClientConfig(config.user, config.password, listener);
+
+        }
         if (config.ssl != null && !config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(config.ssl);
             c_config.enableSSL();
@@ -482,6 +491,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
             } else {
                 dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
+            }
+            if (!config.stopondisconnect) {
+                listener.setClient(csvClient);
+                listener.setLoader(dataLoader);
             }
 
             CSVFileReader.initializeReader(cfg, csvClient, listReader);
@@ -592,7 +605,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
     public static Client getClient(ClientConfig config, String[] servers,
             int port) throws Exception {
         config.setTopologyChangeAware(true); // Set client to be topology-aware
-        config.setReconnectOnConnectionLoss(!CSVLoader.config.stopondisconnect);
         final Client client = ClientFactory.createClient(config);
         for (String server : servers) {
             // Try connecting servers one by one until we have a success

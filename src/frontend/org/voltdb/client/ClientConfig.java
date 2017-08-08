@@ -62,6 +62,7 @@ public class ClientConfig {
     boolean m_useClientAffinity = true;
     Subject m_subject = null;
     boolean m_reconnectOnConnectionLoss;
+    boolean m_autoReconnect = true;
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
     boolean m_sendReadsToReplicasBytDefaultIfCAEnabled = false;
@@ -378,6 +379,14 @@ public class ClientConfig {
      */
     public void setSendReadsToReplicasByDefault(boolean on) {
         m_sendReadsToReplicasBytDefaultIfCAEnabled = on;
+    }
+
+    /**
+     * <p>Client would pause when all the connections are lost and would resume to work if the connections are restored</p>
+     * @param on Enable or disable the auto-reconnect feature. Default is on.
+     */
+    public void setAutoReconnect(boolean on) {
+        this.m_autoReconnect = on;
     }
 
     /**
