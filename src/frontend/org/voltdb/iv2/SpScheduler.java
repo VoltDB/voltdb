@@ -841,7 +841,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         //notify the new partition leader that the old leader has completed the Txns if needed.
-        ((InitiatorMailbox)m_mailbox).notifyNewLeaderOfTxnDoneIfNeeded();
+        if (m_mailbox instanceof InitiatorMailbox) {
+            ((InitiatorMailbox)m_mailbox).notifyNewLeaderOfTxnDoneIfNeeded();
+        }
     }
 
     // BorrowTaskMessages encapsulate a FragmentTaskMessage along with
