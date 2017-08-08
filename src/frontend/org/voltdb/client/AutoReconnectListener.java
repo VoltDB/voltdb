@@ -43,7 +43,7 @@ public class AutoReconnectListener extends ClientStatusListenerExt {
     private Client m_client;
 
     @Override
-    public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+    public void connectionLost(final String hostname, final int port, int connectionsLeft, DisconnectCause cause) {
         LOG.warn(String.format("Connection to VoltDB node at: %s:%d was lost.", hostname, port));
         executor.execute(new Runnable() {
             @Override
