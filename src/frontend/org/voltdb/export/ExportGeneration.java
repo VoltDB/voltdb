@@ -380,19 +380,18 @@ public class ExportGeneration implements Generation {
         assert(m_dataSourcesByPartition.containsKey(partitionId));
         assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
         ExportDataSource source;
-        System.out.println("Done: " + signature + " Partition: "  + partitionId);
         synchronized(this) {
             Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
             if (sources == null) {
-                exportLog.error("Could not find export data sources for partition "
+                exportLog.warn("Could not find export data sources for partition "
                         + partitionId + ". The export cleanup stream is being discarded.");
                 return;
             }
 
             source = sources.get(signature);
             if (source == null) {
-                exportLog.error("Could not find export data source for signature " + partitionId +
+                exportLog.warn("Could not find export data source for signature " + partitionId +
                         " signature " + signature + ". The export cleanup stream is being discarded.");
                 return;
             }
@@ -500,11 +499,6 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void pushEndOfStream(int partitionId, String signature) {
-        //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
-        //        for (Integer i : m_dataSourcesByPartition.keySet()) {
-        //            System.out.println("Have partition " + i);
-        //        }
-        System.out.println("EOS pushed for: " + signature + " Partition: " + partitionId);
         assert(m_dataSourcesByPartition.containsKey(partitionId));
         assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
@@ -620,6 +614,14 @@ public class ExportGeneration implements Generation {
         cleanup(messenger);
     }
 
+    public void unacceptMastership() {
+        for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
+            for (ExportDataSource source : partitionDataSourceMap.values()) {
+                source.unacceptMastership();
+            }
+        }
+
+    }
     /**
      * Indicate to all associated {@link ExportDataSource}to assume
      * mastership role for the given partition id

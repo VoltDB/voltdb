@@ -441,6 +441,8 @@ public class ExportManager
             //TODO: How to update client configuration and recreate the client.
             //TODO: How to handle ack coming from node which has gone past this phase but this node is still processing? Or will synchronized UAC will take care?
 
+            //This is so we pause polling.
+            generation.unacceptMastership();
             //Load any missing table data sources.
             generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
             m_processor.get().updateProcessorConfig(m_processorConfig);

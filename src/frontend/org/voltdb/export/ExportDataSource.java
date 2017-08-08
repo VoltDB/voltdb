@@ -575,7 +575,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                          * which nulls out the field
                          */
                         if (m_pollFuture != null) {
-                            fut.setException(new RuntimeException("Should not poll more than once"));
+                            fut.setException(new RuntimeException("Should not poll more than once: " +
+                                    "ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId()));
                             return;
                         }
                         if (!m_es.isShutdown()) {
@@ -613,6 +614,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
             if (!m_isInCatalog && m_committedBuffers.isEmpty()) {
                 //Returning null indicates end of stream
+                m_pollFuture = null;
                 try {
                     fut.set(null);
                 } catch (RejectedExecutionException reex) {
@@ -813,6 +815,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_runEveryWhere;
     }
 
+    public synchronized void unacceptMastership() {
+        m_onMastership = null;
+        m_mastershipAccepted.set(false);
+        m_pollFuture = null;
+    }
     /**
      * Trigger an execution of the mastership runnable by the associated
      * executor service
