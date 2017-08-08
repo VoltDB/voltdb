@@ -91,9 +91,10 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
      */
     @Override
     protected String computeDigest() {
-        String dg = super.computeDigest();
-        // To make an instance of the scan is unique for Calcite to be able to distinguish them
-        // it must have a unique digest. Are there better ways of doing this?
+        // Make an instance of the scan unique for Calcite to be able to distinguish them
+        // specially when we merge scans with other redundant nodes like sort for example.
+        // Are there better ways of doing this?
+        String dg = id + "_" + super.computeDigest();
         if (m_program != null) {
             dg += "_program_" + m_program.toString();
         }

@@ -9,9 +9,11 @@ create table R1 (
 create table RI1 (
     i integer PRIMARY KEY,
     si smallint,
-    bi bigint
+    bi bigint,
+    ti tinyint
 );
-CREATE INDEX RI1_IND2 ON RI1 (i, bi);
+CREATE INDEX RI1_IND2 ON RI1 (bi, si);
+CREATE INDEX RI1_IND1 ON RI1 (ti);
 
 create table R2 (
     i integer,
