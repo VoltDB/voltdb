@@ -108,10 +108,10 @@ public class KafkaLoader {
         AutoReconnectListener listener = new AutoReconnectListener();
         if (m_config.stopondisconnect) {
             c_config = new ClientConfig(m_config.user, m_config.password, null);
-            c_config.setAutoReconnect(false);
+            c_config.setReconnectOnConnectionLoss(false);
         } else {
             c_config = new ClientConfig(m_config.user, m_config.password, listener);
-
+            c_config.setReconnectOnConnectionLoss(true);
         }
 
         if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
@@ -128,7 +128,6 @@ public class KafkaLoader {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.update, new KafkaBulkLoaderCallback());
         }
         if (!m_config.stopondisconnect) {
-            listener.setClient(m_client);
             listener.setLoader(m_loader);
         }
         m_loader.setFlushInterval(m_config.flush, m_config.flush);

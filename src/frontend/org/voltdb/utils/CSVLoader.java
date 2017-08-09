@@ -457,10 +457,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         AutoReconnectListener listener = new AutoReconnectListener();
         if (config.stopondisconnect) {
             c_config = new ClientConfig(config.user, config.password, null);
-            c_config.setAutoReconnect(false);
+            c_config.setReconnectOnConnectionLoss(false);
         } else {
             c_config = new ClientConfig(config.user, config.password, listener);
-
+            c_config.setReconnectOnConnectionLoss(true);
         }
         if (config.ssl != null && !config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(config.ssl);
@@ -493,7 +493,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
             }
             if (!config.stopondisconnect) {
-                listener.setClient(csvClient);
                 listener.setLoader(dataLoader);
             }
 

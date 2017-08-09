@@ -336,10 +336,10 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         AutoReconnectListener listener = new AutoReconnectListener();
         if (m_config.stopondisconnect) {
             c_config = new ClientConfig(m_config.user, m_config.password, null);
-            c_config.setAutoReconnect(false);
+            c_config.setReconnectOnConnectionLoss(false);
         } else {
             c_config = new ClientConfig(m_config.user, m_config.password, listener);
-
+            c_config.setReconnectOnConnectionLoss(true);
         }
         if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
@@ -373,7 +373,6 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             }
 
             if (!m_config.stopondisconnect) {
-                listener.setClient(csvClient);
                 listener.setLoader(dataLoader);
             }
 

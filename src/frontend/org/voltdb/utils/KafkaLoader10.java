@@ -443,10 +443,10 @@ public class KafkaLoader10 {
         AutoReconnectListener listener = new AutoReconnectListener();
         if (m_cliOptions.stopondisconnect) {
             clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, null);
-            clientConfig.setAutoReconnect(false);
+            clientConfig.setReconnectOnConnectionLoss(false);
         } else {
             clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, listener);
-
+            clientConfig.setReconnectOnConnectionLoss(true);
         }
         if (m_cliOptions.ssl != null && !m_cliOptions.ssl.trim().isEmpty()) {
             clientConfig.setTrustStoreConfigFromPropertyFile(m_cliOptions.ssl);
@@ -463,7 +463,6 @@ public class KafkaLoader10 {
         m_loader.setFlushInterval(m_cliOptions.flush, m_cliOptions.flush);
 
         if (!m_cliOptions.stopondisconnect) {
-            listener.setClient(m_client);
             listener.setLoader(m_loader);
         }
 

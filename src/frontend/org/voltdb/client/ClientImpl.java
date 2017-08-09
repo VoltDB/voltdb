@@ -80,7 +80,6 @@ public final class ClientImpl implements Client {
     private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
-    private boolean m_autoReconnect;
     final InternalClientStatusListener m_listener = new InternalClientStatusListener();
     ClientStatusListenerExt m_clientStatusListener = null;
 
@@ -159,7 +158,6 @@ public final class ClientImpl implements Client {
             m_reconnectStatusListener = null;
         }
 
-        m_autoReconnect = config.m_autoReconnect;
         m_hashScheme = config.m_hashScheme;
         if (config.m_cleartext) {
             m_passwordHash = ConnectionUtil.getHashedPassword(m_hashScheme, config.m_password);
@@ -1033,7 +1031,7 @@ public final class ClientImpl implements Client {
 
     @Override
     public boolean isAutoReconnectEnabled() {
-        return m_autoReconnect;
+        return (m_reconnectStatusListener != null);
     }
 
     @Override
