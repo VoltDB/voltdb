@@ -383,21 +383,19 @@ public class ExportManager
             exportLog.info("Skipped rolling generations as generation not created in EE.");
             return;
         }
-        ExportGeneration generation;
         if (m_generation.get() == null) {
             File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
             try {
-                generation = new ExportGeneration(exportOverflowDirectory);
-                m_generation.set(generation);
+                ExportGeneration gen = new ExportGeneration(exportOverflowDirectory);
+                m_generation.set(gen);
             } catch (IOException crash) {
                 //This means durig UAC we had a bad disk on a node or bad directory.
                 VoltDB.crashLocalVoltDB("Error creating export generation", true, crash);
                 return;
             }
-        } else {
-            generation = m_generation.get();
         }
-
+        ExportGeneration generation = m_generation.get();
+        assert(generation != null);
         /*
          * If there is no existing export processor, create an initial one.
          * This occurs when export is turned on/off at runtime.
@@ -435,17 +433,15 @@ public class ExportManager
             }
         }
         else {
-            //Load new tables from catalog and create data sources.
-            //Update processor config to create any missing clients.
-            //Accept mastership of missing partitions.
-            //TODO: How to update client configuration and recreate the client.
             //TODO: How to handle ack coming from node which has gone past this phase but this node is still processing? Or will synchronized UAC will take care?
 
             //This is so we pause polling.
             generation.unacceptMastership();
             //Load any missing table data sources.
             generation.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+            //Update processor config to create any missing clients.
             m_processor.get().updateProcessorConfig(m_processorConfig);
+            //Accept mastership of missing partitions.
             for (Integer partitionId: m_masterOfPartitions) {
                 generation.acceptMastershipTask(partitionId);
             }
