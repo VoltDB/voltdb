@@ -200,7 +200,10 @@ public class SnapshotSaveAPI
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateSequenceNumbersForExecutionSite(context);
             Integer partitionId = TxnEgo.getPartitionId(partitionTxnId);
-            SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId));
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId) + " SP Txn:" +
+                        TxnEgo.txnIdSeqToString(partitionTxnId) + " MP Txn:" + TxnEgo.txnIdSeqToString(multiPartTxnId));
+            }
             m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
             m_remoteDataCenterLastIds.put(partitionId, perSiteRemoteDataCenterDrIds);
         }

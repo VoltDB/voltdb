@@ -437,7 +437,8 @@ public class InitiatorMailbox implements Mailbox
             response.m_sourceHSId = getHSId();
             deliver(response);
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Restarting txn on:" + CoreUtils.hsIdToString(m_hsId) + " " + message);
+                tmLog.debug("Restarting txn on:" + CoreUtils.hsIdToString(m_hsId) + " isLeader:" + m_scheduler.isLeader() +
+                        " status:" + m_balanceSPIStatus + "\n" + message);
             }
             return true;
         }

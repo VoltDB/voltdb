@@ -235,6 +235,9 @@ public class SpPromoteAlgo implements RepairAlgo
             tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
         }
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + "RespairResponse:\n" + li);
+            }
             List<Long> needsRepair = new ArrayList<Long>(5);
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
                 if  (entry.getValue().needs(li.getHandle())) {
