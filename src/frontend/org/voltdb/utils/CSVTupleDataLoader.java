@@ -147,8 +147,13 @@ public class CSVTupleDataLoader implements CSVDataLoader {
         m_errHandler = errHandler;
         m_callbackExecutor = callbackExecutor;
         m_successCallback = successCallback;
-        m_reinsertExecutor = CoreUtils.getSingleThreadExecutor(procName);
         m_autoReconnect = client.isAutoReconnectEnabled();
+        if (m_autoReconnect) {
+            m_reinsertExecutor = CoreUtils.getSingleThreadExecutor(procName);
+        } else {
+            m_reinsertExecutor = null;
+        }
+
 
         List<VoltType> typeList = Lists.newArrayList();
         VoltTable procInfo = client.callProcedure("@SystemCatalog", "PROCEDURECOLUMNS").getResults()[0];
@@ -236,8 +241,10 @@ public class CSVTupleDataLoader implements CSVDataLoader {
             m_client.drain();
             Thread.yield();
         }
-        m_reinsertExecutor.shutdown();
-        m_reinsertExecutor.awaitTermination(365, TimeUnit.DAYS);
+        if (m_reinsertExecutor != null) {
+            m_reinsertExecutor.shutdown();
+            m_reinsertExecutor.awaitTermination(365, TimeUnit.DAYS);
+        }
         // Don't close the client because it may be shared with other loaders
     }
 
