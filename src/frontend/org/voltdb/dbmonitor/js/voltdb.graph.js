@@ -707,7 +707,7 @@
             getBarHeightAndSpacing(dataTable, ChartDataTableAnalysis);
             ChartDataTableAnalysis.height(barHeight);
             $("#chartDataTableAnalysis").css("height", barHeight + 50);
-            ChartDataTableAnalysis.margin({"left": 115,"right": 40});
+            ChartDataTableAnalysis.margin({"left": 125,"right": 40});
             dataTableAnalysis[0]["values"] = dataTable;
             d3.select("#visualiseDataTable")
                 .datum(dataTableAnalysis)
