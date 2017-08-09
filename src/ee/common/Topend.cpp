@@ -158,7 +158,7 @@ namespace voltdb {
         return false;
     }
 
-    int DummyTopend::callJavaUserDefinedFunction(int32_t functionId) {
+    int DummyTopend::callJavaUserDefinedFunction() {
         // We do not call any UDF here, directly return zero which means success.
         return 0;
     }

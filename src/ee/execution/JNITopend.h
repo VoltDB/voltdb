@@ -79,7 +79,7 @@ public:
         return false;
     }
 
-    int callJavaUserDefinedFunction(int32_t functionId);
+    int callJavaUserDefinedFunction();
 
 private:
     JNIEnv *m_jniEnv;

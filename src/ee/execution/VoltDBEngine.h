@@ -218,7 +218,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                                   int64_t* tuplesModified = NULL);
 
         // Call user-defined function
-        NValue callJavaUserDefinedFunction(int functionId, const std::vector<NValue>& arguments);
+        NValue callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments);
 
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.

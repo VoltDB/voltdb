@@ -92,7 +92,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     }
 
     m_callJavaUserDefinedFunctionMID = m_jniEnv->GetMethodID(
-            jniClass, "callJavaUserDefinedFunction", "(I)I");
+            jniClass, "callJavaUserDefinedFunction", "()I");
     if (m_callJavaUserDefinedFunctionMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_callJavaUserDefinedFunctionMID != 0);
@@ -375,10 +375,9 @@ std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
     return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
 }
 
-int JNITopend::callJavaUserDefinedFunction(int32_t functionId) {
+int JNITopend::callJavaUserDefinedFunction() {
     return (int)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
-                                        m_callJavaUserDefinedFunctionMID,
-                                        functionId);
+                                        m_callJavaUserDefinedFunctionMID);
 }
 
 void JNITopend::crashVoltDB(FatalException e) {

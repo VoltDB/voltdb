@@ -563,7 +563,7 @@ UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executor
     return result;
 }
 
-NValue VoltDBEngine::callJavaUserDefinedFunction(int functionId, const std::vector<NValue>& arguments) {
+NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments) {
     resetUDFOutputBuffer();
 
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
@@ -571,12 +571,34 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int functionId, const std::vect
         // There must be serious inconsistency in the catalog if this could happen.
         throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
     }
+
+    // Estimate the size of the buffer we need. We will put:
+    //   * size of the buffer (function id + parameters)
+    //   * function id (int32_t)
+    //   * parameters.
+    size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
+    for (int i = 0; i < arguments.size(); i++) {
+        arguments[i] = arguments[i].castAs(info->paramTypes[i]);
+        bufferSizeNeeded += arguments[i].size();
+    }
+
+    // Check buffer size here.
+    // Adjust the buffer size when needed.
+
+    // Serialize buffer size, function Id.
+    m_udfOutput.writeInt(bufferSizeNeeded);
+    m_udfOutput.writeInt(functionId);
+
     // Serialize UDF parameters to the buffer.
     for (int i = 0; i < arguments.size(); i++) {
-        arguments[i].castAs(info->paramTypes[i]).serializeTo(m_udfOutput);
+        arguments[i].serializeTo(m_udfOutput);
     }
+
     ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
-    if (m_topend->callJavaUserDefinedFunction(functionId) == 0) {
+    // callJavaUserDefinedFunction() will inform the Java end to execute the
+    // Java user-defined function according to the function Id and the parameters
+    // stored in the shared buffer. It will return 0 if the execution is successful.
+    if (m_topend->callJavaUserDefinedFunction() == 0) {
         // After the the invocation, read the return value from the buffer.
         NValue retval = ValueFactory::getNValueOfType(info->returnType);
         retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
