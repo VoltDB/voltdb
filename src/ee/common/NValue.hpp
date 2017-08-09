@@ -238,6 +238,9 @@ class NValue {
     /* Release memory associated to object type NValues */
     void free() const;
 
+    /* Get the serialized size of this NValue. */
+    int32_t serializedSize() const;
+
     /* Release memory associated to object type tuple columns */
     static void freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects);
 

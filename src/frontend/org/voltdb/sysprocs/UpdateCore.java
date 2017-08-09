@@ -221,7 +221,7 @@ public class UpdateCore extends VoltSystemProcedure {
 
     public static class JavaClassForTest {
         public Class<?> forName(String name, boolean initialize, ClassLoader jarfileLoader) throws ClassNotFoundException {
-            return CatalogContext.classForProcedure(name, jarfileLoader);
+            return CatalogContext.classForProcedureOrUDF(name, jarfileLoader);
         }
     }
 

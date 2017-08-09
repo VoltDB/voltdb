@@ -54,6 +54,8 @@
 #include "catalog/columnref.h"
 #include "catalog/connector.h"
 #include "catalog/database.h"
+#include "catalog/function.h"
+#include "catalog/functionparameter.h"
 #include "catalog/index.h"
 #include "catalog/materializedviewhandlerinfo.h"
 #include "catalog/materializedviewinfo.h"
@@ -112,6 +114,7 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(Function);
 
 static const size_t PLAN_CACHE_SIZE = 1000;
 // table name prefix of DR conflict table
@@ -126,6 +129,7 @@ typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
 typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
+typedef std::pair<std::string, catalog::Function*> LabeledFunction;
 
 /**
  * The set of plan bytes is explicitly maintained in MRU-first order,
@@ -266,6 +270,10 @@ VoltDBEngine::~VoltDBEngine() {
 
     BOOST_FOREACH (TID tid, m_snapshottingTables) {
         tid.second->decrementRefcount();
+    }
+
+    BOOST_FOREACH (auto labeledInfo, m_functionInfo) {
+        delete labeledInfo.second;
     }
 
     delete m_executorContext;
@@ -555,6 +563,55 @@ UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executor
     return result;
 }
 
+NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments) {
+    resetUDFOutputBuffer();
+
+    UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
+    if (info == NULL) {
+        // There must be serious inconsistency in the catalog if this could happen.
+        throwFatalException("The execution engine lost track of the user-defined function (id = %d)", functionId);
+    }
+
+    // Estimate the size of the buffer we need. We will put:
+    //   * size of the buffer (function id + parameters)
+    //   * function id (int32_t)
+    //   * parameters.
+    size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
+    for (int i = 0; i < arguments.size(); i++) {
+        arguments[i] = arguments[i].castAs(info->paramTypes[i]);
+        bufferSizeNeeded += arguments[i].serializedSize();
+    }
+
+    // Check buffer size here.
+    // Adjust the buffer size when needed.
+
+    // Serialize buffer size, function Id.
+    m_udfOutput.writeInt(bufferSizeNeeded);
+    m_udfOutput.writeInt(functionId);
+
+    // Serialize UDF parameters to the buffer.
+    for (int i = 0; i < arguments.size(); i++) {
+        arguments[i].serializeTo(m_udfOutput);
+    }
+    assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
+
+    ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
+    // callJavaUserDefinedFunction() will inform the Java end to execute the
+    // Java user-defined function according to the function Id and the parameters
+    // stored in the shared buffer. It will return 0 if the execution is successful.
+    if (m_topend->callJavaUserDefinedFunction() == 0) {
+        // After the the invocation, read the return value from the buffer.
+        NValue retval = ValueFactory::getNValueOfType(info->returnType);
+        retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);
+        return retval;
+    }
+    else {
+        // Error handling
+        string errorMsg = udfResultIn.readTextString();
+        throw SQLException(SQLException::volt_user_defined_function_error, errorMsg);
+    }
+}
+
 void VoltDBEngine::releaseUndoToken(int64_t undoToken) {
     if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
         m_currentUndoQuantum = NULL;
@@ -666,7 +723,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
  *
  * TODO: This should be extended to find the parent delegate if the
  * deletion isn't a top-level object .. and delegates should have a
- * deleteChildCommand() intrface.
+ * deleteChildCommand() interface.
  *
  * Note, this only deletes tables, indexes are deleted in
  * processCatalogAdditions(..) for dumb reasons.
@@ -695,9 +752,21 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp) {
         }
     }
 
+    auto catalogFunctions = m_database->functions();
+
     // delete tables in the set
     BOOST_FOREACH (auto path, deletions) {
         VOLT_TRACE("delete path:");
+
+        if (startsWith(path, catalogFunctions.path())) {
+            catalog::Function* catalogFunction =
+                    static_cast<catalog::Function*>(m_catalog->itemForRef(path));
+            if (catalogFunction != NULL) {
+                delete m_functionInfo[catalogFunction->functionId()];
+                m_functionInfo.erase(catalogFunction->functionId());
+            }
+            continue;
+        }
 
         auto pos = m_catalogDelegates.find(path);
         if (pos == m_catalogDelegates.end()) {
@@ -1091,6 +1160,20 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                 persistentTable->dropMaterializedView(toDrop);
             }
         }
+    }
+
+    BOOST_FOREACH (LabeledFunction labeledFunction, m_database->functions()) {
+        auto catalogFunction = labeledFunction.second;
+        UserDefinedFunctionInfo *info = new UserDefinedFunctionInfo();
+        info->returnType = (ValueType) catalogFunction->returnType();
+        catalog::CatalogMap<catalog::FunctionParameter> parameters = catalogFunction->parameters();
+        info->paramTypes.resize(parameters.size());
+        for (catalog::CatalogMap<catalog::FunctionParameter>::field_map_iter iter = parameters.begin();
+                 iter != parameters.end(); iter++) {
+            int key = std::stoi(iter->first);
+            info->paramTypes[key] = (ValueType)iter->second->parameterType();
+        }
+        m_functionInfo[catalogFunction->functionId()] = info;
     }
 
     // new plan fragments are handled differently.
@@ -1488,16 +1571,21 @@ int32_t VoltDBEngine::getPerFragmentStatsSize() const {
     return static_cast<int32_t>(m_perFragmentStatsOutput.size());
 }
 
-void VoltDBEngine::setBuffers(char* parameterBuffer, int parameterBufferCapacity,
-        char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
-        char *firstResultBuffer, int firstResultBufferCapacity,
-        char *nextResultBuffer, int nextResultBufferCapacity,
-        char *exceptionBuffer, int exceptionBufferCapacity) {
+void VoltDBEngine::setBuffers(
+            char* parameterBuffer,        int parameterBufferCapacity,
+            char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
+            char* udfBuffer,              int udfBufferCapacity,
+            char* firstResultBuffer,      int firstResultBufferCapacity,
+            char* nextResultBuffer,       int nextResultBufferCapacity,
+            char* exceptionBuffer,        int exceptionBufferCapacity) {
     m_parameterBuffer = parameterBuffer;
     m_parameterBufferCapacity = parameterBufferCapacity;
 
     m_perFragmentStatsBuffer = perFragmentStatsBuffer;
     m_perFragmentStatsBufferCapacity = perFragmentStatsBufferCapacity;
+
+    m_udfBuffer = udfBuffer;
+    m_udfBufferCapacity = udfBufferCapacity;
 
     m_firstReusedResultBuffer = firstResultBuffer;
     m_firstReusedResultCapacity = firstResultBufferCapacity;

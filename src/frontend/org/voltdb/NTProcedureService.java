@@ -321,7 +321,7 @@ public class NTProcedureService {
             String className = procedure.getClassname();
             Class<? extends VoltNonTransactionalProcedure> clz = null;
             try {
-                clz = (Class<? extends VoltNonTransactionalProcedure>) catalogContext.classForProcedure(className);
+                clz = (Class<? extends VoltNonTransactionalProcedure>) catalogContext.classForProcedureOrUDF(className);
             } catch (ClassNotFoundException e) {
                 if (className.startsWith("org.voltdb.")) {
                     String msg = String.format(LoadedProcedureSet.ORGVOLTDB_PROCNAME_ERROR_FMT, className);
