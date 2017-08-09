@@ -9252,7 +9252,8 @@
             });
              if(stacked){
                if(VoltDbUI.isTotalProcessing){
-                     d3.select('#visualizeCombinedDetails > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
+
+                     d3.select('#visualizeCombinedDetails > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-'+ (VoltDbUI.partitionLength - 1)).selectAll('text')
                    .data(function (d) { return d.values })
                     .attr('dy', '.32em')
                     .attr('text-anchor', function (d, i) { return getY(d, i) < 0 ? 'end' : 'start' })
@@ -9265,7 +9266,7 @@
 
 
                 if(VoltDbUI.isLatency){
-                    d3.select('#visualizeLatencyDetail > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
+                    d3.select('#visualizeLatencyDetail > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-'+ (VoltDbUI.partitionLength - 1)).selectAll('text')
                    .data(function (d) {
                         return d.values})
                     .attr('dy', '.32em')
@@ -9278,7 +9279,7 @@
                 }
 
                 if(VoltDbUI.isFrequency){
-                    d3.select('#visualizeFrequencyDetails > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-7').selectAll('text')
+                    d3.select('#visualizeFrequencyDetails > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group.nv-series-'+ (VoltDbUI.partitionLength - 1)).selectAll('text')
                    .data(function (d) {
                         return d.values})
                     .attr('dy', '.32em')

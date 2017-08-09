@@ -2450,7 +2450,7 @@ var loadPage = function (serverName, portid) {
                 var z = 0;
                 var orderedDetails = {};
                 var statementList = [];
-               for( var key in VoltDbAnalysis.totalProcessingDetail){
+            for( var key in VoltDbAnalysis.totalProcessingDetail){
                 var obj = VoltDbAnalysis.totalProcessingDetail[key];
                 obj.forEach(function(subItems){
                     if(subItems.PROCEDURE == procedureName){
@@ -2485,7 +2485,7 @@ var loadPage = function (serverName, portid) {
                           return 0;
                     });
                }
-
+               VoltDbUI.partitionLength = orderedDetails[statementList[0]].length;
                for(var x=0; x< orderedDetails[statementList[0]].length; x++){
 
                     var u = 0;
@@ -2610,7 +2610,7 @@ var loadPage = function (serverName, portid) {
                           return 0;
                     });
                }
-
+                VoltDbUI.partitionLength = orderedDetails[statementList[0]].length;
                for(var x=0; x< orderedDetails[statementList[0]].length; x++){
 
                     var u = 0;
@@ -2757,7 +2757,7 @@ var loadPage = function (serverName, portid) {
                           return 0;
                     });
                }
-
+                VoltDbUI.partitionLength = orderedDetails[statementList[0]].length;
                for(var x=0; x< orderedDetails[statementList[0]].length; x++){
 
                     var u = 0;
@@ -3291,6 +3291,7 @@ var adjustImporterGraphSpacing = function() {
         this.isLatency = false;
         this.isTotalProcessing = false;
         this.isFrequency = false;
+        this.partitionLength = 0;
         this.getCookie = function (name) {
             return $.cookie(name + "_" + VoltDBConfig.GetPortId());
         },
