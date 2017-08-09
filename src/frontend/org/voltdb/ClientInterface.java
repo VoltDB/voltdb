@@ -2141,10 +2141,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         //stop BalanceSPI service
         m_balanceSpiExecutor.shutdown();
-        try {
-            m_balanceSpiExecutor.awaitTermination(365,  TimeUnit.DAYS);
-        } catch (InterruptedException e) {
-        }
         m_balanceSpiExecutor = null;
         hostLog.info("BalanceSPI task is stopped.");
     }
