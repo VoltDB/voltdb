@@ -61,13 +61,6 @@ DROP FUNCTION concat2Varchar IF EXISTS;
 DROP FUNCTION concat3Varchar IF EXISTS;
 DROP FUNCTION concat4Varchar IF EXISTS;
 
--- Load the class containing the test UDF's (user-defined functions); but
--- first, remove the class, in case it was loaded previously
--- TODO: these are needed when running in sqlcmd, but don't work when running
--- JUnit regresssionsuites tests (apparently because it only supports "true" DDL):
---remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
---load classes testfuncs.jar;
-
 
 -- Create the 'add...' test UDF's, which throw all kinds of exceptions, and
 -- return various flavors of VoltDB 'null' values, when given certain special
@@ -88,9 +81,8 @@ CREATE FUNCTION add2Varchar   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFu
 CREATE FUNCTION add2Varbinary FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varbinary;
 CREATE FUNCTION add2VarbinaryBoxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2VarbinaryBoxed;
 CREATE FUNCTION addYearsToTimestamp  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addYearsToTimestamp;
--- TODO: uncomment these once UDF's using GEOGRAPHY_POINT and GEOGRAPHY work:
---CREATE FUNCTION add2GeographyPoint FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
---CREATE FUNCTION addGeographyPointToGeography FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography;
+CREATE FUNCTION add2GeographyPoint   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
+CREATE FUNCTION addGeographyPointToGeography FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography;
 
 -- Create simple test UDF's with 0 or 1 arguments (these, and the ones below,
 -- unlike the ones above, are 'compatible' with PostgreSQL, and do not go out
@@ -111,9 +103,8 @@ CREATE FUNCTION absBigintBoxed   FROM METHOD org.voltdb_testfuncs.UserDefinedTes
 CREATE FUNCTION absFloatBoxed    FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absFloatBoxed;
 CREATE FUNCTION absDecimal  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.absDecimal;
 CREATE FUNCTION reverse     FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.reverse;
--- TODO: uncomment these once UDF's using GEOGRAPHY work:
---CREATE FUNCTION numRings  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numRings;
---CREATE FUNCTION numPointsUdf   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numPointsUdf;
+CREATE FUNCTION numRings  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numRings;
+CREATE FUNCTION numPointsUdf   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.numPointsUdf;
 
 -- Create simple test UDF's with 2 arguments
 
@@ -136,10 +127,3 @@ CREATE FUNCTION concat2Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestF
 
 CREATE FUNCTION concat3Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.concat3Varchar;
 CREATE FUNCTION concat4Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.concat4Varchar;
-
-
--- These just show that the functions have been loaded and created successfully
--- TODO: these are helpful when running in sqlcmd, but don't work when running
--- JUnit regresssionsuites tests (apparently because it only supports "true" DDL):
---show classes;
---show functions;
