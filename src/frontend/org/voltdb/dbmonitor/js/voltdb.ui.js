@@ -2421,13 +2421,22 @@ var loadPage = function (serverName, portid) {
                         isMultiple = false;
                         sum = item.value;
                     }
-
                     if(isMultiple){
                         count = calculateStatementCount(VoltDbAnalysis.latencyDetailValue, item.STATEMENT)
-                        procDetails[item.STATEMENT] = sum;
+                        if($("#hidPartitionType").html() == "Single Partitioned"){
+                            procDetails[item.STATEMENT] = sum;
+                        }
+                        else{
+                            procDetails[item.STATEMENT] = sum/count;
+                        }
                     }
                     else{
-                        procDetails[item.STATEMENT] = sum;
+                        if($("#hidPartitionType").html() == "Single Partitioned"){
+                            procDetails[item.STATEMENT] = sum;
+                        }
+                        else{
+                            procDetails[item.STATEMENT] = sum/count;
+                        }
                     }
                     statement = item.STATEMENT;
                 }
@@ -2447,21 +2456,18 @@ var loadPage = function (serverName, portid) {
             }
             finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
 
-                var z = 0;
-                var orderedDetails = {};
-                var statementList = [];
+            var z = 0;
+            var orderedDetails = {};
+            var statementList = [];
             for( var key in VoltDbAnalysis.totalProcessingDetail){
                 var obj = VoltDbAnalysis.totalProcessingDetail[key];
                 obj.forEach(function(subItems){
                     if(subItems.PROCEDURE == procedureName){
                         count = objectLength(obj, statement);
-
                         if(orderedDetails[subItems.STATEMENT] == undefined){
                             orderedDetails[subItems.STATEMENT] = [];
                             statementList.push(subItems.STATEMENT)
                         }
-
-
                         orderedDetails[subItems.STATEMENT].push({"PARTITION_ID" : subItems.PARTITION_ID, "STATEMENT" : subItems.STATEMENT , "AVG": subItems.AVG, "z": procDetails[subItems.STATEMENT]})
                     }
                     statement = subItems.STATEMENT;
@@ -2487,21 +2493,18 @@ var loadPage = function (serverName, portid) {
                }
                VoltDbUI.partitionLength = orderedDetails[statementList[0]].length;
                for(var x=0; x< orderedDetails[statementList[0]].length; x++){
-
                     var u = 0;
                     for(var key in orderedDetails){
                         if(partitionDetails[x]== undefined){
                             partitionDetails.push({"key": "Execution Time SP"})
                             partitionDetails[x]["values"] = [];
                         }
-
                         partitionDetails[x]["values"].push({"PARTITION_ID": orderedDetails[key][x].PARTITION_ID,  "x": orderedDetails[key][x].STATEMENT, "y": orderedDetails[key][x].AVG, "z": orderedDetails[key][x].z})
                     }
                     u++;
 
                 }
             }
-
             sortArray(partitionDetails)
 
             if($("#hidPartitionType").html() == "Single Partitioned"){
@@ -2612,18 +2615,15 @@ var loadPage = function (serverName, portid) {
                }
                 VoltDbUI.partitionLength = orderedDetails[statementList[0]].length;
                for(var x=0; x< orderedDetails[statementList[0]].length; x++){
-
                     var u = 0;
                     for(var key in orderedDetails){
                         if(partitionDetails[x]== undefined){
                             partitionDetails.push({"key": "Frequency SP"})
                             partitionDetails[x]["values"] = [];
                         }
-
                         partitionDetails[x]["values"].push({"PARTITION_ID": orderedDetails[key][x].PARTITION_ID,  "x": orderedDetails[key][x].STATEMENT, "y": orderedDetails[key][x].INVOCATION, "z": orderedDetails[key][x].z})
                     }
                     u++;
-
                 }
             }
 
@@ -2682,9 +2682,7 @@ var loadPage = function (serverName, portid) {
                             else{
                                 sum = subItems.AVG * subItems.INVOCATIONS
                             }
-
                         }
-
                         statement = subItems.STATEMENT;
 
                         if(subItems.TYPE == "Single Partitioned"){
@@ -2693,7 +2691,7 @@ var loadPage = function (serverName, portid) {
                         }
                         else{
                             count = objectLength(obj, statement);
-                            combinedWeight = (sum/count) * subItems.INVOCATIONS
+                            combinedWeight = (sum/count) * subItems.INVOCATIONS;
                             combinedDetails[subItems.STATEMENT] = combinedWeight;
                             VoltDbUI.totalProcessingTime[subItems.STATEMENT]= combinedWeight;
                         }
@@ -2727,13 +2725,10 @@ var loadPage = function (serverName, portid) {
                     if(subItems.PROCEDURE == procedureName){
                         count = objectLength(obj, statement);
                         combinedWeight = subItems.AVG * subItems.INVOCATIONS
-
                         if(orderedDetails[subItems.STATEMENT] == undefined){
                             orderedDetails[subItems.STATEMENT] = [];
                             statementList.push(subItems.STATEMENT)
                         }
-
-
                         orderedDetails[subItems.STATEMENT].push({"PARTITION_ID" : subItems.PARTITION_ID, "STATEMENT" : subItems.STATEMENT , "combinedWeight": combinedWeight, "z": VoltDbUI.totalProcessingTime[subItems.STATEMENT]})
                     }
                     statement = subItems.STATEMENT;
@@ -2752,7 +2747,6 @@ var loadPage = function (serverName, portid) {
                           if (nameA < nameB) {
                             return 1;
                           }
-
                           // names must be equal
                           return 0;
                     });
@@ -2766,7 +2760,6 @@ var loadPage = function (serverName, portid) {
                             partitionDetails.push({"key": "Total Processing Time SP"})
                             partitionDetails[x]["values"] = [];
                         }
-
                         partitionDetails[x]["values"].push({"PARTITION_ID": orderedDetails[key][x].PARTITION_ID,  "x": orderedDetails[key][x].STATEMENT, "y": orderedDetails[key][x].combinedWeight, "z": orderedDetails[key][x].z})
                     }
                     u++;
