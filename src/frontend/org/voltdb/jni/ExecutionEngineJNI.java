@@ -179,7 +179,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         setupPsetBuffer(smallBufferSize);
         setupPerFragmentStatsBuffer(smallBufferSize);
-        setupUDFBuffer(2 * 1024 * 1024);
+        setupUDFBuffer(smallBufferSize);
         updateEEBufferPointers();
 
         updateHashinator(hashinatorConfig);
@@ -188,12 +188,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     final void updateEEBufferPointers() {
         int errorCode = nativeSetBuffers(pointer,
-                m_psetBuffer, m_psetBuffer.capacity(),
-                m_perFragmentStatsBuffer, m_perFragmentStatsBuffer.capacity(),
-                m_udfBuffer, m_udfBuffer.capacity(),
+                m_psetBuffer,                 m_psetBuffer.capacity(),
+                m_perFragmentStatsBuffer,     m_perFragmentStatsBuffer.capacity(),
+                m_udfBuffer,                  m_udfBuffer.capacity(),
                 m_firstDeserializer.buffer(), m_firstDeserializer.buffer().capacity(),
-                m_nextDeserializer.buffer(), m_nextDeserializer.buffer().capacity(),
-                m_exceptionBuffer, m_exceptionBuffer.capacity());
+                m_nextDeserializer.buffer(),  m_nextDeserializer.buffer().capacity(),
+                m_exceptionBuffer,            m_exceptionBuffer.capacity());
         checkErrorCode(errorCode);
     }
 

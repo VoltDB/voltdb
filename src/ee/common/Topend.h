@@ -93,7 +93,10 @@ class Topend {
     /** Delete any data for the specified block that is stored on disk. */
     virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
 
-    // Call into Java top end to execute a user-defined function
+    // Call into the Java top end to execute a user-defined function.
+    // The function Id for the function to be called and the parameter data is stored in a
+    // buffer shared by the top end and the EE.
+    // The VoltDBEngine will serialize them into the buffer before calling this function.
     virtual int callJavaUserDefinedFunction() = 0;
 
     virtual ~Topend()

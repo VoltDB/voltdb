@@ -34,7 +34,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 import junit.framework.Test;
 
-public class TestUDFSuite extends RegressionSuite {
+public class TestAddDropUDF extends RegressionSuite {
 
     private void addFunction(Client client, String functionName, String methodName) throws IOException, ProcCallException {
         try {
@@ -95,11 +95,7 @@ public class TestUDFSuite extends RegressionSuite {
         }
     }
 
-    public void testParamAndReturnValueSerialization() {
-
-    }
-
-    public TestUDFSuite(String name) {
+    public TestAddDropUDF(String name) {
         super(name);
     }
 
@@ -107,7 +103,7 @@ public class TestUDFSuite extends RegressionSuite {
 
     static public Test suite() {
         // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestUDFSuite.class);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestAddDropUDF.class);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();

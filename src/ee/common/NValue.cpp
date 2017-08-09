@@ -201,7 +201,7 @@ std::string NValue::debug() const {
     return (ret);
 }
 
-int32_t NValue::size() const {
+int32_t NValue::serializedSize() const {
     switch (m_valueType) {
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:

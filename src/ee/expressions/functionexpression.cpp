@@ -229,13 +229,15 @@ public:
 
     std::string debugInfo(const std::string &spacer) const {
         std::stringstream buffer;
-        buffer << spacer << "UserDefinedFunctionExpression (function ID = " << m_functionId << std::endl;
+        buffer << spacer << "UserDefinedFunctionExpression (function ID = " << m_functionId << ")" << std::endl;
         return (buffer.str());
     }
 
 private:
     int m_functionId;
     const std::vector<AbstractExpression *>& m_args;
+    // We need the help from the VoltDBEngine to initiate the call into the Java top end for UDF execution.
+    // So we cache a pointer to the engine object that is tied to the current site thread for direct access.
     VoltDBEngine* m_engine;
 };
 

@@ -579,7 +579,7 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
     for (int i = 0; i < arguments.size(); i++) {
         arguments[i] = arguments[i].castAs(info->paramTypes[i]);
-        bufferSizeNeeded += arguments[i].size();
+        bufferSizeNeeded += arguments[i].serializedSize();
     }
 
     // Check buffer size here.
@@ -593,6 +593,7 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     for (int i = 0; i < arguments.size(); i++) {
         arguments[i].serializeTo(m_udfOutput);
     }
+    assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
 
     ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
     // callJavaUserDefinedFunction() will inform the Java end to execute the

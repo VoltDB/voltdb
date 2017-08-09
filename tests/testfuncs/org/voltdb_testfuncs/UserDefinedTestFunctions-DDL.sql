@@ -72,7 +72,6 @@ DROP FUNCTION concat2Varchar IF EXISTS;
 DROP FUNCTION concat3Varchar IF EXISTS;
 DROP FUNCTION concat4Varchar IF EXISTS;
 
-
 -- Create the 'add...' test UDF's, which throw all kinds of exceptions, and
 -- return various flavors of VoltDB 'null' values, when given certain special
 -- input values (generally from -100 to -120):

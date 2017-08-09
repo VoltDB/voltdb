@@ -35,6 +35,9 @@ import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
+/**
+ * This is the Java class that manages the UDF class instances, and also the invocation logics.
+ */
 public class UserDefinedFunctionManager {
 
     static final String ORGVOLTDB_FUNCCNAME_ERROR_FMT =
@@ -51,6 +54,7 @@ public class UserDefinedFunctionManager {
         return m_udfs.get(functionId);
     }
 
+    // Load all the UDFs recorded in the catalog. Instantiate and register them in the system.
     public void loadFunctions(CatalogContext catalogContext) {
         final CatalogMap<Function> catalogFunctions = catalogContext.database.getFunctions();
         // Remove obsolete tokens
@@ -94,6 +98,10 @@ public class UserDefinedFunctionManager {
     }
 
 
+    /**
+     * This class maintains the necessary information for each UDF including the class instance and
+     * the method ID for the UDF implementation. We run UDFs from this runner.
+     */
     public static class UserDefinedFunctionRunner {
         final String m_functionName;
         final int m_functionId;
