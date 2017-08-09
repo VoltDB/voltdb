@@ -583,6 +583,9 @@ public class ReportMaker {
         if (procedure.getSinglepartition()) {
             tag(sb, "success", "Single");
         }
+        else if (CatalogUtil.isProcedurePartitioned(procedure)) {
+            tag(sb, "info", "2-Partition");
+        }
         else {
             tag(sb, "warning", "Multi");
         }
@@ -649,6 +652,20 @@ public class ReportMaker {
             sb.append(String.format("<p>Partitioned on parameter %d which maps to column %s" +
                                     " of table <a class='invert' href='#s-%s'>%s</a>.</p>",
                                     pIndex, pColumn, pTable, pTable));
+        } else if (CatalogUtil.isProcedurePartitioned(procedure)) {
+            // 2P txn
+            String pTable1 = procedure.getPartitioncolumn().getParent().getTypeName();
+            String pColumn1 = procedure.getPartitioncolumn().getTypeName();
+            int pIndex1 = procedure.getPartitionparameter();
+
+            String pTable2 = procedure.getPartitioncolumn2().getParent().getTypeName();
+            String pColumn2 = procedure.getPartitioncolumn2().getTypeName();
+            int pIndex2 = procedure.getPartitionparameter2();
+
+            sb.append(String.format("<p>Partitioned on parameter %d which maps to column %s" +
+                                    " of table <a class='invert' href='#s-%s'>%s</a> and on parameter %d "
+                                  + "which maps to column %s of table <a class='invert' href='#s-%s'>%s</a>.</p>",
+                                    pIndex1, pColumn1, pTable1, pTable1, pIndex2, pColumn2, pTable2, pTable2));
         }
 
         // get the annotation or ensure it's there

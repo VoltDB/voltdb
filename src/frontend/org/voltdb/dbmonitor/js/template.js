@@ -59,9 +59,9 @@ function navigate(hash) {
 }
 
 $(document).ready(function () {
-    
+
     $('#o').find('br').remove();//for removing br form id o
-    
+
     var hash = window.location.hash.substr(1);
     if (hash == "" || hash == undefined) {
         $("#o-nav").addClass('active');
@@ -71,21 +71,21 @@ $(document).ready(function () {
     }
 
     $(window).bind('hashchange', function () {
-        
+
         var hash = window.location.hash.substr(1);
         $('ul.catalogNav').children().removeClass('active');
         $("#" + hash + "-nav").addClass('active');
     });
 
     var timeOut = (navigator.userAgent.indexOf('Firefox') >= 0) ? 20 : 1;
-    
+
     $(".catalogNav > li > a").on("click", function () {
-        
+
         setTimeout(function() {
             window.scrollTo(0, 0);
         }, timeOut);
     });
-    
+
     $.extend($.tablesorter.themes.bootstrap, {
         // these classes are added to the table. To see other table classes available,
         // look here: http://twitter.github.com/bootstrap/base-css.html#tables
@@ -277,6 +277,10 @@ $(document).ready(function () {
         trigger: 'focus hover', delay: { show: 500, hide: 100 }, placement: 'top', content:
             'This procedure only runs at one partition.'
     });
+    $('.l-2-Partition').popover({
+        trigger: 'focus hover', delay: { show: 500, hide: 100 }, placement: 'top', content:
+            'This procedure runs at two partitions.'
+    });
     $('.l-Multi').popover({
         trigger: 'focus hover', delay: { show: 500, hide: 100 }, placement: 'top', content:
             'This procedure runs at all partitions, which can affect performance.'
@@ -416,7 +420,7 @@ function sizes_update_all() {
         sizes_update_row(nrow);
     }
     sizes_update_summary();
-    
+
     //Update the table for sorting.
     $("#sizetable").trigger("update");
     heap_update();
