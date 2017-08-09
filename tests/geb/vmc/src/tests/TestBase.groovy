@@ -51,7 +51,7 @@ class TestBase extends GebReportingSpec {
     @Rule public TestName tName = new TestName()
 
     // Set this to true, if you want to see debug print
-    static final boolean DEFAULT_DEBUG_PRINT = false
+    static final boolean DEFAULT_DEBUG_PRINT = true
     static final int DEFAULT_WINDOW_WIDTH  = 1500
     static final int DEFAULT_WINDOW_HEIGHT = 1000
     static final int MAX_SECS_WAIT_FOR_PAGE = 60
