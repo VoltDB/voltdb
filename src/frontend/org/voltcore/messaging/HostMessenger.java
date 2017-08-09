@@ -159,8 +159,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         //Only used by tests.
-        public Config(boolean paused) {
-            this(null, org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT, paused);
+        public Config() {
+            this(null, org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT, false);
             acceptor = org.voltdb.probe.MeshProber.builder()
                     .coordinators(":" + internalPort)
                     .build();
