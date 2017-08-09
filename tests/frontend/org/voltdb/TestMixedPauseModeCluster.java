@@ -215,40 +215,6 @@ public class TestMixedPauseModeCluster extends JUnit4LocalClusterTest {
             client.createConnection(cluster.m_cluster.getListenerAddress(0));
             checkSystemInformationClusterState(client);
 
-            assertTrue(cluster.killAndRejoin());
-            checkSystemInformationClusterState(client);
-            checkClusterDoesNotAllowWrite(client);
-            assertTrue(cluster.killAndRejoin());
-            checkSystemInformationClusterState(client);
-            checkClusterDoesNotAllowWrite(client);
-
-            cluster.shutdown();
-
-            // test some rejoins
-            cluster = new MixedPauseCluster(new String[]{"", "paused", ""});
-
-            assertTrue(cluster.start());
-            client = ClientFactory.createClient();
-            client.createConnection(cluster.m_cluster.getListenerAddress(0));
-            checkSystemInformationClusterState(client);
-
-            assertTrue(cluster.killAndRejoin());
-            checkSystemInformationClusterState(client);
-            checkClusterDoesNotAllowWrite(client);
-            assertTrue(cluster.killAndRejoin());
-            checkSystemInformationClusterState(client);
-            checkClusterDoesNotAllowWrite(client);
-
-            cluster.shutdown();
-
-            // test some rejoins
-            cluster = new MixedPauseCluster(new String[]{"", "", "paused"});
-
-            assertTrue(cluster.start());
-            client = ClientFactory.createClient();
-            client.createConnection(cluster.m_cluster.getListenerAddress(0));
-            checkSystemInformationClusterState(client);
-
             for (int i = 0; i < 2; i++) {
                 assertTrue(cluster.killAndRejoin(i));
                 client.createConnection(cluster.m_cluster.getListenerAddress(i));
