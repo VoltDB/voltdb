@@ -55,7 +55,7 @@ public class UpdateWaitTimeForStation extends VoltProcedure {
 
     // Update wait time by station
     public static final SQLStmt updateWaitTime = new SQLStmt(
-    "INSERT INTO wait_time (station_id, last_depart, total_time, entries) VALUES (?, ?, ?, ?);"
+    "UPSERT INTO wait_time (station_id, last_depart, total_time, entries) VALUES (?, ?, ?, ?);"
     );
 
     // Delete old wait time calculations

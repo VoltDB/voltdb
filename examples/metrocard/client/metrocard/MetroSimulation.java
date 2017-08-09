@@ -277,7 +277,6 @@ public class MetroSimulation {
             } else {
                 lastState = 1;
             }
-            System.out.println(sb.toString());
             return rec;
         }
 
@@ -556,7 +555,7 @@ public class MetroSimulation {
 
         String trains[] = { "1", "2", "3", "4" };
         List<TrainActivityPublisher> trainPubs = new ArrayList<>();
-        long num_activity = config.count;
+        long num_activity = (config.count % 17) + config.count;
         for (String train : trains) {
             TrainActivityPublisher redLine = new TrainActivityPublisher(train, config, producerConfig, num_activity);
             redLine.start();
