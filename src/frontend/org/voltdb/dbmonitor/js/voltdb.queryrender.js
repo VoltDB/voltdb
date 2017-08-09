@@ -62,10 +62,10 @@ function QueryUI(queryTab) {
             MatchParameterSeparators = /[\s,]+/g;
 
         function matchToken(buffer, position, token) {
-            let tokLength = token.length;
-            let bufLength = buffer.length;
-            let firstLo = token.charAt(0).toLowerCase();
-            let firstHi = token.charAt(0).toUpperCase();
+            var tokLength = token.length;
+            var bufLength = buffer.length;
+            var firstLo = token.charAt(0).toLowerCase();
+            var firstHi = token.charAt(0).toUpperCase();
             var letterNumber = /^[0-9a-zA-Z]/;
             // for case insenstive comparison
             token = token.toUpperCase();
@@ -84,8 +84,8 @@ function QueryUI(queryTab) {
         }
 
         function findEndOfMultiStmtProc(src, idx) {
-            let inCase = 0;
-            for (let i = idx; i < src.length; i++) {
+            var inCase = 0;
+            for (var i = idx; i < src.length; i++) {
                 if ( matchToken(src, i, "CASE") ) {
                     inCase++;
                     i += 4
@@ -115,7 +115,7 @@ function QueryUI(queryTab) {
                 if (nextString === null) {
                     break;
                 }
-                let replacingStringLiteral = QuotedStringNonceLiteral + nonceNum;
+                var replacingStringLiteral = QuotedStringNonceLiteral + nonceNum;
                 stringBankOut[replacingStringLiteral] = nextString;
                 src = src.replace(nextString, replacingStringLiteral);
                 nonceNum += 1;
@@ -142,7 +142,7 @@ function QueryUI(queryTab) {
         // Avoid false positives for statement grammar inside multi statement procedures by
         // substituting a nonce for each string.
         function disguiseMultiStmtProc(src, stringBankOut) {
-            let nonceNum, nextString;
+            var nonceNum, nextString;
 
             // Extract multi stmt procs to keep their content from getting confused with interesting
             // statement syntax - (multiple statements with ;)
@@ -152,10 +152,10 @@ function QueryUI(queryTab) {
                 if (matchArr == null) {
                     break;
                 }
-                let endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
+                var endidx = findEndOfMultiStmtProc(src, src.indexOf(matchArr[0]) + matchArr[0].length);
                 // get all the statements after CREATE PROCEDURE ... END
-                let mspStmts = src.substring(src.indexOf(matchArr[0]), endidx);
-                let replacingStringLiteral = MultiStmtProcNonceLiteral + nonceNum;
+                var mspStmts = src.substring(src.indexOf(matchArr[0]), endidx);
+                var replacingStringLiteral = MultiStmtProcNonceLiteral + nonceNum;
                 stringBankOut[replacingStringLiteral] = mspStmts;
                 src = src.replace(mspStmts, replacingStringLiteral);
                 nonceNum += 1;
