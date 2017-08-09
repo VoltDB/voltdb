@@ -34,6 +34,10 @@ public class DummyTransactionResponseMessage extends VoltMessage {
     private long m_spHandle;
     private long m_spiHSId;
 
+    //The flag used for SPI balance operation, indicating that the task was created
+    //when the site was leader partition
+    boolean m_forLeader = false;
+
     /** Empty constructor for de-serialization */
     public DummyTransactionResponseMessage()
     {
@@ -70,7 +74,7 @@ public class DummyTransactionResponseMessage extends VoltMessage {
         msgsize += 8 // txnId
             + 8 // m_spHandle
             + 8 // SPI HSId
-            ;
+            + 1;//m_forLeader
         return msgsize;
     }
 
@@ -81,6 +85,7 @@ public class DummyTransactionResponseMessage extends VoltMessage {
         buf.putLong(m_txnId);
         buf.putLong(m_spHandle);
         buf.putLong(m_spiHSId);
+        buf.put(m_forLeader ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -91,6 +96,7 @@ public class DummyTransactionResponseMessage extends VoltMessage {
         m_txnId = buf.getLong();
         m_spHandle = buf.getLong();
         m_spiHSId = buf.getLong();
+        m_forLeader = buf.get() == 1;
     }
 
     @Override
@@ -103,5 +109,14 @@ public class DummyTransactionResponseMessage extends VoltMessage {
         sb.append(" SPI HSID: ").append(CoreUtils.hsIdToString(m_spiHSId));
 
         return sb.toString();
+    }
+
+
+    public void setForLeader(boolean forLeader) {
+        m_forLeader = forLeader;
+    }
+
+    public boolean isForLeader() {
+        return m_forLeader;
     }
 }

@@ -568,6 +568,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             true);
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
+                replmsg.setLeaderToReplica(true);
                 m_mailbox.send(m_sendToHSIds, replmsg);
 
                 DuplicateCounter counter = new DuplicateCounter(
@@ -745,7 +746,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
-            replmsg.setToReplica(true);
+            replmsg.setLeaderToReplica(true);
             m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
@@ -836,7 +837,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // the initiatorHSId is the ClientInterface mailbox.
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
-            setRepairLogTruncationHandle(spHandle);
+            setRepairLogTruncationHandle(spHandle, message.isForLeader());
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
 
@@ -911,7 +912,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         FragmentTaskMessage msg = message;
         long newSpHandle;
         //The site has been marked as non-leader. The follow-up batches or fragments are processed here
-        if (!message.toReplica() && (m_isLeader || (!m_isLeader && message.shouldHandleByOriginalLeader()))) {
+        if (!message.isLeaderToReplica() && (m_isLeader || (!m_isLeader && message.shouldHandleByOriginalLeader()))) {
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
             // before we start mucking with its state (SPHANDLE).  We need to revisit
             // all the messaging mess at some point.
@@ -959,7 +960,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
-                replmsg.setToReplica(true);
+                replmsg.setLeaderToReplica(true);
                 m_mailbox.send(m_sendToHSIds,replmsg);
                 DuplicateCounter counter;
                 /*
@@ -1172,7 +1173,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 if (txn != null && txn.isDone()) {
-                    setRepairLogTruncationHandle(txn.m_spHandle, message.shouldHandleByOriginalLeader());
+                    setRepairLogTruncationHandle(txn.m_spHandle, message.isForLeader());
                 }
 
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
@@ -1205,7 +1206,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // for complete writes txn, we will advance the transaction point
         if (txn != null && !txn.isReadOnly() && txn.isDone()) {
-            setRepairLogTruncationHandle(txn.m_spHandle);
+            setRepairLogTruncationHandle(txn.m_spHandle, message.isForLeader());
         }
 
         if (traceLog != null) {
@@ -1304,7 +1305,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
                 assert txn.isDone() : "Counter " + counter + ", leader " + m_isLeader + ", " + msg;
-                setRepairLogTruncationHandle(txn.m_spHandle);
+                setRepairLogTruncationHandle(txn.m_spHandle, msg.isAckRequestedFromSender());
             }
         }
 
@@ -1394,7 +1395,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
 
             if (m_sendToHSIds.length > 0) {
-                m_mailbox.send(m_sendToHSIds, msg);
+
+                DummyTransactionTaskMessage replmsg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
+                replmsg.setLeaderToReplica(true);
+                m_mailbox.send(m_sendToHSIds, replmsg);
 
                 DuplicateCounter counter = new DuplicateCounter(
                         HostMessenger.VALHALLA,
@@ -1439,7 +1443,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (result == DuplicateCounter.DONE) {
             // DummyTransactionResponseMessage ends on SPI
             m_duplicateCounters.remove(dcKey);
-            setRepairLogTruncationHandle(spHandle);
+            setRepairLogTruncationHandle(spHandle, message.isForLeader());
         }
     }
 

@@ -167,9 +167,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
-    // indicate if the fragment is created on partition leader and sent to replicas.
-    boolean m_toReplica = false;
-
     // indicate that the fragment should be handled via original partition leader
     // before spi migration if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
@@ -671,9 +668,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // 1 byte for the timeout flag
         msgsize += 1;
 
-        //for isForReplica
-        msgsize += 1;
-
         msgsize += 1; //m_handleByOriginalLeader
         msgsize += m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4;
 
@@ -779,7 +773,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(m_isFinal ? (byte) 1 : (byte) 0);
         buf.put(m_taskType);
         buf.put(m_emptyForRestart ? (byte) 1 : (byte) 0);
-        buf.put(m_toReplica ? (byte) 1 : (byte) 0);
         buf.put(m_handleByOriginalLeader ? (byte) 1 : (byte) 0);
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
@@ -916,7 +909,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_isFinal = buf.get() != 0;
         m_taskType = buf.get();
         m_emptyForRestart = buf.get() != 0;
-        m_toReplica = buf.get() == 1;
         m_handleByOriginalLeader = buf.get() == 1;
         boolean haveOutputDependencies = buf.get() != 0;
         boolean haveInputDependencies = buf.get() != 0;
@@ -1094,7 +1086,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         if (m_isFinal)
             sb.append("\n  THIS IS THE FINAL TASK");
-        if (m_toReplica)
+        if (m_isLeaderToReplica)
             sb.append("\n  THIS IS SENT TO REPLICA");
 
         if (m_handleByOriginalLeader) {
@@ -1130,14 +1122,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public boolean isEmpty() {
         return m_items.isEmpty();
-    }
-
-    public boolean toReplica() {
-        return m_toReplica;
-    }
-
-    public void setToReplica(boolean toReplica) {
-        m_toReplica = toReplica;
     }
 
     public void setHandleByOriginalLeader(boolean handleByOriginalLeader) {

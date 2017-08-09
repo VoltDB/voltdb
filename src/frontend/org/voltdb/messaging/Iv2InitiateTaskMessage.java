@@ -57,9 +57,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     // not serialized.
     AtomicBoolean m_isDurable;
 
-    // indicate if the message is created on partition leader and sent to replicas.
-    boolean m_toReplica = false;
-
     /** Empty constructor for de-serialization */
     Iv2InitiateTaskMessage() {
         super();
@@ -110,7 +107,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
         m_connectionId = connectionId;
-        m_toReplica = toReplica;
     }
 
     // SpScheduler creates messages with truncation handles.
@@ -153,8 +149,8 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
-        m_toReplica = toReplica;
         m_nPartitions = rhs.m_nPartitions;
+        m_isLeaderToReplica = toReplica;
     }
 
     @Override
@@ -222,7 +218,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         msgsize += 8; // m_clientInterfaceHandle
         msgsize += 8; // m_connectionId
         msgsize += 1; // is single partition flag
-        msgsize += 1; // is isForReplica flag
         msgsize += 1; // should generate a response
         msgsize += 1; // flags (SP/NP/return tables)
         if (m_nPartitions != null) {
@@ -247,7 +242,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         buf.putLong(m_clientInterfaceHandle);
         buf.putLong(m_connectionId);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
-        buf.put(m_toReplica ? (byte) 1 : (byte) 0);
         buf.put((byte)0);//Should never generate a response if we have to forward to a replica
         buf.put(flags);
         if (m_nPartitions != null) {
@@ -268,7 +262,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
-        m_toReplica = buf.get() == 1;
         m_shouldReturnResultTables = buf.get() != 0;
         byte flags = buf.get();
         m_isSinglePartition = (flags & SINGLE_PARTITION_MASK) != 0;
@@ -336,9 +329,5 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     public ByteBuffer getSerializedParams() {
         return m_invocation.getSerializedParams();
-    }
-
-    public boolean toReplica() {
-        return m_toReplica;
     }
 }

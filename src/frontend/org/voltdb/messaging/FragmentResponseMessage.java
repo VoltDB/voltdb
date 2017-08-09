@@ -68,7 +68,7 @@ public class FragmentResponseMessage extends VoltMessage {
     // indicate that the fragment is handled via original partition leader
     // before spi migration if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
-    boolean m_handleByOriginalLeader = false;
+    boolean m_forLeader = false;
 
     /** Empty constructor for de-serialization */
     FragmentResponseMessage() {
@@ -194,7 +194,7 @@ public class FragmentResponseMessage extends VoltMessage {
             + 1 // node recovering flag
             + 2 // dependency count
             + 4// partition id
-            + 1; //m_handleByOriginalLeader
+            + 1; //m_forLeader
         // one int per dependency ID and table length (0 = null)
         msgsize += 8 * m_dependencyCount;
 
@@ -230,7 +230,7 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.put((byte) (m_recovering ? 1 : 0));
         buf.putShort(m_dependencyCount);
         buf.putInt(m_partitionId);
-        buf.put(m_handleByOriginalLeader ? (byte) 1 : (byte) 0);
+        buf.put(m_forLeader ? (byte) 1 : (byte) 0);
         for (DependencyPair depPair : m_dependencies) {
             buf.putInt(depPair.depId);
 
@@ -264,7 +264,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_recovering = buf.get() == 0 ? false : true;
         m_dependencyCount = buf.getShort();
         m_partitionId = buf.getInt();
-        m_handleByOriginalLeader = buf.get() == 1;
+        m_forLeader = buf.get() == 1;
         for (int i = 0; i < m_dependencyCount; i++) {
             int depId = buf.getInt();
             int depLen = buf.getInt(buf.position());
@@ -333,11 +333,11 @@ public class FragmentResponseMessage extends VoltMessage {
         return sb.toString();
     }
 
-    public void setHandleByOriginalLeader(boolean handleByOriginalLeader) {
-        m_handleByOriginalLeader = handleByOriginalLeader;
+    public void setForLeader(boolean forLeader) {
+        m_forLeader = forLeader;
     }
 
-    public boolean shouldHandleByOriginalLeader() {
-        return m_handleByOriginalLeader;
+    public boolean isForLeader() {
+        return m_forLeader;
     }
 }

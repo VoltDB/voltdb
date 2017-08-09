@@ -1703,11 +1703,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void handleHostsFailedForBalanceSpi(Set<Integer> failedHosts) {
-
-        //hosts are down, so stop balance spi service if there is one
-        m_messenger.send(CoreUtils.getHSIdFromHostAndSite(m_messenger.getHostId(),
-                        HostMessenger.CLIENT_INTERFACE_SITE_ID), new BalanceSPIMessage());
-
         BalanceSpiInfo spiInfo = CoreZK.getSPIBalanceInfo(m_messenger.getZK());
         if (spiInfo == null){
             return;

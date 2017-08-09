@@ -2168,8 +2168,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final int targetHostId = target.getSecond();
         int partitionKey = -1;
 
-        //Balance spi is completed! Stop BalanceSPI service on this host
-        if (targetHostId == -1) {
+        //Balance spi is completed or there are hosts down. Stop BalanceSPI service on this host
+        if (targetHostId == -1 || !voltDB.isClusterCompelte()) {
             voltDB.scheduleWork(new Runnable() {
                 public void run() {m_mailbox.deliver(new BalanceSPIMessage());}
             }, 0, 0, TimeUnit.SECONDS);

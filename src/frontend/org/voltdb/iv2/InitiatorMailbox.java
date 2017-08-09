@@ -417,7 +417,7 @@ public class InitiatorMailbox implements Mailbox
     // After the SPI migration has been requested, all the sp requests will be sent back to the sender
     // if these requests are intended for leader. Client interface will restart these transactions.
     private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
-        if (message.toReplica()) {
+        if (message.isLeaderToReplica()) {
             return false;
         }
 
@@ -448,7 +448,7 @@ public class InitiatorMailbox implements Mailbox
 
     // After SPI migration has been requested, the fragments which are sent to leader site should be restarted.
     private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
-        if (m_scheduler.isLeader() || message.toReplica()) {
+        if (m_scheduler.isLeader() || message.isLeaderToReplica()) {
             return false;
         }
 
@@ -472,7 +472,7 @@ public class InitiatorMailbox implements Mailbox
 
         // A transaction may have multiple batches or fragments. If the first batch or fragment has already been
         // processed, the follow-up batches or fragments should also be processed on this site.
-        if (!m_scheduler.isLeader() && !message.toReplica() && seenTheTxn) {
+        if (!m_scheduler.isLeader() && !message.isLeaderToReplica() && seenTheTxn) {
             message.setHandleByOriginalLeader(true);
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + "\n" + message);

@@ -43,6 +43,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     // Message create for command log replay.
     protected boolean m_isForReplay;
 
+    // If its is true, the message is created on partition leader and sent to replicas.
+    protected boolean m_isLeaderToReplica = false;
 
     /** Empty constructor for de-serialization */
     protected TransactionInfoBaseMessage() {
@@ -144,7 +146,9 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
             + 8        // m_spHandle
             + 8        // m_truncationHandle
             + 1        // m_isReadOnly
-            + 1;       // is for replay flag
+            + 1        // is for replay flag
+            + 1;       // m_isLeaderToReplica
+
         return msgsize;
     }
 
@@ -158,6 +162,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_truncationHandle);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
         buf.put(m_isForReplay ? (byte) 1 : (byte) 0);
+        buf.put(m_isLeaderToReplica ? (byte) 1 : (byte) 0);
     }
 
     @Override
@@ -170,5 +175,14 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_truncationHandle = buf.getLong();
         m_isReadOnly = buf.get() == 1;
         m_isForReplay = buf.get() == 1;
+        m_isLeaderToReplica = buf.get() == 1;
+    }
+
+    public void setLeaderToReplica(boolean toReplica) {
+        m_isLeaderToReplica = toReplica;
+    }
+
+    public boolean isLeaderToReplica() {
+        return m_isLeaderToReplica;
     }
 }

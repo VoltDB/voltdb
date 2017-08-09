@@ -54,9 +54,9 @@ public class InitiateResponseMessage extends VoltMessage {
     private StoredProcedureInvocation m_invocation;
     private Pair<Long, byte[]> m_currentHashinatorConfig;
 
-    // a flag used for SPI balance operation, indicating that the task was created
+    //The flag used for SPI balance operation, indicating that the task was created
     //when the site was leader partition
-    boolean m_createdFromLeader = false;
+    boolean m_forLeader = false;
 
     /** Empty constructor for de-serialization */
     public InitiateResponseMessage()
@@ -165,14 +165,6 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_commit;
     }
 
-    public boolean wasCreatedFromLeader() {
-        return m_createdFromLeader;
-    }
-
-    public void setCreatedFromLeader(boolean createdFromLeader) {
-        m_createdFromLeader = createdFromLeader;
-    }
-
     public boolean isRecovering() {
         return m_recovering;
     }
@@ -269,7 +261,7 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_readOnly == true ? 1 : 0));
         buf.put((byte) (m_recovering == true ? 1 : 0));
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
-        buf.put((byte) (m_createdFromLeader == true ? 1 : 0));
+        buf.put((byte) (m_forLeader == true ? 1 : 0));
         m_response.flattenToBuffer(buf);
         if (m_mispartitioned || isMisrouted()) {
             buf.putLong(m_currentHashinatorConfig.getFirst());
@@ -293,7 +285,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_readOnly = buf.get() == 1;
         m_recovering = buf.get() == 1;
         m_mispartitioned = buf.get() == 1;
-        m_createdFromLeader = buf.get() == 1;
+        m_forLeader = buf.get() == 1;
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
         m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
@@ -341,4 +333,13 @@ public class InitiateResponseMessage extends VoltMessage {
 
         return sb.toString();
     }
+
+    public void setForLeader(boolean forLeader) {
+        m_forLeader = forLeader;
+    }
+
+    public boolean isForLeader() {
+        return m_forLeader;
+    }
+
 }
