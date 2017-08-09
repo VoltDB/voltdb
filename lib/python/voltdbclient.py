@@ -201,7 +201,6 @@ class FastSerializer:
             self.usekerberos = kerberos
         self.kerberosprinciple = None
         self.ssl_config = ssl_config
-        print ssl_config_file
         self.ssl_config_file = ssl_config_file
         if not dump_file_path is None:
             self.dump_file = open(dump_file_path, "wb")
