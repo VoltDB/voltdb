@@ -2833,6 +2833,7 @@ function alertNodeClicked(obj) {
                         if(!tableObj[tableName].hasOwnProperty('PARTITIONS')){
                             tableObj[tableName]["PARTITIONS"] = [];
                             tableObj[tableName]["TUPLE_COUNT"] = 0;
+                            tableObj[tableName]["TIMESTAMP"] = rawTablePartitions[i][0]
                         }
 
                         if(value["PARTITION_TYPE"] == "Partitioned"){

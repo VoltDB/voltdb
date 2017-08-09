@@ -272,10 +272,11 @@ function loadAnalysisPage(){
             var tableData = []
             var isReplicated = false;
             var isPartitioned = false;
+            var timeStamp;
             $.each(tableDetails["TABLES"], function(key, value){
                 var tableName = key;
                 var tupleCount = value["TUPLE_COUNT"];
-                tableData.push({"label": tableName, "value": tupleCount})
+                timeStamp = value["TIMESTAMP"];
 
                 if(value["PARTITION_TYPE"] == "Partitioned"){
                     isPartitioned = true;
@@ -286,9 +287,13 @@ function loadAnalysisPage(){
                 VoltDbAnalysis.tablePropertyValue[tableName] = {
                     "PARTITION_TYPE": value["PARTITION_TYPE"]
                 }
+
+                tableData.push({"label": tableName, "value": tupleCount})
             });
 
             formatAnalysisTableLegend(isPartitioned, isReplicated)
+            var formatTableDate = VoltDbAnalysis.formatDateTime(timeStamp);
+            $("#analysisDateTable").html(formatTableDate);
             setTimeout(function(){
                 tableData.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
                 MonitorGraphUI.RefreshAnalysisTableGraph(tableData);
