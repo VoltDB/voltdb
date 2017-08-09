@@ -9325,7 +9325,7 @@
                     .attr('y', (x.rangeBand() - 20))
                     .attr('x', function (d, i) { return getY(d, i) < 0 ? -4 : y(getY(d, i)) - y(0) })
                     .text(function (d, i) {
-                        return d.z.toFixed(3) + '';
+                        return d.z + '';
                     });
                 }
             }
