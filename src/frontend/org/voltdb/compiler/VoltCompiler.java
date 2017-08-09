@@ -108,6 +108,9 @@ public class VoltCompiler {
     // tables that change between the previous compile and this one
     // used for Live-DDL caching of plans
     private final Set<String> m_dirtyTables = new TreeSet<>();
+    // If we want to force all tables to be recompiled, we
+    // set this to true.
+    private boolean m_allTablesAreDirty = false;
     // A collection of statements from the previous catalog
     // used for Live-DDL caching of plans
     private final Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
@@ -2185,14 +2188,14 @@ public class VoltCompiler {
         // check that no underlying tables have been modified since the proc had been compiled
         String[] tablesTouched = candidate.getTablesread().split(",");
         for (String tableName : tablesTouched) {
-            if (m_dirtyTables.contains(tableName.toLowerCase())) {
+            if (isDirtyTable(tableName)) {
                 ++m_stmtCacheMisses;
                 return null;
             }
         }
         tablesTouched = candidate.getTablesupdated().split(",");
         for (String tableName : tablesTouched) {
-            if (m_dirtyTables.contains(tableName.toLowerCase())) {
+            if (isDirtyTable(tableName)) {
                 ++m_stmtCacheMisses;
                 return null;
             }
@@ -2204,6 +2207,14 @@ public class VoltCompiler {
         return candidate;
     }
 
+    private boolean isDirtyTable(String tableName) {
+        return m_allTablesAreDirty || m_dirtyTables.contains(tableName.toLowerCase());
+    }
+
+    public void setEverythingDirty() {
+        m_allTablesAreDirty = true;
+    }
+
     @SuppressWarnings("unused")
     private void printStmtCacheStats() {
         System.out.printf("Hits: %d, Misses %d, Percent %.2f\n",
@@ -2211,4 +2222,5 @@ public class VoltCompiler {
                 (m_stmtCacheHits * 100.0) / (m_stmtCacheHits + m_stmtCacheMisses));
         System.out.flush();
     }
+
 }

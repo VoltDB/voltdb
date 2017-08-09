@@ -59,6 +59,8 @@ public class DropFunction extends StatementProcessor {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Function name \"%s\" in DROP FUNCTION statement does not exist.",
                         functionName));
+            } else {
+                m_compiler.setEverythingDirty();
             }
         }
         return true;
