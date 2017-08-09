@@ -2808,23 +2808,15 @@ var loadPage = function (serverName, portid) {
         VoltDbUI.executionDetails = {};
         var statement = '';
 
-        VoltDbAnalysis.latencyDetailValue.forEach (function(item){
-            var smallest = VoltDbAnalysis.latencyDetailValue[0].MIN;
-            var largest = VoltDbAnalysis.latencyDetailValue[0].MIN;
 
+        VoltDbAnalysis.latencyDetailValue.forEach (function(item){
             if(item.PROCEDURE == procedureName ){
                 if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
                     VoltDbUI.executionDetails[item.STATEMENT]={};
                 }
-
                 if (statement == item.STATEMENT){
-                    if(item.MIN < smallest){
-                        smallest = item.MIN;
-                    }
-
-                    if(item.MAX > largest){
-                       largest = item.MAX;
-                    }
+                    var smallest = GetMinimumValue(VoltDbAnalysis.latencyDetailValue, item.STATEMENT);
+                    var largest = GetMaximumValue(VoltDbAnalysis.latencyDetailValue, item.STATEMENT);
 
                     if(item.type == "Single Partitioned"){
                         VoltDbUI.executionDetails[item.STATEMENT]["INVOCATION"] += item.INVOCATION;
@@ -2843,6 +2835,22 @@ var loadPage = function (serverName, portid) {
             statement = item.STATEMENT;
         });
     }
+
+    function GetMinimumValue(arr, statement){
+        arr = arr.filter(function( obj ) {
+            return obj.STATEMENT == statement;
+        });
+        return Math.min.apply(Math,arr.map(function(o){return o.MIN;}))
+    }
+
+     function GetMaximumValue(arr, statement){
+
+        arr = arr.filter(function( obj ) {
+            return obj.STATEMENT == statement;
+        });
+        return Math.max.apply(Math,arr.map(function(o){return o.MAX;}))
+    }
+
 
     function objectLength(obj, statement) {
       var result = 0;
@@ -3292,6 +3300,7 @@ var adjustImporterGraphSpacing = function() {
         this.isTotalProcessing = false;
         this.isFrequency = false;
         this.partitionLength = 0;
+        this.MIN = 0;
         this.getCookie = function (name) {
             return $.cookie(name + "_" + VoltDBConfig.GetPortId());
         },
