@@ -182,7 +182,7 @@ function QueryUI(queryTab) {
         // break down a multi-statement string into a statement array.
         function parseUserInputMethod(src) {
             var splitStmts, stmt, ii, len,
-                stringBank = {},  // distionary to store disguised string literals with the actual content
+                stringBank = {},  // dictionary to store disguised string literals with the actual content
                 statementBank = [];
             // Eliminate line comments permanently.
 
