@@ -756,6 +756,7 @@ simple-numeric-expr     ::= {numeric-value} | [[[[{table-alias-or-name}.]]]]{num
 int-function-expr       ::= {int-expression} {math-operator} {int-expression} | \
                             {int-function-1arg}({int-expression}) | \
                             {int-function-2args}({int-expression}, {int-expression}) | \
+                            {int-function-2args-1pos}({int-expression},{non-negative-int-value}) | \
                             {int-valued-string-expr} | {int-valued-time-expr} | {int-valued-t-unit-expr}
 byte-function-expr      ::= {byte-expression} {math-operator} {byte-expression} | \
                             {int-function-2args}({byte-expression}, {byte-expression})
