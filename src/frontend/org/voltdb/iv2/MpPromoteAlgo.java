@@ -318,9 +318,10 @@ public class MpPromoteAlgo implements RepairAlgo
     VoltMessage createRepairMessage(Iv2RepairLogResponseMessage msg)
     {
         if (msg.getPayload() instanceof CompleteTransactionMessage) {
-            return msg.getPayload();
-        }
-        else {
+            CompleteTransactionMessage message = (CompleteTransactionMessage)msg.getPayload();
+            message.setToLeader(true);
+            return message;
+        } else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();
             // We currently don't want to restart read-only MP transactions because:
             // 1) We're not writing the Iv2InitiateTaskMessage to the first
