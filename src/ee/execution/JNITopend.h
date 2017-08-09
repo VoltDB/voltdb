@@ -103,7 +103,7 @@ private:
     jmethodID m_callJavaUserDefinedFunctionMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
-    jclass m_encoderClass;
+    jclass m_decompressionClass;
 };
 
 }

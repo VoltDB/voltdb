@@ -1256,10 +1256,6 @@ public abstract class CatalogUtil {
                     if (key.toLowerCase().contains("passw")) {
                         // Don't trim password
                         processorProperties.setProperty(key, value);
-                    } else if (key.toLowerCase().contains("delim")){
-                        // Don't trim \n in delimiters
-                        String trimmedDelimiters = value.replaceAll("^(\r|\f|\t| )+", "").replaceAll("(\r|\f|\t| )+$", "");
-                        processorProperties.setProperty(key, StringEscapeUtils.escapeJava(trimmedDelimiters));
                     } else {
                         processorProperties.setProperty(key, value.trim());
                     }
@@ -2770,5 +2766,12 @@ public abstract class CatalogUtil {
             sb.append("\n");
         }
         return sb.toString();
+    }
+
+    /*
+     * Check if the procedure is partitioned or not
+     */
+    public static boolean isProcedurePartitioned(Procedure proc) {
+        return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
     }
 }

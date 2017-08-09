@@ -677,6 +677,7 @@ DISTRIBUTION
 	 target="dist" inheritAll="false"
 	 dir="${base.dir}/tools/meshmonitor">
         <property name="volthome" value="${base.dir}"/>
+        <property name="voltdb.build" value="${build}"/>
     </ant>
     <copy todir="${dist.dir}/tools/meshmonitor">
         <fileset dir="${base.dir}/tools/meshmonitor/dist" defaultexcludes="yes">

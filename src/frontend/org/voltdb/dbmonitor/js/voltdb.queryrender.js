@@ -112,6 +112,9 @@ function QueryUI(queryTab) {
             // semicolon boundaries -- semicolons might appear in quoted text.
             src = disguiseQuotedStrings(src, stringBank);
 
+            //Replace extra spaces from query statement.
+            src = src.replace(/\s+/g, ' ');
+
             splitStmts = src.split(';');
 
             statementBank = [];
@@ -233,24 +236,23 @@ function QueryUI(queryTab) {
         if (source != null){
             source = source.replace(/^\s+|\s+$/g,'');
             if (source == '')
-                source = $('#querybox-' + query_id)[0].innerText.replace(/\s+/g, ' ');
+                source = $('#querybox-' + query_id)[0].innerText;
         } else
-            source = $('#querybox-' + query_id)[0].innerText.replace(/\s+/g, ' ');
+            source = $('#querybox-' + query_id)[0].innerText;
 
         source = source.replace(/^\s+|\s+$/g,'');
+        source = source.replace("\\", "\\\\");
         if (source == '')
             return;
 
         $('#runBTn-' + query_id).attr('disabled', 'disabled');
         $('#runBTn-' + query_id).addClass("graphOpacity");
-
         var statements = CommandParser.parseUserInput(source);
         var start = (new Date()).getTime();
         var connectionQueue = connection.getQueue();
         connectionQueue.Start();
 
         for (var i = 0; i < statements.length; i++) {
-
             var isExplainQuery = false;
             var id = 'r' + i;
             if (statements[i].toLowerCase().indexOf('@explain') >= 0) {
