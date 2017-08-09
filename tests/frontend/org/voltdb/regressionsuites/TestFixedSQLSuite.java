@@ -39,10 +39,10 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
-import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
-import org.voltdb_testprocs.regressionsuites.fixedsql.InsertBoxed;
 import org.voltdb_testprocs.regressionsuites.fixedsql.BoxedByteArrays;
 import org.voltdb_testprocs.regressionsuites.fixedsql.InPrimitiveArrays;
+import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
+import org.voltdb_testprocs.regressionsuites.fixedsql.InsertBoxed;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
@@ -491,7 +491,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
             results = client.callProcedure("BoxedByteArrays", "SEL_VARBIN", null, null, box2DByteArr,
                         null, null, null).getResults();
         } catch (Exception e) {
-            assertTrue(e.getMessage().contains("Type class [Ljava.lang.Byte; not supported in parameter set arrays"));
+            errMsg = "VOLTDB ERROR: UNEXPECTED FAILURE:\n"
+                    + "  org.voltdb.VoltTypeException: Procedure BoxedByteArrays: "
+                    + "Incompatible parameter type: can not convert type 'byte[][]' to 'INLIST_OF_BIGINT' "
+                    + "for arg 0 for SQL stmt: SELECT * FROM ENG_539 WHERE VARBIN IN ?;. "
+                    + "Try explicitly using a long[] parameter";
+            assertTrue(e.getMessage().contains(errMsg));
         }
 
         String query =
