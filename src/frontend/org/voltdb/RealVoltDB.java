@@ -198,6 +198,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -3365,7 +3366,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         Database db = newCatalog.getClusters().get("cluster").getDatabases().get("database");
         CatalogMap<Procedure> catalogProcedures = db.getProcedures();
 
-        ExecutorService es = Executors.newSingleThreadScheduledExecutor();
+        ExecutorService es = Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder()
+                .setNameFormat("ProcedureRunner-creation-" + "%d")
+                .build());
+
 
         SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
         List<Long> immutableSites = siteTracker.getSitesForHost(m_messenger.getHostId());
@@ -3408,6 +3413,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             hostLog.error(errorMsg);
             return errorMsg;
         }
+
+        // close the executor service
+        es.shutdown();
 
         return null;
     }
