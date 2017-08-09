@@ -699,7 +699,7 @@
                         trowEnter.append("td")
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
                     }
-                    else if (d.series[0].key == "Total Processing Time MP"){
+                    else if (d.series[0].key == "Total Processing Time SP" || d.series[0].key == "Frequency SP" || d.series[0].key == "Execution Time SP"){
                         var keyName = d.series[0].key;
                         keyName = (keyName == "Frequency Detail" ? "Frequency":(keyName == "Processing Time Detail" ? "Total Processing Time" : keyName));
                         trowEnter.append("td")
@@ -724,7 +724,7 @@
                     trowEnter.append("td")
                         .html(function (p, i) { return (d.series[0].key != "Frequency"  && d.series[0].key != "Frequency Detail" ? p.value.toFixed(3) : p.value)+ unit });
                 }
-                else if (d.series[0].key == "Total Processing Time MP"){
+                else if (d.series[0].key == "Total Processing Time SP" || d.series[0].key == "Frequency SP" || d.series[0].key == "Execution Time SP"){
                     trowEnter.append("td")
                         .html(function (p, i) { return ((d.data.y / d.data.z) * 100).toFixed(3) + unit });
                 }
@@ -835,7 +835,7 @@
                         trowEnter3.append("td")
                             .html(VoltDbUI.executionDetails[statement].INVOCATION);
                 }
-                else if(d.series[0].key == "Total Processing Time MP") {
+                else if(d.series[0].key == "Total Processing Time SP") {
                     var trowEnter1 = tbodyEnter.selectAll("tr")
                     .append("tr");
                     trowEnter1.append("td")
@@ -853,6 +853,44 @@
 
                         trowEnter2.append("td")
                             .html(d.series[0].value.toFixed(3) +"s");
+                }
+                 else if(d.series[0].key == "Frequency SP") {
+                    var trowEnter1 = tbodyEnter.selectAll("tr")
+                    .append("tr");
+                    trowEnter1.append("td")
+                    .html("Partition ID")
+                    var partitionId = d.data.PARTITION_ID;
+
+                    trowEnter1.append("td")
+                        .html(partitionId);
+
+                    var trowEnter2 = tbodyEnter
+                        .append("tr");
+
+                        trowEnter2.append("td")
+                        .html("Frequency")
+
+                        trowEnter2.append("td")
+                            .html(d.series[0].value.toFixed(3) +"");
+                }
+                else if(d.series[0].key == "Execution Time SP") {
+                    var trowEnter1 = tbodyEnter.selectAll("tr")
+                    .append("tr");
+                    trowEnter1.append("td")
+                    .html("Partition ID")
+                    var partitionId = d.data.PARTITION_ID;
+
+                    trowEnter1.append("td")
+                        .html(partitionId);
+
+                    var trowEnter2 = tbodyEnter
+                        .append("tr");
+
+                        trowEnter2.append("td")
+                        .html("Avg Execution Time")
+
+                        trowEnter2.append("td")
+                            .html(d.series[0].value.toFixed(3) +"ms");
                 }
 
                 var html = table.node().outerHTML;

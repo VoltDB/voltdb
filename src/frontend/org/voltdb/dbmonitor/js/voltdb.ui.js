@@ -2491,7 +2491,7 @@ var loadPage = function (serverName, portid) {
                     var u = 0;
                     for(var key in orderedDetails){
                         if(partitionDetails[x]== undefined){
-                            partitionDetails.push({"key": "Total Processing Time MP"})
+                            partitionDetails.push({"key": "Execution Time SP"})
                             partitionDetails[x]["values"] = [];
                         }
 
@@ -2616,7 +2616,7 @@ var loadPage = function (serverName, portid) {
                     var u = 0;
                     for(var key in orderedDetails){
                         if(partitionDetails[x]== undefined){
-                            partitionDetails.push({"key": "Total Processing Time MP"})
+                            partitionDetails.push({"key": "Frequency SP"})
                             partitionDetails[x]["values"] = [];
                         }
 
@@ -2763,7 +2763,7 @@ var loadPage = function (serverName, portid) {
                     var u = 0;
                     for(var key in orderedDetails){
                         if(partitionDetails[x]== undefined){
-                            partitionDetails.push({"key": "Total Processing Time MP"})
+                            partitionDetails.push({"key": "Total Processing Time SP"})
                             partitionDetails[x]["values"] = [];
                         }
 
