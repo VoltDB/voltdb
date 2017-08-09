@@ -14,6 +14,11 @@ function RefreshData(){
                      }
                     );
 
+    con.BeginExecute('GetStationWaitTime',
+                     [],
+                     function(response) {
+                         DrawTable(response,'#avg_wait_time')}
+                    );
 }
 
 function RefreshStats() {

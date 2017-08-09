@@ -179,6 +179,12 @@ WHERE
 GROUP BY s.name
 ORDER BY swipes DESC;
 
+CREATE PROCEDURE GetStationWaitTime AS
+SELECT s.name as name, w.total_time as totaltime, w.entries as entries
+FROM wait_time_by_station w
+INNER JOIN stations s ON s.station_id = w.station_id
+ORDER BY name;
+
 CREATE PROCEDURE GetSwipesPerSecond AS
 SELECT second, activities, entries
 FROM secondly_stats
