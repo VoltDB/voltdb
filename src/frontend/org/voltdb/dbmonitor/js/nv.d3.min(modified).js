@@ -9189,12 +9189,22 @@
                         })
                         .text(function (d, i) {
                             var unit = " ";
-                            if(d.key == "Execution Time" || d.key == "Avg Execution Time")
+                            if(d.key == "Execution Time" || d.key == "Avg Execution Time"){
                                 unit = "ms";
-                            else if (d.key == "Total Processing Time" || d.key == "Processing Time Detail")
+                                var t = getY(d, i).toFixed(3);
+                            }
+                            else if (d.key == "Total Processing Time" || d.key == "Processing Time Detail"){
                                 unit = "s";
-                            var t = valueFormat(getY(d, i))
-                                , yerr = getYerr(d, i);
+                                var t = getY(d, i).toFixed(3);
+                            }
+                            else{
+                                var t = getY(d, i)
+                            }
+
+                            var yerr = getYerr(d, i);
+
+//                            var t = valueFormat(getY(d, i))
+//                                , yerr = getYerr(d, i);
                             if (yerr === undefined)
                                 return t + unit;
                             if (!yerr.length)
@@ -10792,7 +10802,7 @@
             , id = Math.floor(Math.random() * 10000) //Create semi-unique ID in case user doesn't select one
             , container = null
             , color = nv.utils.defaultColor()
-            , valueFormat = d3.format(',.2f')
+            , valueFormat = d3.format(',.3f')
             , showLabels = true
             , labelsOutside = false
             , labelType = "key"
