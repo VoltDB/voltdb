@@ -644,6 +644,11 @@ public class ProcedureRunner {
         if (stmt == null) {
             throw new IllegalArgumentException("SQLStmt parameter to voltQueueSQL(..) was null.");
         }
+        if (stmt.statementParamTypes == null) {
+            // reflected SQLStmt is not initialized, this means the SQLStmt is not declared as public final StmtSQL
+            throw new IllegalArgumentException("SQLStmt is not declared as final or initialized at compile time.");
+        }
+
         QueuedSQL queuedSQL = new QueuedSQL();
         queuedSQL.expectation = expectation;
         queuedSQL.params = getCleanParams(stmt, true, args);
