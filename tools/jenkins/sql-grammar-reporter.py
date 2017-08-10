@@ -33,13 +33,6 @@ class Issues(object):
             logging.exception('Could not connect to Jira')
             return
 
-        summary = job + ' failed on build ' + str(build)
-
-        existing = jira.search_issues('summary ~ \'%s\'' % summary)
-        if len(existing) > 0:
-            print 'No new Jira issue created. Build ' + str(build) + ' has already been reported.'
-            return
-
         build_report_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
         build_report = eval(self.read_url(build_report_url))
         build_url = build_report.get('url')
@@ -52,6 +45,26 @@ class Issues(object):
         summary_url = self.jhost + '/job/' + job + '/' + str(build) + '/artifact/tests/sqlgrammar/summary.out'
         summary_report = self.read_url(summary_url)
 
+        pframe_split = summary_report.split('Problematic frame:')
+        pframe_split = pframe_split[1].split(']')
+        pframe_split = pframe_split[1].split('#')
+
+        summary = job + ':' + str(build) + ' - ' + pframe_split[0].strip()
+        existing = jira.search_issues('summary ~ \'%s\'' % summary)
+        if len(existing) > 0:
+            print 'No new Jira issue created. Build ' + str(build) + ' has already been reported.'
+            return 'Already reported'
+
+        old_issue = ''
+        existing = jira.search_issues('summary ~ \'%s\'' % 'voltdb::StringRef::getObject(int*)')
+        for issue in existing:
+            if str(issue.fields.status) == 'Open' and u'grammar-gen' in issue.fields.labels:
+                old_issue = issue
+
+        build_artifacts = build_report.get('artifacts')[0]
+        pid_fileName = build_artifacts['fileName']
+        pid_url = build_url + '/artifact/' + pid_fileName
+
         query_split = summary_report.split('(or it was never started??), after SQL statement:')
         crash_query = query_split[1]
 
@@ -60,10 +73,11 @@ class Issues(object):
         sigsegv_message = hash_split[0] + '# See problematic frame for where to report the bug.\n#'
 
         description = job + ' build ' + str(build) + ' : ' + str(build_result) + '\n' \
-            + 'Link to Jenkins build: ' + build_url + ' \n \n' \
+            + 'Jenkins build: ' + build_url + ' \n \n' \
+            + 'DDL: ' + 'https://github.com/VoltDB/voltdb/blob/master/tests/sqlgrammar/DDL.sql' + ' \n \n' \
+            + 'hs_err_pid: ' + pid_url + ' \n \n' \
             + 'SIGSEGV Message: \n' + '#' + sigsegv_message + ' \n \n' \
             + 'Query that Caused the Crash: ' + crash_query
-
         description = description.replace('#', '\#')
 
         labels = ['grammar-gen']
@@ -103,8 +117,12 @@ class Issues(object):
             'versions': [jira_version]
         }
 
-        new_issue = jira.create_issue(fields=issue_dict)
-        print 'New issue created for failure on build ' + str(build)
+        if old_issue:
+            new_comment = jira.add_comment(old_issue, description)
+            print 'New comment created on issue: ' + str(old_issue)
+        else:
+            new_issue = jira.create_issue(fields=issue_dict)
+            print 'New issue created for failure on build ' + str(build)
 
 if __name__ == '__main__':
     this_build = os.environ.get('build', None)

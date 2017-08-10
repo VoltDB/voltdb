@@ -22,16 +22,12 @@
  */
 
 /*
- * Stored procedure for ExportBenchmark
+ * Stored procedure for Kafka import
  *
- * 2 tables -- all datatypes with nullable and not nullable variants
+ * If incoming data is in the mirror table, increment received count.
  *
- * Call the SP with DB tables insert count and export tables insert count.
- * This allows mixing DB insert to export insert ratio, following the recent
- * Flipkart customer case where export rows could exceed DB inserts as much as 10:1.
- *
- * Since DB inserts and export inserts are parameterized, it's possible to try many
- * variations in the test driver.
+ * Else add to error table as a record of rows that didn't get
+ * into the mirror table, a major error!
  */
 
 package kafkaimporter.db.procedures;
@@ -39,19 +35,24 @@ package kafkaimporter.db.procedures;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltcore.logging.VoltLogger;
 
-//@ProcInfo(
-//        partitionInfo = "ALL_VALUES1.rowid:0",
-//        singlePartition = true
-//    )
+public class InsertImportWithCount4 extends VoltProcedure {
+    public final String sqlSuffix = "(key, value) VALUES (?, ?)";
+    public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable4 " + sqlSuffix);
+    public final SQLStmt incrementMirrorRow = new SQLStmt("UPDATE kafkamirrortable1 SET import_count=import_count+1 WHERE key = ? and value = ?");
+    public final SQLStmt insertError = new SQLStmt("INSERT into importnomatch (key, value, streamnumber) values(?, ?, 4)");
 
-public class MatchRows extends VoltProcedure {
-    public final SQLStmt matchSelect = new SQLStmt("select ki.key from kafkaImportTable1 as ki, kafkaMirrorTable1 as km where ki.key = km.key and ki.value = km.value order by ki.key");
-
-    public VoltTable[] run()
+    public long run(long key, long value)
     {
-        voltQueueSQL(matchSelect);
-        return voltExecuteSQL(true);
+        voltQueueSQL(incrementMirrorRow, EXPECT_SCALAR_LONG, key, value);
+        VoltTable[] queryresult = voltExecuteSQL();
+        VoltTable result = queryresult[0];
+        long rowsUpdated = result.fetchRow(0).getLong(0);
+        if (rowsUpdated == 0) { // row
+            voltQueueSQL(insertError, key, value);
+        }
+        voltQueueSQL(importInsert, key, value);
+        voltExecuteSQL(true);
+        return 0;
     }
 }
