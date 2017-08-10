@@ -71,9 +71,6 @@ function loadAnalysisPage(){
                     $(".noDataContent").show();
 
                 }
-                //For data section
-                //$("#tblAnalyzeNowContent").hide();
-                //$("#tblNoDataContent").show();
             }
             $("#analysisLoader").hide();
             $("#procedureWarningSection").hide();
@@ -196,11 +193,6 @@ function loadAnalysisPage(){
         VoltDbAnalysis.totalProcessingDetail = {};
         voltDbRenderer.GetProcedureDetailInformation(function (procedureDetails){
             var latencyDetails = [];
-
-
-
-             //find procedure type
-
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
                 var procedureName = item.PROCEDURE;
                 var type = "Single Partitioned";
@@ -239,6 +231,7 @@ function loadAnalysisPage(){
                         PROCEDURE: item.PROCEDURE,
                         TYPE: type
                     })
+
                 }
 
                 VoltDbAnalysis.latencyDetail[item.STATEMENT] =

@@ -207,8 +207,6 @@ $(document).ready(function () {
             $(".showhideImporterIcon").addClass('collapsed');
         }
         $('#mainImporterGraphBlock').slideToggle();
-
-        //MonitorGraphUI.UpdateCharts();
     });
 
 
@@ -817,10 +815,6 @@ var loadPage = function (serverName, portid) {
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
 
-//    var currentProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-//    var priorProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-//    var currentTableAction = VoltDbUI.ACTION_STATES.NONE;
-//    var priorTableAction = VoltDbUI.ACTION_STATES.NONE;
     VoltDbUI.CurrentTab = getCurrentTab();
 
     RefreshServerUI();
@@ -1255,7 +1249,6 @@ var loadPage = function (serverName, portid) {
                                                     var userPreference = getUserPreferences();
                                                     VoltDbUI.isDRInfoRequired = true;
                                                     VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
-                                                    // showHideLastLineClass(true);
                                                     $("#divDrWrapperAdmin").show();
                                                     if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
                                                         if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
@@ -2525,6 +2518,7 @@ var loadPage = function (serverName, portid) {
             var finalDetails = [];
             var freqDetails = {};
             var partitionDetails = [];
+
             var i =0;
             if(VoltDbAnalysis.latencyDetailValue.length == 0){
                 $("#spanFreqLegend").hide();
@@ -2574,7 +2568,6 @@ var loadPage = function (serverName, portid) {
                 finalDetails.push({"label": key,"value": freqDetails[key]})
             }
             finalDetails.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
-
              var z = 0;
                 var orderedDetails = {};
                 var statementList = [];
@@ -2661,7 +2654,6 @@ var loadPage = function (serverName, portid) {
             getTooltipValues(procedureName);
 
             for (var key in VoltDbAnalysis.combinedDetail){
-
                 var newStatement = '';
                 var obj = VoltDbAnalysis.combinedDetail[key];
                 if(key == procedureName){
@@ -2705,7 +2697,6 @@ var loadPage = function (serverName, portid) {
                         $("#spanCombinedLegend").show();
                         $("#totalProcTimeLegend").show();
                     }
-
                     for (var key in combinedDetails){
                         finalDetails.push({"label": key,"value": combinedDetails[key]})
                     }
@@ -2801,8 +2792,8 @@ var loadPage = function (serverName, portid) {
         VoltDbUI.executionDetails = {};
         var statement = '';
 
-
         VoltDbAnalysis.latencyDetailValue.forEach (function(item){
+
             if(item.PROCEDURE == procedureName ){
                 if(VoltDbUI.executionDetails[item.STATEMENT] == undefined){
                     VoltDbUI.executionDetails[item.STATEMENT]={};
@@ -2843,7 +2834,6 @@ var loadPage = function (serverName, portid) {
         });
         return Math.max.apply(Math,arr.map(function(o){return o.MAX;}))
     }
-
 
     function objectLength(obj, statement) {
       var result = 0;
