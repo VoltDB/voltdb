@@ -466,11 +466,8 @@ PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
 PARTITION PROCEDURE ImportInsertP ON TABLE importbp COLUMN cid PARAMETER 3;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertR;
 CREATE FUNCTION add2Bigint    FROM METHOD txnIdSelfCheck.procedures.udfs.add2Bigint;
-CREATE FUNCTION zvarbin    FROM METHOD txnIdSelfCheck.procedures.udfs.zvarbin;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.droppedUDF;
-PARTITION PROCEDURE droppedUDF on TABLE partitioned COLUMN cid;
+CREATE FUNCTION identityVarbin    FROM METHOD txnIdSelfCheck.procedures.udfs.identityVarbin;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.exceptionUDF;
-CREATE FUNCTION missingUDF    FROM METHOD txnIdSelfCheck.procedures.udfs.missingUDF;
 CREATE FUNCTION excUDF    FROM METHOD txnIdSelfCheck.procedures.udfs.badUDF;
 
 END_OF_BATCH
