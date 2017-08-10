@@ -868,6 +868,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         return fid.getId();
     }
 
+    public static boolean isDefinedFunctionId(int functionId) {
+        return functionId != FunctionId.FUNC_VOLT_ID_NOT_DEFINED;
+    }
+
     public static boolean isUserDefinedFunctionId(int functionId) {
         return functionId >= FunctionId.FUNC_VOLT_UDF_ID_START;
     }

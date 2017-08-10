@@ -58,34 +58,51 @@ public class TestUserDefinedFunctionCatalogDependences extends RegressionSuite {
         Client client = getClient();
 
         ClientResponse cr;
-        String SQL = ""
-                + "create table R1 ( BIG BIGINT ); "
-                + "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint; "
-                + "-- create index alphidx on R1 ( add2bigint(BIG, BIG) ); "
-                + ""
-                ;
-        cr = client.callProcedure("@AdHoc", SQL);
+        cr = client.callProcedure("@AdHoc", "create table R1 ( BIG BIGINT );");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        // /*
-        cr = client.callProcedure("@AdHoc", "create procedure proc as select * from R1;");
+        cr = client.callProcedure("@AdHoc", "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        // */
-        // /*
+        cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         try {
-            cr = client.callProcedure("@AdHoc", "drop table r1;");
+            cr = client.callProcedure("@AdHoc", "create index alphidx on R1 ( add2bigint(BIG, BIG) );");
+            fail("Should not be able to create index with UDF.");
         } catch (Exception ex) {
-            ;
+            assertTrue(ex.getMessage().contains("Index \"ALPHIDX\" with user defined function calls is not supported"));
         }
-        // */
-        ///*
+        try {
+            cr = client.callProcedure("@AdHoc", "create view alphview as select BIG, COUNT(*), MAX(ADD2BIGINT(BIG, BIG)) from R1 group by BIG;");
+            fail("Should not be able to create materialized view with UDF.");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Materialized view \"ALPHVIEW\" with user defined function calls is not supported"));
+        }
         try {
             cr = client.callProcedure("@AdHoc", "drop function add2bigint");
-            fail("Should not be able to drop the function add2bigint.");
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Cannot define index \"ALPHIDX\".  It depends on the user defined function \"ADD2BIGINT\""));
+            assertTrue(ex.getMessage().contains("Failed to plan for statement (sql) \"select ADD2biginT(BIG, BIG) from R1;\"."));
         }
+        //
+        // The procedure should still exist, because the drop function failed.  We can call it.
+        //
+        cr = client.callProcedure("proc");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        // */
+        cr = client.callProcedure("@AdHoc", "drop procedure proc");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // This should work because nothing is dropped.
+        cr = client.callProcedure("@AdHoc", "drop function add2BIGINT");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        try {
+            cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
+            fail("Should not be able to recreate proc.");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Failed to plan for statement (sql) \"select ADD2biginT(BIG, BIG) from R1;\"."));
+        }
+        cr = client.callProcedure("@AdHoc", "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("proc");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     static public Test suite() {
@@ -110,7 +127,7 @@ public class TestUserDefinedFunctionCatalogDependences extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 3-node k=1 cluster
         /////////////////////////////////////////////////////////////
-        /*
+        // /*
         config = new LocalCluster("tudfcatdep-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
         builder.addServerConfig(config);

@@ -19,10 +19,8 @@ package org.voltdb.compiler.statements;
 
 import java.util.regex.Matcher;
 
-import org.hsqldb_voltpatches.FunctionForVoltDB;
-import org.voltdb.catalog.CatalogMap;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Function;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
@@ -39,6 +37,28 @@ public class DropFunction extends StatementProcessor {
         super(ddlCompiler);
     }
 
+    /**
+     * Remove the function with the given name from the VoltXMLElement schema
+     * if it is there already.
+     *
+     * @param functionName
+     * @return Return true iff the function is removed.
+     *         Return false if the function does not exist in the schema.
+     */
+    private boolean removeUDFInSchema(String functionName) {
+        for (int idx = 0; idx < m_schema.children.size(); idx += 1) {
+            VoltXMLElement func = m_schema.children.get(idx);
+            if ("ud_function".equals(func.name)) {
+                String fnm = func.attributes.get("functionName");
+                if (fnm != null && functionName.equals(fnm)) {
+                    m_schema.children.remove(idx);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
@@ -49,21 +69,16 @@ public class DropFunction extends StatementProcessor {
         }
         String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
         boolean ifExists = statementMatcher.group(2) != null;
-        CatalogMap<Function> functions = db.getFunctions();
-        if (functions.get(functionName) != null) {
-            functions.delete(functionName);
-            FunctionForVoltDB.deregisterUserDefinedFunction(functionName);
-        }
-        else {
-            if (! ifExists) {
+        if ( ! removeUDFInSchema(functionName)) {
+            if ( ! ifExists ) {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Function name \"%s\" in DROP FUNCTION statement does not exist.",
                         functionName));
-            } else {
-                m_compiler.setEverythingDirty();
             }
+        } else {
+            m_compiler.setEverythingDirty();
         }
+        m_tracker.addDroppedFunction(functionName);
         return true;
     }
-
 }

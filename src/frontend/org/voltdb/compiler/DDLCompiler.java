@@ -50,6 +50,8 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Function;
+import org.voltdb.catalog.FunctionParameter;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -801,7 +803,26 @@ public class DDLCompiler {
         //* enable to debug */ System.out.println("DEBUG: " + m_schema);
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
 
-        // build the local catalog from the xml catalog
+        // Build the local catalog from the xml catalog.
+        // 1.) Add the user defined functions.  We want
+        //     these first in case something depends on them.
+        // 2.) Add the tables.  This will add indexes as well,
+        //     since the indexes are stored with the tables.
+        // 3.) Amend the tracker with all the artifacts that
+        //     we can't actually add to the catalog right now.
+        //     This includes partitioning information, and whether
+        //     tables are export or DR tables.
+        // 4.) Add partitioning information from the tracker
+        //     into the catalog.
+        // 5.) Deregister the udfs from the HSQL interface.
+        //     This makes sure that stored procedures which use
+        //     dropped UDFs fail to compile.
+        // 6.) Process material views.
+        for (VoltXMLElement node : m_schema.children) {
+            if (node.name.equals("ud_function")) {
+                addUDFToCatalog(db, node, isXDCR);
+            }
+        }
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("table")) {
                 addTableToCatalog(db, node, isXDCR);
@@ -810,7 +831,38 @@ public class DDLCompiler {
 
         fillTrackerFromXML();
         handlePartitions(db);
+        m_tracker.dropFunctions();
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
+    }
+
+    private int intFromString(String str) throws VoltCompilerException {
+        try {
+            return(Integer.parseInt(str));
+        } catch (NumberFormatException ex) {
+            throw m_compiler.new VoltCompilerException("Bad integer string: \"" + str + "\"");
+        }
+    }
+
+    private void addUDFToCatalog(Database db, VoltXMLElement XMLfunc, boolean isXDCR)
+                        throws VoltCompilerException {
+        CatalogMap<Function> catalogFunctions = db.getFunctions();
+        String functionName = XMLfunc.attributes.get("functionName");
+        Function func = catalogFunctions.add(functionName);
+        func.setFunctionname(functionName);
+        func.setClassname(XMLfunc.attributes.get("className"));
+        func.setMethodname(XMLfunc.attributes.get("methodName"));
+        int returnType = intFromString(XMLfunc.attributes.get("returnType"));
+        func.setReturntype(returnType);
+        int functionId = intFromString(XMLfunc.attributes.get("functionId"));
+        func.setFunctionid(functionId);
+        CatalogMap<FunctionParameter> params = func.getParameters();
+        for (int pidx = 0; pidx < XMLfunc.children.size(); pidx += 1) {
+            VoltXMLElement ptype = XMLfunc.children.get(pidx);
+            assert("udf_ptype".equals(ptype.name));
+            FunctionParameter param = params.add(String.valueOf(pidx));
+            int ptypeno = intFromString(ptype.attributes.get("type"));
+            param.setParametertype(ptypeno);
+        }
     }
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when

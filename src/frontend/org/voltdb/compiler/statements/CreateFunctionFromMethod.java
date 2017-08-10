@@ -24,15 +24,11 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 
-import org.hsqldb_voltpatches.FunctionCustom;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
-import org.hsqldb_voltpatches.FunctionSQL;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Function;
-import org.voltdb.catalog.FunctionParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
@@ -92,17 +88,12 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         String methodName = checkIdentifierStart(statementMatcher.group(3), ddlStatement.statement);
 
         // Check if the function is already defined
-        CatalogMap<Function> functions = db.getFunctions();
-        int functionId = FunctionForVoltDB.getFunctionId(functionName);
-        if (functions.get(functionName) != null
-                || FunctionSQL.isFunction(functionName)
-                || FunctionCustom.getFunctionId(functionName) != ID_NOT_DEFINED
-                || (functionId != ID_NOT_DEFINED && ! FunctionForVoltDB.isUserDefinedFunctionId(functionId))) {
+        VoltXMLElement funcXML = m_schema.findChild("ud_function", functionName);
+        if (funcXML != null) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Function \"%s\" is already defined.",
                     functionName));
         }
-
         // Load the function class
         Class<?> funcClass;
         try {
@@ -198,24 +189,35 @@ public class CreateFunctionFromMethod extends StatementProcessor {
             throw new RuntimeException(String.format("Error instantiating function \"%s\"", className), e);
         }
 
-        if (functionId == ID_NOT_DEFINED) {
+        // Add the description of the function to the VoltXMLElement
+        // in m_schema.
+        int functionId = FunctionForVoltDB.getFunctionId(functionName);
+        if ( ! FunctionForVoltDB.isDefinedFunctionId(functionId)) {
             functionId = FunctionForVoltDB.getNextFunctionId();
         }
-
-        Function func = db.getFunctions().add(functionName);
-        func.setFunctionid(functionId);
-        func.setFunctionname(functionName);
-        func.setClassname(className);
-        func.setMethodname(methodName);
-        CatalogMap<FunctionParameter> parameters = func.getParameters();
+        int returnType = VoltType.typeFromClass(returnTypeClass).getValue();
+        funcXML = new VoltXMLElement("ud_function")
+                         .withValue("functionName", functionName)
+                         .withValue("className", className)
+                         .withValue("methodName", methodName)
+                         .withValue("functionId", String.valueOf(functionId))
+                         .withValue("returnType", String.valueOf(returnType));
         for (int i = 0; i < paramTypeClasses.length; i++) {
-            FunctionParameter param = parameters.add(String.valueOf(i));
-            param.setParametertype(VoltType.typeFromClass(paramTypeClasses[i]).getValue());
+            int paramtype = VoltType.typeFromClass(paramTypeClasses[i]).getValue();
+            VoltXMLElement paramXML = new VoltXMLElement("udf_ptype")
+                                        .withValue("type", String.valueOf(paramtype));
+            funcXML.children.add(paramXML);
         }
-        func.setReturntype(VoltType.typeFromClass(returnTypeClass).getValue());
-
+        m_schema.children.add(funcXML);
+        // We may have dropped this function and then
+        // added a new one.  I don't think this can actually
+        // happen, but maybe it can somehow.
+        m_tracker.removeDroppedFunction(functionName);
+        //
+        // We still have to register this with HSQLDB, because we will want
+        // to use in in subsequent DDL statements.
+        //
         FunctionForVoltDB.registerTokenForUDF(functionName, functionId, returnTypeClass, paramTypeClasses);
         return true;
     }
-
 }

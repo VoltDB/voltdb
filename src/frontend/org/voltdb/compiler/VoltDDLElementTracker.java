@@ -21,6 +21,7 @@ import static org.voltdb.compiler.ProcedureCompiler.deriveShortProcedureName;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -30,6 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 
@@ -49,6 +51,7 @@ public class VoltDDLElementTracker {
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<>();
     final Map<String, String> m_drTables = new LinkedHashMap<>();
+    final Set<String> m_droppedFunctions = new HashSet<>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -130,6 +133,12 @@ public class VoltDDLElementTracker {
         else if (!ifExists) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Dropped Procedure \"%s\" is not defined", procName));
+        }
+    }
+
+    public void dropFunctions() {
+        for (String functionName : m_droppedFunctions) {
+            FunctionForVoltDB.deregisterUserDefinedFunction(functionName);
         }
     }
 
@@ -231,6 +240,14 @@ public class VoltDDLElementTracker {
 
     Map<String, String> getDRedTables() {
         return m_drTables;
+    }
+
+    public void addDroppedFunction(String functionName) {
+        m_droppedFunctions.add(functionName);
+    }
+
+    public void removeDroppedFunction(String functionName) {
+        m_droppedFunctions.remove(functionName);
     }
 
 }
