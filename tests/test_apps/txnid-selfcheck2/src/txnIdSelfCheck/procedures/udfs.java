@@ -23,14 +23,27 @@
 
 package txnIdSelfCheck.procedures;
 
-import org.voltdb.VoltTable;
+public class udfs {
 
-public class UpdatePartitionedMP extends ReplicatedUpdateBaseProc {
+    public long add2Bigint(long i, long j) {
+        // add two big ints
+        return i + j;
+    }
 
-    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        VoltTable[] results = doWork(p_getCIDData, p_cleanUp, p_insert, p_update, p_export, p_getAdhocData, p_getViewData,
-                cid, rid, value, rollback, false);
+    public byte[] zvarbin(byte[] z) {
+        // return a varbinary without change
+        return z;
+    }
 
-        return doSummaryAndCombineResults(results);
+    public long missingUDF(long i) {
+        // this function is dropped by the thread that attempts it
+        // if the drop fails, function will work, which will fail the test
+        // throw an exception in UDF
+        return i;
+    }
+
+    public long badUDF(long i) {
+        // this is function which always throws an exception
+        return i/0;
     }
 }

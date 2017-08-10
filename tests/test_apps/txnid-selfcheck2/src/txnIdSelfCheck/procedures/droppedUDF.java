@@ -23,14 +23,19 @@
 
 package txnIdSelfCheck.procedures;
 
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class UpdatePartitionedMP extends ReplicatedUpdateBaseProc {
 
-    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        VoltTable[] results = doWork(p_getCIDData, p_cleanUp, p_insert, p_update, p_export, p_getAdhocData, p_getViewData,
-                cid, rid, value, rollback, false);
+public class droppedUDF extends VoltProcedure {
 
-        return doSummaryAndCombineResults(results);
+    public final SQLStmt d_getNothing = new SQLStmt(
+            "select missingUDF(cid) FROM partitioned where cid=? order by cid, rid desc");
+
+    public VoltTable[] run(byte cid) {
+        voltQueueSQL(d_getNothing, cid);
+        VoltTable[] results = voltExecuteSQL(true);
+        return results;
     }
 }

@@ -23,14 +23,19 @@
 
 package txnIdSelfCheck.procedures;
 
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class UpdatePartitionedMP extends ReplicatedUpdateBaseProc {
 
-    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        VoltTable[] results = doWork(p_getCIDData, p_cleanUp, p_insert, p_update, p_export, p_getAdhocData, p_getViewData,
-                cid, rid, value, rollback, false);
+public class exceptionUDF extends VoltProcedure {
 
-        return doSummaryAndCombineResults(results);
+    public final SQLStmt d_getNothing = new SQLStmt(
+            "select excUDF(cid) FROM dimension");
+
+    public VoltTable[] run() {
+        voltQueueSQL(d_getNothing);
+        VoltTable[] results = voltExecuteSQL(true);
+        return results;
     }
 }
