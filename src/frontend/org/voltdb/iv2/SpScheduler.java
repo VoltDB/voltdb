@@ -772,7 +772,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 traceLog.add(() -> VoltTrace.endAsync("initsp", MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getClientInterfaceHandle())));
             }
 
-            if (m_defaultConsistencyReadLevel == ReadLevel.FAST || !m_isLeader) {
+            if (m_defaultConsistencyReadLevel == ReadLevel.FAST) {
                 // the initiatorHSId is the ClientInterface mailbox.
                 m_mailbox.send(message.getInitiatorHSId(), message);
                 return;
@@ -780,7 +780,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
                 // InvocationDispatcher routes SAFE reads to SPI only
-                assert(m_isLeader);
                 assert(m_bufferedReadLog != null);
                 m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
                 return;
@@ -801,7 +800,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(dcKey);
-                setRepairLogTruncationHandle(spHandle);
+                setRepairLogTruncationHandle(spHandle, message.isForLeader());
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
@@ -837,6 +836,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // the initiatorHSId is the ClientInterface mailbox.
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Response not in DC: " + CoreUtils.hsIdToString(message.getInitiatorHSId()) + " leader:" + m_isLeader + " isForLeader:" + message.isForLeader()+ "\n" + message);
+            }
             setRepairLogTruncationHandle(spHandle, message.isForLeader());
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
@@ -1194,8 +1196,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // No k-safety means no replica: read/write queries on master.
         // K-safety: read-only queries (on master) or write queries (on replica).
-        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && m_isLeader && m_sendToHSIds.length > 0
-                && message.getRespBufferable()
+        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && (m_isLeader || (!m_isLeader && message.isForLeader()))
+                  && m_sendToHSIds.length > 0 && message.getRespBufferable()
                 && (txn == null || txn.isReadOnly()) ) {
             // on k-safety leader with safe reads configuration: one shot reads + normal multi-fragments MP reads
             // we will have to buffer these reads until previous writes acked in the cluster.
@@ -1432,7 +1434,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         DuplicateCounter counter = m_duplicateCounters.get(dcKey);
         if (counter == null) {
             // this will be on SPI without k-safety or replica only with k-safety
-            setRepairLogTruncationHandle(spHandle);
+            setRepairLogTruncationHandle(spHandle, message.isForLeader());
             if (!m_isLeader) {
                 m_mailbox.send(message.getSPIHSId(), message);
             }
@@ -1600,27 +1602,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         return m_repairLogTruncationHandle;
     }
 
-    private void setRepairLogTruncationHandle(long newHandle, boolean forceAdvance)
+    private void setRepairLogTruncationHandle(long newHandle, boolean isForLeader)
     {
         if (newHandle > m_repairLogTruncationHandle) {
             m_repairLogTruncationHandle = newHandle;
-
             // We have to advance the local truncation point on the replica. It's important for
             // node promotion when there are no missing repair log transactions on the replica.
             // Because we still want to release the reads if no following writes will come to this replica.
-            if (! m_isLeader && !forceAdvance) {
-                return;
+            // Also advance the truncation point if this is not a leader but the response message is for leader.
+            if (m_isLeader || (!m_isLeader  && isForLeader)) {
+                if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
+                    m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
+                }
+                scheduleRepairLogTruncateMsg();
             }
-            if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-                m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
-            }
-            scheduleRepairLogTruncateMsg();
         } else {
             // As far as I know, they are cases that will move truncation handle backwards.
             // These include node failures (promotion phase) and node rejoin (early rejoin phase).
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
-                        "to" + TxnEgo.txnIdToString(newHandle));
+                        "to" + TxnEgo.txnIdToString(newHandle)+ " isLeader:" + m_isLeader + " isForLeader:" + isForLeader);
             }
         }
     }
