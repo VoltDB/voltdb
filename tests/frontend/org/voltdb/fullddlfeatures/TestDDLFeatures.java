@@ -140,6 +140,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         ClientResponse resp;
         VoltTable vt;
 
+        m_client.callProcedure("@AdHoc", "DELETE FROM T26;");
         // multi partitioned query with 2 statements
         resp = m_client.callProcedure("msp1", 19, 0);
         vt = resp.getResults()[0];
@@ -154,7 +155,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         m_client.callProcedure("T26.insert", 20, 0);
 
         // single partitioned query with 3 statements
-        resp = m_client.callProcedure("msp2", 19, 0, 20);
+        resp = m_client.callProcedure("msp2", 0, 19, 20);
         vt = resp.getResults()[0];
         vt.advanceToRow(0);
         assertEquals(2l, vt.get(0, VoltType.BIGINT));

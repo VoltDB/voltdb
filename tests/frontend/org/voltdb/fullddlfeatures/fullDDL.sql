@@ -569,11 +569,11 @@ PARTITION ON
     COLUMN
         age
     PARAMETER
-        0
+        1
 AS BEGIN
     SELECT COUNT(*)
     FROM T26
-    WHERE age = ? AND gender = ?;
+    WHERE gender = ? AND age = ?;
     DELETE
     FROM T26
     WHERE age = ?;
