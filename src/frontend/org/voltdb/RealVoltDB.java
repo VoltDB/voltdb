@@ -60,8 +60,6 @@ import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -172,6 +170,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
+import org.voltdb.utils.FailedLoginCounter;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
@@ -234,9 +233,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "7.5";
+    static final String m_defaultVersionString = "7.6";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q7.5\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q7.6\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -274,6 +273,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ScheduledFuture<?> resMonitorWork;
     private HealthMonitor m_healthMonitor;
 
+    private FailedLoginCounter m_flc = new FailedLoginCounter();
 
     private NodeStateTracker m_statusTracker;
     // Should the execution sites be started in recovery mode
@@ -346,7 +346,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
-    private static final String SECONDARY_PICONETWORK_THREADS = "secondaryPicoNetworkThreads";
 
     /** Last transaction ID at which the logging config updated.
      * Also, use the intrinsic lock to safeguard access from multiple
@@ -1174,6 +1173,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 };
                 List<Integer> partitions = null;
+                Set<Integer> partitionGroupPeers = null;
                 if (m_rejoining) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     partitions = recoverPartitions(topo, hostGroups.get(m_messenger.getHostId()));
@@ -1183,6 +1183,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                                           m_messenger.getHostId(),
                                                                           hostGroups);
                     }
+                    partitionGroupPeers = m_cartographer.findPartitionGroupPeers(partitions);
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
@@ -1192,7 +1193,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 } else {
                     m_configuredNumberOfPartitions = topo.getPartitionCount();
                     partitions = topo.getPartitionIdList(m_messenger.getHostId());
+                    partitionGroupPeers = topo.getPartitionGroupPeers(m_messenger.getHostId());
                 }
+                m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
                 for (int ii = 0; ii < partitions.size(); ii++) {
                     Integer partition = partitions.get(ii);
                     m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
@@ -2021,56 +2024,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void createSecondaryConnections(boolean isRejoin) {
         int partitionGroupCount = m_clusterSettings.get().hostcount() / (m_configuredReplicationFactor + 1);
-        int localHostId = m_messenger.getHostId();
-        Set<Integer> peers = Sets.newHashSet();
         if (m_configuredReplicationFactor > 0 && partitionGroupCount > 1) {
-            Set<Integer> hostIdsWithinGroup = m_cartographer.getHostIdsWithinPartitionGroup(localHostId);
-            if (isRejoin) {
-                peers.addAll(hostIdsWithinGroup);
-                // exclude local host id
-                peers.remove(m_messenger.getHostId());
-            } else {
-                for (Integer host : hostIdsWithinGroup) {
-                    // This node sends connection request to all its peers, once the connection
-                    // is established, both nodes will create a foreign host (contains a PicoNetwork thread).
-                    // That said, here we only connect to the nodes that have higher host id to avoid double
-                    // the network thread we expected.
-                    if (host > localHostId) {
-                        peers.add(host);
-                    }
-                }
-            }
-
-            // it is possible if some nodes are inactive
-            if (peers.isEmpty()) return;
-
-            /**
-             *  Basic goal is each host should has the same number of connections compare to the number
-             *  without partition group layout.
-             *
-             * (targetConnectionsWithinPG - existingConnectionsWithinPG) is the the total number of secondary
-             * connections we try to create, I want the secondary connections to have an even distribution
-             * across all nodes within the partition group, and round up the result because this is
-             * integer division, there is a trick to do this:  (a + (b - 1)) / b
-             * so it becomes (targetConnectionsWithinPG - existingConnectionsWithinPG) + (existingConnectionsWithinPG - 1)
-             * which equals to (targetConnectionsWithinPG - 1).
-             *
-             * All the numbers are per node basis, PG is short for Partition Group
-             */
-            int connectionsWithoutPG = m_clusterSettings.get().hostcount() - 1;
-            int existingConnectionsWithinPG = hostIdsWithinGroup.size() - 1;
-            int targetConnectionsWithinPG = Math.min( connectionsWithoutPG, CoreUtils.availableProcessors() / 4);
-
-            int secondaryConnections = (targetConnectionsWithinPG - 1) / existingConnectionsWithinPG;
-            Integer configNumberOfConnections = Integer.getInteger(SECONDARY_PICONETWORK_THREADS);
-            if (configNumberOfConnections != null) {
-                secondaryConnections = configNumberOfConnections;
-                hostLog.info("Overridden secondary PicoNetwork network thread count:" + configNumberOfConnections);
-            } else {
-                hostLog.info("This node has " + secondaryConnections + " secondary PicoNetwork thread" + ((secondaryConnections > 1) ? "s" :""));
-            }
-
-            m_messenger.createAuxiliaryConnections(peers, secondaryConnections);
+            m_messenger.createAuxiliaryConnections(isRejoin);
         }
     }
 
@@ -2091,6 +2046,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
         }, 0, StatsManager.POLL_INTERVAL, TimeUnit.MILLISECONDS));
+
+        // clear login count
+        m_periodicWorks.add(scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                ScheduledExecutorService es = VoltDB.instance().getSES(false);
+                if (es != null && !es.isShutdown()) {
+                    es.submit(new Runnable() {
+                        @Override
+                        public void run()
+                        {
+                            long timestamp = System.currentTimeMillis();
+                            m_flc.checkCounter(timestamp);
+                        }
+                    });
+                }
+            }
+        }, 0, 10, TimeUnit.SECONDS));
 
         // small stats samples
         m_periodicWorks.add(scheduleWork(new Runnable() {
@@ -3390,7 +3363,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         Database db = newCatalog.getClusters().get("cluster").getDatabases().get("database");
         CatalogMap<Procedure> catalogProcedures = db.getProcedures();
 
-        ExecutorService es = Executors.newSingleThreadScheduledExecutor();
 
         SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
         List<Long> immutableSites = siteTracker.getSitesForHost(m_messenger.getHostId());
@@ -3401,37 +3373,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ctx.m_preparedCatalogInfo.m_catalog = newCatalog;
         ctx.m_preparedCatalogInfo.m_userProcsMap = new ConcurrentHashMap<>();
 
-        Map<Long, Future<String>> resultFutureMap = new HashMap<>();
         for (Long site : sites) {
-            Future<String> ft = es.submit(() -> {
-                try {
-                    ImmutableMap<String, ProcedureRunner> userProcs =
-                        LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
-                                                                    classesMap.build(), null);
-                    ctx.m_preparedCatalogInfo.m_userProcsMap.put(site, userProcs);
-                } catch (Exception e) {
-                    String msg = "error setting up user procedure runners using NT-procedure pattern: "
-                                + e.getMessage();
-                    hostLog.error(msg);
-                    return msg;
-                }
-                return null;
-            });
-            resultFutureMap.put(site, ft);
-        }
-
-        for (Future<String> ft : resultFutureMap.values()) {
             try {
-                errorMsg = ft.get();
-                if (errorMsg == null)
-                    // this means there are no errors executing the this catalog preparation job
-                    continue;
-            } catch (InterruptedException | ExecutionException e) {
-                return "Exception throw waiting for procedure runner creation result: " + e.getMessage();
+                ImmutableMap<String, ProcedureRunner> userProcs =
+                    LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
+                                                                classesMap.build(), null);
+                ctx.m_preparedCatalogInfo.m_userProcsMap.put(site, userProcs);
+            } catch (Exception e) {
+                String msg = "error setting up user procedure runners using NT-procedure pattern: "
+                            + e.getMessage();
+                hostLog.error(msg);
+                return msg;
             }
-            // catalog preparation job has errors
-            hostLog.error(errorMsg);
-            return errorMsg;
         }
 
         return null;
@@ -4652,5 +4605,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         hostLog.error(sb.toString());
+    }
+
+    public void logMessageToFLC(long timestampMilis, String user, String ip) {
+        m_flc.logMessage(timestampMilis, user, ip);
     }
 }

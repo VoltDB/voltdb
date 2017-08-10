@@ -179,7 +179,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         setupPsetBuffer(smallBufferSize);
         setupPerFragmentStatsBuffer(smallBufferSize);
-        setupUDFBuffer(2 * 1024 * 1024);
+        setupUDFBuffer(smallBufferSize);
         updateEEBufferPointers();
 
         updateHashinator(hashinatorConfig);
@@ -188,12 +188,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     final void updateEEBufferPointers() {
         int errorCode = nativeSetBuffers(pointer,
-                m_psetBuffer, m_psetBuffer.capacity(),
-                m_perFragmentStatsBuffer, m_perFragmentStatsBuffer.capacity(),
-                m_udfBuffer, m_udfBuffer.capacity(),
+                m_psetBuffer,                 m_psetBuffer.capacity(),
+                m_perFragmentStatsBuffer,     m_perFragmentStatsBuffer.capacity(),
+                m_udfBuffer,                  m_udfBuffer.capacity(),
                 m_firstDeserializer.buffer(), m_firstDeserializer.buffer().capacity(),
-                m_nextDeserializer.buffer(), m_nextDeserializer.buffer().capacity(),
-                m_exceptionBuffer, m_exceptionBuffer.capacity());
+                m_nextDeserializer.buffer(),  m_nextDeserializer.buffer().capacity(),
+                m_exceptionBuffer,            m_exceptionBuffer.capacity());
         checkErrorCode(errorCode);
     }
 
@@ -749,26 +749,43 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_fallbackBuffer = buffer;
     }
 
-    public int callJavaUserDefinedFunction(int functionId) throws Throwable {
+    public int callJavaUserDefinedFunction() {
+        m_udfBuffer.clear();
+        m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
+        int functionId = m_udfBuffer.getInt();
         UserDefinedFunctionRunner udfRunner = m_functionManager.getFunctionRunnerById(functionId);
         assert(udfRunner != null);
         Throwable throwable = null;
+        Object returnValue = null;
         try {
-            udfRunner.call(m_udfBuffer);
+            // Call the user-defined function.
+            returnValue = udfRunner.call(m_udfBuffer);
+            // Write the result to the shared buffer.
+            m_udfBuffer.clear();
+            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, udfRunner.getReturnType(), returnValue);
+            // Return zero status code for a successful execution.
+            return 0;
         }
         catch (InvocationTargetException ex1) {
+            // Exceptions thrown during Java reflection will be wrapped into this InvocationTargetException.
+            // We need to get its cause and throw that to the user.
             throwable = ex1.getCause();
         }
-        catch (Exception ex2) {
+        catch (Throwable ex2) {
             throwable = ex2;
         }
-        if (throwable != null) {
+        // Getting here means the execution was not successful.
+        try {
             m_udfBuffer.clear();
-            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
-            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
-            return -1;
+            if (throwable != null) {
+                byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+                SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
+            }
         }
-        return 0;
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return -1;
     }
 
     @Override

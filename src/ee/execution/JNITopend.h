@@ -79,7 +79,7 @@ public:
         return false;
     }
 
-    int callJavaUserDefinedFunction(int32_t functionId);
+    int callJavaUserDefinedFunction();
 
 private:
     JNIEnv *m_jniEnv;
@@ -103,7 +103,7 @@ private:
     jmethodID m_callJavaUserDefinedFunctionMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
-    jclass m_encoderClass;
+    jclass m_decompressionClass;
 };
 
 }

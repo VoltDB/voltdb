@@ -51,7 +51,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.InMemoryJarfile;
 
 /**
@@ -266,7 +266,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
             retval.requireCatalogDiffCmdsApplyToEE = diff.requiresCatalogDiffCmdsApplyToEE();
             // since diff commands can be stupidly big, compress them here
-            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
+            retval.encodedDiffCommands = CompressionService.compressAndBase64Encode(commands);
             retval.diffCommandsLength = commands.length();
             String emptyTablesAndReasons[][] = diff.tablesThatMustBeEmpty();
             assert(emptyTablesAndReasons.length == 2);
@@ -401,7 +401,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     protected String verifyAndWriteCatalogJar(CatalogChangeResult ccr)
     {
         String procedureName = "@VerifyCatalogAndWriteJar";
-        String diffCommands = Encoder.decodeBase64AndDecompress(ccr.encodedDiffCommands);
+        String diffCommands = CompressionService.decodeBase64AndDecompress(ccr.encodedDiffCommands);
 
         CompletableFuture<Map<Integer,ClientResponse>> cf =
                 callNTProcedureOnAllHosts(procedureName, ccr.catalogBytes, diffCommands,

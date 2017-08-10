@@ -87,6 +87,7 @@ public:
     field_map_iter end() const;
 
     // Get the path of this catalog map.
+    // It is used by VoltDBEngine::processCatalogDeletes() for locating the deleted UDFs.
     std::string path() const;
 
     /**

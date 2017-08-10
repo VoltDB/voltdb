@@ -757,9 +757,8 @@ public class RegressionSuite extends TestCase {
               assertTrue(vt.advanceRow());
               double actual = vt.getDouble(col);
 
-              if (expected[i] == Double.MIN_VALUE) {
+              if (expected[i] <= VoltType.NULL_FLOAT) {
                   assertTrue(vt.wasNull());
-                  assertEquals(null, actual);
               }
               else {
                   assertEquals(expected[i], actual, 0.00001);

@@ -168,19 +168,11 @@ public class ProcedureRunnerNT {
             return;
         }
 
-        final Map<Integer,ClientResponse> allHostResponses = m_allHostResponses;
-
         m_allHostResponses.put(hostId, clientResponse);
         if (m_outstandingAllHostProcedureHostIds.size() == 0) {
             m_outstandingAllHostProc.set(false);
-            // the future needs to be completed in the right executor service
-            // so any follow on work will be in the right executor service
-            m_executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    m_allHostFut.complete(allHostResponses);
-                }
-            });
+
+            m_allHostFut.complete(m_allHostResponses);
         }
     }
 

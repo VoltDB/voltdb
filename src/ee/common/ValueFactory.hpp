@@ -211,6 +211,7 @@ public:
         return value.castAsString();
     }
 
+    // Get an empty NValue with specified data type.
     static NValue getNValueOfType(const ValueType type) {
         NValue retval(type);
         return retval;

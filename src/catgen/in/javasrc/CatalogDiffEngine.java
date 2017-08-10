@@ -42,7 +42,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
+import org.voltdb.utils.CompressionService;
 
 public class CatalogDiffEngine {
 
@@ -1288,6 +1288,8 @@ public class CatalogDiffEngine {
         }
 
         // Information about user-defined functions need to be applied to EE.
+        // Because the EE needs to know about the parameter types and the return type to do
+        // many type casting operations.
         if (suspect instanceof Function) {
             return true;
         }
@@ -1539,12 +1541,12 @@ public class CatalogDiffEngine {
                             if (field.equals("plannodetree")) {
                                 try {
                                     System.out.println("DEBUG VERBOSE where prev plannodetree expands to: " +
-                                            new String(Encoder.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
+                                            new String(CompressionService.decodeBase64AndDecompressToBytes((String)prevValue), "UTF-8"));
                                 }
                                 catch (UnsupportedEncodingException e) {}
                                 try {
                                     System.out.println("DEBUG VERBOSE and new plannodetree expands to: " +
-                                            new String(Encoder.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
+                                            new String(CompressionService.decodeBase64AndDecompressToBytes((String)newValue), "UTF-8"));
                                 }
                                 catch (UnsupportedEncodingException e) {}
                             }
