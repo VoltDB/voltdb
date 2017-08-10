@@ -2672,7 +2672,7 @@ var loadPage = function (serverName, portid) {
                                 sum = subItems.AVG * subItems.INVOCATIONS
                             }
                             else{
-                                sum = subItems.AVG * subItems.INVOCATIONS
+                                sum = subItems.AVG
                             }
                         }
                         statement = subItems.STATEMENT;
