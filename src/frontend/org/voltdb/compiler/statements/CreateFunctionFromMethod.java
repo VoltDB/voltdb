@@ -28,9 +28,11 @@ import org.hsqldb_voltpatches.FunctionCustom;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.FunctionSQL;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Function;
+import org.voltdb.catalog.FunctionParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
@@ -57,14 +59,12 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         m_allowedDataTypes.add(int.class);
         m_allowedDataTypes.add(long.class);
         m_allowedDataTypes.add(double.class);
-        m_allowedDataTypes.add(float.class);
         m_allowedDataTypes.add(Byte.class);
         m_allowedDataTypes.add(Byte[].class);
         m_allowedDataTypes.add(Short.class);
         m_allowedDataTypes.add(Integer.class);
         m_allowedDataTypes.add(Long.class);
         m_allowedDataTypes.add(Double.class);
-        m_allowedDataTypes.add(Float.class);
         m_allowedDataTypes.add(BigDecimal.class);
         m_allowedDataTypes.add(String.class);
         m_allowedDataTypes.add(TimestampType.class);
@@ -79,19 +79,19 @@ public class CreateFunctionFromMethod extends StatementProcessor {
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
+
         // Matches if it is CREATE FUNCTION <name> FROM METHOD <class-name>.<method-name>
         Matcher statementMatcher = SQLParser.matchCreateFunctionFromMethod(ddlStatement.statement);
         if (! statementMatcher.matches()) {
             return false;
         }
 
-        // Before we complete the user-defined function feature, executing UDF-related DDLs will
-        // generate compiler warnings.
-        m_compiler.addWarn("User-defined functions are not implemented yet.");
-
+        // Clean up the names
         String functionName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement).toLowerCase();
         String className = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
         String methodName = checkIdentifierStart(statementMatcher.group(3), ddlStatement.statement);
+
+        // Check if the function is already defined
         CatalogMap<Function> functions = db.getFunctions();
         int functionId = FunctionForVoltDB.getFunctionId(functionName);
         if (functions.get(functionName) != null
@@ -103,7 +103,7 @@ public class CreateFunctionFromMethod extends StatementProcessor {
                     functionName));
         }
 
-        // Load class
+        // Load the function class
         Class<?> funcClass;
         try {
             funcClass = Class.forName(className, true, m_classLoader);
@@ -133,38 +133,37 @@ public class CreateFunctionFromMethod extends StatementProcessor {
 
         // find the UDF method and get the params
         Method functionMethod = null;
-        Method[] methods = funcClass.getDeclaredMethods();
-        for (final Method m : methods) {
-            String name = m.getName();
-            if (name.equals(methodName)) {
-                boolean found = true;
-                StringBuilder warningMessage = new StringBuilder("Class " + shortName + " has a ");
-                if (! Modifier.isPublic(m.getModifiers())) {
-                    warningMessage.append("non-public ");
-                    found = false;
+        for (final Method m : funcClass.getDeclaredMethods()) {
+            if (! m.getName().equals(methodName)) {
+                continue;
+            }
+            boolean found = true;
+            StringBuilder warningMessage = new StringBuilder("Class " + shortName + " has a ");
+            if (! Modifier.isPublic(m.getModifiers())) {
+                warningMessage.append("non-public ");
+                found = false;
+            }
+            if (Modifier.isStatic(m.getModifiers())) {
+                warningMessage.append("static ");
+                found = false;
+            }
+            if (m.getReturnType().equals(Void.TYPE)) {
+                warningMessage.append("void ");
+                found = false;
+            }
+            warningMessage.append(methodName);
+            warningMessage.append("() method.");
+            if (found) {
+                // if not null, then we've got more than one run method
+                if (functionMethod != null) {
+                    String msg = "Class " + shortName + " has multiple methods named " + methodName;
+                    msg += ". Only a single function method is supported.";
+                    throw m_compiler.new VoltCompilerException(msg);
                 }
-                if (Modifier.isStatic(m.getModifiers())) {
-                    warningMessage.append("static ");
-                    found = false;
-                }
-                if (m.getReturnType().equals(Void.TYPE)) {
-                    warningMessage.append("void ");
-                    found = false;
-                }
-                warningMessage.append(methodName);
-                warningMessage.append("() method.");
-                if (found) {
-                    // if not null, then we've got more than one run method
-                    if (functionMethod != null) {
-                        String msg = "Class " + shortName + " has multiple methods named " + methodName;
-                        msg += ". Only a single function method is supported.";
-                        throw m_compiler.new VoltCompilerException(msg);
-                    }
-                    functionMethod = m;
-                }
-                else {
-                    m_compiler.addWarn(warningMessage.toString());
-                }
+                functionMethod = m;
+            }
+            else {
+                m_compiler.addWarn(warningMessage.toString());
             }
         }
 
@@ -182,21 +181,40 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         }
 
         Class<?>[] paramTypeClasses = functionMethod.getParameterTypes();
-        for (int i = 0; i < paramTypeClasses.length; i++) {
-            Class<?> paramType = paramTypeClasses[i];
-            if (! m_allowedDataTypes.contains(paramType)) {
+        int paramCount = paramTypeClasses.length;
+        for (int i = 0; i < paramCount; i++) {
+            Class<?> paramTypeClass = paramTypeClasses[i];
+            if (! m_allowedDataTypes.contains(paramTypeClass)) {
                 String msg = String.format("Method %s.%s has an unsupported parameter type %s at position %d",
-                        shortName, methodName, paramType.getName(), i);
+                        shortName, methodName, paramTypeClass.getName(), i);
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
 
-        FunctionForVoltDB.registerUserDefinedFunction(functionName, returnTypeClass, paramTypeClasses);
+        try {
+            funcClass.newInstance();
+        }
+        catch (InstantiationException | IllegalAccessException e) {
+            throw new RuntimeException(String.format("Error instantiating function \"%s\"", className), e);
+        }
+
+        if (functionId == ID_NOT_DEFINED) {
+            functionId = FunctionForVoltDB.getNextFunctionId();
+        }
 
         Function func = db.getFunctions().add(functionName);
+        func.setFunctionid(functionId);
         func.setFunctionname(functionName);
         func.setClassname(className);
         func.setMethodname(methodName);
+        CatalogMap<FunctionParameter> parameters = func.getParameters();
+        for (int i = 0; i < paramTypeClasses.length; i++) {
+            FunctionParameter param = parameters.add(String.valueOf(i));
+            param.setParametertype(VoltType.typeFromClass(paramTypeClasses[i]).getValue());
+        }
+        func.setReturntype(VoltType.typeFromClass(returnTypeClass).getValue());
+
+        FunctionForVoltDB.registerTokenForUDF(functionName, functionId, returnTypeClass, paramTypeClasses);
         return true;
     }
 

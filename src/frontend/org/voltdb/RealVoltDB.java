@@ -61,8 +61,6 @@ import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -239,9 +237,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "7.5";
+    static final String m_defaultVersionString = "7.6";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q7.5\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q7.6\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -3415,7 +3413,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             jarLoader = newCatalogJar.getLoader();
             for (String classname : jarLoader.getClassNames()) {
                 try {
-                    Class<?> procCls = CatalogContext.classForProcedure(classname, jarLoader);
+                    Class<?> procCls = CatalogContext.classForProcedureOrUDF(classname, jarLoader);
                     classesMap.put(classname, procCls);
                 }
                 // LinkageError catches most of the various class loading errors we'd
@@ -3463,7 +3461,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         Database db = newCatalog.getClusters().get("cluster").getDatabases().get("database");
         CatalogMap<Procedure> catalogProcedures = db.getProcedures();
 
-        ExecutorService es = Executors.newSingleThreadScheduledExecutor();
 
         SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
         List<Long> immutableSites = siteTracker.getSitesForHost(m_messenger.getHostId());
@@ -3474,37 +3471,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ctx.m_preparedCatalogInfo.m_catalog = newCatalog;
         ctx.m_preparedCatalogInfo.m_userProcsMap = new ConcurrentHashMap<>();
 
-        Map<Long, Future<String>> resultFutureMap = new HashMap<>();
         for (Long site : sites) {
-            Future<String> ft = es.submit(() -> {
-                try {
-                    ImmutableMap<String, ProcedureRunner> userProcs =
-                        LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
-                                                                    classesMap.build(), null);
-                    ctx.m_preparedCatalogInfo.m_userProcsMap.put(site, userProcs);
-                } catch (Exception e) {
-                    String msg = "error setting up user procedure runners using NT-procedure pattern: "
-                                + e.getMessage();
-                    hostLog.error(msg);
-                    return msg;
-                }
-                return null;
-            });
-            resultFutureMap.put(site, ft);
-        }
-
-        for (Future<String> ft : resultFutureMap.values()) {
             try {
-                errorMsg = ft.get();
-                if (errorMsg == null)
-                    // this means there are no errors executing the this catalog preparation job
-                    continue;
-            } catch (InterruptedException | ExecutionException e) {
-                return "Exception throw waiting for procedure runner creation result: " + e.getMessage();
+                ImmutableMap<String, ProcedureRunner> userProcs =
+                    LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
+                                                                classesMap.build(), null);
+                ctx.m_preparedCatalogInfo.m_userProcsMap.put(site, userProcs);
+            } catch (Exception e) {
+                String msg = "error setting up user procedure runners using NT-procedure pattern: "
+                            + e.getMessage();
+                hostLog.error(msg);
+                return msg;
             }
-            // catalog preparation job has errors
-            hostLog.error(errorMsg);
-            return errorMsg;
         }
 
         return null;

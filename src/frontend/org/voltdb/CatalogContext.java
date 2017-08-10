@@ -377,12 +377,12 @@ public class CatalogContext {
      * @return A java Class variable associated with the class.
      * @throws ClassNotFoundException if the class is not in the jar file.
      */
-    public Class<?> classForProcedure(String procedureClassName)
+    public Class<?> classForProcedureOrUDF(String procedureClassName)
             throws LinkageError, ExceptionInInitializerError, ClassNotFoundException {
-        return classForProcedure(procedureClassName, m_catalogInfo.m_jarfile.getLoader());
+        return classForProcedureOrUDF(procedureClassName, m_catalogInfo.m_jarfile.getLoader());
     }
 
-    public static Class<?> classForProcedure(String procedureClassName, ClassLoader loader)
+    public static Class<?> classForProcedureOrUDF(String procedureClassName, ClassLoader loader)
             throws LinkageError, ExceptionInInitializerError, ClassNotFoundException {
         // this is a safety mechanism to prevent catalog classes overriding VoltDB stuff
         if (procedureClassName.startsWith("org.voltdb.")) {

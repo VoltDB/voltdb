@@ -21,16 +21,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package txnIdSelfCheck.procedures;
+package org.voltdb_testprocs.updateclasses;
 
-import org.voltdb.VoltTable;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-public class UpdatePartitionedMP extends ReplicatedUpdateBaseProc {
+public class TestProcWithInvalidSQLStmt extends VoltProcedure {
 
-    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        VoltTable[] results = doWork(p_getCIDData, p_cleanUp, p_insert, p_update, p_export, p_getAdhocData, p_getViewData,
-                cid, rid, value, rollback, false);
-
-        return doSummaryAndCombineResults(results);
+    public long run(long param0)
+    {
+        SQLStmt Q1 = new SQLStmt("select a + ? from t1 order by 1");
+        voltQueueSQL(Q1, param0);
+        voltExecuteSQL();
+        return 1;
     }
 }
