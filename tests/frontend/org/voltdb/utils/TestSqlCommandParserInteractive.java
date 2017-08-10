@@ -91,6 +91,14 @@ public class TestSqlCommandParserInteractive extends TestCase {
             return result;
         }
 
+        // we add a two spaces and character at the beginning of the prompt
+        // to indicate a multi-line statement definition is in progress
+        public boolean isContinuationPrompt() {
+            // get the prompt after the last statement
+            String lastPrompt = baos.toString().substring(baos.toString().lastIndexOf("\n") + 1);
+            return lastPrompt.startsWith("  ");
+        }
+
         public void close() throws Exception
         {
             pos.close();
@@ -182,18 +190,23 @@ public class TestSqlCommandParserInteractive extends TestCase {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
 
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText("--insert into goats values (0, 1); select * from goats;\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText(";\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());
         assertEquals(0, result.get().size());
 
         result = cmd.openQuery();
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText("insert into goats values (0, 1)");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        // a new prompt is obtained only after \n
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText("; --select * from goats;\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());
@@ -252,15 +265,19 @@ public class TestSqlCommandParserInteractive extends TestCase {
     {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText("create table foo (\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        assertTrue(cmd.isContinuationPrompt());
         cmd.submitText("col1 integer,\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        assertTrue(cmd.isContinuationPrompt());
         cmd.submitText("col2 varchar(50) default ';'\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        assertTrue(cmd.isContinuationPrompt());
         cmd.submitText(");\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());
@@ -286,6 +303,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
         CommandStuff cmd = new CommandStuff();
         for (int i = 0; i < alterStmts.length; ++i) {
             Future<List<String>> result = cmd.openQuery();
+            assertFalse(cmd.isContinuationPrompt());
             cmd.submitText(alterStmts[i] + ";\n");
             cmd.waitOnResult();
             System.out.println("RESULT: " + result.get());
@@ -310,6 +328,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
     {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
+        assertFalse(cmd.isContinuationPrompt());
         String create = "create view foo (col1, col2) as select col1, count(*) from foo group by col1";
         cmd.submitText(create + ";\n");
         cmd.waitOnResult();
@@ -319,6 +338,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
 
         // From ENG-6641
         result = cmd.openQuery();
+        assertFalse(cmd.isContinuationPrompt());
         create = "create view foo\n" +
                  "(\n" +
                  "C1\n" +

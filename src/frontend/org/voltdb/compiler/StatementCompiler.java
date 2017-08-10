@@ -49,6 +49,7 @@ import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -325,7 +326,7 @@ public abstract class StatementCompiler {
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
-        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
+        String bin64String = CompressionService.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
     }
@@ -496,7 +497,7 @@ public abstract class StatementCompiler {
         String json = node_list.toJSONString();
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
-        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
+        String bin64String = CompressionService.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
     }

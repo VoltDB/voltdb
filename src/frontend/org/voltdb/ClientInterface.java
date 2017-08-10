@@ -40,6 +40,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -231,23 +232,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     };
 
     final long m_siteId;
-    final long m_plannerSiteId;
-
     final Mailbox m_mailbox;
-
-    /**
-     * This boolean allows the DTXN to communicate to the
-     * ClientInputHandler the presence of DTXN backpressure.
-     * The m_connections ArrayList is used as the synchronization
-     * point to ensure that modifications to read interest ops
-     * that are based on the status of this information are atomic.
-     * Additionally each connection must be synchronized on before modification
-     * because the disabling of read selection for an individual connection
-     * due to backpressure (not DTXN backpressure, client backpressure due to a client
-     * that refuses to read responses) occurs inside the SimpleDTXNInitiator which
-     * doesn't have access to m_connections
-     */
-    private final boolean m_hasDTXNBackPressure = false;
 
     // MAX_CONNECTIONS is updated to be (FD LIMIT - 300) after startup
     private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
@@ -705,20 +690,32 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 boolean authenticated = arq.authenticate(hashScheme, socket.socket().getRemoteSocketAddress().toString());
 
                 if (!authenticated) {
+                    long timestamp = System.currentTimeMillis();
+                    ScheduledExecutorService es = VoltDB.instance().getSES(false);
+                    if (es != null && !es.isShutdown()) {
+                        es.submit(new Runnable() {
+                            @Override
+                            public void run()
+                            {
+                                ((RealVoltDB)VoltDB.instance()).logMessageToFLC(timestamp, username, socket.socket().getRemoteSocketAddress().toString());
+                            }
+                        });
+                    }
+
                     Exception faex = arq.getAuthenticationFailureException();
+                    if (faex != null) {
+                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                                     "):", faex);
+                    } else {
+                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                                     "): user " + username + " failed authentication.");
+                    }
 
                     boolean isItIo = false;
                     for (Throwable cause = faex; faex != null && !isItIo; cause = cause.getCause()) {
                         isItIo = cause instanceof IOException;
                     }
 
-                    if (faex != null) {
-                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                                 "):", faex);
-                    } else {
-                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                                     "): user " + username + " failed authentication.");
-                    }
                     //Send negative response
                     if (!isItIo) {
                         responseBuffer.put(AUTHENTICATION_FAILURE).flip();
@@ -758,6 +755,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             messagingChannel.writeMessage(responseBuffer);
             return handler;
         }
+
     }
 
     /** A port that reads client procedure invocations and writes responses */
@@ -794,11 +792,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public int getMaxRead() {
-            if (m_hasDTXNBackPressure) {
-                return 0;
-            } else {
-                return Math.max( MAX_READ, getNextMessageLength());
-            }
+            return Math.max( MAX_READ, getNextMessageLength());
         }
 
         @Override
@@ -1029,14 +1023,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                 try {
                     ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                    int partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
+                    int partition = InvocationDispatcher.getPartitionForProcedureParameter(ppi.index,
                             ppi.type, response.getInvocation());
-                    createTransaction(cihm.connection.connectionId(),
+                    m_dispatcher.createTransaction(cihm.connection.connectionId(),
                             response.getInvocation(),
                             isReadonly,
                             true, // Only SP could be mis-partitioned
                             false, // Only SP could be mis-partitioned
-                            partition,
+                            new int [] { partition },
                             messageSize,
                             nowNanos);
                     return true;
@@ -1074,7 +1068,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isReadOnly,
                 isSinglePartition,
                 isEveryPartition,
-                partition,
+                new int [] { partition },
                 messageSize,
                 nowNanos,
                 false);  // is for replay.
@@ -1102,7 +1096,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isReadOnly,
                 isSinglePartition,
                 isEveryPartition,
-                partition,
+                new int [] { partition },
                 messageSize,
                 nowNanos,
                 isForReplay);
@@ -1225,14 +1219,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     };
 
-                    m_internalConnectionHandler.callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
-                                                              true,
-                                                              1000 * 120,
-                                                              cb,
-                                                              true, // priority NT
-                                                              null, // back pressure predicate
-                                                              invocation.getProcName(),
-                                                              itm.getParameters());
+                    m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
+                            true, 1000 * 120, cb, invocation.getProcName(), itm.getParameters());
                 }
                 else {
                     // m_d is for test only
@@ -1247,7 +1235,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         };
         messenger.createMailbox(m_mailbox.getHSId(), m_mailbox);
-        m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
 
@@ -1262,7 +1249,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .catalogContext(m_catalogContext)
                 .mailbox(m_mailbox)
                 .clientInterfaceHandleManagerMap(m_cihm)
-                .plannerSiteId(m_plannerSiteId)
                 .siteId(m_siteId)
                 .build();
     }
@@ -1775,10 +1761,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return;
         }
         // initiate the transaction
-        createTransaction(m_snapshotDaemonAdapter.connectionId(),
+        m_dispatcher.createTransaction(m_snapshotDaemonAdapter.connectionId(),
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
-                0,
+                new int[] { 0 }, // partition id
                 0, System.nanoTime());
     }
 
@@ -2055,9 +2041,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             spi = MiscUtils.roundTripForCL(spi);
         }
         synchronized (m_executeTaskAdpater) {
-            createTransaction(m_executeTaskAdpater.connectionId(), spi,
+            m_dispatcher.createTransaction(m_executeTaskAdpater.connectionId(), spi,
                     proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
-                    0 /* Can provide anything for multi-part */,
+                    new int[] { 0 } /* Can provide anything for multi-part */,
                     spi.getSerializedSize(), System.nanoTime());
         }
     }

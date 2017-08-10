@@ -91,6 +91,14 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_callJavaUserDefinedFunctionMID = m_jniEnv->GetMethodID(
+            jniClass, "callJavaUserDefinedFunction", "()I");
+    if (m_callJavaUserDefinedFunctionMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_callJavaUserDefinedFunctionMID != 0);
+        throw std::exception();
+    }
+
     m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
     if (m_nextDependencyMID == NULL) {
         m_jniEnv->ExceptionDescribe();
@@ -198,22 +206,22 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_encoderClass = m_jniEnv->FindClass("org/voltdb/utils/Encoder");
-    if (m_encoderClass == NULL) {
+    m_decompressionClass = m_jniEnv->FindClass("org/voltdb/utils/CompressionService");
+    if (m_decompressionClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_encoderClass != NULL);
+        assert(m_decompressionClass != NULL);
         throw std::exception();
     }
 
-    m_encoderClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_encoderClass));
-    if (m_encoderClass == NULL) {
+    m_decompressionClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_decompressionClass));
+    if (m_decompressionClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_encoderClass != NULL);
+        assert(m_decompressionClass != NULL);
         throw std::exception();
     }
 
     m_decodeBase64AndDecompressToBytesMID = m_jniEnv->GetStaticMethodID(
-            m_encoderClass,
+            m_decompressionClass,
             "decodeBase64AndDecompressToBytes",
             "(Ljava/lang/String;)[B");
     if (m_decodeBase64AndDecompressToBytesMID == NULL) {
@@ -361,10 +369,15 @@ std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
         throw std::exception();
     }
 
-    jbyteArray jbuf = (jbyteArray)m_jniEnv->CallStaticObjectMethod(m_encoderClass,
+    jbyteArray jbuf = (jbyteArray)m_jniEnv->CallStaticObjectMethod(m_decompressionClass,
                                                                    m_decodeBase64AndDecompressToBytesMID,
                                                                    jBase64Str);
     return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
+}
+
+int JNITopend::callJavaUserDefinedFunction() {
+    return (int)m_jniEnv->CallIntMethod(m_javaExecutionEngine,
+                                        m_callJavaUserDefinedFunctionMID);
 }
 
 void JNITopend::crashVoltDB(FatalException e) {
@@ -414,7 +427,7 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
     m_jniEnv->DeleteGlobalRef(m_exportManagerClass);
     m_jniEnv->DeleteGlobalRef(m_partitionDRGatewayClass);
-    m_jniEnv->DeleteGlobalRef(m_encoderClass);
+    m_jniEnv->DeleteGlobalRef(m_decompressionClass);
 }
 
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {

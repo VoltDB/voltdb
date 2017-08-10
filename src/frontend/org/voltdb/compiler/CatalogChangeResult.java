@@ -21,22 +21,13 @@ import org.voltdb.client.ProcedureInvocationType;
 
 public class CatalogChangeResult {
 
-    public static final long CATALOG_CHANGE_NOREPLAY = -1L;
-    public static class PrepareDiffFailureException extends Exception {
-        private static final long serialVersionUID = 1L;
-
-        public final byte statusCode;
-        public PrepareDiffFailureException(byte statusCode, String msg) {
-            super(msg);
-            this.statusCode = statusCode;
-        }
-    }
-
-    public byte[] catalogHash;
-    public byte[] catalogBytes;
-    public String deploymentString;
-    public String encodedDiffCommands;
+    public String errorMsg = null;
     public int diffCommandsLength;
+    public String encodedDiffCommands;
+    public byte[] catalogBytes;
+    public byte[] catalogHash;
+    public byte[] deploymentBytes;
+    public byte[] deploymentHash;
     public String[] tablesThatMustBeEmpty;
     public String[] reasonsForEmptyTables;
     public boolean requiresSnapshotIsolation;
@@ -44,7 +35,7 @@ public class CatalogChangeResult {
     public ProcedureInvocationType invocationType;
     // null or source version string if an automatic upgrade was done.
     public String upgradedFromVersion;
-    public byte[] deploymentHash;
+
     public boolean isForReplay;
     // Should catalog diff commands apply to EE or not
     public boolean requireCatalogDiffCmdsApplyToEE;
@@ -53,6 +44,4 @@ public class CatalogChangeResult {
     public int expectedCatalogVersion = -1;
     // This is set to true if schema change involves stream or connector changes or a view on stream is created or dropped.
     public boolean requiresNewExportGeneration;
-    //Catalog change replay time is computed on replay to get a generation in future of reset of the generations loaded for export.
-    public long m_ccrTime = CATALOG_CHANGE_NOREPLAY;
 }

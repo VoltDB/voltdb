@@ -67,7 +67,6 @@ import org.voltdb.compiler.statements.DropFunction;
 import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
 import org.voltdb.compiler.statements.DropStream;
-import org.voltdb.compiler.statements.ImportClass;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
@@ -88,6 +87,7 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LineReaderAdapter;
 import org.voltdb.utils.SQLCommand;
@@ -197,7 +197,6 @@ public class DDLCompiler {
                                 .addNextProcessor(new DropProcedure(this))
                                 .addNextProcessor(new PartitionStatement(this))
                                 .addNextProcessor(new ReplicateTable(this))
-                                .addNextProcessor(new ImportClass(this))
                                 .addNextProcessor(new CreateRole(this))
                                 .addNextProcessor(new DropRole(this))
                                 .addNextProcessor(new DropStream(this))
@@ -657,12 +656,6 @@ public class DDLCompiler {
         }
     }
 
-    public static class CreateProcedurePartitionData {
-        String tableName = null;
-        String columnName = null;
-        String parameterNo = null;
-    }
-
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
             throws VoltCompilerException {
         // skip checking for non-unique indexes.
@@ -802,7 +795,7 @@ public class DDLCompiler {
 
     void compileToCatalog(Database db, boolean isXDCR) throws VoltCompilerException {
         // note this will need to be decompressed to be used
-        String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
+        String binDDL = CompressionService.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
 
         // output the xml catalog to disk

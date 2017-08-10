@@ -543,7 +543,6 @@ FROM CLASS
     org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 ;
 
-
 -- CREATE TABLE T26
 -- (
 --     age BIGINT NOT NULL
@@ -581,7 +580,7 @@ AS BEGIN
     FROM T26;
 END;
 
-CREATE FUNCTION IntFunction FROM METHOD org.voltdb_testfuncs.IntFunction.unaryIntFunction;
+CREATE FUNCTION IntFunction FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.unaryIntFunction;
 
 -- PARTITION TABLE
 -- basic

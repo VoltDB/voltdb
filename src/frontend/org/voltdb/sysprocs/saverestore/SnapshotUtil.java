@@ -77,6 +77,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -434,7 +435,8 @@ public class SnapshotUtil {
         String filename = SnapshotUtil.constructCatalogFilenameForNonce(nonce);
         try
         {
-            return VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename);
+            return VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename,
+                    CatalogJarWriteMode.RECOVER);
         }
         catch (IOException ioe)
         {
