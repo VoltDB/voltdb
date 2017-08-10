@@ -569,7 +569,7 @@ PARTITION ON
     COLUMN
         age
     PARAMETER
-        1
+        0
 AS BEGIN
     SELECT COUNT(*)
     FROM T26

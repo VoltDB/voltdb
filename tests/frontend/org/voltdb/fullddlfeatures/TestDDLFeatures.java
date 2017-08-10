@@ -140,15 +140,11 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         ClientResponse resp;
         VoltTable vt;
 
-        m_client.callProcedure("@AdHoc", "DELETE FROM T26;");
         // multi partitioned query with 2 statements
         resp = m_client.callProcedure("msp1", 19, 0);
         vt = resp.getResults()[0];
-        System.out.println("MSP1");
-        System.out.println(vt);
         assertEquals(vt.getRowCount(), 1);
         vt = resp.getResults()[1];
-        System.out.println(vt);
         vt.advanceToRow(0);
         assertEquals(19l, vt.get(0, VoltType.BIGINT));
         assertEquals((byte)0, vt.get(1, VoltType.TINYINT));
@@ -157,20 +153,14 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         m_client.callProcedure("T26.insert", 19, 0);
         m_client.callProcedure("T26.insert", 20, 0);
 
-        System.out.println("MSP2");
         // single partitioned query with 3 statements
         resp = m_client.callProcedure("msp2", 19, 0, 20);
         vt = resp.getResults()[0];
-        System.out.println(vt);
-        System.out.println(resp.getResults()[1]);
-        System.out.println(resp.getResults()[2]);
         vt.advanceToRow(0);
         assertEquals(2l, vt.get(0, VoltType.BIGINT));
         vt = resp.getResults()[1];
-        System.out.println(vt);
         assertEquals(vt.getRowCount(), 1);
         vt = resp.getResults()[2];
-        System.out.println(vt);
         assertEquals(vt.getRowCount(), 3);
     }
 
