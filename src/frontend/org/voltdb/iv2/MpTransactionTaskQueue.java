@@ -159,10 +159,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 m_sitePool.repair(txnId, task);
             }
         }
-        if (!m_currentWrites.isEmpty()) {
-            tmLog.debug("MpTTQ: repairing writes");
-            m_taskQueue.offer(task);
-        }
+
+        System.err.println("=== Repairing writes !!! ===");
+        tmLog.debug("MpTTQ: repairing writes");
+        m_taskQueue.offer(task);    // necessary, otherwise the write site will be waiting indefinitely
+                                    // this is a tricky race issue
 
         for (Entry<Long, TransactionTask> e : m_currentReads.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
@@ -353,22 +354,28 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     @Override
     synchronized void restart()
     {
-        if (!m_currentReads.isEmpty()) {
-            // re-submit all the tasks in the current read set to the pool.
-            // the pool will ensure that things submitted with the same
-            // txnID will go to the the MpRoSite which is currently running it
-            for (TransactionTask task : m_currentReads.values()) {
-                taskQueueOffer(task);
-            }
-        }
-        else {
-            assert(!m_currentWrites.isEmpty());
-            TransactionTask task;
-            // There currently should only ever be one current write.  This
-            // is the awkward way to get a single value out of a Map
-            task = m_currentWrites.entrySet().iterator().next().getValue();
-            taskQueueOffer(task);
-        }
+//        if (!m_currentReads.isEmpty()) {
+//            // re-submit all the tasks in the current read set to the pool.
+//            // the pool will ensure that things submitted with the same
+//            // txnID will go to the the MpRoSite which is currently running it
+//            for (TransactionTask task : m_currentReads.values()) {
+//                taskQueueOffer(task);
+//            }
+//        }
+//
+//        if(!m_currentWrites.isEmpty()) {
+//            TransactionTask task;
+//            // There currently should only ever be one current write.  This
+//            // is the awkward way to get a single value out of a Map
+//            task = m_currentWrites.entrySet().iterator().next().getValue();
+//            taskQueueOffer(task);
+//        }
+    }
+
+    @Override
+    synchronized void restart(TransactionTask task) {
+        // must be a write task
+        taskQueueOffer(task);
     }
 
     /**

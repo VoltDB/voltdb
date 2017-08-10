@@ -245,7 +245,7 @@ public class MpProcedureTask extends ProcedureTask
         // Update the masters list with the list provided when restart was triggered
         updateMasters(m_restartMasters.get(), m_restartMastersMap.get());
         m_isRestart = true;
-        m_queue.restart();
+        m_queue.restart(this);
     }
 
     @Override
