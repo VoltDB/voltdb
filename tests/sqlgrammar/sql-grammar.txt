@@ -764,7 +764,8 @@ numeric-function-expr   ::= {numeric-expression} {math-operator} {numeric-expres
                             {math-function-0args}[()] | \
                             {math-function-1arg}({numeric-expression}) 14| \
                             {math-function-2args}({numeric-expression}, {numeric-expression}) | \
-                            {num-valued-time-expr} | {num-valued-point-expr} | {num-valued-polygon-expr}
+                            {num-valued-time-expr} | {num-valued-point-expr} | {num-valued-polygon-expr} | \
+                            {num-valued-logic-expr}
 
 math-operator           ::= + | - | * | /
 math-function-0args     ::= PI 9| {numeric-udf-func-0args}
@@ -817,7 +818,7 @@ simple-string-expr      ::= {string-value} | [[[[{table-alias-or-name}.]]]]{stri
 string-function-expr    ::= {string-expression} {string-operator} {string-expression} 2| \
                             {string-valued-int-expr}  4| {string-val-str-int-expr}  5| \
                             {string-val-num-int-expr} 2| {string-special-func-expr} 3| \
-                            {str-valued-point-expr}    | {str-valued-polygon-expr}   | \
+                            {str-valued-point-expr}    | {str-valued-polygon-expr}   | {str-valued-logic-expr} | \
                             {string-function-1arg} ({string-expression}) 3| \
                             {string-function-2args}({string-expression}, {string-expression}) 2| \
                                     REGEXP_POSITION({string-expression}, {string-expression}, {case-sensitivity})   | \
@@ -1126,3 +1127,22 @@ ng-insert-select-backward  ::= SERT INTO {table-name} ( \
 ng-star                    ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN
 ng-point-value             ::= NULL
 ng-polygon-value           ::= NULL
+
+################################################################################
+# Logic & Conversion functions
+numeric-datatype           ::= TINY | SMALL | ID | BIG | NUM | DEC
+
+# COALESCE should handle a lot of NULL values
+str-or-null-expr           ::= {string-expression} | NULL
+num-or-null-expr           ::= {numeric-expression} | NULL
+str-or-null-list           ::= {str-or-null-expr} [, {str-or-null-list}]
+num-or-null-list           ::= {num-or-null-expr} [, {num-or-null-list}]
+
+#lists for DECODE >=2 expressions b.c. it needs at least one comparison & result each
+str-list                   ::= {string-expression} , {string-expression} [, {str-list}]
+num-list                   ::= {numeric-expression} , {numeric-expression} [, {num-list}]
+
+str-valued-logic-expr      ::= CAST({numeric-expression} AS VARCHAR) | COALESCE({str-or-null-list}) | \
+                               DECODE({string-expression}, {str-list})
+num-valued-logic-expr      ::= CAST({numeric-expression} AS {numeric-datatype}) | COALESCE({num-or-null-list}) | \
+                               DECODE({numeric-expression}, {num-list})
