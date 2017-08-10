@@ -28,6 +28,7 @@ from voltcli.checkstats import StatisticsProcedureException
 
 RELEASE_MAJOR_VERSION = 7
 RELEASE_MINOR_VERSION = 2
+available_hosts = []
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
@@ -46,22 +47,38 @@ def status(runner):
                 # clear screen first
                 tmp = subprocess.call('clear', shell=True)
                 doStatus(runner)
+
                 time.sleep(2)  # used to be runner.opts.interval, default as 2 seconds
         except KeyboardInterrupt, e:
-            pass  # don't care
+            pass # don't care
     else:
         doStatus(runner)
 
 def doStatus(runner):
-    # the cluster which voltadmin is running on always comes first
-    if runner.client.host != runner.opts.host:
-        runner.voltdb_connect(runner.opts.host.host,
-                              runner.opts.host.port,
-                              runner.opts.username,
-                              runner.opts.password,
-                              runner.opts.ssl_config)
+    # the cluster(host) which voltadmin is running on always comes first
+    global available_hosts
+    try:
+        if runner.client.host != runner.opts.host.host:
+            runner.__voltdb_connect__(runner.opts.host.host,
+                                  runner.opts.host.port,
+                                  runner.opts.username,
+                                  runner.opts.password,
+                                  runner.opts.ssl_config)
+        clusterInfo = getClusterInfo(runner, true)
+    except:
+        for hostname in available_hosts:
+            try:
+                runner.__voltdb_connect__(hostname,
+                                  runner.opts.host.port,
+                                  runner.opts.username,
+                                  runner.opts.password,
+                                  runner.opts.ssl_config)
+                clusterInfo = getClusterInfo(runner, false)
+                if clusterInfo != None:
+                    break
+            except:
+                pass
 
-    clusterInfo = getClusterInfo(runner)
     if runner.opts.json:
         printJSONSummary(clusterInfo)
     else:
@@ -78,7 +95,7 @@ def doStatus(runner):
                                              runner.opts.username,
                                              runner.opts.password,
                                              runner.opts.ssl_config)
-                    clusterInfo = getClusterInfo(runner)
+                    clusterInfo = getClusterInfo(runner, false)
                     if runner.opts.json:
                         printJSONSummary(clusterInfo)
                     else:
@@ -87,15 +104,21 @@ def doStatus(runner):
                 except Exception, e:
                     pass  # ignore it
 
-def getClusterInfo(runner):
+def getClusterInfo(runner, flag):
     response = runner.call_proc('@SystemInformation',
                                 [VOLT.FastSerializer.VOLTTYPE_STRING],
                                 ['OVERVIEW'])
+    if response.response.status != 1:
+        return None;
 
     # Convert @SystemInformation results to objects.
     hosts = Hosts(runner.abort)
     for tuple in response.table(0).tuples():
         hosts.update(tuple[0], tuple[1], tuple[2])
+
+    # reset available hosts
+    if flag: 
+        available_hosts = hosts.hosts_by_id.keys()
 
     # get current version and root directory from an arbitrary node
     host = hosts.hosts_by_id.itervalues().next()
@@ -185,7 +208,6 @@ def getClusterInfo(runner):
             last_applied_ts = tuple[9]
             if covering_host != '':
                 cluster.get_remote_cluster(remote_cluster_id).add_remote_member(covering_host)
-
     return cluster
 
 def printPlainSummary(cluster):
@@ -208,11 +230,13 @@ def printPlainSummary(cluster):
     hostHeader = '{:>8}{:>16}'.format("HostId", "Host Name")
     for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
         hostHeader += '{:>20}'.format("Cluster " + str(clusterId) + " (" + remoteCluster.status + ")")
+
     rows = list()
     for hostId, hostname in cluster.hosts_by_id.items():
         row = "{:>8}{:>16}".format(hostId, hostname)
         for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
-            row += '{:>17} s'.format(remoteCluster.producer_max_latency[hostname + str(clusterId)])
+            # use get() to avoid keyError when node is shut down
+            row += '{:>17} s'.format(remoteCluster.producer_max_latency.get(hostname + str(clusterId), ''))
         rows.append(row)
 
     sys.stdout.write(header1)
@@ -271,5 +295,3 @@ def printJSONSummary(cluster):
     }
     jsonStr = json.dumps(body)
     print jsonStr
-
-
