@@ -46,6 +46,7 @@ import javax.xml.bind.JAXBException;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.TransactionIdManager;
@@ -57,6 +58,7 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltNonTransactionalProcedure;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -64,6 +66,8 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
+import org.voltdb.catalog.Function;
+import org.voltdb.catalog.FunctionParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -880,11 +884,40 @@ public class VoltCompiler {
         return catalog.getClusters().get("cluster").getDatabases().get("database");
     }
 
-    private static Database initCatalogDatabase(Catalog catalog) {
+    private static Database initCatalogDatabase(Catalog catalog, Database previousDBIfAny) {
         // create the database in the catalog
         catalog.execute("add /clusters#cluster databases database");
         addDefaultRoles(catalog);
+        initUserDefinedFunctions(previousDBIfAny);
         return getCatalogDatabase(catalog);
+    }
+
+    /**
+     * Register all the user defined functions in the catalog.
+     *
+     * @param previousDBIfAny
+     */
+    private static void initUserDefinedFunctions(Database previousDBIfAny) {
+        // Always delete all the UDFs.
+        FunctionForVoltDB.deregisterAllUserDefinedFunctions();
+        if (previousDBIfAny != null) {
+            CatalogMap<Function> functions = previousDBIfAny.getFunctions();
+            for (Function func : functions) {
+                Class<?> returnType = VoltType.classFromByteValue((byte)func.getReturntype());
+                CatalogMap<FunctionParameter> parameters = func.getParameters();
+                Class<?>[] parameterTypes = new Class<?>[parameters.size()];
+                int idx = 0;
+                for (FunctionParameter param : parameters) {
+                    parameterTypes[idx] = VoltType.classFromByteValue((byte)param.getParametertype());
+                    idx += 1;
+                }
+                FunctionForVoltDB.registerTokenForUDF(func.getFunctionname(),
+                                                      func.getFunctionid(),
+                                                      returnType,
+                                                      parameterTypes);
+            }
+        }
+
     }
 
     /**
@@ -930,7 +963,7 @@ public class VoltCompiler {
     {
         m_catalog = new Catalog(); //
         m_catalog.execute("add / clusters cluster");
-        Database db = initCatalogDatabase(m_catalog);
+        Database db = initCatalogDatabase(m_catalog, null);
         List<VoltCompilerReader> ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
@@ -957,7 +990,7 @@ public class VoltCompiler {
         final ArrayList<Class<?>> classDependencies = new ArrayList<>();
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
 
-        Database db = initCatalogDatabase(m_catalog);
+        Database db = initCatalogDatabase(m_catalog, previousDBIfAny);
 
         // shutdown and make a new hsqldb
         HSQLInterface hsql = HSQLInterface.loadHsqldb();

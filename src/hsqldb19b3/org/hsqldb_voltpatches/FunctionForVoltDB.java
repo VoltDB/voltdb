@@ -32,8 +32,10 @@ package org.hsqldb_voltpatches;
 
 import java.sql.Timestamp;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.types.Type;
 
@@ -409,7 +411,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<>();
-
+        private static Set<String> userDefinedFunctions = new HashSet<>();
         static {
             for (FunctionId fn : instances) {
                 by_LC_name.put(fn.m_name, fn);
@@ -851,13 +853,34 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         FunctionId fid = new FunctionId(functionName, returnType, functionId, -1, parameterTypes, syntax);
         FunctionId.by_LC_name.put(functionName, fid);
+        // This is not the same as by_LC_name.keys(), since it only
+        // contains the user defined functions.
+        FunctionId.userDefinedFunctions.add(functionName);
         if (m_udfSeqId <= functionId) {
             m_udfSeqId = functionId + 1;
         }
     }
 
+    /**
+     * Remove all user defined functions.  We use this
+     * to initialize the table when we start.  If the table
+     * was part of the HSQL object we would not have to do
+     * this.
+     */
+    public static void deregisterAllUserDefinedFunctions() {
+        for (String functionName : FunctionId.userDefinedFunctions) {
+            FunctionId.by_LC_name.remove(functionName);
+        }
+        FunctionId.userDefinedFunctions.clear();
+    }
+
+    /**
+     * Remove one user defined function.
+     * @param functionName
+     */
     public static void deregisterUserDefinedFunction(String functionName) {
         FunctionId.by_LC_name.remove(functionName);
+        FunctionId.userDefinedFunctions.remove(functionName);
     }
 
     public static int getFunctionId(String functionName) {
