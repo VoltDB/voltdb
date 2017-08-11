@@ -38,6 +38,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.types.Type;
+import org.voltcore.logging.VoltLogger;
 
 
 /**
@@ -48,6 +49,7 @@ import org.hsqldb_voltpatches.types.Type;
  * @since 1.9.0
  */
 public class FunctionForVoltDB extends FunctionSQL {
+    private static final VoltLogger m_logger = new VoltLogger("UDF");
 
     static class FunctionId {
         final private String m_name;
@@ -856,6 +858,8 @@ public class FunctionForVoltDB extends FunctionSQL {
         // This is not the same as by_LC_name.keys(), since it only
         // contains the user defined functions.
         FunctionId.userDefinedFunctions.add(functionName);
+        m_logger.info(String.format("Added UDF \"%s\"(%d) with %d parameters",
+        							functionName, functionId, parameterTypes.length));
         if (m_udfSeqId <= functionId) {
             m_udfSeqId = functionId + 1;
         }
@@ -872,6 +876,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             FunctionId.by_LC_name.remove(functionName);
         }
         FunctionId.userDefinedFunctions.clear();
+        m_udfSeqId = FunctionId.FUNC_VOLT_UDF_ID_START;
     }
 
     /**

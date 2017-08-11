@@ -49,7 +49,7 @@ public class DropFunction extends StatementProcessor {
         for (int idx = 0; idx < m_schema.children.size(); idx += 1) {
             VoltXMLElement func = m_schema.children.get(idx);
             if ("ud_function".equals(func.name)) {
-                String fnm = func.attributes.get("functionName");
+                String fnm = func.attributes.get("name");
                 if (fnm != null && functionName.equals(fnm)) {
                     m_schema.children.remove(idx);
                     return true;

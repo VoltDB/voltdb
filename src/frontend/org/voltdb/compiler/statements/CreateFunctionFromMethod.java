@@ -197,7 +197,7 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         }
         int returnType = VoltType.typeFromClass(returnTypeClass).getValue();
         funcXML = new VoltXMLElement("ud_function")
-                         .withValue("functionName", functionName)
+                         .withValue("name", functionName)
                          .withValue("className", className)
                          .withValue("methodName", methodName)
                          .withValue("functionId", String.valueOf(functionId))

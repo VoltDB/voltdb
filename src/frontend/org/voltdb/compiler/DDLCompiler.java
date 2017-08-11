@@ -848,7 +848,7 @@ public class DDLCompiler {
     private void addUDFToCatalog(Database db, VoltXMLElement XMLfunc, boolean isXDCR)
                         throws VoltCompilerException {
         CatalogMap<Function> catalogFunctions = db.getFunctions();
-        String functionName = XMLfunc.attributes.get("functionName");
+        String functionName = XMLfunc.attributes.get("name");
         Function func = catalogFunctions.add(functionName);
         func.setFunctionname(functionName);
         func.setClassname(XMLfunc.attributes.get("className"));

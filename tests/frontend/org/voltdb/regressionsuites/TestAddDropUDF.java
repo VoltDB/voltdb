@@ -29,6 +29,7 @@ import java.util.Collections;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -93,6 +94,77 @@ public class TestAddDropUDF extends RegressionSuite {
                         "user lacks privilege or object not found: TESTFUNC");
             }
         }
+    }
+
+    public void testDropFunction() throws Exception {
+        Client client = getClient();
+
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", "create table R1 ( BIG BIGINT );");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        try {
+            cr = client.callProcedure("@AdHoc", "create index alphidx on R1 ( add2bigint(BIG, BIG) );");
+            fail("Should not be able to create index with UDF.");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Index \"ALPHIDX\" with user defined function calls is not supported"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "create view alphview as select BIG, COUNT(*), MAX(ADD2BIGINT(BIG, BIG)) from R1 group by BIG;");
+            fail("Should not be able to create materialized view with UDF.");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Materialized view \"ALPHVIEW\" with user defined function calls is not supported"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "drop function add2bigint");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Failed to plan for statement (sql) \"select ADD2biginT(BIG, BIG) from R1;\"."));
+        }
+        //
+        // The procedure should still exist, because the drop function failed.  We can call it.
+        //
+        cr = client.callProcedure("proc");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "drop procedure proc");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // This should work because nothing is dropped.
+        cr = client.callProcedure("@AdHoc", "drop function add2BIGINT");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        try {
+            cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
+            fail("Should not be able to recreate proc.");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Failed to plan for statement (sql) \"select ADD2biginT(BIG, BIG) from R1;\"."));
+        }
+        cr = client.callProcedure("@AdHoc", "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("proc");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "drop procedure proc if exists");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // Check tuple limit delete.
+        try {
+            cr = client.callProcedure("@AdHoc", "create table R2 ( id bigint, "
+                                                 + "limit partition rows 100 "
+                                                 + "execute ( delete from r2 "
+                                                 + "where add2bigint(id, id) < 100 ) )");
+            fail("tuple limit delete with a call to a user defined function should not compile.");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("user defined function calls are not supported: \"add2bigint\""));
+        }
+        // Drop everything.  RegressionSuite seems to want this.
+        cr = client.callProcedure("@AdHoc", "drop function add2bigint;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "drop table r1 if exists");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "drop table r2 if exists");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     public TestAddDropUDF(String name) {
