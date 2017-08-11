@@ -3609,6 +3609,7 @@ ul.analysisNav li.active a, ul.analysisNav li.active a:hover {
     height:390px;
     padding:10px 10px 0;
 }
+
 #visualiseLatencyAnalysis.nvd3-svg, #visualiseFrequencyAnalysis.nvd3-svg, #visualiseProcessingTimeAnalysis.nvd3-svg,#visualiseDataTable.nvd3-svg {height:100% !important; width:100%!important;}
 
 .legendAnalysis { float:right;margin:15px 120px 0 0;}
@@ -4019,11 +4020,11 @@ ul#shutdownMsg li {
     }
        .mainContent, .mainContentAnalysis{ width:auto;}
 
-
     .analysisSubTab { margin-top:60px;}
 
 
 }
+
 @media (max-width: 580px) {
    ul#ulProcedure li { float:none;}
 }
@@ -4031,7 +4032,6 @@ ul#shutdownMsg li {
 .generateproDetails { position:relative; /*top:-28px;*/ float:none; padding:5px 0;}
 .generateProcedureDate { position:relative; top:-28px; float:none; padding:5px 0;}
 .generateTableDate{position:relative; top:-28px; float:none; padding:5px 0;}
-
 }
 @media (max-width: 550px) {.procDetailTitle {height:100%;line-height:20px;}}
 @media (min-width: 720px) and (max-width: 800px) {
@@ -4080,7 +4080,6 @@ ul#shutdownMsg li {
     .generateTableDate{top:0;}
     .subTabSection { margin-top:58px;}
     .analysisSubTab { margin-top:0;}
-
 }
 @media (min-width: 639px) and (max-width: 640px) {
     #serverConfigAdmin {

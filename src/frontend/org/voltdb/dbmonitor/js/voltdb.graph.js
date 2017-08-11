@@ -61,6 +61,7 @@
         var ChartFrequencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartDataTableAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+
         var drChartList = {}
         var ChartCommandlog = nv.models.lineChart();
         var dataMapperSec = {};
