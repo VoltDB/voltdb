@@ -415,7 +415,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             vt = client.callProcedure("MSP3", 1, "zoo", 2, "keeper").getResults();
             assertContentOfTable(new Object[][] {{1}}, vt[0]);
             assertContentOfTable(new Object[][] {{1}}, vt[1]);
-            assertContentOfTable(new Object[][] {{2, "keeper"}, {1, "zoo"}}, vt[2]);
+            assertContentOfTable(new Object[][] {{1, "zoo"}, {2, "keeper"}}, vt[2]);
         }
 
         vt = client.callProcedure("MSP4", 1, 2).getResults();
