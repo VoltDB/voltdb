@@ -46,9 +46,9 @@ StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn)
     , m_partitionColumn(partitionColumn)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
-    if (exportEnabled) {
-        enableStream();
-    }
+//    if (exportEnabled) {
+//        enableStream();
+//    }
 }
 
 StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
@@ -60,9 +60,9 @@ StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
     , m_partitionColumn(-1)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
-    if (exportEnabled) {
-        enableStream();
-    }
+//    if (exportEnabled) {
+//        enableStream();
+//    }
 }
 
 StreamedTable *
@@ -74,15 +74,15 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     return st;
 }
 
-//This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
-bool StreamedTable::enableStream() {
-    if (!m_wrapper) {
-        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId);
-        return true;
-    }
-    return false;
-}
+////This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
+//bool StreamedTable::enableStream() {
+//    if (!m_wrapper) {
+//        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+//                                           m_executorContext->m_siteId);
+//        return true;
+//    }
+//    return false;
+//}
 
 /*
  * claim ownership of a view. table is responsible for this view*
@@ -112,7 +112,8 @@ StreamedTable::~StreamedTable() {
     for (int i = 0; i < m_views.size(); i++) {
         delete m_views[i];
     }
-    delete m_wrapper;
+    //Dont delete wrapper
+//    delete m_wrapper;
 }
 
 TableIterator& StreamedTable::iterator() {
@@ -193,9 +194,9 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis) {
 /**
  * Inform the tuple stream wrapper of the table's delegate id
  */
-void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t generation, bool eof) {
+void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t generation) {
     if (m_wrapper) {
-        m_wrapper->setSignatureAndGeneration(signature, generation, eof);
+        m_wrapper->setSignatureAndGeneration(signature, generation);
     }
 }
 

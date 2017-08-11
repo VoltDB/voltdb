@@ -486,8 +486,9 @@ public class ExportGeneration implements Generation {
 
         ExportDataSource source = sources.get(signature);
         if (source == null) {
+            (new Exception()).printStackTrace();
             exportLog.error("Could not find export data source for partition " + partitionId +
-                    " signature " + signature + ". The export data is being discarded.");
+                    " Signature " + signature + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
             }

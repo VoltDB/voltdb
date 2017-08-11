@@ -52,7 +52,7 @@ public:
     static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema, std::vector<std::string> & columnNames);
 
     //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
-    bool enableStream();
+    //bool enableStream();
 
     virtual ~StreamedTable();
 
@@ -74,7 +74,7 @@ public:
 
     virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
-    void setSignatureAndGeneration(std::string signature, int64_t generation, bool eof = false);
+    void setSignatureAndGeneration(std::string signature, int64_t generation);
 
     // The MatViewType typedef is required to satisfy initMaterializedViews
     // template code that needs to identify
@@ -125,6 +125,14 @@ public:
     // No Op
     std::vector<uint64_t> getBlockAddresses() const {
         return std::vector<uint64_t>();
+    }
+
+    void setWrapper(ExportTupleStream *wrapper) {
+        m_wrapper = wrapper;
+    }
+
+    ExportTupleStream* getWrapper() {
+        return m_wrapper;
     }
 
 private:

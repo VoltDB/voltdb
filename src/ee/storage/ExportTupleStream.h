@@ -31,12 +31,12 @@ class ExportTupleStream : public voltdb::TupleStreamBase {
 public:
     enum Type { INSERT, DELETE };
 
-    ExportTupleStream(CatalogId partitionId, int64_t siteId);
+    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature);
 
     virtual ~ExportTupleStream() {
     }
 
-    void setSignatureAndGeneration(std::string signature, int64_t generation, bool eof = false);
+    void setSignatureAndGeneration(std::string signature, int64_t generation);
 
     /** Read the total bytes used over the life of the stream */
     size_t bytesUsed() {

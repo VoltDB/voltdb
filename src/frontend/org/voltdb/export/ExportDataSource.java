@@ -303,8 +303,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return result;
         }
 
-        // does not verify replicated / unreplicated.
-        // does not verify column names / schema
         return 0;
     }
 
@@ -437,6 +435,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         if (m_es.isShutdown()) {
+            System.out.println("Push came when we are shutdown.");
            m_bufferPushPermits.release();
            return;
         }
@@ -446,7 +445,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(uso, buffer, sync, true);
+                            pushExportBufferImpl(uso, buffer, sync, !m_es.isShutdown());
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -621,7 +620,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //We are closing source.
                 }
                 //Let generation know to cleanup. Processor needs to do its own cleanup.
-                m_generation.onSourceDone(m_partitionId, m_signature);
+//                m_generation.onSourceDone(m_partitionId, m_signature);
                 //TODO: handle ack.
 //                forwardAckToOtherReplicas(Long.MIN_VALUE);
                 return;
@@ -669,8 +668,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
-                    //We are closing source.
-                    ackingContainer.discard();
+                    //We are closing source dont discard next processor will pick it up.
+                    //ackingContainer.discard();
                 }
                 m_pollFuture = null;
             }
@@ -818,7 +817,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public synchronized void unacceptMastership() {
         m_onMastership = null;
         m_mastershipAccepted.set(false);
-        m_pollFuture = null;
+        m_isInCatalog = false;
+        // For case where the previous export processor had only row of the first block to process
+        // and it completed processing it, poll future is not set to null still. Set it to null to
+        // prepare for the new processor polling
+//        if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
+//            m_pollFuture = null;
+//        }
     }
     /**
      * Trigger an execution of the mastership runnable by the associated

@@ -86,6 +86,7 @@
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
+#include "storage/ExportTupleStream.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 
@@ -126,6 +127,8 @@ typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
 typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
+typedef std::pair<std::string, StreamedTable*> LabeledStream;
+typedef std::pair<std::string, ExportTupleStream*> LabeledStreamWrapper;
 
 /**
  * The set of plan bytes is explicitly maintained in MRU-first order,
@@ -717,8 +720,10 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp) {
             auto streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
                 const std::string signature = tcd->signature();
-                streamedtable->setSignatureAndGeneration(signature, timestamp, true);
+                streamedtable->setSignatureAndGeneration(signature, timestamp);
                 m_exportingTables.erase(signature);
+                //Maintain the streams that will go away for which wrapper needs to be cleaned;
+                m_exportingDeletedStreams[signature] = streamedtable->getWrapper();
             }
             delete tcd;
         }
@@ -813,6 +818,15 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
             if (streamedtable) {
                 streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 m_exportingTables[catalogTable->signature()] = streamedtable;
+                ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
+                if (!wrapper) {
+                    wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
+                    m_exportingStreams[catalogTable->signature()] = wrapper;
+                } else {
+                    //Undelete them.
+                    m_exportingDeletedStreams[catalogTable->signature()] = NULL;
+                }
+                streamedtable->setWrapper(wrapper);
 
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
                 std::vector<MaterializedViewTriggerForStreamInsert*> survivingViews;
@@ -872,10 +886,19 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
                         // Evaluate export enabled or not and cache it on the tcd.
                         tcd->evaluateExport(*m_database, *catalogTable);
                         // If enabled hook up streamer
-                        if (tcd->exportEnabled() && streamedTable->enableStream()) {
+                        if (tcd->exportEnabled()) {
                             //Reset generation after stream wrapper is created.
                             streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                             m_exportingTables[catalogTable->signature()] = streamedTable;
+                            ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
+                            if (!wrapper) {
+                                wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
+                                m_exportingStreams[catalogTable->signature()] = wrapper;
+                            } else {
+                                //Undelete them.
+                                m_exportingDeletedStreams[catalogTable->signature()] = NULL;
+                            }
+                            streamedTable->setWrapper(wrapper);
                         }
                     }
                 }
@@ -1140,9 +1163,22 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
 
     initMaterializedViewsAndLimitDeletePlans();
 
+    purgeMissingStreams();
+
     m_catalog->purgeDeletions();
     VOLT_DEBUG("Updated catalog...");
     return true;
+}
+
+void
+VoltDBEngine::purgeMissingStreams() {
+    BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingDeletedStreams) {
+        //Do delete
+        if (entry.second) {
+            entry.second->pushEndOfStream();
+        }
+    }
+    m_exportingDeletedStreams.clear();
 }
 
 bool
@@ -1529,8 +1565,6 @@ bool VoltDBEngine::isLocalSite(const int32_t pkHash) const {
 std::string VoltDBEngine::dumpCurrentHashinator() const {
     return m_hashinator.get()->debug();
 }
-
-typedef std::pair<std::string, StreamedTable*> LabeledStream;
 
 /** Perform once per second, non-transactional work. */
 void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
