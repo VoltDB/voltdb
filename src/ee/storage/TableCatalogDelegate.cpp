@@ -73,12 +73,13 @@ Table* TableCatalogDelegate::getTable() const {
 }
 
 TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catalogTable,
-                                                     bool isXDCR) {
+                                                     bool isXDCR,
+                                                     bool forceNoDR) {
     // Columns:
     // Column is stored as map<std::string, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
     auto numColumns = catalogTable.columns().size();
-    bool needsDRTimestamp = isXDCR && catalogTable.isDRed();
+    bool needsDRTimestamp = isXDCR && !forceNoDR && catalogTable.isDRed();
     TupleSchemaBuilder schemaBuilder(numColumns,
                                      needsDRTimestamp ? 1 : 0); // number of hidden columns
 
@@ -263,6 +264,7 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme& indexScheme) {
 Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& catalogDatabase,
                                                        catalog::Table const& catalogTable,
                                                        bool isXDCR,
+                                                       bool forceNoDR,
                                                        int tableAllocationTargetSize) {
     // Create a persistent table for this table in our catalog
     int32_t tableId = catalogTable.relativeIndex();
@@ -279,7 +281,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     }
 
     // get the schema for the table
-    TupleSchema* schema = createTupleSchema(catalogTable, isXDCR);
+    TupleSchema* schema = createTupleSchema(catalogTable, isXDCR, forceNoDR);
 
     // Indexes
     std::map<std::string, TableIndexScheme> index_map;
@@ -369,7 +371,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, tableId);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, tableId);
-    bool drEnabled = catalogTable.isDRed();
+    bool drEnabled = !forceNoDR && catalogTable.isDRed();
     m_materialized = isTableMaterialized(catalogTable);
     std::string const& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -446,7 +448,7 @@ PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const&
     // Delta table will only have one row (currently).
     // Set the table block size to 64KB to achieve better space efficiency.
     // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
-    Table* deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, false, 1024 * 64);
+    Table* deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, false, 1024 * 64, true);
     deltaTable->incrementRefcount();
     // We have the restriction that view on joined table cannot have non-persistent table source.
     // So here we could use static_cast. But if we in the future want to lift this limitation,

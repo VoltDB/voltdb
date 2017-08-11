@@ -87,7 +87,8 @@ class TableCatalogDelegate {
                               bool isXDCR);
 
     static TupleSchema *createTupleSchema(catalog::Table const &catalogTable,
-                                          bool isXDCR);
+                                          bool isXDCR,
+                                          bool forceNoDR);
 
     static bool getIndexScheme(catalog::Table const &catalogTable,
                                catalog::Index const &catalogIndex,
@@ -144,6 +145,7 @@ class TableCatalogDelegate {
     Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                      catalog::Table const &catalogTable,
                                      bool isXDCR,
+                                     bool forceNoDR = false,
                                      int tableAllocationTargetSize = 0);
 
     voltdb::Table *m_table;
