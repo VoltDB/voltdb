@@ -42,6 +42,8 @@ import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.CatalogContext;
@@ -67,10 +69,9 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.net.HostAndPort;
-
-import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -756,9 +757,8 @@ public class RegressionSuite extends TestCase {
               assertTrue(vt.advanceRow());
               double actual = vt.getDouble(col);
 
-              if (expected[i] == Double.MIN_VALUE) {
+              if (expected[i] <= VoltType.NULL_FLOAT) {
                   assertTrue(vt.wasNull());
-                  assertEquals(null, actual);
               }
               else {
                   assertEquals(expected[i], actual, 0.00001);
@@ -1020,8 +1020,8 @@ public class RegressionSuite extends TestCase {
         Iterator<List<GeographyPointValue>> expectedLoopIt = expectedLoops.iterator();
         for (List<GeographyPointValue> actualLoop : actualLoops) {
             List<GeographyPointValue> expectedLoop = expectedLoopIt.next();
-            assertEquals(msg + loopCtr + "the loop should have " + expectedLoop.size()
-                    + " vertices, but has " + actualLoop.size(),
+            assertEquals(msg + "loop " + loopCtr + " should have " + expectedLoop.size()
+                    + " vertices, but has " + actualLoop.size() + ";",
                     expectedLoop.size(), actualLoop.size());
 
             int vertexCtr = 0;
@@ -1052,8 +1052,16 @@ public class RegressionSuite extends TestCase {
             Object expectedObj = expectedRow[i];
             if (expectedObj == null) {
                 VoltType vt = actualRow.getColumnType(i);
-                actualRow.get(i,  vt);
-                assertTrue(msg, actualRow.wasNull());
+                Object actualValue = actualRow.get(i, vt);
+                String fullMsg = msg + "expected null, but got: "+actualValue;
+                if (actualValue instanceof byte[]) {
+                    fullMsg = msg+"expected null, but got VARBINARY with array of byte values: "
+                            + Arrays.toString((byte[])actualValue);
+                } else if (actualValue instanceof Byte[]) {
+                    fullMsg = msg+"expected null, but got VARBINARY with array of Byte values: "
+                            + Arrays.toString((Byte[])actualValue);
+                }
+                assertTrue(fullMsg, actualRow.wasNull());
             }
             else if (expectedObj instanceof GeographyPointValue) {
                 assertApproximatelyEquals(msg, (GeographyPointValue) expectedObj, actualRow.getGeographyPointValue(i), epsilon);
@@ -1069,16 +1077,21 @@ public class RegressionSuite extends TestCase {
                 long val = ((Integer)expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
             }
+            else if (expectedObj instanceof Short) {
+                long val = ((Short)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
+            else if (expectedObj instanceof Byte) {
+                long val = ((Byte)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
             else if (expectedObj instanceof Double) {
-                double expectedValue = (Double)expectedObj;
+                Double expectedValue = (Double)expectedObj;
                 double actualValue = actualRow.getDouble(i);
-                // check if the row value was evaluated as null. Looking
-                // at return is not reliable way to do so;
-                // for null values, convert value into double min
-                if (actualRow.wasNull()) {
-                    actualValue = Double.MIN_VALUE;
-                }
-                if (epsilon <= 0) {
+                // Either both are null or neither is null
+                assertEquals(msg+"expected "+expectedValue+" but got "+actualValue+": checking for null FLOAT: ",
+                        expectedValue == null, actualRow.wasNull());
+                if (epsilon <= 0 || !Double.isFinite(expectedValue)) {
                     String fullMsg = msg + String.format("Expected value %f != actual value %f", expectedValue, actualValue);
                     assertEquals(fullMsg, expectedValue, actualValue);
                 }
@@ -1091,9 +1104,26 @@ public class RegressionSuite extends TestCase {
             else if (expectedObj instanceof BigDecimal) {
                 BigDecimal exp = (BigDecimal)expectedObj;
                 BigDecimal got = actualRow.getDecimalAsBigDecimal(i);
-                // Either both are null or neither are null.
-                assertEquals(exp == null, got == null);
+                // Either both are null or neither is null
+                assertEquals(msg+"expected "+exp+" but got "+got+": checking for null DECIMAL: ",
+                        exp == null, got == null);
                 assertEquals(msg, exp.doubleValue(), got.doubleValue(), epsilon);
+            }
+            else if (expectedObj instanceof byte[]) {
+                byte[] expectedVarbinary = (byte[]) expectedObj;
+                byte[] actualVarbinary = actualRow.getVarbinary(i);
+                assertEquals(msg+"length of VARBINARY: ", expectedVarbinary.length, actualVarbinary.length);
+                for (int k = 0; k < expectedVarbinary.length; k++) {
+                    assertEquals(msg+"index "+k+" of VARBINARY value: ", expectedVarbinary[k], actualVarbinary[k]);
+                }
+            }
+            else if (expectedObj instanceof Byte[]) {
+                Byte[] expectedVarbinary = (Byte[]) expectedObj;
+                Byte[] actualVarbinary = SerializationHelper.boxUpByteArray(actualRow.getVarbinary(i));
+                assertEquals(msg+"length of VARBINARY: ", expectedVarbinary.length, actualVarbinary.length);
+                for (int k = 0; k < expectedVarbinary.length; k++) {
+                    assertEquals(msg+"index "+k+" of VARBINARY value: ", expectedVarbinary[k], actualVarbinary[k]);
+                }
             }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;

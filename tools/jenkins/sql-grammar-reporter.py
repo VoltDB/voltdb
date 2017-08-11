@@ -46,10 +46,12 @@ class Issues(object):
         summary_report = self.read_url(summary_url)
 
         pframe_split = summary_report.split('Problematic frame:')
+        pframe_split = pframe_split[1].split('C')
         pframe_split = pframe_split[1].split(']')
         pframe_split = pframe_split[1].split('#')
+        pframe = pframe_split[0].strip()
 
-        summary = job + ':' + str(build) + ' - ' + pframe_split[0].strip()
+        summary = job + ':' + str(build) + ' - ' + pframe
         existing = jira.search_issues('summary ~ \'%s\'' % summary)
         if len(existing) > 0:
             print 'No new Jira issue created. Build ' + str(build) + ' has already been reported.'

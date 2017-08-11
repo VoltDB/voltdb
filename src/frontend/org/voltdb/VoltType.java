@@ -309,7 +309,7 @@ public enum VoltType {
             // Normally, only compatible NON-ARRAY types are listed,
             // but byte array is included here as the special case
             // most suitable representation of VARBINARY.
-            new Class[] {byte[].class, },
+            new Class[] {byte[].class, Byte[].class},
             byte[][].class,
             'l',
             java.sql.Types.VARBINARY,  // java.sql.Types DATA_TYPE
@@ -690,13 +690,19 @@ public enum VoltType {
                 return type;
             }
         }
+
         if (str.equalsIgnoreCase("DOUBLE")) {
             return FLOAT;
         }
+
         if (str.equalsIgnoreCase("CHARACTER") ||
                 str.equalsIgnoreCase("CHAR") ||
                 str.equalsIgnoreCase("VARCHAR")) {
             return STRING;
+        }
+
+        if (str.equalsIgnoreCase("BINARY")) {
+            return VoltType.VARBINARY;
         }
 
         throw new RuntimeException("Can't find type: " + str);
