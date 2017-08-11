@@ -1030,6 +1030,11 @@ public final class ClientImpl implements Client {
     }
 
     @Override
+    public boolean isAutoReconnectEnabled() {
+        return (m_reconnectStatusListener != null);
+    }
+
+    @Override
     public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)
             throws IOException, NoConnectionsException, ProcCallException {
         CountDownLatch latch = new CountDownLatch(1);
