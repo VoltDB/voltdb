@@ -81,10 +81,10 @@ public class MpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
-                numberOfPartitions, startAction, null, null, cl, coreBindIds, false);
+                numberOfPartitions, startAction, null, null, cl, coreBindIds, false, true);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
-        MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
+        MpRWSitePool sitePool = new MpRWSitePool(m_initiatorMailbox.getHSId(),
                 backend,
                 catalogContext,
                 m_partitionId,

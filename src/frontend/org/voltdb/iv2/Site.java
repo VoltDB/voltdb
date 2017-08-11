@@ -146,6 +146,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Manages pending tasks.
     final SiteTaskerQueue m_scheduler;
 
+    private MpRWSitePool m_writePool;
+
     /*
      * There is really no legitimate reason to touch the initiator mailbox from the site,
      * but it turns out to be necessary at startup when restoring a snapshot. The snapshot
@@ -813,7 +815,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_currentTxnId = ((TransactionTask)task).getTxnId();
                         m_lastTxnTime = EstTime.currentTimeMillis();
                     }
-                    task.run(getSiteProcedureConnection());
+                    if (m_writePool != null && task instanceof TransactionTask) {
+                        m_writePool.doWork(m_currentTxnId, (TransactionTask) task);
+                    } else {
+                        task.run(getSiteProcedureConnection());
+                    }
                 } else if (m_rejoinState == kStateReplayingRejoin) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
@@ -1002,6 +1008,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 } catch (IOException e) {
                     hostLog.error("Exception closing rejoin task log", e);
                 }
+            }
+            if (m_writePool != null) {
+                m_writePool.shutdown();
             }
         } catch (InterruptedException e) {
             hostLog.warn("Interrupted shutdown execution site.", e);
@@ -1746,5 +1755,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     public ExecutionEngine getExecutionEngine() {
         return m_ee;
+    }
+
+    public void configureSitePool() {
+        // The parameters are the same as the pool for reads in the scheduler
+        m_writePool = new MpRWSitePool(m_initiatorMailbox.getHSId(),
+                                       m_backend, m_context, m_partitionId, m_initiatorMailbox, false);
+        m_writePool.setWrappingMPISite(this);
     }
 }

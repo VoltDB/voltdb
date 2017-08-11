@@ -36,13 +36,34 @@ import org.voltdb.StarvationTracker;
  * This should be owned by the MpTransactionTaskQueue and expects all operations
  * to be done while holding its lock.
  */
-class MpRoSitePool {
+class MpRWSitePool {
     final static VoltLogger tmLog = new VoltLogger("TM");
 
     static int DEFAULT_MAX_POOL_SIZE = 20;
     static int INITIAL_POOL_SIZE = 1;
 
-    class MpRoSiteContext {
+    interface MpSiteContext {
+        boolean offer(SiteTasker task);
+        long getCatalogCRC();
+        long getCatalogVersion();
+        void shutdown();
+        void joinThread();
+    }
+
+    protected MpSiteContext createMpSiteContext() {
+        if (m_isReadOnly) {
+            return new MpRoSiteContext(m_siteId,
+                                       m_backend,
+                                       m_catalogContext,
+                                       m_partitionId,
+                                       m_initiatorMailbox,
+                                       m_poolThreadFactory);
+        } else {
+            return null;
+        }
+    }
+
+    class MpRoSiteContext implements MpSiteContext {
         final private SiteTaskerQueue m_queue;
         final private MpRoSite m_site;
         final private CatalogContext m_catalogContext;
@@ -67,25 +88,86 @@ class MpRoSitePool {
             m_siteThread.start();
         }
 
-        boolean offer(SiteTasker task) {
+        @Override
+        public boolean offer(SiteTasker task) {
             return m_queue.offer(task);
         }
 
-        long getCatalogCRC() {
+        @Override
+        public long getCatalogCRC() {
             return m_catalogContext.getCatalogCRC();
         }
 
-        long getCatalogVersion() {
+        @Override
+        public long getCatalogVersion() {
             return m_catalogContext.catalogVersion;
         }
 
-        void shutdown() {
+        @Override
+        public void shutdown() {
             m_site.startShutdown();
             // Need to unblock the site's run() loop on the take() call on the queue
             m_queue.offer(Scheduler.m_nullTask);
         }
 
-        void joinThread() {
+        @Override
+        public void joinThread() {
+            try {
+                m_siteThread.join();
+            } catch (InterruptedException e) {
+            }
+        }
+    }
+
+    class MpRWSiteContext implements MpSiteContext {
+        final private SiteTaskerQueue m_queue;
+        final private MpRoSite m_site;
+        final private CatalogContext m_catalogContext;
+        final private LoadedProcedureSet m_loadedProcedures;
+        final private Thread m_siteThread;
+
+        MpRWSiteContext(long siteId, BackendTarget backend,
+                CatalogContext context, int partitionId,
+                InitiatorMailbox initiatorMailbox,
+                ThreadFactory threadFactory)
+        {
+            m_catalogContext = context;
+            m_queue = new SiteTaskerQueue(partitionId);
+            // IZZY: Just need something non-null for now
+            m_queue.setStarvationTracker(new StarvationTracker(siteId));
+            m_queue.setupQueueDepthTracker(siteId);
+            m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
+            m_loadedProcedures = new LoadedProcedureSet(m_site);
+            m_loadedProcedures.loadProcedures(m_catalogContext);
+            m_site.setLoadedProcedures(m_loadedProcedures);
+            m_siteThread = threadFactory.newThread(m_site);
+            m_siteThread.start();
+        }
+
+        @Override
+        public boolean offer(SiteTasker task) {
+            return m_queue.offer(task);
+        }
+
+        @Override
+        public long getCatalogCRC() {
+            return m_catalogContext.getCatalogCRC();
+        }
+
+        @Override
+        public long getCatalogVersion() {
+            return m_catalogContext.catalogVersion;
+        }
+
+        @Override
+        public void shutdown() {
+            m_site.startShutdown();
+            // Need to unblock the site's run() loop on the take() call on the queue
+            m_queue.offer(Scheduler.m_nullTask);
+        }
+
+        @Override
+        public void joinThread() {
             try {
                 m_siteThread.join();
             } catch (InterruptedException e) {
@@ -94,9 +176,9 @@ class MpRoSitePool {
     }
 
     // Stack of idle MpRoSites
-    private Deque<MpRoSiteContext> m_idleSites = new ArrayDeque<MpRoSiteContext>();
+    private Deque<MpSiteContext> m_idleSites = new ArrayDeque<MpSiteContext>();
     // Active sites, hashed by the txnID they're working on
-    private Map<Long, MpRoSiteContext> m_busySites = new HashMap<Long, MpRoSiteContext>();
+    private Map<Long, MpSiteContext> m_busySites = new HashMap<Long, MpSiteContext>();
 
     // Stuff we need to construct new MpRoSites
     private final long m_siteId;
@@ -107,13 +189,18 @@ class MpRoSitePool {
     private ThreadFactory m_poolThreadFactory;
     private final int m_poolSize;
 
-    MpRoSitePool(
+    private final boolean m_isReadOnly; // Indicates whether this is a read-only pool
+    private Site m_mpiSite; // Used for RW pool
+
+    MpRWSitePool(
             long siteId,
             BackendTarget backend,
             CatalogContext context,
             int partitionId,
-            InitiatorMailbox initiatorMailbox)
+            InitiatorMailbox initiatorMailbox,
+            boolean isReadOnly)
     {
+        m_isReadOnly = isReadOnly;
         m_siteId = siteId;
         m_backend = backend;
         m_catalogContext = context;
@@ -132,14 +219,24 @@ class MpRoSitePool {
 
         // Construct the initial pool
         for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
-            m_idleSites.push(new MpRoSiteContext(m_siteId,
-                        m_backend,
-                        m_catalogContext,
-                        m_partitionId,
-                        m_initiatorMailbox,
-                        m_poolThreadFactory));
+            m_idleSites.push(createMpSiteContext());
         }
 
+    }
+
+    MpRWSitePool(
+            long siteId,
+            BackendTarget backend,
+            CatalogContext context,
+            int partitionId,
+            InitiatorMailbox initiatorMailbox)
+    {
+        this(siteId,
+             backend,
+             context,
+             partitionId,
+             initiatorMailbox,
+             true); // By default this is a read-only site pool
     }
 
     /**
@@ -151,9 +248,9 @@ class MpRoSitePool {
         // Wipe out all the idle sites with stale catalogs.
         // Non-idle sites will get killed and replaced when they finish
         // whatever they started before the catalog update
-        Iterator<MpRoSiteContext> siterator = m_idleSites.iterator();
+        Iterator<MpSiteContext> siterator = m_idleSites.iterator();
         while (siterator.hasNext()) {
-            MpRoSiteContext site = siterator.next();
+            MpSiteContext site = siterator.next();
             if (site.getCatalogCRC() != m_catalogContext.getCatalogCRC()
                     || site.getCatalogVersion() != m_catalogContext.catalogVersion) {
                 site.shutdown();
@@ -178,7 +275,7 @@ class MpRoSitePool {
     void repair(long txnId, SiteTasker task)
     {
         if (m_busySites.containsKey(txnId)) {
-            MpRoSiteContext site = m_busySites.get(txnId);
+            MpSiteContext site = m_busySites.get(txnId);
             site.offer(task);
         }
         else {
@@ -205,19 +302,14 @@ class MpRoSitePool {
         // Checking is not necessary
         assert(canAcceptWork());
 
-        MpRoSiteContext site;
+        MpSiteContext site;
         // Repair case
         if (m_busySites.containsKey(txnId)) {
             site = m_busySites.get(txnId);
         }
         else {
             if (m_idleSites.isEmpty()) {
-                site = new MpRoSiteContext(m_siteId,
-                                           m_backend,
-                                           m_catalogContext,
-                                           m_partitionId,
-                                           m_initiatorMailbox,
-                                           m_poolThreadFactory);
+                site = createMpSiteContext();
             } else {
                 site = m_idleSites.pop();
             }
@@ -232,7 +324,7 @@ class MpRoSitePool {
      */
     void completeWork(long txnId)
     {
-        MpRoSiteContext site = m_busySites.remove(txnId);
+        MpSiteContext site = m_busySites.remove(txnId);
         if (site == null) {
             throw new RuntimeException("No busy site for txnID: " + txnId + " found, shouldn't happen.");
         }
@@ -251,17 +343,23 @@ class MpRoSitePool {
     void shutdown()
     {
         // Shutdown all, then join all, hopefully save some shutdown time for tests.
-        for (MpRoSiteContext site : m_idleSites) {
+        for (MpSiteContext site : m_idleSites) {
             site.shutdown();
         }
-        for (MpRoSiteContext site : m_busySites.values()) {
+        for (MpSiteContext site : m_busySites.values()) {
             site.shutdown();
         }
-        for (MpRoSiteContext site : m_idleSites) {
+        for (MpSiteContext site : m_idleSites) {
             site.joinThread();
         }
-        for (MpRoSiteContext site : m_busySites.values()) {
+        for (MpSiteContext site : m_busySites.values()) {
             site.joinThread();
         }
+    }
+
+    // Pass the MPI write site reference to the pool
+    public void setWrappingMPISite(Site site) {
+        assert(site != null);
+        m_mpiSite = site;
     }
 }

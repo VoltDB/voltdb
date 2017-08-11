@@ -46,7 +46,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private final Map<Long, TransactionTask> m_currentReads = new HashMap<Long, TransactionTask>();
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
-    private MpRoSitePool m_sitePool = null;
+    private MpRWSitePool m_sitePool = null;
 
     // Partition r/w counts, the key is the partition master hsid
     private HashMap<Long, PartitionLock> m_lockedPartitions = new HashMap<>();
@@ -99,7 +99,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         super(queue);
     }
 
-    void setMpRoSitePool(MpRoSitePool sitePool)
+    void setMpRoSitePool(MpRWSitePool sitePool)
     {
         m_sitePool = sitePool;
     }
