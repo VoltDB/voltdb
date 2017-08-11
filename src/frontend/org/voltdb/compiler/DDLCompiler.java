@@ -37,6 +37,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -1810,6 +1811,19 @@ public class DDLCompiler {
             // We parse the statement here and cache the XML below if the statement passes
             // validation.
             deleteXml = m_hsql.getXMLCompiledStatement(catStmt.getSqltext());
+            List<VoltXMLElement> exprs = deleteXml.findChildrenRecursively("function");
+            for (VoltXMLElement expr : exprs) {
+                int functionId = Integer.parseInt(expr.attributes.get("function_id"));
+                if (FunctionForVoltDB.isUserDefinedFunctionId(functionId)) {
+                    String functionName = expr.attributes.get("name");
+                    throw m_compiler.new VoltCompilerException(
+                            msgPrefix
+                            + "user defined function calls are not supported: \""
+                            + functionName
+                            + "\""
+                    );
+                }
+            }
         }
         catch (HSQLInterface.HSQLParseException e) {
             throw m_compiler.new VoltCompilerException(msgPrefix + "parse error: " + e.getMessage());

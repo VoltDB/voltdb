@@ -103,6 +103,19 @@ public class TestUserDefinedFunctionCatalogDependences extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("proc");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "drop procedure proc if exists");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // Check tuple limit delete.
+        try {
+            cr = client.callProcedure("@AdHoc", "create table R2 ( id bigint, "
+                                                 + "limit partition rows 100 "
+                                                 + "execute ( delete from r2 "
+                                                 + "where add2bigint(id, id) < 100 ) )");
+            fail("tuple limit delete with a call to a user defined function should not compile.");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("user defined function calls are not supported: \"add2bigint\""));
+        }
     }
 
     static public Test suite() {

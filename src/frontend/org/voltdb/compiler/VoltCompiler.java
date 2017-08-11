@@ -1035,6 +1035,7 @@ public class VoltCompiler {
         }
 
         m_dirtyTables.clear();
+        m_allTablesAreDirty = false;
 
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             String origFilename = m_currentFilename;
