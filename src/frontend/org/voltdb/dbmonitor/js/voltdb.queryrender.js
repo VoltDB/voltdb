@@ -241,7 +241,7 @@ function QueryUI(queryTab) {
             source = $('#querybox-' + query_id)[0].innerText;
 
         source = source.replace(/^\s+|\s+$/g,'');
-        source = source.replace("\\", "\\\\");
+        source = source.replace(/\\/g, "\\\\");
         if (source == '')
             return;
 
