@@ -676,4 +676,12 @@ public class InitiatorMailbox implements Mailbox
                 CoreUtils.hsIdToString(m_newLeaderHSID) + " transactions are drained." + " status:" + m_balanceSPIStatus);
         m_newLeaderHSID = Long.MIN_VALUE;
     }
+
+    //Reinstall the site as leader.
+    public void resetBalanceSPIStatus() {
+        m_scheduler.m_isLeader = true;
+        m_balanceSPIStatus = BalanceSpiStatus.NONE;
+        m_repairLog.setLeaderState(true);
+        m_newLeaderHSID = Long.MIN_VALUE;
+    }
 }

@@ -25,7 +25,6 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
@@ -290,5 +289,13 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
     public boolean isLeader() {
         return m_scheduler.isLeader();
+    }
+
+    public void resetBalanceSPIStatus() {
+        m_initiatorMailbox.resetBalanceSPIStatus();
+    }
+
+    public Scheduler getScheduler() {
+        return m_scheduler;
     }
 }

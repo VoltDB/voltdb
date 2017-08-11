@@ -837,7 +837,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Response not in DC: " + CoreUtils.hsIdToString(message.getInitiatorHSId()) + " leader:" + m_isLeader + " isForLeader:" + message.isForLeader()+ "\n" + message);
+                tmLog.debug("Response not in DC: " + CoreUtils.hsIdToString(message.getInitiatorHSId()) + " leader:" + m_isLeader + " isForLeader:" + message.isForLeader() +
+                           "TXN ID:" + TxnEgo.txnIdToString(message.getTxnId()));
             }
             setRepairLogTruncationHandle(spHandle, message.isForLeader());
             m_mailbox.send(message.getInitiatorHSId(), message);

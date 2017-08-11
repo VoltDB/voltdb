@@ -1701,6 +1701,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void handleHostsFailedForBalanceSpi(Set<Integer> failedHosts) {
+
+        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_SPI_BALANCE", "false"));
+        if (disableSpiTask) {
+            return;
+        }
+
         BalanceSpiInfo spiInfo = CoreZK.getSPIBalanceInfo(m_messenger.getZK());
         if (spiInfo == null){
             return;
@@ -1726,33 +1732,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
 
-        //On old leader host:
-        //The new leader is down and does not get chance to be promoted. The partition leader is still on the old host.
-        //then re-install the old leader.
+        //The new leader is down, on old leader host:
         if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) {
             int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(spiInfo.getPartitionId()));
-            if (oldHostId != currentLeaderHostId) {
-                return;
-            }
-
-            //valid leader status
             SpInitiator initiator = (SpInitiator)m_iv2Initiators.get(spiInfo.getPartitionId());
-            if (initiator.isLeader()) {
-                return;
-            }
-
-            //leader on this host (ZooKeeper) but the initiator is marked as none-leader
-            LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
-            try {
-                leaderAppointee.start(true);
-                leaderAppointee.put(spiInfo.getPartitionId(), spiInfo.getOldLeaderHsid());
-            } catch (InterruptedException | ExecutionException | KeeperException e) {
-                VoltDB.crashLocalVoltDB("fail to move spi back to " + CoreUtils.hsIdToString(spiInfo.getOldLeaderHsid()),true, e);
-            } finally {
-                try {
-                    leaderAppointee.shutdown();
-                } catch (InterruptedException e) {
-                }
+            //The partition leader is still on old host but marked as none leader. Reinstall the old leader.
+            if (oldHostId == currentLeaderHostId && !initiator.isLeader()) {
+                consoleLog.info("Reset Balance SPI status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
+                initiator.resetBalanceSPIStatus();
             }
         }
     }
