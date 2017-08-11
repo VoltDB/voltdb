@@ -2080,7 +2080,7 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         assert(uq);
         uq->registerUndoAction(
                 new (*uq) ExecuteTaskUndoGenerateDREventAction(
-                        m_executorContext, type, lastCommittedSpHandle,
+                        m_executorContext->drStream(), m_executorContext->drReplicatedStream(), type, lastCommittedSpHandle,
                         spHandle, uniqueId, payloads));
         break;
     }

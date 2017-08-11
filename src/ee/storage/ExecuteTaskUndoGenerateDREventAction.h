@@ -24,9 +24,9 @@ namespace voltdb {
 
 class ExecuteTaskUndoGenerateDREventAction : public voltdb::UndoAction {
 public:
-        ExecuteTaskUndoGenerateDREventAction(ExecutorContext* executorContext, DREventType type, int64_t lastCommittedSpHandle,
+        ExecuteTaskUndoGenerateDREventAction(AbstractDRTupleStream* drStream, AbstractDRTupleStream* drReplicatedStream , DREventType type, int64_t lastCommittedSpHandle,
                 int64_t spHandle, int64_t uniqueId, ByteArray payloads)
-    : m_executorContext(executorContext), m_type(type), m_lastCommittedSpHandle(lastCommittedSpHandle),m_spHandle(spHandle), m_uniqueId(uniqueId), m_payloads(payloads)
+    : m_drStream(drStream), m_drReplicatedStream(drReplicatedStream), m_type(type), m_lastCommittedSpHandle(lastCommittedSpHandle),m_spHandle(spHandle), m_uniqueId(uniqueId), m_payloads(payloads)
     {
     }
 
@@ -34,19 +34,18 @@ public:
     }
 
     void release() {
-        if (m_type == DR_STREAM_START || m_executorContext->drStream()->drStreamStarted()) {
-            m_executorContext->drStream()->generateDREvent(m_type, m_lastCommittedSpHandle,
-                                                           m_spHandle, m_uniqueId, m_payloads);
+        if (m_type == DR_STREAM_START || m_drStream->drStreamStarted()) {
+            m_drStream ->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);
         }
-        if (m_executorContext->drReplicatedStream() &&
-            (m_type == DR_STREAM_START || m_executorContext->drReplicatedStream()->drStreamStarted())) {
-            m_executorContext->drReplicatedStream()->generateDREvent(m_type, m_lastCommittedSpHandle,
-                                                                     m_spHandle, m_uniqueId, m_payloads);
+
+        if (m_drReplicatedStream && (m_type == DR_STREAM_START || m_drReplicatedStream->drStreamStarted())) {
+            m_drReplicatedStream ->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);
         }
     }
 
 private:
-    ExecutorContext* m_executorContext;
+    AbstractDRTupleStream* m_drStream;
+    AbstractDRTupleStream* m_drReplicatedStream;
     DREventType m_type;
     int64_t m_lastCommittedSpHandle;
     int64_t m_spHandle;

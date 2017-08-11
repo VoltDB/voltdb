@@ -41,8 +41,8 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.utils.VoltTableUtil;
 
-// ExecuteTask is now restartable system Procedure
-// make sure each sub task is either idempotent or can rollback (i.e. generateDREvent)
+// ExecuteTask is now a restartable system procedure
+// make sure each sub task is either idempotent or can rollback (e.g. generateDREvent)
 public class ExecuteTask extends VoltSystemProcedure {
 
     private static final int DEP_executeTask = (int) SysProcFragmentId.PF_executeTask | DtxnConstants.MULTIPARTITION_DEPENDENCY;
