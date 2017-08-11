@@ -302,6 +302,85 @@ public class MetroSimulation {
 
         @Override
         protected boolean doEnd() {
+            return (close && cardsEntered.size() <= 1);
+        }
+
+        @Override
+        protected void initialize() {
+            stations.add(242200,1);
+            stations.add(325479,2);
+            stations.add(221055,3);
+            stations.add(581530,4);
+            stations.add(406389,5);
+            stations.add(375640,6);
+            stations.add(259210,7);
+            stations.add(412809,8);
+            stations.add(496942,9);
+            stations.add(559110,10);
+            stations.add(131022,11);
+            stations.add(145955,12);
+            stations.add(207333,13);
+            stations.add(56457,14);
+            stations.add(122236,15);
+            stations.add(51981,16);
+            stations.add(203866,17);
+            startTime = System.currentTimeMillis();
+            swipeTime = startTime;
+        }
+
+        @Override
+        protected ProducerRecord<String, String> getNextRecord() {
+            int card_id = -1;
+            long atime;
+            int amt = 0;
+            atime = System.currentTimeMillis();
+            while (card_id == -1) {
+                card_id = rand.nextInt(config.cardcount+1000); // use +1000 so sometimes we get an invalid card_id
+                if (cardsEntered.containsKey(card_id)) {
+                    card_id = -1;
+                    continue;
+                }
+                cardsEntered.put(card_id, atime);
+                break;
+            }
+            //Get a station.
+            int station_id;
+            if (rand.nextInt(16) == 0) {
+                station_id = rand.nextInt(max_station_id) + 1; // sometimes pick a random station
+            } else {
+                station_id = stations.next(); // pick a station based on the weights
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append(Integer.valueOf(card_id)).append(",")
+                    .append(Long.valueOf(atime*1000)).append(",")
+                    .append(Integer.valueOf(station_id)).append(",")
+                    .append(Integer.valueOf(activity_code)).append(",")
+                    .append(Integer.valueOf(amt));
+            ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
+            //System.out.println(sb.toString());
+            return rec;
+        }
+    }
+
+    class SwipeExitActivityPublisher extends KafkaPublisher {
+        private final Random rand = new Random();
+        private final int max_station_id = 16;
+        private final RandomCollection<Integer> stations = new RandomCollection<>();
+        public long startTime;
+        public long swipeTime;
+        final MetroCardConfig m_config;
+        final int activity_code;
+        boolean massReached = false;
+        public volatile boolean close = false;
+
+        SwipeExitActivityPublisher(MetroCardConfig config, Properties producerConfig, long count) {
+            super(producerConfig, count);
+            activity_code = -1;
+            m_config = config;
+        }
+
+        @Override
+        protected boolean doEnd() {
             if (activity_code == -1) return false;
             return (close && cardsEntered.size() <= 1);
         }
@@ -326,27 +405,22 @@ public class MetroSimulation {
             stations.add(51981,16);
             stations.add(203866,17);
             startTime = System.currentTimeMillis();
-            if (activity_code == 0)
-                swipeTime = startTime;
-            else
-                swipeTime = startTime + 120000; // Exit time minimum after frst station.
+            swipeTime = startTime + 120000; // Exit time minimum after frst station.
         }
 
         @Override
         protected ProducerRecord<String, String> getNextRecord() {
-            int card_id = -1;
             long atime;
             int amt = 0;
-            atime = swipeTime;
-            while (card_id == -1) {
-                card_id = rand.nextInt(config.cardcount+1000); // use +1000 so sometimes we get an invalid card_id
-                if (cardsEntered.containsKey(card_id)) {
-                    card_id = -1;
-                    continue;
-                }
-                cardsEntered.put(card_id, System.currentTimeMillis());
-                break;
-            }
+            Integer card_id;
+            if (cardsEntered.size() <= 0) return null;
+
+            Integer arr[] = cardsEntered.keySet().toArray(new Integer[0]);
+            card_id = arr[rand.nextInt(arr.length)];
+            long st = cardsEntered.remove(card_id);
+            //Longest journy is 39 min so pick a random exit time from start.
+            atime = st + ((rand.nextInt(30)+1)*60000);
+
             //Get a station.
             int station_id;
             if (rand.nextInt(16) == 0) {
@@ -355,7 +429,7 @@ public class MetroSimulation {
                 station_id = stations.next(); // pick a station based on the weights
             }
             StringBuilder sb = new StringBuilder();
-            sb.append(Integer.valueOf(card_id)).append(",")
+            sb.append(card_id).append(",")
                     .append(Long.valueOf(atime*1000)).append(",")
                     .append(Integer.valueOf(station_id)).append(",")
                     .append(Integer.valueOf(activity_code)).append(",")
@@ -364,6 +438,7 @@ public class MetroSimulation {
             //System.out.println(sb.toString());
             return rec;
         }
+
     }
 
     class SwipeReplenishActivityPublisher extends KafkaPublisher {
@@ -444,104 +519,6 @@ public class MetroSimulation {
             //System.out.println(sb.toString());
             return rec;
         }
-    }
-
-    class SwipeExitActivityPublisher extends KafkaPublisher {
-        private final Random rand = new Random();
-        private final int max_station_id = 16;
-        private final RandomCollection<Integer> stations = new RandomCollection<>();
-        public long startTime;
-        public long swipeTime;
-        final MetroCardConfig m_config;
-        final int activity_code;
-        boolean massReached = false;
-        public volatile boolean close = false;
-
-        SwipeExitActivityPublisher(MetroCardConfig config, Properties producerConfig, long count) {
-            super(producerConfig, count);
-            activity_code = -1;
-            m_config = config;
-        }
-
-        @Override
-        protected boolean doEnd() {
-            if (activity_code == -1) return false;
-            return (close && cardsEntered.size() <= 1);
-        }
-
-        @Override
-        protected void initialize() {
-            stations.add(242200,1);
-            stations.add(325479,2);
-            stations.add(221055,3);
-            stations.add(581530,4);
-            stations.add(406389,5);
-            stations.add(375640,6);
-            stations.add(259210,7);
-            stations.add(412809,8);
-            stations.add(496942,9);
-            stations.add(559110,10);
-            stations.add(131022,11);
-            stations.add(145955,12);
-            stations.add(207333,13);
-            stations.add(56457,14);
-            stations.add(122236,15);
-            stations.add(51981,16);
-            stations.add(203866,17);
-            startTime = System.currentTimeMillis();
-            if (activity_code == 0)
-                swipeTime = startTime;
-            else
-                swipeTime = startTime + 120000; // Exit time minimum after frst station.
-        }
-
-        @Override
-        protected ProducerRecord<String, String> getNextRecord() {
-            int card_id = -1;
-            long atime;
-            int amt = 0;
-            int sz = cardsEntered.size();
-            if (!close) {
-                if (sz < 100) {
-                    return null;
-                }
-            }
-            Integer r;
-            if (sz == 1) {
-                System.out.println("Last one to exit.");
-                r = (Integer )cardsEntered.keySet().toArray()[0];
-                close = true;
-            } else {
-                r = (Integer )cardsEntered.keySet().toArray()[rand.nextInt(sz)];
-            }
-            long st = cardsEntered.get(r);
-            cardsEntered.remove(r);
-            card_id = r;
-            //Longest journy is 39 min so pick a random exit time from start.
-            atime = st + (rand.nextInt(36)*60000);
-
-            //Get a station.
-            int station_id;
-            if (rand.nextInt(16) == 0) {
-                station_id = rand.nextInt(max_station_id) + 1; // sometimes pick a random station
-            } else {
-                station_id = stations.next(); // pick a station based on the weights
-            }
-            StringBuilder sb = new StringBuilder();
-            sb.append(Integer.valueOf(card_id)).append(",")
-                    .append(Long.valueOf(atime*1000)).append(",")
-                    .append(Integer.valueOf(station_id)).append(",")
-                    .append(Integer.valueOf(activity_code)).append(",")
-                    .append(Integer.valueOf(amt));
-            ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
-            //System.out.println(sb.toString());
-            return rec;
-        }
-
-    }
-
-    public void iterate() throws Exception {
-
     }
 
     /**
