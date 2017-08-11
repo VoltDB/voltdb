@@ -111,6 +111,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
             String deploymentString = operationString;
             if ("@UpdateApplicationCatalog".equals(invocationName)) {
+                compilerLog.info("@UpdateApplicationCatalog is invoked, current catalog version: " + context.catalogVersion);
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
                 if ((operationBytes == null) || (operationBytes.length == 0)) {
                     newCatalogJar = oldJar;
@@ -136,7 +137,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     }
                 }
                 catch (ClassNotFoundException e) {
-                    retval.errorMsg = "Unexpected error in @UpdateClasses modifying classes: " + e.getMessage();
+                    retval.errorMsg = "Classes not found in @UpdateClasses jar: " + e.getMessage();
                     return retval;
                 }
                 // Real deploymentString should be the current deployment, just set it to null
@@ -358,7 +359,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return null;
         }
 
-        compilerLog.info("Updating java classes available to stored procedures");
+        compilerLog.info("@UpdateClasses is invoked, updating java classes available to stored procedures");
+
         VoltCompiler compiler = new VoltCompiler(isXDCR);
         try {
             compiler.compileInMemoryJarfileForUpdateClasses(jarfile, catalog, hsql);
@@ -475,12 +477,12 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                 getUsername());
         } catch (Exception e) {
             String errorMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
-            compilerLog.error(errorMsg);
+            compilerLog.info(errorMsg);
             return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, errorMsg);
         }
 
         if (ccr.errorMsg != null) {
-            compilerLog.error(invocationName + " has been rejected: " + ccr.errorMsg);
+            compilerLog.info(invocationName + " has been rejected: " + ccr.errorMsg);
             return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
         }
         // Log something useful about catalog upgrades when they occur.
@@ -524,7 +526,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // write the new catalog to a temporary jar file
         errMsg = verifyAndWriteCatalogJar(ccr);
         if (errMsg != null) {
-            hostLog.error("Catalog jar verification and/or jar writes failed: " + errMsg);
+            hostLog.info("Catalog jar verification and/or jar writes failed: " + errMsg);
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 

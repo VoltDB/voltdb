@@ -60,7 +60,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public final static long SUPPRESS_INTERVAL = 120;
     private static final int BACK_PRESSURE_WAIT_TIME = Integer.getInteger("INTERNAL_BACK_PRESSURE_WAIT_TIME", 50);
 
-    public interface Callback {
+    private interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
         public String getProcedureName();
         public int[] getPartitionIds();

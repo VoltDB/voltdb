@@ -190,6 +190,57 @@ private:
     const std::vector<AbstractExpression *>& m_args;
 };
 
+/*
+ * User-defined scalar function.
+ */
+class UserDefinedFunctionExpression : public AbstractExpression {
+public:
+    UserDefinedFunctionExpression(int functionId, const std::vector<AbstractExpression *>& args)
+        : AbstractExpression(EXPRESSION_TYPE_FUNCTION),
+          m_functionId(functionId),
+          m_args(args),
+          m_engine(ExecutorContext::getEngine()) {}
+
+    virtual ~UserDefinedFunctionExpression() {
+        size_t i = m_args.size();
+        while (i--) {
+            delete m_args[i];
+        }
+        delete &m_args;
+    }
+
+    virtual bool hasParameter() const {
+        for (size_t i = 0; i < m_args.size(); i++) {
+            assert(m_args[i]);
+            if (m_args[i]->hasParameter()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        std::vector<NValue> nValue(m_args.size());
+        for (int i = 0; i < m_args.size(); ++i) {
+            nValue[i] = m_args[i]->eval(tuple1, tuple2);
+        }
+        return m_engine->callJavaUserDefinedFunction(m_functionId, nValue);
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        std::stringstream buffer;
+        buffer << spacer << "UserDefinedFunctionExpression (function ID = " << m_functionId << ")" << std::endl;
+        return (buffer.str());
+    }
+
+private:
+    int m_functionId;
+    const std::vector<AbstractExpression *>& m_args;
+    // We need the help from the VoltDBEngine to initiate the call into the Java top end for UDF execution.
+    // So we cache a pointer to the engine object that is tied to the current site thread for direct access.
+    VoltDBEngine* m_engine;
+};
+
 }
 
 using namespace functionexpression;
@@ -197,14 +248,7 @@ using namespace functionexpression;
 AbstractExpression*
 ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments) {
     if (IS_USER_DEFINED_ID(functionId)) {
-        // This part is temporary to avoid the memory leak.
-        // It will be removed after the UDF code is checked in.
-        size_t i = arguments->size();
-        while (i--) {
-            delete (*arguments)[i];
-        }
-        delete arguments;
-        return new ConstantValueExpression(NValue::getNullValue(VALUE_TYPE_BIGINT));
+        return new UserDefinedFunctionExpression(functionId, *arguments);
     }
     AbstractExpression* ret = 0;
     assert(arguments);

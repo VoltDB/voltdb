@@ -225,7 +225,8 @@ public class SQLCommand
         boolean isRecall = false;
 
         while (true) {
-            String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
+            String stmtContinuationStr = (statement.length() > 0 ? "  " : "");
+            String prompt = isRecall ? "" : ( stmtContinuationStr + (RecallableSessionLines.size() + 1) + "> ");
             isRecall = false;
             String line = interactiveReader.readLine(prompt);
             if (line == null) {

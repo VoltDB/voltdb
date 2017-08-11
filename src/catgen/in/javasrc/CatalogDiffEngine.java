@@ -1287,6 +1287,13 @@ public class CatalogDiffEngine {
             return true;
         }
 
+        // Information about user-defined functions need to be applied to EE.
+        // Because the EE needs to know about the parameter types and the return type to do
+        // many type casting operations.
+        if (suspect instanceof Function) {
+            return true;
+        }
+
         if (suspect instanceof Table || suspect instanceof TableRef ||
                 suspect instanceof Column || suspect instanceof ColumnRef ||
                 suspect instanceof Index || suspect instanceof IndexRef ||

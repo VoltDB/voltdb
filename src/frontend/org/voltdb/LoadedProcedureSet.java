@@ -143,7 +143,7 @@ public class LoadedProcedureSet {
                     procClass = classesMap.get(className);
                 } else {
                     try {
-                        procClass = CatalogContext.classForProcedure(className, loader);
+                        procClass = CatalogContext.classForProcedureOrUDF(className, loader);
                     } catch (final ClassNotFoundException e) {
                         String msg; // generate a better ClassNotFoundException message
                         if (className.startsWith("org.voltdb.")) {
@@ -195,7 +195,7 @@ public class LoadedProcedureSet {
             // this check is for sysprocs that don't have a procedure class
             if (className != null) {
                 try {
-                    procClass = catalogContext.classForProcedure(className);
+                    procClass = catalogContext.classForProcedureOrUDF(className);
                 }
                 catch (final ClassNotFoundException e) {
                     if (sysProc.commercial) {

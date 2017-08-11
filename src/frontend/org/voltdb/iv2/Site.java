@@ -169,7 +169,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Current catalog
     volatile CatalogContext m_context;
 
-    // Currently available procedure
+    // Currently available procedures
     volatile LoadedProcedureSet m_loadedProcedures;
 
     // Cache the DR gateway here so that we can pass it to tasks as they are reconstructed from
@@ -184,7 +184,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      *  ReplicaDRGateway on repair
      */
     private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition =
-            new HashMap<Integer, Map<Integer, DRConsumerDrIdTracker>>();
+            new HashMap<>();
     private long m_lastLocalSpUniqueId = -1L;   // Only populated by the Site for ApplyBinaryLog Txns
     private long m_lastLocalMpUniqueId = -1L;   // Only populated by the Site for ApplyBinaryLog Txns
 
@@ -263,7 +263,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         return this;
     }
-
 
     /**
      * SystemProcedures are "friends" with ExecutionSites and granted
@@ -505,7 +504,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
             Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
             if (clusterSources == null) {
-                clusterSources = new HashMap<Integer, DRConsumerDrIdTracker>();
+                clusterSources = new HashMap<>();
                 clusterSources.put(producerPartitionId, tracker);
                 m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
             }
@@ -706,6 +705,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_non_voltdb_backend = null;
             m_ee = initializeEE();
         }
+        m_ee.loadFunctions(m_context);
 
         m_snapshotter = new SnapshotSiteProcessor(m_scheduler,
         m_snapshotPriority,
@@ -1520,6 +1520,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
         m_loadedProcedures.loadProcedures(m_context, isReplay);
+        m_ee.loadFunctions(m_context);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs
@@ -1528,7 +1529,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         if (requireCatalogDiffCmdsApplyToEE == false) {
             // empty diff cmds for the EE to apply, so skip the JNI call
-            hostLog.info("Skipped applying diff commands on EE.");
+            hostLog.debug("Skipped applying diff commands on EE.");
             return true;
         }
 
@@ -1595,6 +1596,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         // here you could bring the timeout settings
         m_loadedProcedures.loadProcedures(m_context);
+        m_ee.loadFunctions(m_context);
         return true;
     }
 

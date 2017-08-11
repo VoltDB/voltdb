@@ -2400,57 +2400,46 @@ public class TestVoltCompiler extends TestCase {
         // Test method validation
         VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
         VoltCompiler.setVoltLogger(mockedLogger);
-        String temporaryWarningMessage = "User-defined functions are not implemented yet.";
 
         // Class not found
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.NonExistentClass.run;");
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Cannot load class for user-defined function: org.voltdb.compiler.functions.NonExistentClass", fbs));
 
         // Abstract class
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.AbstractUDFClass.run;");
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Cannot define a function using an abstract class org.voltdb.compiler.functions.AbstractUDFClass", fbs));
 
         // Method not found
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.nonexistent;");
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Cannot find the implementation method nonexistent for user-defined function afunc in class InvalidUDFLibrary", fbs));
 
         // Invalid return type
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.runWithUnsupportedReturnType;");
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedReturnType has an unsupported return type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType", fbs));
 
         // Invalid parameter type
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.runWithUnsupportedParamType;");
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Method InvalidUDFLibrary.runWithUnsupportedParamType has an unsupported parameter type org.voltdb.compiler.functions.InvalidUDFLibrary$UnsupportedType at position 2", fbs));
 
         // Multiple functions with the same name
         fbs = checkInvalidDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.dup;");
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Class InvalidUDFLibrary has multiple methods named dup. Only a single function method is supported.", fbs));
 
         // Function name exists
         // One from FunctionSQL
         fbs = checkInvalidDDL("CREATE FUNCTION abs FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;");
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Function \"abs\" is already defined.", fbs));
         // One from FunctionCustom
         fbs = checkInvalidDDL("CREATE FUNCTION log FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;");
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Function \"log\" is already defined.", fbs));
         // One from FunctionForVoltDB
         fbs = checkInvalidDDL("CREATE FUNCTION longitude FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;");
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         assertTrue(isFeedbackPresent("Function \"longitude\" is already defined.", fbs));
 
         // The class contains some other invalid functions with the same name
         VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL("CREATE FUNCTION afunc FROM METHOD org.voltdb.compiler.functions.InvalidUDFLibrary.run;", compiler);
         assertTrue("A CREATE FUNCTION statement should be able to succeed, but it did not.", success);
-        verify(mockedLogger, atLeastOnce()).warn(contains(temporaryWarningMessage));
         verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a non-public run() method."));
         verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a void run() method."));
         verify(mockedLogger, atLeastOnce()).warn(contains("Class InvalidUDFLibrary has a static run() method."));
