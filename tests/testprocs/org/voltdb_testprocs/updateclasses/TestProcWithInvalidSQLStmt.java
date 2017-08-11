@@ -21,21 +21,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package txnIdSelfCheck.procedures;
+package org.voltdb_testprocs.updateclasses;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
+public class TestProcWithInvalidSQLStmt extends VoltProcedure {
 
-public class droppedUDF extends VoltProcedure {
-
-    public final SQLStmt d_getNothing = new SQLStmt(
-            "select missingUDF(cid) FROM partitioned where cid=? order by cid, rid desc");
-
-    public VoltTable[] run(byte cid) {
-        voltQueueSQL(d_getNothing, cid);
-        VoltTable[] results = voltExecuteSQL(true);
-        return results;
+    public long run(long param0)
+    {
+        SQLStmt Q1 = new SQLStmt("select a + ? from t1 order by 1");
+        voltQueueSQL(Q1, param0);
+        voltExecuteSQL();
+        return 1;
     }
 }

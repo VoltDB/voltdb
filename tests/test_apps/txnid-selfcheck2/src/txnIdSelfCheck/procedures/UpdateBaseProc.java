@@ -48,7 +48,7 @@ public class UpdateBaseProc extends VoltProcedure {
             "INSERT INTO partitioned (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public final SQLStmt p_update = new SQLStmt(
-            "UPDATE partitioned set txnid=?, prevtxnid=?, ts=?, cidallhash=?, rid=?, cnt=add2Bigint(cnt,1), adhocinc=?, adhocjmp=?, value=zvarbin(value) where cid=? and rid=?");
+            "UPDATE partitioned set txnid=?, prevtxnid=?, ts=?, cidallhash=?, rid=?, cnt=add2Bigint(cnt,1), adhocinc=?, adhocjmp=?, value=identityVarbin(value) where cid=? and rid=?");
 
     public final SQLStmt p_export = new SQLStmt(
             "INSERT INTO partitioned_export (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, add2Bigint(?,1), ?, ?, ?);");

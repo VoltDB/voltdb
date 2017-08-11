@@ -263,8 +263,8 @@ public class UpdateCore extends VoltSystemProcedure {
             DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
 
-            if (log.isInfoEnabled()) {
-                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+            if (log.isDebugEnabled()) {
+                log.debug("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                         " completed data precheck.");
             }
             return success;

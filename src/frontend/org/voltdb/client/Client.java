@@ -394,6 +394,14 @@ public interface Client {
     public List<InetSocketAddress> getConnectedHostList();
 
     /**
+     * <p>Tell whether Client has turned on the auto-reconnect feature. If it is on,
+     * Client would pause instead of stop when all connections to the server are lost,
+     * and would resume after the connection is restored.
+     * @return true if the client wants to use auto-reconnect feature.</p>
+     */
+    public boolean isAutoReconnectEnabled();
+
+    /**
      * <p>Write a single line of comma separated values to the file specified.
      * Used mainly for collecting results from benchmarks.</p>
      *

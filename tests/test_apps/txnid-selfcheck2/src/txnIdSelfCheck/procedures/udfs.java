@@ -30,7 +30,7 @@ public class udfs {
         return i + j;
     }
 
-    public byte[] zvarbin(byte[] z) {
+    public byte[] identityVarbin(byte[] z) {
         // return a varbinary without change
         return z;
     }
@@ -43,7 +43,7 @@ public class udfs {
     }
 
     public long badUDF(long i) {
-        // this is function which always throws an exception
+        // a function which always throws an exception
         return i/0;
     }
 }

@@ -1529,7 +1529,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         if (requireCatalogDiffCmdsApplyToEE == false) {
             // empty diff cmds for the EE to apply, so skip the JNI call
-            hostLog.info("Skipped applying diff commands on EE.");
+            hostLog.debug("Skipped applying diff commands on EE.");
             return true;
         }
 
