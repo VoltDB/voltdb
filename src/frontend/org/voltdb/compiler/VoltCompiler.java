@@ -1082,20 +1082,30 @@ public class VoltCompiler {
             compileDRTable(drNode, db);
         }
 
-        if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
-            Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
-            CatalogMap<Procedure> previousProcsIfAny = null;
-            if (previousDBIfAny != null) {
-                previousProcsIfAny = previousDBIfAny.getProcedures();
+        // Ugly, ugly hack.
+        // If the procedure compilations or tuple limit calculations do not succeed, and we have
+        // dropped some UDFs, then we need to restore them.
+        try {
+            if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
+                Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
+                CatalogMap<Procedure> previousProcsIfAny = null;
+                if (previousDBIfAny != null) {
+                    previousProcsIfAny = previousDBIfAny.getProcedures();
+                }
+                compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, previousProcsIfAny, jarOutput);
             }
-            compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, previousProcsIfAny, jarOutput);
+
+            // add extra classes from the DDL
+            m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
+            addExtraClasses(jarOutput);
+
+            compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
         }
-
-        // add extra classes from the DDL
-        m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
-        addExtraClasses(jarOutput);
-
-        compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
+        catch (VoltCompilerException ex) {
+            ddlcompiler.reRegisterAllDroppedFunctions();
+            throw ex;
+        }
+        ddlcompiler.dropAllDroppedFunctions();
     }
 
     private void compileRowLimitDeleteStmts(

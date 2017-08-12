@@ -136,10 +136,31 @@ public class VoltDDLElementTracker {
         }
     }
 
-    public void dropFunctions() {
+    /**
+     * Mark the dropped functions as disabled.  We will try to compile
+     * everything else without them.  But if their compilation fails we will
+     * need to reenable them.
+     */
+    public void disableDroppedFunctions() {
         for (String functionName : m_droppedFunctions) {
-            FunctionForVoltDB.deregisterUserDefinedFunction(functionName);
+            FunctionForVoltDB.deregisterUserDefinedFunction(functionName, true);
         }
+    }
+
+    /**
+     * Drop all disabled functions.
+     */
+    public void dropDroppedFunctions() {
+        for (String functionName : m_droppedFunctions) {
+            FunctionForVoltDB.dropDisabledFunctions();
+        }
+    }
+
+    public void reRegisterAllDroppedFunctions() {
+        for (String functionName : m_droppedFunctions) {
+            FunctionForVoltDB.reRegisterUserDefinedFunction(functionName);
+        }
+
     }
 
     /**

@@ -833,8 +833,12 @@ public class DDLCompiler {
 
         fillTrackerFromXML();
         handlePartitions(db);
-        m_tracker.dropFunctions();
+        m_tracker.disableDroppedFunctions();
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
+    }
+
+    public void reRegisterAllDroppedFunctions() {
+        m_tracker.reRegisterAllDroppedFunctions();
     }
 
     private int intFromString(String str) throws VoltCompilerException {
@@ -2032,5 +2036,9 @@ public class DDLCompiler {
                 throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
             }
         }
+    }
+
+    public void dropAllDroppedFunctions() {
+        m_tracker.dropDroppedFunctions();
     }
 }

@@ -34,6 +34,7 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 
@@ -413,6 +414,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<>();
+        private static Map<String, FunctionId> dropped_UDFs = new HashMap<>();
         private static Set<String> userDefinedFunctions = new HashSet<>();
         static {
             for (FunctionId fn : instances) {
@@ -420,6 +422,9 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
         }
 
+        public static Set<String> getAllUserDefinedFunctionNames() {
+        	return userDefinedFunctions;
+        }
         static FunctionId fn_by_name(String anyCase) {
             String upCase = anyCase.toLowerCase();
             return by_LC_name.get(upCase);
@@ -875,6 +880,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         for (String functionName : FunctionId.userDefinedFunctions) {
             FunctionId.by_LC_name.remove(functionName);
         }
+        FunctionId.dropped_UDFs.clear();
         FunctionId.userDefinedFunctions.clear();
         m_udfSeqId = FunctionId.FUNC_VOLT_UDF_ID_START;
     }
@@ -883,11 +889,23 @@ public class FunctionForVoltDB extends FunctionSQL {
      * Remove one user defined function.
      * @param functionName
      */
-    public static void deregisterUserDefinedFunction(String functionName) {
-        FunctionId.by_LC_name.remove(functionName);
-        FunctionId.userDefinedFunctions.remove(functionName);
+    public static void deregisterUserDefinedFunction(String functionName, boolean justDisable) {
+    	FunctionId dfn = FunctionId.by_LC_name.get(functionName);
+    	if (justDisable && (dfn != null)) {
+    		FunctionId.by_LC_name.remove(functionName);
+    		FunctionId.dropped_UDFs.put(functionName, dfn);
+    		FunctionId.userDefinedFunctions.remove(functionName);
+    	}
     }
 
+    public static void reRegisterUserDefinedFunction(String functionName) {
+    	FunctionId dfn = FunctionId.dropped_UDFs.get(functionName);
+    	assert(dfn != null);
+    	FunctionId.dropped_UDFs.remove(functionName);
+    	FunctionId.by_LC_name.put(functionName, dfn);
+    	FunctionId.userDefinedFunctions.add(functionName);
+    }
+    
     public static int getFunctionId(String functionName) {
         FunctionId fid = FunctionId.fn_by_name(functionName);
         if (fid == null) {
@@ -907,6 +925,14 @@ public class FunctionForVoltDB extends FunctionSQL {
     public FunctionId getFunctionId() {
         return m_def;
     }
+    
+    public static Set<String> getAllUserDefinedFunctionNamesForDebugging() {
+    	Set<String> answer = new HashSet<>();
+    	for (String name : FunctionId.getAllUserDefinedFunctionNames()) {
+    		answer.add(name);
+    	}
+    	return answer;
+    }
 
     @Override
     public boolean equals(Object other) {
@@ -925,5 +951,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         val += Objects.hashCode(m_def.getId());
         return val;
     }
+
+	public static void dropDisabledFunctions() {
+		FunctionId.dropped_UDFs.clear();
+	}
 
 }

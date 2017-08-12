@@ -62,7 +62,7 @@ public class UserDefinedFunctionManager {
             // The function that the current UserDefinedFunctionRunner is referring to
             // does not exist in the catalog anymore, we need to remove its token.
             if (catalogFunctions.get(runner.m_functionName) == null) {
-                FunctionForVoltDB.deregisterUserDefinedFunction(runner.m_functionName);
+                FunctionForVoltDB.deregisterUserDefinedFunction(runner.m_functionName, false);
             }
         }
         // Build new UDF runners

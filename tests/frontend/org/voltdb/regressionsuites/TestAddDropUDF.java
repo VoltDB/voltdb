@@ -25,18 +25,21 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Set;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 import junit.framework.Test;
 
 public class TestAddDropUDF extends RegressionSuite {
-
     private void addFunction(Client client, String functionName, String methodName) throws IOException, ProcCallException {
         try {
             client.callProcedure("@AdHoc",
@@ -96,6 +99,34 @@ public class TestAddDropUDF extends RegressionSuite {
         }
     }
 
+    String catalogMatchesCompilerFunctionSet(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        StringBuffer success = new StringBuffer();
+        String sep = "";
+        Set<String> dfns = FunctionForVoltDB.getAllUserDefinedFunctionNamesForDebugging();
+        VoltTable vt = client.callProcedure("@SystemCatalog", "functions").getResults()[0];
+        if (dfns.size() != vt.getRowCount()) {
+            success.append(String.format("Compiler set has %d elements, catalog has %d functions",
+                                         dfns.size(), vt.getRowCount()));
+            sep = "; ";
+        }
+        while (vt.advanceRow()) {
+            String name = vt.getString("FUNCTION_NAME");
+            if ( ! dfns.contains(name)) {
+                success.append(sep)
+                       .append(name + " is only in the catalog");
+                sep = "; ";
+            } else {
+                dfns.remove(name);
+            }
+        }
+        for (String dfn : dfns) {
+            success.append(sep)
+                   .append(dfn + " is only in the compiler");
+            sep = "; ";
+        }
+        return success.toString();
+    }
+
     public void testDropFunction() throws Exception {
         Client client = getClient();
 
@@ -106,44 +137,64 @@ public class TestAddDropUDF extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // This should fail, since we can't use UDFs in index expressions.
         try {
             cr = client.callProcedure("@AdHoc", "create index alphidx on R1 ( add2bigint(BIG, BIG) );");
             fail("Should not be able to create index with UDF.");
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("Index \"ALPHIDX\" with user defined function calls is not supported"));
         }
+
+        // This should fail, since we can't use UDFs in materialized views.
         try {
             cr = client.callProcedure("@AdHoc", "create view alphview as select BIG, COUNT(*), MAX(ADD2BIGINT(BIG, BIG)) from R1 group by BIG;");
             fail("Should not be able to create materialized view with UDF.");
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("Materialized view \"ALPHVIEW\" with user defined function calls is not supported"));
         }
+
+        // This should fail because the procedure proc depends on add2bigint.
         try {
             cr = client.callProcedure("@AdHoc", "drop function add2bigint");
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("Failed to plan for statement (sql) \"select ADD2biginT(BIG, BIG) from R1;\"."));
         }
+
         //
-        // The procedure should still exist, because the drop function failed.  We can call it.
+        // The procedure should still exist, because the drop function failed.  We can call it in
+        // proc and in adhoc sql.
         //
         cr = client.callProcedure("proc");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        String catalogError = catalogMatchesCompilerFunctionSet(client);
+        assertEquals(catalogError, "", catalogError);
+        cr = client.callProcedure("@AdHoc", "select add2bigint(big, big) from R1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // Drop the procedure.  All should be well.
         cr = client.callProcedure("@AdHoc", "drop procedure proc");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        // This should work because nothing is dropped.
+        // This should work because nothing depends on the function now.
         cr = client.callProcedure("@AdHoc", "drop function add2BIGINT");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // This should fail because we dropped the procedure.
         try {
             cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
             fail("Should not be able to recreate proc.");
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("Failed to plan for statement (sql) \"select ADD2biginT(BIG, BIG) from R1;\"."));
         }
+
+        // See if we can do it all over again.
         cr = client.callProcedure("@AdHoc", "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("proc");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "select add2bigint(big, big) from R1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("@AdHoc", "drop procedure proc if exists");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
