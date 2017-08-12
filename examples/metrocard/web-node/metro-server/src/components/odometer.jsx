@@ -5,26 +5,28 @@ import ReactDOM from 'react-dom';
 
 import '../components-css/odometer.css';
 
+// A simple wrapper for the HubSpot odometer
 class OdometerInstance extends Component {
-    static propTypes = {
-        value: PropTypes.number.isRequired,
-        options: PropTypes.object,
-    };
+  static propTypes = {
+    value: PropTypes.number.isRequired,
+    options: PropTypes.object,
+  };
 
-    componentDidMount() {
-        this.odometer = new Odometer({
-            el: ReactDOM.findDOMNode(this),
-            value: this.props.value, ...this.props.options,
-        });
-    }
+  componentDidMount() {
+    this.odometer = new Odometer({
+      el: ReactDOM.findDOMNode(this),
+      value: this.props.value, ...this.props.options,
+      theme: this.props.theme
+    });
+  }
 
-    componentDidUpdate() {
-        this.odometer.update(this.props.value)
-    }
+  componentDidUpdate() {
+    this.odometer.update(this.props.value)
+  }
 
-    render() {
-        return React.createElement('div');
-    }
+  render() {
+    return React.createElement('div');
+  }
 }
 
 export default OdometerInstance;
