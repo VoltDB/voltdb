@@ -1,18 +1,32 @@
 import React, { Component } from 'react';
-import logo from './logo.svg';
+// import logo from './logo.svg';
 import './App.css';
 
+import NavbarInstance from './components/navbar.jsx';
+import OdometerInstance from './components/odometer.jsx';
+
+// Root element
 class App extends Component {
+
+  constructor(props) {
+    super(props);
+    this.state = {
+      num: 1234
+    };
+
+    setInterval(() => {
+      var prev = this.state.num;
+      this.setState({ num: prev + 1000 });
+    }, 2000);
+  }
+
   render() {
     return (
-      <div className="App">
-        <div className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <h2>Welcome to React</h2>
+      <div>
+        <NavbarInstance />
+        <div>
+          <OdometerInstance value={this.state.num} />
         </div>
-        <p className="App-intro">
-          To get started, edit <code>src/App.js</code> and save to reload.
-        </p>
       </div>
     );
   }
