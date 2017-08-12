@@ -22,10 +22,15 @@
 
 .elem-right {
     float: right!important;
-    margin-right: 200px;
+    margin-right: 150px;
 }
 
 .nav-img {
     margin-left: 20px;
     margin-top: 15px;
+
+    float: left;
+    margin-left: 40px;
+    margin-top: 20px;
+    font-size: 20px;
 }

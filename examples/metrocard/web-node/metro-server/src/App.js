@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import './App.css';
 
 import Pages from './components/pages.jsx';
+// import Fullpage from './components/fullpage.jsx';
 
 // Root element
 class App extends Component {

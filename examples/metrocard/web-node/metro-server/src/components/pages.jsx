@@ -25,7 +25,7 @@ class Pages extends Component {
     return (
       <div>
         <Header>
-          <a href="" className='nav-elem nav-img'><img alt='Boom' src={logo} height="40" /></a>
+          <a href="" className='nav-img'><img alt='Boom' src={logo} height="40" /></a>
           <a href="#sectionOne" className='nav-elem'>Section One</a>
           <a href="#sectionTwo" className='nav-elem'>Section Two</a>
           <a href="#sectionThree" className='nav-elem'>Section Three</a>
