@@ -811,7 +811,7 @@ public class SQLCommand
                         statementStarted = false;
                     }
                 }
-                else { // not in a batch:
+                else { // when in a batch:
                     SplitStmtResults splitResults = SQLLexer.splitStatements(statementString);
                     if (splitResults.getIncompleteStmt() == null) {
                         // not in the middle of a statement.
