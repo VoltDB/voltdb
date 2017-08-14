@@ -68,14 +68,17 @@ class AnalysisPageTest extends TestBase {
         page.refreshquery.click()
     }
 
+    def createTable(createQuery){
+        page.setQueryText(createQuery)
+        page.runQuery()
+    }
+
     def deleteTableAndProcedure(dropTableAndProcQuery){
         try{
             page.setQueryText(dropTableAndProcQuery)
             page.runQuery()
-//            println("Table deleted successfully.")
             return true;
         } catch (Exception e){
-//            println("sdfsdfsdfsdffsdf")
             return false;
         }
 
@@ -83,32 +86,45 @@ class AnalysisPageTest extends TestBase {
 
     def checkAnalysisTabOpened(){
         when:
-        waitFor(10){ page.divAnalysis.isDisplayed() }
+        waitFor(2){ page.divAnalysis.isDisplayed() }
         then:
         println("Analysis tab is opened")
     }
 
     def checkIfAnalyzeNowMsgDisplayed(){
         when:
-        waitFor(2){ page.analyzeNowContent.isDisplayed() }
+        waitFor(2){ page.tabDataBtn.isDisplayed() }
+        page.tabDataBtn.click()
         then:
-        println("Analyze now message is displayed")
+        waitFor(2){ page.tblAnalyzeNowContent.isDisplayed() }
+
+        when:
+        waitFor(2){ page.tabProcedureBtn.isDisplayed() }
+        page.tabProcedureBtn.click()
+        then:
+        waitFor(2){ page.proAnalyzeNowContent.isDisplayed() }
     }
 
     def checkAnalyzeBtn(){
-        //CLick on procedure tab and verify its content are displayed.
-        when:
-        waitFor(2){ page.analyzeNowContent.isDisplayed() }
-        waitFor(2){ page.tabProcedureBtn.isDisplayed() }
-        page.tabProcedureBtn.click();
-        then:
-        waitFor(2){ page.tabProcedure.isDisplayed() }
-
         //Click on Analyze Now button and verify if it is working.
         when:
         waitFor(2){ page.btnAnalyzeNow.isDisplayed() }
         page.btnAnalyzeNow.click();
         then:
+        page.tabDataBtn.click()
+        assert !page.tblAnalyzeNowContent.displayed
+        if(!page.checkForTableNoDataContent()){
+            if(page.checkForTableDataContent()){
+               println("Data is available")
+            } else {
+                assert false;
+            }
+        } else {
+            page.procedureNoDataMsg.equals("No data is available.")
+            println("No data is available." )
+        }
+        page.tabProcedureBtn.click()
+        assert !page.proAnalyzeNowContent.displayed
         if(!page.checkForProcedureNoDataContent()){
             if(page.checkForProcedureDataContent()){
                println("Data is available")
@@ -121,8 +137,35 @@ class AnalysisPageTest extends TestBase {
         }
     }
 
+    def checkForDataChart(){
+        //Query to create necessary tables
+        String createQuery = page.getQueryToCreateTable()
+
+        when: 'Click SQL tab'
+        page.gotoSqlQuery()
+        then: 'at SQL page'
+        at SqlQueryPage
+
+        createTable(createQuery)
+
+        when: 'Analysis tab is clicked'
+        page.gotoAnalysis()
+        then: 'at Analysis Page'
+        at AnalysisPage
+
+        when:
+        waitFor(2){ page.btnAnalyzeNow.isDisplayed() }
+        page.btnAnalyzeNow.click();
+        then:
+        if(page.checkForTableDataContent()){
+            waitFor(2){ page.chartDataTableAnalysis.isDisplayed() }
+        } else {
+            assert false;
+        }
+    }
+
     def checkProcedureSubTabsAndGraph(){
-        //Create necessary tables and procedures
+        //Queries to create necessary tables and procedures.
         String createQuery = page.getQueryToCreateTable()
         String createProcedureQuery = page.getQueryToCreateStoredProcedure()
         String execProcedureQuery = page.getQueryToExecuteProcedureQuery()
@@ -142,8 +185,8 @@ class AnalysisPageTest extends TestBase {
         when:
         waitFor(2){ page.analyzeNowContent.isDisplayed() }
         waitFor(2){ page.tabProcedureBtn.isDisplayed() }
-        page.tabProcedureBtn.click();
         then:
+        page.tabProcedureBtn.click();
         waitFor(2){ page.tabProcedure.isDisplayed() }
 
         //Click on Analyze Now button and verify if it is working.
@@ -168,15 +211,6 @@ class AnalysisPageTest extends TestBase {
         } else {
             assert false;
         }
-
-        //deleted the created test talbes and procedures.
-        String dropTableAndProcQuery = page.getQueryToDropTableAndProcedureQuery()
-        when: 'Click SQL tab'
-        page.gotoSqlQuery()
-        then: 'at SQL page'
-        at SqlQueryPage
-
-        deleteTableAndProcedure(dropTableAndProcQuery)
     }
 
     def checkThresholdPopup(){
@@ -184,7 +218,7 @@ class AnalysisPageTest extends TestBase {
         waitFor(5){ btnThreshold.isDisplayed() }
         btnThreshold.click()
         then:
-        waitFor(10){ settingMessage.isDisplayed() }
+        waitFor(5){ settingMessage.isDisplayed() }
         tblAnalysisSettings.isDisplayed()
         btnSaveThreshold.isDisplayed()
         btnCancelThreshold.isDisplayed()
@@ -204,18 +238,20 @@ class AnalysisPageTest extends TestBase {
             chkShowSysProcedure.click()
             btnSaveThreshold.click()
         }
-        then:
+        and:
         waitFor(2){ btnAnalyzeNow.isDisplayed() }
         btnAnalyzeNow.click()
+        then:
+        waitFor(2){ page.tabProcedureBtn.isDisplayed() }
+        page.tabProcedureBtn.click()
         waitFor(2){ foreignObjectForSys.isDisplayed() }
 
         when:
         btnThreshold.click()
-        then:
+        waitFor(2){ btnSaveThreshold.isDisplayed() }
         chkShowSysProcedure.click()
         btnSaveThreshold.click()
-
-        when:
+        and:
         waitFor(2){ btnAnalyzeNow.isDisplayed() }
         btnAnalyzeNow.click()
         then:
@@ -245,29 +281,23 @@ class AnalysisPageTest extends TestBase {
 
         when:
         waitFor(2){ btnThreshold.isDisplayed() }
-        btnThreshold.click()
         then:
+        btnThreshold.click()
         waitFor(2){ settingMessage.isDisplayed() }
 
         when:
         waitFor(2){ averageExecutionTime.isDisplayed() }
         averageExecutionTime.value("0")
-        btnSaveThreshold.click()
         then:
+        btnSaveThreshold.click()
 
+        when:
         waitFor(2){ btnAnalyzeNow.isDisplayed() }
+        waitFor(2){ tabProcedureBtn.isDisplayed() }
+        then:
         btnAnalyzeNow.click()
-        report 'test warning'
+        tabProcedureBtn.click()
         waitFor(5){ analysisRemarks.isDisplayed() }
-
-        //deleted the created test talbes and procedures.
-        String dropTableAndProcQuery = page.getQueryToDropTableAndProcedureQuery()
-        when: 'Click SQL tab'
-        page.gotoSqlQuery()
-        then: 'at SQL page'
-        at SqlQueryPage
-
-        deleteTableAndProcedure(dropTableAndProcQuery)
     }
 
     def openAndCloseGraphDetailPopup() {
@@ -289,8 +319,10 @@ class AnalysisPageTest extends TestBase {
 
         when: 'wait for analyze now button to be displayed'
         waitFor(waitTime) { page.btnAnalyzeNow.isDisplayed() }
+        waitFor(2){ page.tabProcedureBtn.isDisplayed() }
         then: 'click analyze now button'
         page.btnAnalyzeNow.click()
+        page.tabProcedureBtn.click()
 
         when: 'click open the first bar'
         page.firstBar.click();
