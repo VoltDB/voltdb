@@ -127,8 +127,9 @@ public class UpdateClassesThread extends BenchmarkThread {
                 log.info(cr.getStatusString());
                 log.info(cr.getStatus());
                 if (cr.getStatus() == ClientResponse.GRACEFUL_FAILURE) {
-                    if (cr.getStatusString() != "Can't do catalog update(@UpdateClasses) while another elastic join, rejoin or catalog update is active"
-                            && cr.getStatusString() != "Invalid catalog update(@UpdateClasses) request: Can't run catalog update(@UpdateClasses) when another one is in progress")
+                    if (!     (cr.getStatusString().equals("Can't do catalog update(@UpdateClasses) while another elastic join, rejoin or catalog update is active")
+                            || cr.getStatusString().equals("Invalid catalog update(@UpdateClasses) request: Can't run catalog update(@UpdateClasses) when another one is in progress")
+                        ))
                         hardStop("UpdateClasses Proc failed gracefully", e);
                     else
                         m_needsBlock.set(true);
