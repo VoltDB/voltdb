@@ -47,6 +47,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
@@ -435,6 +436,14 @@ public class UpdateCore extends VoltSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         try {
+            try {
+                CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
+                        catalogBytes, catalogHash, deploymentBytes);
+            } catch (KeeperException | InterruptedException e) {
+                log.error("error writing catalog bytes on ZK during @UpdateCore");
+                throw e;
+            }
+
             // log the start of UpdateCore
             log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
             log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
