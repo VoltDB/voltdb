@@ -3806,7 +3806,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ExportManager.instance().startPolling(m_catalogContext);
 
         //Tell import processors that they can start ingesting data.
-        ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+        if (m_mode != OperationMode.PAUSED) {
+            ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+        }
 
         if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
@@ -3880,6 +3882,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             {
                 m_config.m_isPaused = false;
                 m_statusTracker.setNodeState(NodeState.UP);
+                if (mode == OperationMode.RUNNING) {
+                    ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+                }
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
         }
@@ -4032,7 +4037,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ExportManager.instance().startPolling(m_catalogContext);
 
             //Tell import processors that they can start ingesting data.
-            ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+            if (m_mode != OperationMode.PAUSED) {
+                ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+            }
 
             try {
                 if (m_adminListener != null) {
