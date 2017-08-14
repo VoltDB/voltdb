@@ -83,7 +83,6 @@ import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Permission;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.PathsType;
@@ -326,28 +325,16 @@ public class HTTPAdminListener {
 
             super.handle(target, baseRequest, request, response);
             if (baseRequest.isHandled()) return;
+            //jsonp is specified when response is expected to go to javascript function.
+            String jsonp = request.getParameter(HTTPClientInterface.JSONP);
+            AuthenticationResult authResult = authenticate(baseRequest);
+            if (!authResult.isAuthenticated()) {
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                baseRequest.setHandled(true);
+                return;
+            }
             handleReportPage(baseRequest, response);
-        }
-
-    }
-
-    class DDLRequestHandler extends VoltRequestHandler {
-
-        @Override
-        public void handle(String target,
-                           Request baseRequest,
-                           HttpServletRequest request,
-                           HttpServletResponse response)
-                           throws IOException, ServletException {
-
-            super.handle(target, baseRequest, request, response);
-            if (baseRequest.isHandled()) return;
-            byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar(VoltCompiler.AUTOGEN_DDL_FILE_NAME);
-            String ddl = new String(reportbytes, Charsets.UTF_8);
-            response.setContentType("text/plain;charset=utf-8");
-            response.setStatus(HttpServletResponse.SC_OK);
-            baseRequest.setHandled(true);
-            response.getWriter().print(ddl);
         }
 
     }
@@ -1111,10 +1098,6 @@ public class HTTPAdminListener {
             ContextHandler catalogRequestHandler = new ContextHandler("/catalog");
             catalogRequestHandler.setHandler(new CatalogRequestHandler());
 
-            ///catalog
-            ContextHandler ddlRequestHandler = new ContextHandler("/ddl");
-            ddlRequestHandler.setHandler(new DDLRequestHandler());
-
             ///deployment
             ContextHandler deploymentRequestHandler = new ContextHandler("/deployment");
             m_deploymentHandler = new DeploymentRequestHandler();
@@ -1142,7 +1125,6 @@ public class HTTPAdminListener {
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
                     catalogRequestHandler,
-                    ddlRequestHandler,
                     deploymentRequestHandler,
                     profileRequestHandler,
                     dbMonitorHandler,
