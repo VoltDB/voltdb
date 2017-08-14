@@ -1,0 +1,36 @@
+.nav-elem {
+    float: left;
+    margin-left: 40px;
+    margin-top: 20px;
+    font-size: 20px;
+
+    display: inline-block;
+    color: #000;
+    background: #fff;
+    background: rgba(255,255,255,.5);
+    -webkit-border-radius: 10px;
+    border-radius: 10px;
+
+    padding: 9px 18px;
+}
+
+.nav-elem.active {
+    background: rgba(0, 0, 0, .5);
+    color: #fff;
+    text-decoration: none;
+}
+
+.elem-right {
+    float: right!important;
+    margin-right: 150px;
+}
+
+.nav-img {
+    margin-left: 20px;
+    margin-top: 15px;
+
+    float: left;
+    margin-left: 40px;
+    margin-top: 20px;
+    font-size: 20px;
+}

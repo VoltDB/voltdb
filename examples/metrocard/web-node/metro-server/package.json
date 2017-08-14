@@ -1,0 +1,21 @@
+{
+  "name": "metro-server",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "odometer": "^0.4.8",
+    "react": "^15.6.1",
+    "react-bootstrap": "^0.31.2",
+    "react-dom": "^15.6.1",
+    "react-fullpage": "^0.1.18"
+  },
+  "devDependencies": {
+    "react-scripts": "1.0.11"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
+}
