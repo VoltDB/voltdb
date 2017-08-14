@@ -87,8 +87,7 @@ class TableCatalogDelegate {
                               bool isXDCR);
 
     static TupleSchema *createTupleSchema(catalog::Table const &catalogTable,
-                                          bool isXDCR,
-                                          bool forceNoDR);
+                                          bool isXDCR);
 
     static bool getIndexScheme(catalog::Table const &catalogTable,
                                catalog::Index const &catalogIndex,
