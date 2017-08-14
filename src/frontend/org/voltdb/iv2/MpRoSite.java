@@ -227,7 +227,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                boolean requiresSnapshotIsolation, long uniqueId, long spHandle,
+                boolean requiresSnapshotIsolation, long txnId, long uniqueId, long spHandle,
                 boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -678,18 +678,18 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId)
+    public void setDRProtocolVersion(int drVersion, long txnId, long spHandle, long uniqueId)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long spHandle, long uniqueId) {
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public void setDRStreamEnd(long spHandle, long uniqueId) {
+    public void setDRStreamEnd(long spHandle, long txnId, long uniqueId) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
