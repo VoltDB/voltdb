@@ -37,12 +37,22 @@ class Pages extends Component {
           <a href="">About</a>
         </Footer>
         <SectionsContainer className="container" {...options}>
-          <Section className="custom-section" verticalAlign="true" color="#69D2E7">
-            <OdometerInstance value={this.props.num} />
+          {/* The first odometer for showing # of card swipes */}
+          <Section className="custom-section" verticalAlign="true" color="#eee0d3">
+            <section className='wrapper1'>
+              <div id="one">
+                <OdometerInstance value={this.props.num} theme={'car'} />
+              </div>
+              <div id="two">
+                Card Swipes
+              </div>
+            </section>
           </Section>
+
           <Section color="#A7DBD8">
             Section 2
           </Section>
+
           <Section color="#E0E4CC">Section 3</Section>
         </SectionsContainer>
       </div>

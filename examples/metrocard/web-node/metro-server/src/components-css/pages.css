@@ -34,3 +34,32 @@
     margin-top: 20px;
     font-size: 20px;
 }
+
+.wrapper1 {
+    width: 80%;
+    height: 200px;
+    background: aqua;
+    margin: auto;
+    padding: 10px;
+}
+
+.wrapper1 div#one {
+    width: 50%;
+    height: 300px;
+    background: red;
+    float: left;
+}
+
+.wrapper1 div#two {
+    margin-left: 15%;
+    height: 300px;
+    background: white;
+    text-align: center;
+    vertical-align: center;
+    line-height: 300px; /* set the same as div height for vertical aslignment */
+    font-family: 'Sedgwick Ave Display', cursive;
+    font-size: 8em;
+    color: #000;
+}
+
+@import url('https://fonts.googleapis.com/css?family=Sedgwick+Ave+Display');
