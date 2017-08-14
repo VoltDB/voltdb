@@ -4,7 +4,8 @@ import { SectionsContainer, Section, Header, Footer } from 'react-fullpage';
 
 // import NavbarInstance from './navbar.jsx';
 import OdometerInstance from './odometer.jsx';
-import BusiestStationsChart from './chart.jsx';
+import BusiestStationsChart from './busychart.jsx';
+import AvgWaitsChart from './avgwaitschart.jsx';
 
 import logo from '../resources/logo.png';
 
@@ -14,7 +15,7 @@ class Pages extends Component {
   render() {
     let options = {
       sectionClassName: 'section',
-      anchors: ['sectionOne', 'sectionTwo', 'sectionThree'],
+      anchors: ['sectionOne', 'sectionTwo', 'sectionThree', 'sectionFour', 'sectionFive'],
       scrollBar: false,
       navigation: true,
       verticalAlign: false,
@@ -27,9 +28,11 @@ class Pages extends Component {
       <div>
         <Header>
           <a href="" className='nav-img'><img alt='Boom' src={logo} height="40" /></a>
-          <a href="#sectionOne" className='nav-elem'>Section One</a>
-          <a href="#sectionTwo" className='nav-elem'>Section Two</a>
-          <a href="#sectionThree" className='nav-elem'>Section Three</a>
+          <a href="#sectionOne" className='nav-elem'>Swipes</a>
+          <a href="#sectionTwo" className='nav-elem'>Station Stats</a>
+          <a href="#sectionThree" className='nav-elem'>Waiting Time</a>
+          <a href="#sectionFour" className='nav-elem'>Frauds</a>
+          <a href="#sectionFive" className='nav-elem'>Section Five</a>
           <a href="" className='nav-elem elem-right'>Metro Monitoring System</a>
         </Header>
         <Footer>
@@ -51,14 +54,24 @@ class Pages extends Component {
             </section>
           </Section>
 
-          {/* The chart */}
+          {/* The busy stations chart */}
           <Section color="#A7DBD8">
+            <div className='chart-1-title'>
+              <p>Busiest Stations</p>
+            </div>
             <div className='chart-container'>
               <BusiestStationsChart busiestStations={this.props.busiestStations}/>
             </div>
           </Section>
 
-          <Section color="#E0E4CC">Section 3</Section>
+          {/* The avg waiting time chart */}
+          <Section color="#E0E4CC">
+            <AvgWaitsChart avgWaits={this.props.avgWaits}/>
+          </Section>
+
+          <Section color="#E0E4CC">Section 4</Section>
+
+          <Section color="#E0E4CC">Section 5</Section>
 
         </SectionsContainer>
       </div>

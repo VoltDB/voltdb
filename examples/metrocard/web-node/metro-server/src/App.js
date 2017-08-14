@@ -17,20 +17,10 @@ class App extends Component {
     super(props);
     this.state = {
       num: 1001, // total # of swipes
+      frauds: 0,  // detected frauds
       busiestStations: data, // busiest stations
       avgWaits: []
     };
-
-    // setInterval(() => {
-    //   let oldData = this.state.busiestStations.slice(0);
-    //   oldData.map((v, i, arr) => {
-    //     v.y = v.y * (1 + Math.random()) * (Math.random() < 0.5 ? -1 : 1);
-    //     return v;
-    //   });
-    //   this.setState({
-    //     busiestStations: oldData
-    //   });
-    // }, 3000);
 
     // Update the data
     setInterval(() => {
@@ -65,13 +55,35 @@ class App extends Component {
         error: (err) => { console.log(err); },
         callbackName: 'jsonp' // Important !
       });
+
+      // Get the info for avg waiting time
+      JSONP({
+        url: 'http://localhost:8080/api/1.0/',
+        data: { Procedure: 'GetStationWaitTime' },
+        success: (data) => {
+          let newData = data.results[0].data;
+          newData = newData.map((v, i, arr) => {
+            let r = {};
+            r.x = v[0];
+            r.y = v[1];
+            return r;
+          });
+
+          this.setState({
+            avgWaits: newData
+          });
+          console.log(newData);
+        },
+        error: (err) => { console.log(err); },
+        callbackName: 'jsonp' // Important !
+      });
     }, 2000);
   }
 
   render() {
     return (
       <div>
-        <Pages num={this.state.num} busiestStations={this.state.busiestStations} theme={'car'} />
+        <Pages num={this.state.num} busiestStations={this.state.busiestStations} avgWaits={this.state.avgWaits} theme={'car'} />
       </div>
     );
   }

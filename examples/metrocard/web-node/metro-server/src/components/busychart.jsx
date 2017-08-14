@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 
-import { XYPlot, XAxis, YAxis, HorizontalGridLines, VerticalBarSeries, LineSeries, LineMarkSeries } from 'react-vis';
+import { XYPlot, XAxis, YAxis, HorizontalGridLines, VerticalBarSeries } from 'react-vis';
 
 class BusiestStationsChart extends Component {
   render() {
