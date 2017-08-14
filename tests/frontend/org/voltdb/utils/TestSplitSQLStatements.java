@@ -40,11 +40,11 @@ public class TestSplitSQLStatements {
     public void setUp() throws Exception {
     }
 
-    private void checkSplitter(final String strIn, final String... strsCmp) {
-        final List<String> strsOut = SQLLexer.splitStatements(strIn).completelyParsedStmts;
-        assertEquals(strsCmp.length, strsOut.size());
-        for (int i = 0; i < strsCmp.length; ++i) {
-            assertEquals(strsCmp[i], strsOut.get(i));
+    private void checkSplitter(final String inputStmts, final String... expectedStmts) {
+        final List<String> strsOut = SQLLexer.splitStatements(inputStmts).getCompletelyParsedStmts();
+        assertEquals(expectedStmts.length, strsOut.size());
+        for (int i = 0; i < expectedStmts.length; ++i) {
+            assertEquals(expectedStmts[i], strsOut.get(i));
         }
     }
 
@@ -89,8 +89,8 @@ public class TestSplitSQLStatements {
         // because begin has not end yet, they are incomplete
         String sql = "as begin en";
         SplitStmtResults parsedOut = SQLLexer.splitStatements(sql);
-        assertEquals(0, parsedOut.completelyParsedStmts.size());
-        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
+        assertEquals(0, parsedOut.getCompletelyParsedStmts().size());
+        assertEquals(sql, parsedOut.getIncompleteStmt());
 
         sql = "create table begin (a int);";
         checkSplitter(sql, sql.substring(0, sql.length() - 1));
@@ -135,14 +135,14 @@ public class TestSplitSQLStatements {
         // there is no END statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
         sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t;";
         parsedOut = SQLLexer.splitStatements(sql);
-        assertEquals(0, parsedOut.completelyParsedStmts.size());
-        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
+        assertEquals(0, parsedOut.getCompletelyParsedStmts().size());
+        assertEquals(sql, parsedOut.getIncompleteStmt());
 
         // enf is not end of statement for BEGIN, so the ; is included as the parsing of BEGIN is not complete
         sql = "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; ENF;";
         parsedOut = SQLLexer.splitStatements(sql);
-        assertEquals(0, parsedOut.completelyParsedStmts.size());
-        assertEquals(sql, parsedOut.incompleteMuliStmtProc);
+        assertEquals(0, parsedOut.getCompletelyParsedStmts().size());
+        assertEquals(sql, parsedOut.getIncompleteStmt());
 
         checkSplitter("CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; ENF; end",
                 "CREATE PROCEDURE foo AS BEGIN SELECT * from t; SELECT * from t; ENF; end");
@@ -278,23 +278,27 @@ public class TestSplitSQLStatements {
         // parsing AS BEGIN will only end with END
         sql = "create table as begin (a int);";
         parsedOut = SQLLexer.splitStatements(sql + sql1);
-        assertEquals(0, parsedOut.completelyParsedStmts.size());
-        assertEquals(sql + sql1, parsedOut.incompleteMuliStmtProc);
+        assertEquals(0, parsedOut.getCompletelyParsedStmts().size());
+        assertEquals(sql + sql1, parsedOut.getIncompleteStmt());
     }
 
     @Test
     public void testProcSQLSplitWithComments() {
 
-        String sql = "create procedure thisproc as "
+        String sql = "-- preceding comment\n"
+                  + "create procedure thisproc as "
                   + "begin --one\n"
                   + "select * from t;"
-                  + "select * from r where f = 'foo';"
+                  + "select * from r where f = 'foo';\n"
+                  + "-- mid-statement comment\n"
                   + "select * from r where f = 'begin' or f = 'END';"
-                  + "end;";
+                  + "end;\n"
+                  + "-- trailing comment\n";
         String expected = "create procedure thisproc as "
                     + "begin \n"
                     + "select * from t;"
-                    + "select * from r where f = 'foo';"
+                    + "select * from r where f = 'foo';\n"
+                    + "\n"
                     + "select * from r where f = 'begin' or f = 'END';"
                     + "end";
         checkSplitter(sql, expected);

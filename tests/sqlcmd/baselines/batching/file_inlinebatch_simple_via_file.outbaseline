@@ -17,6 +17,16 @@ create index tidx on t(i);
 create procedure p as
     select * from t;
 
+-- here is another table
+create table commented_table (
+   id integer not null,
+   v1 float,
+   f2 bigint
+);
+-- here is a comment
+partition table commented_table on column id;
+-- that is it for commented_table
+
 
 Batch command succeeded.
 
