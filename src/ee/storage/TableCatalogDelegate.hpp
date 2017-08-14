@@ -145,6 +145,9 @@ class TableCatalogDelegate {
                                      catalog::Table const &catalogTable,
                                      bool isXDCR,
                                      int tableAllocationTargetSize = 0,
+                                     /* indicates whether the constructed table should inherit isDRed attributed from
+                                      * the provided catalog table or set isDRed to false forcefully. Currently, only
+                                      * delta tables for joins in materialized views use the second option */
                                      bool forceNoDR = false);
 
     voltdb::Table *m_table;
