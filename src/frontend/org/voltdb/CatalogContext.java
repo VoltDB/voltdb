@@ -135,6 +135,7 @@ public class CatalogContext {
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
     private DeploymentType m_memoizedDeployment;
 
+    public long m_lastUpdateCoreDuration = -1; // in nano seconds
 
     /**
      * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
