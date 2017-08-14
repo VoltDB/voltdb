@@ -392,13 +392,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 boolean requiresSnapshotIsolation,
-                long uniqueId, long spHandle,
+                long txnId, long uniqueId, long spHandle,
                 boolean isReplay,
                 boolean requireCatalogDiffCmdsApplyToEE,
                 boolean requiresNewExportGeneration)
         {
             return Site.this.updateCatalog(diffCmds, context, requiresSnapshotIsolation,
-                    false, uniqueId, spHandle, isReplay,
+                    false, txnId, uniqueId, spHandle, isReplay,
                     requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
         }
 
@@ -1510,7 +1510,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle,
+            boolean requiresSnapshotIsolationboolean, boolean isMPI, long txnId, long uniqueId, long spHandle,
             boolean isReplay,
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean requiresNewExportGeneration)
@@ -1579,7 +1579,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_ee.updateCatalog(m_context.m_genId, requiresNewExportGeneration, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
-            generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
+            generateDREvent(EventType.CATALOG_UPDATE, txnId, uniqueId, m_lastCommittedSpHandle,
                     spHandle, catalogCommands.commands.getBytes(Charsets.UTF_8));
         }
 
@@ -1589,7 +1589,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     /**
      * Update the system settings
      * @param context catalog context
-     * @param csp catalog specific planner
      * @return true if it succeeds
      */
     public boolean updateSettings(CatalogContext context) {
@@ -1713,14 +1712,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId) {
+    public void setDRProtocolVersion(int drVersion, long txnId, long spHandle, long uniqueId) {
         setDRProtocolVersion(drVersion);
         generateDREvent(
-                EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
+                EventType.DR_STREAM_START, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
     }
 
     @Override
-    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long spHandle, long uniqueId) {
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId) {
 //        Enable this code and fix up generateDREvent in DRTuplestream once the DR ReplicatedTable Stream has been removed
 //        if (m_partitionId >= oldPartitionCnt) {
 //            generateDREvent(
@@ -1731,26 +1730,29 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             paramBuffer.putInt(oldPartitionCnt);
             paramBuffer.putInt(newPartitionCnt);
             generateDREvent(
-                    EventType.DR_ELASTIC_CHANGE, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
+                    EventType.DR_ELASTIC_CHANGE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
 //        }
     }
 
-    public void setDRStreamEnd(long spHandle, long uniqueId) {
+    public void setDRStreamEnd(long txnId, long spHandle, long uniqueId) {
         generateDREvent(
-                EventType.DR_STREAM_END, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
+                EventType.DR_STREAM_END, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
     }
 
     /**
      * Generate a in-stream DR event which pushes an event buffer to topend
      */
-    public void generateDREvent(EventType type, long uniqueId, long lastCommittedSpHandle,
+    public void generateDREvent(EventType type, long txnId, long uniqueId, long lastCommittedSpHandle,
             long spHandle, byte[] payloads) {
         m_ee.quiesce(lastCommittedSpHandle);
-        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(32 + payloads.length);
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(32 + 16 + payloads.length);
         paramBuffer.putInt(type.ordinal());
         paramBuffer.putLong(uniqueId);
         paramBuffer.putLong(lastCommittedSpHandle);
         paramBuffer.putLong(spHandle);
+        // adding txnId and undoToken to make generateDREvent undoable
+        paramBuffer.putLong(txnId);
+        paramBuffer.putLong(getNextUndoToken(m_currentTxnId));
         paramBuffer.putInt(payloads.length);
         paramBuffer.put(payloads);
         m_ee.executeTask(TaskType.GENERATE_DR_EVENT, paramBuffer);
