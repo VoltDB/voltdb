@@ -1739,13 +1739,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long spHandle, long uniqueId) {
-        ByteBuffer paramBuffer = ByteBuffer.allocate(8);
+    public void generateElasticRebalanceEvents(int srcPartition, int destPartition, long txnId, long spHandle, long uniqueId) {
+        ByteBuffer paramBuffer = ByteBuffer.allocate(8 + 8);
         paramBuffer.putInt(srcPartition);
         paramBuffer.putInt(destPartition);
         paramBuffer.putLong(uniqueId);
         generateDREvent(
-                EventType.DR_ELASTIC_REBALANCE, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
+                EventType.DR_ELASTIC_REBALANCE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
     }
 
     public void setDRStreamEnd(long txnId, long spHandle, long uniqueId) {

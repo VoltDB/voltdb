@@ -42,9 +42,12 @@ public:
     void undo() { }
 
     void release() {
-        if (m_drReplicatedStream && (m_type == DR_STREAM_START || m_drReplicatedStream->drStreamStarted())) {
+        // TODO: skip generate DR_ELASTIC_REBALANCE event on replicated stream, remove this once the DR ReplicatedTable Stream has been removed
+        if (m_drReplicatedStream && (m_type != DR_ELASTIC_REBALANCE) &&
+            (m_type == DR_STREAM_START || m_drReplicatedStream->drStreamStarted())) {
             m_drReplicatedStream->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);
         }
+
         if (m_type == DR_ELASTIC_CHANGE) {
             ReferenceSerializeInputBE input(m_payloads.data(), 8);
             int oldPartitionCnt = input.readInt();
@@ -54,6 +57,7 @@ public:
                 return;
             }
         }
+
         if (m_type == DR_STREAM_START || m_drStream->drStreamStarted()) {
             m_drStream->generateDREvent(m_type, m_lastCommittedSpHandle, m_spHandle, m_uniqueId, m_payloads);
         }
