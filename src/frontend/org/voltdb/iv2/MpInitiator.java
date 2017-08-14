@@ -202,7 +202,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
             boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
     {
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
-        m_executionSite.updateCatalog(diffCmds, context, false, true, Long.MIN_VALUE, Long.MIN_VALUE,
+        m_executionSite.updateCatalog(diffCmds, context, false, true, Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE,
                 isReplay, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
         MpScheduler sched = (MpScheduler)m_scheduler;
         sched.updateCatalog(diffCmds, context);
