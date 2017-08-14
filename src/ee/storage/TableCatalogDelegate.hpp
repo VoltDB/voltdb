@@ -144,8 +144,8 @@ class TableCatalogDelegate {
     Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                      catalog::Table const &catalogTable,
                                      bool isXDCR,
-                                     bool forceNoDR = false,
-                                     int tableAllocationTargetSize = 0);
+                                     int tableAllocationTargetSize = 0,
+                                     bool forceNoDR = false);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;

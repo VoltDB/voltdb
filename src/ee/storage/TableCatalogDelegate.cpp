@@ -263,8 +263,8 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme& indexScheme) {
 Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& catalogDatabase,
                                                        catalog::Table const& catalogTable,
                                                        bool isXDCR,
-                                                       bool forceNoDR,
-                                                       int tableAllocationTargetSize) {
+                                                       int tableAllocationTargetSize,
+                                                       bool forceNoDR) {
     // Create a persistent table for this table in our catalog
     int32_t tableId = catalogTable.relativeIndex();
 
@@ -447,7 +447,7 @@ PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const&
     // Delta table will only have one row (currently).
     // Set the table block size to 64KB to achieve better space efficiency.
     // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
-    Table* deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, false, true, 1024 * 64);
+    Table* deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, false, 1024 * 64, true);
     deltaTable->incrementRefcount();
     // We have the restriction that view on joined table cannot have non-persistent table source.
     // So here we could use static_cast. But if we in the future want to lift this limitation,
