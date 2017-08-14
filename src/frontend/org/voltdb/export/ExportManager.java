@@ -526,11 +526,9 @@ public class ExportManager
         ExportManager instance = instance();
         try {
             ExportGeneration generation = instance.m_generation.get();
-            if (generation == null) {
-                VoltDB.crashLocalVoltDB("BSDBG: pushed export end of stream before generation was initialized");
-                return;
+            if (generation != null) {
+                generation.pushEndOfStream(partitionId, signature);
             }
-            generation.pushEndOfStream(partitionId, signature);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export end of stream", e);
@@ -556,11 +554,9 @@ public class ExportManager
         try {
             ExportGeneration generation = instance.m_generation.get();
             if (generation == null) {
-                // TODO: this should probably be an error, not a crash. It still should not happen.
                 if (buffer != null) {
                     DBBPool.wrapBB(buffer).discard();
                 }
-                VoltDB.crashLocalVoltDB("BSDBG: pushed export buffer before generation was initialized");
                 return;
             }
             generation.pushExportBuffer(partitionId, signature, uso, buffer, sync);

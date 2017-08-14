@@ -412,8 +412,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
-        if (poll) {
-            pollImpl(m_pollFuture);
+        //If not in catalog means we are doing UAC and push came
+        if (poll && m_isInCatalog) {
+            try {
+                pollImpl(m_pollFuture);
+            } catch (RejectedExecutionException ex) {
+                //Its ok.
+            }
         }
     }
 
@@ -421,7 +426,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushEndOfStream() {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
         m_isInCatalog = false;
-        pollImpl(m_pollFuture);
+        m_pollFuture = null;
     }
 
     public void pushExportBuffer(
@@ -435,7 +440,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         if (m_es.isShutdown()) {
-            System.out.println("Push came when we are shutdown.");
            m_bufferPushPermits.release();
            return;
         }
@@ -618,9 +622,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     fut.set(null);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source.
+                    reex.printStackTrace();
                 }
                 //Let generation know to cleanup. Processor needs to do its own cleanup.
-//                m_generation.onSourceDone(m_partitionId, m_signature);
+                m_generation.onSourceDone(m_partitionId, m_signature);
                 //TODO: handle ack.
 //                forwardAckToOtherReplicas(Long.MIN_VALUE);
                 return;
@@ -821,10 +826,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // For case where the previous export processor had only row of the first block to process
         // and it completed processing it, poll future is not set to null still. Set it to null to
         // prepare for the new processor polling
-//        if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
-//            m_pollFuture = null;
-//        }
+        if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
+            m_pollFuture = null;
+        }
     }
+
     /**
      * Trigger an execution of the mastership runnable by the associated
      * executor service

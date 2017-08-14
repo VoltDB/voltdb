@@ -1178,6 +1178,7 @@ VoltDBEngine::purgeMissingStreams() {
             entry.second->pushEndOfStream();
         }
     }
+    //TODO: We should go and delete any wrappers that are dropped and have no more data.
     m_exportingDeletedStreams.clear();
 }
 
@@ -1572,6 +1573,11 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (LabeledStream table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
     }
+    BOOST_FOREACH (LabeledStreamWrapper table, m_exportingDeletedStreams) {
+        if (table.second)
+            delete table.second;
+    }
+
     m_executorContext->drStream()->periodicFlush(timeInMillis, lastCommittedSpHandle);
     if (m_executorContext->drReplicatedStream()) {
         m_executorContext->drReplicatedStream()->periodicFlush(timeInMillis, lastCommittedSpHandle);
