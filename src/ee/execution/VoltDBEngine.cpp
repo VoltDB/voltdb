@@ -84,6 +84,7 @@
 
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
+#include "storage/ExecuteTaskUndoGenerateDREventAction.h"
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/persistenttable.h"
@@ -2172,14 +2173,20 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         int64_t uniqueId = taskInfo.readLong();
         int64_t lastCommittedSpHandle = taskInfo.readLong();
         int64_t spHandle = taskInfo.readLong();
+        int64_t txnId = taskInfo.readLong();
+        int64_t undoToken = taskInfo.readLong();
         ByteArray payloads = taskInfo.readBinaryString();
 
-        m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
-                                                       spHandle, uniqueId, payloads);
-        if (m_executorContext->drReplicatedStream()) {
-            m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
-                                                                     spHandle, uniqueId, payloads);
-        }
+        setUndoToken(undoToken);
+        m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(), txnId,
+                spHandle, lastCommittedSpHandle, uniqueId, false);
+
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        assert(uq);
+        uq->registerUndoAction(
+                new (*uq) ExecuteTaskUndoGenerateDREventAction(
+                        m_executorContext->drStream(), m_executorContext->drReplicatedStream(), type, lastCommittedSpHandle,
+                        spHandle, uniqueId, payloads));
         break;
     }
     default:

@@ -232,7 +232,7 @@ public interface SiteProcedureConnection {
      * Starting in DR version 7.0, we also generate a special event indicating the beginning of
      * binary log stream when we set protocol version.
      */
-    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId);
+    public void setDRProtocolVersion(int drVersion, long txnId, long spHandle, long uniqueId);
 
-    public void setDRStreamEnd(long spHandle, long uniqueId);
+    public void setDRStreamEnd(long txnId, long spHandle, long uniqueId);
 }

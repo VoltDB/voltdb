@@ -39,6 +39,8 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.utils.VoltTableUtil;
 
+// ExecuteTask is now a restartable system procedure
+// make sure each sub task is either idempotent or can rollback (e.g. generateDREvent)
 public class ExecuteTask extends VoltSystemProcedure {
 
     private static final int DEP_executeTask = (int) SysProcFragmentId.PF_executeTask | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -105,9 +107,10 @@ public class ExecuteTask extends VoltSystemProcedure {
                 int drVersion = buffer.getInt();
                 int createStartStream = buffer.getInt();
                 if (createStartStream > 0) {
+                    long txnId = m_runner.getTxnState().txnId;
                     long uniqueId = m_runner.getUniqueId();
                     long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
-                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, spHandle, uniqueId);
+                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, txnId, spHandle, uniqueId);
                 } else {
                     context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
                 }
