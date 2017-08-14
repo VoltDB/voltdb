@@ -4,6 +4,7 @@ import { SectionsContainer, Section, Header, Footer } from 'react-fullpage';
 
 // import NavbarInstance from './navbar.jsx';
 import OdometerInstance from './odometer.jsx';
+import BusiestStationsChart from './chart.jsx';
 
 import logo from '../resources/logo.png';
 
@@ -37,6 +38,7 @@ class Pages extends Component {
           <a href="">About</a>
         </Footer>
         <SectionsContainer className="container" {...options}>
+
           {/* The first odometer for showing # of card swipes */}
           <Section className="custom-section" verticalAlign="true" color="#eee0d3">
             <section className='wrapper1'>
@@ -49,11 +51,15 @@ class Pages extends Component {
             </section>
           </Section>
 
+          {/* The chart */}
           <Section color="#A7DBD8">
-            Section 2
+            <div className='chart-container'>
+              <BusiestStationsChart busiestStations={this.props.busiestStations}/>
+            </div>
           </Section>
 
           <Section color="#E0E4CC">Section 3</Section>
+
         </SectionsContainer>
       </div>
     );

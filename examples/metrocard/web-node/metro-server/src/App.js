@@ -5,25 +5,64 @@ import Pages from './components/pages.jsx';
 // import Fullpage from './components/fullpage.jsx';
 import JSONP from 'browser-jsonp';
 
+const data = new Array(10).fill(0).reduce((prev, curr) => [...prev, {
+  x: prev.slice(-1)[0].x + 1,
+  y: prev.slice(-1)[0].y * (1 + Math.random())
+}], [{ x: 0, y: 10 }])
+
 // Root element
 class App extends Component {
 
   constructor(props) {
     super(props);
     this.state = {
-      num: 1001
+      num: 1001, // total # of swipes
+      busiestStations: data, // busiest stations
+      avgWaits: []
     };
 
-    // Update the total number of swipes
+    // setInterval(() => {
+    //   let oldData = this.state.busiestStations.slice(0);
+    //   oldData.map((v, i, arr) => {
+    //     v.y = v.y * (1 + Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+    //     return v;
+    //   });
+    //   this.setState({
+    //     busiestStations: oldData
+    //   });
+    // }, 3000);
+
+    // Update the data
     setInterval(() => {
-      // let url = "http://localhost:8080/api/1.0/?Procedure=@AdHoc&Parameters=['select count(*) from activity']";
+      // Get the total number of swipes
       JSONP({
         url: 'http://localhost:8080/api/1.0/',
         data: { Procedure: '@AdHoc', Parameters: "['select count(*) from activity']" },
         success: (data) => {
           this.setState({ num: data.results[0].data[0][0] });
         },
-        error:(err) => { console.log(err); },
+        error: (err) => { console.log(err); },
+        callbackName: 'jsonp' // Important !
+      });
+
+      // Get the swipes for the busiest stations
+      JSONP({
+        url: 'http://localhost:8080/api/1.0/',
+        data: { Procedure: 'GetBusiestStationInLastMinute' },
+        success: (data) => {
+          let newData = data.results[0].data;
+          newData = newData.map((v, i, arr) => {
+            let r = {};
+            r.x = v[0];
+            r.y = v[1];
+            return r;
+          });
+
+          this.setState({
+            busiestStations: newData
+          });
+        },
+        error: (err) => { console.log(err); },
         callbackName: 'jsonp' // Important !
       });
     }, 2000);
@@ -32,7 +71,7 @@ class App extends Component {
   render() {
     return (
       <div>
-        <Pages num={this.state.num} theme={'car'} />
+        <Pages num={this.state.num} busiestStations={this.state.busiestStations} theme={'car'} />
       </div>
     );
   }
