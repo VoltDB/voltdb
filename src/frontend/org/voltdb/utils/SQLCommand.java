@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.StringReader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
@@ -793,8 +792,8 @@ public class SQLCommand
             // Check if the current statement ends here and now.
             // if it is an incomplete multi statement procedure, it is returned back
             if (SQLParser.isSemiColonTerminated(line)) {
+                String statementString = statement.toString();
                 if (batch == null) {
-                    String statementString = statement.toString();
                     // Trim here avoids a "missing statement" error from adhoc in an edge case
                     // like a blank line from stdin.
                     if ( ! statementString.trim().isEmpty()) {
@@ -809,6 +808,13 @@ public class SQLCommand
                         }
                     } else {
                         statement.setLength(0);
+                        statementStarted = false;
+                    }
+                }
+                else { // not in a batch:
+                    SplitStmtResults splitResults = SQLLexer.splitStatements(statementString);
+                    if (splitResults.getIncompleteStmt() == null) {
+                        // not in the middle of a statement.
                         statementStarted = false;
                     }
                 }
@@ -830,11 +836,11 @@ public class SQLCommand
     private static String executeStatements(String statements, DDLParserCallback callback, int lineNum)
     {
         SplitStmtResults parsedOutput = SQLLexer.splitStatements(statements);
-        List<String> parsedStatements = parsedOutput.completelyParsedStmts;
+        List<String> parsedStatements = parsedOutput.getCompletelyParsedStmts();
         for (String statement: parsedStatements) {
             executeStatement(statement, callback, lineNum);
         }
-        return parsedOutput.incompleteMuliStmtProc;
+        return parsedOutput.getIncompleteStmt();
     }
 
     private static void executeStatement(String statement, DDLParserCallback callback, int lineNum)
@@ -1343,7 +1349,7 @@ public class SQLCommand
         try {
             SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
             getInteractiveQueries(reader);
-            return SQLLexer.splitStatements(m_testFrontEndResult).completelyParsedStmts;
+            return SQLLexer.splitStatements(m_testFrontEndResult).getCompletelyParsedStmts();
         } catch (Exception ioe) {}
         return null;
     }
@@ -1410,7 +1416,7 @@ public class SQLCommand
                 kerberos = "VoltDBClient";
             }
             else if (arg.startsWith("--query=")) {
-                List<String> argQueries = SQLLexer.splitStatements(arg.substring(8)).completelyParsedStmts;
+                List<String> argQueries = SQLLexer.splitStatements(arg.substring(8)).getCompletelyParsedStmts();
                 if (!argQueries.isEmpty()) {
                     if (queries == null) {
                         queries = argQueries;

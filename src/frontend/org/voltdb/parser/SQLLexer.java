@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.voltdb.utils.SplitStmtResults;
 
 /**
@@ -344,7 +345,6 @@ public class SQLLexer extends SQLPatternFactory
      */
       public static SplitStmtResults splitStatements(final String sql) {
         List<String> statements = new ArrayList<>();
-        SplitStmtResults results = new SplitStmtResults();
 
         // strip out comments
         String sqlNoComments = SQLParser.AnyWholeLineComments.matcher(sql).replaceAll("");
@@ -488,6 +488,7 @@ public class SQLLexer extends SQLPatternFactory
         }
         // Get the last statement, if any.
         // we are still processing a multi statement procedure if we are still in begin...end
+        String incompleteStmt = null;
         if (iStart < buf.length) {
             if (!inBegin) {
                 String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
@@ -497,12 +498,11 @@ public class SQLLexer extends SQLPatternFactory
             } else {
                 // we only check for incomplete multi statement procedures right now
                 // add a mandatory space..
-                results.incompleteMuliStmtProc = String.copyValueOf(buf, iStart, iCur - iStart);
+                incompleteStmt = String.copyValueOf(buf, iStart, iCur - iStart);
             }
         }
 
-        results.completelyParsedStmts = statements;
-        return results;
+        return new SplitStmtResults(statements, incompleteStmt);
     }
 
     /**

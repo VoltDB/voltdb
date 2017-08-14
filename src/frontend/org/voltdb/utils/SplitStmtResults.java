@@ -20,16 +20,24 @@ import java.util.List;
 import java.util.ArrayList;
 
 /**
- * To store the statements which are parsed/split by the SQLLexer.splitStatements()
- * currently the incompleteStmt is used to store the incomplete multi statement procedure
- * and is used to return back to SQLCMD so that more user input can be appended at the end of it
+ * To store the statements which are parsed/split by the SQLLexer.splitStatements().
+ * Currently the incompleteStmt is used to store statements that are not complete,
+ * so that more user input can be appended at the end of it.
  */
 public class SplitStmtResults {
-    public List<String> completelyParsedStmts;
-    public String incompleteMuliStmtProc;
+    private final List<String> m_completelyParsedStmts;
+    private final String m_incompleteStmt;
 
-    public SplitStmtResults() {
-        completelyParsedStmts = new ArrayList<String>();
-        incompleteMuliStmtProc = null;
+    public SplitStmtResults(List<String> completelyParsedStmts, String incompleteStmt) {
+        m_completelyParsedStmts = completelyParsedStmts;
+        m_incompleteStmt = incompleteStmt;
     }
+
+	public String getIncompleteStmt() {
+		return m_incompleteStmt;
+	}
+
+	public List<String> getCompletelyParsedStmts() {
+		return m_completelyParsedStmts;
+	}
 }
