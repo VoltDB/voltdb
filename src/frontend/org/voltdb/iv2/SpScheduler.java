@@ -582,9 +582,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
     {
-        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
         if (traceLog != null) {
+            final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
             traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
                     .add(() -> VoltTrace.meta("thread_name", "name", threadName))
                     .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(10000)))
