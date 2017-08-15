@@ -126,7 +126,7 @@ SELECT
   station_id,
   COUNT(*) AS activities,
   COUNT(DECODE(activity_code,1,1)) AS entries,
-  SUM(DECODE(activity_code,2,amount)) AS entry_total,
+  SUM(DECODE(activity_code,1,amount)) AS entry_total,
   COUNT(DECODE(activity_code,2,1)) AS purchases,
   SUM(DECODE(activity_code,2,amount)) AS purchase_total
 FROM activity
@@ -141,7 +141,7 @@ SELECT
   TRUNCATE(SECOND,date_time) AS second,
   COUNT(*) AS activities,
   COUNT(DECODE(activity_code,1,1)) AS entries,
-  SUM(DECODE(activity_code,2,amount)) AS entry_total,
+  SUM(DECODE(activity_code,1,amount)) AS entry_total,
   COUNT(DECODE(activity_code,2,1)) AS purchases,
   SUM(DECODE(activity_code,2,amount)) AS purchase_total
 FROM activity

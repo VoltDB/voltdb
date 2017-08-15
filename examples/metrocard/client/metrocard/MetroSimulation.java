@@ -535,13 +535,16 @@ public class MetroSimulation {
         long num_activity = (config.count % 17) + config.count;
         for (String train : trains) {
             TrainActivityPublisher redLine = new TrainActivityPublisher(train, config, producerConfig, num_activity);
-            redLine.start();
             trainPubs.add(redLine);
         }
         SwipeEntryActivityPublisher entry = new SwipeEntryActivityPublisher(config, producerConfig, config.count);
         entry.start();
         SwipeExitActivityPublisher exit = new SwipeExitActivityPublisher(config, producerConfig, config.count);
         exit.start();
+        //Start trains now.
+        for (TrainActivityPublisher trainPub : trainPubs) {
+            trainPub.start();
+        }
         SwipeReplenishActivityPublisher replenish = new SwipeReplenishActivityPublisher(config, producerConfig, config.count/5);
         replenish.start();
         entry.join();

@@ -543,13 +543,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
         }
         long genId = getNextGenerationId();
-        try {
-            CatalogUtil.updateCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId,
-                    ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes);
-        } catch (KeeperException | InterruptedException e) {
-            errMsg = "error writing catalog bytes on ZK";
-            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-        }
 
         // update the catalog jar
         return callProcedure("@UpdateCore",
