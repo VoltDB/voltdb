@@ -707,24 +707,21 @@ public class SQLCommand
                     line = null;
                 }
             }
+
             if (line == null) {
                 // No more lines.  Execute whatever we got.
-                if (statement.length() > 0) {
-                    if (batch == null) {
-                        String statementString = statement.toString();
-                        // Trim here avoids a "missing statement" error from adhoc in an edge case
-                        // like a blank line from stdin.
-                        if ( ! statementString.trim().isEmpty()) {
-                            //* enable to debug */if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                            executeStatements(statementString, callback, reader.getLineNumber());
-                        }
+                if (batch == null) {
+                    String statementString = statement.toString();
+                    // Trim here avoids a "missing statement" error from adhoc in an edge case
+                    // like a blank line from stdin.
+                    if ( ! statementString.trim().isEmpty()) {
+                        //* enable to debug */if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
+                        executeStatements(statementString, callback, reader.getLineNumber());
                     }
-                    else {
-                        // This means that batch did not end with a semicolon.
-                        // Maybe it ended with a comment.
-                        // For now, treat the final semicolon as optional and
-                        // assume that we are not just adding a partial statement to the batch.
-                        batch.append(statement);
+                }
+                else {
+                    batch.append(statement);
+                    if (batch.length() > 0) {
                         executeDDLBatch(fileInfo.getFilePath(), batch.toString(), callback, reader.getLineNumber());
                     }
                 }
@@ -743,6 +740,7 @@ public class SQLCommand
                     }
                     continue;
                 }
+
                 // Recursively process FILE commands, any failure will cause a recursive failure
                 List<FileInfo> nestedFilesInfo = SQLParser.parseFileStatement(fileInfo, line);
 
@@ -817,6 +815,9 @@ public class SQLCommand
                         // not in the middle of a statement.
                         statementStarted = false;
                     }
+
+                    batch.append(statement);
+                    statement.setLength(0);
                 }
             }
             else {
@@ -843,6 +844,7 @@ public class SQLCommand
         return parsedOutput.getIncompleteStmt();
     }
 
+    @SuppressWarnings("deprecation")
     private static void executeStatement(String statement, DDLParserCallback callback, int lineNum)
     {
         if (m_testFrontEndOnly) {
