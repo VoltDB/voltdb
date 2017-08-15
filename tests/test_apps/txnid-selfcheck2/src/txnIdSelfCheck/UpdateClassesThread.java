@@ -130,6 +130,7 @@ public class UpdateClassesThread extends BenchmarkThread {
                     if (!     (cr.getStatusString().equals("Can't do catalog update(@UpdateClasses) while another elastic join, rejoin or catalog update is active")
                             || cr.getStatusString().equals("Invalid catalog update(@UpdateClasses) request: Can't run catalog update(@UpdateClasses) when another one is in progress")
                             || cr.getStatusString().equals("Transaction dropped due to change in mastership. It is possible the transaction was committed")
+                            || cr.getStatusString().equals("Server is shutting down.")
                         ))
                         hardStop("UpdateClasses Proc failed gracefully", e);
                     else
