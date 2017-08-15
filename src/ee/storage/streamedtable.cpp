@@ -37,7 +37,7 @@
 
 using namespace voltdb;
 
-StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn)
+StreamedTable::StreamedTable(int partitionColumn)
     : Table(1)
     , m_stats(this)
     , m_executorContext(ExecutorContext::getExecutorContext())
@@ -45,44 +45,28 @@ StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn)
     , m_sequenceNo(0)
     , m_partitionColumn(partitionColumn)
 {
-    // In StreamedTable, a non-null m_wrapper implies export enabled.
-//    if (exportEnabled) {
-//        enableStream();
-//    }
 }
 
-StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
+StreamedTable::StreamedTable(ExportTupleStream *wrapper, int partitionColumn)
     : Table(1)
     , m_stats(this)
     , m_executorContext(ExecutorContext::getExecutorContext())
     , m_wrapper(wrapper)
     , m_sequenceNo(0)
-    , m_partitionColumn(-1)
+    , m_partitionColumn(partitionColumn)
 {
-    // In StreamedTable, a non-null m_wrapper implies export enabled.
-//    if (exportEnabled) {
-//        enableStream();
-//    }
 }
 
 StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::vector<std::string> & columnNames) {
-    StreamedTable * st = new StreamedTable(true);
+    ExportTupleStream *wrapper = new ExportTupleStream(ctx->m_partitionId,
+                                           ctx->m_siteId, 0, "sign");
+    StreamedTable * st = new StreamedTable(wrapper);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
     st->m_wrapper->setDefaultCapacity(wrapperBufSize);
     return st;
 }
-
-////This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
-//bool StreamedTable::enableStream() {
-//    if (!m_wrapper) {
-//        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-//                                           m_executorContext->m_siteId);
-//        return true;
-//    }
-//    return false;
-//}
 
 /*
  * claim ownership of a view. table is responsible for this view*
