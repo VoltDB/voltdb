@@ -164,7 +164,7 @@ namespace voltdb {
     }
 
     void DummyTopend::resizeUDFBuffer(int32_t size) {
-        // Do nothing here.
+        // We do nothing here.
     }
 
 } // end namespace voltdb
