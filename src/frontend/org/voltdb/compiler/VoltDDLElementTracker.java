@@ -154,13 +154,14 @@ public class VoltDDLElementTracker {
         for (String functionName : m_droppedFunctions) {
             FunctionForVoltDB.dropDisabledFunctions();
         }
+        m_droppedFunctions.clear();
     }
 
     public void reRegisterAllDroppedFunctions() {
         for (String functionName : m_droppedFunctions) {
             FunctionForVoltDB.reRegisterUserDefinedFunction(functionName);
         }
-
+        m_droppedFunctions.clear();
     }
 
     /**

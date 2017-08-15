@@ -26,6 +26,7 @@ import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
@@ -44,6 +45,7 @@ import org.voltdb.types.TimestampType;
  * Process CREATE FUNCTION <function-name> FROM METHOD <class-name>.<method-name>
  */
 public class CreateFunctionFromMethod extends StatementProcessor {
+    private static VoltLogger m_logger = new VoltLogger("UDF");
 
     static int ID_NOT_DEFINED = -1;
     static Set<Class<?>> m_allowedDataTypes = new HashSet<>();
@@ -217,7 +219,9 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         // We still have to register this with HSQLDB, because we will want
         // to use in in subsequent DDL statements.
         //
+        m_logger.debug("CreateFunction: " + functionName);
         FunctionForVoltDB.registerTokenForUDF(functionName, functionId, returnTypeClass, paramTypeClasses);
+        m_logger.debug("End CreateFunction: " + functionName);
         return true;
     }
 }

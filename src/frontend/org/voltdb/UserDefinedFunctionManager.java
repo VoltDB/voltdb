@@ -150,9 +150,10 @@ public class UserDefinedFunctionManager {
                 m_boxUpByteArray[i] = paramTypeClasses[i] == Byte[].class;
             }
             m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
-
+            /*
             FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId,
                                                   m_functionMethod.getReturnType(), paramTypeClasses);
+            */
         }
 
         // We should refactor those functions into SerializationHelper

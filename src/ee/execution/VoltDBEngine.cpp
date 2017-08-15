@@ -762,6 +762,13 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp) {
             catalog::Function* catalogFunction =
                     static_cast<catalog::Function*>(m_catalog->itemForRef(path));
             if (catalogFunction != NULL) {
+#ifdef          VOLT_DEBUG_ENABLED
+                    VOLT_DEBUG("UDFCAT: Deleting function is %d", catalogFunction->functionId());
+                    auto fnc = m_functionInfo.find(catalogFunction->functionId());
+                    if (fnc == m_functionInfo.end()) {
+                        VOLT_DEBUG("UDFCAT:    It is not there.");
+                    }
+#endif
                 delete m_functionInfo[catalogFunction->functionId()];
                 m_functionInfo.erase(catalogFunction->functionId());
             }
@@ -1173,6 +1180,13 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
             int key = std::stoi(iter->first);
             info->paramTypes[key] = (ValueType)iter->second->parameterType();
         }
+        VOLT_DEBUG("UDFCAT: Adding function id %d", catalogFunction->functionId());
+#ifdef  VOLT_DEBUG_ENABLED
+        auto fnc = m_functionInfo.find(catalogFunction->functionId());
+        if (fnc != m_functionInfo.end()) {
+            VOLT_DEBUG("UDFCAT:    It is already there!!");
+        }
+#endif
         m_functionInfo[catalogFunction->functionId()] = info;
     }
 

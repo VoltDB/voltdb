@@ -882,7 +882,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
         FunctionId.dropped_UDFs.clear();
         FunctionId.userDefinedFunctions.clear();
-        m_udfSeqId = FunctionId.FUNC_VOLT_UDF_ID_START;
+        // m_udfSeqId = FunctionId.FUNC_VOLT_UDF_ID_START;
     }
 
     /**
@@ -891,10 +891,10 @@ public class FunctionForVoltDB extends FunctionSQL {
      */
     public static void deregisterUserDefinedFunction(String functionName, boolean justDisable) {
     	FunctionId dfn = FunctionId.by_LC_name.get(functionName);
+    	FunctionId.userDefinedFunctions.remove(functionName);
     	if (justDisable && (dfn != null)) {
     		FunctionId.by_LC_name.remove(functionName);
     		FunctionId.dropped_UDFs.put(functionName, dfn);
-    		FunctionId.userDefinedFunctions.remove(functionName);
     	}
     }
 
