@@ -818,15 +818,17 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
             if (streamedtable) {
                 streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 m_exportingTables[catalogTable->signature()] = streamedtable;
-                ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
-                if (!wrapper) {
-                    wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
-                    m_exportingStreams[catalogTable->signature()] = wrapper;
-                } else {
-                    //Undelete them.
-                    m_exportingDeletedStreams[catalogTable->signature()] = NULL;
+                if (tcd->exportEnabled()) {
+                    ExportTupleStream *wrapper = m_exportingStreams[catalogTable->signature()];
+                    if (!wrapper) {
+                        wrapper = new ExportTupleStream(m_executorContext->m_partitionId, m_executorContext->m_siteId, timestamp, catalogTable->signature());
+                        m_exportingStreams[catalogTable->signature()] = wrapper;
+                    } else {
+                        //Undelete them.
+                        m_exportingDeletedStreams[catalogTable->signature()] = NULL;
+                    }
+                    streamedtable->setWrapper(wrapper);
                 }
-                streamedtable->setWrapper(wrapper);
 
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
                 std::vector<MaterializedViewTriggerForStreamInsert*> survivingViews;
