@@ -40,11 +40,11 @@ public class TestSplitSQLStatements {
     public void setUp() throws Exception {
     }
 
-    private void checkSplitter(final String strIn, final String... strsCmp) {
-        final List<String> strsOut = SQLLexer.splitStatements(strIn).getCompletelyParsedStmts();
-        assertEquals(strsCmp.length, strsOut.size());
-        for (int i = 0; i < strsCmp.length; ++i) {
-            assertEquals(strsCmp[i], strsOut.get(i));
+    private void checkSplitter(final String inputStmts, final String... expectedStmts) {
+        final List<String> strsOut = SQLLexer.splitStatements(inputStmts).getCompletelyParsedStmts();
+        assertEquals(expectedStmts.length, strsOut.size());
+        for (int i = 0; i < expectedStmts.length; ++i) {
+            assertEquals(expectedStmts[i], strsOut.get(i));
         }
     }
 
@@ -285,16 +285,20 @@ public class TestSplitSQLStatements {
     @Test
     public void testProcSQLSplitWithComments() {
 
-        String sql = "create procedure thisproc as "
+        String sql = "-- preceding comment\n"
+                  + "create procedure thisproc as "
                   + "begin --one\n"
                   + "select * from t;"
-                  + "select * from r where f = 'foo';"
+                  + "select * from r where f = 'foo';\n"
+                  + "-- mid-statement comment\n"
                   + "select * from r where f = 'begin' or f = 'END';"
-                  + "end;";
+                  + "end;\n"
+                  + "-- trailing comment\n";
         String expected = "create procedure thisproc as "
                     + "begin \n"
                     + "select * from t;"
-                    + "select * from r where f = 'foo';"
+                    + "select * from r where f = 'foo';\n"
+                    + "\n"
                     + "select * from r where f = 'begin' or f = 'END';"
                     + "end";
         checkSplitter(sql, expected);
