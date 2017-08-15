@@ -11,6 +11,7 @@ const data = new Array(10).fill(0).reduce((prev, curr) => [...prev, {
 }], [{ x: 0, y: 10 }])
 
 // Root element
+// TODO: setup routing ?
 class App extends Component {
 
   constructor(props) {

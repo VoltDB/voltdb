@@ -66,6 +66,10 @@ class Pages extends Component {
 
           {/* The avg waiting time chart */}
           <Section color="#E0E4CC">
+            <div className='chart-1-title'>
+              <p>Average Waiting Time</p>
+              <p>per Station</p>
+            </div>
             <div className='chart-2-container'>
               <AvgWaitsChart avgWaits={this.props.avgWaits} />
             </div>
