@@ -26,6 +26,7 @@ DROP FUNCTION add2VarbinaryBoxed  IF EXISTS;
 DROP FUNCTION addYearsToTimestamp IF EXISTS;
 DROP FUNCTION add2GeographyPoint  IF EXISTS;
 DROP FUNCTION addGeographyPointToGeography IF EXISTS;
+DROP FUNCTION getByteArrayOfSize IF EXISTS;
 
 DROP FUNCTION add2TinyintWithoutNullCheck  IF EXISTS;
 DROP FUNCTION add2SmallintWithoutNullCheck IF EXISTS;
@@ -93,6 +94,7 @@ CREATE FUNCTION add2VarbinaryBoxed   FROM METHOD org.voltdb_testfuncs.UserDefine
 CREATE FUNCTION addYearsToTimestamp  FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addYearsToTimestamp;
 CREATE FUNCTION add2GeographyPoint   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
 CREATE FUNCTION addGeographyPointToGeography FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography;
+CREATE FUNCTION getByteArrayOfSize   FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.getByteArrayOfSize;
 
 -- Create the 'add...WithoutNullCheck' test UDF's, which are just like (some of)
 -- the ones above (they throw all kinds of exceptions, and return various flavors

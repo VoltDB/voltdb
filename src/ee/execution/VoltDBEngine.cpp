@@ -599,11 +599,13 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
     assert(bufferSizeNeeded + sizeof(int32_t) == m_udfOutput.position());
 
-    ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
     // callJavaUserDefinedFunction() will inform the Java end to execute the
     // Java user-defined function according to the function Id and the parameters
     // stored in the shared buffer. It will return 0 if the execution is successful.
-    if (m_topend->callJavaUserDefinedFunction() == 0) {
+    int32_t UDFSucceeded = m_topend->callJavaUserDefinedFunction();
+    // Note that the buffer may already be resized after the execution.
+    ReferenceSerializeInputBE udfResultIn(m_udfBuffer, m_udfBufferCapacity);
+    if (UDFSucceeded == 0) {
         // After the the invocation, read the return value from the buffer.
         NValue retval = ValueFactory::getNValueOfType(info->returnType);
         retval.deserializeFromAllocateForStorage(udfResultIn, &m_stringPool);

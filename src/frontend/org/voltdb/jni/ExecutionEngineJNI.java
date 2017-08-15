@@ -741,13 +741,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     public void resizeUDFBuffer(int size) {
-        m_udfBuffer.clear();
         // Read the size which we want to change to.
         assert(m_udfBuffer != null);
         if (size > m_udfBuffer.capacity()) {
             setupUDFBuffer(size);
             updateEEBufferPointers();
         }
+        m_udfBuffer.clear();
     }
 
     public int callJavaUserDefinedFunction() {
@@ -761,8 +761,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         try {
             // Call the user-defined function.
             returnValue = udfRunner.call(m_udfBuffer);
-            // Write the result to the shared buffer.
-            m_udfBuffer.clear();
 
             VoltType returnType = udfRunner.getReturnType();
             // If the function we are running returns variable-length return value,
@@ -795,6 +793,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 // then take action if needed.
                 resizeUDFBuffer(sizeRequired);
             }
+            // Write the result to the shared buffer.
+            m_udfBuffer.clear();
             UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
             // Return zero status code for a successful execution.
             return 0;
@@ -809,9 +809,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
         // Getting here means the execution was not successful.
         try {
-            m_udfBuffer.clear();
             if (throwable != null) {
                 byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+                // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+                // But you never know.
+                // Again, the comparison happens inside the resizeUDFBuffer() function.
+                // No action will be taken if the buffer resizing is unnecessary.
+                resizeUDFBuffer(errorMsg.length + 4);
                 SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
             }
         }
