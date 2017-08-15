@@ -785,6 +785,12 @@ public abstract class Type implements SchemaObject, Cloneable {
             case Types.OTHER :
                 return OTHER;
 
+            case Types.VOLT_GEOGRAPHY :
+                return VOLT_GEOGRAPHY;
+
+            case Types.VOLT_GEOGRAPHY_POINT :
+                return VOLT_GEOGRAPHY_POINT;
+
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Type");
         }

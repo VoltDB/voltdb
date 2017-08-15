@@ -47,8 +47,11 @@ public class UpdateBaseProc extends VoltProcedure {
     public final SQLStmt p_insert = new SQLStmt(
             "INSERT INTO partitioned (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
+    public final SQLStmt p_update = new SQLStmt(
+            "UPDATE partitioned set txnid=?, prevtxnid=?, ts=?, cidallhash=?, rid=?, cnt=add2Bigint(cnt,1), adhocinc=?, adhocjmp=?, value=identityVarbin(value) where cid=? and rid=?");
+
     public final SQLStmt p_export = new SQLStmt(
-            "INSERT INTO partitioned_export (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO partitioned_export (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, add2Bigint(?,1), ?, ?, ?);");
 
     public final SQLStmt p_getViewData = new SQLStmt(
             "SELECT * FROM partview WHERE cid=? ORDER BY cid DESC;");
@@ -81,7 +84,7 @@ public class UpdateBaseProc extends VoltProcedure {
         return 0; // never called in base procedure
     }
 
-    protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt export, SQLStmt getAdHocData, SQLStmt getViewData,
+    protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt update, SQLStmt export, SQLStmt getAdHocData, SQLStmt getViewData,
             byte cid, long rid, byte[] value, byte shouldRollback, boolean usestreamviews)
     {
         voltQueueSQL(getCIDData, cid);
@@ -99,6 +102,7 @@ public class UpdateBaseProc extends VoltProcedure {
         long prevtxnid = 0;
         long prevrid = 0;
         long cnt = 0;
+        long prevcnt = 0;
 
         // read data modified by AdHocMayhemThread for later insertion
         final long adhocInc = adhoc.getRowCount() > 0 ? adhoc.fetchRow(0).getLong("inc") : 0;
@@ -112,6 +116,7 @@ public class UpdateBaseProc extends VoltProcedure {
         int rowCount = data.getRowCount();
         if (rowCount != 0) {
             VoltTableRow row = data.fetchRow(0);
+            prevcnt = row.getLong("cnt");
             cnt = row.getLong("cnt") + 1;
             prevtxnid = row.getLong("txnid");
             prevrid = row.getLong("rid");
@@ -127,8 +132,10 @@ public class UpdateBaseProc extends VoltProcedure {
                     " for cid " + cid);
         }
 
-        voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
-        voltQueueSQL(export, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
+        voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, prevcnt, adhocInc, adhocJmp, value);
+        if (rowCount > 0)
+            voltQueueSQL(update, txnid, prevtxnid, ts, cidallhash, rid, adhocInc, adhocJmp, cid, rid);
+        voltQueueSQL(export, txnid, prevtxnid, ts, cid, cidallhash, rid, prevcnt, adhocInc, adhocJmp, value);
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
         voltQueueSQL(getViewData, cid);
@@ -137,8 +144,8 @@ public class UpdateBaseProc extends VoltProcedure {
         // Is this comment below now obsolete and can be removed?
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occurring.
-        data = retval[3];
-        view = retval[4];
+        data = retval[retval.length-2];
+        view = retval[retval.length-1];
 
         VoltTableRow row = data.fetchRow(0);
         if (row.getVarbinary("value").length == 0)

@@ -76,7 +76,6 @@ public class UserDefinedTestFunctions {
         case "class java.lang.Integer":     return VoltType.NULL_INTEGER;   // the INTEGER (int) null value (-2147483648)
         case "class java.lang.Long":        return VoltType.NULL_BIGINT;    // the BIGINT (long) null value (-9223372036854775808L)
         case "class java.lang.Double":      return VoltType.NULL_FLOAT;     // the FLOAT (double) null value (-1.7E+308D)
-        case "class java.math.BigDecimal":  return new BigDecimal("-100000000000000000000000000");  // a DECIMAL (BigDecimal) null value
         default:                            return null;
         }
     }
@@ -89,19 +88,18 @@ public class UserDefinedTestFunctions {
         public static final int RETURN_INTEGER_NULL   = -104;
         public static final int RETURN_BIGINT_NULL    = -105;
         public static final int RETURN_FLOAT_NULL     = -106;
-        public static final int RETURN_DECIMAL_NULL   = -107;
-        public static final int RETURN_DECIMAL_MIN    = -108;
-        public static final int RETURN_DECIMAL_MAX    = -109;
-        public static final int RETURN_NaN            = -110;
-        public static final int THROW_NullPointerException           = -111;
-        public static final int THROW_IllegalArgumentException       = -112;
-        public static final int THROW_NumberFormatException          = -113;
-        public static final int THROW_ArrayIndexOutOfBoundsException = -114;
-        public static final int THROW_ClassCastException             = -115;
-        public static final int THROW_ArithmeticException            = -116;
-        public static final int THROW_UnsupportedOperationException  = -117;
-        public static final int THROW_VoltTypeException              = -118;
-        public static final int THROW_UserDefinedTestException       = -119;
+        public static final int RETURN_DECIMAL_MIN    = -107;
+        public static final int RETURN_DECIMAL_MAX    = -108;
+        public static final int RETURN_NaN            = -109;
+        public static final int THROW_NullPointerException           = -110;
+        public static final int THROW_IllegalArgumentException       = -111;
+        public static final int THROW_NumberFormatException          = -112;
+        public static final int THROW_ArrayIndexOutOfBoundsException = -113;
+        public static final int THROW_ClassCastException             = -114;
+        public static final int THROW_ArithmeticException            = -115;
+        public static final int THROW_UnsupportedOperationException  = -116;
+        public static final int THROW_VoltTypeException              = -117;
+        public static final int THROW_UserDefinedTestException       = -118;
     }
 
     /** Usually just returns the input value; but certain special input values
@@ -133,7 +131,6 @@ public class UserDefinedTestFunctions {
         case UDF_TEST.RETURN_INTEGER_NULL:      return VoltType.NULL_INTEGER;   // the INTEGER (int) null value (-2147483648)
         case UDF_TEST.RETURN_BIGINT_NULL:       return VoltType.NULL_BIGINT;    // the BIGINT (long) null value (-9223372036854775808L)
         case UDF_TEST.RETURN_FLOAT_NULL:        return VoltType.NULL_FLOAT;     // the FLOAT (double) null value (-1.7E+308D)
-        case UDF_TEST.RETURN_DECIMAL_NULL:      return new BigDecimal("-100000000000000000000000000");  // a DECIMAL (BigDecimal) null value
         case UDF_TEST.RETURN_DECIMAL_MIN:       return new BigDecimal("-99999999999999999999999999.999999999999");  // the DECIMAL (BigDecimal) minimum value
         case UDF_TEST.RETURN_DECIMAL_MAX:       return new BigDecimal( "99999999999999999999999999.999999999999");  // the DECIMAL (BigDecimal) maximum value
         case UDF_TEST.RETURN_NaN:               return Math.log(value.doubleValue());   // Return NaN
@@ -202,10 +199,19 @@ public class UserDefinedTestFunctions {
 
     /** Usually just returns the input value; but certain special input values
      *  (generally between -100 and -120) trigger an exception to be thrown,
+     *  or special VoltDB "null" values to be returned. When <i>useTrueNullValue</i>
+     *  is true, and the special input value -100 is given, a true Java <b>null</b>
+     *  is returned. */
+    private Double testExceptions(Double value, boolean useTrueNullValue) {
+        Number result = testExceptionsByValue(value, useTrueNullValue);
+        return (result == null ? null : result.doubleValue());
+    }
+
+    /** Usually just returns the input value; but certain special input values
+     *  (generally between -100 and -120) trigger an exception to be thrown,
      *  or special VoltDB "null" values to be returned. */
     private Double testExceptions(Double value) {
-        Number result = testExceptionsByValue(value);
-        return (result == null ? null : result.doubleValue());
+        return testExceptions(value, false);
     }
 
     /** Usually just returns the input value; but certain special input values
@@ -250,7 +256,12 @@ public class UserDefinedTestFunctions {
         }
         byte[] result = new byte[value.length];
         for (int i=0; i < value.length; i++) {
-            result[i] = testExceptions(value[i]);
+            Byte test_i = testExceptions(value[i], true);
+            if (test_i == null) {
+                return null;
+            } else {
+                result[i] = test_i;
+            }
         }
         return result;
     }
@@ -266,7 +277,7 @@ public class UserDefinedTestFunctions {
         }
         Byte[] result = new Byte[value.length];
         for (int i=0; i < value.length; i++) {
-            Byte test_i = testExceptions(value[i]);
+            Byte test_i = testExceptions(value[i], true);
             if (test_i == null) {
                 return null;
             } else {
@@ -312,8 +323,8 @@ public class UserDefinedTestFunctions {
         }
         // We don't bother to "test" Latitude, because it must be between -90
         // and 90, so it cannot have any of the "interesting" values, such as
-        // -101, -102, etc.
-        Double longitude = testExceptions(value.getLongitude());
+        // -100, -101, etc.
+        Double longitude = testExceptions(value.getLongitude(), true);
         return (longitude == null ? null : new GeographyPointValue(Math.min(180, Math.max(-180, longitude)), value.getLatitude() ) );
     }
 
@@ -333,7 +344,7 @@ public class UserDefinedTestFunctions {
         for (int i=0; i < rings.size(); i++) {
             List<GeographyPointValue> ring = rings.get(i);
             for (int j=0; j < ring.size(); j++) {
-                if (testExceptions(ring.get(j).getLongitude()) == null) {
+                if (testExceptions(ring.get(j).getLongitude(), true) == null) {
                     return null;
                 }
             }
@@ -370,6 +381,9 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public byte add2Tinyint(byte i, byte j) {
+        if (i == VoltType.NULL_TINYINT || j == VoltType.NULL_TINYINT) {
+            return VoltType.NULL_TINYINT;
+        }
         return (byte) (testExceptions(i) + testExceptions(j));
     }
 
@@ -380,7 +394,8 @@ public class UserDefinedTestFunctions {
     public Byte add2TinyintBoxed(Byte i, Byte j) {
         Byte test_i = testExceptions(i);
         Byte test_j = testExceptions(j);
-        if (test_i == null || test_j == null) {
+        if (test_i == null || test_j == null || test_i.equals(VoltType.NULL_TINYINT)
+                || test_j.equals(VoltType.NULL_TINYINT)) {
             return null;
         }
         return (byte) (test_i + test_j);
@@ -391,6 +406,9 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public short add2Smallint(short i, short j) {
+        if (i == VoltType.NULL_SMALLINT || j == VoltType.NULL_SMALLINT) {
+            return VoltType.NULL_SMALLINT;
+        }
         return (short) (testExceptions(i) + testExceptions(j));
     }
 
@@ -401,7 +419,8 @@ public class UserDefinedTestFunctions {
     public Short add2SmallintBoxed(Short i, Short j) {
         Short test_i = testExceptions(i);
         Short test_j = testExceptions(j);
-        if (test_i == null || test_j == null) {
+        if (test_i == null || test_j == null || test_i.equals(VoltType.NULL_SMALLINT)
+                || test_j.equals(VoltType.NULL_SMALLINT)) {
             return null;
         }
         return (short) (test_i + test_j);
@@ -412,6 +431,9 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public int add2Integer(int i, int j) {
+        if (i == VoltType.NULL_INTEGER || j == VoltType.NULL_INTEGER) {
+            return VoltType.NULL_INTEGER;
+        }
         return testExceptions(i) + testExceptions(j);
     }
 
@@ -422,7 +444,8 @@ public class UserDefinedTestFunctions {
     public Integer add2IntegerBoxed(Integer i, Integer j) {
         Integer test_i = testExceptions(i);
         Integer test_j = testExceptions(j);
-        if (test_i == null || test_j == null) {
+        if (test_i == null || test_j == null || test_i.equals(VoltType.NULL_INTEGER)
+                || test_j.equals(VoltType.NULL_INTEGER)) {
             return null;
         }
         return test_i + test_j;
@@ -433,6 +456,9 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public long add2Bigint(long i, long j) {
+        if (i == VoltType.NULL_BIGINT || j == VoltType.NULL_BIGINT) {
+            return VoltType.NULL_BIGINT;
+        }
         return testExceptions(i) + testExceptions(j);
     }
 
@@ -443,7 +469,8 @@ public class UserDefinedTestFunctions {
     public Long add2BigintBoxed(Long i, Long j) {
         Long test_i = testExceptions(i);
         Long test_j = testExceptions(j);
-        if (test_i == null || test_j == null) {
+        if (test_i == null || test_j == null || test_i.equals(VoltType.NULL_BIGINT)
+                || test_j.equals(VoltType.NULL_BIGINT)) {
             return null;
         }
         return test_i + test_j;
@@ -454,6 +481,9 @@ public class UserDefinedTestFunctions {
      *  values (generally between -100 and -120) trigger an exception to be
      *  thrown, or special VoltDB "null" values to be used. */
     public double add2Float(double x, double y) {
+        if (x <= VoltType.NULL_FLOAT || y <= VoltType.NULL_FLOAT) {
+            return VoltType.NULL_FLOAT;
+        }
         return testExceptions(x) + testExceptions(y);
     }
 
@@ -464,7 +494,8 @@ public class UserDefinedTestFunctions {
     public Double add2FloatBoxed(Double x, Double y) {
         Double test_x = testExceptions(x);
         Double test_y = testExceptions(y);
-        if (test_x == null || test_y == null) {
+        if (test_x == null || test_y == null || test_x <= VoltType.NULL_FLOAT
+                || test_y <= VoltType.NULL_FLOAT) {
             return null;
         }
         return test_x + test_y;
@@ -565,8 +596,8 @@ public class UserDefinedTestFunctions {
         // We don't bother to "test" Latitude, because it must be between -90
         // and 90, so it cannot have any of the "interesting" values, such as
         // -101, -102, etc.
-        Double p_long = testExceptions(p.getLongitude());
-        Double q_long = testExceptions(q.getLongitude());
+        Double p_long = testExceptions(p.getLongitude(), true);
+        Double q_long = testExceptions(q.getLongitude(), true);
         if (p_long == null || q_long == null) {
             return null;
         }
@@ -580,14 +611,97 @@ public class UserDefinedTestFunctions {
      *  between -100 and -120) trigger an exception to be thrown, or special
      *  VoltDB "null" values to be used. */
     public GeographyValue addGeographyPointToGeography(GeographyValue g, GeographyPointValue p) {
-        if (g == null || p == null) {
-            return null;
-        }
         GeographyValue g2 = testExceptions(g);
-        if (g2 == null) {
+        if (g2 == null || p == null) {
             return null;
         }
         return g2.add(p);
+    }
+
+
+    // Test UDF's (user-defined functions) that are similar to (some of) the
+    // above UDF's, but without null checking, so slightly odd things can happen,
+    // such as null plus one equals a number
+
+    /** Simple test UDF (user-defined function) that adds two TINYINT
+     *  (primitive, or unboxed, byte) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public byte add2TinyintWithoutNullCheck(byte i, byte j) {
+        return (byte) (testExceptions(i) + testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two TINYINT
+     *  (boxed Byte) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Byte add2TinyintBoxedWithoutNullCheck(Byte i, Byte j) {
+        return (byte) (testExceptions(i) + testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two SMALLINT
+     *  (primitive, or unboxed, short) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public short add2SmallintWithoutNullCheck(short i, short j) {
+        return (short) (testExceptions(i) + testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two SMALLINT
+     *  (boxed Short) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Short add2SmallintBoxedWithoutNullCheck(Short i, Short j) {
+        return (short) (testExceptions(i) + testExceptions(j));
+    }
+    /** Simple test UDF (user-defined function) that adds two INTEGER
+     *  (primitive, or unboxed, int) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public int add2IntegerWithoutNullCheck(int i, int j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two INTEGER
+     *  (boxed Integer) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Integer add2IntegerBoxedWithoutNullCheck(Integer i, Integer j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two BIGINT
+     *  (primitive, or unboxed, long) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public long add2BigintWithoutNullCheck(long i, long j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two BIGINT
+     *  (boxed Long) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Long add2BigintBoxedWithoutNullCheck(Long i, Long j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two FLOAT
+     *  (primitive, or unboxed, double) values; except, certain special input
+     *  values (generally between -100 and -120) trigger an exception to be
+     *  thrown, or special VoltDB "null" values to be used; but this version
+     *  has no null checking. */
+    public double add2FloatWithoutNullCheck(double i, double j) {
+        return testExceptions(i) + testExceptions(j);
+    }
+    /** Simple test UDF (user-defined function) that adds two FLOAT
+     *  (boxed Double) values; except, certain special input values (generally
+     *  between -100 and -120) trigger an exception to be thrown, or special
+     *  VoltDB "null" values to be used; but this version has no null
+     *  checking. */
+    public Double add2FloatBoxedWithoutNullCheck(Double i, Double j) {
+        return testExceptions(i) + testExceptions(j);
     }
 
 
@@ -610,12 +724,15 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public byte absTinyint(byte i) {
+        if (i == VoltType.NULL_TINYINT) {
+            return VoltType.NULL_TINYINT;
+        }
         return (byte) Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Byte absTinyintBoxed(Byte i) {
-        if (i == null) {
+        if (i == null || i.equals(VoltType.NULL_TINYINT)) {
             return null;
         }
         return (Byte) (byte) Math.abs(i);
@@ -623,12 +740,15 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public short absSmallint(short i) {
+        if (i == VoltType.NULL_SMALLINT) {
+            return VoltType.NULL_SMALLINT;
+        }
         return (short) Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Short absSmallintBoxed(Short i) {
-        if (i == null) {
+        if (i == null || i.equals(VoltType.NULL_SMALLINT)) {
             return null;
         }
         return (Short) (short) Math.abs(i);
@@ -636,12 +756,15 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public int absInteger(int i) {
+        if (i == VoltType.NULL_INTEGER) {
+            return VoltType.NULL_INTEGER;
+        }
         return Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Integer absIntegerBoxed(Integer i) {
-        if (i == null) {
+        if (i == null || i.equals(VoltType.NULL_INTEGER)) {
             return null;
         }
         return Math.abs(i);
@@ -649,12 +772,15 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public long absBigint(long i) {
+        if (i == VoltType.NULL_BIGINT) {
+            return VoltType.NULL_BIGINT;
+        }
         return Math.abs(i);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Long absBigintBoxed(Long i) {
-        if (i == null) {
+        if (i == null || i.equals(VoltType.NULL_BIGINT)) {
             return null;
         }
         return Math.abs(i);
@@ -662,12 +788,15 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public double absFloat(double x) {
+        if (x <= VoltType.NULL_FLOAT) {
+            return VoltType.NULL_FLOAT;
+        }
         return Math.abs(x);
     }
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public Double absFloatBoxed(Double x) {
-        if (x == null) {
+        if (x == null || x <= VoltType.NULL_FLOAT) {
             return null;
         }
         return Math.abs(x);
@@ -675,6 +804,9 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the absolute
      *  value of the input value. */
     public BigDecimal absDecimal(BigDecimal x) {
+        if (x == null) {
+            return null;
+        }
         return x.abs();
     }
 
@@ -723,12 +855,16 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public byte modTinyint(byte i, byte j) {
+        if (i == VoltType.NULL_TINYINT || j == VoltType.NULL_TINYINT) {
+            return VoltType.NULL_TINYINT;
+        }
         return (byte) (i % j);
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Byte modTinyintBoxed(Byte i, Byte j) {
-        if (i == null || j == null) {
+        if (i == null || j == null || i.equals(VoltType.NULL_TINYINT)
+                || j.equals(VoltType.NULL_TINYINT)) {
             return null;
         }
         return (Byte) (byte) (i % j);
@@ -736,12 +872,16 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public short modSmallint(short i, short j) {
+        if (i == VoltType.NULL_SMALLINT || j == VoltType.NULL_SMALLINT) {
+            return VoltType.NULL_SMALLINT;
+        }
         return (short) (i % j);
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Short modSmallintBoxed(Short i, Short j) {
-        if (i == null || j == null) {
+        if (i == null || j == null || i.equals(VoltType.NULL_SMALLINT)
+                || j.equals(VoltType.NULL_SMALLINT)) {
             return null;
         }
         return (Short) (short) (i % j);
@@ -749,12 +889,16 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public int modInteger(int i, int j) {
+        if (i == VoltType.NULL_INTEGER || j == VoltType.NULL_INTEGER) {
+            return VoltType.NULL_INTEGER;
+        }
         return i % j;
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Integer modIntegerBoxed(Integer i, Integer j) {
-        if (i == null || j == null) {
+        if (i == null || j == null || i.equals(VoltType.NULL_INTEGER)
+                || j.equals(VoltType.NULL_INTEGER)) {
             return null;
         }
         return i % j;
@@ -762,12 +906,16 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public long modBigint(long i, long j) {
+        if (i == VoltType.NULL_BIGINT || j == VoltType.NULL_BIGINT) {
+            return VoltType.NULL_BIGINT;
+        }
         return i % j;
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Long modBigintBoxed(Long i, Long j) {
-        if (i == null || j == null) {
+        if (i == null || j == null || i.equals(VoltType.NULL_BIGINT)
+                || j.equals(VoltType.NULL_BIGINT)) {
             return null;
         }
         return i % j;
@@ -775,12 +923,16 @@ public class UserDefinedTestFunctions {
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public double modFloat(double x, double y) {
+        if (x <= VoltType.NULL_FLOAT || y <= VoltType.NULL_FLOAT) {
+            return VoltType.NULL_FLOAT;
+        }
         return x % y;
     }
     /** Simple test UDF (user-defined function) that just returns the mod
      *  (remainder) of the input values. */
     public Double modFloatBoxed(Double x, Double y) {
-        if (x == null || y == null) {
+        if (x == null || y == null || x <= VoltType.NULL_BIGINT
+                || y <= VoltType.NULL_BIGINT) {
             return null;
         }
         return x % y;

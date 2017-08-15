@@ -28,7 +28,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 package org.hsqldb_voltpatches;
 
 import java.sql.Timestamp;
@@ -37,7 +36,6 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.hsqldb_voltpatches.types.Type;
-
 
 
 /**
@@ -95,6 +93,8 @@ public class FunctionForVoltDB extends FunctionSQL {
             m_paramParseList = paramParseList;
             m_paramParseListAlt = paramParseListAlt;
         }
+
+        static final int FUNC_VOLT_ID_NOT_DEFINED               = -1;
 
         // These ID numbers need to be unique values for FunctionSQL.functType.
         // Assume that 1-19999 are reserved for existing HSQL functions.
@@ -423,18 +423,6 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         public int getTypeParameter() {
             return m_typeParameter;
-        }
-
-        private static int udfCount = 0;
-
-        static void addUserDefinedFunctionId(String functionName, Type returnType, Type[] parameterTypes, short[] syntax) {
-            FunctionId fid = by_LC_name.get(functionName);
-            if (fid == null) {
-                int seqId = udfCount + FUNC_VOLT_UDF_ID_START;
-                udfCount++;
-                fid = new FunctionId(functionName, returnType, seqId, -1, parameterTypes, syntax);
-                by_LC_name.put(functionName, fid);
-            }
         }
     }
 
@@ -790,7 +778,6 @@ public class FunctionForVoltDB extends FunctionSQL {
 
     @Override
     public String getSQL() {
-
         StringBuffer sb = new StringBuffer();
         sb.append(m_def.getName()).append(Tokens.T_OPENBRACKET);
 
@@ -826,7 +813,19 @@ public class FunctionForVoltDB extends FunctionSQL {
         return sb.toString();
     }
 
-    public static void registerUserDefinedFunction(String functionName, Class<?> returnTypeClass, Class<?>[] parameterTypeClasses) {
+    // This is the unique sequential UDF Id we assign to every UDF defined by the user.
+    private static int m_udfSeqId = FunctionId.FUNC_VOLT_UDF_ID_START;
+
+    public static int getNextFunctionId() {
+        return m_udfSeqId++;
+    }
+
+    public static void registerTokenForUDF(String functionName, int functionId,
+                                           Class<?> returnTypeClass, Class<?>[] parameterTypeClasses) {
+        // If the token is already registered in the map, do not bother again.
+        if (getFunctionId(functionName) != FunctionId.FUNC_VOLT_ID_NOT_DEFINED) {
+            return;
+        }
         Type returnType = Type.getDefaultTypeWithSize(Types.getParameterSQLTypeNumber(returnTypeClass));
         Type[] parameterTypes = new Type[parameterTypeClasses.length];
         for (int i = 0; i < parameterTypeClasses.length; i++) {
@@ -849,7 +848,15 @@ public class FunctionForVoltDB extends FunctionSQL {
             syntax[idx++] = Tokens.QUESTION;
         }
         syntax[syntax.length - 1] = Tokens.CLOSEBRACKET;
-        FunctionId.addUserDefinedFunctionId(functionName, returnType, parameterTypes, syntax);
+
+        FunctionId fid = new FunctionId(functionName, returnType, functionId, -1, parameterTypes, syntax);
+        FunctionId.by_LC_name.put(functionName, fid);
+
+        // If the udfSeqId is out of sync, sync it up so if the next CREATE FUNCTION DDL is executed
+        // on this node, we will not allocate the same function Id to multiple functions.
+        if (m_udfSeqId <= functionId) {
+            m_udfSeqId = functionId + 1;
+        }
     }
 
     public static void deregisterUserDefinedFunction(String functionName) {
@@ -859,7 +866,7 @@ public class FunctionForVoltDB extends FunctionSQL {
     public static int getFunctionId(String functionName) {
         FunctionId fid = FunctionId.fn_by_name(functionName);
         if (fid == null) {
-            return -1;
+            return FunctionId.FUNC_VOLT_ID_NOT_DEFINED;
         }
         return fid.getId();
     }

@@ -91,6 +91,14 @@ public class TestSqlCommandParserInteractive extends TestCase {
             return result;
         }
 
+        // we add a two spaces and character at the beginning of the prompt
+        // to indicate a multi-line statement definition is in progress
+        public boolean isContinuationPrompt() {
+            // get the prompt after the last statement
+            String lastPrompt = baos.toString().substring(baos.toString().lastIndexOf("\n") + 1);
+            return lastPrompt.startsWith("  ");
+        }
+
         public void close() throws Exception
         {
             pos.close();
@@ -182,18 +190,23 @@ public class TestSqlCommandParserInteractive extends TestCase {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
 
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText("--insert into goats values (0, 1); select * from goats;\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText(";\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());
         assertEquals(0, result.get().size());
 
         result = cmd.openQuery();
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText("insert into goats values (0, 1)");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        // a new prompt is obtained only after \n
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText("; --select * from goats;\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());
@@ -252,15 +265,19 @@ public class TestSqlCommandParserInteractive extends TestCase {
     {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
+        assertFalse(cmd.isContinuationPrompt());
         cmd.submitText("create table foo (\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        assertTrue(cmd.isContinuationPrompt());
         cmd.submitText("col1 integer,\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        assertTrue(cmd.isContinuationPrompt());
         cmd.submitText("col2 varchar(50) default ';'\n");
         Thread.sleep(100);
         assertFalse(result.isDone());
+        assertTrue(cmd.isContinuationPrompt());
         cmd.submitText(");\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());
@@ -286,6 +303,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
         CommandStuff cmd = new CommandStuff();
         for (int i = 0; i < alterStmts.length; ++i) {
             Future<List<String>> result = cmd.openQuery();
+            assertFalse(cmd.isContinuationPrompt());
             cmd.submitText(alterStmts[i] + ";\n");
             cmd.waitOnResult();
             System.out.println("RESULT: " + result.get());
@@ -310,6 +328,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
     {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
+        assertFalse(cmd.isContinuationPrompt());
         String create = "create view foo (col1, col2) as select col1, count(*) from foo group by col1";
         cmd.submitText(create + ";\n");
         cmd.waitOnResult();
@@ -319,6 +338,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
 
         // From ENG-6641
         result = cmd.openQuery();
+        assertFalse(cmd.isContinuationPrompt());
         create = "create view foo\n" +
                  "(\n" +
                  "C1\n" +
@@ -392,6 +412,87 @@ public class TestSqlCommandParserInteractive extends TestCase {
         assertEquals(create, result.get().get(0));
     }
 
+    public void testCreateMultiStmtProcedure() throws Exception
+    {
+        CommandStuff cmd = new CommandStuff();
+        Future<List<String>> result = cmd.openQuery();
+        cmd.submitText("create procedure pr as begin\n");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("select * from t;\n");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("insert into t values (1);\n");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("end;\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals("create procedure pr as begin\nselect * from t;\ninsert into t values (1);\nend",
+                result.get().get(0));
+
+        String sql = "create procedure thisproc as "
+        + "begin \n"
+        + "select * from r where f = 'begin' or f = 'END';"
+        + "select a, "
+        + "case when a > 100.00 then 'Expensive' else 'Cheap' end "
+        + "from t;"
+        + "end";
+        result = cmd.openQuery();
+        cmd.submitText("create procedure thisproc as begin \n");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("select * from r where f = 'begin' or f = 'END';");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("select a, case when a > 100.00 then 'Expensive' else 'Cheap' end ");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("from t;");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("end;\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(sql, result.get().get(0));
+
+        // case/end with no whitespace before and after it
+        sql = "create procedure thisproc as begin "
+                + "SELECT a, "
+                + "10+case when id < 0 then (id+0)end+100 from aaa;"
+                + "end";
+        result = cmd.openQuery();
+        cmd.submitText("create procedure thisproc as begin ");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("SELECT a, 10+case when id < 0 then (id+0)end+100 from aaa;");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("end;\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(sql, result.get().get(0));
+
+        sql = "create procedure mumble as begin "
+                + "select * from t order by case when t.a < 1 then asc else desc end; "
+                + "end";
+        result = cmd.openQuery();
+        cmd.submitText("create procedure mumble as begin ");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("select * from t order by case when t.a < 1 then asc else desc end; ");
+        Thread.sleep(100);
+        assertFalse(result.isDone());
+        cmd.submitText("end;\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(sql, result.get().get(0));
+    }
+
     public void testSubQuery() throws Exception
     {
         CommandStuff cmd = new CommandStuff();
@@ -440,15 +541,15 @@ public class TestSqlCommandParserInteractive extends TestCase {
 
         // double quoted identifiers with embedded semicolons
         // are yet not handled correctly---this test will fail
-        //
-        // result = cmd.openQuery();
-        // insert = "insert into hats (\"fo;o\", bar) " +
-        //     "( ( ( (((( (select goat, chicken from hats))))))))";
-        // cmd.submitText(insert + ";\n");
-        // cmd.waitOnResult();
-        // System.out.println("RESULT: " + result.get());
-        // assertEquals(1, result.get().size());
-        // assertEquals(insert, result.get().get(0));
+        // works from ENG-12846 multi stmt sp - changed parser
+         result = cmd.openQuery();
+         insert = "insert into hats (\"fo;o\", bar) " +
+             "( ( ( (((( (select goat, chicken from hats))))))))";
+         cmd.submitText(insert + ";\n");
+         cmd.waitOnResult();
+         System.out.println("RESULT: " + result.get());
+         assertEquals(1, result.get().size());
+         assertEquals(insert, result.get().get(0));
     }
 
     /**

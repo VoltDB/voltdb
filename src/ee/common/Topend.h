@@ -91,6 +91,12 @@ class Topend {
     /** Delete any data for the specified block that is stored on disk. */
     virtual bool releaseLargeTempTableBlock(int64_t blockId) = 0;
 
+    // Call into the Java top end to execute a user-defined function.
+    // The function Id for the function to be called and the parameter data is stored in a
+    // buffer shared by the top end and the EE.
+    // The VoltDBEngine will serialize them into the buffer before calling this function.
+    virtual int callJavaUserDefinedFunction() = 0;
+
     virtual ~Topend()
     {
     }
@@ -135,6 +141,8 @@ public:
     virtual bool loadLargeTempTableBlock(int64_t blockId, LargeTempTableBlock* block);
 
     virtual bool releaseLargeTempTableBlock(int64_t blockId);
+
+    int callJavaUserDefinedFunction();
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;
