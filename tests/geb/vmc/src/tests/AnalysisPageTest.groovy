@@ -128,14 +128,14 @@ class AnalysisPageTest extends TestBase {
         String execProcedureQuery = page.getQueryToExecuteProcedureQuery()
 
         when: 'Click SQL tab'
-        page.gotoSqlQuery()
+        page.openSqlQueryPage()
         then: 'at SQL page'
         at SqlQueryPage
 
         createExecuteTableAndProcedure(createQuery, createProcedureQuery, execProcedureQuery)
 
         when: 'Analysis tab is clicked'
-        page.gotoAnalysis()
+        page.openAnalysisPage()
         then: 'at Analysis Page'
         at AnalysisPage
 
@@ -172,7 +172,7 @@ class AnalysisPageTest extends TestBase {
         //deleted the created test talbes and procedures.
         String dropTableAndProcQuery = page.getQueryToDropTableAndProcedureQuery()
         when: 'Click SQL tab'
-        page.gotoSqlQuery()
+        page.openSqlQueryPage()
         then: 'at SQL page'
         at SqlQueryPage
 
@@ -233,13 +233,13 @@ class AnalysisPageTest extends TestBase {
         String execProcedureQuery = page.getQueryToExecuteProcedureQuery()
 
         when: 'Click SQL tab'
-        page.gotoSqlQuery()
+        page.openSqlQueryPage()
         then: 'at SQL page'
         at SqlQueryPage
         createExecuteTableAndProcedure(createQuery, createProcedureQuery, execProcedureQuery)
 
         when: 'Analysis tab is clicked'
-        page.gotoAnalysis()
+        page.openAnalysisPage()
         then: 'at Analysis Page'
         at AnalysisPage
 
@@ -263,7 +263,7 @@ class AnalysisPageTest extends TestBase {
         //deleted the created test talbes and procedures.
         String dropTableAndProcQuery = page.getQueryToDropTableAndProcedureQuery()
         when: 'Click SQL tab'
-        page.gotoSqlQuery()
+        page.openSqlQueryPage()
         then: 'at SQL page'
         at SqlQueryPage
 
@@ -277,13 +277,13 @@ class AnalysisPageTest extends TestBase {
         String execProcedureQuery = page.getQueryToExecuteProcedureQuery()
 
         when: 'Click SQL tab'
-        page.gotoSqlQuery()
+        page.openSqlQueryPage()
         then: 'at SQL page'
         at SqlQueryPage
         createExecuteTableAndProcedure(createQuery, createProcedureQuery, execProcedureQuery)
 
         when: 'Analysis tab is clicked'
-        page.gotoAnalysis()
+        page.openAnalysisPage()
         then: 'at Analysis Page'
         at AnalysisPage
 
@@ -305,12 +305,48 @@ class AnalysisPageTest extends TestBase {
         println();
     }
 
-    def cleanup() {
-        String dropTableAndProcQuery = page.getQueryToDropTableAndProcedureQuery()
+    def checkDataTable() {
+        given:
+        String createQuery = page.getQueryToCreateTable();
+        String insertQuery = page.getInsertQuery();
+
         when: 'Click SQL tab'
-        page.gotoSqlQuery()
+        page.openSqlQueryPage()
         then: 'at SQL page'
         at SqlQueryPage
+        // This function is used for insertquery instead of creating the procedure
+        createExecuteTableAndProcedure(createQuery, insertQuery, insertQuery)
+        createExecuteTableAndProcedure(insertQuery, insertQuery, insertQuery)
+
+        when: 'Analysis tab is clicked'
+        page.openAnalysisPage()
+        then: 'at Analysis Page'
+        at AnalysisPage
+
+        when:
+        waitFor(30) { page.btnAnalyzeNow.isDisplayed() }
+        page.btnAnalyzeNow.click();
+        try {
+            page.btnAnalyzeNow.click();
+            waitFor(10) { 1 == 0 }
+        } catch (geb.waiting.WaitTimeoutException exception) {
+        }
+        then:
+        page.dataGraphAll.isDisplayed();
+        println("this is " + page.dataValueForFirst.text());
+        page.dataValueForFirst.text().equals("5.000");
+    }
+
+    def cleanup() {
+        String dropTableAndProcQuery = page.getQueryToDropTableAndProcedureQuery();
+        String dropTableOnly = page.getQueryToDeleteTable();
+
+        when: 'Click SQL tab'
+        page.openSqlQueryPage()
+        then: 'at SQL page'
+        at SqlQueryPage
+
+        deleteTableAndProcedure(dropTableOnly)
         deleteTableAndProcedure(dropTableAndProcQuery)
     }
 //    #visualiseLatencyAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g > g > foreignObject > p

@@ -50,7 +50,7 @@ class AnalysisPage extends VoltDBManagementCenterPage {
         chkShowSysProcedure         { $('#trShowHideSysProcedures > td:nth-child(2) > div > ins') }
         foreignObjectForSys         { $('p', text: 'org.voltdb.sysprocs.UpdateCore')}
         averageExecutionTime        { $('#averageExecutionTime') }
-        warningSign                 { $('foreignObject', text: '⚠')}
+        warningSign                 { $('foreignObject', text: '⚠') }
         analysisRemarks             { $('#analysisRemarks') }
 
         allBars                     { $("#visualiseLatencyAnalysis > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g") }
@@ -62,6 +62,10 @@ class AnalysisPage extends VoltDBManagementCenterPage {
 
         allNames                    { $("#visualiseLatencyAnalysis > g > g > g.nv-x.nv-axis.nvd3-svg > g > g") }
         firstName                   { allNames.find("g") }
+
+        dataGraphAll                { $("#visualiseDataTable > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g") }
+        dataNameForFirst            { $('p', text: 'VOTERS') }
+        dataValueForFirst           { $("#visualiseDataTable > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g > g > text") }
     }
 
     static at = {
@@ -230,7 +234,7 @@ class AnalysisPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#dropTableAndProcedure") {
         }
 
-        while ((line = br.readLine()) != "#endQuery") {
+        while ((line = br.readLine()) != "#insertQuery") {
             // process the line.
             query = query + line + "\n"
         }
@@ -238,4 +242,19 @@ class AnalysisPage extends VoltDBManagementCenterPage {
         return query
     }
 
+    def String getInsertQuery() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryAnalysis.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#insertQuery") {
+        }
+
+        while ((line = br.readLine()) != "#endQuery") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
 }
