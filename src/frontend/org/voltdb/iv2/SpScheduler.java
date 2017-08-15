@@ -446,25 +446,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         long uniqueId = Long.MIN_VALUE;
         Iv2InitiateTaskMessage msg = message;
         if (m_isLeader || message.isReadOnly()) {
-            /*
-             * A short circuit read is a read where the client interface is local to
-             * this node. The CI will let a replica perform a read in this case and
-             * it does looser tracking of client handles since it can't be
-             * partitioned from the local replica.
-             */
-
-            //When this site is marked as non-leader, m_isLeader will be immediately set to false.
-            //Before new leader is installed, read-only messages may come from local (safe or fast read) and other CIs (safe read)
-            //
-            boolean balanceSPI = (message.getStoredProcedureInvocation() != null &&
-                    "@BalanceSPI".equals(message.getStoredProcedureName()));
-            final ReadLevel level = VoltDB.Configuration.getDefaultReadConsistencyLevel();
-            if (!m_isLeader && !balanceSPI && level == ReadLevel.FAST && message.isReadOnly() &&
-                    CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
-                    CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
-                hostLog.error("site:" + CoreUtils.hsIdToString(m_mailbox.getHSId())+ " is leader:" + m_isLeader + "\n" + message);
-                VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
-            }
 
             /*
              * If this is for CL replay or DR, update the unique ID generator
@@ -841,7 +822,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         //notify the new partition leader that the old leader has completed the Txns if needed.
-        if (m_mailbox instanceof InitiatorMailbox) {
+        if (!m_isLeader && m_mailbox instanceof InitiatorMailbox) {
             ((InitiatorMailbox)m_mailbox).notifyNewLeaderOfTxnDoneIfNeeded();
         }
     }
