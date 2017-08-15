@@ -86,25 +86,6 @@ public class ClientInterfaceHandleManager
         }
     }
 
-    public static int getPartIdFromHandle(long handle)
-    {
-        return (int)((handle >> PART_ID_SHIFT) & MP_PART_ID);
-    }
-
-    public static long getSeqNumFromHandle(long handle)
-    {
-        return handle & SEQNUM_MAX;
-    }
-
-    public static String handleToString(long handle)
-    {
-        return "(pid " + getPartIdFromHandle(handle) + " seq " + getSeqNumFromHandle(handle) + ")";
-    }
-
-    private boolean isShortCircuitReadHandle(long handle) {
-        return (handle >> PART_ID_SHIFT) == SHORT_CIRCUIT_PART_ID;
-    }
-
     static class Iv2InFlight
     {
         final long m_ciHandle;
@@ -521,5 +502,24 @@ public class ClientInterfaceHandleManager
 
     public boolean wantsTopologyUpdates() {
         return m_wantsTopologyUpdates;
+    }
+
+    public static int getPartIdFromHandle(long handle)
+    {
+        return (int)((handle >> PART_ID_SHIFT) & MP_PART_ID);
+    }
+
+    public static long getSeqNumFromHandle(long handle)
+    {
+        return handle & SEQNUM_MAX;
+    }
+
+    public static String handleToString(long handle)
+    {
+        return "(pid " + getPartIdFromHandle(handle) + " seq " + getSeqNumFromHandle(handle) + ")";
+    }
+
+    private boolean isShortCircuitReadHandle(long handle) {
+        return (handle >> PART_ID_SHIFT) == SHORT_CIRCUIT_PART_ID;
     }
 }
