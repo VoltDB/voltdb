@@ -2013,7 +2013,7 @@ public class VoltCompiler {
             while (entry != null) {
                 String path = entry.getKey();
                 // ENG-12980: only look for auto-gen.ddl on root directory
-                if (AUTOGEN_DDL_FILE_NAME.equals(path.toLowerCase())) {
+                if (AUTOGEN_DDL_FILE_NAME.equalsIgnoreCase(path)) {
                     ddlReaderList.add(new VoltCompilerJarFileReader(outputJar, path));
                     break;
                 }
