@@ -65,7 +65,7 @@ class App extends Component {
           newData = newData.map((v, i, arr) => {
             let r = {};
             r.x = v[0];
-            r.y = v[1];
+            r.y = v[1] + Math.random() * 1000;  // fake data
             return r;
           });
 

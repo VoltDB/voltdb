@@ -65,6 +65,8 @@
 .chart-container {
     width: 200px;
     height: 200px;
+    margin-top: 100px;
+    margin-left: 100px;
 }
 
 .chart-1-title {
@@ -72,13 +74,15 @@
     z-index: 10000;
     font-size: 8em;
     left: 700px;
-    margin-top: 50px;
+    margin-top: 80px;
     font-family: 'Anton', sans-serif;
 }
 
 .chart-2-container {
     width: 200px;
     height: 200px;
+    margin-top: 100px;
+    margin-left: 100px;
 }
 
 .wrapper-odometer-2 {

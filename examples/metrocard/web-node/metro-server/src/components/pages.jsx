@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 
-import { SectionsContainer, Section, Header, Footer } from 'react-fullpage';
+import { SectionsContainer, Section, Header } from 'react-fullpage';
 
 // import NavbarInstance from './navbar.jsx';
 import OdometerInstance from './odometer.jsx';
