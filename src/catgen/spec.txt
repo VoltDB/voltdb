@@ -123,10 +123,17 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   bool transactional        "Whether the code needs to access state or just run anywhere"
 end
 
-begin Function javaonly     "A user-defined function"
-  string functionName       "The name of the function"
-  string className          "The class name of the function implementation"
-  string methodName         "The method name of the function implementation"
+begin FunctionParameter      "A user-defined function parameter"
+  int parameterType          "The type of the parameter"
+end
+
+begin Function                   "A user-defined function"
+  int functionId                 "The function sequential ID"
+  string functionName            "The name of the function"
+  string className               "The class name of the function implementation"
+  string methodName              "The method name of the function implementation"
+  FunctionParameter* parameters  "The parameter types of this function"
+  int returnType                 "The return value type of this function"
 end
 
 begin Table                                  "A table (relation) in the database"

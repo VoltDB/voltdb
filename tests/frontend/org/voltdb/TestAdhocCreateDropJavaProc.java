@@ -128,7 +128,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 assertTrue(pce.getMessage(),
-                        pce.getMessage().contains("Unexpected error in @UpdateClasses modifying classes: "
+                        pce.getMessage().contains("Classes not found in @UpdateClasses jar: "
                                 + "org.voltdb_testprocs.updateclasses.testImportProc"));
             }
 

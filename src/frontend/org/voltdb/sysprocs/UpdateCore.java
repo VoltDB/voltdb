@@ -47,6 +47,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
@@ -221,7 +222,7 @@ public class UpdateCore extends VoltSystemProcedure {
 
     public static class JavaClassForTest {
         public Class<?> forName(String name, boolean initialize, ClassLoader jarfileLoader) throws ClassNotFoundException {
-            return CatalogContext.classForProcedure(name, jarfileLoader);
+            return CatalogContext.classForProcedureOrUDF(name, jarfileLoader);
         }
     }
 
@@ -263,8 +264,8 @@ public class UpdateCore extends VoltSystemProcedure {
             DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
 
-            if (log.isInfoEnabled()) {
-                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+            if (log.isDebugEnabled()) {
+                log.debug("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                         " completed data precheck.");
             }
             return success;
@@ -435,6 +436,14 @@ public class UpdateCore extends VoltSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         try {
+            try {
+                CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
+                        catalogBytes, catalogHash, deploymentBytes);
+            } catch (KeeperException | InterruptedException e) {
+                log.error("error writing catalog bytes on ZK during @UpdateCore");
+                throw e;
+            }
+
             // log the start of UpdateCore
             log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
             log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +

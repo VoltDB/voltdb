@@ -33,13 +33,6 @@ class Issues(object):
             logging.exception('Could not connect to Jira')
             return
 
-        summary = job + ' failed on build ' + str(build)
-
-        existing = jira.search_issues('summary ~ \'%s\'' % summary)
-        if len(existing) > 0:
-            print 'No new Jira issue created. Build ' + str(build) + ' has already been reported.'
-            return
-
         build_report_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
         build_report = eval(self.read_url(build_report_url))
         build_url = build_report.get('url')
@@ -52,6 +45,28 @@ class Issues(object):
         summary_url = self.jhost + '/job/' + job + '/' + str(build) + '/artifact/tests/sqlgrammar/summary.out'
         summary_report = self.read_url(summary_url)
 
+        pframe_split = summary_report.split('Problematic frame:')
+        pframe_split = pframe_split[1].split('C')
+        pframe_split = pframe_split[1].split(']')
+        pframe_split = pframe_split[1].split('#')
+        pframe = pframe_split[0].strip()
+
+        summary = job + ':' + str(build) + ' - ' + pframe
+        existing = jira.search_issues('summary ~ \'%s\'' % summary)
+        if len(existing) > 0:
+            print 'No new Jira issue created. Build ' + str(build) + ' has already been reported.'
+            return 'Already reported'
+
+        old_issue = ''
+        existing = jira.search_issues('summary ~ \'%s\'' % pframe_split[0].strip())
+        for issue in existing:
+            if str(issue.fields.status) != 'Closed' and u'grammar-gen' in issue.fields.labels:
+                old_issue = issue
+
+        build_artifacts = build_report.get('artifacts')[0]
+        pid_fileName = build_artifacts['fileName']
+        pid_url = build_url + 'artifact/' + pid_fileName
+
         query_split = summary_report.split('(or it was never started??), after SQL statement:')
         crash_query = query_split[1]
 
@@ -60,10 +75,11 @@ class Issues(object):
         sigsegv_message = hash_split[0] + '# See problematic frame for where to report the bug.\n#'
 
         description = job + ' build ' + str(build) + ' : ' + str(build_result) + '\n' \
-            + 'Link to Jenkins build: ' + build_url + ' \n \n' \
+            + 'Jenkins build: ' + build_url + ' \n \n' \
+            + 'DDL: ' + 'https://github.com/VoltDB/voltdb/blob/master/tests/sqlgrammar/DDL.sql' + ' \n \n' \
+            + 'hs_err_pid: ' + pid_url + ' \n \n' \
             + 'SIGSEGV Message: \n' + '#' + sigsegv_message + ' \n \n' \
             + 'Query that Caused the Crash: ' + crash_query
-
         description = description.replace('#', '\#')
 
         labels = ['grammar-gen']
@@ -79,14 +95,27 @@ class Issues(object):
                 }
                 break
 
-        current_version = 'V' + \
-                          str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/master/version.txt'))
+        current_version_raw = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/master/version.txt'))
+        current_version_float = float(current_version_raw)
+        current_version = 'V' + current_version_raw
+        current_version = current_version.strip()
+        next_version = current_version_float + .1
+        next_version = str(next_version)
+        next_version = 'V' + next_version
+        next_version = next_version[:4]
+
         jira_versions = jira.project_versions(JIRA_PROJECT)
-        jira_version = {}
+        this_version = {}
+        new_version = {}
+
         for v in jira_versions:
-            current_version.strip()
-            if str(v.name) == current_version.strip():
-                jira_version = {
+            if str(v.name) == current_version:
+                this_version = {
+                    'name': v.name,
+                    'id': v.id
+                }
+            if str(v.name) == next_version:
+                new_version = {
                     'name': v.name,
                     'id': v.id
                 }
@@ -99,12 +128,23 @@ class Issues(object):
             'priority': {'name': 'Blocker'},
             'labels': labels,
             'customfield_10430': {'value': 'CORE team'},
-            'components': [jira_component],
-            'versions': [jira_version]
+            'components': [jira_component]
         }
 
-        new_issue = jira.create_issue(fields=issue_dict)
-        print 'New issue created for failure on build ' + str(build)
+        if new_version:
+            issue_dict['versions'] = [new_version]
+            issue_dict['fixVersions'] = [new_version]
+
+        elif this_version:
+            issue_dict['versions'] = [this_version]
+            issue_dict['fixVersions'] = [this_version]
+
+        if old_issue:
+            new_comment = jira.add_comment(old_issue, description)
+            print 'New comment created on issue: ' + str(old_issue)
+        else:
+            new_issue = jira.create_issue(fields=issue_dict)
+            print 'New issue created for failure on build ' + str(build)
 
 if __name__ == '__main__':
     this_build = os.environ.get('build', None)
