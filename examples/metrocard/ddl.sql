@@ -159,8 +159,6 @@ FROM wait_time
 GROUP BY
   station_id;
 
--------------- PROCEDURES -------------------------------------------------------
-
 CREATE PROCEDURE PARTITION ON TABLE cards COLUMN card_id PARAMETER 0 FROM CLASS metrocard.CardSwipe;
 CREATE PROCEDURE FROM CLASS metrocard.UpdateWaitTime;
 CREATE PROCEDURE PARTITION ON TABLE train_activity COLUMN station_id PARAMETER 0 FROM CLASS metrocard.UpdateWaitTimeForStation;

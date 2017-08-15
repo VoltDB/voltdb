@@ -68,7 +68,6 @@ public class UpdateWaitTimeForStation extends VoltProcedure {
         public final TimestampType lastDepartTime;
         public final long totalTime;
         public final long totalEntries;
-
         private StationStats(short station, TimestampType lastDepartTime, long totalTime, long totalEntries)
         {
             this.station = station;

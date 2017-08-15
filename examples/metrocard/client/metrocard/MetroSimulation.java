@@ -201,7 +201,7 @@ public class MetroSimulation {
                     } else {
                         //If we didnt get record that may be on purpose so wait.
                         Thread.yield();
-                        Thread.sleep(200);
+                        Thread.sleep(20);
                     }
                     if (doEnd()) {
                         break;
@@ -224,7 +224,6 @@ public class MetroSimulation {
         public int curStation = 1;
         public long startTime;
         public volatile int lastState = 0; // 0 for arrival, 1 for departure
-        public long arrivalTime;
         public long departureTime;
         public volatile int direction = 1;
         TrainActivityPublisher(String trainId, MetroCardConfig config, Properties producerConfig, long count) {
@@ -237,7 +236,6 @@ public class MetroSimulation {
         protected void initialize() {
             //Shift start time for each train by 1 min
             startTime = System.currentTimeMillis() + (tcnt++ * 120*1000);
-            arrivalTime = startTime;
         }
 
         @Override
@@ -535,16 +533,13 @@ public class MetroSimulation {
         long num_activity = (config.count % 17) + config.count;
         for (String train : trains) {
             TrainActivityPublisher redLine = new TrainActivityPublisher(train, config, producerConfig, num_activity);
+            redLine.start();
             trainPubs.add(redLine);
         }
         SwipeEntryActivityPublisher entry = new SwipeEntryActivityPublisher(config, producerConfig, config.count);
         entry.start();
         SwipeExitActivityPublisher exit = new SwipeExitActivityPublisher(config, producerConfig, config.count);
         exit.start();
-        //Start trains now.
-        for (TrainActivityPublisher trainPub : trainPubs) {
-            trainPub.start();
-        }
         SwipeReplenishActivityPublisher replenish = new SwipeReplenishActivityPublisher(config, producerConfig, config.count/5);
         replenish.start();
         entry.join();

@@ -66,6 +66,7 @@ function jars-ifneeded() {
 
 # Init to directory voltdbroot
 function voltinit-ifneeded() {
+    jars-ifneeded
     voltdb init -C deployment.xml --force
 }
 
@@ -81,13 +82,14 @@ function init() {
     sqlcmd < ddl.sql
     echo "----Loading Redline Stations----"
     #csvloader --servers $SERVERS --file data/stations.csv --reportdir log stations
-    csvloader --servers $SERVERS --file data/redline.csv --reportdir log stations
-    csvloader --servers $SERVERS --file data/trains.csv --reportdir log trains
+    csvloader --servers $SERVERS --port 21211 --file data/redline.csv --reportdir log stations
+    csvloader --servers $SERVERS --port 21211 --file data/trains.csv --reportdir log trains
     rm -f data/cards.csv
     echo "----Loading Cards----"
     java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.CardGenerator \
         --output=data/cards.csv
-    csvloader --servers $SERVERS --file data/cards.csv --reportdir log cards
+    csvloader --servers $SERVERS --port 21211 --file data/cards.csv --reportdir log cards
+    voltadmin update deployment-enable.xml
 }
 
 # run this target to see what command line options the client offers
@@ -112,7 +114,7 @@ function client() {
 function train() {
     jars-ifneeded
     java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.MetroSimulation \
-        --broker=localhost:9092 --count=100000
+        --broker=localhost:9092 --count=500000
 }
 
 # generate metro cards
