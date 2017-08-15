@@ -501,9 +501,9 @@
 
                 $("#chartDataTableAnalysis").css("height", barHeight + 50)
                 ChartDataTableAnalysis.margin({"left": 115,"right": 40})
-                ChartDataTableAnalysis.valueFormat(d3.format(',.3f'));
+                ChartDataTableAnalysis.valueFormat(d3.format(',.0d'));
                 ChartDataTableAnalysis.yAxis
-                    .tickFormat(d3.format(',.2f'));
+                    .tickFormat(d3.format(',.0d'));
                 ChartDataTableAnalysis.xAxis
                     .axisLabelDistance(10)
                 ChartDataTableAnalysis.yAxis.axisLabelDistance(10);
