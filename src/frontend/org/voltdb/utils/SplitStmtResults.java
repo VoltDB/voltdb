@@ -17,7 +17,6 @@
 
 package org.voltdb.utils;
 import java.util.List;
-import java.util.ArrayList;
 
 /**
  * To store the statements which are parsed/split by the SQLLexer.splitStatements().
@@ -27,17 +26,23 @@ import java.util.ArrayList;
 public class SplitStmtResults {
     private final List<String> m_completelyParsedStmts;
     private final String m_incompleteStmt;
+    private final int m_incompleteStmtOffset;
 
-    public SplitStmtResults(List<String> completelyParsedStmts, String incompleteStmt) {
+    public SplitStmtResults(List<String> completelyParsedStmts, String incompleteStmt, int incompleteStmtOffset) {
         m_completelyParsedStmts = completelyParsedStmts;
         m_incompleteStmt = incompleteStmt;
+        m_incompleteStmtOffset = incompleteStmtOffset;
     }
 
-	public String getIncompleteStmt() {
-		return m_incompleteStmt;
-	}
+    public String getIncompleteStmt() {
+        return m_incompleteStmt;
+    }
 
-	public List<String> getCompletelyParsedStmts() {
-		return m_completelyParsedStmts;
-	}
+    public List<String> getCompletelyParsedStmts() {
+        return m_completelyParsedStmts;
+    }
+
+    public int getIncompleteStmtOffset() {
+        return m_incompleteStmtOffset;
+    }
 }

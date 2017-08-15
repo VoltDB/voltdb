@@ -729,7 +729,7 @@ public class SQLCommand
             }
 
             if ( ! statementStarted) {
-                if (line.trim().equals("") || SQLParser.isWholeLineComment(line)) {
+                if (line.trim().isEmpty() || SQLParser.isWholeLineComment(line)) {
                     // We don't strictly have to include a blank line or whole-line
                     // comment at the start of a statement, but when we want to preserve line
                     // numbers (in a batch), we should at least append a newline.
@@ -796,9 +796,9 @@ public class SQLCommand
                     // like a blank line from stdin.
                     if ( ! statementString.trim().isEmpty()) {
                         //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                        String incompleteSt = executeStatements(statementString, callback, reader.getLineNumber());
-                        if (incompleteSt != null) {
-                            statement = new StringBuilder(incompleteSt);
+                        String incompleteStmt = executeStatements(statementString, callback, reader.getLineNumber());
+                        if (incompleteStmt != null) {
+                            statement = new StringBuilder(incompleteStmt);
                         }
                         else {
                             statement.setLength(0);
@@ -814,10 +814,17 @@ public class SQLCommand
                     if (splitResults.getIncompleteStmt() == null) {
                         // not in the middle of a statement.
                         statementStarted = false;
+                        batch.append(statement);
+                        statement.setLength(0);
                     }
-
-                    batch.append(statement);
-                    statement.setLength(0);
+                    else {
+                        int incompleteStmtOffset = splitResults.getIncompleteStmtOffset();
+                        statementStarted = true;
+                        if (incompleteStmtOffset != 0) {
+                            batch.append(statementString.substring(0, incompleteStmtOffset));
+                            statement = new StringBuilder(statementString.substring(incompleteStmtOffset));
+                        }
+                    }
                 }
             }
             else {
