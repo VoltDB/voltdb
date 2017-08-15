@@ -3805,8 +3805,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // as at this juncture the initial truncation snapshot is already complete
         ExportManager.instance().startPolling(m_catalogContext);
 
-        //Tell import processors that they can start ingesting data.
-        ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+        // If Volt does not start under pause mode, tell import processors that they can start ingesting data.
+        if (m_mode != OperationMode.PAUSED) {
+            ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+        }
 
         if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
@@ -3880,6 +3882,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             {
                 m_config.m_isPaused = false;
                 m_statusTracker.setNodeState(NodeState.UP);
+                // Admin resumed the cluster, so let import processors ingest data.
+                if (mode == OperationMode.RUNNING) {
+                    ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+                }
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
         }
@@ -4031,8 +4037,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // as at this juncture the initial truncation snapshot is already complete
             ExportManager.instance().startPolling(m_catalogContext);
 
-            //Tell import processors that they can start ingesting data.
-            ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+            // If Volt does not start under pause mode, tell import processors that they can start ingesting data.
+            if (m_mode != OperationMode.PAUSED) {
+                ImportManager.instance().readyForData(m_catalogContext, m_messenger);
+            }
 
             try {
                 if (m_adminListener != null) {
