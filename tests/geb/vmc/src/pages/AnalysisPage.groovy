@@ -30,7 +30,12 @@ class AnalysisPage extends VoltDBManagementCenterPage {
         divAnalysis                 { $('#divAnalysis') }
         analyzeNowContent           { $('.analyzeNowContent') }
         tabProcedureBtn             { $('#tabProcedureBtn') }
+        proAnalyzeNowContent        { $('#tabProcedure > div.mainContentAnalysis.analyzeNowContent') }
+        tabDataBtn                  { $('#tabAnalysis > li:nth-child(1) > a') }
+        tblAnalyzeNowContent        { $('#tblAnalyzeNowContent') }
         tabProcedure                { $('#tabProcedure') }
+        divNoContentTable           { $('#divNoContentTable') }
+        divTabData                  { $('#divTabData') }
         btnThreshold                { $('#btnThreshold') }
         btnAnalyzeNow               { $('#btnAnalyzeNow') }
         procedureNoDataContent      { $('#tabProcedure > div.mainContentAnalysis.noDataContent') }
@@ -39,6 +44,7 @@ class AnalysisPage extends VoltDBManagementCenterPage {
         executionTimeSubTab         { $('#ulProcedure > li:nth-child(1)') }
         frequencySubTab             { $('#ulProcedure > li:nth-child(2)') }
         processingTimeSubTab        { $('#ulProcedure > li:nth-child(3)') }
+        chartDataTableAnalysis      { $('#chartDataTableAnalysis') }
         chartLatencyAnalysis        { $('#chartLatencyAnalysis') }
         chartFrequencyAnalysis      { $('#chartFrequencyAnalysis') }
         chartProcessingTimeAnalysis { $('#chartProcessingTimeAnalysis') }
@@ -87,6 +93,14 @@ class AnalysisPage extends VoltDBManagementCenterPage {
 
     def checkForProcedureDataContent(){
         return divTabProcedure.displayed
+    }
+
+    def checkForTableNoDataContent(){
+        return divNoContentTable.displayed
+    }
+
+    def checkForTableDataContent(){
+        return divTabData.displayed
     }
 
     /*
