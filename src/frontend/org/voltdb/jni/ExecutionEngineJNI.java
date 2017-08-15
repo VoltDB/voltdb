@@ -34,12 +34,14 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.UserDefinedFunctionManager.UserDefinedFunctionRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -257,17 +259,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
         else {
             m_perFragmentStatsBuffer.clear();
-        }
-    }
-
-    final void clearUDFBufferAndEnsureCapacity(int size) {
-        assert(m_udfBuffer != null);
-        if (size > m_udfBuffer.capacity()) {
-            setupUDFBuffer(size);
-            updateEEBufferPointers();
-        }
-        else {
-            m_udfBuffer.clear();
         }
     }
 
@@ -749,6 +740,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_fallbackBuffer = buffer;
     }
 
+    public void resizeUDFBuffer(int size) {
+        m_udfBuffer.clear();
+        // Read the size which we want to change to.
+        assert(m_udfBuffer != null);
+        if (size > m_udfBuffer.capacity()) {
+            setupUDFBuffer(size);
+            updateEEBufferPointers();
+        }
+    }
+
     public int callJavaUserDefinedFunction() {
         m_udfBuffer.clear();
         m_udfBuffer.getInt(); // skip the buffer size integer, it is only used by VoltDB IPC.
@@ -762,7 +763,39 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             returnValue = udfRunner.call(m_udfBuffer);
             // Write the result to the shared buffer.
             m_udfBuffer.clear();
-            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, udfRunner.getReturnType(), returnValue);
+
+            VoltType returnType = udfRunner.getReturnType();
+            // If the function we are running returns variable-length return value,
+            // it may be possible that the buffer is not large enough to hold it.
+            // Check the required buffer size and enlarge the existing buffer when necessary.
+            // The default buffer size is 256K, which is more than enough for any
+            // fixed-length data and NULL variable-length data (the buffer size will not go less than 256K).
+            if (returnType.isVariableLength() && ! VoltType.isVoltNullValue(returnValue)) {
+                // The minimum required size is 5 bytes:
+                // 1 byte for the type indicator, 4 bytes for the prefixed length.
+                int sizeRequired = 1 + 4;
+                switch(returnType) {
+                case VARBINARY:
+                    if (returnValue instanceof byte[]) {
+                        sizeRequired += ((byte[])returnValue).length;
+                    }
+                    else if (returnValue instanceof Byte[]) {
+                        sizeRequired += ((Byte[])returnValue).length;
+                    }
+                    break;
+                case STRING:
+                    sizeRequired += ((String)returnValue).getBytes(Constants.UTF8ENCODING).length;
+                    break;
+                case GEOGRAPHY:
+                    sizeRequired += ((GeographyValue)returnValue).getLengthInBytes();
+                    break;
+                default:
+                }
+                // resizeUDFBuffer() function will compare the required size and the actual size,
+                // then take action if needed.
+                resizeUDFBuffer(sizeRequired);
+            }
+            UserDefinedFunctionRunner.writeValueToBuffer(m_udfBuffer, returnType, returnValue);
             // Return zero status code for a successful execution.
             return 0;
         }

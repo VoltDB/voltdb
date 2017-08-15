@@ -584,6 +584,10 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
 
     // Check buffer size here.
     // Adjust the buffer size when needed.
+    if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
+        m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
+        resetUDFOutputBuffer();
+    }
 
     // Serialize buffer size, function Id.
     m_udfOutput.writeInt(bufferSizeNeeded);
