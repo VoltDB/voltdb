@@ -226,7 +226,7 @@ public class ClientInterfaceHandleManager
         if (partitionStuff == null) {
             // whoa, bad
             tmLog.error("Unable to find handle list for partition: " + partitionId +
-                ", client interface handle: " + ciHandle + ":" + getSeqNumFromHandle(ciHandle));
+                ", client interface handle: " + ciHandle);
             return null;
         }
 
@@ -329,7 +329,8 @@ public class ClientInterfaceHandleManager
 
     public static int getPartIdFromHandle(long handle)
     {
-        return (int)((handle >> PART_ID_SHIFT) & MP_PART_ID);
+        // SHORT_CIRCUIT_PART_ID has 15 bits
+        return (int)((handle >> PART_ID_SHIFT) & ((MP_PART_ID << 1) + 1));
     }
 
     public static long getSeqNumFromHandle(long handle)
@@ -340,9 +341,5 @@ public class ClientInterfaceHandleManager
     public static String handleToString(long handle)
     {
         return "(pid " + getPartIdFromHandle(handle) + " seq " + getSeqNumFromHandle(handle) + ")";
-    }
-
-    private boolean isShortCircuitReadHandle(long handle) {
-        return (handle >> PART_ID_SHIFT) == SHORT_CIRCUIT_PART_ID;
     }
 }
