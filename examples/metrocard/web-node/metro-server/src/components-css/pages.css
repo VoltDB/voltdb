@@ -76,5 +76,30 @@
     font-family: 'Anton', sans-serif;
 }
 
+.chart-2-container {
+    width: 200px;
+    height: 200px;
+}
+
+.wrapper-odometer-2 {
+    width: 100%;
+    margin-top: 200px;
+}
+
+.wrapper-odometer-2 div:first-child {
+    display: table;
+    margin: 0 auto;
+}
+
+.frauds-text {
+    text-align: center;
+    width: 100%;
+    margin-top: 100px;
+    color: #8bf5a5;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 5em;
+}
+
 @import url('https://fonts.googleapis.com/css?family=Sedgwick+Ave+Display');
 @import url('https://fonts.googleapis.com/css?family=Anton');
+@import url('https://fonts.googleapis.com/css?family=Orbitron');
