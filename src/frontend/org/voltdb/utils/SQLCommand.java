@@ -792,19 +792,12 @@ public class SQLCommand
             if (SQLParser.isSemiColonTerminated(line)) {
                 String statementString = statement.toString();
                 if (batch == null) {
-                    // Trim here avoids a "missing statement" error from adhoc in an edge case
-                    // like a blank line from stdin.
-                    if ( ! statementString.trim().isEmpty()) {
-                        //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
-                        String incompleteStmt = executeStatements(statementString, callback, reader.getLineNumber());
-                        if (incompleteStmt != null) {
-                            statement = new StringBuilder(incompleteStmt);
-                        }
-                        else {
-                            statement.setLength(0);
-                            statementStarted = false;
-                        }
-                    } else {
+                    //* enable to debug */ if (m_debug) System.out.println("DEBUG QUERY:'" + statementString + "'");
+                    String incompleteStmt = executeStatements(statementString, callback, reader.getLineNumber());
+                    if (incompleteStmt != null) {
+                        statement = new StringBuilder(incompleteStmt);
+                    }
+                    else {
                         statement.setLength(0);
                         statementStarted = false;
                     }
