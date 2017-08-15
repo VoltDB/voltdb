@@ -35,11 +35,11 @@ class Pages extends Component {
           <a href="#sectionFive" className='nav-elem'>Section Five</a>
           <a href="" className='nav-elem elem-right'>Metro Monitoring System</a>
         </Header>
-        <Footer>
+        {/* <Footer>
           <a href="">Dcoumentation</a>
           <a href="">Example Source</a>
           <a href="">About</a>
-        </Footer>
+        </Footer> */}
         <SectionsContainer className="container" {...options}>
 
           {/* The first odometer for showing # of card swipes */}
@@ -60,16 +60,28 @@ class Pages extends Component {
               <p>Busiest Stations</p>
             </div>
             <div className='chart-container'>
-              <BusiestStationsChart busiestStations={this.props.busiestStations}/>
+              <BusiestStationsChart busiestStations={this.props.busiestStations} />
             </div>
           </Section>
 
           {/* The avg waiting time chart */}
           <Section color="#E0E4CC">
-            <AvgWaitsChart avgWaits={this.props.avgWaits}/>
+            <div className='chart-2-container'>
+              <AvgWaitsChart avgWaits={this.props.avgWaits} />
+            </div>
           </Section>
 
-          <Section color="#E0E4CC">Section 4</Section>
+          {/* The frauds page */}
+          <Section className='custom-section' color="#111111">
+            <div className='wrapper-odometer-2'>
+              <div>
+                <OdometerInstance value={this.props.num} theme={'digital'} />
+              </div>
+            </div>
+            <div className='frauds-text'>
+              FRAUDS DETECTED
+            </div>
+          </Section>
 
           <Section color="#E0E4CC">Section 5</Section>
 

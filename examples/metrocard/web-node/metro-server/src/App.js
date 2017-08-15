@@ -72,7 +72,6 @@ class App extends Component {
           this.setState({
             avgWaits: newData
           });
-          console.log(newData);
         },
         error: (err) => { console.log(err); },
         callbackName: 'jsonp' // Important !
