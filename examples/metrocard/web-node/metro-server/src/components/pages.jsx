@@ -44,14 +44,16 @@ class Pages extends Component {
 
           {/* The first odometer for showing # of card swipes */}
           <Section className="custom-section" verticalAlign="true" color="#eee0d3">
-            <section className='wrapper1'>
-              <div id="one">
-                <OdometerInstance value={this.props.num} theme={'car'} />
+            <div style={{ fontSize: '5em' }}>
+              <div className='wrapper1'>
+                <div id="one">
+                  <OdometerInstance value={this.props.num} theme={'car'} />
+                </div>
+                <div id="two">
+                  Card Swipes
               </div>
-              <div id="two">
-                Card Swipes
               </div>
-            </section>
+            </div>
           </Section>
 
           {/* The busy stations chart */}

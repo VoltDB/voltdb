@@ -3,8 +3,6 @@ import PropTypes from 'prop-types';
 import Odometer from 'odometer';
 import ReactDOM from 'react-dom';
 
-import '../components-css/odometer.css';
-
 // A simple wrapper for the HubSpot odometer
 class OdometerInstance extends Component {
   static propTypes = {
