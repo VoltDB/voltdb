@@ -50,13 +50,14 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
     public CompletableFuture<ClientResponse> run(byte[] catalogBytes, String diffCommands,
             byte[] catalogHash, byte[] deploymentBytes)
     {
-        log.info("Precheck and prepare catalog update on non-blocking asynchronous threads");
+        log.info("Verify user procedure classes and write catalog jar");
 
         // This should only be called once on each host
         String err = VoltDB.instance().verifyJarAndPrepareProcRunners(
                 catalogBytes, diffCommands, catalogHash, deploymentBytes);
         if (err != null) {
-            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, err);
+            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    "unexpected error verifying classes or preparing procedure runners: " + err);
         }
 
         // Write the new catalog to a temporary jar file
@@ -65,7 +66,8 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
         } catch (Exception e) {
             // Catalog disk write failed, include the message
             VoltDB.instance().cleanUpTempCatalogJar();
-            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE, e.getMessage());
+            return makeQuickResponse(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    "unexpected error writting catalog jar: " + e.getMessage());
         }
 
         return makeQuickResponse(ClientResponseImpl.SUCCESS, "");

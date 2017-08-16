@@ -3328,7 +3328,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     try {
                         major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
                     } catch (Exception ex) {
-                        hostLog.debug("Unable to parse compile version number from UnsupportedClassVersionError.",
+                        hostLog.info("Unable to parse compile version number from UnsupportedClassVersionError.",
                                 ex);
                     }
 
@@ -3338,7 +3338,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     } else {
                         errorMsg = errorMsg.concat("an incompatable Java version.");
                     }
-                    hostLog.error(errorMsg);
+                    hostLog.info(errorMsg);
                     return errorMsg;
                 }
                 catch (LinkageError | ClassNotFoundException e) {
@@ -3348,7 +3348,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                     errorMsg = "Error loading class \'" + classname + "\': " +
                         e.getClass().getCanonicalName() + " for " + cause;
-                    hostLog.warn(errorMsg);
+                    hostLog.info(errorMsg);
                     return errorMsg;
                 }
             }
@@ -3382,7 +3382,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (Exception e) {
                 String msg = "error setting up user procedure runners using NT-procedure pattern: "
                             + e.getMessage();
-                hostLog.error(msg);
+                hostLog.info(msg);
                 return msg;
             }
         }
@@ -3455,7 +3455,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     deploymentBytes = ctx.m_preparedCatalogInfo.m_deploymentBytes;
                 }
 
-                byte[] oldDeployHash = m_catalogContext.getCatalogHash();
+                byte[] oldDeployHash = m_catalogContext.getDeploymentHash();
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
                 // 0. A new catalog! Update the global context and the context tracker

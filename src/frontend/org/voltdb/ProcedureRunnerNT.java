@@ -483,7 +483,7 @@ public class ProcedureRunnerNT {
                         ClientResponseImpl cri = new ClientResponseImpl(
                                 ClientResponse.CONNECTION_LOST,
                                 new VoltTable[0],
-                                "");
+                                "Host " + i + " failed, connection lost");
                         // embed the hostid as a string in app status string
                         // because the recipient expects this hack
                         cri.setAppStatusString(String.valueOf(i));
