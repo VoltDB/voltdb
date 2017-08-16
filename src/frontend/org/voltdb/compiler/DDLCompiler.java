@@ -37,14 +37,18 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 
+import javax.xml.soap.Node;
+
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
+import org.hsqldb_voltpatches.types.Type;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -114,6 +118,8 @@ public class DDLCompiler {
     private String m_fullDDL = "";
 
     private final VoltDBStatementProcessor m_voltStatementProcessor;
+
+    private final static VoltLogger m_udfLogger = new VoltLogger("UDF");
 
     // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     private final VoltDDLElementTracker m_tracker;
@@ -805,7 +811,9 @@ public class DDLCompiler {
         //* enable to debug */ System.out.println("DEBUG: " + m_schema);
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
 
-        // Build the local catalog from the xml catalog.
+        // Build the local catalog from the xml catalog.  Note that we've already
+        // saved the previous user defined function set, so we don't need
+        // to save it here.
         // 1.) Add the user defined functions.  We want
         //     these first in case something depends on them.
         // 2.) Add the tables.  This will add indexes as well,
@@ -816,13 +824,10 @@ public class DDLCompiler {
         //     tables are export or DR tables.
         // 4.) Add partitioning information from the tracker
         //     into the catalog.
-        // 5.) Deregister the udfs from the HSQL interface.
-        //     This makes sure that stored procedures which use
-        //     dropped UDFs fail to compile.
-        // 6.) Process material views.
+        // 5.) Start processing materialized views.
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("ud_function")) {
-                addUDFToCatalog(db, node, isXDCR);
+                addUserDefinedFunctionToCatalog(db, node, isXDCR);
             }
         }
         for (VoltXMLElement node : m_schema.children) {
@@ -833,12 +838,7 @@ public class DDLCompiler {
 
         fillTrackerFromXML();
         handlePartitions(db);
-        m_tracker.disableDroppedFunctions();
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
-    }
-
-    public void reRegisterAllDroppedFunctions() {
-        m_tracker.reRegisterAllDroppedFunctions();
     }
 
     private int intFromString(String str) throws VoltCompilerException {
@@ -849,26 +849,53 @@ public class DDLCompiler {
         }
     }
 
-    private void addUDFToCatalog(Database db, VoltXMLElement XMLfunc, boolean isXDCR)
+    private void addUserDefinedFunctionToCatalog(Database db, VoltXMLElement XMLfunc, boolean isXDCR)
                         throws VoltCompilerException {
+        // Fetch out the functions, find the function name and define
+        // the function object.
         CatalogMap<Function> catalogFunctions = db.getFunctions();
         String functionName = XMLfunc.attributes.get("name");
         Function func = catalogFunctions.add(functionName);
+
+        //
+        // Set the attributes of the function object.
+        //
         func.setFunctionname(functionName);
         func.setClassname(XMLfunc.attributes.get("className"));
         func.setMethodname(XMLfunc.attributes.get("methodName"));
-        int returnType = intFromString(XMLfunc.attributes.get("returnType"));
-        func.setReturntype(returnType);
-        int functionId = intFromString(XMLfunc.attributes.get("functionId"));
-        func.setFunctionid(functionId);
+
+        // Calculate types.  In the XML the types are (stringified) integers
+        // which are the values of VoltType enumerals.  We use the same thing
+        // in the catalog.  But in the compiler types are enumerals of the type
+        // Type.  We need to construct these from the integer values
+        // using getDefaultTypeWithSize.
+        //
+        // Filling in the catalog and compiler types for paraemeters is
+        // kind of mushed together in this loop.
+        int returnTypeInt = intFromString(XMLfunc.attributes.get("returnType"));
+        func.setReturntype(returnTypeInt);
+
+        int nparams = XMLfunc.children.size();
         CatalogMap<FunctionParameter> params = func.getParameters();
-        for (int pidx = 0; pidx < XMLfunc.children.size(); pidx += 1) {
+
+        Type returnType = Type.getDefaultTypeWithSize(returnTypeInt);
+        Type[] paramTypes = new Type[nparams];
+
+        for (int pidx = 0; pidx < nparams; pidx += 1) {
             VoltXMLElement ptype = XMLfunc.children.get(pidx);
             assert("udf_ptype".equals(ptype.name));
             FunctionParameter param = params.add(String.valueOf(pidx));
             int ptypeno = intFromString(ptype.attributes.get("type"));
             param.setParametertype(ptypeno);
+            paramTypes[pidx] = Type.getDefaultType(ptypeno);
         }
+        // Ascertain that the function id in the xml is the same as the
+        // function id returned from the registration.  We don't really
+        // care if this is newly defined or not.
+        int regResult = FunctionForVoltDB.registerTokenForUDF(functionName, returnType, paramTypes);
+        int functionId = Integer.parseInt(XMLfunc.attributes.get("functionid"));
+        assert(functionId == regResult);
+        func.setFunctionid(regResult);
     }
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
@@ -2038,7 +2065,42 @@ public class DDLCompiler {
         }
     }
 
-    public void dropAllDroppedFunctions() {
-        m_tracker.dropDroppedFunctions();
+    private static Type[] getParamTypesFromCatalog(CatalogMap<FunctionParameter> fparams) {
+        int numParams = fparams.size();
+        Type[] parameterTypes = new Type[numParams];
+        for (int idx = 0; idx < numParams; idx += 1) {
+            FunctionParameter fp = fparams.get(String.valueOf(idx));
+            parameterTypes[idx] = Type.getDefaultTypeWithSize(fp.getParametertype());
+        }
+        return parameterTypes;
+    }
+    /**
+     * Load the udfs from the previous DB into the m_oldFunctions.  These are not
+     * actually defined, but they are where we can find them if we need them.  If
+     * we create a UDF which is equal to the old UDF from the the catalog we will
+     * get the function id from the catalog in this way, and reuse the old signature.
+     *
+     * This should really be in FunctionForVoltDB.  But we can't use the catalog
+     * functions in HSQLDB.
+     */
+    public static void loadOldFunctions(Database previousDB) {
+        FunctionForVoltDB.prepareOldFunctions();
+        for (Function fcn : previousDB.getFunctions()) {
+            Type returnType = Type.getDefaultTypeWithSize(fcn.getReturntype());
+            CatalogMap<FunctionParameter> params = fcn.getParameters();
+            Type[] paramTypes = getParamTypesFromCatalog(params);
+            FunctionForVoltDB.loadOldFunctionId(fcn.getTypeName(),
+                                                fcn.getFunctionid(),
+                                                returnType,
+                                                paramTypes);
+        }
+    }
+
+    public void restoreOldFunctions() {
+        FunctionForVoltDB.restoreOldFunctions();
+    }
+
+    public void clearOldFunctions() {
+        FunctionForVoltDB.clearOldFunctions();
     }
 }

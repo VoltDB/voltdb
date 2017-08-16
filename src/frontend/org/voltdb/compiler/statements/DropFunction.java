@@ -19,6 +19,7 @@ package org.voltdb.compiler.statements;
 
 import java.util.regex.Matcher;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Database;
@@ -33,8 +34,7 @@ import org.voltdb.parser.SQLParser;
  * Process DROP FUNCTION <function-name>
  */
 public class DropFunction extends StatementProcessor {
-    private static VoltLogger m_logger = new VoltLogger("UDF");
-
+    private static final VoltLogger m_logger = new VoltLogger("UDF");
     public DropFunction(DDLCompiler ddlCompiler) {
         super(ddlCompiler);
     }
@@ -54,12 +54,13 @@ public class DropFunction extends StatementProcessor {
                 String fnm = func.attributes.get("name");
                 if (fnm != null && functionName.equals(fnm)) {
                     m_schema.children.remove(idx);
-                    m_logger.debug("Removed function " + functionName);
+                    m_compiler.setEverythingDirty();
+                    m_logger.debug(String.format("Removed XML for"
+                            + " function named %s", functionName));
                     return true;
                 }
             }
         }
-        m_logger.debug("Tried to remove function " + functionName + " which was not defined.");
         return false;
     }
 
@@ -79,10 +80,8 @@ public class DropFunction extends StatementProcessor {
                         "Function name \"%s\" in DROP FUNCTION statement does not exist.",
                         functionName));
             }
-        } else {
-            m_tracker.addDroppedFunction(functionName);
-            m_compiler.setEverythingDirty();
         }
+        FunctionForVoltDB.deregisterUserDefinedFunction(functionName);
         return true;
     }
 }

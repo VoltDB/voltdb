@@ -51,7 +51,6 @@ public class VoltDDLElementTracker {
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<>();
     final Map<String, String> m_drTables = new LinkedHashMap<>();
-    final Set<String> m_droppedFunctions = new HashSet<>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -134,34 +133,6 @@ public class VoltDDLElementTracker {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Dropped Procedure \"%s\" is not defined", procName));
         }
-    }
-
-    /**
-     * Mark the dropped functions as disabled.  We will try to compile
-     * everything else without them.  But if their compilation fails we will
-     * need to reenable them.
-     */
-    public void disableDroppedFunctions() {
-        for (String functionName : m_droppedFunctions) {
-            FunctionForVoltDB.deregisterUserDefinedFunction(functionName, true);
-        }
-    }
-
-    /**
-     * Drop all disabled functions.
-     */
-    public void dropDroppedFunctions() {
-        for (String functionName : m_droppedFunctions) {
-            FunctionForVoltDB.dropDisabledFunctions();
-        }
-        m_droppedFunctions.clear();
-    }
-
-    public void reRegisterAllDroppedFunctions() {
-        for (String functionName : m_droppedFunctions) {
-            FunctionForVoltDB.reRegisterUserDefinedFunction(functionName);
-        }
-        m_droppedFunctions.clear();
     }
 
     /**
@@ -263,13 +234,4 @@ public class VoltDDLElementTracker {
     Map<String, String> getDRedTables() {
         return m_drTables;
     }
-
-    public void addDroppedFunction(String functionName) {
-        m_droppedFunctions.add(functionName);
-    }
-
-    public void removeDroppedFunction(String functionName) {
-        m_droppedFunctions.remove(functionName);
-    }
-
 }

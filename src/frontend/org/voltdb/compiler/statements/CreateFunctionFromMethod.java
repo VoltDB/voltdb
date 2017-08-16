@@ -26,6 +26,7 @@ import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.hsqldb_voltpatches.types.Type;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
@@ -192,36 +193,44 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         }
 
         // Add the description of the function to the VoltXMLElement
-        // in m_schema.
-        int functionId = FunctionForVoltDB.getFunctionId(functionName);
-        if ( ! FunctionForVoltDB.isDefinedFunctionId(functionId)) {
-            functionId = FunctionForVoltDB.getNextFunctionId();
+        // in m_schema.  Don't assign the function id now.  We'll do that
+        // when we register it later.
+        //
+        // Note here that the integer values for the return type and for the parameter
+        // types are the value of a VoltType enumeral.  When the UDF is actually
+        // placed into the catalog we have to keep this straight.
+        //
+        // It turns out that we need to register these with the compiler here
+        // as well.  They can't be used until the procedures are defined.  But
+        // the error messages are misleading if we try to use one in an index expression
+        // or a materialized view definition.
+        VoltType voltReturnType = VoltType.typeFromClass(returnTypeClass);
+        int returnTypeInt = voltReturnType.getValue();
+
+        Type compilerReturnType = Type.getDefaultTypeWithSize(voltReturnType.getValue());
+        Type[] compilerParamTypes = new Type[paramTypeClasses.length];
+        for (int i = 0; i < paramTypeClasses.length; i++) {
+            int paramTypeInt = VoltType.typeFromClass(paramTypeClasses[i]).getValue();
+            Type paramType = Type.getDefaultTypeWithSize(paramTypeInt);
+            compilerParamTypes[i] = paramType;
         }
-        int returnType = VoltType.typeFromClass(returnTypeClass).getValue();
+        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, compilerReturnType, compilerParamTypes);
         funcXML = new VoltXMLElement("ud_function")
                          .withValue("name", functionName)
                          .withValue("className", className)
                          .withValue("methodName", methodName)
-                         .withValue("functionId", String.valueOf(functionId))
-                         .withValue("returnType", String.valueOf(returnType));
+                         .withValue("functionid", String.valueOf(functionId))
+                         .withValue("returnType", String.valueOf(returnTypeInt));
         for (int i = 0; i < paramTypeClasses.length; i++) {
-            int paramtype = VoltType.typeFromClass(paramTypeClasses[i]).getValue();
+            int paramTypeInt = VoltType.typeFromClass(paramTypeClasses[i]).getValue();
+            Type paramType = Type.getDefaultTypeWithSize(paramTypeInt);
             VoltXMLElement paramXML = new VoltXMLElement("udf_ptype")
-                                        .withValue("type", String.valueOf(paramtype));
+                                        .withValue("type", String.valueOf(paramTypeInt));
             funcXML.children.add(paramXML);
+            compilerParamTypes[i] = paramType;
         }
+        m_logger.debug(String.format("Added XML for function \"%s\"", functionName));
         m_schema.children.add(funcXML);
-        // We may have dropped this function and then
-        // added a new one.  I don't think this can actually
-        // happen, but maybe it can somehow.
-        m_tracker.removeDroppedFunction(functionName);
-        //
-        // We still have to register this with HSQLDB, because we will want
-        // to use in in subsequent DDL statements.
-        //
-        m_logger.debug("CreateFunction: " + functionName);
-        FunctionForVoltDB.registerTokenForUDF(functionName, functionId, returnTypeClass, paramTypeClasses);
-        m_logger.debug("End CreateFunction: " + functionName);
         return true;
     }
 }

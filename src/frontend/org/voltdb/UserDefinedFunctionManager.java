@@ -24,6 +24,9 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
+import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.types.Type;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Function;
 import org.voltdb.common.Constants;
@@ -39,6 +42,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  * This is the Java class that manages the UDF class instances, and also the invocation logics.
  */
 public class UserDefinedFunctionManager {
+    private static VoltLogger m_logger = new VoltLogger("UDF");
 
     static final String ORGVOLTDB_FUNCCNAME_ERROR_FMT =
             "VoltDB does not support function classes with package names " +
@@ -62,7 +66,7 @@ public class UserDefinedFunctionManager {
             // The function that the current UserDefinedFunctionRunner is referring to
             // does not exist in the catalog anymore, we need to remove its token.
             if (catalogFunctions.get(runner.m_functionName) == null) {
-                FunctionForVoltDB.deregisterUserDefinedFunction(runner.m_functionName, false);
+                FunctionForVoltDB.deregisterUserDefinedFunction(runner.m_functionName);
             }
         }
         // Build new UDF runners
@@ -145,15 +149,21 @@ public class UserDefinedFunctionManager {
             m_paramCount = paramTypeClasses.length;
             m_paramTypes = new VoltType[m_paramCount];
             m_boxUpByteArray = new boolean[m_paramCount];
+            Type[] compilerParameterTypes = new Type[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
                 m_paramTypes[i] = VoltType.typeFromClass(paramTypeClasses[i]);
                 m_boxUpByteArray[i] = paramTypeClasses[i] == Byte[].class;
+                compilerParameterTypes[i] = Type.getDefaultTypeWithSize(m_paramTypes[i].getValue());
             }
             m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
-            /*
-            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId,
-                                                  m_functionMethod.getReturnType(), paramTypeClasses);
-            */
+            Type compilerReturnType = Type.getDefaultTypeWithSize(VoltType.typeFromClass(m_functionMethod.getReturnType()).getValue());
+
+            m_logger.info(String.format("Defining function %s (%s)", m_functionName, m_functionId));
+
+            FunctionForVoltDB.registerTokenForUDF(m_functionName,
+                                                  m_functionId,
+                                                  compilerReturnType,
+                                                  compilerParameterTypes);
         }
 
         // We should refactor those functions into SerializationHelper

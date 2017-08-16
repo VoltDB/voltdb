@@ -33,14 +33,14 @@ package org.hsqldb_voltpatches;
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.types.Type;
 import org.voltcore.logging.VoltLogger;
-
+import org.voltdb.VoltType;
 
 /**
  * Implementation of calls to VoltDB functions that may have no SQL standard equivalent.<p>
@@ -52,7 +52,7 @@ import org.voltcore.logging.VoltLogger;
 public class FunctionForVoltDB extends FunctionSQL {
     private static final VoltLogger m_logger = new VoltLogger("UDF");
 
-    static class FunctionId {
+    static class FunctionDescriptor {
         final private String m_name;
         final private int m_id;
         final private Type m_type;
@@ -85,11 +85,11 @@ public class FunctionForVoltDB extends FunctionSQL {
             return m_paramParseListAlt;
         }
 
-        private FunctionId(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList) {
+        private FunctionDescriptor(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList) {
             this(name, type, id, typeParameter, paramTypes, paramParseList, null);
         }
 
-        private FunctionId(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList, short[] paramParseListAlt) {
+        private FunctionDescriptor(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList, short[] paramParseListAlt) {
             m_name = name;
             m_type = type;
             m_id = id;
@@ -201,67 +201,67 @@ public class FunctionForVoltDB extends FunctionSQL {
         /*
          * Note: The name must be all lower case.
          */
-        private static final FunctionId[] instances = {
+        private static final FunctionDescriptor[] instances = {
 
-            new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
+            new FunctionDescriptor("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
                     new Type[] { null, Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("bit_shift_left", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_LEFT, -1,
+            new FunctionDescriptor("bit_shift_left", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_LEFT, -1,
                     new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("bit_shift_right", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_RIGHT, -1,
+            new FunctionDescriptor("bit_shift_right", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_RIGHT, -1,
                     new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("decode", null, FUNC_VOLT_DECODE, 2,
+            new FunctionDescriptor("decode", null, FUNC_VOLT_DECODE, 2,
                     new Type[] { null, null },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET }),
 
-            new FunctionId("field", Type.SQL_VARCHAR, FUNC_VOLT_FIELD, -1,
+            new FunctionDescriptor("field", Type.SQL_VARCHAR, FUNC_VOLT_FIELD, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET}),
 
-            new FunctionId("set_field", Type.SQL_VARCHAR, FUNC_VOLT_SET_FIELD, -1,
+            new FunctionDescriptor("set_field", Type.SQL_VARCHAR, FUNC_VOLT_SET_FIELD, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET }),
 
-            new FunctionId("array_element", Type.SQL_VARCHAR, FUNC_VOLT_ARRAY_ELEMENT, -1,
+            new FunctionDescriptor("array_element", Type.SQL_VARCHAR, FUNC_VOLT_ARRAY_ELEMENT, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_INTEGER },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET}),
 
-            new FunctionId("array_length", Type.SQL_INTEGER, FUNC_VOLT_ARRAY_LENGTH, -1,
+            new FunctionDescriptor("array_length", Type.SQL_INTEGER, FUNC_VOLT_ARRAY_LENGTH, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET}),
 
-            new FunctionId("since_epoch", Type.SQL_BIGINT, FUNC_VOLT_SINCE_EPOCH, -1,
+            new FunctionDescriptor("since_epoch", Type.SQL_BIGINT, FUNC_VOLT_SINCE_EPOCH, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_TIMESTAMP },
                     new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 5,
                     Tokens.SECOND, Tokens.MILLIS, Tokens.MICROS,
                     Tokens.MILLISECOND, Tokens.MICROSECOND,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("to_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_TO_TIMESTAMP, -1,
+            new FunctionDescriptor("to_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_TO_TIMESTAMP, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 5,
                     Tokens.SECOND, Tokens.MILLIS, Tokens.MICROS,
                     Tokens.MILLISECOND, Tokens.MICROSECOND,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("truncate", Type.SQL_TIMESTAMP, FUNC_VOLT_TRUNCATE_TIMESTAMP, -1,
+            new FunctionDescriptor("truncate", Type.SQL_TIMESTAMP, FUNC_VOLT_TRUNCATE_TIMESTAMP, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_TIMESTAMP },
                     new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 11,
                     Tokens.YEAR, Tokens.QUARTER, Tokens.MONTH, Tokens.DAY, Tokens.HOUR,
@@ -269,163 +269,158 @@ public class FunctionForVoltDB extends FunctionSQL {
                     Tokens.MICROS, Tokens.MICROSECOND,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
+            new FunctionDescriptor("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
                     new Type[] { Type.SQL_BIGINT },
                     singleParamList),
 
-            new FunctionId("format_currency", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_CURRENCY, -1,
+            new FunctionDescriptor("format_currency", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_CURRENCY, -1,
                     new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
                     doubleParamList),
 
-            new FunctionId("round", Type.SQL_DECIMAL, FUNC_VOLT_ROUND, -1,
+            new FunctionDescriptor("round", Type.SQL_DECIMAL, FUNC_VOLT_ROUND, -1,
                     new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
                     doubleParamList),
 
-            new FunctionId("str", Type.SQL_VARCHAR, FUNC_VOLT_STR, -1,
+            new FunctionDescriptor("str", Type.SQL_VARCHAR, FUNC_VOLT_STR, -1,
                     new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER, Type.SQL_INTEGER},
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 6, Tokens.COMMA,
                     Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("bitnot", Type.SQL_BIGINT, FUNC_VOLT_BITNOT, -1,
+            new FunctionDescriptor("bitnot", Type.SQL_BIGINT, FUNC_VOLT_BITNOT, -1,
                     new Type[] { Type.SQL_BIGINT },
                     singleParamList),
 
-            new FunctionId("concat", Type.SQL_VARCHAR, FUNC_CONCAT, -1,
+            new FunctionDescriptor("concat", Type.SQL_VARCHAR, FUNC_CONCAT, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET }),
 
-            new FunctionId("hex", Type.SQL_VARCHAR, FUNC_VOLT_HEX, -1,
+            new FunctionDescriptor("hex", Type.SQL_VARCHAR, FUNC_VOLT_HEX, -1,
                     new Type[] { Type.SQL_BIGINT },
                     singleParamList),
 
-            new FunctionId("bin", Type.SQL_VARCHAR, FUNC_VOLT_BIN, -1,
+            new FunctionDescriptor("bin", Type.SQL_VARCHAR, FUNC_VOLT_BIN, -1,
                     new Type[] { Type.SQL_BIGINT },
                     singleParamList),
 
-            new FunctionId("dateadd", Type.SQL_TIMESTAMP, FUNC_VOLT_DATEADD, -1,
+            new FunctionDescriptor("dateadd", Type.SQL_TIMESTAMP, FUNC_VOLT_DATEADD, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_BIGINT, Type.SQL_TIMESTAMP },
                     new short[] { Tokens.OPENBRACKET, Tokens.X_KEYSET, 11, Tokens.YEAR,
                                   Tokens.QUARTER, Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE, Tokens.SECOND,
                                   Tokens.MILLIS, Tokens.MILLISECOND, Tokens.MICROS, Tokens.MICROSECOND, Tokens.COMMA,
                                   Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("regexp_position", Type.SQL_BIGINT, FUNC_VOLT_REGEXP_POSITION, -1,
+            new FunctionDescriptor("regexp_position", Type.SQL_BIGINT, FUNC_VOLT_REGEXP_POSITION, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET}),
 
-            new FunctionId("pointfromtext", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POINTFROMTEXT, -1,
+            new FunctionDescriptor("pointfromtext", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POINTFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     singleParamList),
 
-            new FunctionId("polygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_POLYGONFROMTEXT, -1,
+            new FunctionDescriptor("polygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_POLYGONFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     singleParamList),
-            new FunctionId("contains", Type.SQL_BOOLEAN, FUNC_VOLT_CONTAINS, -1,
+            new FunctionDescriptor("contains", Type.SQL_BOOLEAN, FUNC_VOLT_CONTAINS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY, Type.VOLT_GEOGRAPHY_POINT },
                     doubleParamList),
 
-            new FunctionId("numinteriorring", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
+            new FunctionDescriptor("numinteriorring", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     singleParamList),
 
              // numinteriorrings is alias of numinteriorring
-            new FunctionId("numinteriorrings", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
+            new FunctionDescriptor("numinteriorrings", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     singleParamList),
 
-            new FunctionId("numpoints", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_POINTS, -1,
+            new FunctionDescriptor("numpoints", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_POINTS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     singleParamList),
 
-            new FunctionId("latitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LATITUDE, -1,
+            new FunctionDescriptor("latitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LATITUDE, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY_POINT },
                     singleParamList),
 
-            new FunctionId("longitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LONGITUDE, -1,
+            new FunctionDescriptor("longitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LONGITUDE, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY_POINT },
                     singleParamList),
 
-            new FunctionId("centroid", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POLYGON_CENTROID, -1,
+            new FunctionDescriptor("centroid", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POLYGON_CENTROID, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     singleParamList),
 
-            new FunctionId("area", Type.SQL_DOUBLE, FUNC_VOLT_POLYGON_AREA, -1,
+            new FunctionDescriptor("area", Type.SQL_DOUBLE, FUNC_VOLT_POLYGON_AREA, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     singleParamList),
 
-            new FunctionId("distance", Type.SQL_DOUBLE, FUNC_VOLT_DISTANCE, -1,
+            new FunctionDescriptor("distance", Type.SQL_DOUBLE, FUNC_VOLT_DISTANCE, -1,
                     new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES },
                     doubleParamList),
 
-            new FunctionId("astext", Type.SQL_VARCHAR, FUNC_VOLT_ASTEXT, -1,
+            new FunctionDescriptor("astext", Type.SQL_VARCHAR, FUNC_VOLT_ASTEXT, -1,
                     new Type[] { Type.SQL_ALL_TYPES },
                     singleParamList),
 
-            new FunctionId("isvalid", Type.SQL_BOOLEAN, FUNC_VOLT_VALIDATE_POLYGON, -1,
+            new FunctionDescriptor("isvalid", Type.SQL_BOOLEAN, FUNC_VOLT_VALIDATE_POLYGON, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     singleParamList),
 
-            new FunctionId("isinvalidreason", Type.SQL_VARCHAR, FUNC_VOLT_POLYGON_INVALID_REASON, -1,
+            new FunctionDescriptor("isinvalidreason", Type.SQL_VARCHAR, FUNC_VOLT_POLYGON_INVALID_REASON, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     singleParamList),
 
-            new FunctionId("dwithin", Type.SQL_BOOLEAN, FUNC_VOLT_DWITHIN, -1,
+            new FunctionDescriptor("dwithin", Type.SQL_BOOLEAN, FUNC_VOLT_DWITHIN, -1,
                     new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES, Type.SQL_DOUBLE },
                     new short[] {  Tokens.OPENBRACKET,
                                    Tokens.QUESTION, Tokens.COMMA,
                                    Tokens.QUESTION, Tokens.COMMA,
                                    Tokens.QUESTION,
                                    Tokens.CLOSEBRACKET }),
-            new FunctionId("validpolygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_VALIDPOLYGONFROMTEXT, -1,
+            new FunctionDescriptor("validpolygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_VALIDPOLYGONFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     singleParamList),
 
-            new FunctionId("min_valid_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_MIN_VALID_TIMESTAMP, -1,
+            new FunctionDescriptor("min_valid_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_MIN_VALID_TIMESTAMP, -1,
                     new Type[] {},
                     emptyParamList,
                     noParamList),
-            new FunctionId("max_valid_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_MAX_VALID_TIMESTAMP, -1,
+            new FunctionDescriptor("max_valid_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_MAX_VALID_TIMESTAMP, -1,
                     new Type[] {},
                     emptyParamList,
                     noParamList),
-            new FunctionId("is_valid_timestamp", Type.SQL_BOOLEAN, FUNC_VOLT_IS_VALID_TIMESTAMP, -1,
+            new FunctionDescriptor("is_valid_timestamp", Type.SQL_BOOLEAN, FUNC_VOLT_IS_VALID_TIMESTAMP, -1,
                     new Type[] { Type.SQL_TIMESTAMP },
                     singleParamList),
 
-            new FunctionId("inet_ntoa", Type.SQL_VARCHAR, FUNC_INET_NTOA, -1,
+            new FunctionDescriptor("inet_ntoa", Type.SQL_VARCHAR, FUNC_INET_NTOA, -1,
                     new Type[] { Type.SQL_BIGINT },
                     singleParamList),
 
-            new FunctionId("inet_aton", Type.SQL_BIGINT, FUNC_INET_ATON, -1,
+            new FunctionDescriptor("inet_aton", Type.SQL_BIGINT, FUNC_INET_ATON, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     singleParamList),
 
-            new FunctionId("inet6_aton", Type.SQL_VARBINARY, FUNC_INET6_ATON, -1,
+            new FunctionDescriptor("inet6_aton", Type.SQL_VARBINARY, FUNC_INET6_ATON, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     singleParamList),
 
-            new FunctionId("inet6_ntoa", Type.SQL_VARCHAR, FUNC_INET6_NTOA, -1,
+            new FunctionDescriptor("inet6_ntoa", Type.SQL_VARCHAR, FUNC_INET6_NTOA, -1,
                     new Type[] { Type.SQL_VARBINARY },
                     singleParamList),
 
         };
 
-        private static Map<String, FunctionId> by_LC_name = new HashMap<>();
-        private static Map<String, FunctionId> dropped_UDFs = new HashMap<>();
-        private static Set<String> userDefinedFunctions = new HashSet<>();
+        private static Map<String, FunctionDescriptor> by_LC_name = new HashMap<>();
         static {
-            for (FunctionId fn : instances) {
+            for (FunctionDescriptor fn : instances) {
                 by_LC_name.put(fn.m_name, fn);
             }
         }
 
-        public static Set<String> getAllUserDefinedFunctionNames() {
-        	return userDefinedFunctions;
-        }
-        static FunctionId fn_by_name(String anyCase) {
+        static FunctionDescriptor fn_by_name(String anyCase) {
             String upCase = anyCase.toLowerCase();
             return by_LC_name.get(upCase);
         }
@@ -435,12 +430,12 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
     }
 
-    public static final int FUNC_VOLT_ID_FOR_CONTAINS = FunctionId.FUNC_VOLT_CONTAINS;
+    public static final int FUNC_VOLT_ID_FOR_CONTAINS = FunctionDescriptor.FUNC_VOLT_CONTAINS;
 
-    private final FunctionId m_def;
+    private final FunctionDescriptor m_def;
 
     public static FunctionSQL newVoltDBFunction(String token) {
-        FunctionId def = FunctionId.fn_by_name(token);
+        FunctionDescriptor def = FunctionDescriptor.fn_by_name(token);
         if (def == null) {
             return null;
         }
@@ -448,7 +443,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         return function;
     }
 
-    public FunctionForVoltDB(FunctionId fn) {
+    public FunctionForVoltDB(FunctionDescriptor fn) {
         super();
         m_def     = fn;
         funcType  = m_def.getId();
@@ -506,7 +501,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
 
         switch(m_def.getId()) {
-        case FunctionId.FUNC_CONCAT:
+        case FunctionDescriptor.FUNC_CONCAT:
             for (int ii = 0; ii < nodes.length; ii++) {
                 if (nodes[ii].dataType == null && nodes[ii].isParam) {
                     nodes[ii].dataType = Type.SQL_VARCHAR;
@@ -516,7 +511,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         /*
          * The types to the FIELD functions parameters are VARCHAR
          */
-        case FunctionId.FUNC_VOLT_FIELD:
+        case FunctionDescriptor.FUNC_VOLT_FIELD:
             if (nodes[0].dataType == null && nodes[0].isParam) {
                 nodes[0].dataType = Type.SQL_VARCHAR;
             }
@@ -533,7 +528,7 @@ public class FunctionForVoltDB extends FunctionSQL {
              * -- the VoltDB EE complains about NULL-typed parameters but is somewhat forgiving about
              * mixed argument types.
              */
-        case FunctionId.FUNC_VOLT_DECODE:
+        case FunctionDescriptor.FUNC_VOLT_DECODE:
             // Track whether parameter type hinting is needed for either key or value arguments.
             // For simplicity(?), parameters are not tracked explicitly (by position)
             // or even by category (key vs. value). So, if any parameter hinting is required at all,
@@ -601,12 +596,12 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             break;
 
-        case FunctionId.FUNC_VOLT_BITNOT:
+        case FunctionDescriptor.FUNC_VOLT_BITNOT:
             voltResolveToBigintTypesForBitwise();
             break;
 
-        case FunctionId.FUNC_VOLT_BIT_SHIFT_LEFT:
-        case FunctionId.FUNC_VOLT_BIT_SHIFT_RIGHT:
+        case FunctionDescriptor.FUNC_VOLT_BIT_SHIFT_LEFT:
+        case FunctionDescriptor.FUNC_VOLT_BIT_SHIFT_RIGHT:
             // the first parameter has to be BigInteger
             voltResolveToBigintType(0);
             voltResolveToBigintCompatibleType(1);
@@ -614,13 +609,13 @@ public class FunctionForVoltDB extends FunctionSQL {
             dataType = Type.SQL_BIGINT;
             break;
 
-        case FunctionId.FUNC_VOLT_HEX:
-        case FunctionId.FUNC_VOLT_BIN:
+        case FunctionDescriptor.FUNC_VOLT_HEX:
+        case FunctionDescriptor.FUNC_VOLT_BIN:
             voltResolveToBigintType(0);
             dataType = Type.SQL_VARCHAR;
             break;
 
-        case FunctionId.FUNC_VOLT_DISTANCE:
+        case FunctionDescriptor.FUNC_VOLT_DISTANCE:
             // validate the types of argument is valid
             if (nodes[0].dataType == null || nodes[1].dataType == null) {
                 // "data type cast needed for parameter or null literal"
@@ -649,7 +644,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             break;
 
-        case FunctionId.FUNC_VOLT_DWITHIN:
+        case FunctionDescriptor.FUNC_VOLT_DWITHIN:
             if (nodes[0].dataType == null || nodes[1].dataType == null) {
                 // "data type cast needed for parameter or null literal"
                 throw Error.error(ErrorCode.X_42567,
@@ -684,7 +679,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             break;
 
-        case FunctionId.FUNC_VOLT_ASTEXT:
+        case FunctionDescriptor.FUNC_VOLT_ASTEXT:
             if (nodes[0].dataType == null) {
                 // "data type cast needed for parameter or null literal"
                 throw Error.error(ErrorCode.X_42567,
@@ -699,7 +694,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
 
         // our networking specified functions
-        case FunctionId.FUNC_INET_NTOA:
+        case FunctionDescriptor.FUNC_INET_NTOA:
             if (nodes[0].dataType != null &&
                 !nodes[0].dataType.isNumberType()) {
                 throw Error.error(ErrorCode.X_42561);
@@ -707,7 +702,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             dataType = Type.SQL_VARCHAR;
             break;
 
-        case FunctionId.FUNC_INET_ATON:
+        case FunctionDescriptor.FUNC_INET_ATON:
             if (nodes[0].dataType != null &&
                 !nodes[0].dataType.isCharacterType()) {
                 throw Error.error(ErrorCode.X_42561);
@@ -715,7 +710,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             dataType = Type.SQL_BIGINT;
             break;
 
-        case FunctionId.FUNC_INET6_ATON:
+        case FunctionDescriptor.FUNC_INET6_ATON:
             if (nodes[0].dataType != null &&
                 !nodes[0].dataType.isCharacterType()) {
                 throw Error.error(ErrorCode.X_42561);
@@ -723,7 +718,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             dataType = Type.SQL_VARBINARY;
             break;
 
-        case FunctionId.FUNC_INET6_NTOA:
+        case FunctionDescriptor.FUNC_INET6_NTOA:
             if (nodes[0].dataType != null &&
                 !nodes[0].dataType.isBinaryType()) {
                 throw Error.error(ErrorCode.X_42561);
@@ -791,9 +786,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         sb.append(m_def.getName()).append(Tokens.T_OPENBRACKET);
 
         switch (m_def.getId()) {
-        case FunctionId.FUNC_VOLT_SINCE_EPOCH:
-        case FunctionId.FUNC_VOLT_TO_TIMESTAMP:
-        case FunctionId.FUNC_VOLT_TRUNCATE_TIMESTAMP: {
+        case FunctionDescriptor.FUNC_VOLT_SINCE_EPOCH:
+        case FunctionDescriptor.FUNC_VOLT_TO_TIMESTAMP:
+        case FunctionDescriptor.FUNC_VOLT_TRUNCATE_TIMESTAMP: {
             int timeUnit = ((Number) nodes[0].valueData).intValue();
             sb.append(Tokens.getKeyword(timeUnit));
             break;
@@ -823,23 +818,99 @@ public class FunctionForVoltDB extends FunctionSQL {
     }
 
     // This is the unique sequential UDF Id we assign to every UDF defined by the user.
-    private static int m_udfSeqId = FunctionId.FUNC_VOLT_UDF_ID_START;
+    private static int m_udfSeqId = FunctionDescriptor.FUNC_VOLT_UDF_ID_START;
 
     public static int getNextFunctionId() {
         return m_udfSeqId++;
     }
 
-    public static void registerTokenForUDF(String functionName, int functionId,
-                                           Class<?> returnTypeClass, Class<?>[] parameterTypeClasses) {
-        // If the token is already registered in the map, do not bother again.
-        if (getFunctionId(functionName) != FunctionId.FUNC_VOLT_ID_NOT_DEFINED) {
-            return;
-        }
+    /**
+     * Remove one user defined function.
+     * @param functionName
+     */
+    public static void deregisterUserDefinedFunction(String functionName) {
+    	FunctionDescriptor.by_LC_name.remove(functionName);
+    }
+    
+    /**
+     * Return true iff the FunctionId newFid matches the given signature.
+     * 
+     * @param newFd
+     * @param functionId
+     * @param returnTypeClass
+     * @param parameterTypeClasses
+     * @return true iff newFid matches the given signature.
+     */
+    private static boolean functionMatches(FunctionDescriptor newFd,
+    									   Class<?> returnTypeClass,
+    									   Class<?>[] parameterTypeClasses) {
         Type returnType = Type.getDefaultTypeWithSize(Types.getParameterSQLTypeNumber(returnTypeClass));
-        Type[] parameterTypes = new Type[parameterTypeClasses.length];
-        for (int i = 0; i < parameterTypeClasses.length; i++) {
-            parameterTypes[i] = Type.getDefaultTypeWithSize(Types.getParameterSQLTypeNumber(parameterTypeClasses[i]));
-        }
+        boolean answer = false;
+    	if ((parameterTypeClasses.length == newFd.m_paramTypes.length)
+    			&& (newFd.m_type.equals(returnType))) {
+    		for (int idx = 0; idx < parameterTypeClasses.length; idx += 1) { 
+    			Type ptype = Type.getDefaultTypeWithSize(Types.getParameterSQLTypeNumber(parameterTypeClasses[idx]));
+    			if (ptype != newFd.m_paramTypes[idx]) {
+    				answer = false;
+    				break;
+    			}
+    		}
+    		answer = true;
+    	}
+    	return answer;
+    }
+
+    /**
+     * This is like the previous functionMatches functions, but it uses
+     * SQL types.  This replication is to avoid creating a Type[] array.
+     * 
+     * @param newFd
+     * @param returnType
+     * @param parameterTypes
+     * @return
+     */
+    private static boolean functionMatches(FunctionDescriptor newFd,
+    									   Type returnType,
+    									   Type[] parameterTypes) {
+        boolean answer = false;
+    	if ((parameterTypes.length == newFd.m_paramTypes.length)
+    			&& (newFd.m_type == returnType)) {
+    		for (int idx = 0; idx < parameterTypes.length; idx += 1) { 
+    			Type ptype = parameterTypes[idx];
+    			if (ptype != newFd.m_paramTypes[idx]) {
+    				answer = false;
+    				break;
+    			}
+    		}
+    		answer = true;
+    	}
+    	return answer;
+    }
+    
+    /**
+     * This is like the previous findFunction, but for SQL types.
+     * @param functionName
+     * @param returnType
+     * @param parameterType
+     * @return
+     */
+    private static FunctionDescriptor findFunction(String functionName, 
+    												Type returnType, 
+    												Type[] parameterType) {
+    	FunctionDescriptor newFd = FunctionDescriptor.by_LC_name.get(functionName);
+    	if (newFd == null && m_oldFunctionDfns != null) {
+    		newFd = m_oldFunctionDfns.get(functionName);
+    	}
+    	if (newFd != null && functionMatches(newFd, returnType, parameterType)) {
+    		return newFd;
+    	}
+    	return null;
+    }
+    
+    private static FunctionDescriptor makeFunctionIdFromParts(String functionName,
+    											      int functionId,
+    											      Type returnType,
+    											      Type[] parameterTypes) {
 
         // A pair of parentheses + number of parameters
         int syntaxLength = 2 + parameterTypes.length;
@@ -857,79 +928,82 @@ public class FunctionForVoltDB extends FunctionSQL {
             syntax[idx++] = Tokens.QUESTION;
         }
         syntax[syntax.length - 1] = Tokens.CLOSEBRACKET;
-
-        FunctionId fid = new FunctionId(functionName, returnType, functionId, -1, parameterTypes, syntax);
-        FunctionId.by_LC_name.put(functionName, fid);
-        // This is not the same as by_LC_name.keys(), since it only
-        // contains the user defined functions.
-        FunctionId.userDefinedFunctions.add(functionName);
-        m_logger.info(String.format("Added UDF \"%s\"(%d) with %d parameters",
-        							functionName, functionId, parameterTypes.length));
-        if (m_udfSeqId <= functionId) {
-            m_udfSeqId = functionId + 1;
-        }
-    }
-
-    /**
-     * Remove all user defined functions.  We use this
-     * to initialize the table when we start.  If the table
-     * was part of the HSQL object we would not have to do
-     * this.
-     */
-    public static void deregisterAllUserDefinedFunctions() {
-        for (String functionName : FunctionId.userDefinedFunctions) {
-            FunctionId.by_LC_name.remove(functionName);
-        }
-        FunctionId.dropped_UDFs.clear();
-        FunctionId.userDefinedFunctions.clear();
-        // m_udfSeqId = FunctionId.FUNC_VOLT_UDF_ID_START;
-    }
-
-    /**
-     * Remove one user defined function.
-     * @param functionName
-     */
-    public static void deregisterUserDefinedFunction(String functionName, boolean justDisable) {
-    	FunctionId dfn = FunctionId.by_LC_name.get(functionName);
-    	FunctionId.userDefinedFunctions.remove(functionName);
-    	if (justDisable && (dfn != null)) {
-    		FunctionId.by_LC_name.remove(functionName);
-    		FunctionId.dropped_UDFs.put(functionName, dfn);
-    	}
-    }
-
-    public static void reRegisterUserDefinedFunction(String functionName) {
-    	FunctionId dfn = FunctionId.dropped_UDFs.get(functionName);
-    	assert(dfn != null);
-    	FunctionId.dropped_UDFs.remove(functionName);
-    	FunctionId.by_LC_name.put(functionName, dfn);
-    	FunctionId.userDefinedFunctions.add(functionName);
+        return new FunctionDescriptor(functionName, returnType, functionId, -1, parameterTypes, syntax);
     }
     
-    public static int getFunctionId(String functionName) {
-        FunctionId fid = FunctionId.fn_by_name(functionName);
-        if (fid == null) {
-            return FunctionId.FUNC_VOLT_ID_NOT_DEFINED;
+    public static int registerTokenForUDF(String functionName,
+                             			  Type returnTypeClass, 
+                             			  Type[] parameterTypeClasses) {
+    	return registerTokenForUDF(functionName, -1, returnTypeClass, parameterTypeClasses);
+    }
+    
+	/**
+	 * This function registers a UDF using Type values for the return type and parameter types.
+	 * This 
+	 * @param functionName
+	 * @param functionId
+	 * @param returnTypeClass
+	 * @param parameterTypeClasses
+	 * @return
+	 */
+    public static int registerTokenForUDF(String functionName, 
+    									  int functionId,
+    									  Type returnTypeClass, 
+    									  Type[] parameterTypeClasses) {
+    	int answer;
+        // If the token is already registered in the map, do not bother again.
+    	FunctionDescriptor oldFd = findFunction(functionName, returnTypeClass, parameterTypeClasses);
+        if (oldFd != null) {
+        	// This may replace functionName with itself.  This will not be an error.
+        	FunctionDescriptor.by_LC_name.put(functionName, oldFd);
+        	answer = oldFd.getId();
+        	// If we were given a non-negative function id, it
+        	// was defined in the catalog.  Our revivification here
+        	// should have a value which we put into the catalog sometime
+        	// earlier.  So, this earlier value should match the one we
+        	// were told to return.
+        	assert((functionId < 0) || (functionId == answer));
+        } else {
+	        // if the function was not already defined, then
+        	//   if functionId is a valid UDF id, then use it
+        	//   otherwise, we want a new number.
+	        // 
+        	if (isUserDefinedFunctionId(functionId)) {
+        		answer = functionId;
+        	} else {
+        		answer = getNextFunctionId();
+        	}
+	        FunctionDescriptor fd = makeFunctionIdFromParts(functionName, answer, returnTypeClass, parameterTypeClasses);
+	        FunctionDescriptor.by_LC_name.put(functionName, fd);
+	        m_logger.info(String.format("Added UDF \"%s\"(%d) with %d parameters",
+	        							functionName, answer, parameterTypeClasses.length));
         }
-        return fid.getId();
+        // Ensure that m_udfSeqId is larger than all the
+        // ones we've seen so far.
+        if (m_udfSeqId <= answer) {
+            m_udfSeqId = answer + 1;
+        }
+        return answer;
     }
 
     public static boolean isDefinedFunctionId(int functionId) {
-        return functionId != FunctionId.FUNC_VOLT_ID_NOT_DEFINED;
+        return functionId != FunctionDescriptor.FUNC_VOLT_ID_NOT_DEFINED;
     }
 
     public static boolean isUserDefinedFunctionId(int functionId) {
-        return functionId >= FunctionId.FUNC_VOLT_UDF_ID_START;
+        return functionId >= FunctionDescriptor.FUNC_VOLT_UDF_ID_START;
     }
 
-    public FunctionId getFunctionId() {
+    public FunctionDescriptor getFunctionId() {
         return m_def;
     }
     
     public static Set<String> getAllUserDefinedFunctionNamesForDebugging() {
     	Set<String> answer = new HashSet<>();
-    	for (String name : FunctionId.getAllUserDefinedFunctionNames()) {
-    		answer.add(name);
+    	for (Map.Entry<String, FunctionDescriptor> entry : FunctionDescriptor.by_LC_name.entrySet()) {
+    		if (isUserDefinedFunctionId(entry.getValue().getId())) {
+    			answer.add(entry.getKey());
+    		}
     	}
     	return answer;
     }
@@ -952,8 +1026,120 @@ public class FunctionForVoltDB extends FunctionSQL {
         return val;
     }
 
-	public static void dropDisabledFunctions() {
-		FunctionId.dropped_UDFs.clear();
+    private static Map<String, FunctionDescriptor> m_oldFunctionDfns = null;
+    
+    private static FunctionDescriptor lookupOldFunction(String functionName) {
+    	if (m_oldFunctionDfns != null) {
+    		return m_oldFunctionDfns.get(functionName);
+    	}
+    	return null;
+    }
+    /**
+     * Delete all the user defined functions, but cache them if that is wanted.
+     * 
+     * @param saved  Where to cache the old functions.
+     */
+    private static void deleteOldFunctions(Map<String, FunctionDescriptor> saved) {
+		for (Iterator<Map.Entry<String, FunctionDescriptor>> i = FunctionDescriptor.by_LC_name.entrySet().iterator(); i.hasNext();) {
+			 Map.Entry<String, FunctionDescriptor> element = i.next();
+			 if (isUserDefinedFunctionId(element.getValue().getId())) {
+				 if (saved != null) {
+					 saved.put(element.getKey(), element.getValue());
+				 }
+				 i.remove();
+			 }
+		}
+    }
+
+    /**
+	 * Restore the saved user defined functions.
+	 */
+	public static void restoreOldFunctions() {
+		assert(m_oldFunctionDfns != null);
+		
+		// Delete the ones we have now, and add back
+		// the old ones.
+		deleteOldFunctions(null);
+		for (Iterator<Map.Entry<String, FunctionDescriptor>> i = m_oldFunctionDfns.entrySet().iterator(); i.hasNext();) {
+			Map.Entry<String, FunctionDescriptor> val = i.next();
+			FunctionDescriptor.by_LC_name.put(val.getKey(), val.getValue());
+		}
+		m_oldFunctionDfns = null;
+	}
+
+	public static void clearOldFunctions() {
+		m_oldFunctionDfns = null;
+	}
+
+	/**
+	 * This is used only in an assert.  This function should be defined and have the
+	 * given function id.
+	 * 
+	 * @param functionName
+	 * @param functionId
+	 * @return
+	 */
+	public static boolean tokenForUDFisDefined(String functionName, int functionId) {
+		FunctionDescriptor fd = FunctionDescriptor.by_LC_name.get(functionName);
+		return (fd != null && fd.getId() == functionId);
+	}
+
+	public static void prepareOldFunctions() {
+		assert (m_oldFunctionDfns == null);
+		m_oldFunctionDfns = new HashMap<String, FunctionDescriptor>();
+	}
+	/**
+	 * Load one function into the old function id table.  These are filled in from an
+	 * old catalog.  They aren't defined after this load, but if they are defined later
+	 * we use this definition.  If the unthinkable happens, and we need to abort a
+	 * compilation, we will restore these to the compiler's function id table, which
+	 * will make them defined to the compiler.
+	 * 
+	 * Note that we will have numeric function ids for these.  The whole point of this
+	 * mishegas is to keep the numeric function function ids stable. 
+	 * 
+	 * @param functionName The function's call name.  The method class and name are not available. 
+	 * @param returnType The return type, in SQL Type form.
+	 * @param paramTypes The parameter types, in SQL Type form.
+	 */
+	public static void loadOldFunctionId(String functionName, int functionId, Type returnType, Type[] paramTypes) {
+		assert(m_oldFunctionDfns != null);
+		FunctionDescriptor oldfd = findFunction(functionName, returnType, paramTypes);
+		if (oldfd != null) {
+			// This should not be defined in m_oldFunctionDfns, but only
+			// in by_LC_name.
+			FunctionDescriptor.by_LC_name.remove(functionName);
+			assert(m_oldFunctionDfns.get(functionName) == null);
+		} else {
+			oldfd = makeFunctionIdFromParts(functionName, functionId, returnType, paramTypes);
+		}
+		m_oldFunctionDfns.put(functionName, oldfd);
+	}
+	
+	public static void logTableState(String message) {
+		if (m_logger.isDebugEnabled()) {
+			m_logger.debug(message);
+			m_logger.debug("  Defined functions:");
+			for (Map.Entry<String, FunctionDescriptor> fd : FunctionDescriptor.by_LC_name.entrySet()) {
+				if ((fd.getValue().getId() < 0) || isUserDefinedFunctionId(fd.getValue().getId())) {
+					m_logger.debug(String.format("    %s(%d) with %d parameters",
+							                     fd.getValue().getName(),
+							                     fd.getValue().getId(),
+							                     fd.getValue().getParamTypes().length));
+				}
+			}
+			if (m_oldFunctionDfns == null) {
+				m_logger.debug("  No Saved Functions");
+			} else {
+				m_logger.debug("  Saved functions:");
+				for (Map.Entry<String, FunctionDescriptor> fd : m_oldFunctionDfns.entrySet()) {
+					m_logger.debug(String.format("    %s(%d) with %d parameters",
+							                     fd.getValue().getName(),
+							                     fd.getValue().getId(),
+							                     fd.getValue().getParamTypes().length));
+				}
+			}
+		}
 	}
 
 }
