@@ -952,8 +952,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // Reuse the creation time of the original invocation to have accurate internal latency
             if (response.isMispartitioned()) {
                 // If the transaction is restarted, don't send a response to the client yet.
-                restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos);
-                return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
+                if (restartTransaction(clientData.m_messageSize, clientData.m_creationTimeNanos)) {
+                    return DeferredSerialization.EMPTY_MESSAGE_LENGTH;
+                }
             }
 
             final long now = System.nanoTime();
@@ -994,10 +995,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         /**
-         * Restart mis-partitioned transaction
+         * Restart mis-partitioned transaction if possible
          * @param messageSize the original message size when the invocation first came in
+         * @return true if the transaction is restarted successfully, false otherwise.
          */
-        private void restartTransaction(int messageSize, long nowNanos)
+        private boolean restartTransaction(int messageSize, long nowNanos)
         {
             // Restart a mis-partitioned transaction
             assert response.getInvocation() != null;
@@ -1014,7 +1016,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // if we are recovering, the mispartitioned txn must come from the log,
             // don't restart it. The correct txn will be replayed by another node.
             if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
-                return;
+                return false;
             }
 
             boolean isReadonly = catProc.getReadonly();
@@ -1036,6 +1038,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 assert(clientResponse == null);
                 clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
             }
+            return true;
         }
     }
 

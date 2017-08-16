@@ -42,7 +42,6 @@ public class ClientInterfaceHandleManager
 {
     private static final VoltLogger tmLog = new VoltLogger("TM");
 
-    static final long READ_BIT = 1L << 63;
     //Add an extra bit so compared to the 14-bits in txnids so there
     //can be a short circuit read partition id
     static final int PART_ID_BITS = 15;
@@ -131,9 +130,9 @@ public class ClientInterfaceHandleManager
             @Override
             synchronized long getHandle(boolean isSinglePartition, int partitionId,
                     long clientHandle, int messageSize, long creationTimeNanos, String procName, long initiatorHSId,
-                    boolean readOnly, boolean isShortCircuitRead) {
+                    boolean isShortCircuitRead) {
                 return super.getHandle(isSinglePartition, partitionId,
-                        clientHandle, messageSize, creationTimeNanos, procName, initiatorHSId, readOnly, isShortCircuitRead);
+                        clientHandle, messageSize, creationTimeNanos, procName, initiatorHSId, isShortCircuitRead);
             }
             @Override
             synchronized Iv2InFlight findHandle(long ciHandle) {
@@ -181,7 +180,6 @@ public class ClientInterfaceHandleManager
             long creationTimeNanos,
             String procName,
             long initiatorHSId,
-            boolean readOnly,
             boolean isShortCircuitRead)
     {
         assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
