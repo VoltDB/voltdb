@@ -40,7 +40,7 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 
 Expect to fail because the jar has been killed by dropping a statically
     dependent class.
-Error loading class 'sqlcmdtest.Breakable1': java.lang.NoClassDefFoundError for sqlcmdtest/Breakable1$NestedGetsKilled
+The response from host 0 for @VerifyCatalogAndWriteJar returned failures: unexpected error verifying classes or preparing procedure runners: Error loading class 'sqlcmdtest.Breakable1': java.lang.NoClassDefFoundError for sqlcmdtest/Breakable1$NestedGetsKilled
 Expect to fail because the jar has been sabotaged by dropping dependent classes
 VOLTDB ERROR: UNEXPECTED FAILURE:
   java.lang.NoClassDefFoundError: sqlcmdtest/Breakable0$NestedGetsSabotaged

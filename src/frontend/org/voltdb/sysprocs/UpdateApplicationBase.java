@@ -427,8 +427,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         for (Entry<Integer, ClientResponse> entry : resultMapByHost.entrySet()) {
             if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
-                err = "A response from host " + entry.getKey().toString() +
-                      " for " + procedureName + " failed. " + entry.getValue().getStatusString();
+                err = "The response from host " + entry.getKey().toString() +
+                      " for " + procedureName + " returned failures: " + entry.getValue().getStatusString();
                 compilerLog.info(err);
 
                 // hide the internal NT-procedure @VerifyCatalogAndWriteJar from the client message
@@ -481,8 +481,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
 
         if (ccr.errorMsg != null) {
-            errMsg = invocationName + " has been rejected: " + ccr.errorMsg;
-            return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
+            return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
         }
         // Log something useful about catalog upgrades when they occur.
         if (ccr.upgradedFromVersion != null) {
@@ -527,8 +526,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // write the new catalog to a temporary jar file
         errMsg = verifyAndWriteCatalogJar(ccr);
         if (errMsg != null) {
-            // errMsg could be empty when having node failures ENG-13018
-            errMsg = "User classes verification or catalog jar writes failed: " + errMsg;
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 

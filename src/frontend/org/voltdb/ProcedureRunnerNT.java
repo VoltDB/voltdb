@@ -470,7 +470,7 @@ public class ProcedureRunnerNT {
     }
 
     /**
-     * For all-host NT procs, use site failures to call callbacks for hosts
+     * For all-host NT procedures, use site failures to call callbacks for hosts
      * that will obviously never respond.
      *
      * ICH and the other plumbing should handle regular, txn procs.
