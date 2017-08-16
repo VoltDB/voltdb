@@ -1431,9 +1431,9 @@ public class AbstractTopology {
                     perspectiveHosts.sort((Host a, Host b) -> {
                         return (a.getleaderCount() - b.getleaderCount());
                     });
+                    leaderId = perspectiveHosts.get(0).id;
+                    partition.leaderHostId = leaderId;
                 }
-                leaderId = perspectiveHosts.get(0).id;
-                partition.leaderHostId = leaderId;
             }
             mp.leader = mutableHostMap.get(leaderId);
         }
