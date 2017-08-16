@@ -40,6 +40,11 @@ if __name__ == '__main__':
                     DATA = getdata(upstream['upstreamUrl'], str(upstream['upstreamBuild']))
                     break
                 else:
+                    if len(affectedPaths) == 0:
+                        # empty change set!!!!
+                        # lie about matching paths so that jobs trigger when change set is empty
+                        # there's a bug in jenkins git plugin that misseses changes in some cases (new branches)?
+                        sys.exit(0)
                     for p in affectedPaths:
                         for pat in patterns:
                             if fnmatch(p, pat):
