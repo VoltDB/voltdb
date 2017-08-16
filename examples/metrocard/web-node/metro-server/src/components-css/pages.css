@@ -73,8 +73,10 @@
 .chart-1-title {
     position: absolute;
     z-index: 10000;
-    font-size: 5em;
-    left: 800px;
+    font-size: 4em;
+    width: 40%;
+    margin-left: 50%;
+    margin-right: 90%;
     margin-top: 50px;
     font-family: 'Anton', sans-serif;
 }
