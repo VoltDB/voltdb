@@ -12,6 +12,7 @@
     border-radius: 10px;
 
     padding: 9px 18px;
+    font-family: 'Saira', sans-serif;
 }
 
 .nav-elem.active {
@@ -65,6 +66,8 @@
 .chart-container {
     width: 200px;
     height: 200px;
+    margin-top: 100px;
+    margin-left: 100px;
 }
 
 .chart-1-title {
@@ -72,13 +75,15 @@
     z-index: 10000;
     font-size: 8em;
     left: 700px;
-    margin-top: 50px;
+    margin-top: 80px;
     font-family: 'Anton', sans-serif;
 }
 
 .chart-2-container {
     width: 200px;
     height: 200px;
+    margin-top: 100px;
+    margin-left: 100px;
 }
 
 .wrapper-odometer-2 {
@@ -103,3 +108,4 @@
 @import url('https://fonts.googleapis.com/css?family=Sedgwick+Ave+Display');
 @import url('https://fonts.googleapis.com/css?family=Anton');
 @import url('https://fonts.googleapis.com/css?family=Orbitron');
+@import url('https://fonts.googleapis.com/css?family=Saira');

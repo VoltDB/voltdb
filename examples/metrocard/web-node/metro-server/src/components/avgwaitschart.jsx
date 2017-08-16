@@ -7,9 +7,10 @@ class AvgWaitsChart extends Component {
     return (
       <div>
         <XYPlot
+          margin={{left: 100}}
           xType={'ordinal'}
-          width={window.innerWidth - 50}
-          height={window.innerHeight - 50}>
+          width={window.innerWidth - 200}
+          height={window.innerHeight - 200}>
           <XAxis />
           <YAxis />
           <HorizontalGridLines />

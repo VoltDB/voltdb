@@ -11,6 +11,7 @@ const data = new Array(10).fill(0).reduce((prev, curr) => [...prev, {
 }], [{ x: 0, y: 10 }])
 
 // Root element
+// TODO: setup routing ?
 class App extends Component {
 
   constructor(props) {
@@ -65,7 +66,7 @@ class App extends Component {
           newData = newData.map((v, i, arr) => {
             let r = {};
             r.x = v[0];
-            r.y = v[1];
+            r.y = v[1] + Math.random() * 1000;  // fake data
             return r;
           });
 
