@@ -41,6 +41,17 @@ function webserver() {
     cd web; python -m SimpleHTTPServer $WEB_PORT
 }
 
+function npminstall() {
+    cd web-node/metro-server
+    npm install
+}
+
+# Start the node server
+function nodeserver() {
+    cd web-node/metro-server
+    npm start
+}
+
 function start_export_web() {
     cd exportWebServer; python exportServer.py
 }
