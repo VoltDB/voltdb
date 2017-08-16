@@ -42,6 +42,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -170,6 +171,9 @@ public class KafkaLoader10 {
 
         @Option(desc = "Enable SSL, optionally provide configuration file")
         String ssl = "";
+
+        @Option(desc = "Stop when all connections are lost", hasArg = false)
+        boolean stopondisconnect = false;
 
         //Read properties from formatter option and do basic validation.
         Properties m_formatterProperties = new Properties();
@@ -435,7 +439,15 @@ public class KafkaLoader10 {
         m_cliOptions.password = CLIConfig.readPasswordIfNeeded(m_cliOptions.user, m_cliOptions.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, null);
+        final ClientConfig clientConfig;
+        AutoReconnectListener listener = new AutoReconnectListener();
+        if (m_cliOptions.stopondisconnect) {
+            clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, null);
+            clientConfig.setReconnectOnConnectionLoss(false);
+        } else {
+            clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, listener);
+            clientConfig.setReconnectOnConnectionLoss(true);
+        }
         if (m_cliOptions.ssl != null && !m_cliOptions.ssl.trim().isEmpty()) {
             clientConfig.setTrustStoreConfigFromPropertyFile(m_cliOptions.ssl);
             clientConfig.enableSSL();
@@ -449,6 +461,10 @@ public class KafkaLoader10 {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_cliOptions.table, m_cliOptions.batch, m_cliOptions.update, new KafkaBulkLoaderCallback());
         }
         m_loader.setFlushInterval(m_cliOptions.flush, m_cliOptions.flush);
+
+        if (!m_cliOptions.stopondisconnect) {
+            listener.setLoader(m_loader);
+        }
 
         if ((m_executorService = getExecutor()) != null) {
             if (m_cliOptions.useSuppliedProcedure) {

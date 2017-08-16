@@ -111,6 +111,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
             String deploymentString = operationString;
             if ("@UpdateApplicationCatalog".equals(invocationName)) {
+                compilerLog.info("@UpdateApplicationCatalog is invoked, current catalog version: " + context.catalogVersion);
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
                 if ((operationBytes == null) || (operationBytes.length == 0)) {
                     newCatalogJar = oldJar;
@@ -121,6 +122,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 // Otherwise, deploymentString has the right contents, don't need to touch it
             }
             else if ("@UpdateClasses".equals(invocationName)) {
+                compilerLog.info("@UpdateClasses is invoked, modifying catalog classes.");
                 // provided operationString is really a String with class patterns to delete,
                 // provided newCatalogJar is the jarfile with the new classes
                 if (operationBytes != null) {
@@ -136,7 +138,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     }
                 }
                 catch (ClassNotFoundException e) {
-                    retval.errorMsg = "Unexpected error in @UpdateClasses modifying classes: " + e.getMessage();
+                    retval.errorMsg = "Classes not found in @UpdateClasses jar: " + e.getMessage();
                     return retval;
                 }
                 // Real deploymentString should be the current deployment, just set it to null
@@ -413,24 +415,24 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             resultMapByHost = cf.get();
         } catch (InterruptedException | ExecutionException e) {
             err = "An invocation of procedure " + procedureName + " on all hosts failed: " + e.getMessage();
-            hostLog.warn(err);
+            hostLog.info(err);
             return err;
         }
 
         if (resultMapByHost == null) {
             err = "An invocation of procedure " + procedureName + " on all hosts returned null result.";
-            hostLog.warn(err);
+            hostLog.info(err);
             return err;
         }
 
         for (Entry<Integer, ClientResponse> entry : resultMapByHost.entrySet()) {
             if (entry.getValue().getStatus() != ClientResponseImpl.SUCCESS) {
-                err = "A response from host " + entry.getKey().toString() +
-                      " for " + procedureName + " has failed: " + entry.getValue().getStatusString();
-                compilerLog.warn(err);
+                err = "The response from host " + entry.getKey().toString() +
+                      " for " + procedureName + " returned failures: " + entry.getValue().getStatusString();
+                compilerLog.info(err);
 
                 // hide the internal NT-procedure @VerifyCatalogAndWriteJar from the client message
-                return entry.getValue().getStatusString();
+                return err;
             }
         }
 
@@ -456,10 +458,10 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                   final boolean useAdhocDDL)
     {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        String blockerError = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog,
+        String errMsg = VoltZK.createCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog,
                 "catalog update(" + invocationName + ")" );
-        if (blockerError != null) {
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, blockerError);
+        if (errMsg != null) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
         }
 
         CatalogChangeResult ccr = null;
@@ -474,13 +476,11 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                 getHostname(),
                                                 getUsername());
         } catch (Exception e) {
-            String errorMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
-            compilerLog.error(errorMsg);
-            return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, errorMsg);
+            errMsg = "Unexpected error during preparing catalog diffs: " + e.getMessage();
+            return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, errMsg);
         }
 
         if (ccr.errorMsg != null) {
-            compilerLog.error(invocationName + " has been rejected: " + ccr.errorMsg);
             return cleanupAndMakeResponse(ClientResponse.GRACEFUL_FAILURE, ccr.errorMsg);
         }
         // Log something useful about catalog upgrades when they occur.
@@ -489,12 +489,14 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     ccr.upgradedFromVersion));
         }
         if (ccr.encodedDiffCommands.trim().length() == 0) {
-            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, invocationName +
-                    " with no catalog changes was skipped.");
+            String msg = invocationName + " with no catalog changes was skipped.";
+            compilerLog.info(msg);
+            return cleanupAndMakeResponse(ClientResponseImpl.SUCCESS, msg);
         }
         if (isRestoring() && !isPromotion && "UpdateApplicationCatalog".equals(invocationName)) {
             // This means no more @UAC calls when using DDL mode.
             noteRestoreCompleted();
+            compilerLog.info("No more @UpdateApplicationCatalog calls when using DDL mode");
         }
 
         try {
@@ -509,7 +511,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                     true, e);
         }
 
-        String errMsg;
+
         // impossible to happen since we only allow catalog update sequentially
         if (VoltDB.instance().getCatalogContext().catalogVersion != ccr.expectedCatalogVersion) {
             errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
@@ -524,7 +526,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         // write the new catalog to a temporary jar file
         errMsg = verifyAndWriteCatalogJar(ccr);
         if (errMsg != null) {
-            hostLog.error("Catalog jar verification and/or jar writes failed: " + errMsg);
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
@@ -541,13 +542,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             }
         }
         long genId = getNextGenerationId();
-        try {
-            CatalogUtil.updateCatalogToZK(zk, ccr.expectedCatalogVersion + 1, genId,
-                    ccr.catalogBytes, ccr.catalogHash, ccr.deploymentBytes);
-        } catch (KeeperException | InterruptedException e) {
-            errMsg = "error writing catalog bytes on ZK";
-            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-        }
 
         // update the catalog jar
         return callProcedure("@UpdateCore",

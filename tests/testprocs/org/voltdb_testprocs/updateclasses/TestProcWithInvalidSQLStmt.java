@@ -21,29 +21,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package txnIdSelfCheck.procedures;
+package org.voltdb_testprocs.updateclasses;
 
-public class udfs {
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-    public long add2Bigint(long i, long j) {
-        // add two big ints
-        return i + j;
-    }
+public class TestProcWithInvalidSQLStmt extends VoltProcedure {
 
-    public byte[] identityVarbin(byte[] z) {
-        // return a varbinary without change
-        return z;
-    }
-
-    public long missingUDF(long i) {
-        // this function is dropped by the thread that attempts it
-        // if the drop fails, function will work, which will fail the test
-        // throw an exception in UDF
-        return i;
-    }
-
-    public long badUDF(long i) {
-        // a function which always throws an exception
-        return i/0;
+    public long run(long param0)
+    {
+        SQLStmt Q1 = new SQLStmt("select a + ? from t1 order by 1");
+        voltQueueSQL(Q1, param0);
+        voltExecuteSQL();
+        return 1;
     }
 }

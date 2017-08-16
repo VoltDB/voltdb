@@ -23,10 +23,7 @@
 
 package txnIdSelfCheck;
 
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.*;
 
 import java.util.Random;
 import java.util.concurrent.Semaphore;
@@ -67,12 +64,6 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
 
     @Override
     public void run() {
-        try {
-            ClientResponse cr = TxnId2Utils.doAdHoc(client, "drop function missingUDF;");
-        }
-        catch (Exception e) {
-            hardStop(e);
-        }
 
         while (m_shouldContinue.get()) {
             // if not, connected, sleep
@@ -100,21 +91,51 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
 
             // call a transaction
             try {
-                int write = r.nextInt(4);
+                int write = r.nextInt(4); //// temporary until drop function is fixed 5);
                 log.info("InvokeDroppedProcedureThread running " + write);
-                if (write == 0) {
+                switch (write) {
+
+                case 0:
                     // try to run a read procedure that has been droppped (or does not exist)
                     client.callProcedure(new InvokeDroppedCallback(), "droppedRead", r.nextInt());
-                } else if (write == 1) {
+                    break;
+
+                case 1:
                     // try to run a write procedure that has been dropped (or does not exist)
                     client.callProcedure(new InvokeDroppedCallback(), "droppedWrite", r.nextInt());
-                } else if (write == 2) {
+                    break;
+
+                case 2:
                     // run a udf that throws an exception
                     client.callProcedure(new InvokeDroppedCallback(), "exceptionUDF");
-                } else {
-                    // run a udf that has been dropped
-                    //////temporary client.callProcedure(new InvokeDroppedCallback(), "droppedUDF", (byte) r.nextInt(256));
+                    break;
+
+                case 3:
+                    // run a statement using a function that is non-existent/dropped
+                    try {
+                        ClientResponse cr = TxnId2Utils.doAdHoc(client,
+                                "select missingUDF(cid) FROM partitioned where cid=? order by cid, rid desc");
+                    }
+                    catch (ProcCallException e) {
+                        log.info(e.getClientResponse().getStatus());
+                        if (e.getClientResponse().getStatus() != ClientResponse.GRACEFUL_FAILURE)
+                            hardStop(e);
+                    }
+                    break;
+
+                case 4:
+                    // try to drop a function which is used in the schema
+                    try {
+                        ClientResponse cr = TxnId2Utils.doAdHoc(client,
+                                "drop function add2Bigint;");
+                    }
+                    catch (Exception e) {
+                        //if (e.getClientResponse().getStatus() != ClientResponse.UNEXPECTED_FAILURE)
+                            hardStop(e);
+                    }
+                    break;
                 }
+
                 // don't flood the system with these
                 Thread.sleep(100);
             }

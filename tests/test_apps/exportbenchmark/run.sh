@@ -64,18 +64,22 @@ function build_deployment_file() {
 
 # compile the source code for procedures and the client into jarfiles
 function srccompile() {
-    javac -classpath $APPCLASSPATH src/procedures/exportbenchmark/*.java
-    javac -classpath $CLIENTCLASSPATH src/client/exportbenchmark/ExportBenchmark.java
+    javac -classpath $APPCLASSPATH procedures/exportbenchmark/*.java
+    javac -classpath $CLIENTCLASSPATH client/exportbenchmark/ExportBenchmark.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-    jar cf exportbenchmark-procs.jar -C src/procedures exportbenchmark
-    jar cf exportbenchmark-client.jar -C src/client exportbenchmark
-    rm -rf src/client/exportbenchmark/*.class src/procedures/exportbenchmark/*.class
+    jar cf ExportBenchmark.jar -C procedures exportbenchmark
+    jar cf exportbenchmark-client.jar -C client exportbenchmark
+    rm -rf client/exportbenchmark/*.class procedures/exportbenchmark/*.class
+}
+
+function jars() {
+     srccompile-ifneeded
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function srccompile-ifneeded() {
-    if [ ! -e exportbenchmark-procs.jar ] || [ ! -e exportbenchmark-client.jar ]; then
+    if [ ! -e ExportBenchmark.jar ] || [ ! -e exportbenchmark-client.jar ]; then
         srccompile;
     fi
 }

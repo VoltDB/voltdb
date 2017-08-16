@@ -47,6 +47,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTableUtil;
@@ -263,8 +264,8 @@ public class UpdateCore extends VoltSystemProcedure {
             DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
 
-            if (log.isInfoEnabled()) {
-                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+            if (log.isDebugEnabled()) {
+                log.debug("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                         " completed data precheck.");
             }
             return success;
@@ -433,12 +434,23 @@ public class UpdateCore extends VoltSystemProcedure {
     {
         assert(tablesThatMustBeEmpty != null);
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        long start, duration = 0;
 
         try {
+            try {
+                CatalogUtil.updateCatalogToZK(zk, expectedCatalogVersion + 1, genId,
+                        catalogBytes, catalogHash, deploymentBytes);
+            } catch (KeeperException | InterruptedException e) {
+                log.error("error writing catalog bytes on ZK during @UpdateCore");
+                throw e;
+            }
+
             // log the start of UpdateCore
             log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
             log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
                     ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
+
+            start = System.nanoTime();
 
             try {
                 performCatalogVerifyWork(
@@ -470,10 +482,16 @@ public class UpdateCore extends VoltSystemProcedure {
                     hasSchemaChange,
                     requiresNewExportGeneration,
                     genId);
+
+            duration = System.nanoTime() - start;
+
         } finally {
             // remove the uac blocker when exits
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
         }
+
+        VoltDB.instance().getCatalogContext().m_lastUpdateCoreDuration = duration;
+        log.info("Catalog update block time (milliseconds): " + duration * 1.0 / 1000 / 1000);
 
         // This is when the UpdateApplicationCatalog really ends in the blocking path
         log.info(String.format("Globally updating the current application catalog and deployment " +

@@ -58,7 +58,7 @@ class Issues(object):
             return 'Already reported'
 
         old_issue = ''
-        existing = jira.search_issues('summary ~ \'%s\'' % 'voltdb::StringRef::getObject(int*)')
+        existing = jira.search_issues('summary ~ \'%s\'' % pframe_split[0].strip())
         for issue in existing:
             if str(issue.fields.status) != 'Closed' and u'grammar-gen' in issue.fields.labels:
                 old_issue = issue
@@ -95,14 +95,27 @@ class Issues(object):
                 }
                 break
 
-        current_version = 'V' + \
-                          str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/master/version.txt'))
+        current_version_raw = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/master/version.txt'))
+        current_version_float = float(current_version_raw)
+        current_version = 'V' + current_version_raw
+        current_version = current_version.strip()
+        next_version = current_version_float + .1
+        next_version = str(next_version)
+        next_version = 'V' + next_version
+        next_version = next_version[:4]
+
         jira_versions = jira.project_versions(JIRA_PROJECT)
-        jira_version = {}
+        this_version = {}
+        new_version = {}
+
         for v in jira_versions:
-            current_version.strip()
-            if str(v.name) == current_version.strip():
-                jira_version = {
+            if str(v.name) == current_version:
+                this_version = {
+                    'name': v.name,
+                    'id': v.id
+                }
+            if str(v.name) == next_version:
+                new_version = {
                     'name': v.name,
                     'id': v.id
                 }
@@ -115,9 +128,16 @@ class Issues(object):
             'priority': {'name': 'Blocker'},
             'labels': labels,
             'customfield_10430': {'value': 'CORE team'},
-            'components': [jira_component],
-            'versions': [jira_version]
+            'components': [jira_component]
         }
+
+        if new_version:
+            issue_dict['versions'] = [new_version]
+            issue_dict['fixVersions'] = [new_version]
+
+        elif this_version:
+            issue_dict['versions'] = [this_version]
+            issue_dict['fixVersions'] = [this_version]
 
         if old_issue:
             new_comment = jira.add_comment(old_issue, description)
