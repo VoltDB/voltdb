@@ -112,8 +112,14 @@
     margin-top: 100px;
     color: #8bf5a5;
     font-family: 'Orbitron', sans-serif;
-    font-size: 5em;
 }
+
+@media screen and (max-width: 1200px) { .frauds-wrapper { font-size: 100%; } }
+@media screen and  (max-width: 1000px) { .frauds-wrapper { font-size: 90%; } }
+@media screen and (max-width: 767px) { .frauds-wrapper { font-size: 80%; } }
+@media screen and (max-width: 568px) { .frauds-wrapper { font-size: 70%; } }
+@media screen and (max-width: 480px) { .frauds-wrapper { font-size: 35%; } }
+@media screen and (max-width: 320px) { .frauds-wrapper { font-size: 25%; } }
 
 @import url('https://fonts.googleapis.com/css?family=Sedgwick+Ave+Display');
 @import url('https://fonts.googleapis.com/css?family=Anton');

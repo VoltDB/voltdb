@@ -79,13 +79,17 @@ class Pages extends Component {
 
           {/* The frauds page */}
           <Section className='custom-section' color="#111111">
-            <div className='wrapper-odometer-2'>
-              <div>
-                <OdometerInstance value={this.props.num} theme={'digital'} />
+            <div style={{ fontSize: '5em' }}>
+              <div className='frauds-wrapper'>
+                <div className='wrapper-odometer-2'>
+                  <div>
+                    <OdometerInstance value={this.props.num} theme={'digital'} />
+                  </div>
+                </div>
+                <div className='frauds-text'>
+                  FRAUDS DETECTED
+                </div>
               </div>
-            </div>
-            <div className='frauds-text'>
-              FRAUDS DETECTED
             </div>
           </Section>
 
