@@ -37,8 +37,9 @@ class BusiestStationsChart extends Component {
     });
   }
 
-  // BUG: animation={{ damping: 15, stiffness: 30 }} currently conflicting with the MouseOut handlers
+  // BUG: animation={{ damping: 15, stiffness: 30 }} currently conflicting with the onValueMouseOut handlers
   // https://github.com/uber/react-vis/issues/381
+  // onMouseLeave works fine
   render() {
     return (
       <div>
@@ -46,7 +47,18 @@ class BusiestStationsChart extends Component {
           margin={{ left: 100 }}
           xType={'ordinal'} // important !
           width={window.innerWidth - 200}
-          height={window.innerHeight - 200}>
+          height={window.innerHeight - 200}
+          onMouseLeave={() => {
+            var temp = this.state.busiestStations.slice(0);
+            for (let i = 0; i < temp.length; i++) {
+              temp[i].color = undefined;
+            }
+            this.setState({
+              value: null,
+              busiestStations: temp
+            });
+          }}
+          >
           <XAxis title='Stations' />
           <YAxis title='Swipes' />
           <HorizontalGridLines />
@@ -66,17 +78,7 @@ class BusiestStationsChart extends Component {
                 busiestStations: temp
               });
             }}
-            onValueMouseOut={event => {
-              var temp = this.state.busiestStations.slice(0);
-              for (let i = 0; i < temp.length; i++) {
-                temp[i].color = undefined;
-              }
-              this.setState({
-                value: null,
-                busiestStations: temp
-              });
-            }}
-            data={this.state.busiestStations}
+            data={this.state.busiestStations} animation={{ damping: 15, stiffness: 30 }}
           />
           {this.state.value ?
             <Hint value={this.state.value}>

@@ -73,9 +73,9 @@
 .chart-1-title {
     position: absolute;
     z-index: 10000;
-    font-size: 8em;
-    left: 700px;
-    margin-top: 80px;
+    font-size: 5em;
+    left: 800px;
+    margin-top: 50px;
     font-family: 'Anton', sans-serif;
 }
 
