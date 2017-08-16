@@ -23,7 +23,7 @@ class BusiestStationsChart extends Component {
       return;
     }
 
-    // Don't change the highlighted bar
+    // Keep the bar highlighted
     for (let i = 0; i < oldData.length; i++) {
       if (oldData[i].x === nextProps.busiestStations[i].x && oldData[i].color === highLightColor) {
         nextProps.busiestStations[i].color = highLightColor;
@@ -52,7 +52,7 @@ class BusiestStationsChart extends Component {
           <HorizontalGridLines />
           <VerticalBarSeries
             colorType={'literal'} // important !
-            onValueMouseOver={(value, event) => {
+            onValueMouseOver={(value, event) => { // trigger the hover animation to show the info
               var temp = this.state.busiestStations.slice(0);
               for (let i = 0; i < temp.length; i++) {
                 if (temp[i].x === value.x) {
