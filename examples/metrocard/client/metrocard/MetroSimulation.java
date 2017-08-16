@@ -138,28 +138,6 @@ public class MetroSimulation {
         System.out.println(config.getConfigDumpString());
     }
 
-    public static final Map<Integer,Integer> STATION_TO_NEXT_STATION = new HashMap<>();
-    static {
-        STATION_TO_NEXT_STATION.put(1, 2*60000);
-        STATION_TO_NEXT_STATION.put(2, 2*60000);
-        STATION_TO_NEXT_STATION.put(3, 3*60000);
-        STATION_TO_NEXT_STATION.put(4, 4*60000);
-        STATION_TO_NEXT_STATION.put(5, 2*60000);
-        STATION_TO_NEXT_STATION.put(6, 2*60000);
-        STATION_TO_NEXT_STATION.put(7, 1*60000);
-        STATION_TO_NEXT_STATION.put(8, 2*60000);
-        STATION_TO_NEXT_STATION.put(9, 2*60000);
-        STATION_TO_NEXT_STATION.put(10, 2*60000);
-        STATION_TO_NEXT_STATION.put(11, 2*60000);
-        STATION_TO_NEXT_STATION.put(12, 2*60000);
-        STATION_TO_NEXT_STATION.put(13, 2*60000);
-        STATION_TO_NEXT_STATION.put(14, 3*60000);
-        STATION_TO_NEXT_STATION.put(15, 2*60000);
-        STATION_TO_NEXT_STATION.put(16, 3*60000);
-        STATION_TO_NEXT_STATION.put(17, 3*60000);
-    }
-
-
     abstract class KafkaPublisher extends Thread {
         private volatile long m_totalCount;
         private volatile long m_currentCount = 0;
@@ -226,6 +204,9 @@ public class MetroSimulation {
         public volatile int lastState = 0; // 0 for arrival, 1 for departure
         public long departureTime;
         public volatile int direction = 1;
+        public boolean close = false;
+        public Map<Integer,Integer> STATION_TO_NEXT_STATION = new HashMap<>();
+
         TrainActivityPublisher(String trainId, MetroCardConfig config, Properties producerConfig, long count) {
             super(producerConfig, count);
             m_trainId = trainId;
@@ -234,13 +215,30 @@ public class MetroSimulation {
 
         @Override
         protected void initialize() {
+            STATION_TO_NEXT_STATION.put(1, 2*60000);
+            STATION_TO_NEXT_STATION.put(2, 2*60000);
+            STATION_TO_NEXT_STATION.put(3, 3*60000);
+            STATION_TO_NEXT_STATION.put(4, 4*60000);
+            STATION_TO_NEXT_STATION.put(5, 2*60000);
+            STATION_TO_NEXT_STATION.put(6, 2*60000);
+            STATION_TO_NEXT_STATION.put(7, 1*60000);
+            STATION_TO_NEXT_STATION.put(8, 2*60000);
+            STATION_TO_NEXT_STATION.put(9, 2*60000);
+            STATION_TO_NEXT_STATION.put(10, 2*60000);
+            STATION_TO_NEXT_STATION.put(11, 2*60000);
+            STATION_TO_NEXT_STATION.put(12, 2*60000);
+            STATION_TO_NEXT_STATION.put(13, 2*60000);
+            STATION_TO_NEXT_STATION.put(14, 3*60000);
+            STATION_TO_NEXT_STATION.put(15, 2*60000);
+            STATION_TO_NEXT_STATION.put(16, 3*60000);
+            STATION_TO_NEXT_STATION.put(17, 3*60000);
             //Shift start time for each train by 1 min
             startTime = System.currentTimeMillis() + (tcnt++ * 120*1000);
         }
 
         @Override
         protected boolean doEnd() {
-            return false;
+            return close;
         }
 
         @Override
@@ -331,7 +329,7 @@ public class MetroSimulation {
             int card_id = -1;
             long atime;
             int amt = 0;
-            atime = System.currentTimeMillis();
+            atime = swipeTime;
             while (card_id == -1) {
                 card_id = rand.nextInt(config.cardcount+1000); // use +1000 so sometimes we get an invalid card_id
                 if (cardsEntered.containsKey(card_id)) {
@@ -355,6 +353,8 @@ public class MetroSimulation {
                     .append(Integer.valueOf(activity_code)).append(",")
                     .append(Integer.valueOf(amt));
             ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
+            //Enter new one every 30 seconds.
+            swipeTime = swipeTime + 60*1000;
             //System.out.println(sb.toString());
             return rec;
         }
@@ -379,8 +379,7 @@ public class MetroSimulation {
 
         @Override
         protected boolean doEnd() {
-            if (activity_code == -1) return false;
-            return (close && cardsEntered.size() <= 1);
+            return close;
         }
 
         @Override
@@ -458,7 +457,7 @@ public class MetroSimulation {
 
         @Override
         protected boolean doEnd() {
-            return (close);
+            return close;
         }
 
         @Override
@@ -530,26 +529,32 @@ public class MetroSimulation {
 
         String trains[] = { "1", "2", "3", "4" };
         List<TrainActivityPublisher> trainPubs = new ArrayList<>();
-        long num_activity = (config.count % 17) + config.count;
-        for (String train : trains) {
-            TrainActivityPublisher redLine = new TrainActivityPublisher(train, config, producerConfig, num_activity);
-            redLine.start();
-            trainPubs.add(redLine);
-        }
         SwipeEntryActivityPublisher entry = new SwipeEntryActivityPublisher(config, producerConfig, config.count);
         entry.start();
         SwipeExitActivityPublisher exit = new SwipeExitActivityPublisher(config, producerConfig, config.count);
         exit.start();
         SwipeReplenishActivityPublisher replenish = new SwipeReplenishActivityPublisher(config, producerConfig, config.count/5);
         replenish.start();
+        //Wait for a min to start trains.
+        Thread.sleep(6000);
+        System.out.println("Starting All Trains....");
+        for (String train : trains) {
+            TrainActivityPublisher redLine = new TrainActivityPublisher(train, config, producerConfig, Integer.MAX_VALUE);
+            redLine.start();
+            trainPubs.add(redLine);
+        }
+        System.out.println("All Trains Started....");
         entry.join();
         exit.close = true;
         exit.join();
         replenish.close = true;
         replenish.join();
+        System.out.println("Stopping All Trains....");
         for (TrainActivityPublisher redLine : trainPubs) {
+            redLine.close = true;
             redLine.join();
         }
+        System.out.println("All Trains Stopped....");
     }
 
     public static void main(String[] args) throws Exception {

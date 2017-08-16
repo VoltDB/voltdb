@@ -114,7 +114,7 @@ function client() {
 function train() {
     jars-ifneeded
     java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.MetroSimulation \
-        --broker=localhost:9092 --count=500000
+        --broker=localhost:9092 --count=1000000
 }
 
 # generate metro cards
