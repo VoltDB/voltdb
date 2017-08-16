@@ -88,9 +88,11 @@ CREATE TABLE activity(
   date_time             TIMESTAMP      NOT NULL,
   station_id            SMALLINT       NOT NULL,
   activity_code         TINYINT        NOT NULL, -- 1=entry, 2=purchase, -1=Exit
-  amount                INTEGER        NOT NULL
+  amount                INTEGER        NOT NULL,
+  accept                TINYINT        NOT NULL, -- 1=accepted, 0=rejected
 );
 PARTITION TABLE activity ON COLUMN card_id;
+CREATE UNIQUE INDEX aCardDate ON activity (card_id, date_time);
 CREATE UNIQUE INDEX aStationDateCard ON activity (station_id, date_time, card_id);
 
 CREATE TABLE train_activity(
@@ -159,10 +161,24 @@ FROM wait_time
 GROUP BY
   station_id;
 
+CREATE VIEW secondly_card_acceptance_rate
+AS
+SELECT
+  TRUNCATE(SECOND, date_time) AS second,
+  accept,
+  COUNT(*) AS cnt
+FROM activity
+GROUP BY
+  TRUNCATE(SECOND, date_time),
+  accept;
+
+-------------- PROCEDURES -------------------------------------------------------
+
 CREATE PROCEDURE PARTITION ON TABLE cards COLUMN card_id PARAMETER 0 FROM CLASS metrocard.CardSwipe;
 CREATE PROCEDURE FROM CLASS metrocard.UpdateWaitTime;
 CREATE PROCEDURE PARTITION ON TABLE train_activity COLUMN station_id PARAMETER 0 FROM CLASS metrocard.UpdateWaitTimeForStation;
 CREATE PROCEDURE PARTITION ON TABLE train_activity COLUMN station_id PARAMETER 1 FROM CLASS metrocard.TrainActivity;
+CREATE PROCEDURE FROM CLASS metrocard.GetCardAcceptanceRate;
 
 CREATE PROCEDURE ReplenishCard PARTITION ON TABLE cards COLUMN card_id PARAMETER 1 AS
 UPDATE cards SET balance = balance + ?

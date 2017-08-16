@@ -50,7 +50,7 @@ public class UpdateWaitTimeForStation extends VoltProcedure {
     public static final SQLStmt getWaitTimeForTrain = new SQLStmt(
     "SELECT SUM(SINCE_EPOCH(SECOND, ?) - SINCE_EPOCH(SECOND, date_time)) AS wait_sum, COUNT(*) AS entries " +
     "FROM activity " +
-    "WHERE station_id = ? AND date_time > ? AND date_time <= ? AND activity_code = 1;"
+    "WHERE station_id = ? AND date_time > ? AND date_time <= ? AND accept = 1 AND activity_code = 1;"
     );
 
     // Update wait time by station
