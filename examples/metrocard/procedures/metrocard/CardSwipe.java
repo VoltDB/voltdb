@@ -30,6 +30,13 @@ import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
 public class CardSwipe extends VoltProcedure {
+    private static byte ACTIVITY_INVALID = 0;
+    private static byte ACTIVITY_EXIT = -1;
+    private static byte ACTIVITY_ENTER = 1;
+    private static byte ACTIVITY_PURCHASE = 2;
+
+    public static byte ACTIVITY_ACCEPTED = 1;
+    public static byte ACTIVITY_REJECTED = 0;
 
     public final SQLStmt checkCard = new SQLStmt(
         "SELECT enabled, card_type, balance, expires, name, phone, email, notify FROM cards WHERE card_id = ?;");
@@ -41,7 +48,7 @@ public class CardSwipe extends VoltProcedure {
         "SELECT fare, name FROM stations WHERE station_id = ?;");
 
     public final SQLStmt insertActivity = new SQLStmt(
-        "INSERT INTO activity (card_id, date_time, station_id, activity_code, amount) VALUES (?,?,?,?,?);");
+        "INSERT INTO activity (card_id, date_time, station_id, activity_code, amount, accept) VALUES (?,?,?,?,?,?);");
 
     public final SQLStmt exportActivity = new SQLStmt(
         "INSERT INTO card_alert_export (card_id, export_time, station_name, name, phone, email, notify, alert_message) VALUES (?,?,?,?,?,?,?,?);");
@@ -77,14 +84,14 @@ public class CardSwipe extends VoltProcedure {
             return buildResult(accepted,"Card Invalid");
         }
 
-        // TODO: exit
-        if (activity_code == -1) {
-            voltQueueSQL(insertActivity, cardId, ts, stationId, activity_code, 0);
+        // Exit
+        if (activity_code == ACTIVITY_EXIT) {
+            voltQueueSQL(insertActivity, cardId, ts, stationId, activity_code, 0, ACTIVITY_ACCEPTED);
             voltExecuteSQL(true);
             return buildResult(1, "");
         }
         //Replenish card.
-        if (activity_code == 2) {
+        if (activity_code == ACTIVITY_PURCHASE) {
             voltQueueSQL(replenishCard, amt, cardId);
             voltExecuteSQL(true);
             return buildResult(1, "Replinished");
@@ -114,14 +121,21 @@ public class CardSwipe extends VoltProcedure {
         // check balance or expiration for valid cards
         if (cardType == 0) { // pay per ride
                 if (balance > fare) {
-                        // charge the fare
-                        voltQueueSQL(chargeCard, balance-fare,cardId);
-                        voltQueueSQL(insertActivity, cardId, ts, stationId, 1, fare);
+                    if (isFraud(cardId, ts, stationId)) {
+                        // Fraud
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, ACTIVITY_ENTER, fare, ACTIVITY_REJECTED);
                         voltExecuteSQL(true);
-                        return buildResult(1,"Remaining Balance: "+intToCurrency(balance-fare));
+                        return buildResult(0, "Fraudulent transaction");
+                    } else {
+                        // charge the fare
+                        voltQueueSQL(chargeCard, balance - fare, cardId);
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, ACTIVITY_ENTER, fare, ACTIVITY_ACCEPTED);
+                        voltExecuteSQL(true);
+                        return buildResult(1, "Remaining Balance: " + intToCurrency(balance - fare));
+                    }
                 } else {
                         // insufficient balance
-                        voltQueueSQL(insertActivity, cardId, ts, stationId, 0, 0);
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, ACTIVITY_ENTER, 0, ACTIVITY_REJECTED);
                         if (notify != 0) {  // only export if notify is 1 or 2 -- email or text
                             voltQueueSQL(exportActivity, cardId, getTransactionTime().getTime(), stationName, owner, phone, email, notify, "Insufficient Balance");
                         }
@@ -131,15 +145,64 @@ public class CardSwipe extends VoltProcedure {
         }
         else { // unlimited card (e.g. monthly or weekly pass)
                 if (expires.compareTo(ts) > 0) {
-                        voltQueueSQL(insertActivity, cardId, ts, stationId, 1, 0);
+                    if (isFraud(cardId, ts, stationId)) {
+                        // Fraud
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, ACTIVITY_ENTER, 0, ACTIVITY_REJECTED);
                         voltExecuteSQL(true);
-                        return buildResult(1,"Card Expires: " + expires.toString());
+                        return buildResult(0, "Fraudulent transaction");
+                    } else {
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, ACTIVITY_ENTER, 0, ACTIVITY_ACCEPTED);
+                        voltExecuteSQL(true);
+                        return buildResult(1, "Card Expires: " + expires.toString());
+                    }
                 } else {
-                        voltQueueSQL(insertActivity, cardId, ts, stationId, 0, 0);
+                        voltQueueSQL(insertActivity, cardId, ts, stationId, ACTIVITY_ENTER, 0, ACTIVITY_REJECTED);
                         voltExecuteSQL(true);
                         return buildResult(0,"Card Expired");
                 }
         }
     }
 
+    public final SQLStmt cardHistory = new SQLStmt(
+        "SELECT activity_code, COUNT(DISTINCT station_id) AS stations " +
+        "FROM activity " +
+        "WHERE card_id = ? AND date_time > ? " +
+        "GROUP BY activity_code;"
+    );
+
+    public boolean isFraud(int cardId, TimestampType ts, int stationId) {
+        voltQueueSQL(cardHistory, cardId, ts);
+        final VoltTable cardHistoryTable = voltExecuteSQL()[0];
+
+        byte prevActivity = ACTIVITY_INVALID;
+        int entranceCount = 0;
+        while (cardHistoryTable.advanceRow()) {
+            final byte activity_code = (byte) cardHistoryTable.getLong("activity_code");
+            final long stations = cardHistoryTable.getLong("stations");
+
+            if (activity_code == ACTIVITY_ENTER) {
+                if (prevActivity == ACTIVITY_INVALID || prevActivity == ACTIVITY_ENTER) {
+                    entranceCount++;
+                }
+
+                // Is more than 20 entries at different stations in past hour?
+                if (stations >= 20) {
+                    return true;
+                }
+            }
+
+            if (prevActivity == ACTIVITY_INVALID) {
+                prevActivity = activity_code;
+            }
+        }
+
+        // Is more than 10 consecutive entries in past hour?
+        if (entranceCount >= 10) {
+            return true;
+        }
+
+        // TODO: 50% more entries than average at station with small number of distinct card?
+
+        return false;
+    }
 }
