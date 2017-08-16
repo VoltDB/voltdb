@@ -114,13 +114,13 @@ public class NTProcedureService {
 
     // runs the initial run() method of nt procs
     // (doesn't run nt procs if started by other nt procs)
-    // from 1 to 20 threads in parallel, with a bounded queue
+    // from 2 to 20 threads in parallel, with a bounded queue
     private final ExecutorService m_primaryExecutorService = new ThreadPoolExecutor(
             2,
             20,
             60,
             TimeUnit.SECONDS,
-            new ArrayBlockingQueue<Runnable>(1000),
+            new ArrayBlockingQueue<Runnable>(10000),
             new ThreadFactoryBuilder()
                 .setNameFormat(NTPROC_THREADPOOL_NAMEPREFIX + "%d")
                 .build());
