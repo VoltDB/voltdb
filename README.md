@@ -3,7 +3,26 @@ What is VoltDB?
 
 Thank you for your interest in VoltDB!
 
-VoltDB is a horizontally-scalable, in-memory SQL RDBMS designed for applications that have extremely high read and write throughput requirements.
+VoltDB is a horizontally-scalable, in-memory SQL RDBMS designed for applications that benefit from strong consistency, high throughput and low, predictable latency.
+
+VoltDB and Open Source
+====================
+
+VoltDB offers the fully open source, AGPL3-licensed Community Edition of VoltDB through GitHub here: 
+
+https://github.com/voltdb/voltdb/
+
+The commercial editions of VoltDB can be downloaded for free from the VoltDB website: 
+
+https://www.voltdb.com/download/
+
+The Community Edition has full application compatibility, but lacks any disk persistence or fault-tolerance capabilities, as well as some operational features like elastic online expansion, live online upgrade, etc..
+
+To fully evaluate VoltDB robustness, we recommend a commercial trial. However, the Community Edition is a majority subset of the code and the VoltDB engineering team does live development in our public Github Repo.
+
+For more information, please see our "Editions" page:
+
+https://www.voltdb.com/product/editions/
 
 
 Building VoltDB
