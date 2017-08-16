@@ -2,13 +2,39 @@ import React, { Component } from 'react';
 
 import { XYPlot, XAxis, YAxis, HorizontalGridLines, VerticalBarSeries, Hint } from 'react-vis';
 
+const highLightColor = '#fca832';
+const barColor = '#12939a';
+
 class BusiestStationsChart extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      value: null,
-      color: null
+      busiestStations: this.props.busiestStations,
+      value: null
     }
+  }
+
+  componentWillReceiveProps(nextProps) {
+    let oldData = this.state.busiestStations.slice(0);
+    if (oldData.length !== nextProps.busiestStations.length) {
+      this.setState({
+        busiestStations: nextProps.busiestStations
+      });
+      return;
+    }
+
+    // Don't change the highlighted bar
+    for (let i = 0; i < oldData.length; i++) {
+      if (oldData[i].x === nextProps.busiestStations[i].x && oldData[i].color === highLightColor) {
+        nextProps.busiestStations[i].color = highLightColor;
+      } else {
+        nextProps.busiestStations[i].color = barColor;
+      }
+    }
+
+    this.setState({
+      busiestStations: nextProps.busiestStations
+    });
   }
 
   // BUG: animation={{ damping: 15, stiffness: 30 }} currently conflicting with the MouseOut handlers
@@ -18,21 +44,39 @@ class BusiestStationsChart extends Component {
       <div>
         <XYPlot
           margin={{ left: 100 }}
-          xType={'ordinal'}
+          xType={'ordinal'} // important !
           width={window.innerWidth - 200}
           height={window.innerHeight - 200}>
           <XAxis title='Stations' />
           <YAxis title='Swipes' />
           <HorizontalGridLines />
           <VerticalBarSeries
+            colorType={'literal'} // important !
             onValueMouseOver={(value, event) => {
-              console.log(event);
-              this.setState({ value: value });
+              var temp = this.state.busiestStations.slice(0);
+              for (let i = 0; i < temp.length; i++) {
+                if (temp[i].x === value.x) {
+                  temp[i].color = highLightColor;
+                } else {
+                  temp[i].color = barColor;
+                }
+              }
+              this.setState({
+                value: value,
+                busiestStations: temp
+              });
             }}
             onValueMouseOut={event => {
-              this.setState({ value: null });
+              var temp = this.state.busiestStations.slice(0);
+              for (let i = 0; i < temp.length; i++) {
+                temp[i].color = undefined;
+              }
+              this.setState({
+                value: null,
+                busiestStations: temp
+              });
             }}
-            data={this.props.busiestStations}
+            data={this.state.busiestStations}
           />
           {this.state.value ?
             <Hint value={this.state.value}>
@@ -46,6 +90,7 @@ class BusiestStationsChart extends Component {
   }
 }
 
+// For showing the hint when hovering over a bar
 class BarHint extends Component {
   render() {
     return (
