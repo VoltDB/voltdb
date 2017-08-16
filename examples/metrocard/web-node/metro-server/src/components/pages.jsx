@@ -27,7 +27,7 @@ class Pages extends Component {
     return (
       <div>
         <Header>
-          <a href="" className='nav-img'><img alt='Boom' src={logo} height="40" /></a>
+          <a href="http://localhost:8080" className='nav-img'><img alt='Boom' src={logo} height="40" /></a>
           <a href="#sectionOne" className='nav-elem'>Swipes</a>
           <a href="#sectionTwo" className='nav-elem'>Station Stats</a>
           <a href="#sectionThree" className='nav-elem'>Waiting Time</a>

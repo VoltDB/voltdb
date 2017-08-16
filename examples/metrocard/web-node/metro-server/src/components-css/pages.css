@@ -65,10 +65,10 @@
     height: 100%;
     /* background: white; */
     text-align: center;
-    font-family: 'Sedgwick Ave Display', cursive;
+    font-family: 'Abril Fatface', cursive;
     color: #000;
     position: absolute;
-    left: 63%;
+    left: 60%;
 }
 
 .chart-container {
@@ -121,7 +121,7 @@
 @media screen and (max-width: 480px) { .frauds-wrapper { font-size: 35%; } }
 @media screen and (max-width: 320px) { .frauds-wrapper { font-size: 25%; } }
 
-@import url('https://fonts.googleapis.com/css?family=Sedgwick+Ave+Display');
+@import url('https://fonts.googleapis.com/css?family=Abril+Fatface');
 @import url('https://fonts.googleapis.com/css?family=Anton');
 @import url('https://fonts.googleapis.com/css?family=Orbitron');
 @import url('https://fonts.googleapis.com/css?family=Saira');
