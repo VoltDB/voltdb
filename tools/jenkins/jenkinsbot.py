@@ -733,7 +733,7 @@ tr:hover{
 
         if jobs is not None:
             log = self.get_log(jobs)
-            self.response([table], channels, filename, vertical, edit, log=log)
+            #self.response([table], channels, filename, vertical, edit, log=log)
         else:
             self.response_html()
 
@@ -868,12 +868,12 @@ if __name__ == '__main__':
             master_query = jenkinsbot.leaderboard_query(MASTER_JOBS, days=30)
             core_query = jenkinsbot.leaderboard_query(CORE_JOBS, days=7)
             system_query = SL_QUERY
-            master_table = jenkinsbot.query(ADMIN_CHANNEL, master_query, ())
-            core_table = jenkinsbot.query(ADMIN_CHANNEL, core_query, ())
-            system_table = jenkinsbot.query(ADMIN_CHANNEL, system_query, ())
-            jenkinsbot.generate_html([master_table], 'master-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/master-junit-leaderboard.html')
-            jenkinsbot.generate_html([core_table], 'core-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/core-junit-leaderboard.html')
-            jenkinsbot.generate_html([system_table], 'systems-master-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/systems-master-leaderboard.html')
+            #master_table = jenkinsbot.query(ADMIN_CHANNEL, master_query, ())
+            #core_table = jenkinsbot.query(ADMIN_CHANNEL, core_query, ())
+            #system_table = jenkinsbot.query(ADMIN_CHANNEL, system_query, ())
+            #jenkinsbot.generate_html([master_table], 'master-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/master-junit-leaderboard.html')
+            #jenkinsbot.generate_html([core_table], 'core-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/core-junit-leaderboard.html')
+            #jenkinsbot.generate_html([system_table], 'systems-master-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/systems-master-leaderboard.html')
         else:
             print 'Command %s not found' % sys.argv[1]
             print help_text

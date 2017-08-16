@@ -2012,12 +2012,18 @@ public class VoltCompiler {
             Entry<String, byte[]> entry = outputJar.firstEntry();
             while (entry != null) {
                 String path = entry.getKey();
-                //TODO: It would be better to have a manifest that explicitly lists
-                // ddl files instead of using a brute force *.sql glob.
-                if (path.toLowerCase().endsWith(".sql")) {
+                // ENG-12980: only look for auto-gen.ddl on root directory
+                if (AUTOGEN_DDL_FILE_NAME.equalsIgnoreCase(path)) {
                     ddlReaderList.add(new VoltCompilerJarFileReader(outputJar, path));
+                    break;
                 }
                 entry = outputJar.higherEntry(entry.getKey());
+            }
+
+            if (ddlReaderList.size() == 0) {
+                // did not find auto generated DDL file during upgrade
+                throw new IOException("Could not find " + AUTOGEN_DDL_FILE_NAME + " in the catalog "
+                        + "compiled by VoltDB " + versionFromCatalog);
             }
 
             // Use the in-memory jarfile-provided class loader so that procedure

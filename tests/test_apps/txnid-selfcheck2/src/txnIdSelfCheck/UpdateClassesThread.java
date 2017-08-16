@@ -126,8 +126,16 @@ public class UpdateClassesThread extends BenchmarkThread {
                 ClientResponse cr = e.getClientResponse();
                 log.info(cr.getStatusString());
                 log.info(cr.getStatus());
-                if (cr.getStatus() == ClientResponse.GRACEFUL_FAILURE)
-                    hardStop("UpdateClasses Proc failed gracefully", e);
+                if (cr.getStatus() == ClientResponse.GRACEFUL_FAILURE) {
+                    if (!     (cr.getStatusString().equals("Can't do catalog update(@UpdateClasses) while another elastic join, rejoin or catalog update is active")
+                            || cr.getStatusString().equals("Invalid catalog update(@UpdateClasses) request: Can't run catalog update(@UpdateClasses) when another one is in progress")
+                            || cr.getStatusString().equals("Transaction dropped due to change in mastership. It is possible the transaction was committed")
+                            || cr.getStatusString().equals("Server is shutting down.")
+                        ))
+                        hardStop("UpdateClasses Proc failed gracefully", e);
+                    else
+                        m_needsBlock.set(true);
+                }
                 if (cr.getStatus() == ClientResponse.SERVER_UNAVAILABLE) {
                     log.warn("UpdateClasses got SERVER_UNAVAILABLE on proc call. Will sleep.");
                     m_needsBlock.set(true);
