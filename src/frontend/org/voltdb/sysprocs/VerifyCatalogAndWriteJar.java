@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.NTProcedureService;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 
@@ -45,7 +46,41 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
         SupportedJavaVersionMap.put(52, "Java 8");
     }
 
-    VoltLogger log = new VoltLogger("HOST");
+    private static VoltLogger log = new VoltLogger("HOST");
+
+    private static long getTimeoutValue() {
+        long timeoutValue = 5 * 60; // default value 5 minutes
+
+        String timeoutEnvString = null;
+        try {
+            timeoutEnvString = System.getenv(NTProcedureService.NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT);
+        } catch (SecurityException ex) {
+            log.warn("Trying to access system environment variable " + ex.getMessage() + " failed, "
+                    + "use default value " + timeoutValue);
+            return timeoutValue;
+        }
+
+        if (timeoutEnvString == null) {
+            return timeoutValue;
+        }
+
+        try {
+            timeoutValue = Long.parseLong(timeoutEnvString);
+        } catch (NumberFormatException ex) {
+            VoltDB.crashLocalVoltDB("Invalid system environment setting for "
+                        + NTProcedureService.NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT
+                        + " in "+ timeoutEnvString + " seconds.");
+        }
+        if (timeoutValue <= 0) {
+            VoltDB.crashLocalVoltDB("Invalid non-positive value " + timeoutValue + " for "
+                    + "system environment variable "
+                    + NTProcedureService.NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT);
+        }
+        return timeoutValue;
+    }
+
+    public final static long TIMEOUT = getTimeoutValue();
+
 
     public CompletableFuture<ClientResponse> run(byte[] catalogBytes, String diffCommands,
             byte[] catalogHash, byte[] deploymentBytes)
