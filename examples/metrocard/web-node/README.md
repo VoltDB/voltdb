@@ -2,7 +2,7 @@
 This is a **React** implementation for the new metro app demo. Everything is written in js / jsx on the browser side. The automated server-side script is provided by the npm module `react-scripts`, which internally uses a *WebPackDevServer*.
 
 ## Prerequisites
-- Please download the latest `NodeJS` package from <https://nodejs.org/en/>. Extract the tar in your desired place and make sure the path to `.../node-v6.11.0/bin` is in yor `PATH`.
+- Please download the latest `NodeJS` package from <https://nodejs.org/en/>. Extract the tar in your desired place and make sure the path to `.../node-v6.11.0/bin` is in your `PATH`.
 
 ## Instructions
 - Run `./run.sh npminstall` to download the necessary npm dependencies. This only needs to be run once.
