@@ -166,7 +166,7 @@ public class CardSwipe extends VoltProcedure {
     public final SQLStmt cardHistory = new SQLStmt(
         "SELECT activity_code, COUNT(DISTINCT station_id) AS stations " +
         "FROM activity " +
-        "WHERE card_id = ? AND date_time > ? " +
+        "WHERE card_id = ? AND date_time >= DATEADD(HOUR, -1, ?) " +
         "GROUP BY activity_code;"
     );
 
