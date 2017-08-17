@@ -428,8 +428,6 @@ public abstract class AbstractParsedStmt {
         boolean isPlannerGenerated = isPlannerGeneratedAttr == null ? false :
             (isPlannerGeneratedAttr.equalsIgnoreCase("true") ? true : false);
 
-
-
         // A ParameterValueExpression is needed to represent any user-provided or planner-injected parameter.
         boolean needParameter = (isParam != null) && (isParam.equalsIgnoreCase("true"));
 
@@ -559,7 +557,7 @@ public abstract class AbstractParsedStmt {
         }
 
         // This is a TVE from the correlated expression
-        int paramIdx = ParameterizationInfo.getNextParamOffset();
+        int paramIdx = ParameterizationInfo.getNextParamIndex();
         ParameterValueExpression pve = new ParameterValueExpression(paramIdx, resolvedExpr);
         m_parameterTveMap.put(paramIdx, resolvedExpr);
         return pve;
@@ -1115,14 +1113,14 @@ public abstract class AbstractParsedStmt {
     protected AbstractExpression replaceExpressionsWithPve(AbstractExpression expr) {
         assert(expr != null);
         if (expr instanceof TupleValueExpression) {
-            int paramIdx = ParameterizationInfo.getNextParamOffset();
+            int paramIdx = ParameterizationInfo.getNextParamIndex();
             ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
             m_parameterTveMap.put(paramIdx, expr);
             return pve;
         }
 
         if (expr instanceof AggregateExpression) {
-            int paramIdx = ParameterizationInfo.getNextParamOffset();
+            int paramIdx = ParameterizationInfo.getNextParamIndex();
             ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
             // Disallow aggregation of parent columns in a subquery.
             // except the case HAVING AGG(T1.C1) IN (SELECT T2.C2 ...)
@@ -1422,9 +1420,13 @@ public abstract class AbstractParsedStmt {
      * the type and vector parameter indication. We add the pve to two maps,
      * m_paramsById and m_paramsByIndex.
      *
-     * We also set a counter, MAX_PARAMETER_ID, to the largest id in the
-     * expression. This helps give ids to references to correlated expressions
-     * of subqueries.
+     * A parameter's index attribute is its offset in the parameters array which
+     * is used to determine the parameter's value in the EE at runtime.
+     *
+     * Some parameters are generated after we generate VoltXML but before we plan (constants may
+     * become parameters in ad hoc queries so their plans may be cached).  In this case
+     * the index of the parameter is already set.  Otherwise, we will assign an index here
+     * in this method.
      *
      * @param paramsNode
      */
@@ -1448,17 +1450,15 @@ public abstract class AbstractParsedStmt {
                 int index;
                 String indexAttr = node.attributes.get("index");
                 if (indexAttr == null) {
-                    index = ParameterizationInfo.getNextParamOffset();
+                    index = ParameterizationInfo.getNextParamIndex();
                 }
                 else {
-                    // the index of planner-generated parameters from ad hoc plans
-                    // is generated in ParameterizationInfo.
+                    // This parameter must have been converted from a constant
+                    // in an ad hoc plan.  It already has an index, so use it.
                     index = Integer.parseInt(indexAttr);
                 }
 
                 VoltType type = VoltType.typeFromString(typeName);
-
-
                 ParameterValueExpression pve = new ParameterValueExpression();
                 pve.setParameterIndex(index);
                 pve.setValueType(type);

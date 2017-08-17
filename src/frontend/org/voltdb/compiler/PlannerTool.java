@@ -33,7 +33,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
-import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
@@ -220,8 +219,6 @@ public class PlannerTool {
                 } else {
                     planner.parse();
                 }
-
-                ParameterizationInfo.resetParamCount();
                 parsedToken = planner.parameterize();
 
                 // check the parameters count

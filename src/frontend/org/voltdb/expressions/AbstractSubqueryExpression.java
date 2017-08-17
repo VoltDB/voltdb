@@ -89,7 +89,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     // Create a matching PVE for this expression to be used on the EE side
     // to get the original expression value
     protected void addCorrelationParameterValueExpression(AbstractExpression expr, List<AbstractExpression> pves) {
-        int paramIdx = ParameterizationInfo.getNextParamOffset();
+        int paramIdx = ParameterizationInfo.getNextParamIndex();
         m_parameterIdxList.add(paramIdx);
         ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
         pves.add(pve);
