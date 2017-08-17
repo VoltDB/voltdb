@@ -97,7 +97,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         buf.putLong(m_spiHSId);
         buf.put((byte) (m_isRestart ? 1 : 0));
         buf.put((byte) (m_isRecovering ? 1 : 0));
-        buf.put((byte)(m_ackRequestedFromSender ? 1 : 0));
+        buf.put((byte) (m_ackRequestedFromSender ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -110,7 +110,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_spiHSId = buf.getLong();
         m_isRestart = buf.get() == 1;
         m_isRecovering = buf.get() == 1;
-        m_ackRequestedFromSender = (buf.get() == 1);
+        m_ackRequestedFromSender = buf.get() == 1;
         assert(buf.capacity() == buf.position());
     }
 

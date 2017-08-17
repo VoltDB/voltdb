@@ -549,7 +549,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             true);
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
-                replmsg.setLeaderToReplica(true);
                 m_mailbox.send(m_sendToHSIds, replmsg);
 
                 DuplicateCounter counter = new DuplicateCounter(
@@ -735,6 +734,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // Pass a response through the duplicate counters.
     private void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
+        //For mis-routed transactions, no update for truncation handle or duplicated counter
+        if (message.isMisrouted()){
+            m_mailbox.send(message.getInitiatorHSId(), message);
+            return;
+        }
+
         /**
          * A shortcut read is a read operation sent to any replica and completed with no
          * confirmation or communication with other replicas. In a partition scenario, it's

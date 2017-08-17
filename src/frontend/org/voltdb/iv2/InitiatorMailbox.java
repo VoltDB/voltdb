@@ -426,20 +426,23 @@ public class InitiatorMailbox implements Mailbox
             return false;
         }
 
-        //at this point, the message is intended to be sent to partition leader
-        //Transaction restart cases:
-        //(1) The site has been demoted, not a leader any more,  but receives messages which are intended to the leader
-        //(2) The site becomes new leader via @BalanceSPI. Transactions will be restarted before is gets notification from old
+        //At this point, the message is sent to partition leader
+        //(1) If a site has been demoted via @balanceSPI, the messages which are sent to the leader will be restarted.
+        //    !m_scheduler.isLeader()
+        //(2) If a site becomes new leader via @BalanceSPI. Transactions will be restarted before it gets notification from old
         //    leader that transactions on older leader have been drained
+        //    m_scheduler.isLeader() && m_balanceSPIStatus == BalanceSpiStatus.DEST_TXN_RESTART
         if (!m_scheduler.isLeader() || (m_scheduler.isLeader() && m_balanceSPIStatus == BalanceSpiStatus.DEST_TXN_RESTART)) {
             InitiateResponseMessage response = new InitiateResponseMessage(message);
             response.setMisrouted(message.getStoredProcedureInvocation());
             response.m_sourceHSId = getHSId();
             deliver(response);
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Restarting txn on:" + CoreUtils.hsIdToString(m_hsId) + " isLeader:" + m_scheduler.isLeader() +
+                tmLog.debug("Sending message back on:" + CoreUtils.hsIdToString(m_hsId) + " isLeader:" + m_scheduler.isLeader() +
                         " status:" + m_balanceSPIStatus + "\n" + message);
             }
+            //notify the new partition leader that the old leader has completed the Txns if needed.
+            notifyNewLeaderOfTxnDoneIfNeeded();
             return true;
         }
 
