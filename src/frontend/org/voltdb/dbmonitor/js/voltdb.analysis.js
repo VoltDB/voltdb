@@ -171,13 +171,13 @@ function loadAnalysisPage(){
                 }
 
                 if(procedureName.indexOf("org.voltdb.sysprocs") > -1){
-                    dataLatencySysProcedures.push({"label": procedureName , "value": avgExecTime, "index": avgExecTime});
-                    dataFrequencySysProcedures.push({"label": procedureName, "value": invocation, "index": invocation});
-                    dataTotalProcessingSysProcedures.push({"label": procedureName, "value": calculatedProcessingTime, "index": calculatedProcessingTime});
+                    dataLatencySysProcedures.push({"label": procedureName , "value": avgExecTime, "index": avgExecTime, "type": type});
+                    dataFrequencySysProcedures.push({"label": procedureName, "value": invocation, "index": invocation, "type": type});
+                    dataTotalProcessingSysProcedures.push({"label": procedureName, "value": calculatedProcessingTime, "index": calculatedProcessingTime, "type": type});
                 } else {
-                    dataLatencyProcedures.push({"label": procedureName , "value": avgExecTime, "index": avgExecTime});
-                    dataFrequencyProcedures.push({"label": procedureName, "value": invocation, "index": invocation});
-                    dataTotalProcessingProcedures.push({"label": procedureName, "value": calculatedProcessingTime, "index": calculatedProcessingTime});
+                    dataLatencyProcedures.push({"label": procedureName , "value": avgExecTime, "index": avgExecTime, "type": type});
+                    dataFrequencyProcedures.push({"label": procedureName, "value": invocation, "index": invocation, "type": type});
+                    dataTotalProcessingProcedures.push({"label": procedureName, "value": calculatedProcessingTime, "index": calculatedProcessingTime, "type": type});
                 }
             });
 
@@ -206,9 +206,9 @@ function loadAnalysisPage(){
             MonitorGraphUI.RefreshAnalysisProcessingTimeGraph(dataTotalProcessingProcedures);
         });
 
+        VoltDbAnalysis.totalProcessingDetail = {};
         voltDbRenderer.GetProcedureDetailInformation(function (procedureDetails){
             var latencyDetails = [];
-            //find procedure type
             procedureDetails["PROCEDURE_DETAIL"].forEach (function(item){
                 var procedureName = item.PROCEDURE;
                 var type = "Single Partitioned";
@@ -224,6 +224,10 @@ function loadAnalysisPage(){
                 }
 
                 if(item.STATEMENT != "<ALL>"){
+                    if(VoltDbAnalysis.totalProcessingDetail[item.PARTITION_ID] == undefined){
+                        VoltDbAnalysis.totalProcessingDetail[item.PARTITION_ID] = [];
+                    }
+
                     VoltDbAnalysis.combinedDetail[item.PROCEDURE].push({
                         AVG: item.AVG_EXECUTION_TIME/1000000,
                         INVOCATIONS: item.INVOCATIONS,
@@ -233,6 +237,17 @@ function loadAnalysisPage(){
                         PROCEDURE: item.PROCEDURE,
                         TYPE: type
                     })
+
+                    VoltDbAnalysis.totalProcessingDetail[item.PARTITION_ID].push({
+                        AVG: item.AVG_EXECUTION_TIME/1000000,
+                        INVOCATIONS: item.INVOCATIONS,
+                        PARTITION_ID : item.PARTITION_ID,
+                        STATEMENT: item.STATEMENT,
+                        TIMESTAMP: item.TIMESTAMP,
+                        PROCEDURE: item.PROCEDURE,
+                        TYPE: type
+                    })
+
                 }
 
                 VoltDbAnalysis.latencyDetail[item.STATEMENT] =
@@ -316,6 +331,7 @@ function loadAnalysisPage(){
         this.partitionStatus = "SP"
         this.latencyDetailTest = {};
         this.currentTab = "Average Execution Time";
+        this.totalProcessingDetail = {};
         this.formatDateTime = function(timestamp) {
             var dateTime = new Date(timestamp);
             //get date
