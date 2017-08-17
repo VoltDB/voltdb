@@ -1,7 +1,6 @@
 var latencyDetails = [];
 function loadAnalysisPage(){
     VoltDbAnalysis.setDefaultAnalysisSettings();
-    //$("#tabProcedureBtn").trigger("click");
     $("#tabAnalysis li a").on("click", function(){
         VoltDbAnalysis.refreshChart();
     })

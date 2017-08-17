@@ -1393,7 +1393,6 @@
         };
         //
 
-        //pm
         this.GetDrRoleInformation = function (onConnectionAdded) {
             try {
                 var processName = "DR_ROLES";

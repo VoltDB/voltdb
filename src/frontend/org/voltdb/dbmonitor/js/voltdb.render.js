@@ -442,7 +442,6 @@ function alertNodeClicked(obj) {
         };
         //
 
-        //pm
         this.GetDrRoleInformation = function (onInformationLoaded) {
             var drRoleInfo = {};
             VoltDBService.GetDrRoleInformation(function (connection) {
@@ -1563,7 +1562,6 @@ function alertNodeClicked(obj) {
         };
         //
 
-        //PM
         var getDrRoleDetails = function (connection, drRoleDetails) {
             var hostName = "";
             var drRoles = []
