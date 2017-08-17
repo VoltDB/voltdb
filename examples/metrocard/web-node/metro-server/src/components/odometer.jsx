@@ -14,7 +14,8 @@ class OdometerInstance extends Component {
     this.odometer = new Odometer({
       el: ReactDOM.findDOMNode(this),
       value: this.props.value, ...this.props.options,
-      theme: this.props.theme
+      theme: this.props.theme,
+      format: this.props.format
     });
   }
 

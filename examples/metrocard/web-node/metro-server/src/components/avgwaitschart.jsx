@@ -27,8 +27,8 @@ class AvgWaitsChart extends Component {
         <XYPlot
           margin={{ left: 100 }}
           xType={'ordinal'}
-          width={window.innerWidth - 200}
-          height={window.innerHeight - 200}
+          width={window.innerWidth - 150}
+          height={window.innerHeight - 150}
           onMouseLeave={() => {
             this.setState({
               hovered: null

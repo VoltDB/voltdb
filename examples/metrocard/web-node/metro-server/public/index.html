@@ -28,6 +28,17 @@
     <link rel="stylesheet" href="https://unpkg.com/react-vis/dist/style.css">
     <script type="text/javascript" src="https://unpkg.com/react-vis/dist/dist.min.js"></script>
 
+    <!-- Add a percentage sign after odometer 2, and change the color to red -->
+    <style>
+      .frauds-wrapper .odometer .odometer-inside:after {
+        content: "%"
+      }
+      .frauds-wrapper .odometer {
+        background-image: radial-gradient(rgba(224, 21, 21, 0.4), #000000);
+        color: #e01919;
+      }
+    </style>
+
     <!--
       Notice the use of %PUBLIC_URL% in the tags above.
       It will be replaced with the URL of the `public` folder during the build.

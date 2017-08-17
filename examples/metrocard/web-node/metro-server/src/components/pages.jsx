@@ -82,11 +82,11 @@ class Pages extends Component {
               <div className='frauds-wrapper'>
                 <div className='wrapper-odometer-2'>
                   <div>
-                    <OdometerInstance value={this.props.num} theme={'digital'} />
+                    <OdometerInstance format={'(,ddd).dd'} value={this.props.rate} theme={'digital'} />
                   </div>
                 </div>
                 <div className='frauds-text'>
-                  FRAUDS DETECTED
+                  ACCEPTANCE RATE
                 </div>
               </div>
             </div>

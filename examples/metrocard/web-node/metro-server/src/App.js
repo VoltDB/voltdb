@@ -20,7 +20,8 @@ class App extends Component {
       num: 1001, // total # of swipes
       frauds: 0,  // detected frauds
       busiestStations: data, // busiest stations
-      avgWaits: []
+      avgWaits: [], // the average wait times
+      rate: 50.00
     };
 
     // Update the data
@@ -66,7 +67,7 @@ class App extends Component {
           newData = newData.map((v, i, arr) => {
             let r = {};
             r.x = v[0];
-            r.y = v[1];
+            r.y = v[1] === 0 ? 0 : v[1] / v[2];
             return r;
           });
 
@@ -77,13 +78,19 @@ class App extends Component {
         error: (err) => { console.log(err); },
         callbackName: 'jsonp' // Important !
       });
+
+      // Get the acceptance rate
+      // TODO: change the fake acceptance rate here
+      this.setState({
+        rate: Math.random() * 100
+      });
     }, 2000);
   }
 
   render() {
     return (
       <div>
-        <Pages num={this.state.num} busiestStations={this.state.busiestStations} avgWaits={this.state.avgWaits} theme={'car'} />
+        <Pages num={this.state.num} rate={this.state.rate} busiestStations={this.state.busiestStations} avgWaits={this.state.avgWaits} theme={'car'} />
       </div>
     );
   }

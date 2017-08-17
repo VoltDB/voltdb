@@ -46,8 +46,8 @@ class BusiestStationsChart extends Component {
         <XYPlot
           margin={{ left: 100 }}
           xType={'ordinal'} // important !
-          width={window.innerWidth - 200}
-          height={window.innerHeight - 200}
+          width={window.innerWidth - 150}
+          height={window.innerHeight - 150}
           onMouseLeave={() => {
             var temp = this.state.busiestStations.slice(0);
             for (let i = 0; i < temp.length; i++) {
