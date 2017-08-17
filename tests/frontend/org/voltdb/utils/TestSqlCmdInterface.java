@@ -473,7 +473,7 @@ public class TestSqlCmdInterface
     }
 
     private void assertThis(String qryStr, int numOfQry, int testID) {
-        List<String> parsed = SQLLexer.splitStatements(qryStr).completelyParsedStmts;
+        List<String> parsed = SQLLexer.splitStatements(qryStr).getCompletelyParsedStmts();
         String msg = "Test ID: " + testID + ". ";
         assertNotNull(msg + "SQLCommand.parseQuery returned a NULL obj!!", parsed);
         assertEquals(msg, numOfQry, parsed.size());
@@ -486,7 +486,7 @@ public class TestSqlCmdInterface
     }
 
     private void assertThis(String qryStr, String cleanQryStr, int numOfQry, int testID, int blockCommentCount) {
-        List<String> parsed = SQLLexer.splitStatements(qryStr).completelyParsedStmts;
+        List<String> parsed = SQLLexer.splitStatements(qryStr).getCompletelyParsedStmts();
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + numOfQry + "\n";
         err1 += "Actual # of queries: " + parsed.size() + "\n";

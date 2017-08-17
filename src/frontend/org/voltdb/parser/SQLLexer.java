@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.voltdb.utils.SplitStmtResults;
 
 /**
@@ -344,7 +345,6 @@ public class SQLLexer extends SQLPatternFactory
      */
       public static SplitStmtResults splitStatements(final String sql) {
         List<String> statements = new ArrayList<>();
-        SplitStmtResults results = new SplitStmtResults();
 
         // strip out comments
         String sqlNoComments = SQLParser.AnyWholeLineComments.matcher(sql).replaceAll("");
@@ -358,9 +358,6 @@ public class SQLLexer extends SQLPatternFactory
         String sCommentEnd = null;
         // Index to start of current statement.
         int iStart = 0;
-        // Index to current character.
-        // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
-        // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
         boolean statementIsComment = false;
         boolean inStatement = false;
         // To indicate if inside multi statement procedure
@@ -368,6 +365,9 @@ public class SQLLexer extends SQLPatternFactory
         boolean checkForNextBegin = false;
         // To indicate if inside CASE .. WHEN .. END
         int inCase = 0;
+        // Index to current character.
+        // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
+        // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
         int iCur = 0;
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
@@ -487,7 +487,9 @@ public class SQLLexer extends SQLPatternFactory
             }
         }
         // Get the last statement, if any.
-        // we are still processing a multi statement procedure if we are still in begin...end
+        // we are still processing a multi-statement procedure if we are still in begin...end
+        String incompleteStmt = null;
+        int incompleteStmtOffset = -1;
         if (iStart < buf.length) {
             if (!inBegin) {
                 String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
@@ -497,12 +499,12 @@ public class SQLLexer extends SQLPatternFactory
             } else {
                 // we only check for incomplete multi statement procedures right now
                 // add a mandatory space..
-                results.incompleteMuliStmtProc = String.copyValueOf(buf, iStart, iCur - iStart);
+                incompleteStmtOffset = iStart;
+                incompleteStmt = String.copyValueOf(buf, iStart, iCur - iStart);
             }
         }
 
-        results.completelyParsedStmts = statements;
-        return results;
+        return new SplitStmtResults(statements, incompleteStmt, incompleteStmtOffset);
     }
 
     /**
