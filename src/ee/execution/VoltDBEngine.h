@@ -246,8 +246,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         bool updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload);
 
-        bool processCatalogAdditions(bool isStreamUpdate, int64_t timestamp);
-        void purgeMissingStreams();
+        bool processCatalogAdditions(bool isStreamUpdate, int64_t timestamp, std::map<std::string, ExportTupleStream*> & purgedStreams);
+        void purgeMissingStreams(std::map<std::string, ExportTupleStream*> & purgedStreams);
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.
@@ -526,7 +526,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-        void processCatalogDeletes(int64_t timestamp);
+        void processCatalogDeletes(int64_t timestamp, std::map<std::string, ExportTupleStream*> & purgedStreams);
 
         void initMaterializedViewsAndLimitDeletePlans();
 

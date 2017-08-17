@@ -257,9 +257,11 @@ public class ExportGeneration implements Generation {
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
-                    for( ExportDataSource eds:
-                        m_dataSourcesByPartition.get( partition).values()) {
-                        eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
+                    synchronized (m_dataSourcesByPartition) {
+                        for( ExportDataSource eds:
+                            m_dataSourcesByPartition.get( partition).values()) {
+                            eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
+                        }
                     }
                 }
             }
@@ -333,8 +335,10 @@ public class ExportGeneration implements Generation {
                                 mailboxes.add(Long.valueOf(child));
                             }
                             ImmutableList<Long> mailboxHsids = mailboxes.build();
-                            for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
-                                eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
+                            synchronized (m_dataSourcesByPartition) {
+                                for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
+                                    eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
+                                }
                             }
                         } catch (Throwable t) {
                             VoltDB.crashLocalVoltDB("Error in export ack handling", true, t);
@@ -380,7 +384,7 @@ public class ExportGeneration implements Generation {
         assert(m_dataSourcesByPartition.containsKey(partitionId));
         assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
         ExportDataSource source;
-        synchronized(this) {
+        synchronized(m_dataSourcesByPartition) {
             Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
             if (sources == null) {
@@ -391,10 +395,17 @@ public class ExportGeneration implements Generation {
 
             source = sources.get(signature);
             if (source == null) {
+                (new Exception()).printStackTrace();
                 exportLog.warn("Could not find export data source for signature " + partitionId +
                         " signature " + signature + ". The export cleanup stream is being discarded.");
                 return;
             }
+            if (source.isInCatalog()) {
+                exportLog.warn("Could not delete export data source for signature " + partitionId +
+                        " signature " + signature + ". The export cleanup stream called for in catalog stream.");
+                return;
+            }
+
             //Remove first then do cleanup. After this is done trigger processor cleanup.
             sources.remove(signature);
         }
@@ -476,7 +487,7 @@ public class ExportGeneration implements Generation {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
-            exportLog.error("Could not find export data sources for partition "
+            exportLog.error("PUSH Could not find export data sources for partition "
                     + partitionId + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
@@ -486,7 +497,7 @@ public class ExportGeneration implements Generation {
 
         ExportDataSource source = sources.get(signature);
         if (source == null) {
-            exportLog.error("Could not find export data source for partition " + partitionId +
+            exportLog.error("PUSH Could not find export data source for partition " + partitionId +
                     " Signature " + signature + ". The export data is being discarded.");
             if (buffer != null) {
                 DBBPool.wrapBB(buffer).discard();
@@ -504,14 +515,14 @@ public class ExportGeneration implements Generation {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
-            exportLog.error("Could not find export data sources for partition "
+            exportLog.error("EOS Could not find export data sources for partition "
                     + partitionId + ". The export end of stream is being discarded.");
             return;
         }
 
         ExportDataSource source = sources.get(signature);
         if (source == null) {
-            exportLog.error("Could not find export data source for partition " + partitionId +
+            exportLog.error("EOS Could not find export data source for partition " + partitionId +
                     " signature " + signature + ". The export end of stream is being discarded.");
             return;
         }

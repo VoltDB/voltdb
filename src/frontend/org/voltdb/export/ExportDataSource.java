@@ -57,6 +57,7 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.exportclient.ExportClientBase;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -98,6 +99,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
     private volatile boolean m_isInCatalog;
     private final Generation m_generation;
+    private final File m_adFile;
+    private ExportClientBase m_client;
 
     /**
      * Create a new data source.
@@ -137,7 +140,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          */
         m_partitionId = partitionId;
 
-        File adFile = new VoltFile(overflowPath, nonce + ".ad");
+        m_adFile = new VoltFile(overflowPath, nonce + ".ad");
         exportLog.info("Creating ad for " + nonce);
         byte jsonBytes[] = null;
         try {
@@ -153,16 +156,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             Throwables.propagate(e);
         }
 
-        try (FileOutputStream fos = new FileOutputStream(adFile)) {
+        try (FileOutputStream fos = new FileOutputStream(m_adFile)) {
             fos.write(jsonBytes);
             fos.getFD().sync();
         }
         m_isInCatalog = true;
+        m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
     }
 
     public ExportDataSource(Generation generation, File adFile) throws IOException {
         m_generation = generation;
+        m_adFile = adFile;
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
         long hsid = -1;
@@ -206,6 +211,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         //EDS created from adfile is always from disk.
         m_isInCatalog = false;
+        m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
     }
 
@@ -220,6 +226,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         m_ackMailboxRefs.set( ackMailboxes);
+    }
+
+    public void setClient(ExportClientBase client) {
+        //TODO prcondition?
+        m_client = client;
+    }
+
+    public ExportClientBase getClient() {
+        return m_client;
     }
 
     private synchronized void releaseExportBytes(long releaseOffset) throws IOException {
@@ -308,6 +323,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     /**
      * Make sure equal objects compareTo as 0.
+     * @param o
      */
     @Override
     public boolean equals(Object o) {
@@ -325,6 +341,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         result += m_tableName.hashCode();
         result += m_signature.hashCode();
         result += m_partitionId;
+        result += (m_isInCatalog ? 1 : 0);
         // does not factor in replicated / unreplicated.
         // does not factor in column names / schema
         return result;
@@ -426,7 +443,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushEndOfStream() {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
         m_isInCatalog = false;
-        m_pollFuture = null;
+        poll();
+//        m_pollFuture = null;
     }
 
     public void pushExportBuffer(
@@ -440,7 +458,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         if (m_es.isShutdown()) {
-           m_bufferPushPermits.release();
+            //If we are shutting down push it to PBD
+            try {
+                pushExportBufferImpl(uso, buffer, sync, false);
+            } catch (Throwable t) {
+                VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
+            } finally {
+                m_bufferPushPermits.release();
+            }
            return;
         }
         try {
@@ -522,6 +547,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     m_committedBuffers.closeAndDelete();
+                    m_adFile.delete();
                     m_ackMailboxRefs.set(null);
                 } catch(IOException e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
@@ -622,12 +648,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     fut.set(null);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source.
-                    reex.printStackTrace();
                 }
                 //Let generation know to cleanup. Processor needs to do its own cleanup.
+                forwardAckToOtherReplicas(Long.MIN_VALUE);
                 m_generation.onSourceDone(m_partitionId, m_signature);
-                //TODO: handle ack.
-//                forwardAckToOtherReplicas(Long.MIN_VALUE);
                 return;
             }
             //Assemble a list of blocks to delete so that they can be deleted
@@ -674,7 +698,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source dont discard next processor will pick it up.
-                    //ackingContainer.discard();
                 }
                 m_pollFuture = null;
             }
@@ -774,7 +797,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     if (!m_es.isShutdown()) {
-                       ackImpl(uso);
+                        ackImpl(uso);
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
@@ -786,10 +809,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
      private void ackImpl(long uso) {
-
-         if (uso == Long.MIN_VALUE) {
-            return;
-         }
 
         //Process the ack if any and add blocks to the delete list or move the released USO pointer
         if (uso > 0) {

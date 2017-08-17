@@ -369,7 +369,6 @@ public class ExportManager
         if (m_processorConfig.isEmpty() && processorConfigBeforeUpdate.isEmpty()) {
             return;
         }
-
         if (!requiresNewExportGeneration) {
             exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
             return;
