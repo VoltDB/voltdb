@@ -83,6 +83,8 @@ public class ExportManager
 
     private final HostMessenger m_messenger;
 
+    private final Object m_pushLock = new Object();
+
     /**
      * Set of partition ids for which this export manager instance is master of
      */
@@ -562,6 +564,7 @@ public class ExportManager
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
+        } finally {
         }
     }
 

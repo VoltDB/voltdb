@@ -57,7 +57,6 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import org.voltdb.exportclient.ExportClientBase;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -100,7 +99,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile boolean m_isInCatalog;
     private final Generation m_generation;
     private final File m_adFile;
-    private ExportClientBase m_client;
+    private Object m_client;
 
     /**
      * Create a new data source.
@@ -228,12 +227,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_ackMailboxRefs.set( ackMailboxes);
     }
 
-    public void setClient(ExportClientBase client) {
+    public void setClient(Object client) {
         //TODO prcondition?
         m_client = client;
     }
 
-    public ExportClientBase getClient() {
+    public Object getClient() {
         return m_client;
     }
 
@@ -444,7 +443,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
         m_isInCatalog = false;
         poll();
-//        m_pollFuture = null;
     }
 
     public void pushExportBuffer(
