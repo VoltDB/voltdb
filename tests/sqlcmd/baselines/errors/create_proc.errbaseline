@@ -67,4 +67,4 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 
 End of error output.
 Expect to fail because we can't create a single statement procedure with @SwapTables.
-[badswap]: Failed to plan for statement (sql0) "@SwapTables swap2 swap1;". Error: "Error in "@SwapTables swap2 swap1;" unknown token"
+[badswap]: Failed to plan for statement (sql) "@SwapTables swap2 swap1;". Error: "Error in "@SwapTables swap2 swap1;" unknown token"

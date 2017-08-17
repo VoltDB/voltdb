@@ -46,7 +46,7 @@ public class ExplainProc extends AdHocNTBase {
          * so I THINK that the string is always a single procname symbol and all this
          * splitting and iterating is a no-op.
          */
-        List<String> procNames = SQLLexer.splitStatements(procedureNames).completelyParsedStmts;
+        List<String> procNames = SQLLexer.splitStatements(procedureNames);
         int size = procNames.size();
         VoltTable[] vt = new VoltTable[size];
 

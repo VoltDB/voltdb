@@ -164,8 +164,8 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
                             action,tableName));
         }
 
-        // statements of all single-statement procs are named "sql0"
-        Statement catStmt = p.getStatements().get(VoltDB.ANON_STMT_NAME + "0");
+        // statements of all single-statement procs are named "sql"
+        Statement catStmt = p.getStatements().get(VoltDB.ANON_STMT_NAME);
         if (catStmt == null) {
             throw new VoltAbortException(
                     String.format("Unable to find SQL statement for found table %s: BAD",
