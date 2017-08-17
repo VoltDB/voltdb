@@ -1117,9 +1117,7 @@ public class VoltCompiler {
             if (m_logger.isDebugEnabled()) {
                 FunctionForVoltDB.logTableState(String.format("Start of compilation %s an old catalog.", (previousDBIfAny == null) ? "without" : "with"));
             }
-            if (previousDBIfAny != null) {
-                ddlcompiler.loadOldFunctions(previousDBIfAny);
-            }
+            ddlcompiler.saveDefinedFunctions();
             if (m_logger.isDebugEnabled()) {
                 FunctionForVoltDB.logTableState(String.format("After loading old functions."));
             }
@@ -1161,6 +1159,9 @@ public class VoltCompiler {
                 }
             }
 
+            if (m_logger.isDebugEnabled()) {
+                FunctionForVoltDB.logTableState("After compiling new ddl.");
+            }
             // When A/A is enabled, create an export table for every DR table to log possible conflicts
             ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs, m_isXDCR);
 
@@ -1210,7 +1211,7 @@ public class VoltCompiler {
             if (m_logger.isDebugEnabled()) {
                 FunctionForVoltDB.logTableState("Compilation failed: " + ex.getMessage());
             }
-            ddlcompiler.restoreOldFunctions();
+            ddlcompiler.restoreSavedFunctions();
             if (m_logger.isDebugEnabled()) {
                 FunctionForVoltDB.logTableState("After restoring old functions.");
             }
@@ -1219,7 +1220,7 @@ public class VoltCompiler {
         if (m_logger.isDebugEnabled()) {
             FunctionForVoltDB.logTableState("Compilation succeeded, before clearing old functions.");
         }
-        ddlcompiler.clearOldFunctions();
+        ddlcompiler.clearSavedFunctions();
         if (m_logger.isDebugEnabled()) {
             FunctionForVoltDB.logTableState("Compilation succeeded, after clearing old functions.");
         }

@@ -197,38 +197,31 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         // when we register it later.
         //
         // Note here that the integer values for the return type and for the parameter
-        // types are the value of a VoltType enumeral.  When the UDF is actually
-        // placed into the catalog we have to keep this straight.
+        // types are the value of a VoltType enumeral.  When the UDF is registered with
+        // FunctionForVoltDB the return type and parameter type values are from HSQL.
+        // When the UDF is actually placed into the catalog we have to keep this straight.
         //
         // It turns out that we need to register these with the compiler here
         // as well.  They can't be used until the procedures are defined.  But
         // the error messages are misleading if we try to use one in an index expression
         // or a materialized view definition.
         VoltType voltReturnType = VoltType.typeFromClass(returnTypeClass);
-        int returnTypeInt = voltReturnType.getValue();
-
-        Type compilerReturnType = Type.getDefaultTypeWithSize(voltReturnType.getValue());
-        Type[] compilerParamTypes = new Type[paramTypeClasses.length];
-        for (int i = 0; i < paramTypeClasses.length; i++) {
-            int paramTypeInt = VoltType.typeFromClass(paramTypeClasses[i]).getValue();
-            Type paramType = Type.getDefaultTypeWithSize(paramTypeInt);
-            compilerParamTypes[i] = paramType;
-        }
-        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, compilerReturnType, compilerParamTypes);
+        VoltType[] voltParamTypes = new VoltType[paramTypeClasses.length];
         funcXML = new VoltXMLElement("ud_function")
                          .withValue("name", functionName)
                          .withValue("className", className)
                          .withValue("methodName", methodName)
-                         .withValue("functionid", String.valueOf(functionId))
-                         .withValue("returnType", String.valueOf(returnTypeInt));
+                         .withValue("returnType", String.valueOf(voltReturnType.getValue()));
         for (int i = 0; i < paramTypeClasses.length; i++) {
-            int paramTypeInt = VoltType.typeFromClass(paramTypeClasses[i]).getValue();
-            Type paramType = Type.getDefaultTypeWithSize(paramTypeInt);
+            VoltType voltParamType = VoltType.typeFromClass(paramTypeClasses[i]);
             VoltXMLElement paramXML = new VoltXMLElement("udf_ptype")
-                                        .withValue("type", String.valueOf(paramTypeInt));
+                                        .withValue("type", String.valueOf(voltParamType.getValue()));
             funcXML.children.add(paramXML);
-            compilerParamTypes[i] = paramType;
+            voltParamTypes[i] = voltParamType;
         }
+        int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, -1, voltReturnType, voltParamTypes);
+        funcXML.attributes.put("functionid", String.valueOf(functionId));
+
         m_logger.debug(String.format("Added XML for function \"%s\"", functionName));
         m_schema.children.add(funcXML);
         return true;

@@ -60,7 +60,7 @@ public class TestAddDropUDF extends RegressionSuite {
         }
     }
 
-    public void notestFunctionNameCaseInsensitivity() throws IOException, ProcCallException {
+    public void testFunctionNameCaseInsensitivity() throws IOException, ProcCallException {
         Client client = getClient();
         addFunction(client, "testfunc", "BasicTestUDFSuite.constantIntFunction");
         verifyStmtFails(client, "CREATE FUNCTION testFUNC FROM METHOD org.voltdb_testfuncs.BasicTestUDFSuite.constantIntFunction;",
@@ -68,7 +68,7 @@ public class TestAddDropUDF extends RegressionSuite {
         dropFunction(client, "testfunc");
     }
 
-    public void notestyesAddRemoveUDF() throws IOException, ProcCallException {
+    public void testAddRemoveUDF() throws IOException, ProcCallException {
         Client client = getClient();
         String[] functionNamesToTest = new String[] {"testfunc", "TESTFUNC", "testFunc"};
         String[] methodNamesToTest = new String[] {"constantIntFunction", "unaryIntFunction", "generalIntFunction"};
@@ -186,8 +186,9 @@ public class TestAddDropUDF extends RegressionSuite {
         // This should fail because the procedure proc depends on add2bigint.
         try {
             cr = client.callProcedure("@AdHoc", "drop function add2bigint");
+            fail("Should not be able to drop add2bigint because proc depends on it.");
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Failed to plan for statement (sql) \"select ADD2biginT(BIG, BIG) from R1;\"."));
+            assertTrue(ex.getMessage().contains("Failed to plan for statement (sql0) \"select ADD2biginT(BIG, BIG) from R1;\"."));
         }
 
         catalogError = catalogMatchesCompilerFunctionSet(client);
@@ -227,7 +228,7 @@ public class TestAddDropUDF extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "create procedure proc as select ADD2biginT(BIG, BIG) from R1;");
             fail("Should not be able to recreate proc.");
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Failed to plan for statement (sql) \"select ADD2biginT(BIG, BIG) from R1;\"."));
+            assertTrue(ex.getMessage().contains("user lacks privilege or object not found: ADD2BIGINT"));
         }
 
         // See if we can do it all over again.

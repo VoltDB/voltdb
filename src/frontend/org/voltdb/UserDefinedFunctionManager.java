@@ -149,21 +149,18 @@ public class UserDefinedFunctionManager {
             m_paramCount = paramTypeClasses.length;
             m_paramTypes = new VoltType[m_paramCount];
             m_boxUpByteArray = new boolean[m_paramCount];
-            Type[] compilerParameterTypes = new Type[m_paramCount];
             for (int i = 0; i < m_paramCount; i++) {
                 m_paramTypes[i] = VoltType.typeFromClass(paramTypeClasses[i]);
                 m_boxUpByteArray[i] = paramTypeClasses[i] == Byte[].class;
-                compilerParameterTypes[i] = Type.getDefaultTypeWithSize(m_paramTypes[i].getValue());
             }
             m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
-            Type compilerReturnType = Type.getDefaultTypeWithSize(VoltType.typeFromClass(m_functionMethod.getReturnType()).getValue());
 
-            m_logger.info(String.format("Defining function %s (%s)", m_functionName, m_functionId));
+            m_logger.debug(String.format("User Defined Function Manager is defining function %s (%s)", m_functionName, m_functionId));
 
             FunctionForVoltDB.registerTokenForUDF(m_functionName,
                                                   m_functionId,
-                                                  compilerReturnType,
-                                                  compilerParameterTypes);
+                                                  m_returnType,
+                                                  m_paramTypes);
         }
 
         // We should refactor those functions into SerializationHelper

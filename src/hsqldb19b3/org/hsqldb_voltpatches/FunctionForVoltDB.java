@@ -414,6 +414,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         };
 
         private static Map<String, FunctionDescriptor> by_LC_name = new HashMap<>();
+        private static Set<String> defined_functions = new HashSet<String>();
         static {
             for (FunctionDescriptor fn : instances) {
                 by_LC_name.put(fn.m_name, fn);
@@ -428,6 +429,26 @@ public class FunctionForVoltDB extends FunctionSQL {
         public int getTypeParameter() {
             return m_typeParameter;
         }
+        
+		public static void addDefinedFunction(String functionName, FunctionDescriptor oldFd) {
+			FunctionDescriptor.by_LC_name.put(functionName, oldFd);
+			FunctionDescriptor.defined_functions.add(functionName);
+		}
+
+		public static void removeOneDefinedFunction(String functionName) {
+			FunctionDescriptor.by_LC_name.remove(functionName);
+	    	FunctionDescriptor.defined_functions.remove(functionName);
+		}
+
+		public static void saveDefinedFunctions() {
+			for (String name : defined_functions) {
+				FunctionDescriptor fd = by_LC_name.get(name);
+				by_LC_name.remove(name);
+				m_savedFunctionDfns.put(name,  fd);
+			}
+			defined_functions.clear();
+		}
+    
     }
 
     public static final int FUNC_VOLT_ID_FOR_CONTAINS = FunctionDescriptor.FUNC_VOLT_CONTAINS;
@@ -829,9 +850,9 @@ public class FunctionForVoltDB extends FunctionSQL {
      * @param functionName
      */
     public static void deregisterUserDefinedFunction(String functionName) {
-    	FunctionDescriptor.by_LC_name.remove(functionName);
+    	FunctionDescriptor.removeOneDefinedFunction(functionName);
     }
-    
+
     /**
      * Return true iff the FunctionId newFid matches the given signature.
      * 
@@ -897,13 +918,17 @@ public class FunctionForVoltDB extends FunctionSQL {
     private static FunctionDescriptor findFunction(String functionName, 
     												Type returnType, 
     												Type[] parameterType) {
+    	m_logger.debug("Looking for UDF " + functionName);
     	FunctionDescriptor newFd = FunctionDescriptor.by_LC_name.get(functionName);
-    	if (newFd == null && m_oldFunctionDfns != null) {
-    		newFd = m_oldFunctionDfns.get(functionName);
+    	if (newFd == null) {
+    		m_logger.debug("    Not defined in by_LC_name.  Maybe it's saved.");
+    		newFd = m_savedFunctionDfns.get(functionName);
     	}
-    	if (newFd != null && functionMatches(newFd, returnType, parameterType)) {
+    	if (newFd != null && functionMatches(newFd, returnType, parameterType) ) {
+    		m_logger.debug("    " + functionName + " is defined or saved.  id == " + newFd.getId());
     		return newFd;
     	}
+    	m_logger.debug("    " + functionName + " is not defined or saved.");
     	return null;
     }
     
@@ -931,31 +956,27 @@ public class FunctionForVoltDB extends FunctionSQL {
         return new FunctionDescriptor(functionName, returnType, functionId, -1, parameterTypes, syntax);
     }
     
-    public static int registerTokenForUDF(String functionName,
-                             			  Type returnTypeClass, 
-                             			  Type[] parameterTypeClasses) {
-    	return registerTokenForUDF(functionName, -1, returnTypeClass, parameterTypeClasses);
-    }
-    
 	/**
-	 * This function registers a UDF using Type values for the return type and parameter types.
-	 * This 
-	 * @param functionName
-	 * @param functionId
-	 * @param returnTypeClass
-	 * @param parameterTypeClasses
+	 * This function registers a UDF using VoltType values for the return type and parameter types.
+	 * 
+	 * @param functionName The function name.
+	 * @param functionId The function id.  If  this is -1 we don't have an opinion about the value.
+	 * @param voltReturnType The return type as a VoltType enumeral.
+	 * @param voltParameterTypes The parameter types as a VoltType enumeral.
 	 * @return
 	 */
-    public static int registerTokenForUDF(String functionName, 
+    public static synchronized int registerTokenForUDF(String functionName, 
     									  int functionId,
-    									  Type returnTypeClass, 
-    									  Type[] parameterTypeClasses) {
+    									  VoltType voltReturnType, 
+    									  VoltType[] voltParameterTypes) {
     	int answer;
+    	Type hsqlReturnType = hsqlTypeFromVoltType(voltReturnType);
+    	Type[] hsqlParameterTypes = hsqlTypeFromVoltType(voltParameterTypes);
         // If the token is already registered in the map, do not bother again.
-    	FunctionDescriptor oldFd = findFunction(functionName, returnTypeClass, parameterTypeClasses);
+    	FunctionDescriptor oldFd = findFunction(functionName, hsqlReturnType, hsqlParameterTypes);
         if (oldFd != null) {
         	// This may replace functionName with itself.  This will not be an error.
-        	FunctionDescriptor.by_LC_name.put(functionName, oldFd);
+        	FunctionDescriptor.addDefinedFunction(functionName, oldFd);
         	answer = oldFd.getId();
         	// If we were given a non-negative function id, it
         	// was defined in the catalog.  Our revivification here
@@ -973,10 +994,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         	} else {
         		answer = getNextFunctionId();
         	}
-	        FunctionDescriptor fd = makeFunctionIdFromParts(functionName, answer, returnTypeClass, parameterTypeClasses);
-	        FunctionDescriptor.by_LC_name.put(functionName, fd);
-	        m_logger.info(String.format("Added UDF \"%s\"(%d) with %d parameters",
-	        							functionName, answer, parameterTypeClasses.length));
+	        FunctionDescriptor fd = makeFunctionIdFromParts(functionName, answer, hsqlReturnType, hsqlParameterTypes);
+	        FunctionDescriptor.addDefinedFunction(functionName, fd);
+	        m_logger.debug(String.format("Added UDF \"%s\"(%d) with %d parameters",
+	        							functionName, answer, voltParameterTypes.length));
         }
         // Ensure that m_udfSeqId is larger than all the
         // ones we've seen so far.
@@ -986,7 +1007,45 @@ public class FunctionForVoltDB extends FunctionSQL {
         return answer;
     }
 
-    public static boolean isDefinedFunctionId(int functionId) {
+	/**
+     * Convert a VoltType to an HSQL type.
+     * 
+	 * Types are somewhat confusing.  There are three type representations, all different.
+	 * <ol>
+	 *   <li> Some types are in HSQl.  These are enumerals of the type org.hsqldb_voltpatches.types.Type.</li> 
+	 *   <li> Some types are in VoltDB.  These are enumerals of the type org.voltdb.VoltType.</li>
+	 *   <li> Some types are Java class types.  These have the type Class<?>, and come from the JVM.</li>
+	 * <ol>
+	 * Neeedless to say, these three all have entirely different structures.  The HSQL types are used here
+	 * in HSQl.  The VoltType enumerals  are used in the rest of Volt.  In particular, the functions we need
+	 * to convert from VoltType to Type, like getParameterSQLTypeNumber, are not visible outside of HSQL.  So
+	 * we we need this function to convert one way.  Conversions the other way are possible, but not
+	 * currently needed.
+     * 
+     * @param voltReturnType
+     * @return
+     */
+    public static Type hsqlTypeFromVoltType(VoltType voltReturnType) {
+    	Class<?> typeClass = VoltType.classFromByteValue(voltReturnType.getValue());
+    	int typeNo = Types.getParameterSQLTypeNumber(typeClass);
+    	return Type.getDefaultTypeWithSize(typeNo);
+	}
+
+    /**
+     * Map the single parameter hsqlTypeFromVoltType over an array.
+     * 
+     * @param voltParameterTypes
+     * @return
+     */
+    public static Type[] hsqlTypeFromVoltType(VoltType[] voltParameterTypes) {
+    	Type[] answer = new Type[voltParameterTypes.length];
+    	for (int idx = 0; idx < voltParameterTypes.length; idx += 1) {
+    		answer[idx] = hsqlTypeFromVoltType(voltParameterTypes[idx]);
+    	}
+		return answer;
+	}
+
+	public static boolean isDefinedFunctionId(int functionId) {
         return functionId != FunctionDescriptor.FUNC_VOLT_ID_NOT_DEFINED;
     }
 
@@ -1000,10 +1059,8 @@ public class FunctionForVoltDB extends FunctionSQL {
     
     public static Set<String> getAllUserDefinedFunctionNamesForDebugging() {
     	Set<String> answer = new HashSet<>();
-    	for (Map.Entry<String, FunctionDescriptor> entry : FunctionDescriptor.by_LC_name.entrySet()) {
-    		if (isUserDefinedFunctionId(entry.getValue().getId())) {
-    			answer.add(entry.getKey());
-    		}
+    	for (String name : FunctionDescriptor.defined_functions) {
+    		answer.add(name);
     	}
     	return answer;
     }
@@ -1026,49 +1083,42 @@ public class FunctionForVoltDB extends FunctionSQL {
         return val;
     }
 
-    private static Map<String, FunctionDescriptor> m_oldFunctionDfns = null;
+    private static Map<String, FunctionDescriptor> m_savedFunctionDfns = new HashMap<>();
     
-    private static FunctionDescriptor lookupOldFunction(String functionName) {
-    	if (m_oldFunctionDfns != null) {
-    		return m_oldFunctionDfns.get(functionName);
-    	}
-    	return null;
-    }
     /**
      * Delete all the user defined functions, but cache them if that is wanted.
      * 
      * @param saved  Where to cache the old functions.
      */
-    private static void deleteOldFunctions(Map<String, FunctionDescriptor> saved) {
-		for (Iterator<Map.Entry<String, FunctionDescriptor>> i = FunctionDescriptor.by_LC_name.entrySet().iterator(); i.hasNext();) {
-			 Map.Entry<String, FunctionDescriptor> element = i.next();
-			 if (isUserDefinedFunctionId(element.getValue().getId())) {
-				 if (saved != null) {
-					 saved.put(element.getKey(), element.getValue());
-				 }
-				 i.remove();
-			 }
+    public static void deleteOldFunctions(Map<String, FunctionDescriptor> saved) {
+		for (String name : FunctionDescriptor.defined_functions) {
+			FunctionDescriptor fdn = FunctionDescriptor.by_LC_name.get(name);
+			FunctionDescriptor.by_LC_name.remove(name);
+			assert(fdn != null);
+			if (saved != null) {
+				saved.put(name, fdn);
+			}
 		}
+		FunctionDescriptor.defined_functions.clear();
     }
 
     /**
 	 * Restore the saved user defined functions.
 	 */
-	public static void restoreOldFunctions() {
-		assert(m_oldFunctionDfns != null);
-		
+	public static void restoreSavedFunctions() {
 		// Delete the ones we have now, and add back
 		// the old ones.
 		deleteOldFunctions(null);
-		for (Iterator<Map.Entry<String, FunctionDescriptor>> i = m_oldFunctionDfns.entrySet().iterator(); i.hasNext();) {
+		for (Iterator<Map.Entry<String, FunctionDescriptor>> i = m_savedFunctionDfns.entrySet().iterator(); i.hasNext();) {
 			Map.Entry<String, FunctionDescriptor> val = i.next();
 			FunctionDescriptor.by_LC_name.put(val.getKey(), val.getValue());
+			FunctionDescriptor.defined_functions.add(val.getKey());
 		}
-		m_oldFunctionDfns = null;
+		m_savedFunctionDfns.clear();
 	}
 
-	public static void clearOldFunctions() {
-		m_oldFunctionDfns = null;
+	public static void clearSavedFunctions() {
+		m_savedFunctionDfns.clear();
 	}
 
 	/**
@@ -1084,10 +1134,6 @@ public class FunctionForVoltDB extends FunctionSQL {
 		return (fd != null && fd.getId() == functionId);
 	}
 
-	public static void prepareOldFunctions() {
-		assert (m_oldFunctionDfns == null);
-		m_oldFunctionDfns = new HashMap<String, FunctionDescriptor>();
-	}
 	/**
 	 * Load one function into the old function id table.  These are filled in from an
 	 * old catalog.  They aren't defined after this load, but if they are defined later
@@ -1102,37 +1148,44 @@ public class FunctionForVoltDB extends FunctionSQL {
 	 * @param returnType The return type, in SQL Type form.
 	 * @param paramTypes The parameter types, in SQL Type form.
 	 */
-	public static void loadOldFunctionId(String functionName, int functionId, Type returnType, Type[] paramTypes) {
-		assert(m_oldFunctionDfns != null);
-		FunctionDescriptor oldfd = findFunction(functionName, returnType, paramTypes);
+	public static void saveOldFunctionId(String functionName, int functionId, VoltType returnType, VoltType[] paramTypes) {
+		assert(m_savedFunctionDfns.size() == 0);
+		Type hsqlReturnType = hsqlTypeFromVoltType(returnType);
+		Type[] hsqlParameterTypes = hsqlTypeFromVoltType(paramTypes);
+		FunctionDescriptor oldfd = findFunction(functionName, hsqlReturnType, hsqlParameterTypes);
 		if (oldfd != null) {
-			// This should not be defined in m_oldFunctionDfns, but only
-			// in by_LC_name.
-			FunctionDescriptor.by_LC_name.remove(functionName);
-			assert(m_oldFunctionDfns.get(functionName) == null);
+			FunctionDescriptor.removeOneDefinedFunction(functionName);
+			assert(m_savedFunctionDfns.get(functionName) == null);
 		} else {
-			oldfd = makeFunctionIdFromParts(functionName, functionId, returnType, paramTypes);
+			oldfd = makeFunctionIdFromParts(functionName, functionId, hsqlReturnType, hsqlParameterTypes);
 		}
-		m_oldFunctionDfns.put(functionName, oldfd);
+		m_savedFunctionDfns.put(functionName, oldfd);
 	}
 	
 	public static void logTableState(String message) {
 		if (m_logger.isDebugEnabled()) {
 			m_logger.debug(message);
-			m_logger.debug("  Defined functions:");
-			for (Map.Entry<String, FunctionDescriptor> fd : FunctionDescriptor.by_LC_name.entrySet()) {
-				if ((fd.getValue().getId() < 0) || isUserDefinedFunctionId(fd.getValue().getId())) {
-					m_logger.debug(String.format("    %s(%d) with %d parameters",
-							                     fd.getValue().getName(),
-							                     fd.getValue().getId(),
-							                     fd.getValue().getParamTypes().length));
+			if (FunctionDescriptor.defined_functions.size() == 0) {
+				m_logger.debug("  No defined functions.");
+			} else {
+				m_logger.debug(String.format("  Defined functions (%d definitions):",
+						       FunctionDescriptor.defined_functions.size()));
+				for (String name : FunctionDescriptor.defined_functions) {
+					FunctionDescriptor fd = FunctionDescriptor.by_LC_name.get(name);
+					assert(fd != null);
+					if ((fd.getId() < 0) || isUserDefinedFunctionId(fd.getId())) {
+						m_logger.debug(String.format("    %s(%d) with %d parameters",
+								                     fd.getName(),
+								                     fd.getId(),
+								                     fd.getParamTypes().length));
+					}
 				}
 			}
-			if (m_oldFunctionDfns == null) {
+			if (m_savedFunctionDfns.size() == 0) {
 				m_logger.debug("  No Saved Functions");
 			} else {
-				m_logger.debug("  Saved functions:");
-				for (Map.Entry<String, FunctionDescriptor> fd : m_oldFunctionDfns.entrySet()) {
+				m_logger.debug(String.format("  Saved functions (%d definitions):", m_savedFunctionDfns.size()));
+				for (Map.Entry<String, FunctionDescriptor> fd : m_savedFunctionDfns.entrySet()) {
 					m_logger.debug(String.format("    %s(%d) with %d parameters",
 							                     fd.getValue().getName(),
 							                     fd.getValue().getId(),
@@ -1142,4 +1195,17 @@ public class FunctionForVoltDB extends FunctionSQL {
 		}
 	}
 
+	/**
+	 * Delete the defined functions, but leave the saved ones alone.
+	 */
+	public static void deleteDefinedFunctions() {
+		for (String name : FunctionDescriptor.defined_functions) {
+			FunctionDescriptor.by_LC_name.remove(name);
+		}
+		FunctionDescriptor.defined_functions.clear();
+	}
+
+	public static void saveDefinedFunctions() {
+		FunctionDescriptor.saveDefinedFunctions();
+	}
 }

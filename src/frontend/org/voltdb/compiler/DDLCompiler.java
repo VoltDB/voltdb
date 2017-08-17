@@ -841,14 +841,6 @@ public class DDLCompiler {
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
     }
 
-    private int intFromString(String str) throws VoltCompilerException {
-        try {
-            return(Integer.parseInt(str));
-        } catch (NumberFormatException ex) {
-            throw m_compiler.new VoltCompilerException("Bad integer string: \"" + str + "\"");
-        }
-    }
-
     private void addUserDefinedFunctionToCatalog(Database db, VoltXMLElement XMLfunc, boolean isXDCR)
                         throws VoltCompilerException {
         // Fetch out the functions, find the function name and define
@@ -872,30 +864,30 @@ public class DDLCompiler {
         //
         // Filling in the catalog and compiler types for paraemeters is
         // kind of mushed together in this loop.
-        int returnTypeInt = intFromString(XMLfunc.attributes.get("returnType"));
-        func.setReturntype(returnTypeInt);
+        byte returnTypeByte = Byte.parseByte(XMLfunc.attributes.get("returnType"));
+        VoltType voltReturnType = VoltType.get(returnTypeByte);
+        func.setReturntype(returnTypeByte);
 
         int nparams = XMLfunc.children.size();
         CatalogMap<FunctionParameter> params = func.getParameters();
 
-        Type returnType = Type.getDefaultTypeWithSize(returnTypeInt);
-        Type[] paramTypes = new Type[nparams];
+        VoltType[] voltParamTypes = new VoltType[nparams];
 
         for (int pidx = 0; pidx < nparams; pidx += 1) {
             VoltXMLElement ptype = XMLfunc.children.get(pidx);
             assert("udf_ptype".equals(ptype.name));
             FunctionParameter param = params.add(String.valueOf(pidx));
-            int ptypeno = intFromString(ptype.attributes.get("type"));
+            byte ptypeno = Byte.parseByte(ptype.attributes.get("type"));
             param.setParametertype(ptypeno);
-            paramTypes[pidx] = Type.getDefaultType(ptypeno);
+            voltParamTypes[pidx] = VoltType.get(ptypeno);
         }
         // Ascertain that the function id in the xml is the same as the
         // function id returned from the registration.  We don't really
         // care if this is newly defined or not.
-        int regResult = FunctionForVoltDB.registerTokenForUDF(functionName, returnType, paramTypes);
         int functionId = Integer.parseInt(XMLfunc.attributes.get("functionid"));
-        assert(functionId == regResult);
-        func.setFunctionid(regResult);
+        func.setFunctionid(functionId);
+        int regResult = FunctionForVoltDB.registerTokenForUDF(functionName, functionId, voltReturnType, voltParamTypes);
+        assert(regResult == functionId);
     }
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
@@ -2119,15 +2111,6 @@ public class DDLCompiler {
         }
     }
 
-    private static Type[] getParamTypesFromCatalog(CatalogMap<FunctionParameter> fparams) {
-        int numParams = fparams.size();
-        Type[] parameterTypes = new Type[numParams];
-        for (int idx = 0; idx < numParams; idx += 1) {
-            FunctionParameter fp = fparams.get(String.valueOf(idx));
-            parameterTypes[idx] = Type.getDefaultTypeWithSize(fp.getParametertype());
-        }
-        return parameterTypes;
-    }
     /**
      * Load the udfs from the previous DB into the m_oldFunctions.  These are not
      * actually defined, but they are where we can find them if we need them.  If
@@ -2137,24 +2120,15 @@ public class DDLCompiler {
      * This should really be in FunctionForVoltDB.  But we can't use the catalog
      * functions in HSQLDB.
      */
-    public static void loadOldFunctions(Database previousDB) {
-        FunctionForVoltDB.prepareOldFunctions();
-        for (Function fcn : previousDB.getFunctions()) {
-            Type returnType = Type.getDefaultTypeWithSize(fcn.getReturntype());
-            CatalogMap<FunctionParameter> params = fcn.getParameters();
-            Type[] paramTypes = getParamTypesFromCatalog(params);
-            FunctionForVoltDB.loadOldFunctionId(fcn.getTypeName(),
-                                                fcn.getFunctionid(),
-                                                returnType,
-                                                paramTypes);
-        }
+    public void saveDefinedFunctions() {
+        FunctionForVoltDB.saveDefinedFunctions();
     }
 
-    public void restoreOldFunctions() {
-        FunctionForVoltDB.restoreOldFunctions();
+    public void restoreSavedFunctions() {
+        FunctionForVoltDB.restoreSavedFunctions();
     }
 
-    public void clearOldFunctions() {
-        FunctionForVoltDB.clearOldFunctions();
+    public void clearSavedFunctions() {
+        FunctionForVoltDB.clearSavedFunctions();
     }
 }
