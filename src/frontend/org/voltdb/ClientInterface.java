@@ -1168,10 +1168,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     // handle all host NT procedure callbacks
                     if (response.getClientConnectionId() == NT_REMOTE_PROC_CID) {
-                        //int hostId = VoltDB.instance().getHostMessenger().getHostId();
-                        //System.out.printf("HostID %d got a response from an all-host NT proc\n", hostId);
-                        //System.out.flush();
-
                         m_dispatcher.handleAllHostNTProcedureResponse(response.getClientResponseData());
                         return;
                     }

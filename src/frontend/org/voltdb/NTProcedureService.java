@@ -112,6 +112,8 @@ public class NTProcedureService {
     final static String NTPROC_THREADPOOL_NAMEPREFIX = "NTPServiceThread-";
     final static String NTPROC_THREADPOOL_PRIORITY_SUFFIX = "Priority-";
 
+    public static final String NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT = "NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT";
+
     // runs the initial run() method of nt procs
     // (doesn't run nt procs if started by other nt procs)
     // from 1 to 20 threads in parallel, with an unbounded queue

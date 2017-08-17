@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -411,10 +413,16 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         Map<Integer, ClientResponse> resultMapByHost = null;
         String err;
+
+        long timeoutSetting = VerifyCatalogAndWriteJar.TIMEOUT;
         try {
-            resultMapByHost = cf.get();
+            resultMapByHost = cf.get(timeoutSetting, TimeUnit.SECONDS);
         } catch (InterruptedException | ExecutionException e) {
-            err = "An invocation of procedure " + procedureName + " on all hosts failed: " + e.getMessage();
+            err = procedureName + " run everywhere call failed: " + e.getMessage();
+            hostLog.info(err);
+            return err;
+        } catch (TimeoutException e) {
+            err = procedureName + " run everywhere call timed out in : " + timeoutSetting + " seconds.";
             hostLog.info(err);
             return err;
         }
