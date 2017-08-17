@@ -34,12 +34,14 @@ class AvgWaitsChart extends Component {
               hovered: null
             });
           }}
-          >
-          <XAxis />
+        >
+          <XAxis style={{
+            text: { fontWeight: 600, fontSize: '55%' }
+          }} />
           <YAxis />
           <HorizontalGridLines />
           <LineSeries
-            onNearestX={(value, {event, innerX, innerY, index}) => {
+            onNearestX={(value, { event, innerX, innerY, index }) => {
               // record the nearest data point and set the state
               value.index = index;
               this.setState({

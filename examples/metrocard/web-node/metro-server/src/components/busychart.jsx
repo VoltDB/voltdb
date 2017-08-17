@@ -58,8 +58,10 @@ class BusiestStationsChart extends Component {
               busiestStations: temp
             });
           }}
-          >
-          <XAxis title='Stations' />
+        >
+          <XAxis title='Stations' style={{
+            text: { fontWeight: 600, fontSize: '55%' }
+          }} />
           <YAxis title='Swipes' />
           <HorizontalGridLines />
           <VerticalBarSeries
