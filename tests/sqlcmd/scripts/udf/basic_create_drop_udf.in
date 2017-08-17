@@ -1,0 +1,5 @@
+file scripts/udf/udf_ddl.sqlfile
+file scripts/udf/udf_insert.sqlfile
+load classes testfuncs.jar;
+
+file scripts/udf/udf_create_drop_select.sqlfile

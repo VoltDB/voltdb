@@ -29,6 +29,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Random;
 
+import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -41,8 +43,6 @@ import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UDF_TEST;
 import org.voltdb_testfuncs.UserDefinedTestFunctions.UserDefinedTestException;
-
-import junit.framework.Test;
 
 /**
  * Tests of SQL statements that use User-Defined Functions (UDF's).
@@ -563,7 +563,7 @@ public class TestUserDefinedFunctions extends RegressionSuite {
         TimestampType expectedResult = new TimestampType(253402300801000000L);  // equals 10000-01-01 00:00:01.0
         testFunction("addYearsToTimestamp('9999-01-01 00:00:01.0', 1)", expectedResult, VoltType.TIMESTAMP);
     }
-    public void testddYearsToTimestampWrap2() throws IOException, ProcCallException {
+    public void testAddYearsToTimestampWrap2() throws IOException, ProcCallException {
         TimestampType expectedResult = new TimestampType("1582-12-31 23:59:59.0");
         testFunction("addYearsToTimestamp('1583-12-31 23:59:59.0', -1)", expectedResult, VoltType.TIMESTAMP);
     }
