@@ -2514,7 +2514,6 @@ var loadPage = function (serverName, portid) {
             var totalInvocations=0;
             var procedureName = $("#hidProcedureName").html();
             $(".procedureName").html(procedureName);
-             //filter specific procedure calls from list of datas
             var finalDetails = [];
             var freqDetails = {};
             var partitionDetails = [];
@@ -2529,7 +2528,6 @@ var loadPage = function (serverName, portid) {
 
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                 var newStatement = '';
-                //order items w.r.to latency
                 var latValue;
 
                 if(item.PROCEDURE == procedureName ){
@@ -2593,16 +2591,14 @@ var loadPage = function (serverName, portid) {
             if(statementList.length > 0){
                 for(var u=0; u< statementList.length; u++){
                      orderedDetails[statementList[u]].sort(function(a, b) {
-                          var nameA = a.INVOCATION; // ignore upper and lowercase
-                          var nameB = b.INVOCATION; // ignore upper and lowercase
+                          var nameA = a.INVOCATION;
+                          var nameB = b.INVOCATION;
                           if (nameA > nameB) {
                             return -1;
                           }
                           if (nameA < nameB) {
                             return 1;
                           }
-
-                          // names must be equal
                           return 0;
                     });
                }
@@ -2634,7 +2630,6 @@ var loadPage = function (serverName, portid) {
         open: function (event, ui, ele)  {
             var procedureName = $("#hidProcedureName").html();
             $(".procedureName").html(procedureName);
-             //filter specific procedure calls from list of datas
             var count = 0;
             var combinedDetails = {};
             var partitionDetails = [];
@@ -2730,15 +2725,14 @@ var loadPage = function (serverName, portid) {
             if(statementList.length > 0){
                 for(var u=0; u< statementList.length; u++){
                      orderedDetails[statementList[u]].sort(function(a, b) {
-                          var nameA = a.combinedWeight; // ignore upper and lowercase
-                          var nameB = b.combinedWeight; // ignore upper and lowercase
+                          var nameA = a.combinedWeight;
+                          var nameB = b.combinedWeight;
                           if (nameA > nameB) {
                             return -1;
                           }
                           if (nameA < nameB) {
                             return 1;
                           }
-                          // names must be equal
                           return 0;
                     });
                }
@@ -2773,16 +2767,14 @@ var loadPage = function (serverName, portid) {
         for(var key in partitionDetails){
             var arr = partitionDetails[key].values
             arr.sort(function(a, b) {
-              var nameA = a.z; // ignore upper and lowercase
-              var nameB = b.z; // ignore upper and lowercase
+              var nameA = a.z;
+              var nameB = b.z;
               if (nameA > nameB) {
                 return -1;
               }
               if (nameA < nameB) {
                 return 1;
               }
-
-              // names must be equal
               return 0;
             });
         }
@@ -2839,8 +2831,6 @@ var loadPage = function (serverName, portid) {
       var result = 0;
       for(var prop in obj) {
         if (obj.hasOwnProperty(prop)) {
-
-        // or Object.prototype.hasOwnProperty.call(obj, prop)
           if(obj[prop]["STATEMENT"] == statement){
             result++;
           }
@@ -3321,14 +3311,6 @@ var adjustImporterGraphSpacing = function() {
                 );
             }
         };
-
-//        this.calculateCombinedDetailValue=function(profileData){
-//            var totalValue = 0;
-//            for(var j = 0; j < profileData.length; j++){
-//                totalValue += (profileData[j].AVG/1000000) * profileData[j].INVOCATIONS;
-//            }
-//            return totalValue;
-//        }
 
         this.loadSchemaTab = function () {
             this.isSchemaTabLoading = true;

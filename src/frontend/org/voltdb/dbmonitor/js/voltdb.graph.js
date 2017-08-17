@@ -608,10 +608,6 @@
 
         this.initializeProcedureDetailGraph = function(){
             nv.addGraph(function() {
-//                ChartLatencyDetailAnalysis.x(function(d) {
-//                    return  d.label
-//                  }).y(function(d) { return d.value }).height(barHeight)
-//                  .showValues(true);
                 ChartLatencyDetailAnalysis.valueFormat(d3.format(',.6f'));
                 ChartLatencyDetailAnalysis.yAxis
                     .tickFormat(d3.format(',.2f'));
@@ -742,9 +738,6 @@
 
             d3.select('#visualizeLatencyDetail > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
             .each(function(d,i){wordWrap(this, d, 110, -115, -8);});
-//            $("#visualizeLatencyDetail").find('.nvd3').removeAttr("x");
-//            $("#visualizeLatencyDetail").find('.nvd3').attr("x",344);
-//            $("#visualizeLatencyDetail").find('.nvd3').attr("y",172);
         }
 
         this.RefreshFrequencyDetailGraph = function(freqDetails){
@@ -783,8 +776,6 @@
 
             d3.select('#visualizeFrequencyDetails > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
             .each(function(d,i){wordWrap(this, d, 110, -115, -8);});
-//            $("#visualizeFrequencyDetails").find('.nvd3').attr("x",344);
-//            $("#visualizeFrequencyDetails").find('.nvd3').attr("y",172);
         }
 
         this.RefreshCombinedDetailGraph = function(dataCombined){

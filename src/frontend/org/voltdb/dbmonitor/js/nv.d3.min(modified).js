@@ -9203,8 +9203,6 @@
 
                             var yerr = getYerr(d, i);
 
-//                            var t = valueFormat(getY(d, i))
-//                                , yerr = getYerr(d, i);
                             if (yerr === undefined)
                                 return t + unit;
                             if (!yerr.length)
