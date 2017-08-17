@@ -169,7 +169,7 @@ public class ClientInterfaceHandleManager
      * Create a new handle for a transaction and store the client information
      * for that transaction in the internal structures.
      * ClientInterface handles have the partition ID encoded in them as the 10
-     * high-order non-sign bits (where the MP partition ID is the max value),
+     * high-order non-sign bits (where the SHORT_CIRCUIT_PART_ID is the max value),
      * and a 53 bit sequence number in the low 53 bits.
      */
     long getHandle(
@@ -180,10 +180,10 @@ public class ClientInterfaceHandleManager
             long creationTimeNanos,
             String procName,
             long initiatorHSId,
-            boolean isShortCircuitRead)
+            boolean isShortCircuitReadOrNTProc)
     {
         assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
-        if (isShortCircuitRead) {
+        if (isShortCircuitReadOrNTProc) {
             partitionId = SHORT_CIRCUIT_PART_ID;
         } else if (!isSinglePartition) {
             partitionId = MP_PART_ID;
