@@ -667,7 +667,7 @@
                     else if(chartContainer == null){
                         if(d.series[0].key == "Execution Time" || d.series[0].key == "Avg Execution Time")
                             unit = " ms"
-                        else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail")
+                        else if(d.series[0].key == "Frequency" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Tuple Count")
                             unit = ""
                         else if(d.series[0].key == "Total Processing Time" || d.series[0].key == "Processing Time Detail")
                             unit =" s"
@@ -695,7 +695,9 @@
                         .append("div")
                         .style("background-color", function (p) { return p.color });
                 else{
-                    if((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Total Processing Time") && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "Multi Partitioned"){
+                    if(((d.data.key == "Execution Time" || d.data.key == "Frequency" || d.data.key == "Total Processing Time")
+                    && VoltDbAnalysis.procedureValue[d.data.label].TYPE == "Multi Partitioned")
+                    || (d.data.key == "Tuple Count" && VoltDbAnalysis.tablePropertyValue[d.data.label].PARTITION_TYPE != "Partitioned")){
                         trowEnter.append("td")
                             .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+ "#14416d" +"'></span><span>"+ d.series[0].key +"</span>" );
                     }
@@ -709,7 +711,7 @@
                         var keyName = d.series[0].key;
                         keyName = (keyName == "Frequency Detail" ? "Frequency":(keyName == "Processing Time Detail" ? "Total Processing Time" : keyName));
                         trowEnter.append("td")
-                            .html("<span style='margin-bottom:0;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ keyName +"</span>" );
+                            .html("<span style='margin-bottom:-3px;margin-right:2px;width:14px;height:14px;background:"+d.color+"'></span><span>"+ keyName +"</span>" );
                     }
                 }
 
@@ -728,7 +730,10 @@
                     trowEnter.append("td")
                         .html(function (p, i) { return ((d.data.y / d.data.z) * 100).toFixed(3) + unit });
                 }
-                else {
+                else if(d.series[0].key == "Tuple Count"){
+                    trowEnter.append("td")
+                        .html(function (p, i) { return parseInt(p.value) + unit });
+                } else {
                     trowEnter.append("td")
                         .classed("value", true)
                         .html(function (p, i) { return valueFormatter(p.value, i) + unit });
@@ -891,6 +896,17 @@
 
                         trowEnter2.append("td")
                             .html(d.series[0].value.toFixed(3) +"ms");
+                }
+
+                if(d.series[0].key == "Tuple Count"){
+                    var trowEnter2 = tbodyEnter
+                    .append("tr");
+
+                    trowEnter2.append("td")
+                    .html("Table Type")
+
+                    trowEnter2.append("td")
+                    .html(VoltDbAnalysis.tablePropertyValue[d.data.label].PARTITION_TYPE);
                 }
 
                 var html = table.node().outerHTML;

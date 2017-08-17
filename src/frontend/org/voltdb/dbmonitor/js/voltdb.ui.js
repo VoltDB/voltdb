@@ -2344,7 +2344,7 @@ var loadPage = function (serverName, portid) {
         }
     });
 
-    //pm remove
+    //remove
     $("#dbPane div.menu_head").click(function () {
         var headerState = $("#dbPane div.menu_body").css('display');
         if (headerState == 'none') {
@@ -2385,7 +2385,6 @@ var loadPage = function (serverName, portid) {
 
             var procedureName = $("#hidProcedureName").html();
             $("#procedureName").html(procedureName);
-             //filter specific procedure calls from list of datas
             var procDetails = {};
             var finalDetails = [];
             var partitionDetails = [];
@@ -2529,7 +2528,6 @@ var loadPage = function (serverName, portid) {
             VoltDbAnalysis.latencyDetailValue.forEach (function(item){
                 var newStatement = '';
                 var latValue;
-
                 if(item.PROCEDURE == procedureName ){
                     newStatement = item.STATEMENT;
                      if(item.type == "Single Partitioned"){

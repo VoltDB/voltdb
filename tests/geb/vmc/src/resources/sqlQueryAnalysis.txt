@@ -27,4 +27,7 @@ procedureVotersA
 DROP PROCEDURE procedureVotersA;
 DROP TABLE voters;
 
+#insertQuery
+INSERT INTO voters values ('name', '5', 5);
+
 #endQuery

@@ -1,7 +1,6 @@
 var latencyDetails = [];
 function loadAnalysisPage(){
     VoltDbAnalysis.setDefaultAnalysisSettings();
-    $("#tabProcedureBtn").trigger("click");
     $("#tabAnalysis li a").on("click", function(){
         VoltDbAnalysis.refreshChart();
     })
@@ -44,6 +43,22 @@ function loadAnalysisPage(){
             VoltDbAnalysis.partitionStatus = "SP"
         }
         refreshLegend(VoltDbAnalysis.currentTab);
+    }
+
+    function formatAnalysisTableLegend(isP, isR){
+        if(isP && isR){
+            $("#legendDataAnalysisP").hide();
+            $("#legendDataAnalysisR").hide();
+            $("#legendDataAnalysisBoth").show();
+        } else if(isP){
+            $("#legendDataAnalysisP").show();
+            $("#legendDataAnalysisR").hide();
+            $("#legendAnalysisBoth").hide();
+        } else {
+            $("#legendDataAnalysisP").hide();
+            $("#legendDataAnalysisR").show();
+            $("#legendDataAnalysisBoth").hide();
+        }
     }
 
     function displayWarningMessages(warningMsgList){
@@ -168,6 +183,7 @@ function loadAnalysisPage(){
 
             var formatDate = VoltDbAnalysis.formatDateTime(timestamp);
             $("#analysisDate").html(formatDate);
+            $("#analysisDateTable").html(formatDate);
             formatAnalysisLegend(isMPPresent, isSPresent);
             MonitorGraphUI.initializeAnalysisGraph();
 
@@ -254,6 +270,50 @@ function loadAnalysisPage(){
             MonitorGraphUI.initializeCombinedDetailGraph();
         });
 
+        voltDbRenderer.GetTableInformationOnly(function(tableDetails){
+            if(tableDetails != undefined){
+                if(!$.isEmptyObject(tableDetails["TABLES"])){
+                    $(".analyzeNowContent").hide();
+                    $("#divTabData").show();
+                    $("#divNoContentTable").hide();
+                } else {
+                    $(".analyzeNowContent").hide();
+                    $("#divTabData").hide();
+                    $("#divNoContentTable").show();
+                }
+            }
+            MonitorGraphUI.initializeAnalysisTableGraph();
+            var tableData = []
+            var isReplicated = false;
+            var isPartitioned = false;
+            var timeStamp;
+            $.each(tableDetails["TABLES"], function(key, value){
+                var tableName = key;
+                var tupleCount = value["TUPLE_COUNT"];
+                timeStamp = value["TIMESTAMP"];
+
+                if(value["PARTITION_TYPE"] == "Partitioned"){
+                    isPartitioned = true;
+                } else {
+                    isReplicated = true;
+                }
+
+                VoltDbAnalysis.tablePropertyValue[tableName] = {
+                    "PARTITION_TYPE": value["PARTITION_TYPE"]
+                }
+
+                tableData.push({"label": tableName, "value": tupleCount})
+            });
+
+            formatAnalysisTableLegend(isPartitioned, isReplicated)
+            var formatTableDate = VoltDbAnalysis.formatDateTime(timeStamp);
+            $("#analysisDateTable").html(formatTableDate);
+            setTimeout(function(){
+                tableData.sort(function(a,b) {return ((b.value) > (a.value)) ? 1 : (((a.value) > (b.value)) ? -1 : 0);});
+                MonitorGraphUI.RefreshAnalysisTableGraph(tableData);
+            }, 500)
+
+        })
     }
 
     $("#btnAnalyzeNow").on("click", function(){
@@ -264,6 +324,7 @@ function loadAnalysisPage(){
 (function(window) {
     iVoltDbAnalysis = (function(){
         this.procedureValue = {};
+        this.tablePropertyValue = {};
         this.latencyDetailValue = [];
         this.latencyDetail = {};
         this.combinedDetail = {};
