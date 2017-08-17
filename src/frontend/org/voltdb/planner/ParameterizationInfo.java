@@ -23,6 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.ParameterStateManager;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
@@ -71,6 +73,20 @@ public class ParameterizationInfo {
      */
     public static void resetCurrentParamIndex() {
         curParamIndex = 0;
+    }
+
+    public static HSQLInterface.ParameterStateManager getParamStateManager() {
+        return new ParameterStateManager() {
+            @Override
+            public int getNextParamIndex() {
+                return ParameterizationInfo.getNextParamIndex();
+            }
+
+            @Override
+            public void resetCurrentParamIndex() {
+                ParameterizationInfo.resetCurrentParamIndex();
+            }
+        };
     }
 
     private ParameterizationInfo(VoltXMLElement parameterizedXmlSQL,

@@ -551,7 +551,6 @@ public abstract class StatementDMQL extends Statement {
 
         int     offset;
         int     idx;
-        boolean hasReturnValue;
 
         offset = 0;
 
@@ -737,14 +736,6 @@ public abstract class StatementDMQL extends Statement {
     private StringBuffer appendTable(StringBuffer sb) {
 
         sb.append("TABLE[").append(targetTable.getName().name).append(']');
-
-        return sb;
-    }
-
-    private StringBuffer appendSourceTable(StringBuffer sb) {
-
-        sb.append("SOURCE TABLE[").append(sourceTable.getName().name).append(
-            ']');
 
         return sb;
     }
@@ -1332,6 +1323,10 @@ public abstract class StatementDMQL extends Statement {
         VoltXMLElement parameterXML = new VoltXMLElement("parameters");
         parentXml.children.add(parameterXML);
         assert(parameterXML != null);
+
+        // We need to reset the current parameter count because statements with set operators
+        // will produce multiple "parameters" nodes, each with the same content.
+        session.getParameterStateManager().resetCurrentParamIndex();
         for (Expression expr : parameters) {
             org.hsqldb_voltpatches.types.Type paramType = expr.getDataType();
             if (paramType == null) {
@@ -1353,6 +1348,8 @@ public abstract class StatementDMQL extends Statement {
             }
             VoltXMLElement parameter = new VoltXMLElement("parameter");
             parameterXML.children.add(parameter);
+            int index = session.getParameterStateManager().getNextParamIndex();
+            parameter.attributes.put("index", String.valueOf(index));
             parameter.attributes.put("id", expr.getUniqueId(session));
             if (paramType == NumberType.SQL_NUMERIC_DEFAULT_INT) {
                 parameter.attributes.put("valuetype", "BIGINT");

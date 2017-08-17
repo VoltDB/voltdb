@@ -33,6 +33,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
+import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
@@ -67,7 +68,7 @@ public class PlannerTool {
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
 
         // LOAD HSQL
-        m_hsql = HSQLInterface.loadHsqldb();
+        m_hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
         String binDDL = m_database.getSchema();
         String ddl = CompressionService.decodeBase64AndDecompress(binDDL);
         String[] commands = ddl.split("\n");

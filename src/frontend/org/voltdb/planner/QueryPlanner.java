@@ -210,11 +210,14 @@ public class QueryPlanner {
      * @return An opaque token representing the parsed statement with (possibly) parameterization.
      */
     public String parameterize() {
-        m_paramzInfo = ParameterizationInfo.parameterize(m_xmlSQL);
-
         Set<Integer> paramIds = new HashSet<>();
         ParameterizationInfo.findUserParametersRecursively(m_xmlSQL, paramIds);
         m_adhocUserParamsCount = paramIds.size();
+
+        m_paramzInfo = null;
+        if (paramIds.size() > 0) {
+            m_paramzInfo = ParameterizationInfo.parameterize(m_xmlSQL);
+        }
 
         // skip plans with pre-existing parameters and plans that don't parameterize
         // assume a user knows how to cache/optimize these

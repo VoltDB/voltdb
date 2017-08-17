@@ -1425,8 +1425,8 @@ public abstract class AbstractParsedStmt {
      *
      * Some parameters are generated after we generate VoltXML but before we plan (constants may
      * become parameters in ad hoc queries so their plans may be cached).  In this case
-     * the index of the parameter is already set.  Otherwise, we will assign an index here
-     * in this method.
+     * the index of the parameter is already set.  Otherwise, the parameter's index will have been
+     * set in HSQL.
      *
      * @param paramsNode
      */
@@ -1447,16 +1447,11 @@ public abstract class AbstractParsedStmt {
                 long id = Long.parseLong(node.attributes.get("id"));
                 String typeName = node.attributes.get("valuetype");
                 String isVectorParam = node.attributes.get("isvector");
-                int index;
+
+                // Get the index for this parameter in the EE's parameter vector
                 String indexAttr = node.attributes.get("index");
-                if (indexAttr == null) {
-                    index = ParameterizationInfo.getNextParamIndex();
-                }
-                else {
-                    // This parameter must have been converted from a constant
-                    // in an ad hoc plan.  It already has an index, so use it.
-                    index = Integer.parseInt(indexAttr);
-                }
+                assert(indexAttr != null);
+                int index = Integer.parseInt(indexAttr);
 
                 VoltType type = VoltType.typeFromString(typeName);
                 ParameterValueExpression pve = new ParameterValueExpression();
