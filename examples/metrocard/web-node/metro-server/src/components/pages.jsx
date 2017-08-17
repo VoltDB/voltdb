@@ -15,7 +15,7 @@ class Pages extends Component {
   render() {
     let options = {
       sectionClassName: 'section',
-      anchors: ['sectionOne', 'sectionTwo', 'sectionThree', 'sectionFour', 'sectionFive'],
+      anchors: ['sectionOne', 'sectionTwo', 'sectionThree', 'sectionFour'],
       scrollBar: false,
       navigation: true,
       verticalAlign: false,
@@ -32,7 +32,6 @@ class Pages extends Component {
           <a href="#sectionTwo" className='nav-elem'>Station Stats</a>
           <a href="#sectionThree" className='nav-elem'>Waiting Time</a>
           <a href="#sectionFour" className='nav-elem'>Frauds</a>
-          <a href="#sectionFive" className='nav-elem'>Section Five</a>
           <a href="" className='nav-elem elem-right'>Metro Monitoring System</a>
         </Header>
         {/* <Footer>
@@ -78,7 +77,7 @@ class Pages extends Component {
           </Section>
 
           {/* The frauds page */}
-          <Section className='custom-section' color="#111111">
+          <Section color="#111111">
             <div style={{ fontSize: '5em' }}>
               <div className='frauds-wrapper'>
                 <div className='wrapper-odometer-2'>
@@ -92,8 +91,6 @@ class Pages extends Component {
               </div>
             </div>
           </Section>
-
-          <Section color="#E0E4CC">Section 5</Section>
 
         </SectionsContainer>
       </div>
