@@ -178,7 +178,7 @@ public abstract class StatementCompiler {
         CompiledPlan plan = null;
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  db,
-                partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
+                partitioning, hsql, estimates, false,
                 costModel, null, joinOrder, detMode);
         try {
             try {

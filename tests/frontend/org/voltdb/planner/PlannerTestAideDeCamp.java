@@ -38,7 +38,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -144,7 +143,7 @@ public class PlannerTestAideDeCamp {
         }
         String procName = catalogStmt.getParent().getTypeName();
         QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
-                partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                partitioning, hsql, estimates, false,
                 costModel, null, joinOrder, detMode);
 
         CompiledPlan plan = null;

@@ -1332,7 +1332,6 @@ public abstract class StatementDMQL extends Statement {
         VoltXMLElement parameterXML = new VoltXMLElement("parameters");
         parentXml.children.add(parameterXML);
         assert(parameterXML != null);
-        int index = 0;
         for (Expression expr : parameters) {
             org.hsqldb_voltpatches.types.Type paramType = expr.getDataType();
             if (paramType == null) {
@@ -1354,8 +1353,6 @@ public abstract class StatementDMQL extends Statement {
             }
             VoltXMLElement parameter = new VoltXMLElement("parameter");
             parameterXML.children.add(parameter);
-            parameter.attributes.put("index", String.valueOf(index));
-            ++index;
             parameter.attributes.put("id", expr.getUniqueId(session));
             if (paramType == NumberType.SQL_NUMERIC_DEFAULT_INT) {
                 parameter.attributes.put("valuetype", "BIGINT");

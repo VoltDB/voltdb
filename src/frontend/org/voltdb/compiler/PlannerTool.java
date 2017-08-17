@@ -33,6 +33,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
+import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
@@ -44,6 +45,8 @@ import org.voltdb.utils.Encoder;
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
  * interactively accept SQL and outputs plans on standard out.
+ *
+ * Used only for ad hoc queries.
  */
 public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -55,8 +58,6 @@ public class PlannerTool {
 
     private final HSQLInterface m_hsql;
     private static PlannerStatsCollector m_plannerStats;
-
-    private static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
 
     public PlannerTool(final Database database, byte[] catalogHash)
     {
@@ -132,7 +133,7 @@ public class PlannerTool {
         QueryPlanner planner = new QueryPlanner(
             sql, "PlannerTool", "PlannerToolProc", m_database,
             partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-            AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
+            costModel, null, null, DeterminismMode.FASTER);
 
         CompiledPlan plan = null;
         try {
@@ -208,7 +209,7 @@ public class PlannerTool {
             QueryPlanner planner = new QueryPlanner(
                     sql, "PlannerTool", "PlannerToolProc", m_database,
                     partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
-                    AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
+                    costModel, null, null, DeterminismMode.FASTER);
 
             CompiledPlan plan = null;
             String[] extractedLiterals = null;
@@ -219,6 +220,8 @@ public class PlannerTool {
                 } else {
                     planner.parse();
                 }
+
+                ParameterizationInfo.resetParamCount();
                 parsedToken = planner.parameterize();
 
                 // check the parameters count

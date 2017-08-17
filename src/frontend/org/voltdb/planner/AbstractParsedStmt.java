@@ -74,8 +74,7 @@ public abstract class AbstractParsedStmt {
 
      // Internal statement counter
     public static int NEXT_STMT_ID = 0;
-    // Internal parameter counter
-    public static int NEXT_PARAMETER_ID = 0;
+
     // The unique id to identify the statement
     public int m_stmtId;
 
@@ -223,7 +222,6 @@ public abstract class AbstractParsedStmt {
 
         // reset the statement counters
         NEXT_STMT_ID = 0;
-        NEXT_PARAMETER_ID = 0;
         AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
 
         parse(retval, sql, stmtTypeElement, joinOrder);
@@ -426,7 +424,11 @@ public abstract class AbstractParsedStmt {
      */
     private AbstractExpression parseValueExpression(VoltXMLElement exprNode) {
         String isParam = exprNode.attributes.get("isparam");
-        String isPlannerGenerated = exprNode.attributes.get("isplannergenerated");
+        String isPlannerGeneratedAttr = exprNode.attributes.get("isplannergenerated");
+        boolean isPlannerGenerated = isPlannerGeneratedAttr == null ? false :
+            (isPlannerGeneratedAttr.equalsIgnoreCase("true") ? true : false);
+
+
 
         // A ParameterValueExpression is needed to represent any user-provided or planner-injected parameter.
         boolean needParameter = (isParam != null) && (isParam.equalsIgnoreCase("true"));
@@ -434,8 +436,7 @@ public abstract class AbstractParsedStmt {
         // A ConstantValueExpression is needed to represent a constant in the statement,
         // EVEN if that constant has been "parameterized" by the plan caching code.
         ConstantValueExpression cve = null;
-        boolean needConstant = (needParameter == false) ||
-            ((isPlannerGenerated != null) && (isPlannerGenerated.equalsIgnoreCase("true")));
+        boolean needConstant = (needParameter == false) || isPlannerGenerated;
 
         if (needConstant) {
             String type = exprNode.attributes.get("valuetype");
@@ -558,7 +559,7 @@ public abstract class AbstractParsedStmt {
         }
 
         // This is a TVE from the correlated expression
-        int paramIdx = NEXT_PARAMETER_ID++;
+        int paramIdx = ParameterizationInfo.getNextParamOffset();
         ParameterValueExpression pve = new ParameterValueExpression(paramIdx, resolvedExpr);
         m_parameterTveMap.put(paramIdx, resolvedExpr);
         return pve;
@@ -1114,14 +1115,14 @@ public abstract class AbstractParsedStmt {
     protected AbstractExpression replaceExpressionsWithPve(AbstractExpression expr) {
         assert(expr != null);
         if (expr instanceof TupleValueExpression) {
-            int paramIdx = NEXT_PARAMETER_ID++;
+            int paramIdx = ParameterizationInfo.getNextParamOffset();
             ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
             m_parameterTveMap.put(paramIdx, expr);
             return pve;
         }
 
         if (expr instanceof AggregateExpression) {
-            int paramIdx = NEXT_PARAMETER_ID++;
+            int paramIdx = ParameterizationInfo.getNextParamOffset();
             ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
             // Disallow aggregation of parent columns in a subquery.
             // except the case HAVING AGG(T1.C1) IN (SELECT T2.C2 ...)
@@ -1439,18 +1440,25 @@ public abstract class AbstractParsedStmt {
             return;
         }
 
-        long max_parameter_id = -1;
-
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
-                int index = Integer.parseInt(node.attributes.get("index"));
-                if (index > max_parameter_id) {
-                    max_parameter_id = index;
-                }
                 String typeName = node.attributes.get("valuetype");
                 String isVectorParam = node.attributes.get("isvector");
+                int index;
+                String indexAttr = node.attributes.get("index");
+                if (indexAttr == null) {
+                    index = ParameterizationInfo.getNextParamOffset();
+                }
+                else {
+                    // the index of planner-generated parameters from ad hoc plans
+                    // is generated in ParameterizationInfo.
+                    index = Integer.parseInt(indexAttr);
+                }
+
                 VoltType type = VoltType.typeFromString(typeName);
+
+
                 ParameterValueExpression pve = new ParameterValueExpression();
                 pve.setParameterIndex(index);
                 pve.setValueType(type);
@@ -1460,9 +1468,6 @@ public abstract class AbstractParsedStmt {
                 m_paramsById.put(id, pve);
                 m_paramsByIndex.put(index, pve);
             }
-        }
-        if (max_parameter_id >= NEXT_PARAMETER_ID) {
-            NEXT_PARAMETER_ID = (int)max_parameter_id + 1;
         }
     }
 
