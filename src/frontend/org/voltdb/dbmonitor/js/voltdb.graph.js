@@ -60,6 +60,7 @@
         var ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartFrequencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartDataTableAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
 
         var drChartList = {}
         var ChartCommandlog = nv.models.lineChart();
@@ -395,6 +396,12 @@
 
         var dataParitionDetails = [];
 
+        var dataTableAnalysis = [{
+            key: "Tuple Count",
+            values: [],
+            color: "rgb(27, 135, 200)"
+        }];
+
         var barHeight = 0;
 
         function getBarHeightAndSpacing(dataSet, chart){
@@ -430,6 +437,10 @@
                 barHeight = (dataCount * 66) + 22;
                 chart.groupSpacing(0.3);
             }
+        }
+
+        function updateTableAnalysis(){
+            ChartLatencyAnalysis.update();
         }
 
         function updateLatencyAnalysis(){
@@ -479,6 +490,37 @@
 
         function updateLatencyDetailAnalysis(){
             ChartLatencyDetailAnalysis.update;
+        }
+
+        this.initializeAnalysisTableGraph = function(){
+            nv.addGraph(function() {
+                ChartDataTableAnalysis
+                  .y(function(d) { return d.value }).height(barHeight)
+                  .x(function(d) { return  d.label })
+                  .showValues(true);
+
+                $("#chartDataTableAnalysis").css("height", barHeight + 50)
+                ChartDataTableAnalysis.margin({"left": 115,"right": 40})
+                ChartDataTableAnalysis.valueFormat(d3.format(',.0d'));
+                ChartDataTableAnalysis.yAxis
+                    .tickFormat(d3.format(',.0d'));
+                ChartDataTableAnalysis.xAxis
+                    .axisLabelDistance(10)
+                ChartDataTableAnalysis.yAxis.axisLabelDistance(10);
+                d3.select('#visualiseDataTable')
+                    .datum(dataTableAnalysis)
+                    .transition().duration(350)
+                    .call(ChartDataTableAnalysis);
+
+//                d3.selectAll("#chartDataTableAnalysis .nv-bar").on('click',
+//                    function(data){
+//                        $("#hidProcedureName").html(data.label);
+//                        $('#showAnalysisDetails').trigger("click");
+//                    }
+//                );
+                nv.utils.windowResize(ChartDataTableAnalysis.update);
+                return ChartDataTableAnalysis;
+            });
         }
 
         this.initializeAnalysisGraph = function(){
@@ -659,6 +701,28 @@
                 nv.utils.windowResize(ChartCombinedDetailAnalysis.update);
                 return ChartCombinedDetailAnalysis;
             });
+        }
+
+        this.RefreshAnalysisTableGraph = function(dataTable){
+            ChartDataTableAnalysis.update;
+            getBarHeightAndSpacing(dataTable, ChartDataTableAnalysis);
+            ChartDataTableAnalysis.height(barHeight);
+            $("#chartDataTableAnalysis").css("height", barHeight + 50);
+            ChartDataTableAnalysis.margin({"left": 125,"right": 40});
+            dataTableAnalysis[0]["values"] = dataTable;
+            d3.select("#visualiseDataTable")
+                .datum(dataTableAnalysis)
+                .transition().duration(500)
+                .call(ChartDataTableAnalysis);
+            d3.selectAll("#visualiseDataTable .nv-barsWrap .nv-bar rect")
+                .attr("style", "cursor: pointer");
+            d3.selectAll("#visualiseDataTable .nv-barsWrap .nv-bar rect")
+                .style("fill", function(d, i){
+                    var tableType = VoltDbAnalysis.tablePropertyValue[d.label].PARTITION_TYPE
+                    return tableType != "Partitioned" ? "#14416d":"#1B87C8";
+                });
+            d3.select('#visualiseDataTable > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
+                .each(function(d,i){ wordWrap(this, d, 110, -115, -6); });
         }
 
         this.RefreshAnalysisLatencyGraph = function(dataLatency, dataFrequency){

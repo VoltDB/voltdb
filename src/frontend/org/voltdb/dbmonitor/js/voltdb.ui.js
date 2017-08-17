@@ -2344,7 +2344,7 @@ var loadPage = function (serverName, portid) {
         }
     });
 
-    //pm remove
+    //remove
     $("#dbPane div.menu_head").click(function () {
         var headerState = $("#dbPane div.menu_body").css('display');
         if (headerState == 'none') {
@@ -2617,8 +2617,6 @@ var loadPage = function (serverName, portid) {
       var result = 0;
       for(var prop in obj) {
         if (obj.hasOwnProperty(prop)) {
-
-        // or Object.prototype.hasOwnProperty.call(obj, prop)
           if(obj[prop]["STATEMENT"] == statement){
             result++;
           }
