@@ -58,7 +58,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -3363,22 +3363,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         Database db = newCatalog.getClusters().get("cluster").getDatabases().get("database");
         CatalogMap<Procedure> catalogProcedures = db.getProcedures();
 
-
-        SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
-        List<Long> immutableSites = siteTracker.getSitesForHost(m_messenger.getHostId());
-        ArrayList<Long> sites = new ArrayList<>(immutableSites);
-        sites.add((long) immutableSites.size());
+        int siteCount = m_nodeSettings.getLocalSitesCount() + 1; // + MPI site
 
         ctx.m_preparedCatalogInfo = new CatalogContext.CatalogInfo(catalogBytes, catalogBytesHash, deploymentBytes);
         ctx.m_preparedCatalogInfo.m_catalog = newCatalog;
-        ctx.m_preparedCatalogInfo.m_userProcsMap = new ConcurrentHashMap<>();
+        ctx.m_preparedCatalogInfo.m_userProcsMap = new ConcurrentLinkedQueue<>();
 
-        for (Long site : sites) {
+        for (long i = 0; i < siteCount; i++) {
             try {
                 ImmutableMap<String, ProcedureRunner> userProcs =
                     LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
                                                                 classesMap.build(), null);
-                ctx.m_preparedCatalogInfo.m_userProcsMap.put(site, userProcs);
+
+                ctx.m_preparedCatalogInfo.m_userProcsMap.offer(userProcs);
             } catch (Exception e) {
                 String msg = "error setting up user procedure runners using NT-procedure pattern: "
                             + e.getMessage();

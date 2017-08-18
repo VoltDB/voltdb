@@ -24,13 +24,12 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -72,7 +71,7 @@ public class CatalogContext {
         public final byte[] m_deploymentHash;
         public final UUID m_deploymentHashForConfig;
         public Catalog m_catalog;
-        public ConcurrentHashMap<Long, ImmutableMap<String, ProcedureRunner>> m_userProcsMap;
+        public ConcurrentLinkedQueue<ImmutableMap<String, ProcedureRunner>> m_userProcsMap;
 
         public CatalogInfo(byte[] catalogBytes, byte[] catalogBytesHash, byte[] deploymentBytes) {
             if (deploymentBytes == null) {
@@ -299,22 +298,25 @@ public class CatalogContext {
     }
 
     public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedures(SiteProcedureConnection site) {
-        long hsId = site.getCorrespondingSiteId();
-        ImmutableMap<String, ProcedureRunner> userProcs = m_catalogInfo.m_userProcsMap.get(hsId);
-        // swap site and initiate the statistics
+
+        ImmutableMap<String, ProcedureRunner> userProcs = m_catalogInfo.m_userProcsMap.poll();
 
         if (userProcs == null) {
-            // this may be the MPI site
-            hostLog.debug("look for MPI site: " + hsId + " in Map: " + m_catalogInfo.m_userProcsMap.keySet());
-            long siteId = CoreUtils.getSiteIdFromHSId(hsId);
-            userProcs = m_catalogInfo.m_userProcsMap.get(siteId);
-            if (userProcs == null) {
-                throw new RuntimeException("look for site id : " + siteId + " in Map: "
-                            + m_catalogInfo.m_userProcsMap.keySet());
+            // somehow there is no prepared user procedure map left, then prepare it again
+
+            CatalogMap<Procedure> catalogProcedures = database.getProcedures();
+            try {
+                userProcs = LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures,
+                                                                        m_catalogInfo.m_jarfile.getLoader(),
+                                                                        null, null);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
             }
         }
 
         for (ProcedureRunner runner: userProcs.values()) {
+            // swap site and initiate the statistics
             runner.initSiteAndStats(site);
         }
 
