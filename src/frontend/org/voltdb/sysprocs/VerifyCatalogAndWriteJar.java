@@ -71,10 +71,9 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
                         + NTProcedureService.NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT
                         + " in "+ timeoutEnvString + " seconds.");
         }
-        if (timeoutValue <= 0) {
-            VoltDB.crashLocalVoltDB("Invalid non-positive value " + timeoutValue + " for "
-                    + "system environment variable "
-                    + NTProcedureService.NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT);
+        if (timeoutValue < 10) {
+            VoltDB.crashLocalVoltDB(" NT run-everywhere timeout value needs to be greater than 10 seconds, now the setting is " +
+                    timeoutValue + " seconds.");
         }
         return timeoutValue;
     }
