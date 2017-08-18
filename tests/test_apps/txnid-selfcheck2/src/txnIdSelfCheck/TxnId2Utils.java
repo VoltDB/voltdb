@@ -53,7 +53,8 @@ public enum TxnId2Utils {;
         return statusString.matches("(?s).*No response received in the allotted time.*") ||
                 statusString.matches(".*Server is currently unavailable; try again later.*") ||
                 statusString.matches(".*Server is paused.*") ||
-                statusString.matches("(?s).*Server is shutting down.*");
+                statusString.matches("(?s).*Server is shutting down.*") ||
+                statusString.matches("(?s).*VoltDB failed to create the transaction internally.*it should be safe to resend the work, as the work was never started.*"); /*-5 SERVER_UNAVAILABLE*/
     }
 
     static boolean isConnectionTransactionCatalogOrServerUnavailableIssue(String statusString) {

@@ -131,6 +131,7 @@ public class UpdateClassesThread extends BenchmarkThread {
                             || cr.getStatusString().equals("Invalid catalog update(@UpdateClasses) request: Can't run catalog update(@UpdateClasses) when another one is in progress")
                             || cr.getStatusString().equals("Transaction dropped due to change in mastership. It is possible the transaction was committed")
                             || cr.getStatusString().equals("Server is shutting down.")
+                            || cr.getStatusString().equals("Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live when attempting to apply the change.  This is likely the result of multiple concurrent attempts to change the cluster configuration.  Please make such changes synchronously from a single connection to the cluster.")
                         ))
                         hardStop("UpdateClasses Proc failed gracefully", e);
                     else
