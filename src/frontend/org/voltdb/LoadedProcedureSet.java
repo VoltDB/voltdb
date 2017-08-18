@@ -107,7 +107,7 @@ public class LoadedProcedureSet {
                                                        m_site);
             } else {
                 // When catalog updates, only user procedures needs to be reloaded.
-                m_userProcs = catalogContext.getPreparedUserProcedures(m_site);
+                m_userProcs = catalogContext.getPreparedUserProcedureRunners(m_site);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error trying to load user procedures: " + e.getMessage());
