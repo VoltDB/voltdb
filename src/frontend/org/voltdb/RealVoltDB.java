@@ -3371,11 +3371,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         for (long i = 0; i < siteCount; i++) {
             try {
-                ImmutableMap<String, ProcedureRunner> userProcs =
+                ImmutableMap<String, ProcedureRunner> userProcRunner =
                     LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
                                                                 classesMap.build(), null);
 
-                ctx.m_preparedCatalogInfo.m_preparedProcRunners.offer(userProcs);
+                ctx.m_preparedCatalogInfo.m_preparedProcRunners.offer(userProcRunner);
             } catch (Exception e) {
                 String msg = "error setting up user procedure runners using NT-procedure pattern: "
                             + e.getMessage();

@@ -299,14 +299,14 @@ public class CatalogContext {
 
     public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedureRunners(SiteProcedureConnection site) {
 
-        ImmutableMap<String, ProcedureRunner> userProcs = m_catalogInfo.m_preparedProcRunners.poll();
+        ImmutableMap<String, ProcedureRunner> userProcRunner = m_catalogInfo.m_preparedProcRunners.poll();
 
-        if (userProcs == null) {
-            // somehow there is no prepared user procedure map left, then prepare it again
+        if (userProcRunner == null) {
+            // somehow there is no prepared user procedure runner map left, then prepare it again
 
             CatalogMap<Procedure> catalogProcedures = database.getProcedures();
             try {
-                userProcs = LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures,
+                userProcRunner = LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures,
                                                                         m_catalogInfo.m_jarfile.getLoader(),
                                                                         null, null);
             } catch (Exception e) {
@@ -315,12 +315,12 @@ public class CatalogContext {
             }
         }
 
-        for (ProcedureRunner runner: userProcs.values()) {
+        for (ProcedureRunner runner: userProcRunner.values()) {
             // swap site and initiate the statistics
             runner.initSiteAndStats(site);
         }
 
-        return userProcs;
+        return userProcRunner;
     }
 
     public enum CatalogJarWriteMode {
