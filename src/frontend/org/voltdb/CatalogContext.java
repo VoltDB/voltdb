@@ -297,7 +297,7 @@ public class CatalogContext {
         return retval;
     }
 
-    public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedures(SiteProcedureConnection site) {
+    public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedureRunners(SiteProcedureConnection site) {
 
         ImmutableMap<String, ProcedureRunner> userProcs = m_catalogInfo.m_preparedProcRunners.poll();
 
