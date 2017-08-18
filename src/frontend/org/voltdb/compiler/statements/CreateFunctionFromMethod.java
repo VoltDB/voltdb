@@ -24,9 +24,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 
+import org.hsqldb_voltpatches.FunctionCustom;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
+import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.hsqldb_voltpatches.types.Type;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
@@ -75,6 +76,20 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         super(ddlCompiler);
     }
 
+    /**
+     * Find out if the function is defined.  It might be defined in the
+     * FunctionForVoltDB table.  It also might be in the VoltXML.
+     *
+     * @param functionName
+     * @return
+     */
+    private boolean isDefinedFunctionName(String functionName) {
+        return FunctionForVoltDB.isFunctionNameDefined(functionName)
+                || FunctionSQL.isFunction(functionName)
+                || FunctionCustom.getFunctionId(functionName) != ID_NOT_DEFINED
+                || (null != m_schema.findChild("ud_function", functionName));
+    }
+
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
@@ -91,8 +106,7 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         String methodName = checkIdentifierStart(statementMatcher.group(3), ddlStatement.statement);
 
         // Check if the function is already defined
-        VoltXMLElement funcXML = m_schema.findChild("ud_function", functionName);
-        if (funcXML != null) {
+        if (isDefinedFunctionName(functionName)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Function \"%s\" is already defined.",
                     functionName));
@@ -207,11 +221,11 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         // or a materialized view definition.
         VoltType voltReturnType = VoltType.typeFromClass(returnTypeClass);
         VoltType[] voltParamTypes = new VoltType[paramTypeClasses.length];
-        funcXML = new VoltXMLElement("ud_function")
-                         .withValue("name", functionName)
-                         .withValue("className", className)
-                         .withValue("methodName", methodName)
-                         .withValue("returnType", String.valueOf(voltReturnType.getValue()));
+        VoltXMLElement funcXML = new VoltXMLElement("ud_function")
+                                    .withValue("name", functionName)
+                                    .withValue("className", className)
+                                    .withValue("methodName", methodName)
+                                    .withValue("returnType", String.valueOf(voltReturnType.getValue()));
         for (int i = 0; i < paramTypeClasses.length; i++) {
             VoltType voltParamType = VoltType.typeFromClass(paramTypeClasses[i]);
             VoltXMLElement paramXML = new VoltXMLElement("udf_ptype")

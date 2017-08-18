@@ -1045,10 +1045,11 @@ public class FunctionForVoltDB extends FunctionSQL {
 		return answer;
 	}
 
-	public static boolean isDefinedFunctionId(int functionId) {
-        return functionId != FunctionDescriptor.FUNC_VOLT_ID_NOT_DEFINED;
-    }
-
+	public static boolean isFunctionNameDefined(String functionName) {
+		FunctionDescriptor found = FunctionDescriptor.by_LC_name.get(functionName);
+		return (null != found);
+	}
+	
     public static boolean isUserDefinedFunctionId(int functionId) {
         return functionId >= FunctionDescriptor.FUNC_VOLT_UDF_ID_START;
     }
