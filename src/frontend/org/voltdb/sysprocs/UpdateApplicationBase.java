@@ -56,6 +56,8 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.InMemoryJarfile;
 
+import com.google_voltpatches.common.base.Stopwatch;
+
 /**
  * Base class for non-transactional sysprocs UpdateApplicationCatalog, UpdateClasses and Promote.
  * *ALSO* the base class for AdHocNTBase, which is the base class for AdHoc, AdHocSPForTest
@@ -416,19 +418,29 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
         long timeoutSetting = VerifyCatalogAndWriteJar.TIMEOUT;
         try {
-            resultMapByHost = cf.get(timeoutSetting, TimeUnit.SECONDS);
+            try {
+                resultMapByHost = cf.get(10, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                Stopwatch sw = Stopwatch.createStarted();
+                while (sw.elapsed(TimeUnit.SECONDS) < (timeoutSetting - 10)) {
+                    resultMapByHost = cf.getNow(null);
+                    if (resultMapByHost != null) {
+                        sw.stop();
+                        break;
+                    }
+                    hostLog.info((sw.elapsed(TimeUnit.SECONDS) + 10) + " seconds has elapsed but " + procedureName +
+                            " is still wait for remote response. The max timeout value is " + timeoutSetting + " seconds.");
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(10));
+                }
+            }
         } catch (InterruptedException | ExecutionException e) {
             err = procedureName + " run everywhere call failed: " + e.getMessage();
-            hostLog.info(err);
-            return err;
-        } catch (TimeoutException e) {
-            err = procedureName + " run everywhere call timed out in : " + timeoutSetting + " seconds.";
             hostLog.info(err);
             return err;
         }
 
         if (resultMapByHost == null) {
-            err = "An invocation of procedure " + procedureName + " on all hosts returned null result.";
+            err = "An invocation of procedure " + procedureName + " on all hosts returned null result or time out.";
             hostLog.info(err);
             return err;
         }
