@@ -207,8 +207,9 @@ public class CreateFunctionFromMethod extends StatementProcessor {
         }
 
         // Add the description of the function to the VoltXMLElement
-        // in m_schema.  Don't assign the function id now.  We'll do that
-        // when we register it later.
+        // in m_schema.  We get the function id from FunctionForVoltDB.
+        // This may be a new function id or an old one, if we are reading
+        // old DDL.
         //
         // Note here that the integer values for the return type and for the parameter
         // types are the value of a VoltType enumeral.  When the UDF is registered with
@@ -233,6 +234,10 @@ public class CreateFunctionFromMethod extends StatementProcessor {
             funcXML.children.add(paramXML);
             voltParamTypes[i] = voltParamType;
         }
+        //
+        // Register the function and get the function id.  This may revive a saved
+        // user defined function.
+        //
         int functionId = FunctionForVoltDB.registerTokenForUDF(functionName, -1, voltReturnType, voltParamTypes);
         funcXML.attributes.put("functionid", String.valueOf(functionId));
 

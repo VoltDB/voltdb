@@ -1180,8 +1180,8 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
             int key = std::stoi(iter->first);
             info->paramTypes[key] = (ValueType)iter->second->parameterType();
         }
-        VOLT_DEBUG("UDFCAT: Adding function id %d", catalogFunction->functionId());
 #ifdef  VOLT_DEBUG_ENABLED
+        VOLT_DEBUG("UDFCAT: Adding function id %d", catalogFunction->functionId());
         auto fnc = m_functionInfo.find(catalogFunction->functionId());
         if (fnc != m_functionInfo.end()) {
             VOLT_DEBUG("UDFCAT:    It is already there!!");
