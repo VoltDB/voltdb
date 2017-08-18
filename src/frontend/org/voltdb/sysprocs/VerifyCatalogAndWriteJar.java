@@ -49,33 +49,33 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
     private static VoltLogger log = new VoltLogger("HOST");
 
     private static long getTimeoutValue() {
-        long timeoutValue = 5 * 60; // default value 5 minutes
+        long timeoutSeconds = 60; // default value 60 seconds
 
         String timeoutEnvString = null;
         try {
             timeoutEnvString = System.getenv(NTProcedureService.NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT);
         } catch (SecurityException ex) {
             log.warn("Trying to access system environment variable " + ex.getMessage() + " failed, "
-                    + "use default value " + timeoutValue);
-            return timeoutValue;
+                    + "use default value " + timeoutSeconds);
+            return timeoutSeconds;
         }
 
         if (timeoutEnvString == null) {
-            return timeoutValue;
+            return timeoutSeconds;
         }
 
         try {
-            timeoutValue = Long.parseLong(timeoutEnvString);
+            timeoutSeconds = Long.parseLong(timeoutEnvString);
         } catch (NumberFormatException ex) {
             VoltDB.crashLocalVoltDB("Invalid system environment setting for "
                         + NTProcedureService.NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT
                         + " in "+ timeoutEnvString + " seconds.");
         }
-        if (timeoutValue < 10) {
+        if (timeoutSeconds < 10) {
             VoltDB.crashLocalVoltDB(" NT run-everywhere timeout value needs to be greater than 10 seconds, now the setting is " +
-                    timeoutValue + " seconds.");
+                    timeoutSeconds + " seconds.");
         }
-        return timeoutValue;
+        return timeoutSeconds;
     }
 
     public final static long TIMEOUT = getTimeoutValue();

@@ -416,20 +416,20 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         Map<Integer, ClientResponse> resultMapByHost = null;
         String err;
 
-        long timeoutSetting = VerifyCatalogAndWriteJar.TIMEOUT;
+        long timeoutSeconds = VerifyCatalogAndWriteJar.TIMEOUT;
         try {
             try {
                 resultMapByHost = cf.get(10, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
                 Stopwatch sw = Stopwatch.createStarted();
-                while (sw.elapsed(TimeUnit.SECONDS) < (timeoutSetting - 10)) {
+                while (sw.elapsed(TimeUnit.SECONDS) < (timeoutSeconds - 10)) {
                     resultMapByHost = cf.getNow(null);
                     if (resultMapByHost != null) {
                         sw.stop();
                         break;
                     }
                     hostLog.info((sw.elapsed(TimeUnit.SECONDS) + 10) + " seconds has elapsed but " + procedureName +
-                            " is still wait for remote response. The max timeout value is " + timeoutSetting + " seconds.");
+                            " is still wait for remote response. The max timeout value is " + timeoutSeconds + " seconds.");
                     Thread.sleep(TimeUnit.SECONDS.toMillis(10));
                 }
             }
