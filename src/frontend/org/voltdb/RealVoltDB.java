@@ -3367,7 +3367,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         ctx.m_preparedCatalogInfo = new CatalogContext.CatalogInfo(catalogBytes, catalogBytesHash, deploymentBytes);
         ctx.m_preparedCatalogInfo.m_catalog = newCatalog;
-        ctx.m_preparedCatalogInfo.m_userProcsMap = new ConcurrentLinkedQueue<>();
+        ctx.m_preparedCatalogInfo.m_preparedProcRunners = new ConcurrentLinkedQueue<>();
 
         for (long i = 0; i < siteCount; i++) {
             try {
@@ -3375,7 +3375,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     LoadedProcedureSet.loadUserProcedureRunners(catalogProcedures, null,
                                                                 classesMap.build(), null);
 
-                ctx.m_preparedCatalogInfo.m_userProcsMap.offer(userProcs);
+                ctx.m_preparedCatalogInfo.m_preparedProcRunners.offer(userProcs);
             } catch (Exception e) {
                 String msg = "error setting up user procedure runners using NT-procedure pattern: "
                             + e.getMessage();

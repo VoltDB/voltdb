@@ -71,7 +71,7 @@ public class CatalogContext {
         public final byte[] m_deploymentHash;
         public final UUID m_deploymentHashForConfig;
         public Catalog m_catalog;
-        public ConcurrentLinkedQueue<ImmutableMap<String, ProcedureRunner>> m_userProcsMap;
+        public ConcurrentLinkedQueue<ImmutableMap<String, ProcedureRunner>> m_preparedProcRunners;
 
         public CatalogInfo(byte[] catalogBytes, byte[] catalogBytesHash, byte[] deploymentBytes) {
             if (deploymentBytes == null) {
@@ -299,7 +299,7 @@ public class CatalogContext {
 
     public ImmutableMap<String, ProcedureRunner> getPreparedUserProcedures(SiteProcedureConnection site) {
 
-        ImmutableMap<String, ProcedureRunner> userProcs = m_catalogInfo.m_userProcsMap.poll();
+        ImmutableMap<String, ProcedureRunner> userProcs = m_catalogInfo.m_preparedProcRunners.poll();
 
         if (userProcs == null) {
             // somehow there is no prepared user procedure map left, then prepare it again
