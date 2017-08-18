@@ -441,6 +441,15 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
     m_currentIndexInBatch = -1;
 
+    // If we were expanding the UDF buffer too much, shrink it back a little bit.
+    // We check this at the end of every batch execution. So we won't resize the buffer
+    // too frequently if most of the workload in the same batch requires a much larger buffer.
+    // We initiate the resizing work in EE because this is a common place where
+    // both single-partition and multi-partition transactions can get.
+    if (m_udfBufferCapacity > MAX_UDF_BUFFER_SIZE) {
+        m_topend->resizeUDFBuffer(MAX_UDF_BUFFER_SIZE);
+    }
+
     return failures;
 }
 
@@ -564,8 +573,6 @@ UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executor
 }
 
 NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector<NValue>& arguments) {
-    resetUDFOutputBuffer();
-
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     if (info == NULL) {
         // There must be serious inconsistency in the catalog if this could happen.
@@ -578,6 +585,10 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     //   * parameters.
     size_t bufferSizeNeeded = sizeof(int32_t); // size of the function id.
     for (int i = 0; i < arguments.size(); i++) {
+        // It is very common that the argument we are going to pass is in
+        // a compatible data type which does not exactly match the type that
+        // is defined in the function.
+        // We need to cast it to the target data type before the serialization.
         arguments[i] = arguments[i].castAs(info->paramTypes[i]);
         bufferSizeNeeded += arguments[i].serializedSize();
     }
@@ -588,8 +599,8 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     // So we are testing bufferSizeNeeded + sizeof(int32_t) here.
     if (bufferSizeNeeded + sizeof(int32_t) > m_udfBufferCapacity) {
         m_topend->resizeUDFBuffer(bufferSizeNeeded + sizeof(int32_t));
-        resetUDFOutputBuffer();
     }
+    resetUDFOutputBuffer();
 
     // Serialize buffer size, function ID.
     m_udfOutput.writeInt(bufferSizeNeeded);

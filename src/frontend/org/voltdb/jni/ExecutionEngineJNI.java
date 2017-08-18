@@ -92,7 +92,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** Create a ByteBuffer (in a container) for serializing arguments to C++. Use a direct
     ByteBuffer as it will be passed directly to the C++ code. */
-    private static final int MAX_PSETBUFFER_SIZE = 50 * 1024 * 1024; // 50MB
+    // This matches MAX_UDF_BUFFER_SIZE in VoltDBEngine.h
+    private static final int MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50MB
     private BBContainer m_psetBufferC = null;
     private ByteBuffer m_psetBuffer = null;
 
@@ -225,8 +226,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             m_udfBuffer = null;
         }
 
-        m_udfBufferC = DBBPool.allocateDirect(size);
-        m_udfBuffer = m_udfBufferC.b();
+        try {
+            m_udfBufferC = DBBPool.allocateDirect(size);
+            m_udfBuffer = m_udfBufferC.b();
+        }
+        catch (OutOfMemoryError e) {
+            // If the allocation failed, we will just fail the current SQL statement,
+            // the server will not crash and can continue to execute the following requests.
+            // In this case, we cannot leave the buffer as NULL, reset it to the default size.
+            setupUDFBuffer(smallBufferSize);
+            updateEEBufferPointers();
+            // But the exception still needs to be thrown out so that the current SQL statement can fail.
+            throw e;
+        }
     }
 
     final void clearPsetAndEnsureCapacity(int size) {
@@ -235,10 +247,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             setupPsetBuffer(size);
             updateEEBufferPointers();
         }
-        else if (m_psetBuffer.capacity() > MAX_PSETBUFFER_SIZE && size < MAX_PSETBUFFER_SIZE) {
+        else if (m_psetBuffer.capacity() > MAX_BUFFER_SIZE && size < MAX_BUFFER_SIZE) {
             // The last request was a batch that was greater than max network buffer size,
             // so let's not hang on to all that memory
-            setupPsetBuffer(MAX_PSETBUFFER_SIZE);
+            setupPsetBuffer(MAX_BUFFER_SIZE);
             updateEEBufferPointers();
         }
         else {
@@ -742,12 +754,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     public void resizeUDFBuffer(int size) {
         // Read the size which we want to change to.
-        assert(m_udfBuffer != null);
-        if (size > m_udfBuffer.capacity()) {
-            setupUDFBuffer(size);
-            updateEEBufferPointers();
-        }
-        m_udfBuffer.clear();
+        setupUDFBuffer(size);
+        updateEEBufferPointers();
     }
 
     public int callJavaUserDefinedFunction() {
@@ -789,9 +797,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     break;
                 default:
                 }
-                // resizeUDFBuffer() function will compare the required size and the actual size,
-                // then take action if needed.
-                resizeUDFBuffer(sizeRequired);
+                if (sizeRequired > m_udfBuffer.capacity()) {
+                    resizeUDFBuffer(sizeRequired);
+                }
             }
             // Write the result to the shared buffer.
             m_udfBuffer.clear();
@@ -809,15 +817,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
         // Getting here means the execution was not successful.
         try {
-            if (throwable != null) {
-                byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
-                // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
-                // But you never know.
-                // Again, the comparison happens inside the resizeUDFBuffer() function.
-                // No action will be taken if the buffer resizing is unnecessary.
+            assert(throwable != null);
+            byte[] errorMsg = throwable.toString().getBytes(Constants.UTF8ENCODING);
+            // It is very unlikely that the size of a user's error message will exceed the UDF buffer size.
+            // But you never know.
+            if (errorMsg.length + 4 > m_udfBuffer.capacity()) {
                 resizeUDFBuffer(errorMsg.length + 4);
-                SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
             }
+            m_udfBuffer.clear();
+            SerializationHelper.writeVarbinary(errorMsg, m_udfBuffer);
         }
         catch (IOException e) {
             throw new RuntimeException(e);
