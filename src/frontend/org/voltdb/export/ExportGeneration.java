@@ -482,11 +482,12 @@ public class ExportGeneration implements Generation {
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
         //        }
-        assert(m_dataSourcesByPartition.containsKey(partitionId));
-        assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
+//        assert(m_dataSourcesByPartition.containsKey(partitionId));
+//        assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
+            (new Exception()).printStackTrace();
             exportLog.error("PUSH Could not find export data sources for partition "
                     + partitionId + ". The export data is being discarded.");
             if (buffer != null) {
@@ -497,6 +498,7 @@ public class ExportGeneration implements Generation {
 
         ExportDataSource source = sources.get(signature);
         if (source == null) {
+            (new Exception()).printStackTrace();
             exportLog.error("PUSH Could not find export data source for partition " + partitionId +
                     " Signature " + signature + ". The export data is being discarded.");
             if (buffer != null) {
