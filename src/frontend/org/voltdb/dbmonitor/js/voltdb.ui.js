@@ -3270,6 +3270,7 @@ var adjustImporterGraphSpacing = function() {
         this.isLatency = false;
         this.isTotalProcessing = false;
         this.isFrequency = false;
+        this.isData = false;
         this.partitionLength = 0;
         this.MIN = 0;
         this.getCookie = function (name) {

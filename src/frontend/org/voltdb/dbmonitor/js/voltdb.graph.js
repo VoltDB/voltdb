@@ -60,7 +60,7 @@
         var ChartLatencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartFrequencyDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
         var ChartCombinedDetailAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
-        var ChartDataTableAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(false).showControls(false);
+        var ChartDataTableAnalysis = nv.models.multiBarHorizontalChart().showLegend(false).stacked(true).showControls(false);
 
         var drChartList = {}
         var ChartCommandlog = nv.models.lineChart();
@@ -87,15 +87,6 @@
             secGraph: 300000,
             minGraph: 1800000,
             dayGraph: 27000000
-        }
-
-        this.refreshGraphLatency = function(){
-            ChartLatencyAnalysis.update;
-
-            d3.select('#visualiseLatencyAnalysis')
-                .datum(exampleData())
-                .transition().duration(350)
-                .call(ChartLatencyAnalysis);
         }
 
         this.GetPartitionDetailData = function (partitionDetails) {
@@ -440,16 +431,18 @@
         }
 
         function updateTableAnalysis(){
-            ChartLatencyAnalysis.update();
+            ChartDataTableAnalysis.update();
         }
 
         function updateLatencyAnalysis(){
             ChartLatencyAnalysis.update();
+
             d3.selectAll("#chartLatencyAnalysis .nv-bar").on('click',
                 function(data){
                     VoltDbUI.isTotalProcessing = false;
                     VoltDbUI.isLatency = true;
                     VoltDbUI.isFrequency = false;
+                    VoltDbUI.isData = false;
                     $("#hidProcedureName").html(data.label);
                     $("#hidPartitionType").html(data.type);
                     $('#showAnalysisDetails').trigger("click");
@@ -464,6 +457,7 @@
                     VoltDbUI.isTotalProcessing = false;
                     VoltDbUI.isLatency = false;
                     VoltDbUI.isFrequency = true;
+                    VoltDbUI.isData = false;
                     $("#hidProcedureName").html(data.label);
                     $("#hidPartitionType").html(data.type);
                     $('#showAnalysisFreqDetails').trigger("click");
@@ -479,6 +473,7 @@
                     VoltDbUI.isTotalProcessing = true;
                     VoltDbUI.isLatency = false;
                     VoltDbUI.isFrequency = false;
+                    VoltDbUI.isData = false;
                     $("#hidProcedureName").html(data.label);
                     $("#hidPartitionType").html(data.type);
                     $('#showAnalysisCombinedDetails').trigger("click");
@@ -504,15 +499,14 @@
             ChartLatencyDetailAnalysis.update;
         }
 
-        this.initializeAnalysisTableGraph = function(){
+       this.initializeAnalysisTableGraph = function(){
             nv.addGraph(function() {
-                ChartDataTableAnalysis
-                  .y(function(d) { return d.value }).height(barHeight)
-                  .x(function(d) { return  d.label })
-                  .showValues(true);
-
+//                ChartDataTableAnalysis
+//                  .y(function(d) { return d.value }).height(barHeight)
+//                  .x(function(d) { return  d.label })
+//                  .showValues(true);
                 $("#chartDataTableAnalysis").css("height", barHeight + 50)
-                ChartDataTableAnalysis.margin({"left": 115,"right": 40})
+                ChartDataTableAnalysis.margin({"left": 115,"right": 70})
                 ChartDataTableAnalysis.valueFormat(d3.format(',.0d'));
                 ChartDataTableAnalysis.yAxis
                     .tickFormat(d3.format(',.0d'));
@@ -523,14 +517,7 @@
                     .datum(dataTableAnalysis)
                     .transition().duration(350)
                     .call(ChartDataTableAnalysis);
-
-//                d3.selectAll("#chartDataTableAnalysis .nv-bar").on('click',
-//                    function(data){
-//                        $("#hidProcedureName").html(data.label);
-//                        $('#showAnalysisDetails').trigger("click");
-//                    }
-//                );
-                nv.utils.windowResize(ChartDataTableAnalysis.update);
+                nv.utils.windowResize(updateTableAnalysis);
                 return ChartDataTableAnalysis;
             });
         }
@@ -580,7 +567,7 @@
                     .showValues(true);
 
                 $("#chartFrequencyAnalysis").css("height", barHeight-10);
-                ChartLatencyAnalysis.margin({"left": 115,"right": 40})
+                ChartFrequencyAnalysis.margin({"left": 115,"right": 40})
                 ChartFrequencyAnalysis.valueFormat(d3.format(',.0d'));
                 ChartFrequencyAnalysis.yAxis
                     .tickFormat(d3.format(',.0d'));
@@ -707,22 +694,29 @@
 
         this.RefreshAnalysisTableGraph = function(dataTable){
             ChartDataTableAnalysis.update;
-            getBarHeightAndSpacing(dataTable, ChartDataTableAnalysis);
+            getBarHeightAndSpacing(dataTable[0].values, ChartDataTableAnalysis);
             ChartDataTableAnalysis.height(barHeight);
-            $("#chartDataTableAnalysis").css("height", barHeight + 50);
-            ChartDataTableAnalysis.margin({"left": 125,"right": 40});
+//            $("#chartDataTableAnalysis").css("height", barHeight + 50);
+//            ChartDataTableAnalysis.margin({"left": 50,"right": 40});
+
+            VoltDbUI.isTotalProcessing = false;
+            VoltDbUI.isLatency = false;
+            VoltDbUI.isFrequency = false;
+            VoltDbUI.isData = true;
+            $("#chartDataTableAnalysis").css("height", barHeight-10);
+            ChartDataTableAnalysis.margin({"left": 115,"right": 60})
             dataTableAnalysis[0]["values"] = dataTable;
             d3.select("#visualiseDataTable")
-                .datum(dataTableAnalysis)
+                .datum(dataTable)
                 .transition().duration(500)
                 .call(ChartDataTableAnalysis);
             d3.selectAll("#visualiseDataTable .nv-barsWrap .nv-bar rect")
                 .attr("style", "cursor: pointer");
-            d3.selectAll("#visualiseDataTable .nv-barsWrap .nv-bar rect")
-                .style("fill", function(d, i){
-                    var tableType = VoltDbAnalysis.tablePropertyValue[d.label].PARTITION_TYPE
-                    return tableType != "Partitioned" ? "#14416d":"#1B87C8";
-                });
+//            d3.selectAll("#visualiseDataTable .nv-barsWrap .nv-bar rect")
+//                .style("fill", function(d, i){
+//                    var tableType = VoltDbAnalysis.tablePropertyValue[d.label].PARTITION_TYPE
+//                    return tableType != "Partitioned" ? "#14416d":"#1B87C8";
+//                });
             d3.select('#visualiseDataTable > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
                 .each(function(d,i){ wordWrap(this, d, 110, -115, -6); });
         }
