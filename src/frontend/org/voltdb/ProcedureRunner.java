@@ -123,7 +123,6 @@ public class ProcedureRunner {
     //
     protected SiteProcedureConnection m_site;
     protected ExecutionEngine m_ee;
-    protected final SystemProcedureExecutionContext m_systemProcedureContext;
 
     // per procedure state and catalog info
     //
@@ -160,15 +159,6 @@ public class ProcedureRunner {
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
                     Procedure catProc) {
-        this(procedure, site, null, catProc);
-        // assert this constructor for non-system procedures
-        assert(procedure instanceof VoltSystemProcedure == false);
-    }
-
-    ProcedureRunner(VoltProcedure procedure,
-                    SiteProcedureConnection site,
-                    SystemProcedureExecutionContext sysprocContext,
-                    Procedure catProc) {
         if (catProc.getHasjava() == false) {
             m_procedureName = catProc.getTypeName().intern();
         } else {
@@ -188,7 +178,6 @@ public class ProcedureRunner {
             m_partitionColumnType = null;
         }
         m_site = site;
-        m_systemProcedureContext = sysprocContext;
 
         m_procedure.init(this);
 
@@ -348,7 +337,7 @@ public class ProcedureRunner {
             // inject sysproc execution context as the first parameter.
             if (isSystemProcedure()) {
                 final Object[] combinedParams = new Object[paramList.length + 1];
-                combinedParams[0] = m_systemProcedureContext;
+                combinedParams[0] = m_site.getSystemProcedureExecutionContext();
                 for (int i=0; i < paramList.length; ++i) {
                     combinedParams[i+1] = paramList[i];
                 }
@@ -869,7 +858,7 @@ public class ProcedureRunner {
         setupTransaction(txnState);
         assert (m_procedure instanceof VoltSystemProcedure);
         VoltSystemProcedure sysproc = (VoltSystemProcedure) m_procedure;
-        return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
+        return sysproc.executePlanFragment(dependencies, fragmentId, params, m_site.getSystemProcedureExecutionContext());
     }
 
     private final void throwIfInfeasibleTypeConversion(SQLStmt stmt,

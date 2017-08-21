@@ -56,12 +56,12 @@ import static org.mockito.Mockito.mock;
 import java.math.BigDecimal;
 import java.util.Date;
 
-import junit.framework.TestCase;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.types.TimestampType;
+
+import junit.framework.TestCase;
 
 public class TestVoltProcedure extends TestCase {
     static class DateProcedure extends NullProcedureWrapper {
@@ -440,7 +440,7 @@ public class TestVoltProcedure extends TestCase {
     public void testProcedureStatsCollector() {
         NullProcedureWrapper wrapper = new LongProcedure();
         ProcedureRunner runner = new ProcedureRunner(
-                wrapper, site, null,
+                wrapper, site,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()));
 
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L);
@@ -468,7 +468,7 @@ public class TestVoltProcedure extends TestCase {
     public void testGetClusterId() {
         GetClusterIdProcedure gcip = new GetClusterIdProcedure();
         ProcedureRunner runner = new ProcedureRunner(
-                gcip, site, null,
+                gcip, site,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()));
         runner.setupTransaction(null);
         ClientResponse r = runner.call((Object) null);
@@ -490,7 +490,7 @@ public class TestVoltProcedure extends TestCase {
             e.printStackTrace();
         }
         ProcedureRunner runner = new ProcedureRunner(
-                wrapper, site, null,
+                wrapper, site,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()));
 
         runner.setupTransaction(null);
