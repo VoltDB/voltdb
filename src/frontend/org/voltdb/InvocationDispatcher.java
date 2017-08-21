@@ -1354,6 +1354,10 @@ public final class InvocationDispatcher {
     public void handleAllHostNTProcedureResponse(ClientResponseImpl clientResponseData) {
         long handle = clientResponseData.getClientHandle();
         ProcedureRunnerNT runner = m_NTProcedureService.m_outstanding.get(handle);
+        if (runner == null) {
+            hostLog.info("Run everywhere NTProcedure early returned, probably gets timed out.");
+            return;
+        }
         runner.allHostNTProcedureCallback(clientResponseData);
     }
 

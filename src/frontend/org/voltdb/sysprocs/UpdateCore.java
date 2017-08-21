@@ -434,6 +434,7 @@ public class UpdateCore extends VoltSystemProcedure {
     {
         assert(tablesThatMustBeEmpty != null);
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        long start, duration = 0;
 
         try {
             try {
@@ -448,6 +449,8 @@ public class UpdateCore extends VoltSystemProcedure {
             log.info("New catalog update from: " + VoltDB.instance().getCatalogContext().getCatalogLogString());
             log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
                     ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
+
+            start = System.nanoTime();
 
             try {
                 performCatalogVerifyWork(
@@ -479,10 +482,16 @@ public class UpdateCore extends VoltSystemProcedure {
                     hasSchemaChange,
                     requiresNewExportGeneration,
                     genId);
+
+            duration = System.nanoTime() - start;
+
         } finally {
             // remove the uac blocker when exits
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, log);
         }
+
+        VoltDB.instance().getCatalogContext().m_lastUpdateCoreDuration = duration;
+        log.info("Catalog update block time (milliseconds): " + duration * 1.0 / 1000 / 1000);
 
         // This is when the UpdateApplicationCatalog really ends in the blocking path
         log.info(String.format("Globally updating the current application catalog and deployment " +

@@ -492,23 +492,14 @@ public abstract class CatalogSchemaTools {
         // Build the appropriate CREATE PROCEDURE statement variant.
         if (!proc.getHasjava()) {
             // SQL Statement procedure
-
             sb.append(String.format(
-                    "CREATE PROCEDURE %s%s%s\n%sAS\nBEGIN\n%s%s",
+                    "CREATE PROCEDURE %s%s%s\n%sAS\n%s%s",
                     proc.getClassname(),
                     allowClause,
                     partitionClause.toString(),
                     spacer,
                     spacer,
-                    proc.getStatements().get("SQL0").getSqltext().trim()));
-
-            for (int i = 1 ; i < proc.getStatements().size() ; i++ ) {
-                sb.append(String.format(
-                        "\n%s%s",
-                        spacer,
-                        proc.getStatements().get("SQL" + String.valueOf(i)).getSqltext().trim()));
-            }
-            sb.append("\nEND");
+                    proc.getStatements().get("SQL").getSqltext().trim()));
         }
         else {
             // Java Class

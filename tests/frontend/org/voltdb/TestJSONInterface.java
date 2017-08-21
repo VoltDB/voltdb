@@ -1968,7 +1968,9 @@ public class TestJSONInterface extends TestCase {
             dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
-
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/catalog/", "user2", "admin", "hashed", 200, "text/html");
+            //Check if we have a catalog element
+            assertTrue(dep.contains("CREATE TABLE FOO"));
         } finally {
             if (server != null) {
                 server.shutdown();

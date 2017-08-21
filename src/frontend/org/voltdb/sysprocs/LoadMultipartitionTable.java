@@ -203,7 +203,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         // ensure MP fragment tasks load the plan for the table loading procedure
         m_runner.setProcNameToLoadForFragmentTasks(crudProcName);
 
-        Statement catStmt = proc.getStatements().get(VoltDB.ANON_STMT_NAME + "0");
+        Statement catStmt = proc.getStatements().get(VoltDB.ANON_STMT_NAME);
         if (catStmt == null) {
             throw new VoltAbortException(
                     String.format("Unable to find SQL statement for found table %s: BAD",

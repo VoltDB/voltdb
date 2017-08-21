@@ -482,9 +482,7 @@ public class Benchmark {
                         (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S")).format(new Date(lastProgressTimestamp)) + ")"));
 
         if (diffInSeconds > config.progresstimeout) {
-            log.error("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
-            printJStack();
-            System.exit(-1);
+            hardStop("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
         }
     }
 
