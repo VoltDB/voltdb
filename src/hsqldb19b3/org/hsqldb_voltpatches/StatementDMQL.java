@@ -1324,43 +1324,45 @@ public abstract class StatementDMQL extends Statement {
         parentXml.children.add(parameterXML);
         assert(parameterXML != null);
 
-        // We need to reset the current parameter count because statements with set operators
-        // will produce multiple "parameters" nodes, each with the same content.
-        session.getParameterStateManager().resetCurrentParamIndex();
-        for (Expression expr : parameters) {
-            org.hsqldb_voltpatches.types.Type paramType = expr.getDataType();
-            if (paramType == null) {
-                // Parameters used with " IN ?" use a different method of recording their paramType
-                // to avoid confusing the HSQL front end. Account for that here.
-                if (expr.nodeDataTypes != null &&
-                        expr.nodeDataTypes.length == 1 &&
-                        expr.nodeDataTypes[0] != null) {
-                    paramType = expr.nodeDataTypes[0];
+        if (parameters.length > 0) {
+            // We need to reset the current parameter count because statements with set operators
+            // will produce multiple "parameters" nodes, each with the same content.
+            session.getParameterStateManager().resetCurrentParamIndex();
+            for (Expression expr : parameters) {
+                org.hsqldb_voltpatches.types.Type paramType = expr.getDataType();
+                if (paramType == null) {
+                    // Parameters used with " IN ?" use a different method of recording their paramType
+                    // to avoid confusing the HSQL front end. Account for that here.
+                    if (expr.nodeDataTypes != null &&
+                            expr.nodeDataTypes.length == 1 &&
+                            expr.nodeDataTypes[0] != null) {
+                        paramType = expr.nodeDataTypes[0];
+                    }
+                    else {
+                        // This covers the case of parameters that were getting tentatively scanned
+                        // by the parser but then lost in a "rewind" and later rescanned and added
+                        // (again!) to this list but then actually processed, given a data type, etc.
+                        // Somehow (?) the hsql executor manages to just ignore the originally scanned
+                        // duplicate parameters left behind like this. So, so should VoltDB.
+                        continue;
+                    }
                 }
-                else {
-                    // This covers the case of parameters that were getting tentatively scanned
-                    // by the parser but then lost in a "rewind" and later rescanned and added
-                    // (again!) to this list but then actually processed, given a data type, etc.
-                    // Somehow (?) the hsql executor manages to just ignore the originally scanned
-                    // duplicate parameters left behind like this. So, so should VoltDB.
-                    continue;
+                VoltXMLElement parameter = new VoltXMLElement("parameter");
+                parameterXML.children.add(parameter);
+                int index = session.getParameterStateManager().getNextParamIndex();
+                parameter.attributes.put("index", String.valueOf(index));
+                parameter.attributes.put("id", expr.getUniqueId(session));
+                if (paramType == NumberType.SQL_NUMERIC_DEFAULT_INT) {
+                    parameter.attributes.put("valuetype", "BIGINT");
+                } else {
+                    parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
                 }
-            }
-            VoltXMLElement parameter = new VoltXMLElement("parameter");
-            parameterXML.children.add(parameter);
-            int index = session.getParameterStateManager().getNextParamIndex();
-            parameter.attributes.put("index", String.valueOf(index));
-            parameter.attributes.put("id", expr.getUniqueId(session));
-            if (paramType == NumberType.SQL_NUMERIC_DEFAULT_INT) {
-                parameter.attributes.put("valuetype", "BIGINT");
-            } else {
-                parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
-            }
-            // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
-            // that values passed to parameters such as the one in "col in ?" must be vectors.
-            // So, it can just be forwarded as a boolean.
-            if (expr.nodeDataTypes != null) {
-                parameter.attributes.put("isvector", "true");
+                // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
+                // that values passed to parameters such as the one in "col in ?" must be vectors.
+                // So, it can just be forwarded as a boolean.
+                if (expr.nodeDataTypes != null) {
+                    parameter.attributes.put("isvector", "true");
+                }
             }
         }
     }
