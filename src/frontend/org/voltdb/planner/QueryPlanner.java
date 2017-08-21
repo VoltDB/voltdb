@@ -215,7 +215,7 @@ public class QueryPlanner {
         m_adhocUserParamsCount = paramIds.size();
 
         m_paramzInfo = null;
-        if (paramIds.size() > 0) {
+        if (paramIds.size() == 0) {
             m_paramzInfo = ParameterizationInfo.parameterize(m_xmlSQL);
         }
 
