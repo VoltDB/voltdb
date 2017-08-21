@@ -25,7 +25,6 @@ package metrocard;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.types.TimestampType;
 
 public class TrainActivity extends VoltProcedure {
 
@@ -34,10 +33,10 @@ public class TrainActivity extends VoltProcedure {
     public final SQLStmt insertUpdateWaitTimeRequest = new SQLStmt(
         "INSERT INTO update_requests (station_id, ttl) VALUES (?, ?);");
 
-    public long run(int train_id, int station_id, byte activity_type, TimestampType time) throws VoltAbortException {
+    public long run(int train_id, int station_id, byte activity_type, long time) throws VoltAbortException {
 
         voltQueueSQL(insertActivity, train_id, station_id, activity_type, time);
-        voltQueueSQL(insertUpdateWaitTimeRequest, station_id, 300);
+        //voltQueueSQL(insertUpdateWaitTimeRequest, station_id, 300);
         voltExecuteSQL(true);
         return 1;
     }

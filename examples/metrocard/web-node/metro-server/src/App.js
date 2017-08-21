@@ -58,6 +58,34 @@ class App extends Component {
         callbackName: 'jsonp' // Important !
       });
 
+
+      JSONP({
+        url: 'http://localhost:8080/api/1.0/',
+        data: { Procedure: 'UpdateWaitTime' , Parameters: "[ '3000' ]" },
+        error: (err) => { console.log(err); },
+        callbackName: 'jsonp' // Important !
+      });
+
+      JSONP({
+        url: 'http://localhost:8080/api/1.0/',
+        data: { Procedure: 'GetStationWaitTime' },
+        success: (data) => {
+          let newData = data.results[0].data;
+          newData = newData.map((v, i, arr) => {
+            let r = {};
+            r.x = v[0];
+            r.y = v[1] === 0 ? 0 : v[1] / v[2];
+            return r;
+          });
+
+          this.setState({
+            avgWaits: newData
+          });
+        },
+        error: (err) => { console.log(err); },
+        callbackName: 'jsonp' // Important !
+      });
+
       // Get the info for avg waiting time
       JSONP({
         url: 'http://localhost:8080/api/1.0/',

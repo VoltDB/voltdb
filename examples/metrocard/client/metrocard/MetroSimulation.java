@@ -26,6 +26,7 @@ package metrocard;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -176,16 +177,12 @@ public class MetroSimulation {
                     if (record != null) {
                         m_producer.send(record);
                         m_currentCount++;
-                    } else {
-                        //If we didnt get record that may be on purpose so wait.
-                        Thread.yield();
-                        Thread.sleep(20);
                     }
                     if (doEnd()) {
                         break;
                     }
                 }
-            } catch (InterruptedException ex) {
+            } catch (Exception ex) {
                 ex.printStackTrace();
             } finally {
                 close();
@@ -201,6 +198,7 @@ public class MetroSimulation {
         public final long lastStopWait = 120000;
         public int curStation = 1;
         public long startTime;
+        public long endTime;
         public volatile int lastState = 0; // 0 for arrival, 1 for departure
         public long departureTime;
         public volatile int direction = 1;
@@ -233,12 +231,15 @@ public class MetroSimulation {
             STATION_TO_NEXT_STATION.put(16, 3*60000);
             STATION_TO_NEXT_STATION.put(17, 3*60000);
             //Shift start time for each train by 1 min
-            startTime = System.currentTimeMillis() + (tcnt++ * 120*1000);
+            startTime = System.currentTimeMillis() + ((tcnt++ * 60) * 1000);
+            System.out.println("Start time for train " + m_trainId + " Is: " + new Date(startTime));
+            endTime = startTime + 4*60*60*1000;
+            System.out.println("End time for train " + m_trainId + " Is: " + new Date(endTime));
         }
 
         @Override
         protected boolean doEnd() {
-            return close;
+            return (close || (startTime > endTime));
         }
 
         @Override
@@ -268,10 +269,10 @@ public class MetroSimulation {
             } else { //Moving and arriving
                 startTime = startTime + STATION_TO_NEXT_STATION.get(curStation) + wtime;
             }
-            if (lastState == 1) {
-                lastState = 0;
-            } else {
+            if (lastState == 0) {
                 lastState = 1;
+            } else {
+                lastState = 0;
             }
             return rec;
         }
@@ -284,11 +285,11 @@ public class MetroSimulation {
         private final int max_station_id = 16;
         private final RandomCollection<Integer> stations = new RandomCollection<>();
         public long startTime;
+        public long endTime;
         public long swipeTime;
         final MetroCardConfig m_config;
         final int activity_code;
         boolean massReached = false;
-        public volatile boolean close = false;
 
         SwipeEntryActivityPublisher(MetroCardConfig config, Properties producerConfig, long count) {
             super(producerConfig, count);
@@ -298,7 +299,7 @@ public class MetroSimulation {
 
         @Override
         protected boolean doEnd() {
-            return (close && cardsEntered.size() <= 1);
+            return (swipeTime > endTime);
         }
 
         @Override
@@ -322,6 +323,8 @@ public class MetroSimulation {
             stations.add(203866,17);
             startTime = System.currentTimeMillis();
             swipeTime = startTime;
+            endTime = startTime + 4*60*60*1000;
+            System.out.println("End time for swipe enter Is: " + new Date(endTime));
         }
 
         @Override
@@ -329,7 +332,7 @@ public class MetroSimulation {
             int card_id = -1;
             long atime;
             int amt = 0;
-            atime = swipeTime;
+            atime = swipeTime = System.currentTimeMillis() + 10000;
             while (card_id == -1) {
                 card_id = rand.nextInt(config.cardcount+1000); // use +1000 so sometimes we get an invalid card_id
                 if (cardsEntered.containsKey(card_id)) {
@@ -353,8 +356,6 @@ public class MetroSimulation {
                     .append(Integer.valueOf(activity_code)).append(",")
                     .append(Integer.valueOf(amt));
             ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
-            //Enter new one every 30 seconds.
-            swipeTime = swipeTime + 60*1000;
             //System.out.println(sb.toString());
             return rec;
         }
@@ -365,6 +366,7 @@ public class MetroSimulation {
         private final int max_station_id = 16;
         private final RandomCollection<Integer> stations = new RandomCollection<>();
         public long startTime;
+        public long endTime;
         public long swipeTime;
         final MetroCardConfig m_config;
         final int activity_code;
@@ -379,7 +381,7 @@ public class MetroSimulation {
 
         @Override
         protected boolean doEnd() {
-            return close;
+            return (cardsEntered.isEmpty() || (endTime > startTime));
         }
 
         @Override
@@ -403,6 +405,8 @@ public class MetroSimulation {
             stations.add(203866,17);
             startTime = System.currentTimeMillis();
             swipeTime = startTime + 120000; // Exit time minimum after frst station.
+            endTime = startTime + 4*60*60*1000 + 60000;
+            System.out.println("End time for swipe EXIT Is: " + new Date(endTime));
         }
 
         @Override
@@ -416,7 +420,7 @@ public class MetroSimulation {
             card_id = arr[rand.nextInt(arr.length)];
             long st = cardsEntered.remove(card_id);
             //Longest journy is 39 min so pick a random exit time from start.
-            atime = st + ((rand.nextInt(30)+1)*60000);
+            atime = st + ((rand.nextInt(10)+1)*60000);
 
             //Get a station.
             int station_id;
@@ -527,7 +531,7 @@ public class MetroSimulation {
     public void runBenchmark() throws Exception {
         printHeading("Publishing Train Activities");
 
-        String trains[] = { "1", "2", "3", "4" };
+        String trains[] = { "1", "2", "3", "4", "5", "6", "7", "8" };
         List<TrainActivityPublisher> trainPubs = new ArrayList<>();
         SwipeEntryActivityPublisher entry = new SwipeEntryActivityPublisher(config, producerConfig, config.count);
         entry.start();
@@ -545,16 +549,11 @@ public class MetroSimulation {
         }
         System.out.println("All Trains Started....");
         entry.join();
+        //No more entry so start exiting.
         exit.close = true;
         exit.join();
         replenish.close = true;
         replenish.join();
-        System.out.println("Stopping All Trains....");
-        for (TrainActivityPublisher redLine : trainPubs) {
-            redLine.close = true;
-            redLine.join();
-        }
-        System.out.println("All Trains Stopped....");
     }
 
     public static void main(String[] args) throws Exception {

@@ -69,7 +69,7 @@ public class CardSwipe extends VoltProcedure {
         return String.format("%d.%02d", i/100, i%100);
     }
 
-    public VoltTable run(int cardId, TimestampType ts, int stationId, byte activity_code, int amt) throws VoltAbortException {
+    public VoltTable run(int cardId, long tsl, int stationId, byte activity_code, int amt) throws VoltAbortException {
 
         // check station fare, card status, get card owner's particulars
         voltQueueSQL(checkCard, EXPECT_ZERO_OR_ONE_ROW, cardId);
@@ -86,7 +86,7 @@ public class CardSwipe extends VoltProcedure {
 
         // Exit
         if (activity_code == ACTIVITY_EXIT) {
-            voltQueueSQL(insertActivity, cardId, ts, stationId, activity_code, 0, ACTIVITY_ACCEPTED);
+            voltQueueSQL(insertActivity, cardId, tsl, stationId, activity_code, 0, ACTIVITY_ACCEPTED);
             voltExecuteSQL(true);
             return buildResult(1, "");
         }
@@ -112,6 +112,7 @@ public class CardSwipe extends VoltProcedure {
         stationInfo.advanceRow();
         int fare = (int)stationInfo.getLong(0);
         String stationName = stationInfo.getString(1);
+        TimestampType ts = new TimestampType(tsl);
 
         // if card is disabled
         if (enabled == 0) {
