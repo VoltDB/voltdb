@@ -17,6 +17,11 @@
 
 package org.voltdb.utils;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
+
 import org.voltdb.common.Constants;
 
 /**
@@ -113,6 +118,64 @@ public class Encoder {
             return false;
         }
         return true;
+    }
+
+    public static String compressAndBase64Encode(String string) {
+        try {
+            byte[] inBytes = string.getBytes(Constants.UTF8ENCODING);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream((int)(string.length() * 0.7));
+            DeflaterOutputStream dos = new DeflaterOutputStream(baos);
+            dos.write(inBytes);
+            dos.close();
+            byte[] outBytes = baos.toByteArray();
+            return Base64.encodeToString(outBytes, false);
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String compressAndBase64Encode(byte[] bytes) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(bytes.length);
+            DeflaterOutputStream dos = new DeflaterOutputStream(baos);
+            dos.write(bytes);
+            dos.close();
+            byte[] outBytes = baos.toByteArray();
+            return Base64.encodeToString(outBytes, false);
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String decodeBase64AndDecompress(String string) {
+        if (string.length() == 0) {
+            return "";
+        }
+        byte bytes[] = decodeBase64AndDecompressToBytes(string);
+        return new String(bytes, Constants.UTF8ENCODING);
+    }
+
+    public static byte[] decodeBase64AndDecompressToBytes(String string) {
+        byte bytes[] = Base64.decodeFast(string);
+        if (string.length() == 0) {
+            return new byte[0];
+        }
+        ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+        InflaterInputStream dis = new InflaterInputStream(bais);
+
+        byte buffer[] = new byte[1024 * 8];
+        int length = 0;
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try {
+            while ( (length = dis.read( buffer )) >= 0) {
+                baos.write(buffer, 0, length);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return baos.toByteArray();
     }
 
     public static String base64Encode(String string) {
