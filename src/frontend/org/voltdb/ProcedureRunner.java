@@ -336,11 +336,7 @@ public class ProcedureRunner {
         Object[] paramList = paramListIn;
 
         // reset the hash of results for a new call
-        if (m_systemProcedureContext != null) {
-            m_determinismHash.reset(m_systemProcedureContext.getCatalogVersion());
-        } else {
-            m_determinismHash.reset(0);
-        }
+        m_determinismHash.reset(m_site.getSystemProcedureExecutionContext().getCatalogVersion());
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
