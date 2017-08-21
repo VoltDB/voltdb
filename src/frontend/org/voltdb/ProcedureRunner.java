@@ -335,7 +335,7 @@ public class ProcedureRunner {
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
 
-        // reset the hash of results for a new call
+        // catalog version and statement count are part of the CRC, reset them for a new call
         m_determinismHash.reset(m_site.getSystemProcedureExecutionContext().getCatalogVersion());
 
         ClientResponseImpl retval = null;
