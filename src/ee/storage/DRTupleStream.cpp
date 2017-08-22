@@ -625,9 +625,10 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
         ReferenceSerializeInputBE input(payloads.data(), 8);
         int oldPartitionCnt = input.readInt();
         if (m_partitionId >= oldPartitionCnt && m_partitionId != 16383) {
-            // Hack change the event to a StreamStart
-            ByteArray emptyBuff = ByteArray(payloads.data(), 0);
-            writeEventData(DR_STREAM_START, emptyBuff);
+            // Hack change the event to a DR_STREAM_START with isNewStreamForElasticAdd set to true
+            ByteArray flagBuf = ByteArray(1);
+            flagBuf[0] = 1;
+            writeEventData(DR_STREAM_START, flagBuf);
         }
         else {
             writeEventData(type, payloads);
