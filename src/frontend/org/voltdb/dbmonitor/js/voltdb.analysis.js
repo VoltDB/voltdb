@@ -341,16 +341,14 @@ function loadAnalysisPage(){
              if(statementList.length > 0){
                 for(var u=0; u< statementList.length; u++){
                      orderedDetails[statementList[u]].sort(function(a, b) {
-                          var nameA = a.TUPLE_COUNT; // ignore upper and lowercase
-                          var nameB = b.TUPLE_COUNT; // ignore upper and lowercase
+                          var nameA = a.TUPLE_COUNT;
+                          var nameB = b.TUPLE_COUNT;
                           if (nameA > nameB) {
                             return -1;
                           }
                           if (nameA < nameB) {
                             return 1;
                           }
-
-                          // names must be equal
                           return 0;
                     });
                 }

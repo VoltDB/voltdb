@@ -907,6 +907,15 @@
 
                     trowEnter2.append("td")
                     .html(VoltDbAnalysis.tablePropertyValue[d.data.x].PARTITION_TYPE);
+
+                     var trowEnter3 = tbodyEnter
+                    .append("tr");
+                    
+                    trowEnter3.append("td")
+                    .html("Partition ID")
+
+                    trowEnter3.append("td")
+                    .html(d.data.PARTITION_ID);
                 }
 
                 var html = table.node().outerHTML;
