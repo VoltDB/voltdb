@@ -20,6 +20,8 @@ package org.voltdb.calciteadapter.rel;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -47,19 +49,17 @@ public class VoltDBTableSeqScan extends AbstractVoltDBTableScan implements VoltD
           super(cluster, table, voltDBTable, program, limit, offset);
     }
 
-    /**
-     * The digest needs to be updated because Calcite considers any two nodes with the same digest
-     * to be identical.
-     */
-    @Override
-    protected String computeDigest() {
-        String dg = super.computeDigest();
-        return dg;
+    @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
+            RelMetadataQuery mq) {
+        double dRows = estimateRowCount(mq);
+        double dCpu = dRows + 1; // ensure non-zero cost
+        double dIo = 0;
+        return planner.getCostFactory().makeCost(dRows, dCpu, dIo);
     }
 
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
-        return super.estimateRowCount(mq) * 2;
+        return AbstractVoltDBTableScan.MAX_TABLE_ROW_COUNT;
     }
 
     @Override

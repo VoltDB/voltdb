@@ -45,6 +45,8 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 
 public abstract class AbstractVoltDBTableScan extends TableScan implements VoltDBRel {
 
+    public static final int MAX_TABLE_ROW_COUNT = 1000000;
+
     protected final VoltDBTable m_voltDBTable;
     protected final RexProgram m_program;
 
@@ -250,6 +252,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan implements VoltD
                     indexScan.getVoltDBTable(),
                     newProgram,
                     indexScan.getIndex(),
+                    indexScan.getAccessPath(),
                     indexScan.m_limit,
                     indexScan.m_offset);
         }

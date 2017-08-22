@@ -14,6 +14,9 @@ create table RI1 (
 );
 CREATE INDEX RI1_IND2 ON RI1 (bi, si);
 CREATE INDEX RI1_IND1 ON RI1 (ti);
+CREATE INDEX RI1_IND3_EXPR ON RI1 (ti + 1);
+CREATE INDEX RI1_IND3_EXPR_PART ON RI1 (ti + 1) WHERE si is NULL;
+CREATE INDEX RI1_IND4_PART ON RI1 (si) WHERE tI * 2 > 10;
 
 create table R2 (
     i integer,
@@ -22,6 +25,17 @@ create table R2 (
     bi bigint,
     f float not null,
     v varchar(32));
+
+create table RI2 (
+    i integer PRIMARY KEY,
+    si smallint,
+    bi bigint,
+    ti tinyint
+);
+CREATE INDEX RI2_IND2 ON RI2 (i, bi);
+CREATE INDEX RI2_IND1 ON RI2 (ti);
+CREATE INDEX RI2_IND3 ON RI2 (ti + i);
+CREATE INDEX RI2_IND4_HASH ON RI2 (ti + i);
 
 create table R3 (
     pk integer,

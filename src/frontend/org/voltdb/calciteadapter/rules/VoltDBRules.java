@@ -36,7 +36,7 @@ import org.voltdb.calciteadapter.rules.rel.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBCalcSendPullUpRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBJoinSendPullUpRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBProjectScanMergeRule;
-import org.voltdb.calciteadapter.rules.rel.VoltDBSeqToIndexScans;
+import org.voltdb.calciteadapter.rules.rel.VoltDBSeqToIndexScansRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSortIndexScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.VoltDBSortSeqScanMergeRule;
 import org.voltdb.calciteadapter.rules.rel.calcite.SortProjectTransposeRule;
@@ -77,7 +77,7 @@ public class VoltDBRules {
         Program program1 = Programs.ofRules(
                 VoltDBSortIndexScanMergeRule.INSTANCE
                 , VoltDBSortSeqScanMergeRule.INSTANCE
-                , VoltDBSeqToIndexScans.INSTANCE
+                , VoltDBSeqToIndexScansRule.INSTANCE
                 , VoltDBProjectScanMergeRule.INSTANCE
                 );
 

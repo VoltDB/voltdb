@@ -39,6 +39,7 @@ import org.apache.calcite.sql.type.IntervalSqlType;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
@@ -74,21 +75,31 @@ public class RexConverter {
             m_numLhsFieldsForJoin = numLhsFields;
         }
 
-        @Override
-        public TupleValueExpression visitInputRef(RexInputRef inputRef) {
-            int index = inputRef.getIndex();
+        protected TupleValueExpression visitInputRef(RexInputRef inputRef, String tableName, String columnName) {
+            int columnIndex = inputRef.getIndex();
             int tableIndex = 0;
-
-            if (m_numLhsFieldsForJoin >= 0 && index >= m_numLhsFieldsForJoin) {
-                index -= m_numLhsFieldsForJoin;
+            if (m_numLhsFieldsForJoin >= 0 && columnIndex >= m_numLhsFieldsForJoin) {
+                columnIndex -= m_numLhsFieldsForJoin;
                 tableIndex = 1;
             }
 
+            if (tableName == null) {
+                tableName = "";
+            }
+            if (columnName == null) {
+                // Generate a column name out of its index in the original table 1 -> "001"
+                columnName = String.format("%03d", columnIndex);
+            }
 
-            TupleValueExpression tve = new TupleValueExpression("", "", "", "", index, index);
+            TupleValueExpression tve = new TupleValueExpression(tableName, tableName, columnName, columnName, columnIndex, columnIndex);
             tve.setTableIndex(tableIndex);
             TypeConverter.setType(tve, inputRef.getType());
             return tve;
+        }
+
+        @Override
+        public TupleValueExpression visitInputRef(RexInputRef inputRef) {
+            return visitInputRef(inputRef, null, null);
         }
 
         @Override
@@ -306,6 +317,41 @@ public class RexConverter {
 
     }
 
+    private static class RefExpressionConvertingVisitor extends ConvertingVisitor {
+
+        private List<RexNode> m_exprList = null;
+        private List<Column> m_catColumns = null;
+        private String m_catTableName = "";
+
+        public RefExpressionConvertingVisitor(String catTableName, List<Column> catColumns, List<RexNode> exprList) {
+            super();
+            m_catTableName = catTableName;
+            m_catColumns = catColumns;
+            m_exprList = exprList;
+        }
+
+        @Override
+        public AbstractExpression visitLocalRef(RexLocalRef localRef) {
+            assert(m_exprList != null);
+            int exprIndx = localRef.getIndex();
+            assert(exprIndx < m_exprList.size());
+            RexNode expr = m_exprList.get(exprIndx);
+            return expr.accept(this);
+        }
+
+        @Override
+        public TupleValueExpression visitInputRef(RexInputRef inputRef) {
+            int index = inputRef.getIndex();
+
+            String columnName = null;
+            if (m_catColumns != null && index < m_catColumns.size()) {
+                columnName = m_catColumns.get(index).getTypeName();
+            }
+
+            return visitInputRef(inputRef, m_catTableName, columnName);
+        }
+    }
+
     public static NodeSchema convertToVoltDBNodeSchema(RexProgram program) {
         NodeSchema newNodeSchema = new NodeSchema();
         int i = 0;
@@ -361,6 +407,23 @@ public class RexConverter {
         }
 
         return nodeSchema;
+    }
+
+    /**
+     * Given a conditional RexNodes representing reference expressions ($1 > $2) converts it into
+     * a corresponding TVE
+     *
+     * @param catTableName a catalog table name
+     * @param catColumns column name list
+     * @param condition RexNode to be converted
+     * @param exprs individual Columns expressions
+     * @return
+     */
+    public static AbstractExpression convertRefExpression(
+            String catTableName, List<Column> catColumns, RexNode condition, List<RexNode> exprs) {
+        AbstractExpression ae = condition.accept(new RefExpressionConvertingVisitor(catTableName, catColumns, exprs));
+        assert ae != null;
+        return ae;
     }
 
 }

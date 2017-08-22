@@ -361,7 +361,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         // This is a select from a single table
         joinNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(joinNode.getTableScan(),
-                joinNode.m_joinInnerList, joinNode.m_whereInnerList, null));
+                joinNode.m_joinInnerList, joinNode.m_whereInnerList, null, m_parsedStmt));
     }
 
     /**
@@ -398,7 +398,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         outerChildNode.m_accessPaths.addAll(
                 getRelevantAccessPathsForTable(outerChildNode.getTableScan(),
-                        joinOuterList, parentWhereList, null));
+                        joinOuterList, parentWhereList, null, m_parsedStmt));
     }
 
     /**
@@ -446,7 +446,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(innerTable != null);
         innerChildNode.m_accessPaths.addAll(
                 getRelevantAccessPathsForTable(innerTable,
-                        parentNode.m_joinInnerOuterList, filterExprs, postExprs));
+                        parentNode.m_joinInnerOuterList, filterExprs, postExprs, m_parsedStmt));
 
         // If there are inner expressions AND inner-outer expressions, it could be that there
         // are indexed access paths that use elements of both in the indexing expressions,
@@ -505,7 +505,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
             Collection<AccessPath>
             nljAccessPaths = getRelevantAccessPathsForTable(
-                    innerTable, null, filterExprs, postExprs);
+                    innerTable, null, filterExprs, postExprs, m_parsedStmt);
 
             innerChildNode.m_accessPaths.clear();
             innerChildNode.m_accessPaths.addAll(nljAccessPaths);

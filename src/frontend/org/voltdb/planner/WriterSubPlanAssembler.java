@@ -82,7 +82,8 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.getTableScan(),
                     null,
                     tableNode.m_whereInnerList,
-                    null));
+                    null,
+                    m_parsedStmt));
 
             for (AccessPath path : tableNode.m_accessPaths) {
                 tableNode.m_currentAccessPath = path;

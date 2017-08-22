@@ -17,18 +17,25 @@
 
 package org.voltdb.calciteadapter.rules.rel;
 
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.calciteadapter.rel.VoltDBTableIndexScan;
 import org.voltdb.calciteadapter.rel.VoltDBTableSeqScan;
+import org.voltdb.calciteadapter.voltdb.IndexUtils;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.Table;
+import org.voltdb.planner.AccessPath;
+import org.voltdb.utils.CatalogUtil;
 
-public class VoltDBSeqToIndexScans extends RelOptRule {
+public class VoltDBSeqToIndexScansRule extends RelOptRule {
 
-    public static final VoltDBSeqToIndexScans INSTANCE = new VoltDBSeqToIndexScans();
+    public static final VoltDBSeqToIndexScansRule INSTANCE = new VoltDBSeqToIndexScansRule();
 
-    private VoltDBSeqToIndexScans() {
+    private VoltDBSeqToIndexScansRule() {
         super(operand(VoltDBTableSeqScan.class, none()));
     }
 
@@ -45,17 +52,25 @@ public class VoltDBSeqToIndexScans extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         VoltDBTableSeqScan seqScan = call.rel(0);
 
+        Table catTableable = seqScan.getVoltDBTable().getCatTable();
+        List<Column> columns = CatalogUtil.getSortedCatalogItems(catTableable.getColumns(), "index");
+
         for (Index index : seqScan.getVoltDBTable().getCatTable().getIndexes()) {
-            // @TODO filter indexes based on a program data
-            VoltDBTableIndexScan indexScan = new VoltDBTableIndexScan(
-                    seqScan.getCluster(),
-                    seqScan.getTable(),
-                    seqScan.getVoltDBTable(),
-                    seqScan.getProgram(),
-                    index,
-                    seqScan.getLimitRexNode(),
-                    seqScan.getOffsetRexNode());
-            call.transformTo(indexScan);
+            AccessPath accessPath = IndexUtils.getCalciteRelevantAccessPathForIndex(catTableable, columns, seqScan.getProgram(), index);
+
+            // @TODO Adjust program based on the access path "other" filters
+            if (accessPath != null) {
+                VoltDBTableIndexScan indexScan = new VoltDBTableIndexScan(
+                        seqScan.getCluster(),
+                        seqScan.getTable(),
+                        seqScan.getVoltDBTable(),
+                        seqScan.getProgram(),
+                        index,
+                        accessPath,
+                        seqScan.getLimitRexNode(),
+                        seqScan.getOffsetRexNode());
+                call.transformTo(indexScan);
+            }
         }
     }
 

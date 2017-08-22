@@ -133,4 +133,20 @@ public class AccessPath {
         assert(false);
         return "";
     }
+
+    public IndexLookupType getIndexLookupType() {
+        return lookupType;
+    }
+
+    public List<AbstractExpression> getIndexExpressions() {
+        return indexExprs;
+    }
+
+    public List<AbstractExpression> getEndExpressions() {
+        return endExprs;
+    }
+
+    public List<AbstractExpression> getEliminatedPostExpressions() {
+        return eliminatedPostExprs;
+    }
 }

@@ -17,10 +17,13 @@
 
 package org.voltdb.calciteadapter.rules.rel;
 
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rex.RexNode;
@@ -58,9 +61,23 @@ public class VoltDBSortIndexScanMergeRule extends RelOptRule {
     }
 
     private boolean areCollationsCompartible(RelCollation scanCollation, RelCollation sortCollation) {
-      return sortCollation == RelCollations.EMPTY ||
-              (scanCollation.getFieldCollations().size() == sortCollation.getFieldCollations().size()
-              && sortCollation.satisfies(scanCollation));
+        if (sortCollation == RelCollations.EMPTY) {
+            return true;
+        }
+        List<RelFieldCollation> sortCollationFields = sortCollation.getFieldCollations();
+        List<RelFieldCollation> scanCollationFields = scanCollation.getFieldCollations();
+        if (scanCollationFields.size() < sortCollationFields.size()) {
+            return false;
+        }
+        for (int i = 0; i < sortCollationFields.size(); ++i) {
+            if (!sortCollationFields.get(i).equals(scanCollationFields.get(i))){
+                return false;
+            }
+        }
+        return true;
+//        return sortCollation == RelCollations.EMPTY ||
+//              (scanCollation.getFieldCollations().size() == sortCollation.getFieldCollations().size()
+//              && sortCollation.satisfies(scanCollation));
   }
 
 }
