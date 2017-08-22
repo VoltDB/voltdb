@@ -93,6 +93,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     /** Create a ByteBuffer (in a container) for serializing arguments to C++. Use a direct
     ByteBuffer as it will be passed directly to the C++ code. */
     // This matches MAX_UDF_BUFFER_SIZE in VoltDBEngine.h
+    // It does not limit the maximum size of the UDF buffer / parameter set buffer we can allocate,
+    // this is the maximum size of the buffer that we can persist without shrinking it at appropriate time.
     private static final int MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50MB
     private BBContainer m_psetBufferC = null;
     private ByteBuffer m_psetBuffer = null;
