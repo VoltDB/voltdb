@@ -55,17 +55,6 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                      new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
                                              PlanNodeType.PROJECTION,
                                              PlanNodeType.INSERT));
-        // Recursive insert, sequential scan, we can inline.
-        validatePlan("INSERT INTO T2 SELECT * from T2;",
-                2,
-                PlanNodeType.SEND,
-                PlanNodeType.LIMIT,
-                PlanNodeType.RECEIVE,
-                PlanNodeType.INVALID,
-                PlanNodeType.SEND,
-                new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
-                                        PlanNodeType.PROJECTION,
-                                        PlanNodeType.INSERT));
         validatePlan("INSERT INTO T2 SELECT * from T1;",
                      2,
                      PlanNodeType.SEND,
@@ -93,17 +82,6 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                      new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
                                              PlanNodeType.INSERT,
                                              PlanNodeType.PROJECTION));
-        // Recursive insert, sequential scan, we can inline.
-        validatePlan("INSERT INTO P2 SELECT * from P2;",
-                2,
-                PlanNodeType.SEND,
-                PlanNodeType.AGGREGATE,
-                PlanNodeType.RECEIVE,
-                PlanNodeType.INVALID,
-                PlanNodeType.SEND,
-                new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
-                                        PlanNodeType.INSERT,
-                                        PlanNodeType.PROJECTION));
         validatePlan("INSERT INTO P2 SELECT * from P1;",
                      2,
                      PlanNodeType.SEND,
@@ -184,7 +162,27 @@ public class TestPlansInsertIntoSelect extends PlannerTestCase {
                                              PlanNodeType.PARTIALAGGREGATE,
                                              PlanNodeType.PROJECTION));
 
-        // Recursive insert, index scan, cannot inline.
+        // Recursive insert, sequential scan, cannot inline (ENG-13036).
+        validatePlan("INSERT INTO T2 SELECT * from T2;",
+                2,
+                PlanNodeType.SEND,
+                PlanNodeType.LIMIT,
+                PlanNodeType.RECEIVE,
+                PlanNodeType.INVALID,
+                PlanNodeType.SEND,
+                PlanNodeType.INSERT,
+                PlanNodeType.SEQSCAN);
+        validatePlan("INSERT INTO P2 SELECT * from P2;",
+                2,
+                PlanNodeType.SEND,
+                PlanNodeType.AGGREGATE,
+                PlanNodeType.RECEIVE,
+                PlanNodeType.INVALID,
+                PlanNodeType.SEND,
+                PlanNodeType.INSERT,
+                PlanNodeType.SEQSCAN);
+
+        // Recursive insert, index scan, cannot inline (ENG-13036).
         validatePlan("INSERT INTO T1 SELECT * from T1;",
                 2,
                 PlanNodeType.SEND,

@@ -19,7 +19,6 @@ package org.voltdb.planner.microoptimizations;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ScanPlanNodeWhichCanHaveInlineInsert;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 
 public class MakeInsertNodesInlineIfPossible extends MicroOptimization {
@@ -56,9 +55,8 @@ public class MakeInsertNodesInlineIfPossible extends MicroOptimization {
                  && ! targetNode.hasInlineAggregateNode()
                  // If INSERT INTO and SELECT FROM have the same target table name,
                  // then it could be a recursive insert into select.
-                 // Currently, our index scan implementation cannot handle it well. (ENG-13036)
-                 && ! (targetNode.getTargetTableName().equalsIgnoreCase(insertNode.getTargetTableName())
-                         && targetNode instanceof IndexScanPlanNode) ) {
+                 // Currently, our scan executor implementations cannot handle it well. (ENG-13036)
+                 && ! targetNode.getTargetTableName().equalsIgnoreCase(insertNode.getTargetTableName()) ) {
                 AbstractPlanNode parent = (insertNode.getParentCount() > 0) ? insertNode.getParent(0) : null;
                 AbstractPlanNode abstractTargetNode = targetNode.getAbstractNode();
                 abstractTargetNode.addInlinePlanNode(insertNode);
