@@ -828,15 +828,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
 
-            //The message from a failed host could get here after duplicate counter is cleaned for a transaction via updateReplica.
-            //For example, a master coordinates a transaction and forwards the
-            //transaction to a replica. The host with the replica fails immediately after the replica sends a response to the master.
-            //the replica will be removed from the duplicate counter after the master detects the failure.
-            //Duplicated counter is clean now and a response to client is sent.
-            //The response from the failed replica then gets here. In this case, do not send the message to the master itself.
+            //Node failure case:
+            //Response message from a failed host could get here after duplicate counter is cleaned.
+            //Likely scenario: a master forwards a transaction to a replica which fails immediately after a response
+            //is sent to the master. The master detects the host failure and engages in the process of cleaning up
+            //duplicated counter, sends response back to client before it gets chance to process the response message from the replica.
+            //The response from the failed replica then gets here. The message should be dropped and not be forwarded to the initiator itself.
             if (message.getInitiatorHSId() != m_mailbox.getHSId()) {
                 m_mailbox.send(message.getInitiatorHSId(), message);
-            } else {
+            } else if (tmLog.isDebugEnabled()){
                 tmLog.debug("send message to itself on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
                         " repair truncation:" + TxnEgo.txnIdToString(message.getTxnId()));
             }
