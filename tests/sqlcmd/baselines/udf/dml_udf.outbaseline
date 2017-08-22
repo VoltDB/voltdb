@@ -12,11 +12,28 @@ create table t ( id integer not null primary key,
                );
 Command succeeded.
 
+--- Empty Class List -----------------------------------------
+
+
+
 load classes testfuncs.jar;
 Command succeeded.
 
+--- Non-Procedure Classes ------------------------------------
+ org.voltdb_testfuncs.UserDefinedTestFunctions                         
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UDF_TEST                
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UserDefinedTestException
+
+
+--- User-defined Functions -----------------------------------
+
+
 create function add2Bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+add2bigint          scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint
+
 
 insert into t (id, b) values (1, add2Bigint(10, 1));
 (Returned 1 rows in #.##s)
@@ -93,3 +110,13 @@ ID  B
 
 drop function add2Bigint;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+

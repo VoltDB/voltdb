@@ -43,11 +43,28 @@ insert into t values (2, 2, 20, 200, 2000, 2.2, 20.2,
                      );
 (Returned 1 rows in #.##s)
 
+--- Empty Class List -----------------------------------------
+
+
+
 load classes testfuncs.jar;
 Command succeeded.
 
+--- Non-Procedure Classes ------------------------------------
+ org.voltdb_testfuncs.UserDefinedTestFunctions                         
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UDF_TEST                
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UserDefinedTestException
+
+
+--- User-defined Functions -----------------------------------
+
+
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint
+
 
 select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by n;
 ID  I            B                     C4           C5 
@@ -76,3 +93,13 @@ ID  I            B                     C4                   C5
 
 drop function changingUdf;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+

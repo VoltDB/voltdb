@@ -1,7 +1,11 @@
 file scripts/udf/udf_ddl.sqlfile
+show classes;
 load classes testfuncs.jar;
+show classes;
 
+show functions;
 create function add2Bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
+show functions;
 
 insert into t (id, b) values (1, add2Bigint(10, 1));
 insert into t (id, b) values (2, add2Bigint(10, 1));
@@ -24,3 +28,7 @@ delete from t where id < add2Bigint(2, 3);
 select id, b from t order by id;
 
 drop function add2Bigint;
+show functions;
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+show classes;

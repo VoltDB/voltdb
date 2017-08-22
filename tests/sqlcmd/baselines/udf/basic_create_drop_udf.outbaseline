@@ -43,15 +43,32 @@ insert into t values (2, 2, 20, 200, 2000, 2.2, 20.2,
                      );
 (Returned 1 rows in #.##s)
 
+--- Empty Class List -----------------------------------------
+
+
+
 load classes testfuncs.jar;
 Command succeeded.
 
+--- Non-Procedure Classes ------------------------------------
+ org.voltdb_testfuncs.UserDefinedTestFunctions                         
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UDF_TEST                
+ org.voltdb_testfuncs.UserDefinedTestFunctions$UserDefinedTestException
+
+
 FILE scripts/udf/udf_create_drop_select.sqlfile
+
+--- User-defined Functions -----------------------------------
+
 
 select id, n, s, changingUdf(n, s), changingUdf(9, 90) from T order by id;
 
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Tinyint;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Tinyint
+
 
 select id, n, s, changingUdf(n, s), changingUdf(3, 30) from T where abs(s) < 129 order by id;
 ID  N     S   C4    C5 
@@ -70,6 +87,10 @@ select id, n, s, changingUdf(n, s), changingUdf(9, 91) from T where abs(s) < 129
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2TinyintBoxed;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2TinyintBoxed
+
+
 select id, n, s, changingUdf(n, s), changingUdf(3, 30) from T where abs(s) < 129 order by id;
 ID  N     S   C4    C5 
 --- ----- --- ----- ---
@@ -84,6 +105,10 @@ Command succeeded.
 
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Smallint;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Smallint
+
 
 select id, n, s, changingUdf(n, s), changingUdf(3, 30) from T order by id;
 ID  N     S       C4    C5 
@@ -102,6 +127,10 @@ Command succeeded.
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2SmallintBoxed;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2SmallintBoxed
+
+
 select id, n, s, changingUdf(n, s), changingUdf(3, 30) from T order by id;
 ID  N     S       C4    C5 
 --- ----- ------- ----- ---
@@ -119,6 +148,10 @@ Command succeeded.
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Integer;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Integer
+
+
 select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T where abs(b) < 2147483649 order by id;
 ID  I            B     C4    C5 
 --- ------------ ----- ----- ---
@@ -134,6 +167,10 @@ Command succeeded.
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2IntegerBoxed;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2IntegerBoxed
+
+
 select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T where abs(b) < 2147483649 order by id;
 ID  I            B     C4    C5 
 --- ------------ ----- ----- ---
@@ -148,6 +185,10 @@ Command succeeded.
 
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint
+
 
 select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by id;
 ID  I            B                     C4           C5 
@@ -165,6 +206,10 @@ Command succeeded.
 
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2BigintBoxed;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2BigintBoxed
+
 
 select id, i, b, changingUdf(i, b), changingUdf(3, 30) from T order by id;
 ID  I            B                     C4           C5 
@@ -187,6 +232,10 @@ Command succeeded.
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Float;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Float
+
+
 select id, f, d, changingUdf(f, f), changingUdf(f, d), changingUdf(3.1, 30.2) from T where abs(d) < 40000000000000000000000000 order by id;
 ID  F          D                C4                        C5         C6   
 --- ---------- ---------------- ------------------------- ---------- -----
@@ -202,6 +251,10 @@ Command succeeded.
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2FloatBoxed;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2FloatBoxed
+
+
 select id, f, d, changingUdf(f, f), changingUdf(f, d), changingUdf(3.1, 30.2) from T where abs(d) < 40000000000000000000000000 order by id;
 ID  F          D                C4                        C5         C6   
 --- ---------- ---------------- ------------------------- ---------- -----
@@ -216,6 +269,10 @@ Command succeeded.
 
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Decimal;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Decimal
+
 
 select id, f, d, changingUdf(f, d), changingUdf(d, d), changingUdf(3.1, 30.2) from T order by id;
 ID  F          D                                         C4                                        C5                                         C6              
@@ -233,6 +290,10 @@ Command succeeded.
 
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varchar;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varchar
+
 
 select id, v1, v2, changingUdf(v1, v2), changingUdf('Foo', 'Bar') from T order by id;
 ID  V1    V2    C4      C5     
@@ -265,6 +326,10 @@ Command succeeded.
 
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.concat3Varchar;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.concat3Varchar
+
 
 select id, v1, v2, changingUdf(v1, ' & ', v2), changingUdf('Foo', ' & ', 'Bar') from T order by id;
 ID  V1    V2    C4         C5        
@@ -300,6 +365,10 @@ Command succeeded.
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.concat4Varchar;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.concat4Varchar
+
+
 select id, v1, v2, changingUdf(v1, ' & ', v2, '.'), changingUdf('Foo', ' & ', 'Bar', '.') from T order by id;
 ID  V1    V2    C4          C5         
 --- ----- ----- ----------- -----------
@@ -334,6 +403,10 @@ Command succeeded.
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varbinary;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2Varbinary
+
+
 select id, b1, b2, changingUdf(b1, b2), changingUdf(x'01', x'02') from T order by id;
 ID  B1        B2            C4            C5 
 --- --------- ------------- ------------- ---
@@ -353,6 +426,10 @@ Command succeeded.
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.addYearsToTimestamp;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.addYearsToTimestamp
+
+
 select id, t, n, changingUdf(t, n), changingUdf('2004-10-27 23:38:59', 3) from T order by id;
 ID  T                           N     C4                          C5                         
 --- --------------------------- ----- --------------------------- ---------------------------
@@ -369,6 +446,10 @@ Command succeeded.
 
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint;
 Command succeeded.
+
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.add2GeographyPoint
+
 
 select id, p1, p2, changingUdf(p1, p2), changingUdf(PointFromText('POINT(1 2)'), PointFromText('POINT(2 1)')) from T order by id;
 ID  P1               P2                 C4               C5              
@@ -387,6 +468,10 @@ Command succeeded.
 create function changingUdf from method org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+changingudf         scalar function     org.voltdb_testfuncs.UserDefinedTestFunctions.addGeographyPointToGeography
+
+
 select id, g, p1, changingUdf(g, p1), changingUdf(PolygonFromText('POLYGON((0 0, 2 0, 0 2, 0 0))'), PointFromText('POINT(1 1)')) from T order by id;
 ID  G                                               P1               C4                                              C5                                             
 --- ----------------------------------------------- ---------------- ----------------------------------------------- -----------------------------------------------
@@ -401,4 +486,14 @@ ID  G                                               P1               C4         
 drop function changingUdf;
 Command succeeded.
 
+--- User-defined Functions -----------------------------------
+
+
 select id, n, b, changingUdf(i, b), changingUdf(9, 99) from T order by id;
+
+remove classes org.voltdb_testfuncs.UserDefinedTestFunctions;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+
