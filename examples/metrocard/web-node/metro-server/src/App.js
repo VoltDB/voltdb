@@ -118,11 +118,22 @@ class App extends Component {
         callbackName: 'jsonp' // Important !
       });
 
+      // Get the card swipe acceptance rate
+      JSONP({
+        url: 'http://localhost:8080/api/1.0/',
+        data: { Procedure: 'GetCardAcceptanceRate' },
+        success: (data) => {
+          this.setState({ rate: data.results[0].data[0][0] });
+        },
+        error: (err) => { console.log(err); },
+        callbackName: 'jsonp' // Important !
+      });
+ 
       // Get the acceptance rate
       // TODO: change the fake acceptance rate here
-      this.setState({
-        rate: Math.random() * 100
-      });
+      //this.setState({
+        //rate: Math.random() * 100
+      //});
     }, 2000);
   }
 

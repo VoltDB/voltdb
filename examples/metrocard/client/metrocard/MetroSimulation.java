@@ -34,7 +34,6 @@ import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TreeMap;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -51,7 +50,7 @@ public class MetroSimulation {
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
-    private static final double FRAUD_RATIO = 0.02; // 2% fraud
+    private static final double FRAUD_RATIO = 0.50; // 2% fraud
 
     // validated command line configuration
     final MetroCardConfig config;
@@ -368,7 +367,7 @@ public class MetroSimulation {
                     // Entries at different stations in short interval
                     for (int i = 1; i <= 25; i++) {
                         records.add(generateRecord(card_id,
-                                                   atime + TimeUnit.SECONDS.toMillis(i),
+                                                   atime + i,
                                                    amt,
                                                    pickStation()));
                     }
@@ -376,7 +375,7 @@ public class MetroSimulation {
                     // Consecutive entries at same station in short interval
                     for (int i = 1; i <= 15; i++) {
                         records.add(generateRecord(card_id,
-                                                   atime + TimeUnit.SECONDS.toMillis(i),
+                                                   atime + i,
                                                    amt,
                                                    station_id));
                     }
