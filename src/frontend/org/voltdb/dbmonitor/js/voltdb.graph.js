@@ -696,9 +696,6 @@
             ChartDataTableAnalysis.update;
             getBarHeightAndSpacing(dataTable[0].values, ChartDataTableAnalysis);
             ChartDataTableAnalysis.height(barHeight);
-//            $("#chartDataTableAnalysis").css("height", barHeight + 50);
-//            ChartDataTableAnalysis.margin({"left": 50,"right": 40});
-
             VoltDbUI.isTotalProcessing = false;
             VoltDbUI.isLatency = false;
             VoltDbUI.isFrequency = false;
@@ -714,7 +711,6 @@
                 .attr("style", "cursor: pointer");
             d3.selectAll("#visualiseDataTable > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group > g.nv-bar > rect")
                 .style("fill", function(d, i){
-                    debugger;
                     var tableType = VoltDbAnalysis.tablePropertyValue[d.x].PARTITION_TYPE
                     return tableType != "Partitioned" ? "#14416d":"#1B87C8";
                 });

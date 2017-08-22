@@ -309,7 +309,6 @@ function loadAnalysisPage(){
                 }
             }
             MonitorGraphUI.initializeAnalysisTableGraph();
-            var tableData = [];
             var isReplicated = false;
             var isPartitioned = false;
             var timeStamp;
@@ -319,10 +318,10 @@ function loadAnalysisPage(){
             var partitionDetails = [];
             var orderedDetails = {};
 
-            VoltDbAnalysis.tableData = tableDetails["TABLES"];
              $.each(tableDetails["TABLES"], function(key, value){
                 var tableName = key;
-                var tupleCount = value["TUPLE_COUNT"];
+                var tupleCountTotal = value["TUPLE_COUNT"];
+                var partition_type = value["PARTITION_TYPE"]
                 timeStamp = value["TIMESTAMP"];
                 if(value["PARTITION_TYPE"] == "Partitioned"){
                     isPartitioned = true;
@@ -339,8 +338,15 @@ function loadAnalysisPage(){
                     statementList.push(tableName)
                }
 
-               $.each(value["PARTITIONS"], function(key, value){
-                orderedDetails[tableName].push({"PARTITION_ID" : value["partition_id"], "TABLE" : tableName, "TUPLE_COUNT": value["tupleCount"], "type": value["PARTITION_TYPE"], "TOTAL_TUPLE": tupleCount})
+               $.each(value["PARTITIONS"], function(key, value1){
+                var tupleCount = 0;
+                if(orderedDetails[tableName].length != 0 && value["PARTITION_TYPE"] != "Partitioned" ){
+                    tupleCount = 0;
+                }
+                else{
+                    tupleCount = value1["tupleCount"];
+                }
+                orderedDetails[tableName].push({"PARTITION_ID" : value1["partition_id"], "TABLE" : tableName, "TUPLE_COUNT": tupleCount, "type": partition_type, "TOTAL_TUPLE": tupleCountTotal})
                })
              });
 
