@@ -324,6 +324,12 @@ function loadAnalysisPage(){
                 var tableName = key;
                 var tupleCount = value["TUPLE_COUNT"];
                 timeStamp = value["TIMESTAMP"];
+                if(value["PARTITION_TYPE"] == "Partitioned"){
+                    isPartitioned = true;
+                } else {
+                    isReplicated = true;
+                }
+
                 VoltDbAnalysis.tablePropertyValue[tableName] = {
                     "PARTITION_TYPE": value["PARTITION_TYPE"]
                 }

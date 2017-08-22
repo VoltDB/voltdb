@@ -712,11 +712,12 @@
                 .call(ChartDataTableAnalysis);
             d3.selectAll("#visualiseDataTable .nv-barsWrap .nv-bar rect")
                 .attr("style", "cursor: pointer");
-//            d3.selectAll("#visualiseDataTable .nv-barsWrap .nv-bar rect")
-//                .style("fill", function(d, i){
-//                    var tableType = VoltDbAnalysis.tablePropertyValue[d.label].PARTITION_TYPE
-//                    return tableType != "Partitioned" ? "#14416d":"#1B87C8";
-//                });
+            d3.selectAll("#visualiseDataTable > g > g > g.nv-barsWrap.nvd3-svg > g > g > g > g.nv-group > g.nv-bar > rect")
+                .style("fill", function(d, i){
+                    debugger;
+                    var tableType = VoltDbAnalysis.tablePropertyValue[d.x].PARTITION_TYPE
+                    return tableType != "Partitioned" ? "#14416d":"#1B87C8";
+                });
             d3.select('#visualiseDataTable > g > g > g.nv-x.nv-axis.nvd3-svg > g > g').selectAll('text')
                 .each(function(d,i){ wordWrap(this, d, 110, -115, -6); });
         }
