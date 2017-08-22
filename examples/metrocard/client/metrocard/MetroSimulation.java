@@ -34,6 +34,8 @@ import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -48,6 +50,8 @@ public class MetroSimulation {
     public static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
+
+    private static final double FRAUD_RATIO = 0.02; // 2% fraud
 
     // validated command line configuration
     final MetroCardConfig config;
@@ -163,7 +167,7 @@ public class MetroSimulation {
                 ex.printStackTrace();
             }
         }
-        protected abstract ProducerRecord<String, String> getNextRecord();
+        protected abstract List<ProducerRecord<String, String>> getNextRecords();
 
         @Override
         public void run() {
@@ -173,10 +177,12 @@ public class MetroSimulation {
             }
             try {
                 while (m_currentCount < m_totalCount) {
-                    ProducerRecord<String, String> record = getNextRecord();
-                    if (record != null) {
-                        m_producer.send(record);
-                        m_currentCount++;
+                    List<ProducerRecord<String, String>> records = getNextRecords();
+                    if (records != null) {
+                        for (ProducerRecord<String, String> record : records) {
+                            m_producer.send(record);
+                            m_currentCount++;
+                        }
                     }
                     if (doEnd()) {
                         break;
@@ -243,7 +249,7 @@ public class MetroSimulation {
         }
 
         @Override
-        protected ProducerRecord<String, String> getNextRecord() {
+        protected List<ProducerRecord<String, String>> getNextRecords() {
             StringBuilder sb = new StringBuilder();
             long eventTime = startTime;
             sb.append(m_trainId).append(",")
@@ -274,7 +280,7 @@ public class MetroSimulation {
             } else {
                 lastState = 0;
             }
-            return rec;
+            return Collections.singletonList(rec);
         }
 
     }
@@ -328,7 +334,7 @@ public class MetroSimulation {
         }
 
         @Override
-        protected ProducerRecord<String, String> getNextRecord() {
+        protected List<ProducerRecord<String, String>> getNextRecords() {
             int card_id = -1;
             long atime;
             int amt = 0;
@@ -351,21 +357,54 @@ public class MetroSimulation {
                 break;
             }
             //Get a station.
+            int station_id = pickStation();
+
+            final List<ProducerRecord<String, String>> records = new ArrayList<>();
+            records.add(generateRecord(card_id, atime, amt, station_id));
+
+            // Generate fraudulent transactions 2% of the time
+            if (rand.nextDouble() <= FRAUD_RATIO) {
+                if (rand.nextBoolean()) {
+                    // Entries at different stations in short interval
+                    for (int i = 1; i <= 25; i++) {
+                        records.add(generateRecord(card_id,
+                                                   atime + TimeUnit.SECONDS.toMillis(i),
+                                                   amt,
+                                                   pickStation()));
+                    }
+                } else {
+                    // Consecutive entries at same station in short interval
+                    for (int i = 1; i <= 15; i++) {
+                        records.add(generateRecord(card_id,
+                                                   atime + TimeUnit.SECONDS.toMillis(i),
+                                                   amt,
+                                                   station_id));
+                    }
+                }
+            }
+
+            return records;
+        }
+
+        private ProducerRecord<String, String> generateRecord(int card_id, long atime, int amt, int station_id)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.append(Integer.valueOf(card_id)).append(",")
+              .append(Long.valueOf(atime * 1000)).append(",")
+              .append(Integer.valueOf(station_id)).append(",")
+              .append(Integer.valueOf(activity_code)).append(",")
+              .append(Integer.valueOf(amt));
+            return new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
+        }
+
+        private int pickStation() {
             int station_id;
             if (rand.nextInt(16) == 0) {
                 station_id = rand.nextInt(max_station_id) + 1; // sometimes pick a random station
             } else {
                 station_id = stations.next(); // pick a station based on the weights
             }
-            StringBuilder sb = new StringBuilder();
-            sb.append(Integer.valueOf(card_id)).append(",")
-                    .append(Long.valueOf(atime*1000)).append(",")
-                    .append(Integer.valueOf(station_id)).append(",")
-                    .append(Integer.valueOf(activity_code)).append(",")
-                    .append(Integer.valueOf(amt));
-            ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
-            //System.out.println(sb.toString());
-            return rec;
+            return station_id;
         }
     }
 
@@ -418,7 +457,7 @@ public class MetroSimulation {
         }
 
         @Override
-        protected ProducerRecord<String, String> getNextRecord() {
+        protected List<ProducerRecord<String, String>> getNextRecords() {
             long atime;
             int amt = 0;
             Integer card_id;
@@ -452,7 +491,7 @@ public class MetroSimulation {
                     .append(Integer.valueOf(amt));
             ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
             //System.out.println(sb.toString());
-            return rec;
+            return Collections.singletonList(rec);
         }
 
     }
@@ -506,7 +545,7 @@ public class MetroSimulation {
         }
 
         @Override
-        protected ProducerRecord<String, String> getNextRecord() {
+        protected List<ProducerRecord<String, String>> getNextRecords() {
             int card_id = -1;
             long atime;
             int amt = 0;
@@ -533,7 +572,7 @@ public class MetroSimulation {
                     .append(Integer.valueOf(amt));
             ProducerRecord<String, String> rec = new ProducerRecord<>(m_config.swipe, String.valueOf(card_id), sb.toString());
             //System.out.println(sb.toString());
-            return rec;
+            return Collections.singletonList(rec);
         }
     }
 
