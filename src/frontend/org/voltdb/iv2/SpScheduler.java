@@ -259,6 +259,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
 
+        //notify the new partition leader that the old leader has completed the Txns if needed.
+        if (!m_isLeader && m_mailbox instanceof InitiatorMailbox) {
+            ((InitiatorMailbox)m_mailbox).notifyNewLeaderOfTxnDoneIfNeeded();
+        }
+
         // Maintain the CI invariant that responses arrive in txnid order.
         Collections.sort(doneCounters);
         for (DuplicateCounterKey key : doneCounters) {
@@ -823,12 +828,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // this will be on SPI without k-safety or replica only with k-safety
             assert(!message.isReadOnly());
 
-            if (tmLog.isDebugEnabled() && message.getInitiatorHSId() == m_mailbox.getHSId()) {
-                tmLog.debug("Recursively send message to itself on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                        " repair truncation:" + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " message:\n" + message);
+            //The message from a failed host could get here after duplicate counter is cleaned for a transaction via updateReplica.
+            //For example, a master coordinates a transaction and forwards the
+            //transaction to a replica. The host with the replica fails immediately after the replica sends a response to the master.
+            //the replica will be removed from the duplicate counter after the master detects the failure.
+            //Duplicated counter is clean now and a response to client is sent.
+            //The response from the failed replica then gets here. In this case, do not send the message to the master itself.
+            if (message.getInitiatorHSId() != m_mailbox.getHSId()) {
+                m_mailbox.send(message.getInitiatorHSId(), message);
+            } else {
+                tmLog.debug("send message to itself on " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                        " repair truncation:" + TxnEgo.txnIdToString(message.getTxnId()));
             }
             setRepairLogTruncationHandle(spHandle, message.isForLeader());
-            m_mailbox.send(message.getInitiatorHSId(), message);
         }
 
         //notify the new partition leader that the old leader has completed the Txns if needed.
