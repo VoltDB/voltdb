@@ -59,8 +59,8 @@ function start_export_web() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -classpath $APPCLASSPATH procedures/metrocard/*.java
-    javac -classpath $APPCLASSPATH client/metrocard/*.java
+    javac -g -classpath $APPCLASSPATH procedures/metrocard/*.java
+    javac -g -classpath $APPCLASSPATH client/metrocard/*.java
     # build procedure and client jars
     jar cf metrocard-procs.jar -C procedures metrocard
     jar cf metrocard-client.jar -C client metrocard
@@ -124,8 +124,8 @@ function client() {
 # run the client that drives the example with some editable options
 function train() {
     jars-ifneeded
-    java -classpath metrocard-client.jar:$APPCLASSPATH metrocard.MetroSimulation \
-        --broker=localhost:9092 --count=1000000
+    java -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=9998 -classpath metrocard-client.jar:$APPCLASSPATH metrocard.MetroSimulation \
+        --broker=localhost:9092 --count=0
 }
 
 # generate metro cards

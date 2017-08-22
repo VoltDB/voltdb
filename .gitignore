@@ -87,3 +87,4 @@ build.gradle
 /build/lib/voltdb.war
 /tests/geb/vmc/.nb-gradle/
 /lib/python/vdm/tests/geb_vdm/.nb-gradle/
+/examples/metrocard/web-node/nbproject/private/

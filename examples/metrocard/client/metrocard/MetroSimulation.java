@@ -233,7 +233,7 @@ public class MetroSimulation {
             //Shift start time for each train by 1 min
             startTime = System.currentTimeMillis() + ((tcnt++ * 60) * 1000);
             System.out.println("Start time for train " + m_trainId + " Is: " + new Date(startTime));
-            endTime = startTime + 4*60*60*1000;
+            endTime = startTime + 2*60*60*1000;
             System.out.println("End time for train " + m_trainId + " Is: " + new Date(endTime));
         }
 
@@ -323,8 +323,8 @@ public class MetroSimulation {
             stations.add(203866,17);
             startTime = System.currentTimeMillis();
             swipeTime = startTime;
-            endTime = startTime + 4*60*60*1000;
-            System.out.println("End time for swipe enter Is: " + new Date(endTime));
+            endTime = startTime + 45*60*1000 + 60000;
+            System.out.println("End time for swipe ENTERY Is: " + new Date(endTime));
         }
 
         @Override
@@ -332,10 +332,18 @@ public class MetroSimulation {
             int card_id = -1;
             long atime;
             int amt = 0;
-            atime = swipeTime = System.currentTimeMillis() + 10000;
+            atime = swipeTime = System.currentTimeMillis() + 5000;
             while (card_id == -1) {
-                card_id = rand.nextInt(config.cardcount+1000); // use +1000 so sometimes we get an invalid card_id
+                card_id = rand.nextInt(config.cardcount); // use +1000 so sometimes we get an invalid card_id
                 if (cardsEntered.containsKey(card_id)) {
+                    if (cardsEntered.size() >= config.cardcount) {
+                        try {
+                            Thread.yield();
+                            Thread.sleep(10);
+                        } catch (InterruptedException ex) {
+                            return null;
+                        }
+                    }
                     card_id = -1;
                     continue;
                 }
@@ -381,7 +389,7 @@ public class MetroSimulation {
 
         @Override
         protected boolean doEnd() {
-            return (cardsEntered.isEmpty() || (endTime > startTime));
+            return close;
         }
 
         @Override
@@ -405,7 +413,7 @@ public class MetroSimulation {
             stations.add(203866,17);
             startTime = System.currentTimeMillis();
             swipeTime = startTime + 120000; // Exit time minimum after frst station.
-            endTime = startTime + 4*60*60*1000 + 60000;
+            endTime = startTime + 50*60*1000 + 60000;//1*60*60*1000 + 60000;
             System.out.println("End time for swipe EXIT Is: " + new Date(endTime));
         }
 
@@ -414,7 +422,14 @@ public class MetroSimulation {
             long atime;
             int amt = 0;
             Integer card_id;
-            if (cardsEntered.size() <= 0) return null;
+            if (cardsEntered.size() <= 0) {
+                try {
+                    Thread.sleep(5);
+                } catch (InterruptedException ex) {
+                    ;
+                }
+                return null;
+            }
 
             Integer arr[] = cardsEntered.keySet().toArray(new Integer[0]);
             card_id = arr[rand.nextInt(arr.length)];
@@ -549,7 +564,6 @@ public class MetroSimulation {
         }
         System.out.println("All Trains Started....");
         entry.join();
-        //No more entry so start exiting.
         exit.close = true;
         exit.join();
         replenish.close = true;

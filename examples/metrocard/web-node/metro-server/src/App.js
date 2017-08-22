@@ -17,7 +17,7 @@ class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      num: 1001, // total # of swipes
+      num: 0, // total # of swipes
       frauds: 0,  // detected frauds
       busiestStations: data, // busiest stations
       avgWaits: [], // the average wait times
@@ -61,7 +61,7 @@ class App extends Component {
 
       JSONP({
         url: 'http://localhost:8080/api/1.0/',
-        data: { Procedure: 'UpdateWaitTime' , Parameters: "[ '3000' ]" },
+        data: { Procedure: 'UpdateWaitTime' , Parameters: "[ '9000' ]" },
         error: (err) => { console.log(err); },
         callbackName: 'jsonp' // Important !
       });
