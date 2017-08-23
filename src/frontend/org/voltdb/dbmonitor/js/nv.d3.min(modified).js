@@ -618,6 +618,11 @@
                 }
                 var currentTime = d.value
 
+
+                if(d.series[0].key == "Tuple Count" && d.data.y == 0){
+                    return '';
+                }
+
                 if (d.series[0].key == "Avg Execution Time" || d.series[0].key == "Frequency Detail" || d.series[0].key == "Processing Time Detail")
                     {
                         if(d.data.label.indexOf(' ') != -1)

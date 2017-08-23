@@ -356,10 +356,10 @@ function loadAnalysisPage(){
                           var nameA = a.TUPLE_COUNT;
                           var nameB = b.TUPLE_COUNT;
                           if (nameA > nameB) {
-                            return -1;
+                            return 1;
                           }
                           if (nameA < nameB) {
-                            return 1;
+                            return -1;
                           }
                           return 0;
                     });
