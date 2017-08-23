@@ -422,8 +422,12 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             long elapsed = 0;
             while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < (timeoutSeconds)) {
                 resultMapByHost = cf.getNow(null);
+                hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
+                        + "The max timeout value is " + timeoutSeconds + " seconds.");
                 if (resultMapByHost != null) {
                     sw.stop();
+
+                    hostLog.info("get response from all nodes");
                     break;
                 }
 
@@ -432,8 +436,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     Thread.sleep(TimeUnit.MILLISECONDS.toMillis(100));
                     continue;
                 }
-                hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
-                        + "The max timeout value is " + timeoutSeconds + " seconds.");
+
                 Thread.sleep(TimeUnit.SECONDS.toMillis(5));
             }
         } catch (Exception e) {
@@ -444,7 +447,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         }
 
         if (resultMapByHost == null) {
-            err = "An invocation of procedure " + procedureName + " on all hosts returned null result or time out.";
+            err = "An invocation of procedure " + procedureName + " on all hosts timed out.";
             hostLog.info(err);
             return err;
         }
