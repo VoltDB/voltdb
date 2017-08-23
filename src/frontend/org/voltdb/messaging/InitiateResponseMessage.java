@@ -182,7 +182,7 @@ public class InitiateResponseMessage extends VoltMessage {
     }
 
     public boolean isMisrouted() {
-        return (m_response.getStatus() == ClientResponse.TXN_MISROUTED);
+        return (m_response != null && m_response.getStatus() == ClientResponse.TXN_MISROUTED);
     }
 
     public StoredProcedureInvocation getInvocation() {
