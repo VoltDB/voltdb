@@ -417,10 +417,12 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         String err;
 
         long timeoutSeconds = VerifyCatalogAndWriteJar.TIMEOUT;
+        hostLog.info("max time out setting for VerifyCatalogAndWriteJar is " + timeoutSeconds + " seconds");
         try {
             try {
                 resultMapByHost = cf.get(10, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
+                hostLog.info("Time out waiting for response for 10 seconds");
                 Stopwatch sw = Stopwatch.createStarted();
                 while (sw.elapsed(TimeUnit.SECONDS) < (timeoutSeconds - 10)) {
                     resultMapByHost = cf.getNow(null);
