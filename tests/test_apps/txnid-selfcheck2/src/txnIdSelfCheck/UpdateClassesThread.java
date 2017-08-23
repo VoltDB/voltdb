@@ -120,7 +120,7 @@ public class UpdateClassesThread extends BenchmarkThread {
                         break;
                     }
 
-                Thread.sleep(cycletime * 1000);
+                Thread.sleep(cycletime * 3000);
             }
             catch (ProcCallException e) {
                 ClientResponse cr = e.getClientResponse();
