@@ -22,9 +22,7 @@ import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -417,27 +415,31 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         String err;
 
         long timeoutSeconds = VerifyCatalogAndWriteJar.TIMEOUT;
-        hostLog.info("max time out setting for VerifyCatalogAndWriteJar is " + timeoutSeconds + " seconds");
+        hostLog.info("Max timeout setting for VerifyCatalogAndWriteJar is " + timeoutSeconds + " seconds");
+
         try {
-            try {
-                resultMapByHost = cf.get(10, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
-                hostLog.info("Time out waiting for response for 10 seconds");
-                Stopwatch sw = Stopwatch.createStarted();
-                while (sw.elapsed(TimeUnit.SECONDS) < (timeoutSeconds - 10)) {
-                    resultMapByHost = cf.getNow(null);
-                    if (resultMapByHost != null) {
-                        sw.stop();
-                        break;
-                    }
-                    hostLog.info((sw.elapsed(TimeUnit.SECONDS) + 10) + " seconds has elapsed but " + procedureName +
-                            " is still wait for remote response. The max timeout value is " + timeoutSeconds + " seconds.");
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(10));
+            Stopwatch sw = Stopwatch.createStarted();
+            long elapsed = 0;
+            while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < (timeoutSeconds)) {
+                resultMapByHost = cf.getNow(null);
+                if (resultMapByHost != null) {
+                    sw.stop();
+                    break;
                 }
+
+                if (elapsed < 5) {
+                    // do not log under 5 seconds and sleep for 100 milliseconds
+                    Thread.sleep(TimeUnit.MILLISECONDS.toMillis(100));
+                    continue;
+                }
+                hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
+                        + "The max timeout value is " + timeoutSeconds + " seconds.");
+                Thread.sleep(TimeUnit.SECONDS.toMillis(5));
             }
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (Exception e) {
+            e.printStackTrace();
             err = procedureName + " run everywhere call failed: " + e.getMessage();
-            hostLog.info(err);
+            hostLog.info(err + ", " + com.google.common.base.Throwables.getStackTraceAsString(e));
             return err;
         }
 
