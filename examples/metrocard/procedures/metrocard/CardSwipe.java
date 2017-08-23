@@ -164,36 +164,51 @@ public class CardSwipe extends VoltProcedure {
         }
     }
 
-    public final SQLStmt cardHistory = new SQLStmt(
+    public final SQLStmt cardHistoryAtStations = new SQLStmt(
         "SELECT activity_code, COUNT(DISTINCT station_id) AS stations " +
         "FROM activity " +
         "WHERE card_id = ? AND date_time >= DATEADD(HOUR, -1, ?) " +
         "GROUP BY activity_code;"
     );
 
-    public boolean isFraud(int cardId, TimestampType ts, int stationId) {
-        voltQueueSQL(cardHistory, cardId, ts);
-        final VoltTable cardHistoryTable = voltExecuteSQL()[0];
+    public final SQLStmt cardEntries = new SQLStmt(
+    "SELECT activity_code " +
+    "FROM activity " +
+    "WHERE card_id = ? AND station_id = ? AND date_time >= DATEADD(HOUR, -1, ?) " +
+    "ORDER BY date_time;"
+    );
 
-        byte prevActivity = ACTIVITY_INVALID;
-        int entranceCount = 0;
-        while (cardHistoryTable.advanceRow()) {
-            final byte activity_code = (byte) cardHistoryTable.getLong("activity_code");
-            final long stations = cardHistoryTable.getLong("stations");
+    public boolean isFraud(int cardId, TimestampType ts, int stationId) {
+        voltQueueSQL(cardHistoryAtStations, cardId, ts);
+        voltQueueSQL(cardEntries, cardId, stationId, ts);
+        final VoltTable[] results = voltExecuteSQL();
+        final VoltTable cardHistoryAtStationisTable = results[0];
+        final VoltTable cardEntriesTable = results[1];
+
+        while (cardHistoryAtStationisTable.advanceRow()) {
+            final byte activity_code = (byte) cardHistoryAtStationisTable.getLong("activity_code");
+            final long stations = cardHistoryAtStationisTable.getLong("stations");
 
             if (activity_code == ACTIVITY_ENTER) {
-                if (prevActivity == ACTIVITY_INVALID || prevActivity == ACTIVITY_ENTER) {
-                    entranceCount++;
-                }
-
-                // Is more than 20 entries at different stations in past hour?
-                if (stations >= 20) {
+                // Is more than 10 entries at different stations in past hour?
+                if (stations >= 5) {
                     return true;
                 }
             }
+        }
 
-            if (prevActivity == ACTIVITY_INVALID) {
-                prevActivity = activity_code;
+        byte prevActivity = ACTIVITY_INVALID;
+        int entranceCount = 0;
+        while (cardEntriesTable.advanceRow()) {
+            final byte activity_code = (byte) cardHistoryAtStationisTable.getLong("activity_code");
+
+            if (prevActivity == ACTIVITY_INVALID || prevActivity == activity_code) {
+                if (activity_code == ACTIVITY_ENTER) {
+                    prevActivity = activity_code;
+                    entranceCount++;
+                } else {
+                    prevActivity = ACTIVITY_INVALID;
+                }
             }
         }
 

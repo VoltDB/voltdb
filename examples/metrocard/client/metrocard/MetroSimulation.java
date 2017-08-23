@@ -50,7 +50,7 @@ public class MetroSimulation {
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
-    private static final double FRAUD_RATIO = 0.50; // 2% fraud
+    private static final double FRAUD_RATIO = 0.002; // 2% fraud
 
     // validated command line configuration
     final MetroCardConfig config;
@@ -369,7 +369,7 @@ public class MetroSimulation {
                         records.add(generateRecord(card_id,
                                                    atime + i,
                                                    amt,
-                                                   pickStation()));
+                                                   i % max_station_id));
                     }
                 } else {
                     // Consecutive entries at same station in short interval

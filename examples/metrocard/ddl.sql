@@ -168,6 +168,7 @@ SELECT
   accept,
   COUNT(*) AS cnt
 FROM activity
+WHERE activity_code = 1
 GROUP BY
   TRUNCATE(SECOND, date_time),
   accept;

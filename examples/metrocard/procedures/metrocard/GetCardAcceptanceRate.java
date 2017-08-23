@@ -31,7 +31,6 @@ public class GetCardAcceptanceRate extends VoltProcedure {
     public static final SQLStmt getLastSecondCounts = new SQLStmt(
     "SELECT accept, cnt " +
     "FROM secondly_card_acceptance_rate " +
-    "WHERE second >= DATEADD(SECOND, -1, NOW) " +
     "ORDER BY second DESC " +
     "LIMIT 2;"
     );
