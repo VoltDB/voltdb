@@ -601,6 +601,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         } finally {
             VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
         }
+
+        errMsg = "Failure to get response of @UpdateCore";
+        return cleanupAndMakeResponse(ClientResponseImpl.RESPONSE_UNKNOWN, errMsg);
     }
 
     protected void logCatalogUpdateInvocation(String procName) {
