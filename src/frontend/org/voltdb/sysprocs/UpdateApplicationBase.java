@@ -22,7 +22,6 @@ import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -417,30 +416,35 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         String err;
 
         long timeoutSeconds = VerifyCatalogAndWriteJar.TIMEOUT;
+        hostLog.info("Max timeout setting for VerifyCatalogAndWriteJar is " + timeoutSeconds + " seconds");
+
         try {
-            try {
-                resultMapByHost = cf.get(10, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
-                Stopwatch sw = Stopwatch.createStarted();
-                while (sw.elapsed(TimeUnit.SECONDS) < (timeoutSeconds - 10)) {
-                    resultMapByHost = cf.getNow(null);
-                    if (resultMapByHost != null) {
-                        sw.stop();
-                        break;
-                    }
-                    hostLog.info((sw.elapsed(TimeUnit.SECONDS) + 10) + " seconds has elapsed but " + procedureName +
-                            " is still wait for remote response. The max timeout value is " + timeoutSeconds + " seconds.");
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(10));
+            Stopwatch sw = Stopwatch.createStarted();
+            long elapsed = 0;
+            while ((elapsed = sw.elapsed(TimeUnit.SECONDS)) < (timeoutSeconds)) {
+                resultMapByHost = cf.getNow(null);
+                if (resultMapByHost != null) {
+                    sw.stop();
+                    break;
                 }
+
+                if (elapsed < 5) {
+                    // do not log under 5 seconds and sleep for 100 milliseconds
+                    Thread.sleep(100);
+                    continue;
+                }
+                hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
+                        + "The max timeout value is " + timeoutSeconds + " seconds.");
+                Thread.sleep(TimeUnit.SECONDS.toMillis(5));
             }
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (Exception e) {
             err = procedureName + " run everywhere call failed: " + e.getMessage();
-            hostLog.info(err);
+            hostLog.info(err + ", " + com.google.common.base.Throwables.getStackTraceAsString(e));
             return err;
         }
 
         if (resultMapByHost == null) {
-            err = "An invocation of procedure " + procedureName + " on all hosts returned null result or time out.";
+            err = "An invocation of procedure " + procedureName + " on all hosts timed out.";
             hostLog.info(err);
             return err;
         }
@@ -531,7 +535,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                     true, e);
         }
 
-
         // impossible to happen since we only allow catalog update sequentially
         if (VoltDB.instance().getCatalogContext().catalogVersion != ccr.expectedCatalogVersion) {
             errMsg = "Invalid catalog update.  Catalog or deployment change was planned " +
@@ -543,41 +546,59 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
         }
 
-        // write the new catalog to a temporary jar file
-        errMsg = verifyAndWriteCatalogJar(ccr);
-        if (errMsg != null) {
-            return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
-        }
-
-        // only copy the current catalog when @UpdateCore could fail
-        if (ccr.tablesThatMustBeEmpty.length != 0) {
-            try {
-                // read the current catalog bytes
-                byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
-                // write to the previous catalog bytes place holder
-                zk.setData(VoltZK.catalogbytesPrevious, data, -1);
-            } catch (KeeperException | InterruptedException e) {
-                errMsg = "error copying catalog bytes or write catalog bytes on ZK";
+        try {
+            // write the new catalog to a temporary jar file
+            errMsg = verifyAndWriteCatalogJar(ccr);
+            if (errMsg != null) {
                 return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
             }
-        }
-        long genId = getNextGenerationId();
 
-        // update the catalog jar
-        return callProcedure("@UpdateCore",
-                             ccr.encodedDiffCommands,
-                             ccr.expectedCatalogVersion,
-                             genId,
-                             ccr.catalogBytes,
-                             ccr.catalogHash,
-                             ccr.deploymentBytes,
-                             ccr.deploymentHash,
-                             ccr.tablesThatMustBeEmpty,
-                             ccr.reasonsForEmptyTables,
-                             ccr.requiresSnapshotIsolation ? 1 : 0,
-                             ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
-                             ccr.hasSchemaChange ?  1 : 0,
-                             ccr.requiresNewExportGeneration ? 1 : 0);
+            // only copy the current catalog when @UpdateCore could fail
+            if (ccr.tablesThatMustBeEmpty.length != 0) {
+                try {
+                    // read the current catalog bytes
+                    byte[] data = zk.getData(VoltZK.catalogbytes, false, null);
+                    // write to the previous catalog bytes place holder
+                    zk.setData(VoltZK.catalogbytesPrevious, data, -1);
+                } catch (KeeperException | InterruptedException e) {
+                    errMsg = "error copying catalog bytes or write catalog bytes on ZK";
+                    return cleanupAndMakeResponse(ClientResponseImpl.GRACEFUL_FAILURE, errMsg);
+                }
+            }
+
+            // MPI node may fail before receiving @UpdateCore invocation, this transactional procedure
+            // may never send out. However, we need to clean up the UAC ZK blocker anyway.
+            long genId = getNextGenerationId();
+            // update the catalog jar
+            CompletableFuture<ClientResponse> ft = callProcedure("@UpdateCore",
+                               ccr.encodedDiffCommands,
+                               ccr.expectedCatalogVersion,
+                               genId,
+                               ccr.catalogBytes,
+                               ccr.catalogHash,
+                               ccr.deploymentBytes,
+                               ccr.deploymentHash,
+                               ccr.tablesThatMustBeEmpty,
+                               ccr.reasonsForEmptyTables,
+                               ccr.requiresSnapshotIsolation ? 1 : 0,
+                               ccr.requireCatalogDiffCmdsApplyToEE ? 1 : 0,
+                               ccr.hasSchemaChange ?  1 : 0,
+                               ccr.requiresNewExportGeneration ? 1 : 0);
+            // wait for future to complete
+            ft.get(10, TimeUnit.SECONDS);
+            return ft;
+        } catch (TimeoutException e) {
+            errMsg = "Timed out waiting for response of @UpdateCore in 10 seconds";
+            hostLog.info(errMsg);
+            return cleanupAndMakeResponse(ClientResponseImpl.RESPONSE_UNKNOWN, errMsg);
+        } catch (Exception e) {
+            errMsg = "Unexpected error while running @UpdateCore, see details in log file.";
+            hostLog.info("Unexpected error while running @UpdateCore: " +
+                    com.google.common.base.Throwables.getStackTraceAsString(e));
+            return cleanupAndMakeResponse(ClientResponseImpl.RESPONSE_UNKNOWN, errMsg);
+        } finally {
+            VoltZK.removeCatalogUpdateBlocker(zk, VoltZK.uacActiveBlocker, hostLog);
+        }
     }
 
     protected void logCatalogUpdateInvocation(String procName) {

@@ -192,6 +192,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             String blockerError = VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker,
                                                                     REJOINLOG, "node rejoin");
             if (blockerError == null) {
+                sw.stop();
                 return;
             }
 
