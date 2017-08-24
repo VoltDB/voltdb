@@ -430,7 +430,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
 
                 if (elapsed < 5) {
                     // do not log under 5 seconds and sleep for 100 milliseconds
-                    Thread.sleep(TimeUnit.MILLISECONDS.toMillis(100));
+                    Thread.sleep(100);
                     continue;
                 }
                 hostLog.info(elapsed + " seconds has elapsed but " + procedureName + " is still wait for remote response."
@@ -438,7 +438,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 Thread.sleep(TimeUnit.SECONDS.toMillis(5));
             }
         } catch (Exception e) {
-            e.printStackTrace();
             err = procedureName + " run everywhere call failed: " + e.getMessage();
             hostLog.info(err + ", " + com.google.common.base.Throwables.getStackTraceAsString(e));
             return err;
@@ -593,7 +592,6 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             errMsg = "@UpdateCore gets timed out in 10 seconds: " + e.getMessage();
             hostLog.info(errMsg);
         } catch (Exception e) {
-            e.printStackTrace();
             errMsg = "Unexpected error running @UpdateCore: " + e.getMessage();
             hostLog.info(errMsg + ", stack trace: " +
                     com.google.common.base.Throwables.getStackTraceAsString(e));
